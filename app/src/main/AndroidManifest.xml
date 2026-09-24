@@ -1,15 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-
-    <application
-        android:allowBackup="true"
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING" />
+    <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
+    <application android:allowBackup="false" android:label="@string/app_name"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
-        android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.DavidsDeals" />
-
+        android:icon="@drawable/ic_app_info_blank" android:roundIcon="@drawable/ic_app_info_blank"
+        android:supportsRtl="true" android:theme="@style/Theme.Olive">
+        <activity android:name=".MainActivity" android:exported="false" android:screenOrientation="portrait" />
+        <activity-alias android:name=".OliveLauncher" android:targetActivity=".MainActivity"
+            android:exported="true" android:enabled="true" android:label="Olive"
+            android:icon="@drawable/ic_olive" android:roundIcon="@drawable/ic_olive">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".NewsLauncher" android:targetActivity=".MainActivity"
+            android:exported="true" android:enabled="false" android:label="Daily Digest"
+            android:icon="@drawable/ic_daily_digest" android:roundIcon="@drawable/ic_daily_digest">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".CalculatorLauncher" android:targetActivity=".MainActivity"
+            android:exported="true" android:enabled="false" android:label="Simple Calculator"
+            android:icon="@drawable/ic_calculator" android:roundIcon="@drawable/ic_calculator">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+    </application>
 </manifest>

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "807039247251",
+    "project_id": "olive-21239",
+    "storage_bucket": "olive-21239.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:807039247251:android:9a874438b11a179df07e66",
+        "android_client_info": {
+          "package_name": "com.olive.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBkud8SXwg4xt8IKfCWo6mOqC23XtkrISM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

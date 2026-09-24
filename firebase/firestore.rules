@@ -1,0 +1,111 @@
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+
+    function contactAt(c, i) {
+
+      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','details'])
+
+        && c[i].id is string && c[i].id.size() <= 64
+
+        && c[i].name is string && c[i].name.size() > 0 && c[i].name.size() <= 120
+
+        && c[i].details is string && c[i].details.size() > 0 && c[i].details.size() <= 200);
+
+    }
+
+    function validAddress(a) {
+
+      return a is map && a.keys().hasAll(['line1','line2','city','province','postalCode','country'])
+
+        && a.keys().hasOnly(['line1','line2','city','province','postalCode','country'])
+
+        && a.line1 is string && a.line1.size() <= 160
+
+        && a.line2 is string && a.line2.size() <= 160
+
+        && a.city is string && a.city.size() <= 160
+
+        && a.province is string && a.province.size() <= 160
+
+        && a.postalCode is string && a.postalCode.size() <= 160
+
+        && a.country is string && a.country.size() <= 160;
+
+    }
+
+    function validProfile(p) {
+
+      return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
+
+        && p.keys().hasOnly(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts','address'])
+
+        && p.username is string && p.username.matches('[a-z0-9_]{3,30}')
+
+        && request.auth.token.email == p.username + '@users.olive.invalid'
+
+        && p.fullName is string && p.fullName.size() > 0 && p.fullName.size() <= 120
+
+        && p.affectedNames is string && p.affectedNames.size() <= 500
+
+        && p.dob is string && p.dob.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+
+        && p.language is string && p.language.size() > 0 && p.language.size() <= 60
+
+        && p.situation is string && p.situation.size() <= 2000
+
+        && p.region is string && p.region.size() <= 200
+
+        && p.triggerHash is string && p.triggerHash.matches('[a-f0-9]{64}')
+
+        && (!('address' in p) || validAddress(p.address))
+
+        && p.contacts is list && p.contacts.size() <= 25
+
+        && contactAt(p.contacts,0) && contactAt(p.contacts,1) && contactAt(p.contacts,2)
+
+        && contactAt(p.contacts,3) && contactAt(p.contacts,4) && contactAt(p.contacts,5)
+
+        && contactAt(p.contacts,6) && contactAt(p.contacts,7) && contactAt(p.contacts,8)
+
+        && contactAt(p.contacts,9) && contactAt(p.contacts,10) && contactAt(p.contacts,11)
+
+        && contactAt(p.contacts,12) && contactAt(p.contacts,13) && contactAt(p.contacts,14)
+
+        && contactAt(p.contacts,15) && contactAt(p.contacts,16) && contactAt(p.contacts,17)
+
+        && contactAt(p.contacts,18) && contactAt(p.contacts,19) && contactAt(p.contacts,20)
+
+        && contactAt(p.contacts,21) && contactAt(p.contacts,22) && contactAt(p.contacts,23)
+
+        && contactAt(p.contacts,24);
+
+    }
+
+    match /users/{uid} {
+
+      allow get: if owner(uid);
+
+      allow list: if false;
+
+      allow create: if owner(uid) && validProfile(request.resource.data)
+        && request.resource.data.username.matches('[a-z0-9_]{4,24}');
+
+      allow update: if owner(uid) && validProfile(request.resource.data)
+
+        && request.resource.data.username == resource.data.username;
+
+      allow delete: if owner(uid);
+
+    }
+
+    match /{document=**} { allow read, write: if false; }
+
+  }
+
+}
+
