@@ -1,0 +1,3 @@
+# Keep the real key in local.properties so it never enters Git history.
+# Add the key normally without quotation marks.
+PLACES_API_KEY=
