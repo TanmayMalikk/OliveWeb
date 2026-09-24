@@ -1,0 +1,69 @@
+package com.olive.app.security
+
+import org.junit.Assert.*
+import org.junit.Test
+
+class SecurityPolicyTest {
+    @Test fun frenchTranslationsIncludeErrorsAndDynamicCounters() {
+        assertEquals("Paramètres", com.olive.app.ui.translate("Settings","French"))
+        assertEquals("NIP incorrect. 3 tentatives restantes.",com.olive.app.ui.translate("Incorrect PIN. 3 attempts remaining.","French"))
+        assertEquals("Paiement refusé",com.olive.app.ui.translate("Payment declined","French"))
+        assertEquals("Settings",com.olive.app.ui.translate("Settings","English"))
+    }
+
+    @Test fun pinVerifierUsesRandomSaltAndRejectsWrongPin() {
+        val first=SecretVerifier.create("123456")
+        val second=SecretVerifier.create("123456")
+        assertNotEquals(first,second)
+        assertTrue(SecretVerifier.matches("123456",first))
+        assertFalse(SecretVerifier.matches("000000",first))
+        assertFalse(SecretVerifier.matches("123456","invalid"))
+    }
+    @Test fun fifthFailureAllowsImmediateNewWindow() {
+        var gate=GateState()
+        repeat(5) { index ->
+            gate=gate.failed()
+            assertEquals(index + 1,gate.failures)
+        }
+        assertEquals(GateState(1),gate.failed())
+        assertEquals(GateState(1),GateState().failed())
+    }
+    @Test fun idleWarningStartsAfterOneMinuteAndLocksAfterFifteenMoreSeconds() {
+        assertNull(IdlePolicy.countdown(59_999))
+        assertEquals(15,IdlePolicy.countdown(60_000))
+        assertEquals(1,IdlePolicy.countdown(74_999))
+        assertEquals(0,IdlePolicy.countdown(75_000))
+    }
+    @Test fun triggerRequiresExactNormalizedMatch() {
+        assertEquals(InputPolicy.triggerHash("  MY WORD  "),InputPolicy.triggerHash("my word"))
+        assertEquals(InputPolicy.triggerHash("  He L P  "),InputPolicy.triggerHash("help"))
+        assertNotEquals(InputPolicy.triggerHash("my word"),InputPolicy.triggerHash("my words"))
+    }
+    @Test fun credentialsAndBirthDatesAreValidated() {
+        assertTrue(InputPolicy.validUsername("Test_user"))
+        assertFalse(InputPolicy.validUsername("a@b.com"))
+        assertFalse(InputPolicy.validUsername("ab"))
+        assertFalse(InputPolicy.validPassword("1234567"))
+        assertTrue(InputPolicy.validPassword("12345678"))
+        assertTrue(InputPolicy.validPassword("Abcd1234"))
+        assertEquals(InputPolicy.username("Olive_User"), InputPolicy.username("olive_user"))
+        val verifier = SecretVerifier.create("Abcd1234")
+        assertTrue(SecretVerifier.matches("Abcd1234", verifier))
+        assertFalse(SecretVerifier.matches("abcd1234", verifier))
+        assertTrue(InputPolicy.validPin("000123"))
+        assertTrue(InputPolicy.validPin("12345"))
+        assertTrue(InputPolicy.validPin("1234"))
+        assertFalse(InputPolicy.validPin("123"))
+        assertFalse(InputPolicy.validPin("1234567"))
+        assertFalse(InputPolicy.validUsername("abc"))
+        assertTrue(InputPolicy.validUsername("a".repeat(24)))
+        assertFalse(InputPolicy.validUsername("a".repeat(25)))
+        assertTrue(InputPolicy.validPassword("a".repeat(24)))
+        assertFalse(InputPolicy.validPassword("a".repeat(25)))
+        assertFalse(InputPolicy.validDob("2024-02-30"))
+        assertFalse(InputPolicy.validDob("2999-01-01"))
+        assertTrue(InputPolicy.validDob("2000-02-29"))
+    }
+}
+
+

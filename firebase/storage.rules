@@ -1,0 +1,33 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Change this path with AccountRepository.profileObject; keep every profile locked to its owner.
+    match /accounts/{uid}/profile.json {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.resource.size <= 64 * 1024
+        && request.resource.contentType == 'application/json';
+      allow delete: if owner(uid);
+    }
+
+    // Each account owns its settings, trigger, and checkout history objects.
+    match /accounts/{uid}/history/{kind}/{entry} {
+      allow read: if owner(uid) && kind in ['settings', 'triggers', 'checkouts'];
+      allow create, update: if owner(uid)
+        && kind in ['settings', 'triggers', 'checkouts']
+        && entry.matches('[A-Za-z0-9-]{8,64}\\.json')
+        && request.resource.size <= 64 * 1024
+        && request.resource.contentType == 'application/json';
+      allow delete: if owner(uid) && kind in ['settings', 'triggers', 'checkouts'];
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

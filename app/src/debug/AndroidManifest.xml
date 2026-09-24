@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <!-- Studio can launch this directly even when a different cover icon is active. -->
+        <activity android:name="com.olive.app.MainActivity"
+            android:exported="true" tools:replace="android:exported" />
+    </application>
+</manifest>

@@ -1,0 +1,4 @@
+const {getGlobalDefaultAccount}=require('./node_modules/firebase-tools/lib/auth');
+const {requireAuth}=require('./node_modules/firebase-tools/lib/requireAuth');
+const {Client}=require('./node_modules/firebase-tools/lib/apiv2');
+(async()=>{await requireAuth({project:'olive-21239',...getGlobalDefaultAccount()});const client=new Client({urlPrefix:'https://identitytoolkit.googleapis.com',auth:true});const policy={passwordPolicyEnforcementState:'ENFORCE',passwordPolicyVersions:[{customStrengthOptions:{minPasswordLength:8,maxPasswordLength:24}}],forceUpgradeOnSignin:false}; const result=await client.patch('/admin/v2/projects/olive-21239/config',{passwordPolicyConfig:policy},{queryParams:{updateMask:'passwordPolicyConfig'}});console.log(JSON.stringify(result.body.passwordPolicyConfig));})().catch(e=>{console.error(e.message);process.exitCode=1});
