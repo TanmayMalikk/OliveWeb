@@ -13,7 +13,10 @@
         android:supportsRtl="true" android:theme="@style/Theme.Olive">
         <activity android:name=".MainActivity" android:exported="false" android:screenOrientation="portrait"
             tools:ignore="LockedOrientationActivity,DiscouragedApi" />
-        <activity-alias android:name=".OliveLauncher" android:targetActivity=".MainActivity"
+        <!-- Android Studio can always use this entry point, even after the user changes covers. -->
+        <activity android:name=".OliveLauncher" android:exported="true" android:screenOrientation="portrait"
+            tools:ignore="LockedOrientationActivity,DiscouragedApi" />
+        <activity-alias android:name=".FoodLauncher" android:targetActivity=".MainActivity"
             android:exported="true" android:enabled="true" android:label="Olive"
             android:icon="@drawable/ic_olive" android:roundIcon="@drawable/ic_olive">
             <intent-filter>

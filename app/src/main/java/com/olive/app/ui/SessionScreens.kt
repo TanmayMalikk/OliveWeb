@@ -7,17 +7,28 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -49,9 +60,9 @@ import java.util.UUID
 // Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
 @Composable fun OliveRoot(session: SessionViewModel) {
     val cover: OliveViewModel = viewModel()
-    SideEffect { cover.persistCover={ cart,favorites -> session.saveFoodCover(cart,favorites) } }
+    SideEffect { cover.persistCover={ cart,favorites,customizations -> session.saveFoodCover(cart,favorites,customizations) } }
     LaunchedEffect(session.coverAccountId,session.coverDataVersion) {
-        cover.restoreCover(session.foodCart,session.foodFavorites)
+        cover.restoreCover(session.foodCart,session.foodFavorites,session.foodCustomizations)
     }
     val keyboard=LocalSoftwareKeyboardController.current
     val focus=LocalFocusManager.current
@@ -355,16 +366,35 @@ import java.util.UUID
     val profile=session.profile ?: return
     when(session.page) {
         SafePage.Home -> FormColumn {
-            Heading("Olive Branch", "Use Quick exit from any page to lock this area and return to your cover app.")
+            Box(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    LocalizedText("Olive Branch",fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
+                    LocalizedText("Your safe space",style=MaterialTheme.typography.headlineMedium)
+                    LocalizedText("Use Quick exit from any page to lock this area and return to your cover app.",color=Muted)
+                }
+                IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.align(Alignment.TopEnd).testTag("safe_settings")) {
+                    Icon(Icons.Outlined.Settings,"Settings")
+                }
+            }
             ModeNotice(session)
             Button(onClick={session.navigate(SafePage.Profile)},modifier=Modifier.fillMaxWidth().testTag("safe_profile")) { LocalizedText("My profile") }
-            Button(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.fillMaxWidth().testTag("safe_settings")) { LocalizedText("Settings") }
-            Button(onClick={session.navigate(SafePage.Contacts)},modifier=Modifier.fillMaxWidth().testTag("safe_contacts")) { LocalizedText("Safe contacts") }
-            Button(onClick={session.navigate(SafePage.Attempts)},modifier=Modifier.fillMaxWidth().testTag("safe_attempts")) { LocalizedText("PIN attempt history · ${session.attempts.size}") }
             Button(onClick={session.navigate(SafePage.Activity)},modifier=Modifier.fillMaxWidth().testTag("safe_activity")) { LocalizedText("Account activity") }
-            // These four slots are ready for the next safe-app features.
-            repeat(4) { index ->
-                OutlinedButton(onClick={},enabled=false,modifier=Modifier.fillMaxWidth().testTag("future_feature_${index+1}")) { LocalizedText("Future feature ${index+1}") }
+            LocalizedText("Private features",style=MaterialTheme.typography.titleLarge)
+            // New safe tools live in this two-wide grid; keep every tile large enough for quick tapping.
+            listOf(1,3).forEach { first ->
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    listOf(first,first+1).forEach { number ->
+                        if(number==1) Button(onClick={session.navigate(SafePage.Notes)},
+                            colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF718669),contentColor=Color.White),
+                            modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_notes")) {
+                            LocalizedText("Notes & incidents")
+                        } else OutlinedButton(onClick={},enabled=false,
+                            colors=ButtonDefaults.outlinedButtonColors(disabledContainerColor=Color(0xFFE7EDE2),disabledContentColor=Muted),
+                            modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("future_feature_$number")) {
+                            LocalizedText("Future feature $number")
+                        }
+                    }
+                }
             }
             if(session.pendingSync) {
                 LocalizedText("Profile changes are saved on this device and awaiting cloud sync.")
@@ -386,26 +416,149 @@ import java.util.UUID
                     else Text(value)
                 }
         }
+        SafePage.Notes -> PrivateNotes(session)
         SafePage.Settings -> SettingsEditor(session,profile)
         SafePage.Contacts -> ContactEditor(session,profile)
         SafePage.Activity -> ActivityHistory(session)
-        SafePage.Attempts -> LazyColumn(contentPadding=PaddingValues(start=24.dp,end=24.dp,top=24.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-            item { SafeBack(session) }
-            item { Heading("PIN attempt history", "Incorrect PIN attempts on this installation. Times use this device’s clock and time zone; entered PINs are never recorded.") }
-            if(session.attempts.isEmpty()) item { LocalizedText("No failed attempts recorded.") }
-            items(session.attempts,key={it.id}) { attempt ->
-                Surface(color=MaterialTheme.colorScheme.surfaceVariant,shape=MaterialTheme.shapes.medium,modifier=Modifier.fillMaxWidth().testTag("attempt_row")) {
-                    Column(Modifier.padding(16.dp)) {
-                        LocalizedText("Incorrect PIN")
-                        LocalizedText(DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm:ss z",if(LocalOliveLanguage.current=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(attempt.timestamp)),style=MaterialTheme.typography.bodySmall)
+    }
+}
+
+// Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor.
+@Composable private fun PrivateNotes(session: SessionViewModel) {
+    var editorOpen by remember { mutableStateOf(false) }
+    var editingId by remember { mutableStateOf<String?>(null) }
+    var kind by remember { mutableStateOf<PrivateEntryKind?>(null) }
+    var title by remember { mutableStateOf("") }
+    var body by remember { mutableStateOf("") }
+    var search by rememberSaveable { mutableStateOf("") }
+    var logEntryId by remember { mutableStateOf<String?>(null) }
+    val language=LocalOliveLanguage.current
+    val formatter=remember(language) { DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm z",
+        if(language=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault()) }
+    fun openEditor(entry: PrivateEntry?) {
+        editingId=entry?.id;kind=entry?.kind;title=entry?.title.orEmpty();body=entry?.body.orEmpty();editorOpen=true
+    }
+    val logEntry=session.privateEntries.firstOrNull { it.id==logEntryId }
+    if(logEntry!=null) {
+        PrivateEntryEditLog(logEntry,formatter,language) { logEntryId=null }
+        return
+    }
+    if(editorOpen) {
+        val entry=session.privateEntries.firstOrNull { it.id==editingId }
+        LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=24.dp,end=24.dp,top=12.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+            item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                IconButton(onClick={editorOpen=false},modifier=Modifier.testTag("private_notes_back")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"All notes") }
+                LocalizedText(if(editingId==null) "New private entry" else "Edit private entry",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
+                if(entry!=null) IconButton(onClick={session.togglePrivateEntryPin(entry.id)},enabled=!session.busy,modifier=Modifier.testTag("private_pin_editor")) {
+                    Icon(Icons.Outlined.PushPin,if(entry.pinned) "Unpin entry" else "Pin entry",tint=if(entry.pinned) Color(0xFFFFC107) else Muted)
+                }
+            } }
+            item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                listOf(PrivateEntryKind.Note to "Note",PrivateEntryKind.Incident to "Incident").forEach { (value,label) ->
+                    FilterChip(selected=kind==value,onClick={kind=if(kind==value) null else value},label={LocalizedText(label)},
+                        modifier=Modifier.weight(1f).testTag("private_kind_${value.name.lowercase()}"))
+                }
+            } }
+            item { Field("Title (optional)",title,"private_entry_title",enabled=!session.busy) { title=it.take(120) } }
+            item { OutlinedTextField(value=body,onValueChange={body=it.take(10_000)},label={LocalizedText("Private details")},
+                modifier=Modifier.fillMaxWidth().heightIn(min=300.dp).testTag("private_entry_body"),enabled=!session.busy) }
+            item { Button(onClick={
+                session.savePrivateEntry(editingId,kind,title,body)
+                if(body.isNotBlank()) editorOpen=false
+            },enabled=!session.busy && body.isNotBlank(),modifier=Modifier.fillMaxWidth().testTag("save_private_entry")) {
+                LocalizedText(if(editingId==null) "Save private entry" else "Update private entry")
+            } }
+            if(entry?.edits?.isNotEmpty()==true) item { TextButton(onClick={logEntryId=entry.id},modifier=Modifier.fillMaxWidth().testTag("private_edit_log")) {
+                Text("${translate("Edit log",language)} (${entry.edits.size})")
+            } }
+            item { Status(session) }
+        }
+        return
+    }
+    val filtered=session.privateEntries.filter { search.isBlank() || it.title.contains(search,true) || it.body.contains(search,true) }
+    val pinned=filtered.filter { it.pinned }.sortedByDescending { it.updatedAt }
+    val others=filtered.filterNot { it.pinned }.sortedByDescending { it.updatedAt }
+    LazyVerticalGrid(columns=GridCells.Adaptive(160.dp),modifier=Modifier.fillMaxSize(),
+        contentPadding=PaddingValues(start=18.dp,end=18.dp,top=12.dp,bottom=112.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item(span={GridItemSpan(maxLineSpan)}) { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            IconButton(onClick={session.navigate(SafePage.Home)},modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Safe home") }
+            LocalizedText("Notes & incidents",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
+            FilledTonalIconButton(onClick={openEditor(null)},modifier=Modifier.testTag("new_private_entry")) { Icon(Icons.Outlined.Add,"New note") }
+        } }
+        item(span={GridItemSpan(maxLineSpan)}) { OutlinedTextField(search,{search=it.take(200)},modifier=Modifier.fillMaxWidth().testTag("private_notes_search"),
+            placeholder={LocalizedText("Search notes")},leadingIcon={Icon(Icons.Outlined.Search,null)},singleLine=true,
+            trailingIcon=if(search.isNotEmpty()) {{IconButton(onClick={search=""}) { Icon(Icons.Outlined.Close,"Clear search") }}} else null) }
+        if(filtered.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) { LocalizedText(if(search.isBlank()) "No private entries yet." else "No notes found.",color=Muted) }
+        if(pinned.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { LocalizedText("Pinned",style=MaterialTheme.typography.titleMedium,color=OliveGreen) }
+        gridItems(pinned,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,language,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id}) }
+        if(others.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { LocalizedText(if(pinned.isEmpty()) "All notes" else "Others",style=MaterialTheme.typography.titleMedium) }
+        gridItems(others,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,language,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id}) }
+    }
+}
+
+@Composable private fun PrivateEntryEditLog(entry: PrivateEntry, formatter: DateTimeFormatter, language: String, close: ()->Unit) {
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        item {
+            TextButton(onClick=close,modifier=Modifier.testTag("close_private_edit_log")) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);LocalizedText("Close")
+            }
+            LocalizedText("Edit log",style=MaterialTheme.typography.headlineMedium)
+            Text(entry.title.ifBlank { translate("Untitled entry",language) },style=MaterialTheme.typography.titleMedium,color=Muted)
+            Text("${entry.edits.size} ${translate("revisions",language)}",style=MaterialTheme.typography.bodySmall,color=Muted)
+        }
+        items(entry.edits.asReversed(),key={it.id}) { edit ->
+            val revision=entry.edits.indexOf(edit)+1
+            Card(Modifier.fillMaxWidth(),border=BorderStroke(1.dp,Color.Black),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Surface(shape=CircleShape,color=Color(0xFFE7EDE2)) {
+                            Text(revision.toString(),Modifier.padding(horizontal=11.dp,vertical=6.dp),fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,color=OliveGreen)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text("${translate("Revision",language)} $revision",style=MaterialTheme.typography.titleMedium)
+                            Text(formatter.format(Instant.ofEpochMilli(edit.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted)
+                        }
+                    }
+                    edit.changes.forEach { change ->
+                        Surface(Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.medium,color=Color(0xFFF5F3EC)) {
+                            Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                                LocalizedText(change.field,style=MaterialTheme.typography.labelLarge,color=OliveGreen)
+                                LocalizedText("Before",style=MaterialTheme.typography.labelSmall,color=Muted)
+                                Text(translate(change.before.ifBlank { "Empty" },language))
+                                HorizontalDivider(Modifier.padding(vertical=3.dp))
+                                LocalizedText("After",style=MaterialTheme.typography.labelSmall,color=Muted)
+                                Text(translate(change.after.ifBlank { "Empty" },language))
+                            }
+                        }
                     }
                 }
             }
         }
     }
 }
+
+@Composable private fun PrivateNoteCard(entry: PrivateEntry, formatter: DateTimeFormatter, language: String,
+    open: ()->Unit, pin: ()->Unit, openLog: ()->Unit) {
+    Card(onClick=open,modifier=Modifier.fillMaxWidth().testTag("private_entry_row"),
+        border=BorderStroke(1.dp,Color.Black),colors=CardDefaults.cardColors(containerColor=Color(0xFFFFFDF4))) {
+        Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                entry.kind?.let { LocalizedText(if(it==PrivateEntryKind.Incident) "Incident" else "Note",style=MaterialTheme.typography.labelMedium,color=OliveGreen,modifier=Modifier.weight(1f)) }
+                    ?: Spacer(Modifier.weight(1f))
+                IconButton(onClick=pin,modifier=Modifier.size(34.dp).testTag("private_pin")) { Icon(Icons.Outlined.PushPin,if(entry.pinned) "Unpin entry" else "Pin entry",tint=if(entry.pinned) Color(0xFFFFC107) else Muted) }
+            }
+            if(entry.title.isNotBlank()) Text(entry.title,style=MaterialTheme.typography.titleMedium,maxLines=3,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(entry.body,maxLines=8,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text((if(entry.edits.isNotEmpty()) "${translate("Edited",language)} · " else "")+formatter.format(Instant.ofEpochMilli(entry.updatedAt)),style=MaterialTheme.typography.bodySmall,color=Muted)
+            if(entry.edits.isNotEmpty()) TextButton(onClick=openLog,modifier=Modifier.testTag("private_edit_log"),contentPadding=PaddingValues(0.dp)) {
+                Text("${translate("Edit log",language)} (${entry.edits.size})")
+            }
+        }
+    }
+}
 @Composable private fun SafeBack(session: SessionViewModel) {
-    TextButton(onClick={session.navigate(SafePage.Home)}) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText("Safe home") }
+    TextButton(onClick={session.navigate(SafePage.Home)},modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText("Safe home") }
 }
 
 // Trusted people can be added or cleaned up here, but the app never auto-calls or auto-messages them.
@@ -414,7 +567,7 @@ import java.util.UUID
     var name by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
     FormColumn {
-        SafeBack(session)
+        TextButton(onClick={session.navigate(SafePage.Settings)}) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText("Settings") }
         Heading("Safe contacts", "Save trusted people here. Olive does not send messages or make calls.")
         profile.contacts.forEach { contact ->
             Card(Modifier.fillMaxWidth()) {
@@ -479,6 +632,7 @@ import java.util.UUID
     FormColumn {
         SafeBack(session)
         Heading("Settings","Update your profile and language at any time.")
+        OutlinedButton(onClick={session.navigate(SafePage.Contacts)},modifier=Modifier.fillMaxWidth().testTag("safe_contacts")) { LocalizedText("Safe contacts") }
         // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
         CoverPicker(profile.coverType,!session.busy) { session.recordSettingsInteraction("Olive Branch","Selected cover app");session.changeCover(it) }
         LocalizedText("Olive and Daily Digest use search for safe entry. Simple Calculator uses your device PIN followed by two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
@@ -514,68 +668,140 @@ import java.util.UUID
     }
 }
 
-// Only the safe side shows account changes and trigger use; checkout attempts also appear in Olive.
+// Tap a range edge to choose its local calendar date first and clock time second.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun ActivityDateTimePicker(label: String, value: Long?, tag: String, onChange: (Long?)->Unit) {
+    var showDate by remember { mutableStateOf(false) }
+    var showTime by remember { mutableStateOf(false) }
+    var pendingDate by remember { mutableStateOf<LocalDate?>(null) }
+    val zone=ZoneId.systemDefault()
+    val locale=if(LocalOliveLanguage.current=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA
+    val display=value?.let { DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm",locale).withZone(zone).format(Instant.ofEpochMilli(it)) }
+    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick={showDate=true},modifier=Modifier.weight(1f).testTag(tag),contentPadding=PaddingValues(horizontal=14.dp,vertical=12.dp)) {
+            Icon(Icons.Outlined.CalendarMonth,null);Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f),horizontalAlignment=Alignment.Start) {
+                LocalizedText(label,style=MaterialTheme.typography.labelMedium)
+                LocalizedText(display ?: "Not selected",color=if(value==null) Muted else MaterialTheme.colorScheme.onSurface)
+            }
+            Icon(Icons.Outlined.AccessTime,null)
+        }
+        if(value!=null) TextButton(onClick={onChange(null)}) { LocalizedText("Clear") }
+    }
+    if(showDate) key(value) {
+        val initial=value ?: System.currentTimeMillis()
+        val localDate=Instant.ofEpochMilli(initial).atZone(zone).toLocalDate()
+        val utcDate=localDate.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+        val picker=rememberDatePickerState(initialSelectedDateMillis=utcDate)
+        DatePickerDialog(onDismissRequest={showDate=false},confirmButton={
+            TextButton(onClick={
+                pendingDate=picker.selectedDateMillis?.let { Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate() } ?: localDate
+                showDate=false;showTime=true
+            }) { LocalizedText("Next") }
+        },dismissButton={TextButton(onClick={showDate=false}) { LocalizedText("Cancel") }}) {
+            DatePicker(state=picker,modifier=Modifier.testTag("${tag}_calendar"))
+        }
+    }
+    if(showTime) key(pendingDate,value) {
+        val initial=value?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() } ?: java.time.LocalTime.now(zone)
+        val picker=rememberTimePickerState(initialHour=initial.hour,initialMinute=initial.minute,is24Hour=true)
+        AlertDialog(onDismissRequest={showTime=false},title={LocalizedText("Select time")},text={Box(Modifier.fillMaxWidth(),contentAlignment=Alignment.Center) {
+            TimePicker(state=picker,modifier=Modifier.testTag("${tag}_clock"))
+        }},
+            confirmButton={TextButton(onClick={
+                val date=pendingDate ?: LocalDate.now(zone)
+                onChange(date.atTime(picker.hour,picker.minute).atZone(zone).toInstant().toEpochMilli());showTime=false
+            }) { LocalizedText("Apply") }},dismissButton={TextButton(onClick={showTime=false}) { LocalizedText("Cancel") }})
+    }
+}
+
+// Activity stays grouped on the overview, then See more opens one searchable category at a time.
 @Composable private fun ActivityHistory(session: SessionViewModel) {
     val language=LocalOliveLanguage.current
     val formatter=DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm:ss z",
-        if(LocalOliveLanguage.current=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault())
+        if(language=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault())
+    var from by remember { mutableStateOf<Long?>(null) }
+    var to by remember { mutableStateOf<Long?>(null) }
+    fun inRange(time: Long)=(from==null || time>=from!!) && (to==null || time<=to!!+59_999)
+    val settings=session.settingsHistory.filter { inRange(it.timestamp) }
+    val triggers=session.triggerHistory.filter { inRange(it.timestamp) }
+    val attempts=session.attempts.filter { inRange(it.timestamp) }
+    val checkouts=session.checkoutHistory.filter { inRange(it.timestamp) }
+    val privacy=session.privacyHistory.filter { inRange(it.timestamp) }
+    val selected=session.activityCategory
+    fun <T> visible(category: ActivityCategory,rows: List<T>)=if(selected==category) rows else rows.take(5)
     LazyColumn(contentPadding=PaddingValues(start=24.dp,end=24.dp,top=24.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-        item { SafeBack(session) }
-        item { Heading("Account activity", "Settings, safe entry and attempted food checkouts on this device.") }
-        item { LocalizedText("Settings history",style=MaterialTheme.typography.titleLarge) }
-        if(session.settingsHistory.isEmpty()) item { LocalizedText("No settings activity yet.") }
-        items(session.settingsHistory,key={it.id}) { event ->
-            Card(Modifier.fillMaxWidth().testTag("settings_history_row")) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                    Text("${translate(event.area,language)} · ${translate(event.action,language)}",
-                        fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
-                    LocalizedText(formatter.format(Instant.ofEpochMilli(event.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted)
-                    event.changes.forEach { change ->
-                        Text("${translate(change.field,language)}: ${translate(change.before.ifBlank { "Empty" },language)} → ${translate(change.after.ifBlank { "Empty" },language)}",
-                            style=MaterialTheme.typography.bodySmall)
-                    }
-                }
+        item { TextButton(onClick=session::activityBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText(if(selected==null) "Safe home" else "All activity") } }
+        item { Heading(if(selected==null) "Account activity" else when(selected) {
+            ActivityCategory.Settings -> "Settings history";ActivityCategory.Triggers -> "Trigger history"
+            ActivityCategory.PinAttempts -> "PIN attempt history";ActivityCategory.Checkouts -> "Checkout attempts"
+            ActivityCategory.Privacy -> "Privacy events"
+        },"Search activity between optional local date and time values.") }
+        item {
+            Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                ActivityDateTimePicker("From",from,"activity_from") { from=it }
+                ActivityDateTimePicker("To",to,"activity_to") { to=it }
             }
         }
-        item { HorizontalDivider(); LocalizedText("Trigger history",style=MaterialTheme.typography.titleLarge) }
-        if(session.triggerHistory.isEmpty()) item { LocalizedText("No trigger activity yet.") }
-        items(session.triggerHistory,key={it.id}) { event ->
-            Card(Modifier.fillMaxWidth().testTag("trigger_history_row")) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+        if(selected==null || selected==ActivityCategory.Settings) {
+            item { LocalizedText("Settings history",style=MaterialTheme.typography.titleLarge) }
+            if(settings.isEmpty()) item { LocalizedText("No settings activity yet.") }
+            items(visible(ActivityCategory.Settings,settings),key={it.id}) { event ->
+                Card(Modifier.fillMaxWidth().testTag("settings_history_row")) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                    Text("${translate(event.area,language)} · ${translate(event.action,language)}",fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
+                    LocalizedText(formatter.format(Instant.ofEpochMilli(event.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted)
+                    event.changes.forEach { change -> Text("${translate(change.field,language)}: ${translate(change.before.ifBlank { "Empty" },language)} → ${translate(change.after.ifBlank { "Empty" },language)}",style=MaterialTheme.typography.bodySmall) }
+                } }
+            }
+            if(selected==null && settings.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.Settings)}) { LocalizedText("See more") } }
+        }
+        if(selected==null || selected==ActivityCategory.Triggers) {
+            item { HorizontalDivider();LocalizedText("Trigger history",style=MaterialTheme.typography.titleLarge) }
+            if(triggers.isEmpty()) item { LocalizedText("No trigger activity yet.") }
+            items(visible(ActivityCategory.Triggers,triggers),key={it.id}) { event ->
+                Card(Modifier.fillMaxWidth().testTag("trigger_history_row")) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                     LocalizedText(event.source,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
                     LocalizedText(formatter.format(Instant.ofEpochMilli(event.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted)
-                    // Keep the trigger timestamp, but show PIN activity only when that session actually had a wrong attempt.
                     if(event.pinAttempts>0) Text("${translate("PIN attempts",language)}: ${event.pinAttempts} · ${translate(event.lastResult,language)}")
-                }
+                } }
             }
+            if(selected==null && triggers.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.Triggers)}) { LocalizedText("See more") } }
         }
-        item { HorizontalDivider(); LocalizedText("Checkout attempts",style=MaterialTheme.typography.titleLarge) }
-        if(session.checkoutHistory.isEmpty()) item { LocalizedText("No checkout attempts yet.") }
-        items(session.checkoutHistory,key={it.id}) { event ->
-            Card(Modifier.fillMaxWidth().testTag("safe_checkout_history_row")) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                    LocalizedText(formatter.format(Instant.ofEpochMilli(event.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted)
-                    event.foods.forEach { LocalizedText("${it.quantity} × ${it.food}") }
-                    LocalizedText(event.error)
-                }
+        if(selected==null || selected==ActivityCategory.PinAttempts) {
+            item { HorizontalDivider();LocalizedText("PIN attempt history",style=MaterialTheme.typography.titleLarge) }
+            if(attempts.isEmpty()) item { LocalizedText("No failed attempts recorded.") }
+            items(visible(ActivityCategory.PinAttempts,attempts),key={it.id}) { attempt ->
+                Card(Modifier.fillMaxWidth().testTag("attempt_row")) { Column(Modifier.padding(16.dp)) {
+                    LocalizedText("Incorrect PIN");LocalizedText(formatter.format(Instant.ofEpochMilli(attempt.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted)
+                } }
             }
+            if(selected==null && attempts.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.PinAttempts)}) { LocalizedText("See more") } }
         }
-        item { HorizontalDivider(); LocalizedText("Privacy events",style=MaterialTheme.typography.titleLarge) }
-        if(session.privacyHistory.isEmpty()) item { LocalizedText("No capture events reported by Android.") }
-        items(session.privacyHistory,key={it.id}) { event ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    LocalizedText(event.action)
+        if(selected==null || selected==ActivityCategory.Checkouts) {
+            item { HorizontalDivider();LocalizedText("Checkout attempts",style=MaterialTheme.typography.titleLarge) }
+            if(checkouts.isEmpty()) item { LocalizedText("No checkout attempts yet.") }
+            items(visible(ActivityCategory.Checkouts,checkouts),key={it.id}) { event ->
+                Card(Modifier.fillMaxWidth().testTag("safe_checkout_history_row")) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                     LocalizedText(formatter.format(Instant.ofEpochMilli(event.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted)
-                }
+                    event.foods.forEach { LocalizedText("${it.quantity} × ${it.food}") };LocalizedText(event.error)
+                } }
             }
+            if(selected==null && checkouts.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.Checkouts)}) { LocalizedText("See more") } }
+        }
+        if(selected==null || selected==ActivityCategory.Privacy) {
+            item { HorizontalDivider();LocalizedText("Privacy events",style=MaterialTheme.typography.titleLarge) }
+            if(privacy.isEmpty()) item { LocalizedText("No capture events reported by Android.") }
+            items(visible(ActivityCategory.Privacy,privacy),key={it.id}) { event ->
+                Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { LocalizedText(event.action);LocalizedText(formatter.format(Instant.ofEpochMilli(event.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted) } }
+            }
+            if(selected==null && privacy.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.Privacy)}) { LocalizedText("See more") } }
         }
     }
 }
 
 @Composable private fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (CoverType) -> Unit) {
     LocalizedText("Choose your cover app",style=MaterialTheme.typography.titleLarge)
-    LocalizedText("The app icon and name update after you close the app.",style=MaterialTheme.typography.bodySmall,color=Muted)
+    LocalizedText("The app stays open. Its icon and name update after you return to the Home screen.",style=MaterialTheme.typography.bodySmall,color=Muted)
     CoverType.entries.forEach { type ->
         val label=when(type) {
             CoverType.FOOD -> "Food Delivery App · Olive"

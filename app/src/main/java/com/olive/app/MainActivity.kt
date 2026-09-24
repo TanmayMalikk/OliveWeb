@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
     private var recordingCallback: Consumer<Int>?=null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CoverLauncher.ensureStudioLauncher(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         window.decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
         if(Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
@@ -35,8 +36,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val selectedCover=session.coverType
             LaunchedEffect(selectedCover) {
-                // Apply the selected cover immediately; Pixel does not need to wait for the app to close.
-                CoverLauncher.apply(this@MainActivity,selectedCover)
+                // Update the open task now; the Home-screen alias changes after the user leaves the app.
                 updateRecentAppIdentity(selectedCover)
             }
             OliveTheme { OliveRoot(session) }

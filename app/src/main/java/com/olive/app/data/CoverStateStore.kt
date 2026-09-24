@@ -5,7 +5,11 @@ import com.olive.app.security.child
 import org.json.JSONArray
 import org.json.JSONObject
 
-data class FoodCoverState(val cart: Map<String,Int> = emptyMap(), val favorites: Set<String> = emptySet())
+data class FoodCoverState(
+    val cart: Map<String,Int> = emptyMap(),
+    val favorites: Set<String> = emptySet(),
+    val customizations: Map<String,Set<String>> = emptyMap(),
+)
 
 // Keep cover favourites, bookmarks, and cart on this phone under the account ID.
 class CoverStateStore(private val vault: EncryptedVault) {
@@ -13,14 +17,22 @@ class CoverStateStore(private val vault: EncryptedVault) {
         val item=vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return FoodCoverState()
         val cart=item.optJSONObject("cart") ?: JSONObject()
         val saved=item.optJSONArray("favorites") ?: JSONArray()
+        val choices=item.optJSONObject("customizations") ?: JSONObject()
         return FoodCoverState(cart.keys().asSequence().associateWith { cart.optInt(it).coerceIn(0,99) }.filterValues { it>0 },
-            (0 until saved.length()).mapNotNull { saved.optString(it).takeIf(String::isNotBlank) }.toSet())
+            (0 until saved.length()).mapNotNull { saved.optString(it).takeIf(String::isNotBlank) }.toSet(),
+            choices.keys().asSequence().associateWith { id ->
+                val values=choices.optJSONArray(id) ?: JSONArray()
+                (0 until values.length()).mapNotNull { values.optString(it).takeIf(String::isNotBlank) }.toSet()
+            })
     }
     fun saveFood(uid: String, state: FoodCoverState) {
         vault.update { root ->
             val item=root.child("accounts").child(uid)
             item.put("cart",JSONObject().also { cart -> state.cart.forEach { (id,amount) -> cart.put(id,amount) } })
             item.put("favorites",JSONArray().also { saved -> state.favorites.forEach(saved::put) })
+            item.put("customizations",JSONObject().also { choices -> state.customizations.forEach { (id,values) ->
+                choices.put(id,JSONArray().also { rows -> values.forEach(rows::put) })
+            } })
         }
     }
     fun news(uid: String): List<NewsArticle> {

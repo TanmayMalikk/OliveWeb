@@ -39,7 +39,6 @@ fun translate(text: String, language: String): String {
     return text
 }
 private val french = """
-Food photo unavailable|Photo du plat indisponible
 Use shipping address|Utiliser l’adresse de livraison
 Enter a complete shipping address.|Saisissez une adresse de livraison complète.
 Recipient name is required.|Le nom du destinataire est obligatoire.
@@ -55,7 +54,7 @@ Date of birth (required)|Date de naissance (obligatoire)
 Year|Année
 Month|Mois
 Day|Jour
-The app icon and name update after you close the app.|L’icône et le nom de l’application changeront après sa fermeture.
+The app stays open. Its icon and name update after you return to the Home screen.|L’application reste ouverte. Son icône et son nom changent lorsque vous revenez à l’écran d’accueil.
 Enter your PIN.|Saisissez votre NIP.
 Olive and Daily Digest ignore spaces and letter case in your trigger. Other searches keep their spaces. Simple Calculator uses your PIN and two equals taps.|Olive et Daily Digest ignorent les espaces et la casse dans le déclencheur. Les autres recherches conservent leurs espaces. Simple Calculator utilise votre NIP et deux pressions sur égal.
 Locking soon|Verrouillage imminent
@@ -160,10 +159,6 @@ Focused address: Country|Champ du pays sélectionné
 Focused address: Google address selection|Suggestion d’adresse Google sélectionnée
 Trigger word|Mot déclencheur
 Cover app|Application de couverture
-Finding restaurants near your delivery area…|Recherche de restaurants près de votre zone de livraison…
-No verified menus are available in your delivery area.|Aucun menu vérifié n’est disponible dans votre zone de livraison.
-Menus near your delivery area|Menus près de votre zone de livraison
-Nearby menus are unavailable. Please try again later.|Les menus à proximité sont indisponibles. Réessayez plus tard.
 English|Anglais
 French|Français
 BOWLS|BOLS
@@ -183,16 +178,12 @@ Choose your area|Choisir votre adresse
 A LITTLE FRESHNESS, EVERY DAY|UN PEU DE FRAÎCHEUR, CHAQUE JOUR
 Good food.\nGood mood.|Bien manger.\nSe sentir bien.
 Find your next feel-good favourite.|Découvrez votre prochain plat préféré.
-Search dishes or kitchens|Rechercher un plat ou un restaurant
 Clear search|Effacer la recherche
-THE FRESH EDIT|LA SÉLECTION FRAÎCHEUR
-Your lunch,\na little greener.|Votre dîner,\nun peu plus vert.
-Explore the bowl  →|Découvrir le bol  →
+Put ad here|Placez votre publicité ici
 Search results|Résultats de recherche
 Made for your cravings|Pour toutes vos envies
 Nothing on the menu yet|Aucun plat trouvé
 Try a different search or choose another category.|Essayez une autre recherche ou catégorie.
-Sample menu · nearby restaurant menus are not connected yet|Menu de démonstration · les menus des restaurants à proximité ne sont pas encore connectés
 Back to menu|Retour au menu
 Back to menu|Retour au menu
 Add to cart|Ajouter au panier
@@ -257,7 +248,6 @@ Date of birth · YYYY-MM-DD (required)|Date de naissance · AAAA-MM-JJ (obligato
 Language (required)|Langue (obligatoire)
 Brief description of your situation (optional, recommended)|Brève description de votre situation (facultatif, recommandé)
 Location (required)|Emplacement (obligatoire)
-Search address with Google|Rechercher une adresse avec Google
 Powered by Google|Fourni par Google
 Address suggestions are unavailable. Continue entering your address.|Les suggestions d’adresse sont indisponibles. Continuez à saisir votre adresse.
 That address could not be filled automatically. Continue entering your address.|Cette adresse n’a pas pu être remplie automatiquement. Continuez à saisir votre adresse.
@@ -297,6 +287,28 @@ Future feature 1|Fonction future 1
 Future feature 2|Fonction future 2
 Future feature 3|Fonction future 3
 Future feature 4|Fonction future 4
+Private features|Fonctions privées
+All activity|Toute l’activité
+Search activity between optional local date and time values.|Recherchez l’activité entre des dates et heures locales facultatives.
+See more|Voir plus
+Notes & incidents|Notes et incidents
+Notes & incident documentation|Notes et documentation d’incidents
+Edit private entry|Modifier l’entrée privée
+Write private notes or document incidents. Entries are shown only inside Olive Branch and sync to your account.|Écrivez des notes privées ou documentez des incidents. Les entrées sont affichées uniquement dans Olive Branch et se synchronisent avec votre compte.
+Note|Note
+Incident|Incident
+Title (optional)|Titre (facultatif)
+Private details|Détails privés
+Save private entry|Enregistrer l’entrée privée
+Update private entry|Mettre à jour l’entrée privée
+Cancel edit|Annuler la modification
+Saved entries|Entrées enregistrées
+No private entries yet.|Aucune entrée privée pour le moment.
+Write something before saving.|Écrivez quelque chose avant d’enregistrer.
+Use up to 120 title characters and 10,000 detail characters.|Utilisez au maximum 120 caractères pour le titre et 10 000 caractères pour les détails.
+Unable to save this private entry. Please retry.|Impossible d’enregistrer cette entrée privée. Veuillez réessayer.
+Saved privately on this device.|Enregistré de façon privée sur cet appareil.
+Saved privately. Syncing to your account.|Enregistré de façon privée. Synchronisation avec votre compte.
 Your saved account information.|Les renseignements de votre compte.
 Full name|Nom complet
 People experiencing abuse|Personnes victimes de violence
@@ -449,6 +461,41 @@ A grilled patty, cheddar, crisp lettuce, tomato and house sauce in a toasted ses
 Salmon, avocado and cucumber rolls with sesame, ginger and a side of soy sauce.|Rouleaux de saumon, avocat et concombre avec sésame, gingembre et sauce soya.
 Roasted sweet potato, ancient grains, baby spinach and lemon dressing.|Patate douce rôtie, grains anciens, jeunes épinards et vinaigrette au citron.
 A simple favourite with tomato, mozzarella, basil and extra virgin olive oil.|Un classique avec tomate, mozzarella, basilic et huile d’olive extra vierge.
+HOMEMADE BY OLIVE KITCHEN|FAIT MAISON PAR OLIVE KITCHEN
+Made in our kitchen and delivered to your door.|Préparé dans notre cuisine et livré à votre porte.
+Search Olive’s menu|Rechercher dans le menu d’Olive
+Homemade by Olive Kitchen|Fait maison par Olive Kitchen
+Vegetarian|Végétarien
+Vegan|Végétalien
+Meat|Viande
+Customize ingredients|Personnaliser les ingrédients
+Edited|Modifié
+Edit log|Journal des modifications
+Tag|Étiquette
+Details|Détails
+No tag|Aucune étiquette
+No changes to save.|Aucune modification à enregistrer.
+Search notes|Rechercher dans les notes
+No notes found.|Aucune note trouvée.
+Pinned|Épinglé
+Others|Autres
+All notes|Toutes les notes
+New private entry|Nouvelle entrée privée
+Show less|Voir moins
+Yes|Oui
+No|Non
+Untitled entry|Entrée sans titre
+revisions|révisions
+Revision|Révision
+Before|Avant
+After|Après
+From|Du
+To|Au
+Not selected|Non sélectionné
+Clear|Effacer
+Select time|Choisir l’heure
+Next|Suivant
+Apply|Appliquer
 """.trimIndent().lines().filter { '|' in it }.associate { line ->
     val (english,french)=line.split('|',limit=2)
     english.replace("\\n","\n") to french.replace("\\n","\n")

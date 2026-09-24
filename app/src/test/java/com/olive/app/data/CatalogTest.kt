@@ -5,15 +5,17 @@ import org.junit.Test
 
 class CatalogTest {
     private val dishes = DemoCatalogRepository().dishes()
-    @Test fun searchMatchesRestaurantIgnoringCaseAndWhitespace() {
-        assertEquals(2, filterDishes(dishes, "  ROOTS  ", "All").size)
+    @Test fun homemadeMenuHasTwentyItemsAndAllDietChoices() {
+        assertTrue(dishes.size>=20)
+        assertEquals(setOf("Vegetarian","Vegan","Meat"),dishes.map { it.diet }.toSet())
+        assertEquals(dishes.size,filterDishes(dishes,"  OLIVE KITCHEN  ","All").size)
     }
     @Test fun categoryAndSearchAreCombined() {
-        assertTrue(filterDishes(dishes,"burrata","Bowls").isEmpty())
-        assertEquals("pizza",filterDishes(dishes,"burrata","Pizza").single().id)
+        assertTrue(filterDishes(dishes,"chicken","Vegan").isEmpty())
+        assertEquals("pizza3",filterDishes(dishes,"garden pizza","Vegan").single().id)
     }
     @Test fun totalsUseCentsAndIgnoreUnknownItems() {
-        assertEquals(4840,cartTotal(dishes,mapOf("bowl" to 2,"pizza" to 1,"unknown" to 7)))
+        assertEquals(4590,cartTotal(dishes,mapOf("bowl" to 2,"pizza" to 1,"unknown" to 7)))
         assertEquals(0,cartTotal(dishes,emptyMap()))
     }
     @Test fun negativeQuantitiesCannotReduceTheTotal() {

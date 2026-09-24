@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -19,14 +20,14 @@ import com.olive.app.data.DeliveryAddress
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 
-// Google suggestions fill the address fields here; manual entry below always stays available.
-@Composable fun AddressAutocomplete(current: DeliveryAddress, onSelected: (DeliveryAddress)->Unit) {
+// Street typing and Google suggestions share one field so the address form never needs a second search box.
+@Composable fun AddressAutocomplete(current: DeliveryAddress, label: String, onFocus: (() -> Unit)?=null, onChange: (DeliveryAddress)->Unit) {
     val context=LocalContext.current
     val key=BuildConfig.PLACES_API_KEY
-    var query by remember { mutableStateOf("") }
     var predictions by remember { mutableStateOf<List<AutocompletePrediction>>(emptyList()) }
     var token by remember { mutableStateOf(AutocompleteSessionToken.newInstance()) }
     var error by remember { mutableStateOf<String?>(null) }
+    var selectedLine by remember { mutableStateOf<String?>(null) }
     val client=remember(key) {
         if(key.isBlank()) null else {
             if(!Places.isInitialized()) Places.initializeWithNewPlacesApiEnabled(context.applicationContext,key)
@@ -34,28 +35,29 @@ import kotlinx.coroutines.tasks.await
         }
     }
 
-    LaunchedEffect(query,token,client) {
+    LaunchedEffect(current.line1,token,client) {
         predictions=emptyList()
-        if(client==null || query.trim().length<3) return@LaunchedEffect
+        if(selectedLine==current.line1) { selectedLine=null;return@LaunchedEffect }
+        if(client==null || current.line1.trim().length<3) return@LaunchedEffect
         delay(300)
         runCatching {
             client.findAutocompletePredictions(FindAutocompletePredictionsRequest.builder()
-                .setQuery(query.trim()).setSessionToken(token).setRegionCode("ca").build()).await().autocompletePredictions
+                .setQuery(current.line1.trim()).setSessionToken(token).setRegionCode("ca").build()).await().autocompletePredictions
         }.onSuccess { predictions=it }.onFailure { error="Address suggestions are unavailable. Continue entering your address." }
     }
 
-    if(client==null) {
-        LocalizedText("Address suggestions are unavailable. Continue entering your address.",style=MaterialTheme.typography.bodySmall,color=Muted)
-    } else {
-        OutlinedTextField(value=query,onValueChange={query=it.take(200);error=null},singleLine=true,
-            label={LocalizedText("Search address with Google")},modifier=Modifier.fillMaxWidth().testTag("address_search"))
+    OutlinedTextField(value=current.line1,onValueChange={onChange(current.copy(line1=it.take(160)));error=null},singleLine=true,
+        label={LocalizedText(label)},modifier=Modifier.fillMaxWidth().testTag("address_line1").onFocusChanged { if(it.isFocused) onFocus?.invoke() },
+        isError=error!=null,supportingText=error?.let { value -> { LocalizedText(value) } })
+    if(client!=null) {
         predictions.forEach { prediction ->
             Surface(Modifier.fillMaxWidth().clickable {
-                predictions=emptyList();query=prediction.getFullText(null).toString()
+                predictions=emptyList();onFocus?.invoke()
                 val request=FetchPlaceRequest.builder(prediction.placeId,listOf(Place.Field.ADDRESS_COMPONENTS,Place.Field.FORMATTED_ADDRESS))
                     .setSessionToken(token).build()
                 client.fetchPlace(request).addOnSuccessListener { response ->
-                    onSelected(response.place.toDeliveryAddress(current))
+                    val selected=response.place.toDeliveryAddress(current)
+                    selectedLine=selected.line1;onChange(selected)
                     token=AutocompleteSessionToken.newInstance();error=null
                 }.addOnFailureListener { error="That address could not be filled automatically. Continue entering your address." }
             },shape=MaterialTheme.shapes.small,color=MaterialTheme.colorScheme.surfaceVariant) {
@@ -66,7 +68,6 @@ import kotlinx.coroutines.tasks.await
             }
         }
         if(predictions.isNotEmpty()) LocalizedText("Powered by Google",style=MaterialTheme.typography.labelSmall,color=Muted)
-        error?.let { LocalizedText(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error) }
     }
 }
 

@@ -8,10 +8,18 @@ import com.olive.app.data.CoverType
 
 // Android reads launcher names/icons from aliases; switch them here when the saved cover changes.
 object CoverLauncher {
+    // Keep Android Studio's Run target alive without touching the user's visible cover icon.
+    fun ensureStudioLauncher(context: Context) {
+        val manager=context.packageManager
+        val component=ComponentName(context.packageName,"${context.packageName}.OliveLauncher")
+        if(manager.getComponentEnabledSetting(component)!=PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+            manager.setComponentEnabledSetting(component,PackageManager.COMPONENT_ENABLED_STATE_ENABLED,PackageManager.DONT_KILL_APP)
+    }
+
     fun apply(context: Context, selected: CoverType) {
         val manager = context.packageManager
         val aliases = mapOf(
-            CoverType.FOOD to "OliveLauncher",
+            CoverType.FOOD to "FoodLauncher",
             CoverType.NEWS to "NewsLauncher",
             CoverType.CALCULATOR to "CalculatorLauncher",
         )

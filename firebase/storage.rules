@@ -15,15 +15,16 @@ service firebase.storage {
       allow delete: if owner(uid);
     }
 
-    // Each account owns its settings, trigger, and checkout history objects.
+    // Each account owns its activity history plus private notes and incident records.
     match /accounts/{uid}/history/{kind}/{entry} {
-      allow read: if owner(uid) && kind in ['settings', 'triggers', 'checkouts'];
+      allow read: if owner(uid) && kind in ['settings', 'triggers', 'checkouts', 'private_entries'];
       allow create, update: if owner(uid)
-        && kind in ['settings', 'triggers', 'checkouts']
+        && kind in ['settings', 'triggers', 'checkouts', 'private_entries']
         && entry.matches('[A-Za-z0-9-]{8,64}\\.json')
-        && request.resource.size <= 64 * 1024
+        && ((kind == 'private_entries' && request.resource.size <= 5 * 1024 * 1024)
+          || (kind != 'private_entries' && request.resource.size <= 64 * 1024))
         && request.resource.contentType == 'application/json';
-      allow delete: if owner(uid) && kind in ['settings', 'triggers', 'checkouts'];
+      allow delete: if owner(uid) && kind in ['settings', 'triggers', 'checkouts', 'private_entries'];
     }
 
     match /{path=**} {

@@ -105,7 +105,7 @@ class FirebaseAccountRepository : AccountRepository {
     // One object per event avoids overwriting another device's history.
     override suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord) {
         check(auth.currentUser?.uid==identity.uid)
-        require(record.category in setOf("settings","triggers","checkouts"))
+        require(record.category in setOf("settings","triggers","checkouts","private_entries"))
         require(record.id.matches(Regex("[A-Za-z0-9-]{8,64}")))
         val bytes=record.json.toByteArray(Charsets.UTF_8)
         require(bytes.size<=MAX_EVENT_BYTES)
@@ -116,7 +116,7 @@ class FirebaseAccountRepository : AccountRepository {
     }
     override suspend fun historyRecords(identity: AccountIdentity): List<HistoryRecord> {
         check(auth.currentUser?.uid==identity.uid)
-        return listOf("settings","triggers","checkouts").flatMap { category ->
+        return listOf("settings","triggers","checkouts","private_entries").flatMap { category ->
             historyFolder(identity.uid,category).listAll().await().items.map { item ->
                 val bytes=item.getBytes(MAX_EVENT_BYTES.toLong()).await()
                 try { HistoryRecord(category,item.name.removeSuffix(".json"),String(bytes,Charsets.UTF_8)) }

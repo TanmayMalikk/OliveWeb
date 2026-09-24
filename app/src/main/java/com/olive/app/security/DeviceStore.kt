@@ -127,10 +127,20 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
     }
     fun recordCheckout(uid: String, event: CheckoutEvent) { activityVault.update { append(it,uid,"checkoutHistory",event.toJson()) } }
     fun checkoutHistory(uid: String): List<CheckoutEvent> = rows(uid,"checkoutHistory").map(CheckoutEvent::fromJson)
+    fun savePrivateEntry(uid: String, entry: PrivateEntry) {
+        activityVault.update { root ->
+            val byAccount=root.child("privateEntries")
+            val entries=byAccount.optJSONArray(uid) ?: JSONArray().also { byAccount.put(uid,it) }
+            val index=(0 until entries.length()).firstOrNull { entries.getJSONObject(it).optString("id")==entry.id }
+            if(index==null) entries.put(entry.toJson()) else entries.put(index,entry.toJson())
+            root.child("historySynced").child(uid).put("private_entries/${entry.id}",false)
+        }
+    }
+    fun privateEntries(uid: String): List<PrivateEntry> = rows(uid,"privateEntries").map(PrivateEntry::fromJson)
     fun pendingHistory(uid: String): List<HistoryRecord> {
         val root=activityVault.read()
         val synced=root.optJSONObject("historySynced")?.optJSONObject(uid)
-        return listOf("settings" to "settingsHistory","triggers" to "triggerHistory","checkouts" to "checkoutHistory")
+        return listOf("settings" to "settingsHistory","triggers" to "triggerHistory","checkouts" to "checkoutHistory","private_entries" to "privateEntries")
             .flatMap { (category,section) ->
                 val rows=root.optJSONObject(section)?.optJSONArray(uid) ?: JSONArray()
                 (0 until rows.length()).map { rows.getJSONObject(it) }.filter { synced?.optBoolean("$category/${it.getString("id")}") != true }
@@ -139,7 +149,11 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
     }
     fun markHistorySynced(uid: String, record: HistoryRecord) {
         activityVault.update { root ->
-            val section=when(record.category) { "settings" -> "settingsHistory"; "triggers" -> "triggerHistory"; else -> "checkoutHistory" }
+            val section=when(record.category) {
+                "settings" -> "settingsHistory"; "triggers" -> "triggerHistory"
+                "checkouts" -> "checkoutHistory"; "private_entries" -> "privateEntries"
+                else -> return@update
+            }
             val rows=root.optJSONObject(section)?.optJSONArray(uid) ?: return@update
             val current=(0 until rows.length()).map { rows.getJSONObject(it) }.firstOrNull { it.optString("id")==record.id }
             if(current?.toString()==record.json)
@@ -148,7 +162,7 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
     }
     fun mergeHistory(uid: String, records: List<HistoryRecord>) {
         activityVault.update { root ->
-            val sections=mapOf("settings" to "settingsHistory","triggers" to "triggerHistory","checkouts" to "checkoutHistory")
+            val sections=mapOf("settings" to "settingsHistory","triggers" to "triggerHistory","checkouts" to "checkoutHistory","private_entries" to "privateEntries")
             records.forEach { record ->
                 val section=sections[record.category] ?: return@forEach
                 val byAccount=root.child(section)
@@ -157,9 +171,19 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
                 val existing=(0 until rows.length()).firstOrNull { rows.getJSONObject(it).optString("id")==record.id }
                 val localIsNewer=record.category=="triggers" && existing!=null &&
                     rows.getJSONObject(existing).optInt("pinAttempts")>incoming.optInt("pinAttempts")
+                var privateNeedsUpload=false
                 if(existing==null) rows.put(incoming)
                 else if(record.category=="triggers" && !localIsNewer) rows.put(existing,incoming)
-                if(!localIsNewer) root.child("historySynced").child(uid).put("${record.category}/${record.id}",true)
+                else if(record.category=="private_entries") {
+                    // Keep revision IDs from both copies, then use the newest note text as the current version.
+                    val local=PrivateEntry.fromJson(rows.getJSONObject(existing))
+                    val cloud=PrivateEntry.fromJson(incoming)
+                    val edits=(local.edits+cloud.edits).distinctBy { it.id }.sortedBy { it.timestamp }
+                    val merged=(if(local.updatedAt>cloud.updatedAt) local else cloud).copy(edits=edits)
+                    rows.put(existing,merged.toJson())
+                    privateNeedsUpload=local.updatedAt>cloud.updatedAt || edits.any { localEdit -> cloud.edits.none { it.id==localEdit.id } }
+                }
+                if(!localIsNewer && !privateNeedsUpload) root.child("historySynced").child(uid).put("${record.category}/${record.id}",true)
             }
         }
     }
@@ -167,7 +191,11 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
         val byAccount=root.child(section)
         val entries=byAccount.optJSONArray(uid) ?: JSONArray().also { byAccount.put(uid,it) }
         entries.put(value)
-        val category=when(section) { "settingsHistory" -> "settings"; "triggerHistory" -> "triggers"; else -> "checkouts" }
+        val category=when(section) {
+            "settingsHistory" -> "settings"; "triggerHistory" -> "triggers"
+            "checkoutHistory" -> "checkouts"; "privateEntries" -> "private_entries"
+            else -> error("Unknown private storage section")
+        }
         root.child("historySynced").child(uid).put("$category/${value.getString("id")}",false)
     }
     private fun rows(uid: String, section: String): List<JSONObject> {
