@@ -41,11 +41,11 @@ import kotlinx.coroutines.tasks.await
         runCatching {
             client.findAutocompletePredictions(FindAutocompletePredictionsRequest.builder()
                 .setQuery(query.trim()).setSessionToken(token).setRegionCode("ca").build()).await().autocompletePredictions
-        }.onSuccess { predictions=it }.onFailure { error="Address suggestions are unavailable. Enter the address manually." }
+        }.onSuccess { predictions=it }.onFailure { error="Address suggestions are unavailable. Continue entering your address." }
     }
 
     if(client==null) {
-        LocalizedText("Google address suggestions need a Places API key. Enter the address manually for now.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        LocalizedText("Address suggestions are unavailable. Continue entering your address.",style=MaterialTheme.typography.bodySmall,color=Muted)
     } else {
         OutlinedTextField(value=query,onValueChange={query=it.take(200);error=null},singleLine=true,
             label={LocalizedText("Search address with Google")},modifier=Modifier.fillMaxWidth().testTag("address_search"))
@@ -57,7 +57,7 @@ import kotlinx.coroutines.tasks.await
                 client.fetchPlace(request).addOnSuccessListener { response ->
                     onSelected(response.place.toDeliveryAddress(current))
                     token=AutocompleteSessionToken.newInstance();error=null
-                }.addOnFailureListener { error="That address could not be filled. Enter it manually." }
+                }.addOnFailureListener { error="That address could not be filled automatically. Continue entering your address." }
             },shape=MaterialTheme.shapes.small,color=MaterialTheme.colorScheme.surfaceVariant) {
                 Column(Modifier.padding(12.dp)) {
                     Text(prediction.getPrimaryText(null).toString(),style=MaterialTheme.typography.titleSmall)
