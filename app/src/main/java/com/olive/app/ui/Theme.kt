@@ -9,7 +9,7 @@ val Ink = Color(0xFF253322)
 val Cream = Color(0xFFFAF9F5)
 val Muted = Color(0xFF73776C)
 
-// One cozy colour and type setup keeps the food cover and safe pages visually consistent.
+// One cozy color and type setup keeps the food cover and safe pages visually consistent.
 @Composable fun OliveTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = lightColorScheme(
         primary = OliveGreen, onPrimary = Color.White,

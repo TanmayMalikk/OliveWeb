@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.os.Build
 import android.app.Activity
 import android.app.ActivityManager
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import android.view.WindowManager
@@ -13,6 +12,8 @@ import androidx.activity.viewModels
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
 import com.olive.app.data.CoverType
 import com.olive.app.ui.CoverLauncher
 import com.olive.app.ui.OliveRoot
@@ -104,8 +105,8 @@ class MainActivity : ComponentActivity() {
         }
         // Android uses this title for the active task and screen-capture attribution.
         title=type.title
-        val icon=getDrawable(iconId) ?: return
-        val bitmap=Bitmap.createBitmap(108,108,Bitmap.Config.ARGB_8888)
+        val icon=ContextCompat.getDrawable(this,iconId) ?: return
+        val bitmap=createBitmap(108,108)
         icon.setBounds(0,0,108,108)
         icon.draw(Canvas(bitmap))
         if(Build.VERSION.SDK_INT>=33) setTaskDescription(ActivityManager.TaskDescription.Builder()

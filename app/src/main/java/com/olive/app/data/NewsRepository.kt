@@ -28,7 +28,7 @@ class GoogleNewsRepository {
     suspend fun latest(language: String, scope: NewsScope, place: String): List<NewsArticle> = withContext(Dispatchers.IO) {
         val locale=if(language=="French") "hl=fr-CA&gl=CA&ceid=CA:fr" else "hl=en-CA&gl=CA&ceid=CA:en"
         val path=when(scope) {
-            NewsScope.LOCAL -> "/rss/search?q="+URLEncoder.encode(place.ifBlank { "Canada" },StandardCharsets.UTF_8)+"&$locale"
+            NewsScope.LOCAL -> "/rss/search?q="+URLEncoder.encode(place.ifBlank { "Canada" },StandardCharsets.UTF_8.name())+"&$locale"
             NewsScope.GLOBAL -> "/rss/headlines/section/topic/WORLD?$locale"
         }
         val connection=(URL("https://news.google.com$path").openConnection() as HttpsURLConnection).apply {
