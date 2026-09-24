@@ -45,8 +45,8 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
 }
 @Composable fun AddressFields(value: DeliveryAddress, cityOnlyRequired: Boolean=false,
     onFocus: ((String)->Unit)?=null, change: (DeliveryAddress)->Unit) {
-    AddressAutocomplete(value) { onFocus?.invoke("Google address selection");change(it) }
-    CheckoutField(if(cityOnlyRequired) "Street address (optional)" else "Street address (required)",value.line1,"address_line1",onFocus={onFocus?.invoke("Street address")}) { change(value.copy(line1=it.take(160))) }
+    AddressAutocomplete(value,if(cityOnlyRequired) "Street address (optional)" else "Street address (required)",
+        onFocus={onFocus?.invoke("Google address selection")},onChange=change)
     CheckoutField("Apartment / unit (optional)",value.line2,"address_line2",onFocus={onFocus?.invoke("Apartment / unit")}) { change(value.copy(line2=it.take(160))) }
     CheckoutField("City (required)",value.city,"address_city",onFocus={onFocus?.invoke("City")}) { change(value.copy(city=it.take(160))) }
     CheckoutField(if(cityOnlyRequired) "Province / state (optional)" else "Province / state (required)",value.province,"address_province",onFocus={onFocus?.invoke("Province / state")}) { change(value.copy(province=it.take(160))) }

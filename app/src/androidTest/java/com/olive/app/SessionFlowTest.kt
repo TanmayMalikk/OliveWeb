@@ -18,7 +18,11 @@ class SessionFlowTest {
     private val cleanStore=object : ExternalResource() {
         override fun before() {
             check(!BuildConfig.FIREBASE_CONFIGURED) { "These tests only run against local test accounts." }
-            val directory=InstrumentationRegistry.getInstrumentation().targetContext.noBackupFilesDir
+            val instrumentation=InstrumentationRegistry.getInstrumentation()
+            val context=instrumentation.targetContext
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_COARSE_LOCATION)
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_FINE_LOCATION)
+            val directory=context.noBackupFilesDir
             listOf("olive-demo.vault","olive-demo.vault.bak","olive-demo.vault.new",
                 "olive-demo-activity.vault","olive-demo-activity.vault.bak","olive-demo-activity.vault.new",
                 "olive-cover.vault","olive-cover.vault.bak","olive-cover.vault.new").forEach { File(directory,it).delete() }
@@ -63,7 +67,7 @@ class SessionFlowTest {
         pin.forEach { compose.onNodeWithTag("pin_digit_$it").performClick() }
         compose.onNodeWithTag("unlock_submit").performClick()
     }
-    private fun unlock(pin: String = "123456") { trigger(); enterPin(pin); waitFor("safe_contacts") }
+    private fun unlock(pin: String = "123456") { trigger(); enterPin(pin); waitFor("safe_settings") }
 
     @Test fun onboardingNeedsCityButNotAFullDeliveryAddress() {
         waitFor("new_user");click("new_user")
@@ -105,13 +109,42 @@ class SessionFlowTest {
         register()
         compose.runOnIdle { assertTrue(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
         // Cover cart stays alive through the secure overlay.
-        compose.onNodeWithText("Explore the bowl  →").performClick()
+        compose.onNodeWithText("Garden harvest bowl").performClick()
         compose.onNodeWithText("Add to cart").performScrollTo().performClick()
         compose.onNodeWithText("Discover").performClick()
         unlock()
-        repeat(4) { compose.onNodeWithTag("future_feature_${it+1}").assertExists() }
+        compose.onNodeWithTag("safe_notes").assertExists()
+        repeat(3) { compose.onNodeWithTag("future_feature_${it+2}").assertExists() }
+        click("safe_notes");click("new_private_entry");click("private_kind_incident")
+        fill("private_entry_title","Private incident")
+        fill("private_entry_body","Details that must stay inside Olive Branch")
+        click("save_private_entry")
+        compose.waitUntil(30_000) { compose.onAllNodesWithText("Details that must stay inside Olive Branch").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("quick_exit").performClick();waitCover()
+        compose.onNodeWithText("Details that must stay inside Olive Branch").assertDoesNotExist()
+        unlock();click("safe_notes")
+        compose.onNodeWithText("Details that must stay inside Olive Branch").assertExists()
+        fill("private_notes_search","Private incident")
+        compose.onNodeWithTag("private_entry_row").assertExists()
+        fill("private_notes_search","")
+        compose.onNodeWithTag("private_pin").performClick()
+        compose.waitUntil(30_000) { compose.onAllNodesWithText("Pinned").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("private_entry_row").performClick()
+        fill("private_entry_body","Updated private incident details")
+        click("save_private_entry")
+        compose.waitUntil(30_000) { compose.onAllNodesWithText("Updated private incident details").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Edited",substring=true).assertExists()
+        compose.onNodeWithTag("private_edit_log").performClick()
+        compose.onNodeWithText("Edit log").assertExists()
+        compose.onNodeWithText("Details that must stay inside Olive Branch",substring=true).assertExists()
+        compose.onAllNodesWithText("Updated private incident details",substring=true).assertAny(hasText("Updated private incident details",substring=true))
+        compose.onNodeWithText("Close").performClick()
+        val privateBytes=File(InstrumentationRegistry.getInstrumentation().targetContext.noBackupFilesDir,"olive-demo-activity.vault").readBytes().toString(Charsets.ISO_8859_1)
+        assertFalse(privateBytes.contains("Details that must stay inside Olive Branch"))
+        assertFalse(privateBytes.contains("Updated private incident details"))
+        click("safe_home")
         compose.runOnIdle { assertTrue(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
-        click("safe_contacts")
+        click("safe_settings");click("safe_contacts")
         fill("contact_name","Trusted Friend"); fill("contact_details","friend@example.invalid"); click("save_contact")
         compose.waitUntil(30_000) { compose.onAllNodesWithText("Trusted Friend").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Edit").performScrollTo().performClick()
@@ -120,10 +153,10 @@ class SessionFlowTest {
         compose.onNodeWithTag("quick_exit").performClick(); waitCover()
         compose.onNodeWithText("Updated Friend").assertDoesNotExist()
         compose.activityRule.scenario.recreate(); waitCover()
-        unlock(); click("safe_contacts"); compose.onNodeWithText("Updated Friend").assertExists()
+        unlock();click("safe_settings");click("safe_contacts");compose.onNodeWithText("Updated Friend").assertExists()
         compose.onNodeWithTag("quick_exit").performClick(); waitCover()
         compose.onNodeWithText("Cart").performClick()
-        compose.onNodeWithText("The green goddess").assertExists()
+        compose.onNodeWithText("Garden harvest bowl").assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         waitCover()
         unlock(); click("sign_out"); waitFor("returning_user")
@@ -135,7 +168,7 @@ class SessionFlowTest {
         fill("new_pin","654321"); fill("confirm_pin","654321"); click("pin_setup_submit")
         waitCover()
         compose.onNodeWithText("Discover").performClick(); waitCover()
-        unlock("654321"); click("safe_contacts"); compose.onNodeWithText("Updated Friend").assertExists()
+        unlock("654321");click("safe_settings");click("safe_contacts");compose.onNodeWithText("Updated Friend").assertExists()
     }
 
     @Test fun fifthFailureAllowsImmediateRetryAndLegacyCooldownIsIgnored() {
@@ -155,13 +188,19 @@ class SessionFlowTest {
         val vault=EncryptedVault(InstrumentationRegistry.getInstrumentation().targetContext,"demo")
         vault.update { root -> root.child("enrollments").getJSONObject(root.getString("activeUid"))
             .put("failures",5).put("lockedUntil",System.currentTimeMillis()+60_000L) }
-        unlock(); click("safe_attempts")
+        unlock();click("safe_activity")
         compose.onAllNodesWithTag("attempt_row").onFirst().assertExists()
         val root=vault.read()
         assertFalse(root.getJSONObject("enrollments").getJSONObject(root.getString("activeUid")).has("lockedUntil"))
         assertEquals(6,root.getJSONObject("attempts").getJSONArray(root.getString("activeUid")).length())
         val bytes=File(InstrumentationRegistry.getInstrumentation().targetContext.noBackupFilesDir,"olive-demo.vault").readBytes().toString(Charsets.ISO_8859_1)
         assertFalse(bytes.contains("Test Person")); assertFalse(bytes.contains("moon garden")); assertFalse(bytes.contains("test-password-123"))
+
+        click("activity_from")
+        compose.onNodeWithTag("activity_from_calendar").assertExists()
+        compose.onNodeWithText("Next").performClick()
+        compose.onNodeWithTag("activity_from_clock").assertExists()
+        compose.onNodeWithText("Cancel").performClick()
     }
 
     @Test fun backgroundAndInFlightUnlockNeverReopenSafeArea() {
@@ -211,7 +250,7 @@ class SessionFlowTest {
     }
     @Test fun checkoutDeclinesDiscardsPaymentAndBackgroundClearsForm() {
         register()
-        compose.onNodeWithText("Explore the bowl  →").performClick()
+        compose.onNodeWithText("Garden harvest bowl").performClick()
         compose.onNodeWithText("Add to cart").performScrollTo().performClick()
         compose.onNodeWithText("Cart").performClick()
         compose.onNodeWithText("Continue to checkout").performScrollTo().performClick()
@@ -229,7 +268,7 @@ class SessionFlowTest {
         assertFalse(activity.toString().contains("Transient"))
         val history=activity.getJSONObject("checkoutHistory").getJSONArray(root.getString("activeUid"))
         assertEquals(1,history.length())
-        assertEquals("The green goddess",history.getJSONObject(0).getJSONArray("foods").getJSONObject(0).getString("food"))
+        assertTrue(history.getJSONObject(0).getJSONArray("foods").getJSONObject(0).getString("food").startsWith("Garden harvest bowl"))
         compose.waitUntil(10_000) {
             EncryptedVault(InstrumentationRegistry.getInstrumentation().targetContext,"cover").read()
                 .optJSONObject("accounts")?.optJSONObject(root.getString("activeUid"))

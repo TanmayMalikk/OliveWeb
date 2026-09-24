@@ -94,7 +94,10 @@ import java.util.Locale
     if(areaDialog && interactive) AddressDialog(savedAddress,session?.busy==true,session?.message,
         onSave={session?.saveAddress(it)},onClose={areaDialog=false;session?.dismissAddressPrompt()})
     if(checkoutNotice && interactive) CheckoutDialog(savedAddress,vm.total,
-        foods=vm.dishes.filter { it.id in vm.cart }.map { OrderLine(it.name,vm.cart[it.id] ?: 0) },
+        foods=vm.dishes.filter { it.id in vm.cart }.map { dish ->
+            val choices=vm.selectedIngredients(dish).joinToString(", ")
+            OrderLine(if(choices.isBlank()) dish.name else "${dish.name} · $choices",vm.cart[dish.id] ?: 0)
+        },
         onSaveAddress={session?.saveAddress(it)},
         onAttempt={ foods,total,error -> session?.recordCheckout(foods,total,error) },
         onClose={checkoutNotice=false})
@@ -122,39 +125,33 @@ import java.util.Locale
         }
         item {
             Column(Modifier.padding(horizontal=24.dp)) {
-                LocalizedText("A LITTLE FRESHNESS, EVERY DAY", style=MaterialTheme.typography.labelSmall, color=OliveGreen, letterSpacing=1.6.sp)
+                LocalizedText("HOMEMADE BY OLIVE KITCHEN", style=MaterialTheme.typography.labelSmall, color=OliveGreen, letterSpacing=1.6.sp)
                 Spacer(Modifier.height(10.dp))
                 LocalizedText("Good food.\nGood mood.", fontFamily=FontFamily.Serif, fontSize=40.sp, lineHeight=44.sp, fontWeight=FontWeight.Medium)
                 Spacer(Modifier.height(10.dp))
-                LocalizedText("Find your next feel-good favourite.", color=Muted)
+                LocalizedText("Made in our kitchen and delivered to your door.", color=Muted)
             }
         }
         item {
             OutlinedTextField(value=vm.query, onValueChange=onSearch,
                 modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp),
-                placeholder={LocalizedText("Search dishes or kitchens")}, leadingIcon={Icon(Icons.Outlined.Search,null)},
+                placeholder={LocalizedText("Search Olive’s menu")}, leadingIcon={Icon(Icons.Outlined.Search,null)},
                 trailingIcon={if(vm.query.isNotEmpty()) IconButton(onClick={vm.search("")}) { Icon(Icons.Outlined.Close,"Clear search") }},
                 singleLine=true, shape=RoundedCornerShape(18.dp),
                 keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search,autoCorrectEnabled=false), keyboardActions=KeyboardActions(onSearch={focus.clearFocus()}))
         }
         item {
             LazyRow(contentPadding=PaddingValues(horizontal=24.dp), horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                items(listOf("All","Bowls","Pizza","Burgers","Sushi")) { category ->
+                items(listOf("All","Vegetarian","Vegan","Meat")) { category ->
                     FilterChip(selected=vm.category == category, onClick={vm.filter(category)}, label={LocalizedText(category)}, shape=RoundedCornerShape(24.dp))
                 }
             }
         }
-        if(vm.query.isBlank() && vm.category == "All" && vm.dishes.any { it.id=="bowl" }) item {
-            Card(onClick={vm.select(vm.dishes.first())},modifier=Modifier.padding(horizontal=24.dp),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFFE7EDDD))) {
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min),verticalAlignment=Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).padding(20.dp)) {
-                        LocalizedText("THE FRESH EDIT",style=MaterialTheme.typography.labelSmall, color=OliveGreen,letterSpacing=1.sp)
-                        Spacer(Modifier.height(8.dp))
-                        LocalizedText("Your lunch,\na little greener.",fontFamily=FontFamily.Serif,fontSize=25.sp,lineHeight=29.sp)
-                        Spacer(Modifier.height(12.dp))
-                        LocalizedText("Explore the bowl  →",style=MaterialTheme.typography.labelLarge,color=OliveGreen)
-                    }
-                    FoodArt("bowl",Modifier.width(140.dp).fillMaxHeight())
+        if(vm.query.isBlank() && vm.category == "All") item {
+            // This blank card is reserved for a future Olive advertisement.
+            Card(modifier=Modifier.fillMaxWidth().height(170.dp).padding(horizontal=24.dp).testTag("olive_ad_placeholder"),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFFF3F3F0))) {
+                Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
+                    LocalizedText("Put ad here",style=MaterialTheme.typography.titleMedium,color=Muted)
                 }
             }
         }
@@ -172,7 +169,7 @@ import java.util.Locale
 @Composable private fun DishCard(dish: Dish, vm: OliveViewModel) {
     Card(onClick={vm.select(dish)},modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
         Box {
-            DishImage(dish,Modifier.fillMaxWidth().height(174.dp))
+            DishImage(dish,Modifier.fillMaxWidth().aspectRatio(16f/9f))
             FilledIconButton(onClick={vm.favorite(dish.id)},modifier=Modifier.align(Alignment.TopEnd).padding(10.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=Cream)) {
                 Icon(if(dish.id in vm.favorites) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,if(dish.id in vm.favorites) "Unsave ${dish.name}" else "Save ${dish.name}",tint=OliveGreen)
             }
@@ -182,7 +179,7 @@ import java.util.Locale
                 LocalizedText(dish.name,fontWeight=FontWeight.SemiBold,fontSize=18.sp,modifier=Modifier.weight(1f))
                 LocalizedText(money(dish.priceCents),fontWeight=FontWeight.SemiBold,color=OliveGreen)
             }
-            LocalizedText("${dish.restaurant}  ·  ${translate(dish.category,LocalOliveLanguage.current)}",color=Muted,style=MaterialTheme.typography.bodyMedium)
+            LocalizedText("${dish.restaurant}  ·  ${translate(dish.diet,LocalOliveLanguage.current)}",color=Muted,style=MaterialTheme.typography.bodyMedium)
             LocalizedText("★ ${dish.rating}     ·     ${dish.minutes} min",style=MaterialTheme.typography.labelMedium,color=OliveGreen)
         }
     }
@@ -195,13 +192,21 @@ import java.util.Locale
             IconButton(onClick={vm.select(null)}) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back to menu") }
             LocalizedText(dish.restaurant,style=MaterialTheme.typography.titleMedium)
         } }
-        item { DishImage(dish,Modifier.fillMaxWidth().height(260.dp)) }
+        item { DishImage(dish,Modifier.fillMaxWidth().aspectRatio(16f/9f)) }
         item { Column(Modifier.padding(horizontal=24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             LocalizedText(dish.category.uppercase(),color=OliveGreen,style=MaterialTheme.typography.labelMedium,letterSpacing=1.sp)
             LocalizedText(dish.name,fontFamily=FontFamily.Serif,fontSize=34.sp,lineHeight=38.sp)
             LocalizedText("★ ${dish.rating}  ·  ${dish.minutes} min",color=Muted)
             LocalizedText(dish.description,style=MaterialTheme.typography.bodyLarge)
-            if(dish.imageCredit.isNotBlank()) LocalizedText(dish.imageCredit,style=MaterialTheme.typography.bodySmall)
+            if(dish.ingredients.isNotEmpty()) {
+                LocalizedText("Customize ingredients",style=MaterialTheme.typography.titleMedium)
+                dish.ingredients.forEach { ingredient ->
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Checkbox(checked=ingredient in vm.selectedIngredients(dish),onCheckedChange={vm.toggleIngredient(dish,ingredient)})
+                        Text(ingredient)
+                    }
+                }
+            }
             LocalizedText(money(dish.priceCents),style=MaterialTheme.typography.headlineSmall,color=OliveGreen)
             Button(onClick={vm.changeQuantity(dish.id,1)}, modifier=Modifier.fillMaxWidth().heightIn(min=54.dp),enabled=(vm.cart[dish.id] ?: 0) < 99) {
                 LocalizedText(if((vm.cart[dish.id] ?: 0) == 0) "Add to cart" else "Add another · ${vm.cart[dish.id]} in cart")
@@ -236,6 +241,8 @@ import java.util.Locale
                     Column(Modifier.weight(1f).padding(start=12.dp)) {
                         LocalizedText(dish.name,fontWeight=FontWeight.SemiBold)
                         LocalizedText(money(dish.priceCents),color=Muted)
+                        val choices=vm.selectedIngredients(dish)
+                        if(choices.isNotEmpty()) Text(choices.joinToString(", "),style=MaterialTheme.typography.bodySmall,color=Muted,maxLines=2)
                         Row(verticalAlignment=Alignment.CenterVertically) {
                             IconButton(onClick={vm.changeQuantity(dish.id,-1)}) { Icon(Icons.Outlined.Remove,"Remove one ${dish.name}") }
                             LocalizedText("${vm.cart[dish.id]}")
@@ -278,6 +285,7 @@ import java.util.Locale
     LaunchedEffect(session?.coverUsername) { if(configured) session?.recordSettingsInteraction("Olive", "Opened account page") }
     var fullName by remember(session?.coverFullName) { mutableStateOf(session?.coverFullName.orEmpty()) }
     var selectedLanguage by remember(session?.language) { mutableStateOf(session?.language ?: "English") }
+    var showAllOrders by remember { mutableStateOf(false) }
     val address=session?.deliveryAddress
     val formattedAddress=address?.let { listOf(it.line1,it.line2,it.city,it.province,it.postalCode,it.country).filter(String::isNotBlank).joinToString(", ") }.orEmpty()
     LazyColumn(contentPadding=PaddingValues(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
@@ -314,7 +322,7 @@ import java.util.Locale
             item { PageTitle("Order history", "Attempted checkouts on this device.") }
             val history=session?.checkoutHistory.orEmpty()
             if(history.isEmpty()) item { LocalizedText("No checkout attempts yet.",Modifier.padding(horizontal=24.dp),color=Muted) }
-            items(history,key={it.id}) { attempt ->
+            items(if(showAllOrders) history else history.take(5),key={it.id}) { attempt ->
                 Card(Modifier.padding(horizontal=24.dp).fillMaxWidth().testTag("checkout_history_row"),
                     colors=CardDefaults.cardColors(containerColor=Color.White)) {
                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
@@ -327,6 +335,9 @@ import java.util.Locale
                     }
                 }
             }
+            if(history.size>5) item { TextButton(onClick={showAllOrders=!showAllOrders},modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp).testTag("cover_order_history_more")) {
+                LocalizedText(if(showAllOrders) "Show less" else "See more")
+            } }
         }
         item { Card(Modifier.padding(horizontal=24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)) {
             Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {

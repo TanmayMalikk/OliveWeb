@@ -1,42 +1,33 @@
 package com.olive.app.ui
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.olive.app.R
 import com.olive.app.data.Dish
-import com.olive.app.data.readLimited
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URI
 
-// Change remote menu photos here and edit the offline fallback drawings in FoodArt.
+private fun localDishPhoto(id: String) = when(id) {
+    "bowl" -> R.drawable.menu_bowl; "bowl2" -> R.drawable.menu_bowl2
+    "bowl3" -> R.drawable.menu_bowl3; "bowl4" -> R.drawable.menu_bowl4
+    "pizza" -> R.drawable.menu_pizza; "pizza2" -> R.drawable.menu_pizza2
+    "pizza3" -> R.drawable.menu_pizza3; "pizza4" -> R.drawable.menu_pizza4
+    "burger" -> R.drawable.menu_burger; "burger2" -> R.drawable.menu_burger2
+    "burger3" -> R.drawable.menu_burger3; "wrap1" -> R.drawable.menu_wrap1
+    "wrap2" -> R.drawable.menu_wrap2; "pasta1" -> R.drawable.menu_pasta1
+    "pasta2" -> R.drawable.menu_pasta2; "pasta3" -> R.drawable.menu_pasta3
+    "salad1" -> R.drawable.menu_salad1; "salad2" -> R.drawable.menu_salad2
+    "soup1" -> R.drawable.menu_soup1; "plate1" -> R.drawable.menu_plate1
+    "plate2" -> R.drawable.menu_plate2; else -> 0
+}
+
+// Olive's homemade menu uses bundled photos so every dish still works without a network connection.
 @Composable fun DishImage(dish: Dish, modifier: Modifier=Modifier) {
-    if(dish.imageUrl.isBlank()) { FoodArt(dish.art,modifier); return }
-    val bitmap by produceState<ImageBitmap?>(null,dish.imageUrl) {
-        value=withContext(Dispatchers.IO) {
-            runCatching {
-                val uri=URI(dish.imageUrl); require(uri.scheme=="https")
-                val connection=uri.toURL().openConnection() as HttpURLConnection
-                try {
-                    connection.connectTimeout=8000; connection.readTimeout=8000;connection.instanceFollowRedirects=false
-                    check(connection.responseCode==200)
-                    val bytes=connection.inputStream.use { it.readLimited(5_000_000) };check(bytes.size<=5_000_000)
-                    val bounds=BitmapFactory.Options().apply { inJustDecodeBounds=true }
-                    BitmapFactory.decodeByteArray(bytes,0,bytes.size,bounds)
-                    check(bounds.outWidth in 1..12000 && bounds.outHeight in 1..12000)
-                    val options=BitmapFactory.Options().apply { inSampleSize=(maxOf(bounds.outWidth,bounds.outHeight)/1024).coerceAtLeast(1) }
-                    BitmapFactory.decodeByteArray(bytes,0,bytes.size,options)?.asImageBitmap()
-                } finally { connection.disconnect() }
-            }.getOrNull()
-        }
+    val localPhoto=localDishPhoto(dish.id)
+    if(localPhoto!=0) {
+        Image(painterResource(localPhoto),dish.name,modifier,contentScale=ContentScale.Crop)
+        return
     }
-    if(bitmap!=null) Image(bitmap!!,dish.name,modifier,contentScale=ContentScale.Crop)
-    else Box(modifier) { LocalizedText("Food photo unavailable") }
+    FoodArt(dish.art,modifier)
 }

@@ -46,10 +46,6 @@ android {
         versionName = "0.2.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("String", "PLACES_API_KEY", "\"$placesApiKey\"")
-        // Set oliveCatalogEndpoint to your HTTPS menu backend when the real restaurant provider is ready.
-        val catalogEndpoint = providers.gradleProperty("oliveCatalogEndpoint").orElse("").get()
-        require(catalogEndpoint.isEmpty() || catalogEndpoint.matches(Regex("https://[A-Za-z0-9./_-]+")))
-        buildConfigField("String", "CATALOG_ENDPOINT", "\"$catalogEndpoint\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }

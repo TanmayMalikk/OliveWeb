@@ -52,3 +52,17 @@ test('activity history belongs to its account and accepts only small JSON events
   await assertFails(uploadString(ref(owner, path), '{}', 'raw', { contentType: 'text/plain' }));
   await assertFails(uploadString(ref(owner, path), 'x'.repeat(64 * 1024 + 1), 'raw', { contentType: 'application/json' }));
 });
+
+test('private notes and incident records belong only to their account', async () => {
+  const owner = env.authenticatedContext('alice-uid').storage();
+  const other = env.authenticatedContext('bob-uid').storage();
+  const path = 'accounts/alice-uid/history/private_entries/12345678-1234.json';
+  const body = JSON.stringify({ kind: 'Incident', title: 'Private record', body: 'Sensitive details' });
+  await assertSucceeds(uploadString(ref(owner, path), body, 'raw', { contentType: 'application/json' }));
+  await assertSucceeds(getBytes(ref(owner, path)));
+  await assertSucceeds(uploadString(ref(owner, path), JSON.stringify({ body: 'Edited private details' }), 'raw', { contentType: 'application/json' }));
+  await assertSucceeds(uploadString(ref(owner, path), JSON.stringify({ edits: 'x'.repeat(70 * 1024) }), 'raw', { contentType: 'application/json' }));
+  await assertFails(getBytes(ref(other, path)));
+  await assertFails(uploadString(ref(other, path), body, 'raw', { contentType: 'application/json' }));
+  await assertSucceeds(deleteObject(ref(owner, path)));
+});

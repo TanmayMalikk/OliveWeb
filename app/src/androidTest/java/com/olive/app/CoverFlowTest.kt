@@ -16,23 +16,23 @@ class CoverFlowTest {
         compose.onNode(hasSetTextAction()).performTextInput("nothingmatches")
         compose.onNodeWithText("Nothing on the menu yet").assertExists()
         compose.onNodeWithContentDescription("Clear search").performClick()
-        compose.onNodeWithText("Explore the bowl  →").assertExists()
+        compose.onNodeWithTag("olive_ad_placeholder").assertExists()
     }
 
     @Test fun cartRemovalWorks() {
-        compose.onNodeWithText("Explore the bowl  →").performClick()
+        compose.onNodeWithText("Garden harvest bowl").performClick()
         compose.onNodeWithText("Add to cart").performScrollTo().performClick()
         compose.onNodeWithText("Cart").performClick()
-        compose.onNodeWithContentDescription("Remove one The green goddess").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Remove one Garden harvest bowl").performScrollTo().performClick()
         compose.onNodeWithText("Something delicious belongs here").assertExists()
     }
 
     @Test fun savedDishesCanBeRemoved() {
-        compose.onNodeWithText("Explore the bowl  →").performClick()
+        compose.onNodeWithText("Garden harvest bowl").performClick()
         compose.onNodeWithText("Save for later").performScrollTo().performClick()
         compose.onNodeWithText("Saved").performClick()
-        compose.onNodeWithText("The green goddess").assertExists()
-        compose.onNodeWithContentDescription("Unsave The green goddess").performClick()
+        compose.onNodeWithText("Garden harvest bowl").assertExists()
+        compose.onNodeWithContentDescription("Unsave Garden harvest bowl").performClick()
         compose.onNodeWithText("A place for your favourites").assertExists()
     }
 }

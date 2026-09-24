@@ -17,7 +17,8 @@ import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, DevicePin, Cover, Pin, Safe, StorageError }
-enum class SafePage { Home, Profile, Contacts, Attempts, Settings, Activity }
+enum class SafePage { Home, Notes, Profile, Contacts, Settings, Activity }
+enum class ActivityCategory { Settings, Triggers, PinAttempts, Checkouts, Privacy }
 
 // This is the traffic controller: it keeps cover mode, setup, PIN access, and the safe side from stepping on each other.
 class SessionViewModel(application: Application) : AndroidViewModel(application) {
@@ -32,6 +33,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val accounts: AccountRepository = if(localMode) LocalAccountRepository(vault) else FirebaseAccountRepository()
     var screen by mutableStateOf(SessionScreen.Loading); private set
     var page by mutableStateOf(SafePage.Home); private set
+    var activityCategory by mutableStateOf<ActivityCategory?>(null); private set
     var busy by mutableStateOf(false); private set
     var message by mutableStateOf<String?>(null); private set
     var profile by mutableStateOf<UserProfile?>(null); private set
@@ -40,6 +42,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     var privacyHistory by mutableStateOf(emptyList<SettingsEvent>()); private set
     var triggerHistory by mutableStateOf(emptyList<TriggerEvent>()); private set
     var checkoutHistory by mutableStateOf(emptyList<CheckoutEvent>()); private set
+    var privateEntries by mutableStateOf(emptyList<PrivateEntry>()); private set
     var pendingSync by mutableStateOf(false); private set
     var deliveryAddress by mutableStateOf(DeliveryAddress()); private set
     var addressPrompt by mutableStateOf(false); private set
@@ -50,6 +53,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     var coverType by mutableStateOf(CoverType.FOOD); private set
     var foodCart by mutableStateOf<Map<String,Int>>(emptyMap()); private set
     var foodFavorites by mutableStateOf<Set<String>>(emptySet()); private set
+    var foodCustomizations by mutableStateOf<Map<String,Set<String>>>(emptyMap()); private set
     var savedNews by mutableStateOf<List<NewsArticle>>(emptyList()); private set
     var coverDataVersion by mutableIntStateOf(0); private set
     var checkoutActive by mutableStateOf(false)
@@ -240,9 +244,9 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         busy=false;checkoutActive=false;coverReset++;addressPrompt=false
         profile?.coverType?.let { coverType=it }
         screen=SessionScreen.Cover
-        page=SafePage.Home
+        page=SafePage.Home;activityCategory=null
         profile=null; attempts=emptyList(); message=null; pendingSync=false
-        settingsHistory=emptyList();privacyHistory=emptyList();triggerHistory=emptyList()
+        settingsHistory=emptyList();privacyHistory=emptyList();triggerHistory=emptyList();privateEntries=emptyList()
         activeTriggerId=null;triggerJob=null
         pendingIdentity=null; pendingProfile=null
     }
@@ -252,17 +256,19 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         if(screen != SessionScreen.Loading && screen != SessionScreen.StorageError) quickExit()
     }
     fun back() {
-        if(screen == SessionScreen.Safe && page != SafePage.Home) { page=SafePage.Home; message=null }
+        if(screen == SessionScreen.Safe && page==SafePage.Activity && activityCategory!=null) { activityCategory=null;message=null }
+        else if(screen == SessionScreen.Safe && page != SafePage.Home) { page=SafePage.Home; message=null }
         else quickExit()
     }
     fun navigate(value: SafePage) {
         if(screen == SessionScreen.Safe) {
             page=value; message=null
+            if(value==SafePage.Activity) activityCategory=null
             val uid=enrollment?.uid
             if(uid!=null) {
                 if(value==SafePage.Settings || value==SafePage.Profile || value==SafePage.Contacts)
                     recordSettingsInteraction("Olive Branch", "Opened ${value.name.lowercase()} page")
-                if(value==SafePage.Activity) refreshHistory(uid)
+                if(value==SafePage.Activity || value==SafePage.Notes) refreshHistory(uid)
             }
         }
     }
@@ -310,13 +316,13 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     // Cover state is local and account-scoped, so a declined checkout or app close won't empty it.
     private suspend fun restoreCoverData(uid: String) {
         val saved=withContext(Dispatchers.IO) { coverStore.food(uid) to coverStore.news(uid) }
-        foodCart=saved.first.cart;foodFavorites=saved.first.favorites;savedNews=saved.second
+        foodCart=saved.first.cart;foodFavorites=saved.first.favorites;foodCustomizations=saved.first.customizations;savedNews=saved.second
         coverDataVersion++
     }
-    fun saveFoodCover(cart: Map<String,Int>, favorites: Set<String>) {
+    fun saveFoodCover(cart: Map<String,Int>, favorites: Set<String>, customizations: Map<String,Set<String>>) {
         val uid=enrollment?.uid ?: return
-        foodCart=cart;foodFavorites=favorites
-        val latest=FoodCoverState(cart,favorites)
+        foodCart=cart;foodFavorites=favorites;foodCustomizations=customizations
+        val latest=FoodCoverState(cart,favorites,customizations)
         val revision=(foodRevisions[uid] ?: 0L)+1L
         foodRevisions[uid]=revision
         viewModelScope.launch {
@@ -345,11 +351,64 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             val histories=withContext(Dispatchers.IO) {
                 Triple(store.settingsHistory(uid),store.triggerHistory(uid),store.checkoutHistory(uid))
             }
+            val entries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
             if(enrollment?.uid==uid) {
                 settingsHistory=histories.first.filter { it.area!="Privacy" && (it.area!="Olive Branch" || it.changes.isNotEmpty()) }
                 privacyHistory=histories.first.filter { it.area=="Privacy" }
-                triggerHistory=histories.second;checkoutHistory=histories.third
+                triggerHistory=histories.second;checkoutHistory=histories.third;privateEntries=entries
             }
+        }
+    }
+    fun showActivityCategory(value: ActivityCategory) {
+        if(screen==SessionScreen.Safe) { activityCategory=value;page=SafePage.Activity;message=null }
+    }
+    fun activityBack() {
+        if(activityCategory!=null) activityCategory=null else navigate(SafePage.Home)
+    }
+
+    // Private writing is encrypted on this phone first, then the normal account sync uploads one owner-only object.
+    fun savePrivateEntry(id: String?, kind: PrivateEntryKind?, title: String, body: String) {
+        if(screen!=SessionScreen.Safe || page!=SafePage.Notes || busy) return
+        val cleanTitle=title.trim()
+        val cleanBody=body.trim()
+        if(cleanBody.isBlank()) { message="Write something before saving."; return }
+        if(cleanTitle.length>120 || cleanBody.length>10_000) { message="Use up to 120 title characters and 10,000 detail characters."; return }
+        val uid=enrollment?.uid ?: return
+        val existing=id?.let { wanted -> privateEntries.firstOrNull { it.id==wanted } }
+        val changes=existing?.let { old -> buildList {
+            fun changed(field: String, before: String, after: String) { if(before!=after) add(FieldChange(field,before,after)) }
+            changed("Tag",old.kind?.name ?: "No tag",kind?.name ?: "No tag")
+            changed("Title",old.title,cleanTitle)
+            changed("Details",old.body,cleanBody)
+        } }.orEmpty()
+        if(existing!=null && changes.isEmpty()) { message="No changes to save."; return }
+        val now=System.currentTimeMillis()
+        val entry=PrivateEntry(id=existing?.id ?: UUID.randomUUID().toString(),timestamp=existing?.timestamp ?: now,
+            updatedAt=now,kind=kind,title=cleanTitle,body=cleanBody,
+            pinned=existing?.pinned ?: false,
+            edits=existing?.edits.orEmpty()+if(existing==null) emptyList() else listOf(PrivateEntryEdit(timestamp=now,changes=changes)))
+        runOperation("Unable to save this private entry. Please retry.") { token ->
+            withContext(Dispatchers.IO) { store.savePrivateEntry(uid,entry) }
+            if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Notes) {
+                privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
+                message=if(localMode) "Saved privately on this device." else "Saved privately. Syncing to your account."
+            }
+            queueHistorySync()
+        }
+    }
+    fun togglePrivateEntryPin(id: String) {
+        if(screen!=SessionScreen.Safe || page!=SafePage.Notes || busy) return
+        val uid=enrollment?.uid ?: return
+        val existing=privateEntries.firstOrNull { it.id==id } ?: return
+        val now=System.currentTimeMillis()
+        val pinned=!existing.pinned
+        val entry=existing.copy(updatedAt=now,pinned=pinned,edits=existing.edits+PrivateEntryEdit(timestamp=now,
+            changes=listOf(FieldChange("Pinned",if(existing.pinned) "Yes" else "No",if(pinned) "Yes" else "No"))))
+        runOperation("Unable to update this private entry. Please retry.") { token ->
+            withContext(Dispatchers.IO) { store.savePrivateEntry(uid,entry) }
+            if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Notes)
+                privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
+            queueHistorySync()
         }
     }
     private fun loadCloudHistory(uid: String, username: String) {
@@ -568,7 +627,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 }
                 accounts.signOut(); enrollment=null; deliveryAddress=DeliveryAddress(); language="English"
                 coverFullName=""; coverUsername=""; coverType=CoverType.FOOD
-                foodCart=emptyMap();foodFavorites=emptySet();savedNews=emptyList();coverDataVersion++
+                foodCart=emptyMap();foodFavorites=emptySet();foodCustomizations=emptyMap();savedNews=emptyList();coverDataVersion++
                 screen=SessionScreen.Welcome
             } catch(_: Exception) { /* Fail closed: the interface remains locked. */ }
             finally { busy=false }
