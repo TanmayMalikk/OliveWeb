@@ -257,11 +257,10 @@ Date of birth · YYYY-MM-DD (required)|Date de naissance · AAAA-MM-JJ (obligato
 Language (required)|Langue (obligatoire)
 Brief description of your situation (optional, recommended)|Brève description de votre situation (facultatif, recommandé)
 Location (required)|Emplacement (obligatoire)
-Google address suggestions need a Places API key. Enter the address manually for now.|Les suggestions d’adresse Google nécessitent une clé API Places. Saisissez l’adresse manuellement pour le moment.
 Search address with Google|Rechercher une adresse avec Google
 Powered by Google|Fourni par Google
-Address suggestions are unavailable. Enter the address manually.|Les suggestions d’adresse sont indisponibles. Saisissez l’adresse manuellement.
-That address could not be filled. Enter it manually.|Cette adresse n’a pas pu être remplie. Saisissez-la manuellement.
+Address suggestions are unavailable. Continue entering your address.|Les suggestions d’adresse sont indisponibles. Continuez à saisir votre adresse.
+That address could not be filled automatically. Continue entering your address.|Cette adresse n’a pas pu être remplie automatiquement. Continuez à saisir votre adresse.
 Trigger word or phrase|Mot ou phrase déclencheur
 Enter this exact word or phrase in the food search to open the PIN prompt. Matching ignores case and outer spaces. Choose something you won’t search for by accident.|Saisissez ce mot ou cette phrase dans la recherche de plats pour ouvrir la demande de NIP. Les majuscules et espaces extérieurs sont ignorés. Choisissez une expression que vous ne chercherez pas par hasard.
 Safe contact · optional|Contact de confiance · facultatif
