@@ -3,6 +3,7 @@ package com.olive.app.ui
 import android.app.Application
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -42,7 +43,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     var pendingSync by mutableStateOf(false); private set
     var deliveryAddress by mutableStateOf(DeliveryAddress()); private set
     var addressPrompt by mutableStateOf(false); private set
-    var addressSaveVersion by mutableStateOf(0); private set
+    var addressSaveVersion by mutableIntStateOf(0); private set
     var language by mutableStateOf("English"); private set
     var coverFullName by mutableStateOf(""); private set
     var coverUsername by mutableStateOf(""); private set
@@ -50,11 +51,11 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     var foodCart by mutableStateOf<Map<String,Int>>(emptyMap()); private set
     var foodFavorites by mutableStateOf<Set<String>>(emptySet()); private set
     var savedNews by mutableStateOf<List<NewsArticle>>(emptyList()); private set
-    var coverDataVersion by mutableStateOf(0); private set
+    var coverDataVersion by mutableIntStateOf(0); private set
     var checkoutActive by mutableStateOf(false)
     var idleCountdownSeconds by mutableStateOf<Int?>(null); private set
     var privacyBlackout by mutableStateOf(false); private set
-    var coverReset by mutableStateOf(0); private set
+    var coverReset by mutableIntStateOf(0); private set
     private var enrollment by mutableStateOf<DeviceEnrollment?>(null)
     private var pendingIdentity: AccountIdentity? = null
     private var pendingProfile: UserProfile? = null

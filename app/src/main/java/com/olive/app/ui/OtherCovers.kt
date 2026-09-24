@@ -1,7 +1,7 @@
 package com.olive.app.ui
 
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,7 +41,7 @@ import com.olive.app.data.localPublished
     var articles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var newsError by remember { mutableStateOf(false) }
-    var refresh by remember { mutableStateOf(0) }
+    var refresh by remember { mutableIntStateOf(0) }
     val saved=session.savedNews
     val fallbackPlace=session.deliveryAddress.generalLocation.ifBlank { "Canada" }
     var currentPlace by remember { mutableStateOf(fallbackPlace) }
@@ -82,7 +82,7 @@ import com.olive.app.data.localPublished
                         item { LocalizedText(article.title,fontFamily=FontFamily.Serif,fontSize=30.sp) }
                         item { LocalizedText(article.summary,style=MaterialTheme.typography.bodyLarge) }
                         item { LocalizedText(article.localPublished(session.language),color=Color(0xFF2A6593)) }
-                        item { Button(onClick={context.startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(article.link)))}) { LocalizedText("Read full story") } }
+                        item { Button(onClick={context.startActivity(Intent(Intent.ACTION_VIEW,article.link.toUri()))}) { LocalizedText("Read full story") } }
                         item { OutlinedButton(onClick={session.toggleNewsBookmark(article)}) { LocalizedText(if(saved.any { it.link==article.link }) "Remove bookmark" else "Save article") } }
                     } else {
                         if(tab=="Today") item {

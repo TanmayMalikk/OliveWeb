@@ -6,7 +6,10 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Build
+import android.os.Bundle
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -35,6 +38,7 @@ object CoverLocation {
     }
 
     @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
     private suspend fun current(manager: LocationManager): Location? = suspendCancellableCoroutine { continuation ->
         val provider=when {
             manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
@@ -42,7 +46,20 @@ object CoverLocation {
             else -> null
         }
         if(provider==null) continuation.resume(null)
-        else runCatching { manager.getCurrentLocation(provider,null,{ it.run() }) { if(continuation.isActive) continuation.resume(it) } }
-            .onFailure { if(continuation.isActive) continuation.resume(null) }
+        else if(Build.VERSION.SDK_INT>=30) {
+            runCatching { manager.getCurrentLocation(provider,null,{ it.run() }) { if(continuation.isActive) continuation.resume(it) } }
+                .onFailure { if(continuation.isActive) continuation.resume(null) }
+        } else {
+            // Android 9 and 10 use the older one-shot listener, then remove it as soon as it answers.
+            val listener=object : LocationListener {
+                override fun onLocationChanged(location: Location) { if(continuation.isActive) continuation.resume(location) }
+                @Deprecated("Deprecated in Android") override fun onStatusChanged(provider: String?,status: Int,extras: Bundle?)=Unit
+                override fun onProviderEnabled(provider: String)=Unit
+                override fun onProviderDisabled(provider: String) { if(continuation.isActive) continuation.resume(null) }
+            }
+            continuation.invokeOnCancellation { manager.removeUpdates(listener) }
+            runCatching { manager.requestSingleUpdate(provider,listener,null) }
+                .onFailure { if(continuation.isActive) continuation.resume(null) }
+        }
     }
 }
