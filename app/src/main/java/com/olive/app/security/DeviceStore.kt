@@ -137,6 +137,24 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
         }
     }
     fun privateEntries(uid: String): List<PrivateEntry> = rows(uid,"privateEntries").map(PrivateEntry::fromJson)
+        .filter { it.purgedAt==null }
+    // After 30 days, erase private content but keep a tiny sync tombstone so another device cannot resurrect it.
+    fun purgeExpiredPrivateEntries(uid: String, now: Long = System.currentTimeMillis()): Boolean {
+        var changed=false
+        activityVault.update { root ->
+            val entries=root.optJSONObject("privateEntries")?.optJSONArray(uid) ?: return@update
+            for(index in 0 until entries.length()) {
+                val entry=PrivateEntry.fromJson(entries.getJSONObject(index))
+                if(entry.purgedAt==null && entry.trashExpired(now)) {
+                    val tombstone=entry.copy(updatedAt=now,kind=null,title="",body="",pinned=false,edits=emptyList(),purgedAt=now)
+                    entries.put(index,tombstone.toJson())
+                    root.child("historySynced").child(uid).put("private_entries/${entry.id}",false)
+                    changed=true
+                }
+            }
+        }
+        return changed
+    }
     fun pendingHistory(uid: String): List<HistoryRecord> {
         val root=activityVault.read()
         val synced=root.optJSONObject("historySynced")?.optJSONObject(uid)
@@ -175,13 +193,21 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
                 if(existing==null) rows.put(incoming)
                 else if(record.category=="triggers" && !localIsNewer) rows.put(existing,incoming)
                 else if(record.category=="private_entries") {
-                    // Keep revision IDs from both copies, then use the newest note text as the current version.
+                    // A purge tombstone wins by timestamp and never pulls old note text or edit history back in.
                     val local=PrivateEntry.fromJson(rows.getJSONObject(existing))
                     val cloud=PrivateEntry.fromJson(incoming)
-                    val edits=(local.edits+cloud.edits).distinctBy { it.id }.sortedBy { it.timestamp }
-                    val merged=(if(local.updatedAt>cloud.updatedAt) local else cloud).copy(edits=edits)
+                    val newest=when {
+                        local.purgedAt!=null -> local
+                        cloud.purgedAt!=null -> cloud
+                        local.updatedAt>cloud.updatedAt -> local
+                        else -> cloud
+                    }
+                    val edits=if(newest.purgedAt!=null) emptyList() else
+                        (local.edits+cloud.edits).distinctBy { it.id }.sortedBy { it.timestamp }
+                    val merged=newest.copy(edits=edits)
                     rows.put(existing,merged.toJson())
-                    privateNeedsUpload=local.updatedAt>cloud.updatedAt || edits.any { localEdit -> cloud.edits.none { it.id==localEdit.id } }
+                    privateNeedsUpload=(local.purgedAt!=null && cloud.purgedAt==null) || local.updatedAt>cloud.updatedAt ||
+                        (newest.purgedAt==null && edits.any { localEdit -> cloud.edits.none { it.id==localEdit.id } })
                 }
                 if(!localIsNewer && !privateNeedsUpload) root.child("historySynced").child(uid).put("${record.category}/${record.id}",true)
             }

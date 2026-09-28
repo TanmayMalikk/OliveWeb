@@ -71,6 +71,8 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val historySyncMutex=Mutex()
     private var activeTriggerId: String? = null
     private var epoch = 0L
+    private val screenHistory=mutableListOf<SessionScreen>()
+    private val safePageHistory=mutableListOf<SafePage>()
     val configured get() = enrollment != null
     val coverAccountId get() = enrollment?.uid
     val sensitive get() = screen != SessionScreen.Cover || checkoutActive
@@ -80,6 +82,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun load() {
         if(busy) return
         busy = true
+        screenHistory.clear();safePageHistory.clear()
         screen = SessionScreen.Loading
         viewModelScope.launch {
             try {
@@ -99,9 +102,14 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             finally { busy = false }
         }
     }
-    fun chooseNew() { if(!busy) { message=null; screen=SessionScreen.NewCredentials } }
-    fun chooseReturning() { if(!busy) { message=null; screen=SessionScreen.ReturningCredentials } }
-    fun setup() { if(!busy) { message=null; screen=SessionScreen.Welcome } }
+    private fun openScreen(value: SessionScreen) {
+        if(value==screen) return
+        screenHistory += screen
+        screen=value
+    }
+    fun chooseNew() { if(!busy) { message=null; openScreen(SessionScreen.NewCredentials) } }
+    fun chooseReturning() { if(!busy) { message=null; openScreen(SessionScreen.ReturningCredentials) } }
+    fun setup() { if(!busy) { message=null; openScreen(SessionScreen.Welcome) } }
     fun error(text: String) { message = text }
 
     // Account creation and returning sign-in meet here; Firebase calls live in AccountRepository.
@@ -119,7 +127,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             if(epoch == token) {
                 pendingIdentity = identity
                 pendingProfile = existing
-                screen = if(existing == null) SessionScreen.ProfileSetup else SessionScreen.DevicePin
+                openScreen(if(existing == null) SessionScreen.ProfileSetup else SessionScreen.DevicePin)
             }
         }
     }
@@ -134,7 +142,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         runOperation("Your account exists, but the profile was not saved. Retry here, or sign in again to finish setup.") { token ->
             accounts.saveProfile(identity,value)
             withContext(Dispatchers.IO) { store.cacheProfile(identity.uid,value) }
-            if(epoch == token) { pendingProfile=value; screen=SessionScreen.DevicePin }
+            if(epoch == token) { pendingProfile=value; openScreen(SessionScreen.DevicePin) }
         }
     }
 
@@ -193,7 +201,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                         busy=false
                         profile=saved.first; attempts=saved.second; pendingSync=saved.third
                         refreshHistory(device.uid)
-                        page=SafePage.Home; screen=SessionScreen.Safe
+                        screenHistory.clear();safePageHistory.clear();page=SafePage.Home;screen=SessionScreen.Safe
                         startIdleTimer()
                     }
                 }
@@ -227,7 +235,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                         busy=false
                         profile=saved.first;attempts=saved.second;pendingSync=saved.third
                         refreshHistory(device.uid)
-                        page=SafePage.Home;screen=SessionScreen.Safe
+                        screenHistory.clear();safePageHistory.clear();page=SafePage.Home;screen=SessionScreen.Safe
                         startIdleTimer()
                     }
                 }
@@ -245,6 +253,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         profile?.coverType?.let { coverType=it }
         screen=SessionScreen.Cover
         page=SafePage.Home;activityCategory=null
+        screenHistory.clear();safePageHistory.clear()
         profile=null; attempts=emptyList(); message=null; pendingSync=false
         settingsHistory=emptyList();privacyHistory=emptyList();triggerHistory=emptyList();privateEntries=emptyList()
         activeTriggerId=null;triggerJob=null
@@ -257,11 +266,17 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
     fun back() {
         if(screen == SessionScreen.Safe && page==SafePage.Activity && activityCategory!=null) { activityCategory=null;message=null }
-        else if(screen == SessionScreen.Safe && page != SafePage.Home) { page=SafePage.Home; message=null }
-        else quickExit()
+        else if(screen == SessionScreen.Safe && safePageHistory.isNotEmpty()) {
+            page=safePageHistory.removeAt(safePageHistory.lastIndex);message=null
+        }
+        else if(screen == SessionScreen.Safe && page != SafePage.Home) { page=SafePage.Home;message=null }
+        else if(screen == SessionScreen.Safe || screen == SessionScreen.Pin) quickExit()
+        else if(screenHistory.isNotEmpty()) { screen=screenHistory.removeAt(screenHistory.lastIndex);message=null }
+        // Root cover/welcome/loading screens deliberately consume Back so Android does not open the phone home screen.
     }
     fun navigate(value: SafePage) {
         if(screen == SessionScreen.Safe) {
+            if(value!=page) safePageHistory += page
             page=value; message=null
             if(value==SafePage.Activity) activityCategory=null
             val uid=enrollment?.uid
@@ -348,8 +363,9 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
     private fun refreshHistory(uid: String) {
         viewModelScope.launch {
-            val histories=withContext(Dispatchers.IO) {
-                Triple(store.settingsHistory(uid),store.triggerHistory(uid),store.checkoutHistory(uid))
+            val (histories,cleanupNeeded)=withContext(Dispatchers.IO) {
+                val purged=store.purgeExpiredPrivateEntries(uid)
+                Triple(store.settingsHistory(uid),store.triggerHistory(uid),store.checkoutHistory(uid)) to purged
             }
             val entries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
             if(enrollment?.uid==uid) {
@@ -357,13 +373,14 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 privacyHistory=histories.first.filter { it.area=="Privacy" }
                 triggerHistory=histories.second;checkoutHistory=histories.third;privateEntries=entries
             }
+            if(cleanupNeeded) queueHistorySync()
         }
     }
     fun showActivityCategory(value: ActivityCategory) {
         if(screen==SessionScreen.Safe) { activityCategory=value;page=SafePage.Activity;message=null }
     }
     fun activityBack() {
-        if(activityCategory!=null) activityCategory=null else navigate(SafePage.Home)
+        if(activityCategory!=null) activityCategory=null else back()
     }
 
     // Private writing is encrypted on this phone first, then the normal account sync uploads one owner-only object.
@@ -374,7 +391,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         if(cleanBody.isBlank()) { message="Write something before saving."; return }
         if(cleanTitle.length>120 || cleanBody.length>10_000) { message="Use up to 120 title characters and 10,000 detail characters."; return }
         val uid=enrollment?.uid ?: return
-        val existing=id?.let { wanted -> privateEntries.firstOrNull { it.id==wanted } }
+        val existing=id?.let { wanted -> privateEntries.firstOrNull { it.id==wanted && it.deletedAt==null } }
         val changes=existing?.let { old -> buildList {
             fun changed(field: String, before: String, after: String) { if(before!=after) add(FieldChange(field,before,after)) }
             changed("Tag",old.kind?.name ?: "No tag",kind?.name ?: "No tag")
@@ -399,15 +416,38 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun togglePrivateEntryPin(id: String) {
         if(screen!=SessionScreen.Safe || page!=SafePage.Notes || busy) return
         val uid=enrollment?.uid ?: return
-        val existing=privateEntries.firstOrNull { it.id==id } ?: return
+        val existing=privateEntries.firstOrNull { it.id==id && it.deletedAt==null } ?: return
         val now=System.currentTimeMillis()
         val pinned=!existing.pinned
-        val entry=existing.copy(updatedAt=now,pinned=pinned,edits=existing.edits+PrivateEntryEdit(timestamp=now,
-            changes=listOf(FieldChange("Pinned",if(existing.pinned) "Yes" else "No",if(pinned) "Yes" else "No"))))
+        // Pinning changes placement only, so it never creates a content revision in the edit log.
+        val entry=existing.copy(updatedAt=now,pinned=pinned)
         runOperation("Unable to update this private entry. Please retry.") { token ->
             withContext(Dispatchers.IO) { store.savePrivateEntry(uid,entry) }
             if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Notes)
                 privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
+            queueHistorySync()
+        }
+    }
+    fun trashPrivateEntry(id: String) {
+        val existing=privateEntries.firstOrNull { it.id==id && it.deletedAt==null } ?: return
+        val now=System.currentTimeMillis()
+        updatePrivateEntry(existing.copy(updatedAt=now,pinned=false,deletedAt=now),
+            "Unable to move this entry to ScratchPad. Please retry.","Moved to ScratchPad for 30 days.")
+    }
+    fun restorePrivateEntry(id: String) {
+        val existing=privateEntries.firstOrNull { it.id==id && it.deletedAt!=null } ?: return
+        updatePrivateEntry(existing.copy(updatedAt=System.currentTimeMillis(),deletedAt=null),
+            "Unable to restore this entry. Please retry.","Restored from ScratchPad.")
+    }
+    private fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String) {
+        if(screen!=SessionScreen.Safe || page!=SafePage.Notes || busy) return
+        val uid=enrollment?.uid ?: return
+        runOperation(failure) { token ->
+            withContext(Dispatchers.IO) { store.savePrivateEntry(uid,entry) }
+            if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Notes) {
+                privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
+                message=success
+            }
             queueHistorySync()
         }
     }

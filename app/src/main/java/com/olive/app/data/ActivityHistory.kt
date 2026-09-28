@@ -8,6 +8,8 @@ data class HistoryRecord(val category: String, val id: String, val json: String)
 
 enum class PrivateEntryKind { Note, Incident }
 
+const val PRIVATE_ENTRY_TRASH_RETENTION_MS = 30L * 24L * 60L * 60L * 1000L
+
 data class PrivateEntryEdit(
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
@@ -32,11 +34,17 @@ data class PrivateEntry(
     val body: String,
     val pinned: Boolean = false,
     val edits: List<PrivateEntryEdit> = emptyList(),
+    val deletedAt: Long? = null,
+    val purgedAt: Long? = null,
 ) {
     fun toJson() = JSONObject().put("id",id).put("timestamp",timestamp).put("updatedAt",updatedAt)
         .put("title",title).put("body",body).put("pinned",pinned)
         .put("edits",JSONArray().also { rows -> edits.forEach { rows.put(it.toJson()) } })
-        .also { if(kind!=null) it.put("kind",kind.name) }
+        .also {
+            if(kind!=null) it.put("kind",kind.name)
+            if(deletedAt!=null) it.put("deletedAt",deletedAt)
+            if(purgedAt!=null) it.put("purgedAt",purgedAt)
+        }
     companion object {
         fun fromJson(value: JSONObject): PrivateEntry {
             val edits=value.optJSONArray("edits") ?: JSONArray()
@@ -44,10 +52,22 @@ data class PrivateEntry(
                 id=value.getString("id"),timestamp=value.getLong("timestamp"),updatedAt=value.optLong("updatedAt",value.getLong("timestamp")),
                 kind=value.optString("kind").takeIf(String::isNotBlank)?.let { runCatching { PrivateEntryKind.valueOf(it) }.getOrNull() },
                 title=value.optString("title"),body=value.getString("body"),pinned=value.optBoolean("pinned"),
-                edits=(0 until edits.length()).map { PrivateEntryEdit.fromJson(edits.getJSONObject(it)) },
+                edits=(0 until edits.length()).map { PrivateEntryEdit.fromJson(edits.getJSONObject(it)) }
+                    .mapNotNull { edit -> edit.copy(changes=edit.changes.filterNot { it.field=="Pinned" }).takeIf { it.changes.isNotEmpty() } },
+                deletedAt=value.optLong("deletedAt").takeIf { it>0L },
+                purgedAt=value.optLong("purgedAt").takeIf { it>0L },
             )
         }
     }
+}
+
+fun PrivateEntry.trashExpired(now: Long = System.currentTimeMillis()) =
+    deletedAt?.let { now-it >= PRIVATE_ENTRY_TRASH_RETENTION_MS } == true
+
+fun PrivateEntry.trashDaysRemaining(now: Long = System.currentTimeMillis()): Int {
+    val deleted=deletedAt ?: return 0
+    val remaining=(PRIVATE_ENTRY_TRASH_RETENTION_MS-(now-deleted)).coerceAtLeast(0L)
+    return ((remaining+86_399_999L)/86_400_000L).toInt()
 }
 
 data class FieldChange(val field: String, val before: String, val after: String) {

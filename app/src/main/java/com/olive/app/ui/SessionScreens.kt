@@ -26,7 +26,9 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
@@ -95,8 +97,8 @@ import java.util.UUID
                     if(session.interceptSearch(value)) { cover.search(""); focus.clearFocus(); keyboard?.hide() }
                     else cover.search(value)
                 },onAccountSetup=session::setup,configured=session.configured, session=session)
-                CoverType.NEWS -> NewsCover(session,locationPermissionVersion)
-                CoverType.CALCULATOR -> CalculatorCover(session)
+                CoverType.NEWS -> NewsCover(session,locationPermissionVersion,isCover)
+                CoverType.CALCULATOR -> CalculatorCover(session,isCover)
             }
         }
         if(!isCover) {
@@ -432,11 +434,19 @@ import java.util.UUID
     var body by remember { mutableStateOf("") }
     var search by rememberSaveable { mutableStateOf("") }
     var logEntryId by remember { mutableStateOf<String?>(null) }
+    var trashOpen by remember { mutableStateOf(false) }
     val language=LocalOliveLanguage.current
     val formatter=remember(language) { DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm z",
         if(language=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault()) }
     fun openEditor(entry: PrivateEntry?) {
         editingId=entry?.id;kind=entry?.kind;title=entry?.title.orEmpty();body=entry?.body.orEmpty();editorOpen=true
+    }
+    BackHandler(editorOpen || logEntryId!=null || trashOpen) {
+        when {
+            logEntryId!=null -> logEntryId=null
+            editorOpen -> editorOpen=false
+            else -> trashOpen=false
+        }
     }
     val logEntry=session.privateEntries.firstOrNull { it.id==logEntryId }
     if(logEntry!=null) {
@@ -452,6 +462,8 @@ import java.util.UUID
                 if(entry!=null) IconButton(onClick={session.togglePrivateEntryPin(entry.id)},enabled=!session.busy,modifier=Modifier.testTag("private_pin_editor")) {
                     Icon(Icons.Outlined.PushPin,if(entry.pinned) "Unpin entry" else "Pin entry",tint=if(entry.pinned) Color(0xFFFFC107) else Muted)
                 }
+                if(entry!=null) IconButton(onClick={session.trashPrivateEntry(entry.id);editorOpen=false},enabled=!session.busy,
+                    modifier=Modifier.testTag("delete_private_entry")) { Icon(Icons.Outlined.DeleteOutline,"Move to ScratchPad") }
             } }
             item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                 listOf(PrivateEntryKind.Note to "Note",PrivateEntryKind.Incident to "Incident").forEach { (value,label) ->
@@ -475,14 +487,24 @@ import java.util.UUID
         }
         return
     }
-    val filtered=session.privateEntries.filter { search.isBlank() || it.title.contains(search,true) || it.body.contains(search,true) }
+    val trashed=session.privateEntries.filter { it.deletedAt!=null }.sortedByDescending { it.deletedAt }
+    if(trashOpen) {
+        ScratchPad(trashed,formatter,language,session::restorePrivateEntry) { trashOpen=false }
+        return
+    }
+    val filtered=session.privateEntries.filter { it.deletedAt==null && (search.isBlank() || it.title.contains(search,true) || it.body.contains(search,true)) }
     val pinned=filtered.filter { it.pinned }.sortedByDescending { it.updatedAt }
     val others=filtered.filterNot { it.pinned }.sortedByDescending { it.updatedAt }
     LazyVerticalGrid(columns=GridCells.Adaptive(160.dp),modifier=Modifier.fillMaxSize(),
         contentPadding=PaddingValues(start=18.dp,end=18.dp,top=12.dp,bottom=112.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item(span={GridItemSpan(maxLineSpan)}) { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            IconButton(onClick={session.navigate(SafePage.Home)},modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Safe home") }
+            IconButton(onClick=session::back,modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Previous safe page") }
             LocalizedText("Notes & incidents",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
+            IconButton(onClick={trashOpen=true},modifier=Modifier.testTag("open_scratchpad")) {
+                BadgedBox(badge={if(trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) }}) {
+                    Icon(Icons.Outlined.DeleteOutline,"ScratchPad")
+                }
+            }
             FilledTonalIconButton(onClick={openEditor(null)},modifier=Modifier.testTag("new_private_entry")) { Icon(Icons.Outlined.Add,"New note") }
         } }
         item(span={GridItemSpan(maxLineSpan)}) { OutlinedTextField(search,{search=it.take(200)},modifier=Modifier.fillMaxWidth().testTag("private_notes_search"),
@@ -493,6 +515,37 @@ import java.util.UUID
         gridItems(pinned,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,language,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id}) }
         if(others.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { LocalizedText(if(pinned.isEmpty()) "All notes" else "Others",style=MaterialTheme.typography.titleMedium) }
         gridItems(others,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,language,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id}) }
+    }
+}
+
+@Composable private fun ScratchPad(entries: List<PrivateEntry>, formatter: DateTimeFormatter, language: String,
+    restore: (String)->Unit, close: ()->Unit) {
+    val now=System.currentTimeMillis()
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=112.dp),
+        verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                IconButton(onClick=close,modifier=Modifier.testTag("close_scratchpad")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"All notes") }
+                LocalizedText("ScratchPad",style=MaterialTheme.typography.headlineSmall)
+            }
+            LocalizedText("Deleted notes stay here for 30 days, then their private contents are permanently erased.",color=Muted)
+        }
+        if(entries.isEmpty()) item { LocalizedText("ScratchPad is empty.",color=Muted) }
+        items(entries,key={it.id}) { entry ->
+            Card(Modifier.fillMaxWidth().testTag("scratchpad_entry"),border=BorderStroke(1.dp,Color.Black),
+                colors=CardDefaults.cardColors(containerColor=Color(0xFFFFFDF4))) {
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    entry.kind?.let { LocalizedText(if(it==PrivateEntryKind.Incident) "Incident" else "Note",color=OliveGreen) }
+                    if(entry.title.isNotBlank()) Text(entry.title,style=MaterialTheme.typography.titleMedium)
+                    Text(entry.body,maxLines=5,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text("${entry.trashDaysRemaining(now)} ${translate("days remaining",language)}",style=MaterialTheme.typography.bodySmall,color=Muted)
+                    Text(formatter.format(Instant.ofEpochMilli(entry.deletedAt ?: entry.updatedAt)),style=MaterialTheme.typography.bodySmall,color=Muted)
+                    OutlinedButton(onClick={restore(entry.id)},modifier=Modifier.fillMaxWidth().testTag("restore_private_entry")) {
+                        Icon(Icons.Outlined.RestoreFromTrash,null);Spacer(Modifier.width(8.dp));LocalizedText("Restore")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -558,7 +611,7 @@ import java.util.UUID
     }
 }
 @Composable private fun SafeBack(session: SessionViewModel) {
-    TextButton(onClick={session.navigate(SafePage.Home)},modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText("Safe home") }
+    TextButton(onClick=session::back,modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText("Back") }
 }
 
 // Trusted people can be added or cleaned up here, but the app never auto-calls or auto-messages them.
@@ -567,7 +620,7 @@ import java.util.UUID
     var name by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
     FormColumn {
-        TextButton(onClick={session.navigate(SafePage.Settings)}) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText("Settings") }
+        TextButton(onClick=session::back) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText("Settings") }
         Heading("Safe contacts", "Save trusted people here. Olive does not send messages or make calls.")
         profile.contacts.forEach { contact ->
             Card(Modifier.fillMaxWidth()) {
