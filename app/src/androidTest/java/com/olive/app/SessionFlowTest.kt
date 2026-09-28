@@ -138,7 +138,17 @@ class SessionFlowTest {
         compose.onNodeWithText("Edit log").assertExists()
         compose.onNodeWithText("Details that must stay inside Olive Branch",substring=true).assertExists()
         compose.onAllNodesWithText("Updated private incident details",substring=true).assertAny(hasText("Updated private incident details",substring=true))
+        compose.onAllNodesWithText("Pinned").assertCountEquals(0)
         compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithTag("private_entry_row").performClick()
+        click("delete_private_entry")
+        click("open_scratchpad")
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("scratchpad_entry").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Updated private incident details").assertExists()
+        click("restore_private_entry")
+        compose.waitUntil(30_000) { compose.onAllNodesWithText("ScratchPad is empty.").fetchSemanticsNodes().isNotEmpty() }
+        click("close_scratchpad")
+        compose.onNodeWithText("Updated private incident details").assertExists()
         val privateBytes=File(InstrumentationRegistry.getInstrumentation().targetContext.noBackupFilesDir,"olive-demo-activity.vault").readBytes().toString(Charsets.ISO_8859_1)
         assertFalse(privateBytes.contains("Details that must stay inside Olive Branch"))
         assertFalse(privateBytes.contains("Updated private incident details"))

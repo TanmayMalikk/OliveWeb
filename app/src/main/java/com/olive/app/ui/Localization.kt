@@ -293,6 +293,13 @@ Search activity between optional local date and time values.|Recherchez l’acti
 See more|Voir plus
 Notes & incidents|Notes et incidents
 Notes & incident documentation|Notes et documentation d’incidents
+ScratchPad|Bloc-notes supprimées
+Deleted notes stay here for 30 days, then their private contents are permanently erased.|Les notes supprimées restent ici pendant 30 jours, puis leur contenu privé est effacé définitivement.
+ScratchPad is empty.|Le bloc-notes supprimées est vide.
+Restore|Restaurer
+days remaining|jours restants
+Moved to ScratchPad for 30 days.|Déplacé vers le bloc-notes supprimées pendant 30 jours.
+Restored from ScratchPad.|Restauré depuis le bloc-notes supprimées.
 Edit private entry|Modifier l’entrée privée
 Write private notes or document incidents. Entries are shown only inside Olive Branch and sync to your account.|Écrivez des notes privées ou documentez des incidents. Les entrées sont affichées uniquement dans Olive Branch et se synchronisent avec votre compte.
 Note|Note

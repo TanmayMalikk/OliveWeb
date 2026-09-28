@@ -60,9 +60,8 @@ import java.util.Locale
     LaunchedEffect(checkoutNotice) { session?.checkoutActive=checkoutNotice }
     DisposableEffect(Unit) { onDispose { session?.checkoutActive=false } }
     LaunchedEffect(interactive) { if(!interactive) { checkoutNotice=false; areaDialog=false } }
-    BackHandler(interactive && (vm.selectedDish != null || vm.tab != CoverTab.Discover)) {
-        if(vm.selectedDish != null) vm.select(null) else vm.navigate(CoverTab.Discover)
-    }
+    // Keep system Back inside the cover and walk through its real tab/detail history.
+    BackHandler(interactive) { vm.back() }
     Scaffold(
         bottomBar = {
             NavigationBar(containerColor = Cream, tonalElevation = 0.dp) {

@@ -1,6 +1,7 @@
 package com.olive.app.ui
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.core.net.toUri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -32,7 +33,7 @@ import com.olive.app.data.localPublished
 
 // Daily Digest refreshes local/global headlines while bookmarks stay saved separately.
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun NewsCover(session: SessionViewModel, locationPermissionVersion: Int=0) {
+@Composable fun NewsCover(session: SessionViewModel, locationPermissionVersion: Int=0, interactive: Boolean=true) {
     val context=LocalContext.current
     var tab by remember { mutableStateOf("Today") }
     var scope by remember { mutableStateOf(NewsScope.LOCAL) }
@@ -42,9 +43,18 @@ import com.olive.app.data.localPublished
     var loading by remember { mutableStateOf(true) }
     var newsError by remember { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
+    val tabHistory=remember { mutableListOf<String>() }
     val saved=session.savedNews
     val fallbackPlace=session.deliveryAddress.generalLocation.ifBlank { "Canada" }
     var currentPlace by remember { mutableStateOf(fallbackPlace) }
+    // Back closes an article first, then returns through the previous news tabs.
+    BackHandler(interactive) {
+        when {
+            selected!=null -> selected=null
+            tabHistory.isNotEmpty() -> { selected=null;tab=tabHistory.removeAt(tabHistory.lastIndex) }
+            tab!="Today" -> { selected=null;tab="Today" }
+        }
+    }
     LaunchedEffect(session.language,scope,refresh,session.coverReset,fallbackPlace,locationPermissionVersion) {
         loading=true;newsError=false
         if(scope==NewsScope.LOCAL) currentPlace=CoverLocation.city(context,fallbackPlace)
@@ -57,6 +67,7 @@ import com.olive.app.data.localPublished
         NavigationBar {
             listOf("Today","Saved","Account").forEach { choice ->
                 NavigationBarItem(selected=tab==choice,onClick={
+                    if(choice!=tab) tabHistory += tab
                     selected=null;tab=choice
                     if(choice=="Account") session.recordSettingsInteraction("Daily Digest","Opened account page")
                 },
@@ -132,13 +143,15 @@ import com.olive.app.data.localPublished
 }
 
 // Keep the calculator looking like a calculator, with no account controls on the cover.
-@Composable fun CalculatorCover(session: SessionViewModel) {
+@Composable fun CalculatorCover(session: SessionViewModel, interactive: Boolean=true) {
     val input=remember { CalculatorInput() }
     LaunchedEffect(session.coverReset) { input.reset() }
     val background=Color(0xFF101820)
     val number=Color(0xFF27323B)
     val utility=Color(0xFF34434D)
     val accent=Color(0xFF6EC5B0)
+    // The calculator has one page, so Back stays here instead of exposing the phone home screen.
+    BackHandler(interactive) { }
     Column(Modifier.fillMaxSize().background(background).safeDrawingPadding().padding(horizontal=20.dp,vertical=14.dp).testTag("calculator_cover"),
         verticalArrangement=Arrangement.spacedBy(12.dp)) {
         LocalizedText("Simple Calculator",color=Color(0xFFF4F7F5),fontSize=19.sp,fontWeight=FontWeight.SemiBold)

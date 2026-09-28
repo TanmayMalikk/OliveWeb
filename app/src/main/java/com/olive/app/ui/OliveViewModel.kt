@@ -23,6 +23,7 @@ class OliveViewModel(private val repository: CatalogRepository = DemoCatalogRepo
     var category by mutableStateOf("All"); private set
     var tab by mutableStateOf(CoverTab.Discover); private set
     var selectedDish by mutableStateOf<Dish?>(null); private set
+    private val tabHistory=mutableListOf<CoverTab>()
     var favorites by mutableStateOf(setOf<String>()); private set
     var cart by mutableStateOf(mapOf<String, Int>()); private set
     var customizations by mutableStateOf<Map<String,Set<String>>>(emptyMap()); private set
@@ -38,8 +39,18 @@ class OliveViewModel(private val repository: CatalogRepository = DemoCatalogRepo
     // Normal food searches filter the menu; the session layer checks the secret trigger first.
     fun search(value: String) { query = value }
     fun filter(value: String) { category = value }
-    fun navigate(value: CoverTab) { tab = value; selectedDish = null }
+    fun navigate(value: CoverTab) {
+        if(value!=tab) tabHistory += tab
+        tab = value; selectedDish = null
+    }
     fun select(dish: Dish?) { selectedDish = dish }
+    // Phone Back closes a dish or returns to the tab the user actually came from.
+    fun back(): Boolean {
+        if(selectedDish!=null) { selectedDish=null;return true }
+        if(tabHistory.isNotEmpty()) { tab=tabHistory.removeAt(tabHistory.lastIndex);return true }
+        if(tab!=CoverTab.Discover) { tab=CoverTab.Discover;return true }
+        return false
+    }
     fun favorite(id: String) {
         favorites = if (id in favorites) favorites - id else favorites + id
         persistCover?.invoke(cart,favorites,customizations)
@@ -58,5 +69,5 @@ class OliveViewModel(private val repository: CatalogRepository = DemoCatalogRepo
         if(quantity>0 && id !in customizations) dishes.firstOrNull { it.id==id }?.let { customizations=customizations+(id to it.ingredients.toSet()) }
         persistCover?.invoke(cart,favorites,customizations)
     }
-    fun returnToCover() { selectedDish = null; query = ""; tab = CoverTab.Discover }
+    fun returnToCover() { selectedDish = null; query = ""; tab = CoverTab.Discover;tabHistory.clear() }
 }
