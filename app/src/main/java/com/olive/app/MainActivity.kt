@@ -21,17 +21,19 @@ import com.olive.app.ui.OliveTheme
 import com.olive.app.ui.SessionViewModel
 import java.util.function.Consumer
 
-// The Android shell is intentionally thin: secure the window, show Olive, and lock it whenever it leaves the foreground.
+// The Android shell is intentionally thin: show Olive and lock it whenever it leaves the foreground.
 class MainActivity : ComponentActivity() {
+    companion object {
+        const val SCREEN_CAPTURE_PROTECTION_ENABLED = false
+    }
     private val session: SessionViewModel by viewModels()
     private var screenshotCallback: Activity.ScreenCaptureCallback?=null
     private var recordingCallback: Consumer<Int>?=null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CoverLauncher.ensureStudioLauncher(this)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        applyScreenCaptureProtection()
         window.decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
-        if(Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(false)
         enableEdgeToEdge()
         setContent {
             val selectedCover=session.coverType
@@ -44,14 +46,14 @@ class MainActivity : ComponentActivity() {
     }
     // The second Olive slips into the background, the safe area gets covered and locked.
     override fun onPause() {
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        applyScreenCaptureProtection()
         session.background()
         updateRecentAppIdentity(session.coverType)
         super.onPause()
     }
     // Android calls this as the user heads for Home or the recent-apps screen, so swap to cover before they get there.
     public override fun onUserLeaveHint() {
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        applyScreenCaptureProtection()
         session.background()
         updateRecentAppIdentity(session.coverType)
         super.onUserLeaveHint()
@@ -59,7 +61,7 @@ class MainActivity : ComponentActivity() {
     // Coming back just refreshes screen protection; it never auto-reopens private pages.
     override fun onResume() {
         super.onResume()
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType)
     }
     override fun onUserInteraction() {
@@ -69,6 +71,7 @@ class MainActivity : ComponentActivity() {
     // FLAG_SECURE blacks out captures; these callbacks log only attempts Android actually reports.
     override fun onStart() {
         super.onStart()
+        if(!SCREEN_CAPTURE_PROTECTION_ENABLED) return
         if(Build.VERSION.SDK_INT>=34) runCatching {
             Activity.ScreenCaptureCallback { session.captureDetected("Screenshot") }.also {
                 registerScreenCaptureCallback(mainExecutor,it)
@@ -93,6 +96,13 @@ class MainActivity : ComponentActivity() {
         session.recordingStopped()
         super.onStop()
         runCatching { CoverLauncher.apply(this,session.coverType) }
+    }
+
+    // This single switch controls screenshots, recordings, recent-app previews, and capture callbacks.
+    private fun applyScreenCaptureProtection() {
+        if(SCREEN_CAPTURE_PROTECTION_ENABLED) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if(Build.VERSION.SDK_INT>=33) setRecentsScreenshotEnabled(!SCREEN_CAPTURE_PROTECTION_ENABLED)
     }
 
     // Keep the recent-apps title and icon aligned with the chosen launcher cover.
