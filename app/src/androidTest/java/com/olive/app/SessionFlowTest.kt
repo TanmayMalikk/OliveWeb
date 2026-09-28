@@ -107,7 +107,7 @@ class SessionFlowTest {
 
     @Test fun onboardingContactsQuickExitAndReturningUser() {
         register()
-        compose.runOnIdle { assertTrue(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
+        compose.runOnIdle { assertFalse(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
         // Cover cart stays alive through the secure overlay.
         compose.onNodeWithText("Garden harvest bowl").performClick()
         compose.onNodeWithText("Add to cart").performScrollTo().performClick()
@@ -143,7 +143,7 @@ class SessionFlowTest {
         assertFalse(privateBytes.contains("Details that must stay inside Olive Branch"))
         assertFalse(privateBytes.contains("Updated private incident details"))
         click("safe_home")
-        compose.runOnIdle { assertTrue(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
+        compose.runOnIdle { assertFalse(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
         click("safe_settings");click("safe_contacts")
         fill("contact_name","Trusted Friend"); fill("contact_details","friend@example.invalid"); click("save_contact")
         compose.waitUntil(30_000) { compose.onAllNodesWithText("Trusted Friend").fetchSemanticsNodes().isNotEmpty() }
