@@ -3,6 +3,7 @@ package com.olive.app.ui
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.core.net.toUri
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -125,7 +126,7 @@ import com.olive.app.data.localPublished
                         }
                         if(visible.isEmpty() && !loading && !newsError) item { LocalizedText(if(tab=="Saved") "No saved stories yet." else "No stories found.") }
                         items(visible,key={it.link}) { article ->
-                            Card(onClick={selected=article},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(16.dp)) {
+                            Card(onClick={selected=article},modifier=Modifier.animateItem().fillMaxWidth().animateContentSize(),shape=RoundedCornerShape(16.dp)) {
                                 Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                                     LocalizedText(article.source.uppercase(),color=Color(0xFF2A6593),style=MaterialTheme.typography.labelSmall)
                                     LocalizedText(article.title,fontFamily=FontFamily.Serif,fontSize=23.sp)

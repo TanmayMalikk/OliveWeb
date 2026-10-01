@@ -5,6 +5,7 @@ import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
+import com.google.firebase.storage.StorageReference
 import com.olive.app.security.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -21,6 +22,8 @@ interface AccountRepository {
     suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord)
     suspend fun historyRecords(identity: AccountIdentity): List<HistoryRecord>
     suspend fun changePassword(identity: AccountIdentity, currentPassword: String, newPassword: String)
+    fun authenticatedUid(): String?
+    fun authenticatedUsername(): String?
     fun signOut()
 }
 
@@ -59,6 +62,8 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
             account.put("passwordVerifier",SecretVerifier.create(newPassword))
         }
     }
+    override fun authenticatedUid(): String? = null
+    override fun authenticatedUsername(): String? = null
     override fun signOut() = Unit
 }
 
@@ -83,7 +88,13 @@ class FirebaseAccountRepository : AccountRepository {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         return try {
             val bytes = profileObject(identity.uid).getBytes(MAX_PROFILE_BYTES).await()
-            try { UserProfile.fromJson(JSONObject(String(bytes, Charsets.UTF_8))) }
+            try {
+                val current=String(bytes,Charsets.UTF_8)
+                val profile=UserProfile.fromJson(JSONObject(current))
+                val readable=profile.toJson().toString(2)
+                runCatching { rewriteIfNeeded(profileObject(identity.uid),current,readable,MAX_PROFILE_BYTES.toInt()) }
+                profile
+            }
             finally { bytes.fill(0) }
         } catch (error: StorageException) {
             if (error.errorCode == StorageException.ERROR_OBJECT_NOT_FOUND) null else throw error
@@ -92,14 +103,11 @@ class FirebaseAccountRepository : AccountRepository {
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         check(profile.username == identity.username) { "Profile account mismatch" }
-        val bytes = profile.toJson().toString().toByteArray(Charsets.UTF_8)
+        // Pretty JSON stays structured for the app while remaining easy to inspect in Firebase Storage.
+        val bytes = profile.toJson().toString(2).toByteArray(Charsets.UTF_8)
         check(bytes.size <= MAX_PROFILE_BYTES) { "Profile is too large" }
         try {
-            val metadata = StorageMetadata.Builder()
-                .setContentType("application/json")
-                .setCustomMetadata("schemaVersion", "1")
-                .build()
-            profileObject(identity.uid).putBytes(bytes, metadata).await()
+            profileObject(identity.uid).putBytes(bytes,jsonMetadata()).await()
         } finally { bytes.fill(0) }
     }
     // One object per event avoids overwriting another device's history.
@@ -107,11 +115,10 @@ class FirebaseAccountRepository : AccountRepository {
         check(auth.currentUser?.uid==identity.uid)
         require(record.category in setOf("settings","triggers","checkouts","private_entries"))
         require(record.id.matches(Regex("[A-Za-z0-9-]{8,64}")))
-        val bytes=record.json.toByteArray(Charsets.UTF_8)
+        val bytes=JSONObject(record.json).toString(2).toByteArray(Charsets.UTF_8)
         require(bytes.size<=MAX_EVENT_BYTES)
         try {
-            historyFolder(identity.uid,record.category).child("${record.id}.json").putBytes(bytes,
-                StorageMetadata.Builder().setContentType("application/json").build()).await()
+            historyFolder(identity.uid,record.category).child("${record.id}.json").putBytes(bytes,jsonMetadata()).await()
         } finally { bytes.fill(0) }
     }
     override suspend fun historyRecords(identity: AccountIdentity): List<HistoryRecord> {
@@ -119,7 +126,12 @@ class FirebaseAccountRepository : AccountRepository {
         return listOf("settings","triggers","checkouts","private_entries").flatMap { category ->
             historyFolder(identity.uid,category).listAll().await().items.map { item ->
                 val bytes=item.getBytes(MAX_EVENT_BYTES.toLong()).await()
-                try { HistoryRecord(category,item.name.removeSuffix(".json"),String(bytes,Charsets.UTF_8)) }
+                try {
+                    val current=String(bytes,Charsets.UTF_8)
+                    val readable=readableHistory(category,current)
+                    runCatching { rewriteIfNeeded(item,current,readable,MAX_EVENT_BYTES) }
+                    HistoryRecord(category,item.name.removeSuffix(".json"),readable)
+                }
                 finally { bytes.fill(0) }
             }
         }
@@ -130,7 +142,30 @@ class FirebaseAccountRepository : AccountRepository {
         user.reauthenticate(EmailAuthProvider.getCredential(email(identity.username),currentPassword)).await()
         user.updatePassword(newPassword).await()
     }
+    override fun authenticatedUid(): String? = auth.currentUser?.uid
+    override fun authenticatedUsername(): String? = auth.currentUser?.email
+        ?.substringBefore('@')?.let(InputPolicy::username)
     override fun signOut() = auth.signOut()
+
+    private fun readableHistory(category: String, raw: String): String {
+        val value=JSONObject(raw)
+        return when(category) {
+            "settings" -> SettingsEvent.fromJson(value).toJson()
+            "triggers" -> TriggerEvent.fromJson(value).toJson()
+            "checkouts" -> CheckoutEvent.fromJson(value).toJson()
+            "private_entries" -> PrivateEntry.fromJson(value).toJson()
+            else -> value
+        }.toString(2)
+    }
+    private fun jsonMetadata() = StorageMetadata.Builder().setContentType("application/json")
+        .setCustomMetadata("schemaVersion","2").setCustomMetadata("format","pretty-json").build()
+    private suspend fun rewriteIfNeeded(reference: StorageReference, current: String, readable: String, limit: Int) {
+        if(current==readable) return
+        val bytes=readable.toByteArray(Charsets.UTF_8)
+        require(bytes.size<=limit)
+        try { reference.putBytes(bytes,jsonMetadata()).await() }
+        finally { bytes.fill(0) }
+    }
 
     private companion object { const val MAX_PROFILE_BYTES = 64L * 1024L; const val MAX_EVENT_BYTES = 64 * 1024 }
 }

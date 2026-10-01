@@ -1,6 +1,9 @@
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import {
+  doc, setDoc, getDoc, collection, getDocs, query, where,
+  serverTimestamp, writeBatch, updateDoc, deleteDoc
+} from 'firebase/firestore';
 
 import { readFile } from 'node:fs/promises';
 
@@ -68,6 +71,8 @@ test('required profile fields and address whitelist are enforced', async () => {
   await assertSucceeds(setDoc(target,{...profile,address}));
   await assertFails(setDoc(target,{...profile,address:{...address,cardNumber:'4242424242424242'}}));
   await assertFails(setDoc(target,{...profile,cardNumber:'4242424242424242'}));
+  await assertSucceeds(setDoc(target,{...profile,role:'SAFE_CONTACT',triggerHash:''}));
+  await assertFails(setDoc(target,{...profile,role:'OWNER'}));
 });
 
 test('new usernames enforce bounds while existing usernames remain usable', async () => {
@@ -76,4 +81,74 @@ test('new usernames enforce bounds while existing usernames remain usable', asyn
   await assertFails(setDoc(ref,{...profile,username:'old'}));
   await env.withSecurityRulesDisabled(async context => {await setDoc(doc(context.firestore(),'users/legacy'),{...profile,username:'old'});});
   await assertSucceeds(setDoc(ref,{...profile,username:'old',situation:'Updated'}));
+});
+
+test('friend requests become a private DM and only the sender can unsend', async () => {
+  const alice=env.authenticatedContext('social-a',{email:'social_alice@users.olive.invalid'}).firestore();
+  const bob=env.authenticatedContext('social-b',{email:'social_bob@users.olive.invalid'}).firestore();
+  const charlie=env.authenticatedContext('social-c',{email:'social_charlie@users.olive.invalid'}).firestore();
+  await assertSucceeds(setDoc(doc(alice,'messageDirectory/social_alice'),{uid:'social-a',username:'social_alice',updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(bob,'messageDirectory/social_bob'),{uid:'social-b',username:'social_bob',updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(charlie,'messageDirectory/social_charlie'),{uid:'social-c',username:'social_charlie',updatedAt:serverTimestamp()}));
+
+  await assertSucceeds(getDoc(doc(alice,'messageDirectory/social_bob')));
+  await assertFails(getDocs(query(collection(alice,'messageDirectory'),where('username','>=','social_b'))));
+  const requestId='social-a--social-b';
+  const friendshipId='social-a--social-b';
+  const request={senderUid:'social-a',senderUsername:'social_alice',recipientUid:'social-b',
+    recipientUsername:'social_bob',friendshipId,createdAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(alice,'friendRequests/'+requestId),request));
+  await assertSucceeds(getDocs(query(collection(bob,'friendRequests'),where('recipientUid','==','social-b'))));
+  await assertSucceeds(getDocs(query(collection(alice,'friendRequests'),where('senderUid','==','social-a'))));
+  await assertFails(deleteDoc(doc(charlie,'friendRequests/'+requestId)));
+  await assertSucceeds(deleteDoc(doc(alice,'friendRequests/'+requestId)));
+  await assertSucceeds(setDoc(doc(alice,'friendRequests/'+requestId),request));
+  await assertFails(setDoc(doc(alice,'friendRequests/'+requestId),request));
+  await assertFails(setDoc(doc(alice,'friendRequests/social-a--social-a'),{...request,recipientUid:'social-a',
+    recipientUsername:'social_alice',friendshipId:'social-a--social-a'}));
+  await assertFails(setDoc(doc(bob,'friendRequests/social-b--social-a'),{senderUid:'social-b',
+    senderUsername:'social_bob',recipientUid:'social-a',recipientUsername:'social_alice',
+    friendshipId,createdAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(charlie,'friendships/'+friendshipId),{participantIds:['social-a','social-b'],
+    participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
+    acceptedRequestId:requestId,createdAt:serverTimestamp()}));
+
+  const accept=writeBatch(bob);
+  accept.set(doc(bob,'friendships/'+friendshipId),{participantIds:['social-a','social-b'],
+    participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
+    acceptedRequestId:requestId,createdAt:serverTimestamp()});
+  accept.set(doc(bob,'friendLists/social-a/friends/'+friendshipId),{friendshipId,friendUid:'social-b',
+    friendUsername:'social_bob',createdAt:serverTimestamp()});
+  accept.set(doc(bob,'friendLists/social-b/friends/'+friendshipId),{friendshipId,friendUid:'social-a',
+    friendUsername:'social_alice',createdAt:serverTimestamp()});
+  const conversation={friendshipId,participantIds:['social-a','social-b'],
+    participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:''};
+  accept.set(doc(bob,'conversations/'+friendshipId),conversation);
+  accept.delete(doc(bob,'friendRequests/'+requestId));
+  await assertSucceeds(accept.commit());
+  await assertSucceeds(getDocs(collection(alice,'friendLists/social-a/friends')));
+  await assertSucceeds(getDocs(collection(bob,'friendLists/social-b/friends')));
+  await assertFails(getDocs(collection(charlie,'friendLists/social-a/friends')));
+  await assertFails(setDoc(doc(alice,'friendRequests/'+requestId),request));
+
+  await assertSucceeds(getDoc(doc(alice,'conversations/'+friendshipId)));
+  await assertFails(getDocs(query(collection(alice,'conversations'),where('participantIds','array-contains','social-a'))));
+  await assertFails(getDoc(doc(charlie,'conversations/'+friendshipId)));
+
+  const messageRef=doc(alice,'conversations/'+friendshipId+'/messages/message-1');
+  const send=writeBatch(alice);
+  send.set(messageRef,{senderUid:'social-a',senderUsername:'social_alice',body:'Private hello',
+    deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()});
+  send.update(doc(alice,'conversations/'+friendshipId),{lastMessage:'Private hello',lastMessageId:'message-1',updatedAt:serverTimestamp()});
+  await assertSucceeds(send.commit());
+  await assertSucceeds(getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-1')));
+  await assertFails(getDoc(doc(charlie,'conversations/'+friendshipId+'/messages/message-1')));
+  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-1'),
+    {body:'Message unsent',deleted:true,deletedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(messageRef,{body:'Message unsent',deleted:true,deletedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),{lastMessage:'Message unsent',updatedAt:serverTimestamp()}));
+  const visible=await getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-1'));
+  if(visible.data()?.body!=='Message unsent' || visible.data()?.deleted!==true)
+    throw new Error('Unsent tombstone was not visible to both friends.');
 });

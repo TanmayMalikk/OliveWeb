@@ -65,6 +65,7 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.android.libraries.places:places:5.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
@@ -76,7 +77,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
-val verifyReleaseConfiguration by tasks.registering {
+val verifyReleaseConfiguration = tasks.register("verifyReleaseConfiguration") {
     doLast {
         check(firebaseConfigured) { "Release requires app/google-services.json. Local test accounts are debug-only." }
         check(releaseSigningReady) { "Release requires keystore.properties. See docs/DISTRIBUTION.md." }

@@ -179,7 +179,6 @@ A LITTLE FRESHNESS, EVERY DAY|UN PEU DE FRAÎCHEUR, CHAQUE JOUR
 Good food.\nGood mood.|Bien manger.\nSe sentir bien.
 Find your next feel-good favourite.|Découvrez votre prochain plat préféré.
 Clear search|Effacer la recherche
-Put ad here|Placez votre publicité ici
 Search results|Résultats de recherche
 Made for your cravings|Pour toutes vos envies
 Nothing on the menu yet|Aucun plat trouvé
@@ -230,6 +229,7 @@ Create your account|Créer votre compte
 Welcome back|Heureux de vous revoir
 Use these credentials when setting up another device.|Utilisez ces identifiants pour configurer un autre appareil.
 Sign in with your existing username and password. Next, create a PIN for this device.|Connectez-vous avec votre nom d’utilisateur et votre mot de passe, puis créez un NIP pour cet appareil.
+Sign in with your existing username and password.|Connectez-vous avec votre nom d’utilisateur et votre mot de passe existants.
 Username|Nom d’utilisateur
 Password|Mot de passe
 Confirm password|Confirmer le mot de passe
@@ -503,6 +503,62 @@ Clear|Effacer
 Select time|Choisir l’heure
 Next|Suivant
 Apply|Appliquer
+Welcome|Bienvenue
+First, choose what kind of account you use.|Choisissez d’abord le type de compte que vous utilisez.
+Account type|Type de compte
+User|Utilisateur
+Safe Contact|Contact de confiance
+Staff|Personnel
+Admin|Administrateur
+The person using the private cover and safe app|La personne qui utilise l’application de couverture et l’espace sécurisé
+A trusted person helping someone|Une personne de confiance qui aide quelqu’un
+An organization staff member|Un membre du personnel d’un organisme
+An organization leader who oversees staff|Un responsable d’organisme qui supervise le personnel
+Create a new account|Créer un nouveau compte
+Sign in to an existing account|Se connecter à un compte existant
+Sign in|Se connecter
+Olive Tree|Olive Tree
+Admin panel|Panneau d’administration
+Staff panel|Panneau du personnel
+Total users|Nombre total d’utilisateurs
+In development|En développement
+Active chats with users|Discussions actives avec les utilisateurs
+Staff and admin accounts|Comptes du personnel et des administrateurs
+Assign roles and create accounts · In development|Attribuer des rôles et créer des comptes · En développement
+Safe Contact space|Espace du contact de confiance
+Messages|Messages
+Send private messages to another Olive Branch username over Wi-Fi or mobile data.|Envoyez des messages privés à un autre nom d’utilisateur Olive Branch par Wi-Fi ou données mobiles.
+Messaging needs a Firebase-connected build.|La messagerie nécessite une version connectée à Firebase.
+Start conversation|Démarrer une conversation
+No conversations yet.|Aucune conversation pour le moment.
+New conversation|Nouvelle conversation
+No messages yet. Say hello when you are ready.|Aucun message pour le moment. Dites bonjour lorsque vous êtes prêt.
+Message|Message
+Send|Envoyer
+All conversations|Toutes les conversations
+Friends & messages|Amis et messages
+Find people by their exact username, manage friend requests, and open private conversations.|Trouvez des personnes avec leur nom d’utilisateur exact, gérez les demandes d’amitié et ouvrez des conversations privées.
+Search usernames|Rechercher des noms d’utilisateur
+Search|Rechercher
+Search results|Résultats de recherche
+No user found for that exact username.|Aucun utilisateur trouvé avec ce nom d’utilisateur exact.
+Add Friend|Ajouter
+Request Sent|Demande envoyée
+Incoming Request|Demande reçue
+Friends|Amis
+Incoming Friend Requests|Demandes d’amitié reçues
+Accept|Accepter
+Decline|Refuser
+Outgoing Friend Requests|Demandes d’amitié envoyées
+No outgoing requests.|Aucune demande envoyée.
+Cancel Request|Annuler la demande
+No friends yet.|Aucun ami pour le moment.
+Direct messages|Messages directs
+Direct message|Message direct
+Select a friend or conversation to start messaging.|Sélectionnez un ami ou une conversation pour commencer.
+Unsend message|Annuler l’envoi
+Message unsent|Message annulé
+Message actions|Actions du message
 """.trimIndent().lines().filter { '|' in it }.associate { line ->
     val (english,french)=line.split('|',limit=2)
     english.replace("\\n","\n") to french.replace("\\n","\n")

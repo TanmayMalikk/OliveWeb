@@ -1,6 +1,8 @@
 package com.olive.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -80,13 +82,18 @@ import java.util.Locale
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            val dish = vm.selectedDish
-            if(dish != null) Detail(dish, vm)
-            else when(vm.tab) {
-                CoverTab.Discover -> Discover(vm,onSearch) { if(configured) areaDialog=true else onAccountSetup() }
-                CoverTab.Saved -> Saved(vm)
-                CoverTab.Cart -> Cart(vm) { if(configured) checkoutNotice = true else onAccountSetup() }
-                CoverTab.Account -> Account(onAccountSetup,configured,session) { areaDialog=true }
+            AnimatedContent(targetState=vm.selectedDish to vm.tab,label="food cover page",
+                transitionSpec={
+                    (fadeIn(tween(180))+slideInHorizontally(tween(180)) { it/10 })
+                        .togetherWith(fadeOut(tween(120))+slideOutHorizontally(tween(120)) { -it/14 })
+                }) { (dish,tab) ->
+                if(dish != null) Detail(dish, vm)
+                else when(tab) {
+                    CoverTab.Discover -> Discover(vm,onSearch) { if(configured) areaDialog=true else onAccountSetup() }
+                    CoverTab.Saved -> Saved(vm)
+                    CoverTab.Cart -> Cart(vm) { if(configured) checkoutNotice = true else onAccountSetup() }
+                    CoverTab.Account -> Account(onAccountSetup,configured,session) { areaDialog=true }
+                }
             }
         }
     }
@@ -146,27 +153,19 @@ import java.util.Locale
                 }
             }
         }
-        if(vm.query.isBlank() && vm.category == "All") item {
-            // This blank card is reserved for a future Olive advertisement.
-            Card(modifier=Modifier.fillMaxWidth().height(170.dp).padding(horizontal=24.dp).testTag("olive_ad_placeholder"),shape=RoundedCornerShape(24.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFFF3F3F0))) {
-                Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {
-                    LocalizedText("Put ad here",style=MaterialTheme.typography.titleMedium,color=Muted)
-                }
-            }
-        }
         item { LocalizedText(vm.catalogMessage,Modifier.padding(horizontal=24.dp),color=Muted,style=MaterialTheme.typography.bodySmall) }
         item { Row(Modifier.fillMaxWidth().padding(horizontal=24.dp),verticalAlignment=Alignment.CenterVertically) {
             LocalizedText(if(vm.query.isNotBlank()) "Search results" else "Made for your cravings",fontSize=22.sp,fontFamily=FontFamily.Serif,modifier=Modifier.weight(1f))
             LocalizedText("${vm.results.size} dishes",style=MaterialTheme.typography.labelMedium,color=Muted)
         } }
         if(vm.results.isEmpty()) item { EmptyState(Icons.Outlined.Search,"Nothing on the menu yet","Try a different search or choose another category.") }
-        items(vm.results, key={it.id}) { DishCard(it, vm) }
+        items(vm.results, key={it.id}) { DishCard(it, vm,Modifier.animateItem()) }
     }
 }
 
 // One bite-sized menu card with its photo, price, favourite button, and quick add.
-@Composable private fun DishCard(dish: Dish, vm: OliveViewModel) {
-    Card(onClick={vm.select(dish)},modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+@Composable private fun DishCard(dish: Dish, vm: OliveViewModel, modifier: Modifier=Modifier) {
+    Card(onClick={vm.select(dish)},modifier=modifier.fillMaxWidth().padding(horizontal=24.dp).animateContentSize(),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
         Box {
             DishImage(dish,Modifier.fillMaxWidth().aspectRatio(16f/9f))
             FilledIconButton(onClick={vm.favorite(dish.id)},modifier=Modifier.align(Alignment.TopEnd).padding(10.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=Cream)) {
@@ -221,7 +220,7 @@ import java.util.Locale
         item { PageTitle("Your favourites", "Good finds, kept close.") }
         val saved = vm.dishes.filter { it.id in vm.favorites }
         if(saved.isEmpty()) item { EmptyState(Icons.Outlined.FavoriteBorder,"A place for your favourites","Tap the heart on any dish to save it here.") }
-        items(saved,key={it.id}) { DishCard(it,vm) }
+        items(saved,key={it.id}) { DishCard(it,vm,Modifier.animateItem()) }
     }
 }
 
@@ -234,7 +233,7 @@ import java.util.Locale
             Button(onClick={vm.navigate(CoverTab.Discover)},modifier=Modifier.padding(horizontal=24.dp).fillMaxWidth()) { LocalizedText("Explore the menu") }
         }
         items(vm.dishes.filter { it.id in vm.cart },key={it.id}) { dish ->
-            Card(modifier=Modifier.padding(horizontal=24.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            Card(modifier=Modifier.animateItem().padding(horizontal=24.dp).animateContentSize(),colors=CardDefaults.cardColors(containerColor=Color.White)) {
                 Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
                     DishImage(dish,Modifier.size(72.dp).clip(RoundedCornerShape(14.dp)))
                     Column(Modifier.weight(1f).padding(start=12.dp)) {

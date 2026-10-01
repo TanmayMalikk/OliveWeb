@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-data class DeviceEnrollment(val uid: String, val triggerHash: String)
+data class DeviceEnrollment(val uid: String, val triggerHash: String, val role: AccountRole = AccountRole.USER)
 sealed interface PinResult {
     data object Accepted : PinResult
     data class Rejected(val failures: Int) : PinResult
@@ -17,7 +17,18 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
         val root = vault.read()
         val uid = root.optString("activeUid")
         val entry = root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return null
-        return DeviceEnrollment(uid,entry.getString("triggerHash"))
+        return DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role")))
+    }
+    // A package update can leave Firebase signed in while the local active pointer is missing; relink only a saved enrollment.
+    fun restoreActive(uid: String): DeviceEnrollment? {
+        var restored: DeviceEnrollment?=null
+        vault.update { root ->
+            val entry=root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return@update
+            if(root.optJSONObject("profiles")?.optJSONObject(uid)==null) return@update
+            root.put("activeUid",uid)
+            restored=DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role")))
+        }
+        return restored
     }
     fun enroll(identity: AccountIdentity, profile: UserProfile, pin: String): DeviceEnrollment {
         require(InputPolicy.validPin(pin))
@@ -25,20 +36,40 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
         vault.update { root ->
             root.child("enrollments").put(identity.uid,JSONObject()
                 .put("pinVerifier",verifier).put("triggerHash",profile.triggerHash)
+                .put("role",profile.role.name)
                 .put("failures",0))
             root.child("profiles").put(identity.uid,profile.toJson())
             root.put("activeUid",identity.uid)
         }
         recordSettings(identity.uid,SettingsEvent(area="Onboarding",action="Created profile",
-            changes=listOf(
-                FieldChange("Full name","Empty",profile.fullName),
-                FieldChange("Date of birth","Empty",profile.dob),
-                FieldChange("Language","Empty",profile.language),
-                FieldChange("City","Empty",profile.address.city),
-                FieldChange("Cover app","Empty",profile.coverType.title),
-                FieldChange("Trigger word","Not set","Set"),
-            )))
-        return DeviceEnrollment(identity.uid,profile.triggerHash)
+            changes=buildList {
+                add(FieldChange("Account type","Empty",profile.role.title))
+                add(FieldChange("Full name","Empty",profile.fullName))
+                add(FieldChange("Date of birth","Empty",profile.dob))
+                add(FieldChange("Language","Empty",profile.language))
+                add(FieldChange("City","Empty",profile.address.city))
+                if(profile.role==AccountRole.USER) {
+                    add(FieldChange("Cover app","Empty",profile.coverType.title))
+                    add(FieldChange("Trigger word","Not set","Set"))
+                }
+            }))
+        return DeviceEnrollment(identity.uid,profile.triggerHash,profile.role)
+    }
+    // Safe contacts, staff, and admins use account login only, so their local session never stores a device PIN.
+    fun enrollWithoutPin(identity: AccountIdentity, profile: UserProfile): DeviceEnrollment {
+        require(profile.role!=AccountRole.USER)
+        vault.update { root ->
+            root.child("enrollments").put(identity.uid,JSONObject()
+                .put("triggerHash","").put("role",profile.role.name).put("failures",0))
+            root.child("profiles").put(identity.uid,profile.toJson())
+            root.put("activeUid",identity.uid)
+        }
+        return DeviceEnrollment(identity.uid,"",profile.role)
+    }
+    fun removePin(uid: String) {
+        vault.update { root -> root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
+            remove("pinVerifier");remove("lockedUntil");put("failures",0)
+        } }
     }
     // PIN attempt counting lives here; change the screen response in SessionViewModel.submitPin too.
     fun verify(uid: String, pin: String, now: Long = System.currentTimeMillis()): PinResult {
