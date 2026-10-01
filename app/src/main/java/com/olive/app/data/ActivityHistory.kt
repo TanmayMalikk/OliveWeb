@@ -2,9 +2,14 @@ package com.olive.app.data
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
 import java.util.UUID
 
 data class HistoryRecord(val category: String, val id: String, val json: String)
+
+// Keep the machine timestamp for sorting and add an ISO value humans can read in Firebase Storage.
+private fun JSONObject.putReadableTime(name: String, value: Long) =
+    put(name,value).put("${name}Iso",Instant.ofEpochMilli(value).toString())
 
 enum class PrivateEntryKind { Note, Incident }
 
@@ -15,7 +20,7 @@ data class PrivateEntryEdit(
     val timestamp: Long = System.currentTimeMillis(),
     val changes: List<FieldChange>,
 ) {
-    fun toJson() = JSONObject().put("id",id).put("timestamp",timestamp)
+    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp)
         .put("changes",JSONArray().also { rows -> changes.forEach { rows.put(it.toJson()) } })
     companion object { fun fromJson(value: JSONObject): PrivateEntryEdit {
         val rows=value.optJSONArray("changes") ?: JSONArray()
@@ -37,13 +42,13 @@ data class PrivateEntry(
     val deletedAt: Long? = null,
     val purgedAt: Long? = null,
 ) {
-    fun toJson() = JSONObject().put("id",id).put("timestamp",timestamp).put("updatedAt",updatedAt)
+    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).putReadableTime("updatedAt",updatedAt)
         .put("title",title).put("body",body).put("pinned",pinned)
         .put("edits",JSONArray().also { rows -> edits.forEach { rows.put(it.toJson()) } })
         .also {
             if(kind!=null) it.put("kind",kind.name)
-            if(deletedAt!=null) it.put("deletedAt",deletedAt)
-            if(purgedAt!=null) it.put("purgedAt",purgedAt)
+            if(deletedAt!=null) it.putReadableTime("deletedAt",deletedAt)
+            if(purgedAt!=null) it.putReadableTime("purgedAt",purgedAt)
         }
     companion object {
         fun fromJson(value: JSONObject): PrivateEntry {
@@ -83,7 +88,7 @@ data class SettingsEvent(
     val action: String,
     val changes: List<FieldChange> = emptyList(),
 ) {
-    fun toJson() = JSONObject().put("id",id).put("timestamp",timestamp).put("area",area)
+    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("area",area)
         .put("action",action).put("changes",JSONArray().also { rows -> changes.forEach { rows.put(it.toJson()) } })
     companion object { fun fromJson(value: JSONObject): SettingsEvent {
         val rows=value.optJSONArray("changes") ?: JSONArray()
@@ -99,7 +104,7 @@ data class TriggerEvent(
     val pinAttempts: Int = 0,
     val lastResult: String = "No PIN attempt",
 ) {
-    fun toJson() = JSONObject().put("id",id).put("timestamp",timestamp).put("source",source)
+    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("source",source)
         .put("pinAttempts",pinAttempts).put("lastResult",lastResult)
     companion object { fun fromJson(value: JSONObject) = TriggerEvent(value.getString("id"),value.getLong("timestamp"),
         value.getString("source"),value.optInt("pinAttempts"),value.optString("lastResult","No PIN attempt")) }
@@ -116,7 +121,7 @@ data class CheckoutEvent(
     val totalCents: Int,
     val error: String,
 ) {
-    fun toJson() = JSONObject().put("id",id).put("timestamp",timestamp).put("totalCents",totalCents)
+    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("totalCents",totalCents)
         .put("error",error).put("foods",JSONArray().also { rows -> foods.forEach { rows.put(it.toJson()) } })
     companion object { fun fromJson(value: JSONObject): CheckoutEvent {
         val rows=value.optJSONArray("foods") ?: JSONArray()

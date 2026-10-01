@@ -40,5 +40,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity-alias android:name=".BranchLauncher" android:targetActivity=".MainActivity"
+            android:exported="true" android:enabled="false" android:label="Olive Branch"
+            android:icon="@drawable/ic_olive" android:roundIcon="@drawable/ic_olive">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias android:name=".TreeLauncher" android:targetActivity=".MainActivity"
+            android:exported="true" android:enabled="false" android:label="Olive Tree"
+            android:icon="@drawable/ic_olive" android:roundIcon="@drawable/ic_olive">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

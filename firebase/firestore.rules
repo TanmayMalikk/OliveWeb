@@ -6,6 +6,12 @@ service cloud.firestore {
 
     function owner(uid) { return request.auth != null && request.auth.uid == uid; }
 
+    function signedIn() { return request.auth != null; }
+
+    function validMessageUsername(username) {
+      return username is string && username.matches('[a-z0-9_]{4,24}');
+    }
+
     function contactAt(c, i) {
 
       return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','details'])
@@ -42,7 +48,7 @@ service cloud.firestore {
 
       return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
 
-        && p.keys().hasOnly(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts','address'])
+        && p.keys().hasOnly(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts','address','role'])
 
         && p.username is string && p.username.matches('[a-z0-9_]{3,30}')
 
@@ -60,7 +66,10 @@ service cloud.firestore {
 
         && p.region is string && p.region.size() <= 200
 
-        && p.triggerHash is string && p.triggerHash.matches('[a-f0-9]{64}')
+        && p.triggerHash is string
+        && (p.triggerHash.matches('[a-f0-9]{64}') || (('role' in p) && p.role in ['SAFE_CONTACT','STAFF','ADMIN'] && p.triggerHash == ''))
+
+        && (!('role' in p) || p.role in ['USER','SAFE_CONTACT','STAFF','ADMIN'])
 
         && (!('address' in p) || validAddress(p.address))
 
@@ -101,6 +110,150 @@ service cloud.firestore {
 
       allow delete: if owner(uid);
 
+    }
+
+    // Username lookup is exact and case-normalized by the app; listing the directory is never allowed.
+    match /messageDirectory/{username} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create, update: if owner(request.resource.data.uid)
+        && request.resource.data.keys().hasOnly(['uid','username','updatedAt'])
+        && request.resource.data.username == username
+        && validMessageUsername(username)
+        && request.auth.token.email == username + '@users.olive.invalid';
+      allow delete: if owner(resource.data.uid);
+    }
+
+    function directoryMatches(uid, username) {
+      return validMessageUsername(username)
+        && get(/databases/$(database)/documents/messageDirectory/$(username)).data.uid == uid;
+    }
+
+    function pairIdMatches(pairId, firstUid, secondUid) {
+      return pairId == firstUid + '--' + secondUid || pairId == secondUid + '--' + firstUid;
+    }
+
+    function validFriendRequest(data) {
+      return data.keys().hasOnly(['senderUid','senderUsername','recipientUid','recipientUsername','friendshipId','createdAt'])
+        && data.senderUid is string && data.recipientUid is string && data.senderUid != data.recipientUid
+        && validMessageUsername(data.senderUsername) && validMessageUsername(data.recipientUsername)
+        && pairIdMatches(data.friendshipId,data.senderUid,data.recipientUid)
+        && directoryMatches(data.senderUid,data.senderUsername)
+        && directoryMatches(data.recipientUid,data.recipientUsername);
+    }
+
+    match /friendRequests/{requestId} {
+      allow read: if signedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.senderUid == request.auth.uid
+        && requestId == request.resource.data.senderUid + '--' + request.resource.data.recipientUid
+        && validFriendRequest(request.resource.data)
+        && !exists(/databases/$(database)/documents/friendRequests/$(request.resource.data.recipientUid + '--' + request.resource.data.senderUid))
+        && !exists(/databases/$(database)/documents/friendships/$(request.resource.data.senderUid + '--' + request.resource.data.recipientUid))
+        && !exists(/databases/$(database)/documents/friendships/$(request.resource.data.recipientUid + '--' + request.resource.data.senderUid));
+      allow update: if false;
+      allow delete: if signedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
+    }
+
+    function validFriendship(data, friendshipId) {
+      return data.keys().hasOnly(['participantIds','participantUsernames','acceptedRequestId','createdAt'])
+        && data.participantIds is list && data.participantIds.size() == 2
+        && data.participantIds[0] != data.participantIds[1]
+        && data.participantUsernames is map
+        && data.participantUsernames[data.participantIds[0]] is string
+        && data.participantUsernames[data.participantIds[1]] is string
+        && directoryMatches(data.participantIds[0],data.participantUsernames[data.participantIds[0]])
+        && directoryMatches(data.participantIds[1],data.participantUsernames[data.participantIds[1]])
+        && pairIdMatches(friendshipId,data.participantIds[0],data.participantIds[1]);
+    }
+
+    function acceptedRequest(data) {
+      return get(/databases/$(database)/documents/friendRequests/$(data.acceptedRequestId)).data;
+    }
+
+    match /friendships/{friendshipId} {
+      allow get: if signedIn() && request.auth.uid in resource.data.participantIds;
+      allow list: if false;
+      allow create: if signedIn() && validFriendship(request.resource.data,friendshipId)
+        && acceptedRequest(request.resource.data).recipientUid == request.auth.uid
+        && acceptedRequest(request.resource.data).friendshipId == friendshipId
+        && acceptedRequest(request.resource.data).senderUid in request.resource.data.participantIds
+        && acceptedRequest(request.resource.data).recipientUid in request.resource.data.participantIds
+        && !exists(/databases/$(database)/documents/friendships/$(request.resource.data.participantIds[1] + '--' + request.resource.data.participantIds[0]));
+      allow update, delete: if false;
+    }
+
+    function friendshipAfter(friendshipId) {
+      return getAfter(/databases/$(database)/documents/friendships/$(friendshipId)).data;
+    }
+
+    function validFriendListEntry(ownerUid, friendshipId, data) {
+      return data.keys().hasOnly(['friendshipId','friendUid','friendUsername','createdAt'])
+        && data.friendshipId == friendshipId && data.friendUid != ownerUid
+        && ownerUid in friendshipAfter(friendshipId).participantIds
+        && data.friendUid in friendshipAfter(friendshipId).participantIds
+        && directoryMatches(data.friendUid,data.friendUsername)
+        && acceptedRequest(friendshipAfter(friendshipId)).recipientUid == request.auth.uid;
+    }
+
+    match /friendLists/{ownerUid}/friends/{friendshipId} {
+      allow get, list: if owner(ownerUid);
+      allow create: if signedIn() && validFriendListEntry(ownerUid,friendshipId,request.resource.data);
+      allow update, delete: if false;
+    }
+
+    function conversationParticipant(data) {
+      return signedIn() && data.participantIds is list && request.auth.uid in data.participantIds;
+    }
+
+    function friendshipForConversation(data) {
+      return getAfter(/databases/$(database)/documents/friendships/$(data.friendshipId)).data;
+    }
+
+    function validConversation(data, conversationId) {
+      return data.keys().hasOnly(['friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId'])
+        && data.friendshipId == conversationId
+        && data.lastMessage is string && data.lastMessage.size() <= 160
+        && data.lastMessageId is string && data.lastMessageId.size() <= 128
+        && existsAfter(/databases/$(database)/documents/friendships/$(data.friendshipId))
+        && data.participantIds == friendshipForConversation(data).participantIds
+        && data.participantUsernames == friendshipForConversation(data).participantUsernames;
+    }
+
+    match /conversations/{conversationId} {
+      allow get: if signedIn()
+        && request.auth.uid in get(/databases/$(database)/documents/friendships/$(conversationId)).data.participantIds;
+      allow list: if false;
+      allow create: if conversationParticipant(request.resource.data) && validConversation(request.resource.data,conversationId);
+      allow update: if conversationParticipant(resource.data)
+        && validConversation(request.resource.data,conversationId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','lastMessageId','updatedAt']);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function parentConversation() {
+          return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        }
+        allow read: if conversationParticipant(parentConversation());
+        allow create: if conversationParticipant(parentConversation())
+          && request.resource.data.keys().hasOnly(['senderUid','senderUsername','body','deleted','sentAt','clientSentAt'])
+          && request.resource.data.senderUid == request.auth.uid
+          && request.resource.data.senderUsername is string
+          && request.auth.token.email == request.resource.data.senderUsername + '@users.olive.invalid'
+          && request.resource.data.body is string && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 2000
+          && request.resource.data.deleted == false
+          && request.resource.data.clientSentAt is int;
+        allow update: if conversationParticipant(parentConversation())
+          && resource.data.senderUid == request.auth.uid
+          && resource.data.deleted == false && request.resource.data.deleted == true
+          && request.resource.data.body == 'Message unsent'
+          && request.resource.data.senderUid == resource.data.senderUid
+          && request.resource.data.senderUsername == resource.data.senderUsername
+          && request.resource.data.sentAt == resource.data.sentAt
+          && request.resource.data.clientSentAt == resource.data.clientSentAt
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body','deleted','deletedAt']);
+        allow delete: if false;
+      }
     }
 
     match /{document=**} { allow read, write: if false; }

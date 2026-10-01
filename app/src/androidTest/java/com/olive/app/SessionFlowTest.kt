@@ -69,6 +69,23 @@ class SessionFlowTest {
     }
     private fun unlock(pin: String = "123456") { trigger(); enterPin(pin); waitFor("safe_settings") }
 
+    @Test fun safeContactGetsShorterOnboardingAndNoCover() {
+        waitFor("account_role");click("account_role");click("role_safe_contact")
+        click("new_user")
+        fill("username","safe_contact_test");fill("password","test-password-123");fill("confirm_password","test-password-123")
+        click("credentials_submit");waitFor("profile_submit")
+        compose.onNodeWithTag("abuser_name").assertDoesNotExist()
+        compose.onNodeWithTag("situation").assertDoesNotExist()
+        compose.onNodeWithTag("trigger").assertDoesNotExist()
+        compose.onNodeWithTag("cover_choice_food").assertDoesNotExist()
+        fill("full_name","Trusted Contact");chooseBirthday();fill("address_city","Edmonton")
+        click("profile_submit");waitFor("safe_settings")
+        compose.onNodeWithTag("cover_root").assertDoesNotExist()
+        compose.onNodeWithText("Safe Contact space").assertExists()
+        compose.onNodeWithTag("change_device_pin").assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").performClick();waitFor("safe_settings")
+    }
+
     @Test fun onboardingNeedsCityButNotAFullDeliveryAddress() {
         waitFor("new_user");click("new_user")
         fill("username","city_only");fill("password","test-password-123");fill("confirm_password","test-password-123")
@@ -114,7 +131,11 @@ class SessionFlowTest {
         compose.onNodeWithText("Discover").performClick()
         unlock()
         compose.onNodeWithTag("safe_notes").assertExists()
-        repeat(3) { compose.onNodeWithTag("future_feature_${it+2}").assertExists() }
+        compose.onNodeWithTag("safe_messages").assertExists()
+        repeat(2) { compose.onNodeWithTag("future_feature_${it+3}").assertExists() }
+        click("safe_messages");waitFor("message_username")
+        compose.onNodeWithText("Messaging needs a Firebase-connected build.").assertExists()
+        click("safe_home")
         click("safe_notes");click("new_private_entry");click("private_kind_incident")
         fill("private_entry_title","Private incident")
         fill("private_entry_body","Details that must stay inside Olive Branch")
@@ -142,13 +163,16 @@ class SessionFlowTest {
         compose.onNodeWithText("Close").performClick()
         compose.onNodeWithTag("private_entry_row").performClick()
         click("delete_private_entry")
+        compose.waitUntil(30_000) { compose.onAllNodesWithText("Moved to ScratchPad for 30 days.").fetchSemanticsNodes().isNotEmpty() }
         click("open_scratchpad")
         compose.waitUntil(30_000) { compose.onAllNodesWithTag("scratchpad_entry").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Updated private incident details").assertExists()
         click("restore_private_entry")
-        compose.waitUntil(30_000) { compose.onAllNodesWithText("ScratchPad is empty.").fetchSemanticsNodes().isNotEmpty() }
-        click("close_scratchpad")
+        compose.waitUntil(30_000) { compose.onAllNodesWithText("Restored from ScratchPad.").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Updated private incident details").assertExists()
+        click("new_private_entry")
+        compose.onNodeWithText("Restored from ScratchPad.").assertDoesNotExist()
+        click("private_notes_back")
         val privateBytes=File(InstrumentationRegistry.getInstrumentation().targetContext.noBackupFilesDir,"olive-demo-activity.vault").readBytes().toString(Charsets.ISO_8859_1)
         assertFalse(privateBytes.contains("Details that must stay inside Olive Branch"))
         assertFalse(privateBytes.contains("Updated private incident details"))

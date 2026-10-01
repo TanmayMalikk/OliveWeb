@@ -5,14 +5,19 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.content.pm.PackageManager
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -22,6 +27,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AccessTime
@@ -31,6 +37,8 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -90,15 +98,17 @@ import java.util.UUID
     }
     CompositionLocalProvider(LocalOliveLanguage provides session.language) {
     Box(Modifier.fillMaxSize()) {
-        // Keep the actual cover composition (including scroll position) alive beneath the opaque overlay.
+        // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(if(isCover) Modifier.fillMaxSize().testTag("cover_root") else Modifier.fillMaxSize().clearAndSetSemantics { }) {
-            when(session.coverType) {
-                CoverType.FOOD, CoverType.GAME -> OliveApp(cover,interactive=isCover,onSearch={ value ->
-                    if(session.interceptSearch(value)) { cover.search(""); focus.clearFocus(); keyboard?.hide() }
-                    else cover.search(value)
-                },onAccountSetup=session::setup,configured=session.configured, session=session)
-                CoverType.NEWS -> NewsCover(session,locationPermissionVersion,isCover)
-                CoverType.CALCULATOR -> CalculatorCover(session,isCover)
+            if(session.usesCover) {
+                when(session.coverType) {
+                    CoverType.FOOD, CoverType.GAME -> OliveApp(cover,interactive=isCover,onSearch={ value ->
+                        if(session.interceptSearch(value)) { cover.search(""); focus.clearFocus(); keyboard?.hide() }
+                        else cover.search(value)
+                    },onAccountSetup=session::setup,configured=session.configured, session=session)
+                    CoverType.NEWS -> NewsCover(session,locationPermissionVersion,isCover)
+                    CoverType.CALCULATOR -> CalculatorCover(session,isCover)
+                }
             }
         }
         if(!isCover) {
@@ -108,17 +118,22 @@ import java.util.UUID
             BackHandler { keyboard?.hide(); focus.clearFocus(force=true); session.back() }
             Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
                 Scaffold(
-                    modifier=Modifier.imePadding(),
-                    bottomBar={
+                    bottomBar={ if((session.screen==SessionScreen.Safe &&
+                            !(session.page==SafePage.Messages && session.activeConversation!=null)) ||
+                            (session.screen==SessionScreen.Pin && session.usesCover)) {
                         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),horizontalArrangement=Arrangement.End) {
                         ExtendedFloatingActionButton(onClick=exit,modifier=Modifier.testTag("quick_exit"),
                             containerColor=OliveGreen,contentColor=MaterialTheme.colorScheme.onPrimary,
                             icon={Icon(Icons.Outlined.Close,null)},text={LocalizedText("Quick exit")})
                         }
-                    },
+                    } },
                 ) { padding ->
                     Box(Modifier.fillMaxSize().padding(padding)) {
-                        when(session.screen) {
+                        AnimatedContent(targetState=session.screen,label="session screen",
+                            transitionSpec={
+                                (fadeIn(tween(180))+scaleIn(tween(180),initialScale=.985f))
+                                    .togetherWith(fadeOut(tween(120)))
+                            }) { targetScreen -> when(targetScreen) {
                             SessionScreen.Loading -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator() }
                             SessionScreen.Welcome -> Welcome(session)
                             SessionScreen.NewCredentials -> Credentials(session,true)
@@ -126,13 +141,14 @@ import java.util.UUID
                             SessionScreen.ProfileSetup -> ProfileSetup(session)
                             SessionScreen.DevicePin -> DevicePin(session)
                             SessionScreen.Pin -> PinPrompt(session)
-                            SessionScreen.Safe -> SafeArea(session)
+                            SessionScreen.Safe -> SafeArea(session,exit)
+                            SessionScreen.Portal -> OrganizationPortal(session)
                             SessionScreen.StorageError -> FormColumn {
                                 Heading("Unable to open local storage", "Access remains locked. Your existing data has not been replaced.")
                                 Button(onClick=session::load,enabled=!session.busy) { LocalizedText("Retry") }
                             }
                             SessionScreen.Cover -> Unit
-                        }
+                        } }
                     }
                 }
             }
@@ -140,7 +156,7 @@ import java.util.UUID
                 if(session.screen==SessionScreen.Safe) AlertDialog(
                     onDismissRequest=session::noteInteraction,
                     title={LocalizedText("Locking soon")},
-                    text={LocalizedText("No activity. Returning to your cover in $seconds seconds.")},
+                    text={LocalizedText(if(session.usesCover) "No activity. Returning to your cover in $seconds seconds." else "No activity. Locking Olive Branch in $seconds seconds.")},
                     confirmButton={TextButton(onClick=session::noteInteraction) { LocalizedText("Stay here") }},
                     dismissButton={TextButton(onClick=exit) { LocalizedText("Quick exit") }}
                 )
@@ -169,8 +185,13 @@ import java.util.UUID
     }
 }
 @Composable private fun Status(session: SessionViewModel) {
-    session.message?.let { LocalizedText(it,modifier=Modifier.testTag("session_message"),color=MaterialTheme.colorScheme.primary) }
-    if(session.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+    AnimatedContent(targetState=session.message,label="status message",
+        transitionSpec={fadeIn(tween(160)).togetherWith(fadeOut(tween(100)))}) { status ->
+        status?.let { LocalizedText(it,modifier=Modifier.testTag("session_message"),color=MaterialTheme.colorScheme.primary) }
+    }
+    AnimatedVisibility(session.busy,enter=fadeIn(tween(120))+expandVertically(),exit=fadeOut(tween(100))+shrinkVertically()) {
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+    }
 }
 @Composable private fun Field(label: String, value: String, tag: String, secret: Boolean=false, numeric: Boolean=false,
                              multiline: Boolean=false, enabled: Boolean=true, onFocus: (() -> Unit)?=null, onChange: (String)->Unit) {
@@ -181,14 +202,30 @@ import java.util.UUID
         keyboardOptions=KeyboardOptions(autoCorrectEnabled=false,keyboardType=when { numeric -> KeyboardType.NumberPassword; secret -> KeyboardType.Password; else -> KeyboardType.Text }))
 }
 
-// First launch starts here: pick a brand-new account or bring an old one onto this phone.
+// First launch starts here: role comes first so every account gets the right setup and app shell.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun Welcome(session: SessionViewModel) {
+    var roleOpen by remember { mutableStateOf(false) }
     FormColumn {
-        Heading("Welcome to Olive", "Choose how you’d like to get started.")
+        Heading("Welcome", "First, choose what kind of account you use.")
         ModeNotice(session)
-        Button(onClick=session::chooseNew,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("new_user")) { LocalizedText("I’m a new user") }
-        OutlinedButton(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("I’m a returning user") }
-        LocalizedText("You can use Quick exit at any time to open the food menu. If setup is incomplete, return through Account.",color=Muted)
+        ExposedDropdownMenuBox(expanded=roleOpen,onExpandedChange={roleOpen=!roleOpen}) {
+            OutlinedTextField(value=session.accountRole.title,onValueChange={},readOnly=true,label={LocalizedText("Account type")},
+                trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(roleOpen)},modifier=Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).testTag("account_role"))
+            ExposedDropdownMenu(expanded=roleOpen,onDismissRequest={roleOpen=false}) {
+                AccountRole.entries.forEach { role -> DropdownMenuItem(
+                    text={Column { LocalizedText(role.title);LocalizedText(role.description,style=MaterialTheme.typography.bodySmall,color=Muted) }},
+                    onClick={session.selectRole(role);roleOpen=false},modifier=Modifier.testTag("role_${role.name.lowercase()}")) }
+            }
+        }
+        if(session.accountRole==AccountRole.USER || session.accountRole==AccountRole.SAFE_CONTACT) {
+            Button(onClick=session::chooseNew,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("new_user")) { LocalizedText("Create a new account") }
+            OutlinedButton(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("Sign in to an existing account") }
+        } else {
+            LocalizedText("${session.accountRole.title} accounts are created by an administrator. Sign in with the username and password you were given.",color=Muted)
+            Button(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("Sign in") }
+        }
+        Status(session)
     }
 }
 
@@ -199,7 +236,13 @@ import java.util.UUID
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     FormColumn {
-        Heading(if(create) "Create your account" else "Welcome back",if(create) "Use these credentials when setting up another device." else "Sign in with your existing username and password. Next, create a PIN for this device.")
+        Heading(if(create) "Create your ${session.accountRole.title} account" else "${session.accountRole.title} sign in",
+            if(create) "Use these credentials when setting up another device."
+            else when(session.accountRole) {
+                AccountRole.USER -> "Sign in with your existing username and password. Next, create a PIN for this device."
+                AccountRole.SAFE_CONTACT -> "Sign in with your existing username and password."
+                else -> "Use the credentials issued by an administrator."
+            })
         ModeNotice(session)
         Field("Username",username,"username",enabled=!session.busy) { username=it.take(if(create) 24 else 30) }
         Field("Password",password,"password",secret=true,enabled=!session.busy) { password=it.take(if(create) 24 else 128) }
@@ -258,6 +301,7 @@ import java.util.UUID
 
 // Add or rearrange onboarding fields here, then update UserProfile and saveSetupProfile too.
 @Composable private fun ProfileSetup(session: SessionViewModel) {
+    val safeContact=session.accountRole==AccountRole.SAFE_CONTACT
     var fullName by remember { mutableStateOf("") }
     var affected by remember { mutableStateOf("") }
     var abuserName by remember { mutableStateOf("") }
@@ -270,27 +314,30 @@ import java.util.UUID
     var contactDetails by remember { mutableStateOf("") }
     var coverType by remember { mutableStateOf(CoverType.FOOD) }
     FormColumn {
-        Heading("Your profile", "Full name, date of birth, language, city and a trigger word are required.")
+        Heading("Your profile",if(safeContact) "Full name, date of birth, language and city are required." else "Full name, date of birth, language, city and a trigger word are required.")
         Field("Full name (required)",fullName,"full_name",enabled=!session.busy) { fullName=it.take(120) }
-        Field("Names of people experiencing abuse (optional)",affected,"affected_names",enabled=!session.busy) { affected=it.take(500) }
-        Field("Abuser's name (optional)",abuserName,"abuser_name",enabled=!session.busy) { abuserName=it.take(120) }
+        if(!safeContact) {
+            Field("Names of people experiencing abuse (optional)",affected,"affected_names",enabled=!session.busy) { affected=it.take(500) }
+            Field("Abuser's name (optional)",abuserName,"abuser_name",enabled=!session.busy) { abuserName=it.take(120) }
+        }
         BirthdayPicker(dob,"dob",!session.busy) { dob=it }
         LanguagePicker(language,!session.busy) { language=it }
-        Field("Brief description of your situation (optional, recommended)",situation,"situation",multiline=true,enabled=!session.busy) { situation=it.take(2000) }
+        if(!safeContact) Field("Brief description of your situation (optional, recommended)",situation,"situation",multiline=true,enabled=!session.busy) { situation=it.take(2000) }
         HorizontalDivider()
         LocalizedText("Location",style=MaterialTheme.typography.titleLarge)
         LocalizedText("City is required. The rest of your delivery address is optional and can be added later.",style=MaterialTheme.typography.bodySmall,color=Muted)
         AddressFields(address,cityOnlyRequired=true) { address=it }
-        HorizontalDivider()
-        LocalizedText("Safe entry",style=MaterialTheme.typography.titleLarge)
-        Field("Trigger word or phrase",trigger,"trigger",secret=true,enabled=!session.busy) { trigger=it.take(64) }
-        LocalizedText("Olive and Daily Digest ignore spaces and letter case in your trigger. Other searches keep their spaces. Simple Calculator uses your PIN and two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        if(!safeContact) {
+            HorizontalDivider()
+            LocalizedText("Safe entry",style=MaterialTheme.typography.titleLarge)
+            Field("Trigger word or phrase",trigger,"trigger",secret=true,enabled=!session.busy) { trigger=it.take(64) }
+            LocalizedText("Olive and Daily Digest ignore spaces and letter case in your trigger. Other searches keep their spaces. Simple Calculator uses your PIN and two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        }
         LocalizedText("Safe contact · optional",style=MaterialTheme.typography.titleMedium)
         Field("Contact name",contactName,"setup_contact_name",enabled=!session.busy) { contactName=it.take(120) }
         Field("Contact phone or email",contactDetails,"setup_contact_details",enabled=!session.busy) { contactDetails=it.take(200) }
         LocalizedText("Contacts can be added and edited later. Olive never contacts anyone automatically.",style=MaterialTheme.typography.bodySmall,color=Muted)
-        // Cover choice is the last onboarding option; the game explains its current status.
-        CoverPicker(coverType,!session.busy) { chosen ->
+        if(!safeContact) CoverPicker(coverType,!session.busy) { chosen ->
             if(chosen == CoverType.GAME) session.error("In development") else coverType=chosen
         }
         Status(session)
@@ -300,12 +347,12 @@ import java.util.UUID
                 !InputPolicy.validDob(dob) -> session.error("Use a valid date of birth in YYYY-MM-DD format.")
                 language.isBlank() -> session.error("Enter your preferred language.")
                 !address.locationValid -> session.error("Enter your city.")
-                !InputPolicy.validTrigger(trigger) -> session.error("Choose a trigger word or phrase of 3–64 characters.")
+                !safeContact && !InputPolicy.validTrigger(trigger) -> session.error("Choose a trigger word or phrase of 3–64 characters.")
                 contactName.isBlank() != contactDetails.isBlank() -> session.error("Enter both contact fields or leave both empty.")
                 else -> session.saveSetupProfile(UserProfile(
                     username=session.setupUsername,fullName=fullName.trim(),affectedNames=affected.trim(),abuserName=abuserName.trim(),dob=dob.trim(),language=language.trim(),
-                    situation=situation.trim(),region=address.generalLocation,triggerHash=InputPolicy.triggerHash(trigger),
-                    contacts=if(contactName.isBlank()) emptyList() else listOf(SafeContact(UUID.randomUUID().toString(),contactName.trim(),contactDetails.trim())),address=address,coverType=coverType))
+                    situation=situation.trim(),region=address.generalLocation,triggerHash=if(safeContact) "" else InputPolicy.triggerHash(trigger),
+                    contacts=if(contactName.isBlank()) emptyList() else listOf(SafeContact(UUID.randomUUID().toString(),contactName.trim(),contactDetails.trim())),address=address,coverType=coverType,role=session.accountRole))
             }
         },enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("profile_submit")) { LocalizedText("Save profile and continue") }
     }
@@ -319,7 +366,7 @@ import java.util.UUID
         Heading("Secure this device", "Create a 4–6 digit PIN. Your account password signs you in on another device; this PIN opens the safe area here.")
         Field("4–6 digit PIN",pin,"new_pin",secret=true,numeric=true,enabled=!session.busy) { pin=it.filter(Char::isDigit).take(6) }
         Field("Confirm PIN",confirm,"confirm_pin",secret=true,numeric=true,enabled=!session.busy) { confirm=it.filter(Char::isDigit).take(6) }
-        LocalizedText("Five incorrect attempts return you to the cover app. You can try again immediately. Failed attempts are recorded on this device.",color=Muted)
+        LocalizedText(if(session.usesCover) "Five incorrect attempts return you to the cover app. You can try again immediately. Failed attempts are recorded on this device." else "Five incorrect attempts keep Olive Branch locked. You can try again immediately. Failed attempts are recorded on this device.",color=Muted)
         Status(session)
         Button(onClick={session.createDevicePin(pin,confirm)},enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("pin_setup_submit")) { LocalizedText("Finish setup") }
     }
@@ -363,16 +410,44 @@ import java.util.UUID
     }
 }
 
+// Staff and admins land here after login; live organization tools can replace these cards later.
+@Composable private fun OrganizationPortal(session: SessionViewModel) {
+    val admin=session.accountRole==AccountRole.ADMIN
+    FormColumn {
+        LocalizedText("Olive Tree",fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
+        LocalizedText(if(admin) "Admin panel" else "Staff panel",style=MaterialTheme.typography.headlineMedium)
+        LocalizedText("Signed in as ${session.coverUsername}",color=Muted)
+        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            LocalizedText("Total users",style=MaterialTheme.typography.titleMedium)
+            LocalizedText("In development",color=Muted)
+        } }
+        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            LocalizedText("Active chats with users",style=MaterialTheme.typography.titleMedium)
+            LocalizedText("In development",color=Muted)
+        } }
+        if(admin) Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            LocalizedText("Staff and admin accounts",style=MaterialTheme.typography.titleMedium)
+            LocalizedText("Assign roles and create accounts · In development",color=Muted)
+        } }
+        Status(session)
+        OutlinedButton(onClick=session::signOut,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("portal_sign_out")) { LocalizedText("Sign out") }
+    }
+}
+
 // The private side switches between home, profile, contacts, attempt history, and settings.
-@Composable private fun SafeArea(session: SessionViewModel) {
+@Composable private fun SafeArea(session: SessionViewModel, exit: ()->Unit) {
     val profile=session.profile ?: return
-    when(session.page) {
+    AnimatedContent(targetState=session.page,label="safe page",
+        transitionSpec={
+            (fadeIn(tween(180))+slideInHorizontally(tween(180)) { it/12 })
+                .togetherWith(fadeOut(tween(120))+slideOutHorizontally(tween(120)) { -it/16 })
+        }) { targetPage -> when(targetPage) {
         SafePage.Home -> FormColumn {
             Box(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     LocalizedText("Olive Branch",fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-                    LocalizedText("Your safe space",style=MaterialTheme.typography.headlineMedium)
-                    LocalizedText("Use Quick exit from any page to lock this area and return to your cover app.",color=Muted)
+                    LocalizedText(if(profile.role==AccountRole.SAFE_CONTACT) "Safe Contact space" else "Your safe space",style=MaterialTheme.typography.headlineMedium)
+                    LocalizedText(if(profile.role==AccountRole.SAFE_CONTACT) "Use Quick exit from any page to lock Olive Branch." else "Use Quick exit from any page to lock this area and return to your cover app.",color=Muted)
                 }
                 IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.align(Alignment.TopEnd).testTag("safe_settings")) {
                     Icon(Icons.Outlined.Settings,"Settings")
@@ -390,6 +465,10 @@ import java.util.UUID
                             colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF718669),contentColor=Color.White),
                             modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_notes")) {
                             LocalizedText("Notes & incidents")
+                        } else if(number==2) Button(onClick={session.navigate(SafePage.Messages)},
+                            colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF7D9274),contentColor=Color.White),
+                            modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_messages")) {
+                            LocalizedText("Messages")
                         } else OutlinedButton(onClick={},enabled=false,
                             colors=ButtonDefaults.outlinedButtonColors(disabledContainerColor=Color(0xFFE7EDE2),disabledContentColor=Muted),
                             modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("future_feature_$number")) {
@@ -402,15 +481,25 @@ import java.util.UUID
                 LocalizedText("Profile changes are saved on this device and awaiting cloud sync.")
                 OutlinedButton(onClick=session::sync,enabled=!session.busy) { LocalizedText("Sync changes") }
             }
-            LocalizedText("Leaving the app locks this area. A cover app does not make Olive Branch impossible to discover.",style=MaterialTheme.typography.bodySmall,color=Muted)
+            LocalizedText(if(profile.role==AccountRole.SAFE_CONTACT) "Leaving the app locks Olive Branch." else "Leaving the app locks this area. A cover app does not make Olive Branch impossible to discover.",style=MaterialTheme.typography.bodySmall,color=Muted)
             Status(session)
             TextButton(onClick=session::signOut,enabled=!session.busy,modifier=Modifier.testTag("sign_out")) { LocalizedText("Sign out on this device") }
         }
         SafePage.Profile -> FormColumn {
             SafeBack(session)
             Heading("My profile", "Your saved account information.")
-            listOf("Username" to profile.username,"Full name" to profile.fullName,"People experiencing abuse" to profile.affectedNames,"Abuser's name" to profile.abuserName,
-                "Date of birth" to profile.dob,"Preferred language" to profile.language,"Situation" to profile.situation,"Region / city / state" to profile.region,"Cover app" to profile.coverType.title,"Delivery address" to listOf(profile.address.line1,profile.address.line2,profile.address.city,profile.address.province,profile.address.postalCode,profile.address.country).filter { it.isNotBlank() }.joinToString(", "))
+            val rows=buildList {
+                add("Account type" to profile.role.title);add("Username" to profile.username);add("Full name" to profile.fullName)
+                if(profile.role==AccountRole.USER) {
+                    add("People experiencing abuse" to profile.affectedNames);add("Abuser's name" to profile.abuserName);add("Situation" to profile.situation)
+                }
+                add("Date of birth" to profile.dob);add("Preferred language" to profile.language);add("Region / city / state" to profile.region)
+                if(profile.role==AccountRole.USER) {
+                    add("Cover app" to profile.coverType.title)
+                    add("Delivery address" to listOf(profile.address.line1,profile.address.line2,profile.address.city,profile.address.province,profile.address.postalCode,profile.address.country).filter { it.isNotBlank() }.joinToString(", "))
+                }
+            }
+            rows
                 .forEach { (label,value) ->
                     LocalizedText(label,style=MaterialTheme.typography.labelLarge,color=OliveGreen)
                     if(value.isBlank()) LocalizedText("Not provided")
@@ -419,11 +508,223 @@ import java.util.UUID
                 }
         }
         SafePage.Notes -> PrivateNotes(session)
+        SafePage.Messages -> MessagesScreen(session,exit)
         SafePage.Settings -> SettingsEditor(session,profile)
         SafePage.Contacts -> ContactEditor(session,profile)
         SafePage.Activity -> ActivityHistory(session)
+    } }
+}
+
+// Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices.
+@Composable private fun MessagesScreen(session: SessionViewModel, exit: ()->Unit) {
+    val active=session.activeConversation
+    val currentUid=session.coverAccountId.orEmpty()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide=maxWidth>=720.dp
+        if(wide) Row(Modifier.fillMaxSize().padding(bottom=96.dp)) {
+            MessagingSidebar(session,currentUid,Modifier.width(340.dp).fillMaxHeight())
+            VerticalDivider()
+            if(active==null) Box(Modifier.weight(1f).fillMaxHeight(),contentAlignment=Alignment.Center) {
+                LocalizedText("Select a friend or conversation to start messaging.",color=Muted)
+            } else ChatPane(session,currentUid,false,exit,Modifier.weight(1f).fillMaxHeight())
+        } else if(active==null) MessagingSidebar(session,currentUid,Modifier.fillMaxSize())
+        else {
+            BackHandler { session.closeConversation() }
+            ChatPane(session,currentUid,true,exit,Modifier.fillMaxSize())
+        }
     }
 }
+
+@Composable private fun MessagingSidebar(session: SessionViewModel, currentUid: String, modifier: Modifier=Modifier) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var reconnectPassword by rememberSaveable { mutableStateOf("") }
+    var friendsExpanded by rememberSaveable { mutableStateOf(false) }
+    var pendingExpanded by rememberSaveable { mutableStateOf(false) }
+    var outgoingExpanded by rememberSaveable { mutableStateOf(false) }
+    LazyColumn(modifier,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                IconButton(onClick=session::back,modifier=Modifier.testTag("safe_home")) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Previous safe page")
+                }
+                LocalizedText("Friends & messages",style=MaterialTheme.typography.headlineSmall)
+            }
+            if(session.localMode) LocalizedText("Messaging needs a Firebase-connected build.",color=Muted)
+        }
+        if(session.messagingNeedsReconnect) item {
+            Surface(shape=MaterialTheme.shapes.medium,color=Color(0xFFFFF7E1),modifier=Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    LocalizedText("Reconnect your account",style=MaterialTheme.typography.titleMedium)
+                    LocalizedText("Your local Olive Branch account is locked safely, but Firebase needs your password again before friends and messages can load.",color=Muted)
+                    Field("Account password",reconnectPassword,"messaging_reconnect_password",secret=true,enabled=!session.messagingBusy) {
+                        reconnectPassword=it.take(128)
+                    }
+                    Button(onClick={session.reconnectMessaging(reconnectPassword) { reconnectPassword="" }},
+                        enabled=reconnectPassword.isNotBlank() && !session.messagingBusy,
+                        modifier=Modifier.fillMaxWidth().testTag("messaging_reconnect")) { LocalizedText("Reconnect") }
+                }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(query,{if(it.length<=24) query=it},label={LocalizedText("Username")},singleLine=true,
+                    modifier=Modifier.weight(1f).testTag("message_username"))
+                Button(onClick={session.searchUsers(query)},enabled=query.isNotBlank() && !session.messagingBusy && !session.localMode && !session.messagingNeedsReconnect,
+                    modifier=Modifier.testTag("search_users")) { LocalizedText("Search") }
+            }
+        }
+        if(session.messagingBusy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+        item { Status(session) }
+        if(session.userSearchResults.isNotEmpty()) {
+            item { LocalizedText("Search results",style=MaterialTheme.typography.titleMedium) }
+            items(session.userSearchResults,key={"search-${it.uid}"}) { user ->
+                val relationship=session.relationshipFor(user.uid)
+                Surface(shape=MaterialTheme.shapes.medium,color=Color(0xFFF3F6F0),modifier=Modifier.animateItem().fillMaxWidth().animateContentSize()) {
+                    Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text(user.username,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
+                        when(relationship) {
+                            FriendRelationship.AddFriend -> Button(onClick={session.sendFriendRequest(user)},enabled=!session.messagingBusy) { LocalizedText("Add Friend") }
+                            FriendRelationship.RequestSent -> AssistChip(onClick={},enabled=false,label={LocalizedText("Request Sent")})
+                            FriendRelationship.IncomingRequest -> AssistChip(onClick={},enabled=false,label={LocalizedText("Incoming Request")})
+                            FriendRelationship.Friends -> AssistChip(onClick={},enabled=false,label={LocalizedText("Friends")})
+                        }
+                    }
+                }
+            }
+        }
+        if(session.incomingFriendRequests.isNotEmpty()) {
+            item {
+                Row(Modifier.fillMaxWidth().clickable { pendingExpanded=!pendingExpanded }.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
+                    Icon(if(pendingExpanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,null)
+                    LocalizedText("Incoming Friend Requests",style=MaterialTheme.typography.titleMedium)
+                    Badge(Modifier.padding(start=8.dp)) { Text(session.incomingFriendRequests.size.toString()) }
+                }
+            }
+            if(pendingExpanded) items(session.incomingFriendRequests,key={"incoming-${it.id}"}) { request ->
+                Surface(shape=MaterialTheme.shapes.medium,color=Color(0xFFFFF7E1),modifier=Modifier.animateItem().fillMaxWidth().animateContentSize()) {
+                    Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text(request.senderUsername,style=MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Button(onClick={session.acceptFriendRequest(request)},enabled=!session.messagingBusy,
+                                modifier=Modifier.testTag("accept_friend_"+request.id)) { LocalizedText("Accept") }
+                            OutlinedButton(onClick={session.declineFriendRequest(request)},enabled=!session.messagingBusy,
+                                modifier=Modifier.testTag("decline_friend_"+request.id)) { LocalizedText("Decline") }
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth().clickable { outgoingExpanded=!outgoingExpanded }.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
+                Icon(if(outgoingExpanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,null)
+                LocalizedText("Outgoing Friend Requests",style=MaterialTheme.typography.titleMedium)
+                Badge(Modifier.padding(start=8.dp)) { Text(session.outgoingFriendRequests.size.toString()) }
+            }
+        }
+        if(outgoingExpanded) {
+            if(session.outgoingFriendRequests.isEmpty()) item { LocalizedText("No outgoing requests.",color=Muted) }
+            items(session.outgoingFriendRequests,key={"outgoing-${it.id}"}) { request ->
+                Surface(shape=MaterialTheme.shapes.medium,color=Color(0xFFF3F6F0),modifier=Modifier.animateItem().fillMaxWidth().animateContentSize()) {
+                    Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text(request.recipientUsername,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
+                        OutlinedButton(onClick={session.cancelFriendRequest(request)},enabled=!session.messagingBusy,
+                            modifier=Modifier.testTag("cancel_friend_"+request.id)) { LocalizedText("Cancel Request") }
+                    }
+                }
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth().clickable { friendsExpanded=!friendsExpanded }.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
+                Icon(if(friendsExpanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,null)
+                LocalizedText("Friends",style=MaterialTheme.typography.titleMedium)
+                Badge(Modifier.padding(start=8.dp)) { Text(session.friends.size.toString()) }
+            }
+        }
+        if(friendsExpanded) {
+            if(session.friends.isEmpty()) item { LocalizedText("No friends yet.",color=Muted) }
+            items(session.friends,key={"friend-${it.friendshipId}"}) { friend ->
+                OutlinedButton(onClick={session.startConversation(friend)},enabled=!session.messagingBusy,
+                    modifier=Modifier.animateItem().fillMaxWidth().testTag("friend_"+friend.uid)) {
+                    Text(friend.username,Modifier.weight(1f),textAlign=androidx.compose.ui.text.style.TextAlign.Start)
+                    LocalizedText("Message")
+                }
+            }
+        }
+        item { LocalizedText("Direct messages",style=MaterialTheme.typography.titleMedium) }
+        if(session.conversations.isEmpty()) item { LocalizedText("No conversations yet.",color=Muted) }
+        items(session.conversations,key={"conversation-${it.id}"}) { conversation ->
+            OutlinedButton(onClick={session.openConversation(conversation)},modifier=Modifier.animateItem().fillMaxWidth().testTag("conversation_"+conversation.id)) {
+                Column(Modifier.fillMaxWidth()) {
+                    Text(conversation.peerUsername(currentUid),style=MaterialTheme.typography.titleMedium)
+                    Text(conversation.lastMessage.ifBlank { "New conversation" },maxLines=1,color=Muted)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable private fun ChatPane(session: SessionViewModel, currentUid: String, showBack: Boolean,
+    exit: ()->Unit, modifier: Modifier=Modifier) {
+    val active=session.activeConversation ?: return
+    var draft by rememberSaveable(active.id) { mutableStateOf("") }
+    val listState=rememberLazyListState()
+    LaunchedEffect(session.chatMessages.size,session.chatMessages.lastOrNull()?.body) {
+        if(session.chatMessages.isNotEmpty()) listState.animateScrollToItem(session.chatMessages.lastIndex)
+    }
+    Column(modifier.padding(start=20.dp,end=20.dp,top=12.dp,bottom=12.dp)) {
+        Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            if(showBack) IconButton(onClick=session::closeConversation,modifier=Modifier.testTag("messages_conversation_back")) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack,"All conversations")
+            }
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                LocalizedText("Direct message",style=MaterialTheme.typography.labelLarge,color=Muted)
+                Text(active.peerUsername(currentUid).lowercase(java.util.Locale.ROOT),style=MaterialTheme.typography.titleLarge)
+            }
+            Button(onClick=exit,contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp),
+                modifier=Modifier.heightIn(min=44.dp).testTag("quick_exit")) { Text("EXIT") }
+        }
+        HorizontalDivider()
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(),state=listState,contentPadding=PaddingValues(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            if(session.chatMessages.isEmpty()) item {
+                LocalizedText("No messages yet. Say hello when you are ready.",color=Muted,modifier=Modifier.padding(12.dp))
+            }
+            items(session.chatMessages,key={it.id}) { chat ->
+                val mine=chat.senderUid==currentUid
+                var menuOpen by remember(chat.id) { mutableStateOf(false) }
+                Row(Modifier.animateItem().fillMaxWidth(),horizontalArrangement=if(mine) Arrangement.End else Arrangement.Start) {
+                    Surface(color=if(mine) OliveGreen else Color(0xFFE7EDE2),contentColor=if(mine) Color.White else Color.Unspecified,
+                        shape=MaterialTheme.shapes.large,modifier=Modifier.widthIn(max=340.dp).combinedClickable(onClick={},onLongClick={if(mine && !chat.unsent) menuOpen=true})) {
+                        Row(Modifier.padding(start=14.dp,end=4.dp,top=8.dp,bottom=8.dp),verticalAlignment=Alignment.Top) {
+                            Column(Modifier.weight(1f)) {
+                                Text(if(mine) session.coverUsername else chat.senderUsername,style=MaterialTheme.typography.labelSmall,
+                                    color=if(mine) Color.White.copy(alpha=.78f) else Muted)
+                                Text(chat.body,fontStyle=if(chat.unsent) androidx.compose.ui.text.font.FontStyle.Italic else null)
+                                if(chat.sentAt>0) Text(DateTimeFormatter.ofPattern("MMM d, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(chat.sentAt)),
+                                    style=MaterialTheme.typography.labelSmall,color=if(mine) Color.White.copy(alpha=.7f) else Muted)
+                            }
+                            if(mine && !chat.unsent) Box {
+                                IconButton(onClick={menuOpen=true},modifier=Modifier.size(34.dp)) { Icon(Icons.Outlined.MoreVert,"Message actions") }
+                                DropdownMenu(menuOpen,{menuOpen=false}) {
+                                    DropdownMenuItem(text={LocalizedText("Unsend message")},onClick={menuOpen=false;session.unsendMessage(chat)})
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Status(session)
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(draft,{if(it.length<=2_000) draft=it},label={LocalizedText("Message")},
+                modifier=Modifier.weight(1f).testTag("message_body"),maxLines=4)
+            Button(onClick={session.sendMessage(draft) { draft="" }},enabled=draft.isNotBlank() && !session.messagingBusy,
+                modifier=Modifier.testTag("send_message")) { LocalizedText("Send") }
+        }
+    }
+}
+
 
 // Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor.
 @Composable private fun PrivateNotes(session: SessionViewModel) {
@@ -439,6 +740,7 @@ import java.util.UUID
     val formatter=remember(language) { DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm z",
         if(language=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault()) }
     fun openEditor(entry: PrivateEntry?) {
+        session.clearPrivateEntryStatus()
         editingId=entry?.id;kind=entry?.kind;title=entry?.title.orEmpty();body=entry?.body.orEmpty();editorOpen=true
     }
     BackHandler(editorOpen || logEntryId!=null || trashOpen) {
@@ -489,7 +791,10 @@ import java.util.UUID
     }
     val trashed=session.privateEntries.filter { it.deletedAt!=null }.sortedByDescending { it.deletedAt }
     if(trashOpen) {
-        ScratchPad(trashed,formatter,language,session::restorePrivateEntry) { trashOpen=false }
+        ScratchPad(trashed,formatter,language,{ id ->
+            session.restorePrivateEntry(id)
+            trashOpen=false
+        }) { trashOpen=false }
         return
     }
     val filtered=session.privateEntries.filter { it.deletedAt==null && (search.isBlank() || it.title.contains(search,true) || it.body.contains(search,true)) }
@@ -505,16 +810,17 @@ import java.util.UUID
                     Icon(Icons.Outlined.DeleteOutline,"ScratchPad")
                 }
             }
-            FilledTonalIconButton(onClick={openEditor(null)},modifier=Modifier.testTag("new_private_entry")) { Icon(Icons.Outlined.Add,"New note") }
+            FilledTonalIconButton(onClick={openEditor(null)},enabled=!session.busy,modifier=Modifier.testTag("new_private_entry")) { Icon(Icons.Outlined.Add,"New note") }
         } }
         item(span={GridItemSpan(maxLineSpan)}) { OutlinedTextField(search,{search=it.take(200)},modifier=Modifier.fillMaxWidth().testTag("private_notes_search"),
             placeholder={LocalizedText("Search notes")},leadingIcon={Icon(Icons.Outlined.Search,null)},singleLine=true,
             trailingIcon=if(search.isNotEmpty()) {{IconButton(onClick={search=""}) { Icon(Icons.Outlined.Close,"Clear search") }}} else null) }
+        if(session.message!=null || session.busy) item(span={GridItemSpan(maxLineSpan)}) { Status(session) }
         if(filtered.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) { LocalizedText(if(search.isBlank()) "No private entries yet." else "No notes found.",color=Muted) }
         if(pinned.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { LocalizedText("Pinned",style=MaterialTheme.typography.titleMedium,color=OliveGreen) }
-        gridItems(pinned,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,language,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id}) }
+        gridItems(pinned,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,language,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id},Modifier.animateItem()) }
         if(others.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { LocalizedText(if(pinned.isEmpty()) "All notes" else "Others",style=MaterialTheme.typography.titleMedium) }
-        gridItems(others,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,language,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id}) }
+        gridItems(others,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,language,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id},Modifier.animateItem()) }
     }
 }
 
@@ -532,7 +838,7 @@ import java.util.UUID
         }
         if(entries.isEmpty()) item { LocalizedText("ScratchPad is empty.",color=Muted) }
         items(entries,key={it.id}) { entry ->
-            Card(Modifier.fillMaxWidth().testTag("scratchpad_entry"),border=BorderStroke(1.dp,Color.Black),
+            Card(Modifier.animateItem().fillMaxWidth().testTag("scratchpad_entry"),border=BorderStroke(1.dp,Color.Black),
                 colors=CardDefaults.cardColors(containerColor=Color(0xFFFFFDF4))) {
                 Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     entry.kind?.let { LocalizedText(if(it==PrivateEntryKind.Incident) "Incident" else "Note",color=OliveGreen) }
@@ -561,7 +867,7 @@ import java.util.UUID
         }
         items(entry.edits.asReversed(),key={it.id}) { edit ->
             val revision=entry.edits.indexOf(edit)+1
-            Card(Modifier.fillMaxWidth(),border=BorderStroke(1.dp,Color.Black),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            Card(Modifier.animateItem().fillMaxWidth(),border=BorderStroke(1.dp,Color.Black),colors=CardDefaults.cardColors(containerColor=Color.White)) {
                 Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                         Surface(shape=CircleShape,color=Color(0xFFE7EDE2)) {
@@ -592,8 +898,8 @@ import java.util.UUID
 }
 
 @Composable private fun PrivateNoteCard(entry: PrivateEntry, formatter: DateTimeFormatter, language: String,
-    open: ()->Unit, pin: ()->Unit, openLog: ()->Unit) {
-    Card(onClick=open,modifier=Modifier.fillMaxWidth().testTag("private_entry_row"),
+    open: ()->Unit, pin: ()->Unit, openLog: ()->Unit, modifier: Modifier=Modifier) {
+    Card(onClick=open,modifier=modifier.fillMaxWidth().testTag("private_entry_row"),
         border=BorderStroke(1.dp,Color.Black),colors=CardDefaults.cardColors(containerColor=Color(0xFFFFFDF4))) {
         Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -667,6 +973,7 @@ import java.util.UUID
 }
 // Edit private profile, language, and PIN-guarded trigger settings in this section.
 @Composable private fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
+    val userRole=profile.role==AccountRole.USER
     var fullName by remember { mutableStateOf(profile.fullName) }
     var affected by remember { mutableStateOf(profile.affectedNames) }
     var abuserName by remember { mutableStateOf(profile.abuserName) }
@@ -686,15 +993,19 @@ import java.util.UUID
         SafeBack(session)
         Heading("Settings","Update your profile and language at any time.")
         OutlinedButton(onClick={session.navigate(SafePage.Contacts)},modifier=Modifier.fillMaxWidth().testTag("safe_contacts")) { LocalizedText("Safe contacts") }
-        // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
-        CoverPicker(profile.coverType,!session.busy) { session.recordSettingsInteraction("Olive Branch","Selected cover app");session.changeCover(it) }
-        LocalizedText("Olive and Daily Digest use search for safe entry. Simple Calculator uses your device PIN followed by two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        if(userRole) {
+            // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
+            CoverPicker(profile.coverType,!session.busy) { session.recordSettingsInteraction("Olive Branch","Selected cover app");session.changeCover(it) }
+            LocalizedText("Olive and Daily Digest use search for safe entry. Simple Calculator uses your device PIN followed by two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        }
         Field("Full name (required)",fullName,"settings_full_name",onFocus={session.recordSettingsInteraction("Olive Branch","Focused full name")}) { fullName=it.take(120) }
-        Field("Names of people experiencing abuse (optional)",affected,"settings_affected",onFocus={session.recordSettingsInteraction("Olive Branch","Focused affected names")}) { affected=it.take(500) }
-        Field("Abuser's name (optional)",abuserName,"settings_abuser_name",onFocus={session.recordSettingsInteraction("Olive Branch","Focused abuser name")}) { abuserName=it.take(120) }
+        if(userRole) {
+            Field("Names of people experiencing abuse (optional)",affected,"settings_affected",onFocus={session.recordSettingsInteraction("Olive Branch","Focused affected names")}) { affected=it.take(500) }
+            Field("Abuser's name (optional)",abuserName,"settings_abuser_name",onFocus={session.recordSettingsInteraction("Olive Branch","Focused abuser name")}) { abuserName=it.take(120) }
+        }
         BirthdayPicker(dob,"settings_dob",!session.busy) { dob=it }
         LanguagePicker(language,!session.busy) { session.recordSettingsInteraction("Olive Branch","Selected language");language=it }
-        Field("Brief description of your situation (optional, recommended)",situation,"settings_situation",multiline=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused situation")}) { situation=it.take(2000) }
+        if(userRole) Field("Brief description of your situation (optional, recommended)",situation,"settings_situation",multiline=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused situation")}) { situation=it.take(2000) }
         LocalizedText("Location · city required",style=MaterialTheme.typography.titleLarge)
         AddressFields(address,cityOnlyRequired=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused address: $it")}) { address=it }
         Button(onClick={session.saveSettings(fullName,affected,abuserName,dob,language,situation,address)},enabled=!session.busy,modifier=Modifier.testTag("save_settings")) { LocalizedText("Save settings") }
@@ -705,18 +1016,20 @@ import java.util.UUID
         Field("New password",newPassword,"new_password",secret=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused new password")}) { newPassword=it.take(24) }
         Field("Confirm new password",confirmPassword,"confirm_new_password",secret=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused password confirmation")}) { confirmPassword=it.take(24) }
         Button(onClick={session.changePassword(currentPassword,newPassword,confirmPassword);currentPassword="";newPassword="";confirmPassword=""},enabled=!session.busy,modifier=Modifier.testTag("change_password")) { LocalizedText("Change password") }
-        HorizontalDivider()
-        LocalizedText("Change device PIN",style=MaterialTheme.typography.titleLarge)
-        Field("Current device PIN",currentDevicePin,"current_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused current PIN")}) { currentDevicePin=it.filter(Char::isDigit).take(6) }
-        Field("New device PIN",newDevicePin,"new_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused new PIN")}) { newDevicePin=it.filter(Char::isDigit).take(6) }
-        Field("Confirm new device PIN",confirmDevicePin,"confirm_new_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused PIN confirmation")}) { confirmDevicePin=it.filter(Char::isDigit).take(6) }
-        Button(onClick={session.changePin(currentDevicePin,newDevicePin,confirmDevicePin);currentDevicePin="";newDevicePin="";confirmDevicePin=""},enabled=!session.busy,modifier=Modifier.testTag("change_device_pin")) { LocalizedText("Change device PIN") }
-        HorizontalDivider()
-        LocalizedText("Change trigger word",style=MaterialTheme.typography.titleLarge)
-        LocalizedText("Enter your current device PIN to change the trigger word. Incorrect attempts count toward the five-attempt limit.")
-        Field("New trigger word or phrase",trigger,"settings_trigger",secret=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused trigger word")}) { trigger=it.take(64) }
-        Field("Current PIN",pin,"settings_pin",secret=true,numeric=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused trigger-change PIN")}) { pin=it.filter { c -> c in '0'..'9' }.take(6) }
-        Button(onClick={session.changeTrigger(trigger,pin);pin="";trigger=""},enabled=!session.busy,modifier=Modifier.testTag("change_trigger")) { LocalizedText("Change trigger word") }
+        if(userRole) {
+            HorizontalDivider()
+            LocalizedText("Change device PIN",style=MaterialTheme.typography.titleLarge)
+            Field("Current device PIN",currentDevicePin,"current_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused current PIN")}) { currentDevicePin=it.filter(Char::isDigit).take(6) }
+            Field("New device PIN",newDevicePin,"new_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused new PIN")}) { newDevicePin=it.filter(Char::isDigit).take(6) }
+            Field("Confirm new device PIN",confirmDevicePin,"confirm_new_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused PIN confirmation")}) { confirmDevicePin=it.filter(Char::isDigit).take(6) }
+            Button(onClick={session.changePin(currentDevicePin,newDevicePin,confirmDevicePin);currentDevicePin="";newDevicePin="";confirmDevicePin=""},enabled=!session.busy,modifier=Modifier.testTag("change_device_pin")) { LocalizedText("Change device PIN") }
+            HorizontalDivider()
+            LocalizedText("Change trigger word",style=MaterialTheme.typography.titleLarge)
+            LocalizedText("Enter your current device PIN to change the trigger word. Incorrect attempts count toward the five-attempt limit.")
+            Field("New trigger word or phrase",trigger,"settings_trigger",secret=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused trigger word")}) { trigger=it.take(64) }
+            Field("Current PIN",pin,"settings_pin",secret=true,numeric=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused trigger-change PIN")}) { pin=it.filter { c -> c in '0'..'9' }.take(6) }
+            Button(onClick={session.changeTrigger(trigger,pin);pin="";trigger=""},enabled=!session.busy,modifier=Modifier.testTag("change_trigger")) { LocalizedText("Change trigger word") }
+        }
         Status(session)
     }
 }

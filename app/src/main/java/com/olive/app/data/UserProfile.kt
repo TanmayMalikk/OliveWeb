@@ -5,6 +5,15 @@ import org.json.JSONObject
 
 // One trusted person, kept simple: a name plus whatever phone or email the user trusts.
 data class SafeContact(val id: String, val name: String, val details: String)
+// The account role decides which onboarding flow and app shell this person receives.
+enum class AccountRole(val title: String, val description: String) {
+    USER("User", "The person using the private cover and safe app"),
+    SAFE_CONTACT("Safe Contact", "A trusted person helping someone"),
+    STAFF("Staff", "An organization staff member"),
+    ADMIN("Admin", "An organization leader who oversees staff");
+
+    companion object { fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: USER }
+}
 // Pick the visible cover here; add another option before wiring its screen and launcher icon.
 enum class CoverType(val title: String) {
     FOOD("Olive"), NEWS("Daily Digest"), CALCULATOR("Simple Calculator"), GAME("Game");
@@ -24,13 +33,14 @@ data class UserProfile(
     val contacts: List<SafeContact> = emptyList(),
     val address: DeliveryAddress = DeliveryAddress(),
     val coverType: CoverType = CoverType.FOOD,
+    val role: AccountRole = AccountRole.USER,
 ) {
     fun toMap(): Map<String, Any> = mapOf(
         "address" to address.toMap(),
         "username" to username, "fullName" to fullName, "affectedNames" to affectedNames, "abuserName" to abuserName,
         "dob" to dob, "language" to language, "situation" to situation, "region" to region,
         "triggerHash" to triggerHash, "contacts" to contacts.map { mapOf("id" to it.id,"name" to it.name,"details" to it.details) },
-        "coverType" to coverType.name,
+        "coverType" to coverType.name, "role" to role.name,
     )
     fun toJson() = JSONObject(toMap())
     companion object {
@@ -40,7 +50,8 @@ data class UserProfile(
                 j.getString("dob"), j.getString("language"), j.getString("situation"), j.getString("region"),
                 j.getString("triggerHash"), (0 until contacts.length()).map {
                     val c = contacts.getJSONObject(it); SafeContact(c.getString("id"),c.getString("name"),c.getString("details"))
-                }, DeliveryAddress.fromJson(j.optJSONObject("address")), CoverType.fromStored(j.optString("coverType")))
+                }, DeliveryAddress.fromJson(j.optJSONObject("address")), CoverType.fromStored(j.optString("coverType")),
+                AccountRole.fromStored(j.optString("role")))
         }
     }
 }

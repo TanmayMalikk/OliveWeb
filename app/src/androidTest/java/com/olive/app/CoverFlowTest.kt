@@ -16,7 +16,7 @@ class CoverFlowTest {
         compose.onNode(hasSetTextAction()).performTextInput("nothingmatches")
         compose.onNodeWithText("Nothing on the menu yet").assertExists()
         compose.onNodeWithContentDescription("Clear search").performClick()
-        compose.onNodeWithTag("olive_ad_placeholder").assertExists()
+        compose.onNodeWithText("Made for your cravings").assertExists()
     }
 
     @Test fun cartRemovalWorks() {

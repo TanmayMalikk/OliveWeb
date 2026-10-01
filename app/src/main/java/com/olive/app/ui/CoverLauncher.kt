@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import com.olive.app.data.CoverType
+import com.olive.app.data.AccountRole
 
 // Android reads launcher names/icons from aliases; switch them here when the saved cover changes.
 object CoverLauncher {
@@ -16,17 +17,21 @@ object CoverLauncher {
             manager.setComponentEnabledSetting(component,PackageManager.COMPONENT_ENABLED_STATE_ENABLED,PackageManager.DONT_KILL_APP)
     }
 
-    fun apply(context: Context, selected: CoverType) {
+    fun apply(context: Context, selected: CoverType, role: AccountRole) {
         val manager = context.packageManager
-        val aliases = mapOf(
-            CoverType.FOOD to "FoodLauncher",
-            CoverType.NEWS to "NewsLauncher",
-            CoverType.CALCULATOR to "CalculatorLauncher",
-        )
-        val target = if(selected == CoverType.GAME) CoverType.FOOD else selected
-        val changes=aliases.map { (type,name) ->
+        val aliases=listOf("FoodLauncher","NewsLauncher","CalculatorLauncher","BranchLauncher","TreeLauncher")
+        val target=when(role) {
+            AccountRole.SAFE_CONTACT -> "BranchLauncher"
+            AccountRole.STAFF,AccountRole.ADMIN -> "TreeLauncher"
+            AccountRole.USER -> when(selected) {
+                CoverType.NEWS -> "NewsLauncher"
+                CoverType.CALCULATOR -> "CalculatorLauncher"
+                else -> "FoodLauncher"
+            }
+        }
+        val changes=aliases.map { name ->
             val component=ComponentName(context.packageName,"${context.packageName}.$name")
-            val state=if(type==target) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+            val state=if(name==target) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
             component to state
         }.filter { (component,state) -> manager.getComponentEnabledSetting(component)!=state }
         if(changes.isEmpty()) return
