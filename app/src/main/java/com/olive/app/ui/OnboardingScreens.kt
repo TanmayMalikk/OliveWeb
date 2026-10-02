@@ -209,7 +209,7 @@ import java.util.UUID
             HorizontalDivider()
             LocalizedText("Safe entry",style=MaterialTheme.typography.titleLarge)
             Field("Trigger word or phrase",trigger,"trigger",secret=true,enabled=!session.busy) { trigger=it.take(64) }
-            LocalizedText("Olive and Daily Digest ignore spaces and letter case in your trigger. Other searches keep their spaces. Simple Calculator uses your PIN and two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
+            LocalizedText("Olive and Daily Digest ignore spaces and letter case in your trigger. Other searches keep their spaces. Better Calculator uses your PIN and two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
         }
         // USER ONLY: Safe Contacts do not add another Safe Contact during their own onboarding.
         if(!safeContact) {

@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.sp
         .padding(start=if(compact) 12.dp else 20.dp,end=if(compact) 12.dp else 20.dp,top=if(compact) 8.dp else 14.dp,bottom=2.dp),
         verticalArrangement=Arrangement.spacedBy(spacing)) {
         // Each pair is compact/regular text. Retest Polynomial and Quadratic first because those labels grow most in translation.
-        LocalizedText("Simple Calculator",color=OliveGreen,fontSize=if(compact) 17.sp else 19.sp,fontWeight=FontWeight.SemiBold)
+        LocalizedText("Better Calculator",color=OliveGreen,fontSize=if(compact) 17.sp else 19.sp,fontWeight=FontWeight.SemiBold)
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             FilledTonalButton(onClick={solver=CalculatorSolver.Polynomial},modifier=Modifier.weight(1f).testTag("polynomial_solver"),contentPadding=PaddingValues(horizontal=4.dp)) {
                 LocalizedText("Polynomial",fontSize=if(compact) 12.sp else 14.sp,maxLines=1)
