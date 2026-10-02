@@ -11,6 +11,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 // Lightweight food illustrations keep the sample menu looking polished without random web photos.
+// UI sizing/color: this fallback art scales from the supplied canvas size; edit the palette below to change food illustration colors.
 @Composable fun FoodArt(kind: String, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val s = size.minDimension

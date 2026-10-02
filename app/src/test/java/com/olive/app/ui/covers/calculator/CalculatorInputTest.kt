@@ -36,4 +36,18 @@ class CalculatorInputTest {
         listOf("+","1","=").forEach { input.press(it) }
         assertEquals("1E+18",input.display)
     }
+
+    @Test fun trigonometryUsesTheSelectedAngleModeAndDisarmsPinEntry() {
+        val input=CalculatorInput()
+        "90".forEach { input.press(it.toString()) }
+        input.applyTrig("sin",CalculatorAngleMode.DEGREES)
+        assertEquals("1",input.display)
+        assertEquals("sin(90)",input.expression)
+        assertNull(input.press("="))
+
+        input.reset()
+        "3.141592653589793".forEach { input.press(it.toString()) }
+        input.applyTrig("cos",CalculatorAngleMode.RADIANS)
+        assertEquals("-1",input.display)
+    }
 }

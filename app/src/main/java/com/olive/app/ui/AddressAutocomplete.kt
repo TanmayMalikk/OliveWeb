@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 
 // Street typing and Google suggestions share one field so the address form never needs a second search box.
+// UI sizing/color: the address field fills its form; suggestion rows use surfaceVariant, 12dp padding, titleSmall, and bodySmall text.
 @Composable fun AddressAutocomplete(current: DeliveryAddress, label: String, onFocus: (() -> Unit)?=null, onChange: (DeliveryAddress)->Unit) {
     val context=LocalContext.current
     val key=BuildConfig.PLACES_API_KEY

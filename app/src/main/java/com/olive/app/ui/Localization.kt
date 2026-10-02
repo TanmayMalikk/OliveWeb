@@ -13,7 +13,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 
 val LocalOliveLanguage = staticCompositionLocalOf { "English" }
-// Use this instead of plain Text when copy should flip between English and French.
+// Text sizing/color: use this instead of plain Text when copy should translate; its optional fontSize, lineHeight, color, and maxLines control local overrides.
 @Composable fun LocalizedText(text: String, modifier: Modifier=Modifier, color: Color=Color.Unspecified,
     fontSize: TextUnit=TextUnit.Unspecified, fontWeight: FontWeight?=null, fontFamily: FontFamily?=null,
     letterSpacing: TextUnit=TextUnit.Unspecified, textAlign: TextAlign?=null, lineHeight: TextUnit=TextUnit.Unspecified,
@@ -50,6 +50,16 @@ Billing address is required.|L’adresse de facturation est obligatoire.
 Processing payment…|Traitement du paiement…
 Local|Local
 Global|Monde
+Local edition|Édition locale
+Global edition|Édition mondiale
+Search headlines|Rechercher des manchettes
+Search saved stories|Rechercher dans les articles enregistrés
+Latest stories|Dernières nouvelles
+Saved stories|Articles enregistrés
+Back to stories|Retour aux articles
+Manage the profile details shown in Daily Digest.|Gérez les renseignements du profil affichés dans Daily Digest.
+No saved stories yet.|Aucun article enregistré.
+No stories found.|Aucun article trouvé.
 Date of birth (required)|Date de naissance (obligatoire)
 Year|Année
 Month|Mois
@@ -97,6 +107,26 @@ Onboarding|Configuration initiale
 Olive search|Recherche Olive
 Daily Digest search|Recherche Daily Digest
 Simple Calculator|Simple Calculator
+Polynomial|Polynôme
+Quadratic|Quadratique
+Graphing Calculator|Calculatrice graphique
+Graph|Tracer
+Reset|Réinitialiser
+Angle mode|Mode angulaire
+Trigonometric functions use radians.|Les fonctions trigonométriques utilisent les radians.
+Trigonometric functions use degrees.|Les fonctions trigonométriques utilisent les degrés.
+Functions: sin, cos, tan, sqrt, abs, ln and log. Angles use radians.|Fonctions : sin, cos, tan, sqrt, abs, ln et log. Les angles utilisent les radians.
+Polynomial equation|Équation polynomiale
+Polynomial calculation|Calcul de polynômes
+Quadratic equation|Équation quadratique
+Enter a polynomial up to degree 8 to find its real and complex roots.|Saisissez un polynôme de degré 8 ou moins pour trouver ses racines réelles et complexes.
+Enter a quadratic equation to find both roots.|Saisissez une équation quadratique pour trouver ses deux racines.
+Parentheses and multiplication such as (x - 2)(x - 3) are supported.|Les parenthèses et la multiplication, comme (x - 2)(x - 3), sont prises en charge.
+Example: x^2 - 5x + 6 = 0|Exemple : x^2 - 5x + 6 = 0
+Example: (x^2 - 1) / (x - 1)|Exemple : (x^2 - 1) / (x - 1)
+Equation|Équation
+Solve|Résoudre
+Close|Fermer
 Cover|Application de couverture
 City|Ville
 Street address|Adresse municipale

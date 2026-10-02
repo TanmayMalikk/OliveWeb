@@ -6,6 +6,10 @@ import androidx.compose.runtime.setValue
 import java.math.BigDecimal
 import java.math.MathContext
 import java.math.RoundingMode
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.tan
 
 // Handle the normal maths here; two equals taps after 4–6 entered digits hand a PIN to the safe gate.
 class CalculatorInput {
@@ -84,6 +88,22 @@ class CalculatorInput {
             }
         }
         return null
+    }
+
+    fun applyTrig(function: String, angleMode: CalculatorAngleMode) {
+        if(display=="Error") return
+        val original=display
+        val input=original.toDoubleOrNull() ?: run { display="Error";return }
+        val angle=if(angleMode==CalculatorAngleMode.DEGREES) Math.toRadians(input) else input
+        val answer=when(function) {
+            "sin" -> sin(angle)
+            "cos" -> cos(angle)
+            "tan" -> tan(angle)
+            else -> return
+        }
+        display=if(answer.isFinite()) BigDecimal.valueOf(if(abs(answer)<1e-12) 0.0 else answer).format() else "Error"
+        expression=if(operator==null) "$function($original)" else "$first $operator $function($original)"
+        fresh=true;pinEligible=false;armedPin=null;typedDigits=null
     }
 
     private fun BigDecimal.format(): String {
