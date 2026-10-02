@@ -145,6 +145,8 @@ import java.util.UUID
                             SessionScreen.NewCredentials -> Credentials(session,true)
                             SessionScreen.ReturningCredentials -> Credentials(session,false)
                             SessionScreen.ProfileSetup -> ProfileSetup(session)
+                            SessionScreen.TriggerSetup -> TriggerSetup(session)
+                            SessionScreen.OrganizationProfileSetup -> OrganizationProfileSetup(session)
                             SessionScreen.DevicePin -> DevicePin(session)
                             SessionScreen.Pin -> PinPrompt(session)
                             SessionScreen.Safe -> SafeArea(session,exit)
@@ -182,9 +184,9 @@ import java.util.UUID
     Column(Modifier.fillMaxSize().oliveScrollbar(scrollState).verticalScroll(scrollState).padding(horizontal=24.dp).padding(top=24.dp,bottom=112.dp),
         verticalArrangement=Arrangement.spacedBy(16.dp),content=content)
 }
-// Text/color: shared headings use a 30sp serif Olive Branch label, Material headline text, and Muted helper copy.
-@Composable internal fun Heading(title: String, subtitle: String) {
-    LocalizedText("Olive Branch",fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
+// Text/color: shared headings use a 30sp serif app label, Material headline text, and Muted helper copy.
+@Composable internal fun Heading(title: String, subtitle: String, appName: String="Olive Branch") {
+    LocalizedText(appName,fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
     LocalizedText(title,style=MaterialTheme.typography.headlineMedium)
     LocalizedText(subtitle,color=Muted)
 }

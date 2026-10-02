@@ -15,8 +15,8 @@ import java.util.UUID
 
 // The UI talks to this one doorway whether accounts are local test accounts or real Firebase accounts.
 interface AccountRepository {
-    suspend fun create(username: String, password: String): AccountIdentity
-    suspend fun authenticate(username: String, password: String): AccountIdentity
+    suspend fun create(username: String, password: String, role: AccountRole): AccountIdentity
+    suspend fun authenticate(username: String, password: String, role: AccountRole): AccountIdentity
     suspend fun profile(identity: AccountIdentity): UserProfile?
     suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile)
     suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord)
@@ -29,19 +29,21 @@ interface AccountRepository {
 
 // Handy for emulator testing: same account flow, but nothing leaves this installation.
 class LocalAccountRepository(private val vault: EncryptedVault) : AccountRepository {
-    override suspend fun create(username: String, password: String) = withContext(Dispatchers.IO) {
+    private fun key(username: String, role: AccountRole) = "${role.name}:${InputPolicy.username(username)}"
+    override suspend fun create(username: String, password: String, role: AccountRole) = withContext(Dispatchers.IO) {
         val identity = AccountIdentity(UUID.randomUUID().toString(), InputPolicy.username(username))
         val verifier = SecretVerifier.create(password)
         vault.update { root ->
             val accounts = root.child("accounts")
-            check(!accounts.has(identity.username)) { "Account unavailable" }
-            accounts.put(identity.username, JSONObject().put("uid",identity.uid).put("passwordVerifier",verifier))
+            check(!accounts.has(key(username,role))) { "Account unavailable" }
+            accounts.put(key(username,role), JSONObject().put("uid",identity.uid).put("passwordVerifier",verifier))
         }
         identity
     }
-    override suspend fun authenticate(username: String, password: String) = withContext(Dispatchers.IO) {
+    override suspend fun authenticate(username: String, password: String, role: AccountRole) = withContext(Dispatchers.IO) {
         val normalized = InputPolicy.username(username)
-        val account = vault.read().optJSONObject("accounts")?.optJSONObject(normalized)
+        val accounts=vault.read().optJSONObject("accounts")
+        val account = accounts?.optJSONObject(key(username,role)) ?: if(role==AccountRole.USER) accounts?.optJSONObject(normalized) else null
         // Perform the KDF for unknown usernames too, avoiding a cheap username timing oracle.
         val verifier = account?.getString("passwordVerifier") ?: SecretVerifier.create("unavailable-account")
         check(SecretVerifier.matches(password, verifier) && account != null) { "Sign-in failed" }
@@ -57,7 +59,9 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
     override suspend fun historyRecords(identity: AccountIdentity) = emptyList<HistoryRecord>()
     override suspend fun changePassword(identity: AccountIdentity, currentPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
         vault.update { root ->
-            val account=root.getJSONObject("accounts").getJSONObject(identity.username)
+            val records=root.getJSONObject("accounts")
+            val account=AccountRole.entries.asSequence().mapNotNull { records.optJSONObject(key(identity.username,it)) }
+                .firstOrNull { it.optString("uid")==identity.uid } ?: records.getJSONObject(identity.username)
             check(account.getString("uid")==identity.uid && SecretVerifier.matches(currentPassword,account.getString("passwordVerifier"))) { "Current password is incorrect" }
             account.put("passwordVerifier",SecretVerifier.create(newPassword))
         }
@@ -75,14 +79,22 @@ class FirebaseAccountRepository : AccountRepository {
     private fun profileObject(uid: String) = storage.reference.child("accounts/$uid/profile.json")
     private fun historyFolder(uid: String, category: String) = storage.reference.child("accounts/$uid/history/$category")
     // Change this alias only with an account migration or existing usernames will stop signing in.
-    private fun email(username: String) = "${InputPolicy.username(username)}@users.olive.invalid"
-    override suspend fun create(username: String, password: String): AccountIdentity {
-        val user = auth.createUserWithEmailAndPassword(email(username),password).await().user ?: error("Missing account")
+    override suspend fun create(username: String, password: String, role: AccountRole): AccountIdentity {
+        val user = auth.createUserWithEmailAndPassword(AccountPolicy.signInEmail(username,role),password).await().user ?: error("Missing account")
+        user.updateProfile(com.google.firebase.auth.UserProfileChangeRequest.Builder().setDisplayName(InputPolicy.username(username)).build()).await()
         return AccountIdentity(user.uid,InputPolicy.username(username))
     }
-    override suspend fun authenticate(username: String, password: String): AccountIdentity {
-        val user = auth.signInWithEmailAndPassword(email(username),password).await().user ?: error("Missing account")
-        return AccountIdentity(user.uid,InputPolicy.username(username))
+    override suspend fun authenticate(username: String, password: String, role: AccountRole): AccountIdentity {
+        val primary=AccountPolicy.signInEmail(username,role)
+        val user = try { auth.signInWithEmailAndPassword(primary,password).await().user }
+        catch(primaryError:Exception) {
+            // Accounts created before role aliases existed used the User domain; keep those logins working during migration.
+            if(role==AccountRole.USER || '@' in username) throw primaryError
+            auth.signInWithEmailAndPassword(AccountPolicy.legacyUserEmail(username),password).await().user
+        } ?: error("Missing account")
+        val accountName=user.displayName?.takeIf(InputPolicy::validUsername)
+            ?: user.email?.substringBefore('@')?.let(InputPolicy::username).orEmpty()
+        return AccountIdentity(user.uid,accountName)
     }
     override suspend fun profile(identity: AccountIdentity): UserProfile? {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
@@ -139,12 +151,13 @@ class FirebaseAccountRepository : AccountRepository {
     override suspend fun changePassword(identity: AccountIdentity, currentPassword: String, newPassword: String) {
         val user=auth.currentUser ?: error("Sign in again before changing your password")
         check(user.uid==identity.uid) { "Sign in again before changing your password" }
-        user.reauthenticate(EmailAuthProvider.getCredential(email(identity.username),currentPassword)).await()
+        val currentEmail=user.email ?: error("This account has no sign-in email")
+        user.reauthenticate(EmailAuthProvider.getCredential(currentEmail,currentPassword)).await()
         user.updatePassword(newPassword).await()
     }
     override fun authenticatedUid(): String? = auth.currentUser?.uid
-    override fun authenticatedUsername(): String? = auth.currentUser?.email
-        ?.substringBefore('@')?.let(InputPolicy::username)
+    override fun authenticatedUsername(): String? = auth.currentUser?.displayName?.takeIf(InputPolicy::validUsername)
+        ?: auth.currentUser?.email?.substringBefore('@')?.let(InputPolicy::username)
     override fun signOut() = auth.signOut()
 
     private fun readableHistory(category: String, raw: String): String {

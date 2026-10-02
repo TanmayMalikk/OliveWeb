@@ -34,24 +34,26 @@ data class UserProfile(
     val address: DeliveryAddress = DeliveryAddress(),
     val coverType: CoverType = CoverType.FOOD,
     val role: AccountRole = AccountRole.USER,
+    val email: String = "",
+    val phone: String = "",
 ) {
     fun toMap(): Map<String, Any> = mapOf(
         "address" to address.toMap(),
         "username" to username, "fullName" to fullName, "affectedNames" to affectedNames, "abuserName" to abuserName,
         "dob" to dob, "language" to language, "situation" to situation, "region" to region,
         "triggerHash" to triggerHash, "contacts" to contacts.map { mapOf("id" to it.id,"name" to it.name,"details" to it.details) },
-        "coverType" to coverType.name, "role" to role.name,
+        "coverType" to coverType.name, "role" to role.name, "email" to email, "phone" to phone,
     )
     fun toJson() = JSONObject(toMap())
     companion object {
         fun fromJson(j: JSONObject): UserProfile {
             val contacts = j.optJSONArray("contacts") ?: JSONArray()
-            return UserProfile(j.getString("username"), j.getString("fullName"), j.getString("affectedNames"),j.optString("abuserName"),
-                j.getString("dob"), j.getString("language"), j.getString("situation"), j.getString("region"),
-                j.getString("triggerHash"), (0 until contacts.length()).map {
+            return UserProfile(j.optString("username"), j.optString("fullName"), j.optString("affectedNames"),j.optString("abuserName"),
+                j.optString("dob"), j.optString("language"), j.optString("situation"), j.optString("region"),
+                j.optString("triggerHash"), (0 until contacts.length()).map {
                     val c = contacts.getJSONObject(it); SafeContact(c.getString("id"),c.getString("name"),c.getString("details"))
                 }, DeliveryAddress.fromJson(j.optJSONObject("address")), CoverType.fromStored(j.optString("coverType")),
-                AccountRole.fromStored(j.optString("role")))
+                AccountRole.fromStored(j.optString("role")),j.optString("email"),j.optString("phone"))
         }
     }
 }

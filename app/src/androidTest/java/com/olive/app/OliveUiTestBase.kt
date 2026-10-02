@@ -1,0 +1,67 @@
+package com.olive.app
+
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Rule
+import org.junit.rules.ExternalResource
+import org.junit.rules.RuleChain
+import java.io.File
+
+// Shared setup keeps every end-to-end UI test isolated and gives feature files the same common actions.
+abstract class OliveUiTestBase {
+    protected val compose=createAndroidComposeRule<MainActivity>()
+    private val cleanStore=object : ExternalResource() {
+        override fun before() {
+            check(!BuildConfig.FIREBASE_CONFIGURED) { "These tests only run against local test accounts." }
+            val instrumentation=InstrumentationRegistry.getInstrumentation()
+            val context=instrumentation.targetContext
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_COARSE_LOCATION)
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_FINE_LOCATION)
+            val directory=context.noBackupFilesDir
+            listOf("olive-demo.vault","olive-demo.vault.bak","olive-demo.vault.new",
+                "olive-demo-activity.vault","olive-demo-activity.vault.bak","olive-demo-activity.vault.new",
+                "olive-cover.vault","olive-cover.vault.bak","olive-cover.vault.new").forEach { File(directory,it).delete() }
+        }
+    }
+    @get:Rule val rules: RuleChain = RuleChain.outerRule(cleanStore).around(compose)
+
+    protected fun waitFor(tag: String) {
+        try { compose.waitUntil(45_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() } }
+        catch(e: Throwable) {
+            val session=androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.SessionViewModel::class.java]
+            throw AssertionError("Waiting for $tag; screen=${session.screen}, busy=${session.busy}, message=${session.message}",e)
+        }
+    }
+    protected fun fill(tag: String, text: String) { compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(text) }
+    protected fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick() }
+    protected fun chooseBirthday() {
+        click("dob_year");click("dob_year_2000")
+        click("dob_month");click("dob_month_1")
+        click("dob_day");click("dob_day_2")
+    }
+    protected fun register(pin: String="123456",username: String="olive_tester") {
+        waitFor("new_user"); click("new_user")
+        fill("username",username); fill("password","test-password-123"); fill("confirm_password","test-password-123")
+        click("credentials_submit"); waitFor("profile_submit")
+        fill("full_name","Test Person"); fill("abuser_name","Test Person Causing Harm"); chooseBirthday(); fill("trigger","moon garden")
+        fill("address_line1","123 Test Street"); fill("address_city","Edmonton")
+        fill("address_province","Alberta"); fill("address_postal","T5J 0N3")
+        click("profile_submit"); waitFor("pin_setup_submit")
+        fill("new_pin",pin); fill("confirm_pin",pin); click("pin_setup_submit")
+        waitCover()
+    }
+    protected fun waitCover() {
+        try { compose.waitUntil(30_000) { compose.onAllNodesWithTag("cover_root").fetchSemanticsNodes().isNotEmpty() } }
+        catch(e: Exception) {
+            val session=androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.SessionViewModel::class.java]
+            throw AssertionError("Expected cover; screen=${session.screen}, busy=${session.busy}, message=${session.message}\n${compose.onRoot().printToString()}",e)
+        }
+    }
+    protected fun trigger() { compose.onNode(hasSetTextAction()).performTextInput("moon garden"); waitFor("unlock_pin") }
+    protected fun enterPin(pin: String) {
+        pin.forEach { compose.onNodeWithTag("pin_digit_$it").performClick() }
+        compose.onNodeWithTag("unlock_submit").performClick()
+    }
+    protected fun unlock(pin: String = "123456") { trigger(); enterPin(pin); waitFor("safe_settings") }
+}
