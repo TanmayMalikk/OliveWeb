@@ -2,7 +2,7 @@ package com.olive.app
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import com.olive.app.ui.OliveApp
+import com.olive.app.ui.OliveCover
 import com.olive.app.ui.OliveTheme
 import org.junit.Before
 import org.junit.Rule
@@ -10,7 +10,7 @@ import org.junit.Test
 
 class CoverFlowTest {
     @get:Rule val compose = createComposeRule()
-    @Before fun showCover() { compose.setContent { OliveTheme { OliveApp() } } }
+    @Before fun showCover() { compose.setContent { OliveTheme { OliveCover() } } }
 
     @Test fun searchFiltersAndClears() {
         compose.onNode(hasSetTextAction()).performTextInput("nothingmatches")

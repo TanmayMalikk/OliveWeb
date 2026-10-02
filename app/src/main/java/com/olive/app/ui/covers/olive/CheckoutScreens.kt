@@ -35,6 +35,7 @@ private fun validExpiry(value: String): Boolean {
 private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,postalCode,country)
     .filter(String::isNotBlank).joinToString(", ")
 
+// UI sizing/text: checkout fields fill the dialog width and rely on Material field/error text sizes.
 @Composable private fun CheckoutField(label: String, value: String, tag: String, numeric: Boolean=false, secret: Boolean=false,
     error: String?=null, onFocus: (() -> Unit)?=null, change: (String)->Unit) {
     OutlinedTextField(value=value,onValueChange=change,label={LocalizedText(label)},singleLine=true,
@@ -43,6 +44,7 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
         visualTransformation=if(secret) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions=KeyboardOptions(autoCorrectEnabled=false,keyboardType=if(numeric) KeyboardType.NumberPassword else KeyboardType.Text))
 }
+// UI sizing: address fields stack at the shared full width so longer localized labels can wrap without narrower columns.
 @Composable fun AddressFields(value: DeliveryAddress, cityOnlyRequired: Boolean=false,
     onFocus: ((String)->Unit)?=null, change: (DeliveryAddress)->Unit) {
     AddressAutocomplete(value,if(cityOnlyRequired) "Street address (optional)" else "Street address (required)",
@@ -53,10 +55,12 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
     CheckoutField(if(cityOnlyRequired) "Postal / ZIP code (optional)" else "Postal / ZIP code (required)",value.postalCode,"address_postal",onFocus={onFocus?.invoke("Postal / ZIP code")}) { change(value.copy(postalCode=it.take(160))) }
     CheckoutField(if(cityOnlyRequired) "Country (optional)" else "Country (required)",value.country,"address_country",onFocus={onFocus?.invoke("Country")}) { change(value.copy(country=it.take(160))) }
 }
+// UI sizing/color: cover dialogs fill the screen with Cream, respect system/keyboard insets, and use 24dp padding with 14dp gaps.
 @Composable private fun CoverDialog(onClose: ()->Unit, content: @Composable ColumnScope.()->Unit) {
     Dialog(onDismissRequest=onClose,properties=DialogProperties(usePlatformDefaultWidth=false,securePolicy=SecureFlagPolicy.SecureOn)) {
         Surface(Modifier.fillMaxSize(),color=Cream) {
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+            val scrollState=rememberScrollState()
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().imePadding().oliveScrollbar(scrollState).verticalScroll(scrollState).padding(24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                 TextButton(onClick=onClose) { LocalizedText("Back to menu") }
                 content()
             }
@@ -64,6 +68,7 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
     }
 }
 // Add or change address fields here; SessionViewModel handles saving and auto-close.
+// UI sizing/text: address headings use headlineMedium and controls fill the dialog width.
 @Composable fun AddressDialog(address: DeliveryAddress, busy: Boolean, message: String?, onSave: (DeliveryAddress)->Unit, onClose: ()->Unit) {
     var draft by remember(address) { mutableStateOf(address) }
     CoverDialog(onClose) {
@@ -78,6 +83,7 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
 }
 
 // Change checkout presentation here; keep payment fields temporary and the result declined.
+// UI sizing/color: checkout sections use titleLarge, inline error colors, full-width buttons, and the shared dialog spacing.
 @Composable fun CheckoutDialog(address: DeliveryAddress, totalCents: Int, foods: List<OrderLine>,
     onSaveAddress: (DeliveryAddress)->Unit, onAttempt: suspend (List<OrderLine>,Int,String)->Unit, onClose: ()->Unit) {
     val scope=rememberCoroutineScope()

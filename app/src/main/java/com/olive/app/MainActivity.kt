@@ -41,9 +41,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val selectedCover=session.coverType
             val selectedRole=session.accountRole
-            val calculatorVisible=session.screen==SessionScreen.Cover &&
-                selectedRole==AccountRole.USER && selectedCover==CoverType.CALCULATOR
-            LaunchedEffect(calculatorVisible) { applySystemBarContrast(calculatorVisible) }
+            LaunchedEffect(selectedCover,selectedRole,session.screen) { applySystemBarContrast(false) }
             LaunchedEffect(selectedCover,selectedRole) {
                 // Update the open task now; the Home-screen alias changes after the user leaves the app.
                 updateRecentAppIdentity(selectedCover,selectedRole)
@@ -127,8 +125,8 @@ class MainActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private fun updateRecentAppIdentity(type: CoverType, role: AccountRole) {
         val iconId=when {
-            role==AccountRole.STAFF || role==AccountRole.ADMIN -> R.drawable.ic_olive
-            role==AccountRole.SAFE_CONTACT -> R.drawable.ic_olive
+            role==AccountRole.STAFF || role==AccountRole.ADMIN -> R.drawable.ic_olive_tree
+            role==AccountRole.SAFE_CONTACT -> R.drawable.ic_olive_branch
             type==CoverType.NEWS -> R.drawable.ic_daily_digest
             type==CoverType.CALCULATOR -> R.drawable.ic_calculator
             else -> R.drawable.ic_olive

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -21,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -42,7 +42,8 @@ import java.util.Locale
 @Composable private fun money(cents: Int): String = NumberFormat.getCurrencyInstance(if(LocalOliveLanguage.current=="French") Locale.CANADA_FRENCH else Locale.CANADA).format(cents / 100.0)
 
 // Change cover navigation, tabs, address popup, or checkout entry in this main food-app section.
-@Composable fun OliveApp(
+// UI sizing/color: the cover shell uses Cream, shared Olive colors, safe-area insets, and Material navigation sizing.
+@Composable fun OliveCover(
     vm: OliveViewModel = viewModel(),
     interactive: Boolean = true,
     onSearch: (String) -> Unit = vm::search,
@@ -111,11 +112,14 @@ import java.util.Locale
 }
 
 // The main food feed lives here—search, categories, location, and all the tempting menu cards.
+// UI sizing/text: the feed uses 24dp sides, 22dp item gaps, a 36sp wordmark, and 40/44sp hero copy.
 @Composable private fun Discover(vm: OliveViewModel, onSearch: (String) -> Unit, onDeliveryArea: () -> Unit) {
     val focus = LocalFocusManager.current
-    LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+    val listState=rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding = PaddingValues(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal=24.dp, vertical=12.dp), verticalAlignment=Alignment.CenterVertically) {
+                // Cover sizing note: this 36sp value is the Olive wordmark; delivery text beside it should wrap or truncate instead of shrinking the brand.
                 LocalizedText("olive", fontFamily=FontFamily.Serif, fontWeight=FontWeight.Bold, fontSize=36.sp, color=OliveGreen)
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick=onDeliveryArea) {
@@ -133,6 +137,7 @@ import java.util.Locale
             Column(Modifier.padding(horizontal=24.dp)) {
                 LocalizedText("HOMEMADE BY OLIVE KITCHEN", style=MaterialTheme.typography.labelSmall, color=OliveGreen, letterSpacing=1.6.sp)
                 Spacer(Modifier.height(10.dp))
+                // Hero copy uses 40/44sp. Change fontSize and lineHeight together, then check French and the narrowest supported phone.
                 LocalizedText("Good food.\nGood mood.", fontFamily=FontFamily.Serif, fontSize=40.sp, lineHeight=44.sp, fontWeight=FontWeight.Medium)
                 Spacer(Modifier.height(10.dp))
                 LocalizedText("Made in our kitchen and delivered to your door.", color=Muted)
@@ -164,8 +169,9 @@ import java.util.Locale
 }
 
 // One bite-sized menu card with its photo, price, favourite button, and quick add.
+// UI sizing/color: dish cards use 24dp sides, 22dp corners, a 16:9 image, 16dp padding, and 18sp item names.
 @Composable private fun DishCard(dish: Dish, vm: OliveViewModel, modifier: Modifier=Modifier) {
-    Card(onClick={vm.select(dish)},modifier=modifier.fillMaxWidth().padding(horizontal=24.dp).animateContentSize(),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+    Card(onClick={vm.select(dish)},modifier=modifier.fillMaxWidth().padding(horizontal=24.dp).animateContentSize(),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=Paper)) {
         Box {
             DishImage(dish,Modifier.fillMaxWidth().aspectRatio(16f/9f))
             FilledIconButton(onClick={vm.favorite(dish.id)},modifier=Modifier.align(Alignment.TopEnd).padding(10.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=Cream)) {
@@ -184,8 +190,10 @@ import java.util.Locale
 }
 
 // Tap a dish and this gives it the full spotlight before adding it to the cart.
+// UI sizing/text: details use 20dp gaps, a 16:9 image, 24dp sides, and a 34/38sp food title.
 @Composable private fun Detail(dish: Dish, vm: OliveViewModel) {
-    LazyColumn(contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+    val listState=rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item { Row(Modifier.padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick={vm.select(null)}) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back to menu") }
             LocalizedText(dish.restaurant,style=MaterialTheme.typography.titleMedium)
@@ -215,8 +223,10 @@ import java.util.Locale
 }
 
 // Hearts land here so users can find their saved food again.
+// UI sizing: saved food uses 24dp vertical padding and 20dp gaps while reusing the shared dish-card sizes.
 @Composable private fun Saved(vm: OliveViewModel) {
-    LazyColumn(contentPadding=PaddingValues(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+    val listState=rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item { PageTitle("Your favourites", "Good finds, kept close.") }
         val saved = vm.dishes.filter { it.id in vm.favorites }
         if(saved.isEmpty()) item { EmptyState(Icons.Outlined.FavoriteBorder,"A place for your favourites","Tap the heart on any dish to save it here.") }
@@ -225,15 +235,17 @@ import java.util.Locale
 }
 
 // The cart handles quantities, subtotal, and the jump into the always-declined checkout.
+// UI sizing: cart rows use 24dp sides, 72dp thumbnails, 12dp padding, and full-width checkout controls.
 @Composable private fun Cart(vm: OliveViewModel, checkout: () -> Unit) {
-    LazyColumn(contentPadding=PaddingValues(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+    val listState=rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
         item { PageTitle("Your cart", "A few good things, all together.") }
         if(vm.itemCount == 0) item {
             EmptyState(Icons.Outlined.ShoppingBag,"Something delicious belongs here","Explore the menu and add a dish to get started.")
             Button(onClick={vm.navigate(CoverTab.Discover)},modifier=Modifier.padding(horizontal=24.dp).fillMaxWidth()) { LocalizedText("Explore the menu") }
         }
         items(vm.dishes.filter { it.id in vm.cart },key={it.id}) { dish ->
-            Card(modifier=Modifier.animateItem().padding(horizontal=24.dp).animateContentSize(),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            Card(modifier=Modifier.animateItem().padding(horizontal=24.dp).animateContentSize(),colors=CardDefaults.cardColors(containerColor=Paper)) {
                 Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
                     DishImage(dish,Modifier.size(72.dp).clip(RoundedCornerShape(14.dp)))
                     Column(Modifier.weight(1f).padding(start=12.dp)) {
@@ -260,6 +272,7 @@ import java.util.Locale
 }
 
 // Add a cover language here only after its text is added in Localization and the safe picker.
+// UI sizing/text: this picker fills the account card so translated language names have room.
 @Composable private fun CoverLanguagePicker(value: String, enabled: Boolean, onChange: (String)->Unit) {
     var open by remember { mutableStateOf(false) }
     val keyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
@@ -279,6 +292,7 @@ import java.util.Locale
 }
 
 // Change cover profile fields here; keep private safe-profile details out of this screen.
+// UI sizing/color: account content uses 24dp padding/gaps, Paper cards, 20dp card padding, and Material heading sizes.
 @Composable private fun Account(onSetup: () -> Unit, configured: Boolean, session: SessionViewModel?, onAddress: ()->Unit) {
     LaunchedEffect(session?.coverUsername) { if(configured) session?.recordSettingsInteraction("Olive", "Opened account page") }
     var fullName by remember(session?.coverFullName) { mutableStateOf(session?.coverFullName.orEmpty()) }
@@ -286,13 +300,14 @@ import java.util.Locale
     var showAllOrders by remember { mutableStateOf(false) }
     val address=session?.deliveryAddress
     val formattedAddress=address?.let { listOf(it.line1,it.line2,it.city,it.province,it.postalCode,it.country).filter(String::isNotBlank).joinToString(", ") }.orEmpty()
-    LazyColumn(contentPadding=PaddingValues(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
+    val listState=rememberLazyListState()
+    LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(vertical=24.dp),verticalArrangement=Arrangement.spacedBy(24.dp)) {
         item { PageTitle("Make yourself at home", "A little space of your own.") }
         if(!configured) {
             item { EmptyState(Icons.Outlined.PersonOutline,"Welcome to Olive","Browse the menu and collect your favourites.") }
             item { Button(onClick=onSetup,modifier=Modifier.padding(horizontal=24.dp).fillMaxWidth()) { LocalizedText("Set up account") } }
         } else {
-            item { Card(Modifier.padding(horizontal=24.dp).fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            item { Card(Modifier.padding(horizontal=24.dp).fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Paper)) {
                 Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     LocalizedText("Your Olive account",style=MaterialTheme.typography.titleLarge)
                     LocalizedText(session?.coverFullName.orEmpty(),fontWeight=FontWeight.SemiBold,modifier=Modifier.testTag("cover_profile_name"))
@@ -303,7 +318,7 @@ import java.util.Locale
                     OutlinedButton(onClick={session?.recordSettingsInteraction("Olive","Opened delivery address editor");onAddress()},modifier=Modifier.fillMaxWidth().testTag("cover_change_address")) { LocalizedText("Change delivery address") }
                 }
             } }
-            item { Card(Modifier.padding(horizontal=24.dp).fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Color.White)) {
+            item { Card(Modifier.padding(horizontal=24.dp).fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Paper)) {
                 Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                     LocalizedText("Account settings",style=MaterialTheme.typography.titleLarge)
                     OutlinedTextField(value=fullName,onValueChange={fullName=it.take(120)},singleLine=true,label={LocalizedText("Full name")},
@@ -322,7 +337,7 @@ import java.util.Locale
             if(history.isEmpty()) item { LocalizedText("No checkout attempts yet.",Modifier.padding(horizontal=24.dp),color=Muted) }
             items(if(showAllOrders) history else history.take(5),key={it.id}) { attempt ->
                 Card(Modifier.padding(horizontal=24.dp).fillMaxWidth().testTag("checkout_history_row"),
-                    colors=CardDefaults.cardColors(containerColor=Color.White)) {
+                    colors=CardDefaults.cardColors(containerColor=Paper)) {
                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                         LocalizedText("Payment declined",fontWeight=FontWeight.SemiBold,color=OliveGreen)
                         LocalizedText(DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm",if(LocalOliveLanguage.current=="French") Locale.CANADA_FRENCH else Locale.CANADA)
@@ -347,6 +362,7 @@ import java.util.Locale
     }
 }
 
+// UI sizing/text: cover page titles use 24dp sides and a 32/37sp serif title pair.
 @Composable private fun PageTitle(title: String, subtitle: String) {
     Column(Modifier.padding(horizontal=24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         LocalizedText(title,fontFamily=FontFamily.Serif,fontSize=32.sp,lineHeight=37.sp)
@@ -354,6 +370,7 @@ import java.util.Locale
     }
 }
 
+// UI sizing/color: empty states use 28dp padding, 14dp gaps, a 58dp themed icon circle, and centered Material text.
 @Composable private fun EmptyState(icon: ImageVector, title: String, description: String) {
     Column(Modifier.fillMaxWidth().padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Icon(icon,null,Modifier.size(58.dp).background(MaterialTheme.colorScheme.primaryContainer,CircleShape).padding(14.dp),tint=OliveGreen)
