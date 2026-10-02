@@ -78,7 +78,7 @@ import java.util.UUID
 @Composable internal fun Welcome(session: SessionViewModel) {
     var roleOpen by remember { mutableStateOf(false) }
     FormColumn {
-        Heading("Welcome", "First, choose what kind of account you use.")
+        Heading("Welcome", "First, choose what kind of account you use.",if(session.accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN)) "Olive Tree" else "Olive Branch")
         ModeNotice(session)
         ExposedDropdownMenuBox(expanded=roleOpen,onExpandedChange={roleOpen=!roleOpen}) {
             OutlinedTextField(value=session.accountRole.title,onValueChange={},readOnly=true,label={LocalizedText("Account type")},
@@ -93,7 +93,7 @@ import java.util.UUID
             Button(onClick=session::chooseNew,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("new_user")) { LocalizedText("Create a new account") }
             OutlinedButton(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("Sign in to an existing account") }
         } else {
-            LocalizedText("${session.accountRole.title} accounts are created by an administrator. Sign in with the username and password you were given.",color=Muted)
+            LocalizedText("${session.accountRole.title} accounts are created by an administrator. Use the temporary username you were given, or your email after setup is complete.",color=Muted)
             Button(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("Sign in") }
         }
         Status(session)
@@ -114,9 +114,9 @@ import java.util.UUID
                 AccountRole.USER -> "Sign in with your existing username and password. Next, create a PIN for this device."
                 AccountRole.SAFE_CONTACT -> "Sign in with your existing username and password."
                 else -> "Use the credentials issued by an administrator."
-            })
+            },if(session.accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN)) "Olive Tree" else "Olive Branch")
         ModeNotice(session)
-        Field("Username",username,"username",enabled=!session.busy) { username=it.take(if(create) 24 else 30) }
+        Field(if(!create && session.accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN)) "Username or email" else "Username",username,"username",enabled=!session.busy) { username=it.take(if(create) 24 else 254) }
         Field("Password",password,"password",secret=true,enabled=!session.busy) { password=it.take(if(create) 24 else 128) }
         if(create) {
             LocalizedText("Passwords use 8–24 characters and are case-sensitive. Usernames are unique, ignore letter case, and use letters, numbers and underscores. No email or phone number needed.",style=MaterialTheme.typography.bodySmall,color=Muted)
@@ -177,17 +177,18 @@ import java.util.UUID
 // UI sizing/text: section titles use Material title sizes, helper text uses bodySmall, and all fields use the shared responsive form width.
 @Composable internal fun ProfileSetup(session: SessionViewModel) {
     val safeContact=session.accountRole==AccountRole.SAFE_CONTACT
-    var fullName by remember { mutableStateOf("") }
-    var affected by remember { mutableStateOf("") }
-    var abuserName by remember { mutableStateOf("") }
-    var dob by remember { mutableStateOf("") }
-    var language by remember { mutableStateOf("English") }
-    var situation by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf(DeliveryAddress()) }
+    val existing=session.setupProfile
+    var fullName by remember(existing) { mutableStateOf(existing?.fullName.orEmpty()) }
+    var affected by remember(existing) { mutableStateOf(existing?.affectedNames.orEmpty()) }
+    var abuserName by remember(existing) { mutableStateOf(existing?.abuserName.orEmpty()) }
+    var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
+    var language by remember(existing) { mutableStateOf(existing?.language?.ifBlank { "English" } ?: "English") }
+    var situation by remember(existing) { mutableStateOf(existing?.situation.orEmpty()) }
+    var address by remember(existing) { mutableStateOf(existing?.address ?: DeliveryAddress()) }
     var trigger by remember { mutableStateOf("") }
     var contactName by remember { mutableStateOf("") }
     var contactDetails by remember { mutableStateOf("") }
-    var coverType by remember { mutableStateOf(CoverType.FOOD) }
+    var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FOOD) }
     FormColumn {
         // USER + SAFE CONTACT: these shared identity, birthday, language, and city questions are required for both roles.
         Heading("Your profile",if(safeContact) "Full name, date of birth, language and city are required." else "Full name, date of birth, language, city and a trigger word are required.")
@@ -237,5 +238,35 @@ import java.util.UUID
                     contacts=if(safeContact || contactName.isBlank()) emptyList() else listOf(SafeContact(UUID.randomUUID().toString(),contactName.trim(),contactDetails.trim())),address=address,coverType=coverType,role=session.accountRole))
             }
         },enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("profile_submit")) { LocalizedText("Save profile and continue") }
+    }
+}
+
+// USER ONLY: an administrator cannot know this private trigger, so a provisioned user sets it personally on first login.
+@Composable internal fun TriggerSetup(session:SessionViewModel) {
+    var trigger by remember { mutableStateOf("") }
+    FormColumn {
+        Heading("Set your private entry","Choose the trigger that opens Olive Branch. Your administrator cannot set or view it.")
+        Field("Trigger word or phrase",trigger,"trigger",secret=true,enabled=!session.busy) { trigger=it.take(64) }
+        LocalizedText("Olive and Daily Digest ignore spaces and letter case in your trigger. Better Calculator uses your device PIN and two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        Status(session)
+        Button(onClick={session.saveProvisionedTrigger(trigger)},enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("trigger_setup_submit")) { LocalizedText("Save trigger and continue") }
+    }
+}
+
+// STAFF + ADMIN ONLY: temporary organization accounts replace their alias with a real email during first-login setup.
+@Composable internal fun OrganizationProfileSetup(session:SessionViewModel) {
+    val existing=session.setupProfile
+    var fullName by remember(existing) { mutableStateOf(existing?.fullName.orEmpty()) }
+    var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
+    var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
+    var phone by remember(existing) { mutableStateOf(existing?.phone.orEmpty()) }
+    FormColumn {
+        Heading("Complete your ${session.accountRole.title} profile","Your real email replaces the temporary sign-in address after this step. Phone is optional.","Olive Tree")
+        Field("Full name (required)",fullName,"organization_full_name",enabled=!session.busy) { fullName=it.take(120) }
+        BirthdayPicker(dob,"organization_dob",!session.busy) { dob=it }
+        Field("Email (required)",email,"organization_email",enabled=!session.busy) { email=it.take(254) }
+        Field("Phone (optional)",phone,"organization_phone",enabled=!session.busy) { phone=it.take(40) }
+        Status(session)
+        Button(onClick={session.saveOrganizationProfile(fullName,dob,email,phone)},enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("organization_profile_submit")) { LocalizedText("Save and open Olive Tree") }
     }
 }

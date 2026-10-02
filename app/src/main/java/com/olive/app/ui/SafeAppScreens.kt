@@ -71,31 +71,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
-// STAFF + ADMIN ONLY: organization accounts land on Olive Tree instead of a cover or personal safe area.
-// UI sizing/text: Olive Tree is 30sp; portal cards use 18dp padding, 6dp gaps, and Material title/body styles.
-@Composable internal fun OrganizationPortal(session: SessionViewModel) {
-    val admin=session.accountRole==AccountRole.ADMIN
-    FormColumn {
-        LocalizedText("Olive Tree",fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-        LocalizedText(if(admin) "Admin panel" else "Staff panel",style=MaterialTheme.typography.headlineMedium)
-        LocalizedText("Signed in as ${session.coverUsername}",color=Muted)
-        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            LocalizedText("Total users",style=MaterialTheme.typography.titleMedium)
-            LocalizedText("In development",color=Muted)
-        } }
-        Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            LocalizedText("Active chats with users",style=MaterialTheme.typography.titleMedium)
-            LocalizedText("In development",color=Muted)
-        } }
-        if(admin) Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            LocalizedText("Staff and admin accounts",style=MaterialTheme.typography.titleMedium)
-            LocalizedText("Assign roles and create accounts · In development",color=Muted)
-        } }
-        Status(session)
-        OutlinedButton(onClick=session::signOut,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("portal_sign_out")) { LocalizedText("Sign out") }
-    }
-}
-
 // USER + SAFE CONTACT: Olive Branch routes to the private profile, settings, notes, activity, and messaging features.
 // UI sizing/color: the safe home uses the shared form grid, OliveGreen branding, Muted guidance, and responsive feature tiles.
 @Composable internal fun SafeArea(session: SessionViewModel, exit: ()->Unit) {
@@ -788,7 +763,7 @@ import java.util.UUID
     val selected=session.activityCategory
     fun <T> visible(category: ActivityCategory,rows: List<T>)=if(selected==category) rows else rows.take(5)
     val listState=rememberLazyListState()
-    LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(start=24.dp,end=24.dp,top=24.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+    LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState).testTag("activity_list"),state=listState,contentPadding=PaddingValues(start=24.dp,end=24.dp,top=24.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         item { TextButton(onClick=session::activityBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); LocalizedText(if(selected==null) "Safe home" else "All activity") } }
         item { Heading(if(selected==null) "Account activity" else when(selected) {
             ActivityCategory.Settings -> "Settings history";ActivityCategory.Triggers -> "Trigger history"

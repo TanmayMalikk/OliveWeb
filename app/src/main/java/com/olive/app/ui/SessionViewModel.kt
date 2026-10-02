@@ -17,7 +17,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
-enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
+enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, TriggerSetup, OrganizationProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
 enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity }
 enum class ActivityCategory { Settings, Triggers, PinAttempts, Checkouts, Privacy }
 
@@ -32,6 +32,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val foodRevisions=mutableMapOf<String,Long>()
     private val newsRevisions=mutableMapOf<String,Long>()
     private val accounts: AccountRepository = if(localMode) LocalAccountRepository(vault) else FirebaseAccountRepository()
+    private val adminRepository = if(localMode) null else AdminRepository()
     private val messagingRepository = if(localMode) null else MessagingRepository()
     var screen by mutableStateOf(SessionScreen.Loading); private set
     var page by mutableStateOf(SafePage.Home); private set
@@ -63,6 +64,8 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     var coverUsername by mutableStateOf(""); private set
     var coverType by mutableStateOf(CoverType.FOOD); private set
     var accountRole by mutableStateOf(AccountRole.USER); private set
+    var adminCounts by mutableStateOf(AccountCounts()); private set
+    var adminAccounts by mutableStateOf(emptyList<AdminAccountSummary>()); private set
     var foodCart by mutableStateOf<Map<String,Int>>(emptyMap()); private set
     var foodFavorites by mutableStateOf<Set<String>>(emptySet()); private set
     var foodCustomizations by mutableStateOf<Map<String,Set<String>>>(emptyMap()); private set
@@ -93,6 +96,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     val coverAccountId get() = enrollment?.uid
     val sensitive get() = screen != SessionScreen.Cover || checkoutActive
     val setupUsername get() = pendingIdentity?.username.orEmpty()
+    val setupProfile get() = pendingProfile
     val usesCover get() = accountRole==AccountRole.USER
 
     init { load() }
@@ -125,6 +129,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                     AccountRole.SAFE_CONTACT -> SessionScreen.Safe
                     AccountRole.STAFF,AccountRole.ADMIN -> SessionScreen.Portal
                 }
+                if(enrollment?.role==AccountRole.ADMIN && !localMode) queueAdminRefresh()
                 if(enrollment?.role==AccountRole.SAFE_CONTACT) startIdleTimer()
             } catch(_: Exception) { screen = SessionScreen.StorageError }
             finally { busy = false }
@@ -148,11 +153,12 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     // Account creation and returning sign-in meet here; Firebase calls live in AccountRepository.
     fun authenticate(username: String, password: String, create: Boolean) {
         if(busy) return
-        if(!InputPolicy.validUsername(username)) { message="Use 4–24 letters, numbers or underscores for your username."; return }
+        val organizationEmail=accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN) && '@' in username
+        if(!organizationEmail && !InputPolicy.validUsername(username)) { message="Use 4–24 letters, numbers or underscores for your username."; return }
         if(create && !InputPolicy.validPassword(password)) { message="Use a password of 8–24 characters."; return }
         if(password.isEmpty()) { message="Enter your password."; return }
         runOperation("Unable to sign in. Check your credentials and connection, then try again.") { token ->
-            val identity = if(create) accounts.create(username,password) else accounts.authenticate(username,password)
+            val identity = if(create) accounts.create(username,password,accountRole) else accounts.authenticate(username,password,accountRole)
             val remote = accounts.profile(identity)
             val existing = withContext(Dispatchers.IO) {
                 if(store.pendingSync(identity.uid)) store.profile(identity.uid) else remote
@@ -166,15 +172,26 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 }
                 pendingIdentity = identity
                 pendingProfile = existing
-                if(existing!=null && existing.role!=AccountRole.USER) {
+                if(existing!=null && existing.role==AccountRole.SAFE_CONTACT && AccountPolicy.personalProfileNeedsSetup(existing)) {
+                    openScreen(SessionScreen.ProfileSetup)
+                } else if(existing!=null && existing.role in setOf(AccountRole.STAFF,AccountRole.ADMIN) && AccountPolicy.organizationProfileNeedsSetup(existing)) {
+                    openScreen(SessionScreen.OrganizationProfileSetup)
+                } else if(existing!=null && existing.role!=AccountRole.USER) {
                     val saved=withContext(Dispatchers.IO) { store.enrollWithoutPin(identity,existing) }
                     enrollment=saved;profile=existing;coverUsername=existing.username;coverFullName=existing.fullName
                     accountRole=existing.role;language=existing.language;deliveryAddress=existing.address
                     screenHistory.clear();safePageHistory.clear()
                     if(existing.role==AccountRole.SAFE_CONTACT) {
                         page=SafePage.Home;screen=SessionScreen.Safe;refreshHistory(saved.uid);startIdleTimer()
-                    } else screen=SessionScreen.Portal
-                } else openScreen(if(existing == null) SessionScreen.ProfileSetup else SessionScreen.DevicePin)
+                    } else {
+                        screen=SessionScreen.Portal
+                        if(existing.role==AccountRole.ADMIN) queueAdminRefresh()
+                    }
+                } else openScreen(when {
+                    existing==null || AccountPolicy.personalProfileNeedsSetup(existing) -> SessionScreen.ProfileSetup
+                    existing.triggerHash.isBlank() -> SessionScreen.TriggerSetup
+                    else -> SessionScreen.DevicePin
+                })
             }
         }
     }
@@ -350,6 +367,90 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         else if(screenHistory.isNotEmpty()) { screen=screenHistory.removeAt(screenHistory.lastIndex);message=null }
         // Root cover/welcome/loading screens deliberately consume Back so Android does not open the phone home screen.
     }
+
+    fun saveProvisionedTrigger(trigger:String) {
+        val identity=pendingIdentity ?: return
+        val existing=pendingProfile ?: return
+        if(!InputPolicy.validTrigger(trigger)) { message="Choose a trigger word or phrase of 3–64 characters.";return }
+        val updated=existing.copy(triggerHash=InputPolicy.triggerHash(trigger))
+        runOperation("The trigger word could not be saved. Retry here.") { token ->
+            accounts.saveProfile(identity,updated)
+            withContext(Dispatchers.IO) { store.cacheProfile(identity.uid,updated) }
+            if(epoch==token) { pendingProfile=updated;openScreen(SessionScreen.DevicePin) }
+        }
+    }
+
+    fun saveOrganizationProfile(fullName:String,dob:String,email:String,phone:String) {
+        val identity=pendingIdentity ?: return
+        val repository=adminRepository ?: return
+        if(fullName.isBlank() || !InputPolicy.validDob(dob) || !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
+            message="Full name, a valid date of birth, and a real email are required.";return
+        }
+        runOperation("Unable to finish the organization profile. Check the email and try again.") { token ->
+            val updated=repository.completeOrganizationProfile(fullName.trim(),dob.trim(),email.trim(),phone.trim())
+            val saved=withContext(Dispatchers.IO) { store.enrollWithoutPin(identity,updated) }
+            if(epoch==token) {
+                enrollment=saved;profile=updated;pendingProfile=updated;accountRole=updated.role
+                coverUsername=updated.username;coverFullName=updated.fullName;language=updated.language
+                screenHistory.clear();screen=SessionScreen.Portal
+                if(updated.role==AccountRole.ADMIN) queueAdminRefresh()
+            }
+        }
+    }
+
+    fun updateOrganizationProfile(fullName:String,dob:String,email:String,phone:String) {
+        val device=enrollment ?: return
+        val repository=adminRepository ?: return
+        if(screen!=SessionScreen.Portal || accountRole !in setOf(AccountRole.STAFF,AccountRole.ADMIN) || busy) return
+        if(fullName.isBlank() || !InputPolicy.validDob(dob) || !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
+            message="Full name, a valid date of birth, and a real email are required.";return
+        }
+        runOperation("Unable to update your Olive Tree profile.") { token ->
+            val updated=repository.completeOrganizationProfile(fullName.trim(),dob.trim(),email.trim(),phone.trim())
+            withContext(Dispatchers.IO) { store.cacheProfile(device.uid,updated) }
+            if(epoch==token && screen==SessionScreen.Portal) {
+                profile=updated;pendingProfile=updated;coverFullName=updated.fullName;message="Profile updated."
+            }
+        }
+    }
+
+    fun refreshAdminAccounts() {
+        val repository=adminRepository ?: return
+        if(accountRole!=AccountRole.ADMIN || busy) return
+        runOperation("Unable to load organization accounts.") { token ->
+            val (counts,rows)=repository.accounts()
+            if(epoch==token && screen==SessionScreen.Portal) { adminCounts=counts;adminAccounts=rows }
+        }
+    }
+
+    private fun queueAdminRefresh() {
+        viewModelScope.launch {
+            while(busy) delay(50)
+            if(screen==SessionScreen.Portal && accountRole==AccountRole.ADMIN) refreshAdminAccounts()
+        }
+    }
+
+    fun createManagedAccount(value:AdminAccountDraft) {
+        val repository=adminRepository ?: return
+        if(accountRole!=AccountRole.ADMIN || busy) return
+        if(!InputPolicy.validUsername(value.username)) { message="Use 4–24 letters, numbers or underscores for the username.";return }
+        if(!InputPolicy.validPassword(value.password)) { message="Use a temporary password of 8–24 characters.";return }
+        runOperation("Unable to create the account. The username or email may already be in use.") { token ->
+            repository.create(value)
+            val (counts,rows)=repository.accounts()
+            if(epoch==token && screen==SessionScreen.Portal) { adminCounts=counts;adminAccounts=rows;message="${value.role.title} account created." }
+        }
+    }
+
+    fun deleteManagedAccount(value:AdminAccountSummary) {
+        val repository=adminRepository ?: return
+        if(accountRole!=AccountRole.ADMIN || busy || value.protected) return
+        runOperation("Unable to delete this account.") { token ->
+            repository.delete(value.uid)
+            val (counts,rows)=repository.accounts()
+            if(epoch==token && screen==SessionScreen.Portal) { adminCounts=counts;adminAccounts=rows;message="${value.username} was deleted." }
+        }
+    }
     fun navigate(value: SafePage) {
         if(screen == SessionScreen.Safe) {
             if(value!=page) safePageHistory += page
@@ -420,7 +521,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             var connected=false
             try {
-                val identity=accounts.authenticate(coverUsername,password)
+                val identity=accounts.authenticate(coverUsername,password,accountRole)
                 check(identity.uid==device.uid) { "This device is linked to an older account. Sign out, then sign in again." }
                 connected=true;messagingNeedsReconnect=false
             } catch(error: CancellationException) { throw error }
@@ -969,8 +1070,9 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
 
     // Password changes verify the current password first; usernames stay permanent.
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) {
-        if(screen!=SessionScreen.Safe || busy) return
-        recordSettingsInteraction("Olive Branch","Pressed change account password")
+        if(screen !in setOf(SessionScreen.Safe,SessionScreen.Portal) || busy) return
+        val area=if(screen==SessionScreen.Portal) "Olive Tree" else "Olive Branch"
+        if(screen==SessionScreen.Safe) recordSettingsInteraction(area,"Pressed change account password")
         val device=enrollment ?: return
         val username=profile?.username ?: return
         if(currentPassword.isEmpty()) { message="Enter your current password."; return }
@@ -978,10 +1080,10 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         if(newPassword!=confirmation) { message="The new passwords do not match."; return }
         runOperation("Unable to change the password. Check your current password and connection.") { token ->
             accounts.changePassword(AccountIdentity(device.uid,username),currentPassword,newPassword)
-            withContext(Dispatchers.IO) { store.recordSettings(device.uid,SettingsEvent(area="Olive Branch",
+            withContext(Dispatchers.IO) { store.recordSettings(device.uid,SettingsEvent(area=area,
                 action="Changed account password",changes=listOf(FieldChange("Password","Hidden","Changed")))) }
             queueHistorySync()
-            if(epoch==token && screen==SessionScreen.Safe) message="Password changed."
+            if(epoch==token && screen in setOf(SessionScreen.Safe,SessionScreen.Portal)) message="Password changed."
         }
     }
 

@@ -12,6 +12,11 @@ service cloud.firestore {
       return username is string && username.matches('[a-z0-9_]{4,24}');
     }
 
+    function validMessagingEmail(username) {
+      return request.auth.token.email == username + '@users.olive.invalid'
+        || request.auth.token.email == username + '@safe.olive.invalid';
+    }
+
     function contactAt(c, i) {
 
       return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','details'])
@@ -48,11 +53,11 @@ service cloud.firestore {
 
       return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
 
-        && p.keys().hasOnly(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts','address','role'])
+        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','email','phone'])
 
         && p.username is string && p.username.matches('[a-z0-9_]{3,30}')
 
-        && request.auth.token.email == p.username + '@users.olive.invalid'
+        && validMessagingEmail(p.username)
 
         && p.fullName is string && p.fullName.size() > 0 && p.fullName.size() <= 120
 
@@ -120,7 +125,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid','username','updatedAt'])
         && request.resource.data.username == username
         && validMessageUsername(username)
-        && request.auth.token.email == username + '@users.olive.invalid';
+        && validMessagingEmail(username);
       allow delete: if owner(resource.data.uid);
     }
 
@@ -238,7 +243,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['senderUid','senderUsername','body','deleted','sentAt','clientSentAt'])
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderUsername is string
-          && request.auth.token.email == request.resource.data.senderUsername + '@users.olive.invalid'
+          && validMessagingEmail(request.resource.data.senderUsername)
           && request.resource.data.body is string && request.resource.data.body.size() > 0
           && request.resource.data.body.size() <= 2000
           && request.resource.data.deleted == false
