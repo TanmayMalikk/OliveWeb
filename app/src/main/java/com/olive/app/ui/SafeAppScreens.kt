@@ -685,7 +685,7 @@ import java.util.UUID
         if(userRole) {
             // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
             CoverPicker(profile.coverType,!session.busy) { session.recordSettingsInteraction("Olive Branch","Selected cover app");session.changeCover(it) }
-            LocalizedText("Olive and Daily Digest use search for safe entry. Simple Calculator uses your device PIN followed by two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
+            LocalizedText("Olive and Daily Digest use search for safe entry. Better Calculator uses your device PIN followed by two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
         }
         Field("Full name (required)",fullName,"settings_full_name",onFocus={session.recordSettingsInteraction("Olive Branch","Focused full name")}) { fullName=it.take(120) }
         if(userRole) {
@@ -866,7 +866,7 @@ import java.util.UUID
             CoverType.FOOD -> "Food Delivery App · Olive"
             CoverType.GAME -> "Game · In development"
             CoverType.NEWS -> "News App · Daily Digest"
-            CoverType.CALCULATOR -> "Calculator · Simple Calculator"
+            CoverType.CALCULATOR -> "Calculator · Better Calculator"
         }
         OutlinedButton(onClick={onSelect(type)},enabled=enabled,modifier=Modifier.fillMaxWidth().testTag("cover_choice_${type.name.lowercase()}")) {
             LocalizedText(if(selected==type) "✓  $label" else label)

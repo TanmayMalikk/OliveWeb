@@ -66,7 +66,7 @@ Month|Mois
 Day|Jour
 The app stays open. Its icon and name update after you return to the Home screen.|L’application reste ouverte. Son icône et son nom changent lorsque vous revenez à l’écran d’accueil.
 Enter your PIN.|Saisissez votre NIP.
-Olive and Daily Digest ignore spaces and letter case in your trigger. Other searches keep their spaces. Simple Calculator uses your PIN and two equals taps.|Olive et Daily Digest ignorent les espaces et la casse dans le déclencheur. Les autres recherches conservent leurs espaces. Simple Calculator utilise votre NIP et deux pressions sur égal.
+Olive and Daily Digest ignore spaces and letter case in your trigger. Other searches keep their spaces. Better Calculator uses your PIN and two equals taps.|Olive et Daily Digest ignorent les espaces et la casse dans le déclencheur. Les autres recherches conservent leurs espaces. Better Calculator utilise votre NIP et deux pressions sur égal.
 Locking soon|Verrouillage imminent
 Stay here|Rester ici
 Read full story|Lire l’article complet
@@ -106,7 +106,7 @@ Country (optional)|Pays (facultatif)
 Onboarding|Configuration initiale
 Olive search|Recherche Olive
 Daily Digest search|Recherche Daily Digest
-Simple Calculator|Simple Calculator
+Better Calculator|Better Calculator
 Polynomial|Polynôme
 Quadratic|Quadratique
 Graphing Calculator|Calculatrice graphique
@@ -440,11 +440,11 @@ Choose your cover app|Choisissez votre application de couverture
 Food Delivery App · Olive|Livraison de repas · Olive
 Game · In development|Jeu · En développement
 News App · Daily Digest|Actualités · Daily Digest
-Calculator · Simple Calculator|Calculatrice · Simple Calculator
+Calculator · Better Calculator|Calculatrice · Better Calculator
 In development|En développement
 Olive Branch|Olive Branch
-In Olive or Daily Digest, enter this word or phrase in search. In Simple Calculator, enter your device PIN and tap equals twice.|Dans Olive ou Daily Digest, saisissez ce mot ou cette phrase dans la recherche. Dans Simple Calculator, saisissez le NIP de l’appareil et appuyez deux fois sur le signe égal.
-Olive and Daily Digest use search for safe entry. Simple Calculator uses your device PIN followed by two equals taps.|Olive et Daily Digest utilisent la recherche pour l’accès sécurisé. Simple Calculator utilise le NIP de l’appareil suivi de deux pressions sur le signe égal.
+In Olive or Daily Digest, enter this word or phrase in search. In Better Calculator, enter your device PIN and tap equals twice.|Dans Olive ou Daily Digest, saisissez ce mot ou cette phrase dans la recherche. Dans Better Calculator, saisissez le NIP de l’appareil et appuyez deux fois sur le signe égal.
+Olive and Daily Digest use search for safe entry. Better Calculator uses your device PIN followed by two equals taps.|Olive et Daily Digest utilisent la recherche pour l’accès sécurisé. Better Calculator utilise le NIP de l’appareil suivi de deux pressions sur le signe égal.
 Sign out?|Se déconnecter?
 You will need your username and password to return on this device.|Vous aurez besoin de votre nom d’utilisateur et de votre mot de passe pour revenir sur cet appareil.
 Cancel|Annuler

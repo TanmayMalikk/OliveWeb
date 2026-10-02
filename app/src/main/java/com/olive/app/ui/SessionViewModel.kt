@@ -277,7 +277,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun submitCalculatorPin(pin: String) {
         if(busy || screen!=SessionScreen.Cover || coverType!=CoverType.CALCULATOR || !InputPolicy.validPin(pin)) return
         val device=enrollment ?: return
-        val newTrigger=if(activeTriggerId==null) TriggerEvent(source="Simple Calculator").also { activeTriggerId=it.id } else null
+        val newTrigger=if(activeTriggerId==null) TriggerEvent(source="Better Calculator").also { activeTriggerId=it.id } else null
         val triggerId=activeTriggerId ?: return
         runOperation("Unable to check the PIN or record this attempt. Access remains locked.") { token ->
             val result=withContext(Dispatchers.IO) {

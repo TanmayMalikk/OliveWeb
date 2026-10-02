@@ -16,7 +16,7 @@ enum class AccountRole(val title: String, val description: String) {
 }
 // Pick the visible cover here; add another option before wiring its screen and launcher icon.
 enum class CoverType(val title: String) {
-    FOOD("Olive"), NEWS("Daily Digest"), CALCULATOR("Simple Calculator"), GAME("Game");
+    FOOD("Olive"), NEWS("Daily Digest"), CALCULATOR("Better Calculator"), GAME("Game");
     companion object { fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: FOOD }
 }
 // This is the complete account profile; cover screens only get the small, normal-looking subset they need.
