@@ -6,6 +6,7 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.graphics.Canvas
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -15,6 +16,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.createBitmap
+import androidx.lifecycle.Lifecycle
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
 import com.olive.app.ui.CoverLauncher
@@ -24,14 +26,19 @@ import com.olive.app.ui.SessionScreen
 import com.olive.app.ui.SessionViewModel
 import java.util.function.Consumer
 
+internal fun shouldBlankRecentPreview(protectionEnabled:Boolean,sensitive:Boolean)=protectionEnabled && sensitive
+
 // The Android shell is intentionally thin: show Olive and lock it whenever it leaves the foreground.
 class MainActivity : ComponentActivity() {
     companion object {
+        // Change this one value to true to enable FLAG_SECURE, capture logging, and blank private recent-app previews.
         const val SCREEN_CAPTURE_PROTECTION_ENABLED = false
     }
     private val session: SessionViewModel by viewModels()
     private var screenshotCallback: Activity.ScreenCaptureCallback?=null
     private var recordingCallback: Consumer<Int>?=null
+    private var recentPrivacyCover:View?=null
+    private var privacyCoverEpoch=0
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CoverLauncher.ensureStudioLauncher(this)
@@ -51,6 +58,7 @@ class MainActivity : ComponentActivity() {
     }
     // The second Olive slips into the background, the safe area gets covered and locked.
     override fun onPause() {
+        showRecentPrivacyCover()
         applyScreenCaptureProtection()
         session.background()
         updateRecentAppIdentity(session.coverType,session.accountRole)
@@ -58,6 +66,7 @@ class MainActivity : ComponentActivity() {
     }
     // Android calls this as the user heads for Home or the recent-apps screen, so swap to cover before they get there.
     public override fun onUserLeaveHint() {
+        showRecentPrivacyCover()
         applyScreenCaptureProtection()
         session.background()
         updateRecentAppIdentity(session.coverType,session.accountRole)
@@ -68,6 +77,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType,session.accountRole)
+        removeRecentPrivacyCoverAfterRedraw()
     }
     override fun onUserInteraction() {
         super.onUserInteraction()
@@ -110,6 +120,37 @@ class MainActivity : ComponentActivity() {
         if(Build.VERSION.SDK_INT>=33) setRecentsScreenshotEnabled(!SCREEN_CAPTURE_PROTECTION_ENABLED)
     }
 
+    // When capture protection is enabled, this native black layer reaches Android before a private task preview can be taken.
+    private fun showRecentPrivacyCover() {
+        if(!shouldBlankRecentPreview(SCREEN_CAPTURE_PROTECTION_ENABLED,session.sensitive)) return
+        privacyCoverEpoch++
+        if(recentPrivacyCover!=null) return
+        val root=window.decorView as? ViewGroup ?: return
+        recentPrivacyCover=View(this).apply {
+            setBackgroundColor(android.graphics.Color.BLACK)
+            importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            elevation=Float.MAX_VALUE
+        }.also { cover ->
+            root.addView(cover,ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT))
+            cover.bringToFront()
+            root.invalidate()
+        }
+    }
+
+    // Wait for two frames after resume so the locked cover is rendered before the native privacy layer is removed.
+    private fun removeRecentPrivacyCoverAfterRedraw() {
+        val expectedEpoch=privacyCoverEpoch
+        window.decorView.postOnAnimation {
+            window.decorView.postOnAnimation {
+                if(expectedEpoch==privacyCoverEpoch && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                    val cover=recentPrivacyCover ?: return@postOnAnimation
+                    (cover.parent as? ViewGroup)?.removeView(cover)
+                    recentPrivacyCover=null
+                }
+            }
+        }
+    }
+
     // Light pages use dark system icons; the calculator flips them light against its dark background.
     private fun applySystemBarContrast(darkBackground: Boolean) {
         val transparent=android.graphics.Color.TRANSPARENT
@@ -125,11 +166,11 @@ class MainActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private fun updateRecentAppIdentity(type: CoverType, role: AccountRole) {
         val iconId=when {
-            role==AccountRole.STAFF || role==AccountRole.ADMIN -> R.drawable.ic_olive_tree
-            role==AccountRole.SAFE_CONTACT -> R.drawable.ic_olive_branch
-            type==CoverType.NEWS -> R.drawable.ic_daily_digest
-            type==CoverType.CALCULATOR -> R.drawable.ic_calculator
-            else -> R.drawable.ic_olive
+            role==AccountRole.STAFF || role==AccountRole.ADMIN -> R.mipmap.ic_launcher_tree
+            role==AccountRole.SAFE_CONTACT -> R.mipmap.ic_launcher_branch
+            type==CoverType.NEWS -> R.mipmap.ic_launcher_news
+            type==CoverType.CALCULATOR -> R.mipmap.ic_launcher_calculator
+            else -> R.mipmap.ic_launcher_food
         }
         val appTitle=when(role) {
             AccountRole.SAFE_CONTACT -> "Olive Branch"

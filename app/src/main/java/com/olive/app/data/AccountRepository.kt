@@ -6,6 +6,7 @@ import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.StorageReference
+import com.google.firebase.functions.FirebaseFunctions
 import com.olive.app.security.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -75,6 +76,7 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
 class FirebaseAccountRepository : AccountRepository {
     private val auth = FirebaseAuth.getInstance()
     private val storage = FirebaseStorage.getInstance()
+    private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
     // Change this path together with firebase/storage.rules and its tests.
     private fun profileObject(uid: String) = storage.reference.child("accounts/$uid/profile.json")
     private fun historyFolder(uid: String, category: String) = storage.reference.child("accounts/$uid/history/$category")
@@ -88,10 +90,22 @@ class FirebaseAccountRepository : AccountRepository {
         val primary=AccountPolicy.signInEmail(username,role)
         val user = try { auth.signInWithEmailAndPassword(primary,password).await().user }
         catch(primaryError:Exception) {
+            if(role in setOf(AccountRole.STAFF,AccountRole.ADMIN) && '@' in username) {
+                val result=functions.getHttpsCallable("resolveOrganizationLogin").call(mapOf("email" to username.trim().lowercase(),"role" to role.name)).await().data as? Map<*,*>
+                val alias=result?.get("authEmail")?.toString().orEmpty()
+                if(alias.isBlank()) throw primaryError
+                auth.signInWithEmailAndPassword(alias,password).await().user
+            } else {
             // Accounts created before role aliases existed used the User domain; keep those logins working during migration.
-            if(role==AccountRole.USER || '@' in username) throw primaryError
-            auth.signInWithEmailAndPassword(AccountPolicy.legacyUserEmail(username),password).await().user
+                if(role==AccountRole.USER) throw primaryError
+                auth.signInWithEmailAndPassword(AccountPolicy.legacyUserEmail(username),password).await().user
+            }
         } ?: error("Missing account")
+        // Every organization login keeps the email lookup current and migrates older accounts back to the username alias.
+        if(role in setOf(AccountRole.STAFF,AccountRole.ADMIN)) {
+            functions.getHttpsCallable("restoreOrganizationLoginAlias").call().await()
+            user.reload().await()
+        }
         val accountName=user.displayName?.takeIf(InputPolicy::validUsername)
             ?: user.email?.substringBefore('@')?.let(InputPolicy::username).orEmpty()
         return AccountIdentity(user.uid,accountName)

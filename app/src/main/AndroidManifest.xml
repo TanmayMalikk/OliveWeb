@@ -18,7 +18,7 @@
             tools:ignore="LockedOrientationActivity,DiscouragedApi" />
         <activity-alias android:name=".FoodLauncher" android:targetActivity=".MainActivity"
             android:exported="true" android:enabled="true" android:label="Olive"
-            android:icon="@drawable/ic_olive" android:roundIcon="@drawable/ic_olive">
+            android:icon="@mipmap/ic_launcher_food" android:roundIcon="@mipmap/ic_launcher_food">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -26,7 +26,7 @@
         </activity-alias>
         <activity-alias android:name=".NewsLauncher" android:targetActivity=".MainActivity"
             android:exported="true" android:enabled="false" android:label="Daily Digest"
-            android:icon="@drawable/ic_daily_digest" android:roundIcon="@drawable/ic_daily_digest">
+            android:icon="@mipmap/ic_launcher_news" android:roundIcon="@mipmap/ic_launcher_news">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -34,7 +34,7 @@
         </activity-alias>
         <activity-alias android:name=".CalculatorLauncher" android:targetActivity=".MainActivity"
             android:exported="true" android:enabled="false" android:label="Better Calculator"
-            android:icon="@drawable/ic_calculator" android:roundIcon="@drawable/ic_calculator">
+            android:icon="@mipmap/ic_launcher_calculator" android:roundIcon="@mipmap/ic_launcher_calculator">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -42,7 +42,7 @@
         </activity-alias>
         <activity-alias android:name=".BranchLauncher" android:targetActivity=".MainActivity"
             android:exported="true" android:enabled="false" android:label="Olive Branch"
-            android:icon="@drawable/ic_olive_branch" android:roundIcon="@drawable/ic_olive_branch">
+            android:icon="@mipmap/ic_launcher_branch" android:roundIcon="@mipmap/ic_launcher_branch">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -50,7 +50,7 @@
         </activity-alias>
         <activity-alias android:name=".TreeLauncher" android:targetActivity=".MainActivity"
             android:exported="true" android:enabled="false" android:label="Olive Tree"
-            android:icon="@drawable/ic_olive_tree" android:roundIcon="@drawable/ic_olive_tree">
+            android:icon="@mipmap/ic_launcher_tree" android:roundIcon="@mipmap/ic_launcher_tree">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
