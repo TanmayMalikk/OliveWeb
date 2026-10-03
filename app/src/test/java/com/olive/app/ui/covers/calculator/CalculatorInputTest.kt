@@ -39,15 +39,54 @@ class CalculatorInputTest {
 
     @Test fun trigonometryUsesTheSelectedAngleModeAndDisarmsPinEntry() {
         val input=CalculatorInput()
+        input.beginTrig("sin",false,CalculatorAngleMode.DEGREES)
         "90".forEach { input.press(it.toString()) }
-        input.applyTrig("sin",CalculatorAngleMode.DEGREES)
+        assertEquals("sin(90",input.display)
+        input.press("=")
         assertEquals("1",input.display)
-        assertEquals("sin(90)",input.expression)
+        assertEquals("sin(90) =",input.expression)
         assertNull(input.press("="))
 
         input.reset()
+        input.beginTrig("cos",false,CalculatorAngleMode.RADIANS)
         "3.141592653589793".forEach { input.press(it.toString()) }
-        input.applyTrig("cos",CalculatorAngleMode.RADIANS)
+        input.press("=")
         assertEquals("-1",input.display)
+
+        input.reset()
+        input.beginTrig("sin",true,CalculatorAngleMode.DEGREES)
+        listOf("0",".","5","=").forEach { input.press(it) }
+        assertEquals("30",input.display)
+        assertEquals("sin⁻¹(0.5) =",input.expression)
+    }
+
+    @Test fun parenthesesAndPercentStayVisibleUntilEquals() {
+        val input=CalculatorInput()
+        listOf("(","2","+","3",")","×","4").forEach { input.press(it) }
+        assertEquals("(2+3)×4",input.display)
+        input.press("=")
+        assertEquals("20",input.display)
+
+        input.reset()
+        listOf("5","%").forEach { input.press(it) }
+        assertEquals("5%",input.display)
+        assertEquals("5%",input.expression)
+        input.press("=")
+        assertEquals("0.05",input.display)
+    }
+
+    @Test fun smartParenthesesAndScientificKeysBuildVisibleExpressions() {
+        val input=CalculatorInput()
+        listOf("()","2","+","3","()","×","4","=").forEach { input.press(it) }
+        assertEquals("20",input.display)
+
+        input.reset()
+        input.beginFunction("√",CalculatorAngleMode.RADIANS)
+        listOf("8","1","=").forEach { input.press(it) }
+        assertEquals("9",input.display)
+
+        input.reset()
+        listOf("5","!","=").forEach { input.press(it) }
+        assertEquals("120",input.display)
     }
 }

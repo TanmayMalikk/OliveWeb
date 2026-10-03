@@ -8,6 +8,7 @@ test("role aliases and real organization emails are deterministic", () => {
   assert.equal(_test.signInEmail("alex_1", "SAFE_CONTACT"), "alex_1@safe.olive.invalid");
   assert.equal(_test.signInEmail("alex_1", "STAFF"), "alex_1@staff.olive.invalid");
   assert.equal(_test.signInEmail("alex_1", "ADMIN", "Admin@Example.ca"), "admin@example.ca");
+  assert.equal(_test.organizationEmailKey(" Admin@Example.ca "), _test.organizationEmailKey("admin@example.ca"));
 });
 
 test("profile completion follows each role's required fields", () => {

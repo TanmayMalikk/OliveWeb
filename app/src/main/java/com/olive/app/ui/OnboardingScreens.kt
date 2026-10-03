@@ -93,7 +93,7 @@ import java.util.UUID
             Button(onClick=session::chooseNew,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("new_user")) { LocalizedText("Create a new account") }
             OutlinedButton(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("Sign in to an existing account") }
         } else {
-            LocalizedText("${session.accountRole.title} accounts are created by an administrator. Use the temporary username you were given, or your email after setup is complete.",color=Muted)
+            LocalizedText("${session.accountRole.title} accounts are created by an administrator. Sign in with your username or the real email saved to your account.",color=Muted)
             Button(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("Sign in") }
         }
         Status(session)
@@ -261,7 +261,7 @@ import java.util.UUID
     var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
     var phone by remember(existing) { mutableStateOf(existing?.phone.orEmpty()) }
     FormColumn {
-        Heading("Complete your ${session.accountRole.title} profile","Your real email replaces the temporary sign-in address after this step. Phone is optional.","Olive Tree")
+        Heading("Complete your ${session.accountRole.title} profile","Your username remains your sign-in, and this email can also be used to sign in. Phone is optional.","Olive Tree")
         Field("Full name (required)",fullName,"organization_full_name",enabled=!session.busy) { fullName=it.take(120) }
         BirthdayPicker(dob,"organization_dob",!session.busy) { dob=it }
         Field("Email (required)",email,"organization_email",enabled=!session.busy) { email=it.take(254) }

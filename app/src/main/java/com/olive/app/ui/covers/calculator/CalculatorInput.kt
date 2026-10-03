@@ -5,110 +5,126 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.math.BigDecimal
 import java.math.MathContext
-import java.math.RoundingMode
 import kotlin.math.abs
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.tan
+import kotlin.math.round
 
-// Handle the normal maths here; two equals taps after 4–6 entered digits hand a PIN to the safe gate.
+// Build the visible equation here and wait for equals before calculating it locally.
 class CalculatorInput {
     var display by mutableStateOf("0"); private set
     var expression by mutableStateOf(""); private set
-    private var first: String? = null
-    private var operator: String? = null
-    private var fresh = false
-    private var pinEligible = false
-    private var armedPin: String? = null
-    private var typedDigits: String? = null
+    private var evaluated=false
+    private var armedPin:String?=null
+    private var angleMode=CalculatorAngleMode.RADIANS
 
     fun reset() {
-        display="0"; expression=""; first=null; operator=null
-        fresh=false; pinEligible=false; armedPin=null; typedDigits=null
+        display="0";expression="";evaluated=false;armedPin=null
     }
 
-    fun press(key: String): String? {
-        if(key != "=") armedPin=null
+    fun press(key:String):String? {
+        if(key!="=") armedPin=null
         when(key) {
             "AC" -> reset()
-            "⌫" -> {
-                typedDigits=typedDigits?.dropLast(1)
-                display=typedDigits?.ifEmpty { "0" } ?: display.dropLast(1).ifEmpty { "0" }
-                pinEligible=!typedDigits.isNullOrEmpty() && operator==null
-            }
+            "⌫" -> if(!evaluated) updateEntry(expression.dropLast(1))
             "±" -> {
-                if(display!="0" && display!="Error") display=if(display.startsWith("-")) display.drop(1) else "-$display"
-                pinEligible=false;typedDigits=null
-            }
-            "%" -> {
-                display=runCatching { (BigDecimal(display).divide(BigDecimal(100))).format() }.getOrDefault("Error")
-                pinEligible=false;typedDigits=null
-            }
-            "+","−","×","÷" -> {
-                if(display=="Error") return null
-                first=display; operator=key; expression="$display $key"; fresh=true; pinEligible=false;typedDigits=null
-            }
-            "=" -> {
-                val prior=first; val op=operator
-                if(prior!=null && op!=null) {
-                    expression="$prior $op $display ="
-                    display=runCatching {
-                        val left=BigDecimal(prior); val right=BigDecimal(display)
-                        when(op) {
-                            "+" -> left.add(right)
-                            "−" -> left.subtract(right)
-                            "×" -> left.multiply(right)
-                            else -> left.divide(right,8,RoundingMode.HALF_UP)
-                        }.format()
-                    }.getOrDefault("Error")
-                    first=null; operator=null; fresh=true; pinEligible=false;typedDigits=null
-                } else if(armedPin!=null) {
-                    val pin=armedPin
-                    reset()
-                    return pin
-                } else if(pinEligible && display.matches(Regex("[0-9]{4,6}"))) {
-                    armedPin=display
-                } else {
-                    fresh=true
+                beginFreshIfNeeded()
+                val changed=when {
+                    expression.isBlank() -> "-"
+                    expression.startsWith("-(") && expression.endsWith(')') -> expression.substring(2,expression.length-1)
+                    else -> "-($expression)"
                 }
+                updateEntry(changed)
             }
+            "%" -> if(canEndValue() && expression.lastOrNull()!='%') updateEntry("$expression%")
+            "+","−","×","÷","^" -> {
+                if(evaluated) { expression=display;evaluated=false }
+                val unaryMinus=key=="−" && (expression.isBlank() || expression.lastOrNull()=='(' || expression.lastOrNull() in operatorCharacters)
+                val next=when {
+                    unaryMinus -> expression+key
+                    expression.lastOrNull() in operatorCharacters -> expression.dropLast(1)+key
+                    else -> expression+key
+                }
+                if(expression.isNotBlank() || unaryMinus) updateEntry(next)
+            }
+            "!" -> if(canEndValue() && expression.lastOrNull()!='!') updateEntry("$expression!")
+            "x²" -> if(canEndValue()) updateEntry("$expression^2")
+            "π","e" -> { beginFreshIfNeeded();updateEntry((expression+key).take(MAX_EXPRESSION_LENGTH)) }
+            "eˣ" -> { beginFreshIfNeeded();updateEntry((expression+"e^(").take(MAX_EXPRESSION_LENGTH)) }
+            "10ˣ" -> { beginFreshIfNeeded();updateEntry((expression+"10^(").take(MAX_EXPRESSION_LENGTH)) }
+            "(" -> {
+                beginFreshIfNeeded()
+                updateEntry("$expression(")
+            }
+            ")" -> if(canEndValue() && expression.count { it=='(' }>expression.count { it==')' }) updateEntry("$expression)")
+            "()" -> {
+                beginFreshIfNeeded()
+                val close=canEndValue() && expression.count { it=='(' }>expression.count { it==')' }
+                updateEntry(expression+if(close) ")" else "(")
+            }
+            "=" -> return evaluateOrUnlock()
             "." -> {
-                if(fresh || display=="Error") { display="0.";fresh=false }
-                else if(!display.contains('.')) display+="."
-                pinEligible=false;typedDigits=null
+                beginFreshIfNeeded()
+                if(!currentNumber().contains('.')) updateEntry(expression+if(needsLeadingZero()) "0." else ".")
             }
-            else -> if(key.length==1 && key[0] in '0'..'9') {
-                when {
-                    fresh || display=="Error" || (typedDigits==null && display=="0") -> { typedDigits=key;display=key }
-                    typedDigits!=null -> { typedDigits=(typedDigits+key).take(18);display=typedDigits!! }
-                    else -> display=(display+key).take(18)
-                }
-                if(fresh || expression.endsWith("=")) expression=""
-                fresh=false; pinEligible=operator==null && typedDigits!=null
+            else -> if(key.length==1 && key[0].isDigit()) {
+                beginFreshIfNeeded()
+                updateEntry((expression+key).take(MAX_EXPRESSION_LENGTH))
             }
         }
         return null
     }
 
-    fun applyTrig(function: String, angleMode: CalculatorAngleMode) {
-        if(display=="Error") return
-        val original=display
-        val input=original.toDoubleOrNull() ?: run { display="Error";return }
-        val angle=if(angleMode==CalculatorAngleMode.DEGREES) Math.toRadians(input) else input
-        val answer=when(function) {
-            "sin" -> sin(angle)
-            "cos" -> cos(angle)
-            "tan" -> tan(angle)
-            else -> return
-        }
-        display=if(answer.isFinite()) BigDecimal.valueOf(if(abs(answer)<1e-12) 0.0 else answer).format() else "Error"
-        expression=if(operator==null) "$function($original)" else "$first $operator $function($original)"
-        fresh=true;pinEligible=false;armedPin=null;typedDigits=null
+    fun beginTrig(function:String,inverse:Boolean,angleMode:CalculatorAngleMode) {
+        val label=if(inverse) when(function) { "sin"->"sin⁻¹";"cos"->"cos⁻¹";else->"tan⁻¹" } else function
+        beginFunction(label,angleMode)
     }
 
-    private fun BigDecimal.format(): String {
-        val number=stripTrailingZeros()
+    fun beginFunction(label:String,angleMode:CalculatorAngleMode) {
+        beginFreshIfNeeded()
+        this.angleMode=angleMode
+        updateEntry((expression+label+"(").take(MAX_EXPRESSION_LENGTH))
+        armedPin=null
+    }
+
+    private fun evaluateOrUnlock():String? {
+        armedPin?.let { pin -> reset();return pin }
+        if(evaluated) return null
+        val missingClosers=(expression.count { it=='(' }-expression.count { it==')' }).coerceAtLeast(0)
+        val source=expression+")".repeat(missingClosers)
+        if(source.isBlank()) return null
+        if(source.matches(Regex("[0-9]{4,6}"))) armedPin=source
+        val normalized=source.replace('−','-')
+            .replace("√","sqrt").replace("π","pi")
+            .replace("sin⁻¹","asin").replace("cos⁻¹","acos").replace("tan⁻¹","atan")
+        display=runCatching { GraphExpression.compile(normalized,angleMode).evaluate(0.0).format() }.getOrDefault("Error")
+        expression="$source ="
+        evaluated=true
+        return null
+    }
+
+    private fun beginFreshIfNeeded() {
+        if(evaluated || display=="Error") { expression="";display="0";evaluated=false }
+    }
+
+    private fun updateEntry(value:String) {
+        expression=value.take(MAX_EXPRESSION_LENGTH)
+        display=expression.ifBlank { "0" }
+        evaluated=false
+    }
+
+    private fun canEndValue()=expression.lastOrNull()?.let { it.isDigit() || it==')' || it=='%' }==true
+    private fun needsLeadingZero()=expression.isBlank() || expression.lastOrNull() in operatorCharacters || expression.lastOrNull()=='('
+    private fun currentNumber()=expression.takeLastWhile { it.isDigit() || it=='.' }
+
+    private fun Double.format():String {
+        if(!isFinite()) return "Error"
+        val cleaned=when { abs(this)<1e-12 -> 0.0;abs(this-round(this))<1e-12 -> round(this);else -> this }
+        val number=BigDecimal.valueOf(cleaned).stripTrailingZeros()
         val plain=number.toPlainString()
         return if(plain.length<=18) plain else number.round(MathContext(10)).stripTrailingZeros().toString()
+    }
+
+    private companion object {
+        const val MAX_EXPRESSION_LENGTH=120
+        val operatorCharacters=setOf('+','−','×','÷','^')
     }
 }

@@ -69,6 +69,7 @@ dependencies {
     implementation("com.google.firebase:firebase-functions")
     implementation("com.google.android.libraries.places:places:5.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
+    implementation("org.apache.commons:commons-math3:3.6.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20251224")

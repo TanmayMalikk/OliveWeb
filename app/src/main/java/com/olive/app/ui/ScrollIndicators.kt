@@ -35,6 +35,24 @@ fun Modifier.oliveScrollbar(state: ScrollState): Modifier = drawWithContent {
     drawRoundRect(ScrollThumb, Offset(x, thumbTop), Size(width, thumbHeight), CornerRadius(width))
 }
 
+// Fixed tables use this matching bottom scrollbar for sideways column movement.
+fun Modifier.oliveHorizontalScrollbar(state: ScrollState): Modifier = drawWithContent {
+    drawContent()
+    if(state.maxValue<=0) return@drawWithContent
+
+    val height=4.dp.toPx()
+    val edge=3.dp.toPx()
+    val trackWidth=size.width-edge*2
+    val viewportShare=size.width/(size.width+state.maxValue)
+    val thumbWidth=max(28.dp.toPx(),trackWidth*viewportShare).coerceAtMost(trackWidth)
+    val progress=state.value.toFloat()/state.maxValue.toFloat()
+    val thumbLeft=edge+(trackWidth-thumbWidth)*progress
+    val y=size.height-height-edge
+
+    drawRoundRect(ScrollTrack,Offset(edge,y),Size(trackWidth,height),CornerRadius(height))
+    drawRoundRect(ScrollThumb,Offset(thumbLeft,y),Size(thumbWidth,height),CornerRadius(height))
+}
+
 // Lazy lists report visible rows instead of pixel scroll range, so this estimates the thumb from those rows.
 fun Modifier.oliveScrollbar(state: LazyListState): Modifier = drawWithContent {
     drawContent()

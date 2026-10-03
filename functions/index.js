@@ -4,6 +4,7 @@ const {initializeApp} = require("firebase-admin/app");
 const {getAuth} = require("firebase-admin/auth");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getStorage} = require("firebase-admin/storage");
+const {createHash} = require("node:crypto");
 
 initializeApp();
 setGlobalOptions({region: "northamerica-northeast1", maxInstances: 10});
@@ -36,6 +37,21 @@ function signInEmail(username, role, suppliedEmail = "") {
   }
   const domain = {USER: "users", SAFE_CONTACT: "safe", STAFF: "staff", ADMIN: "admin"}[role];
   return `${username}@${domain}.olive.invalid`;
+}
+function organizationEmailKey(email) {
+  return createHash("sha256").update(text(email, 254).toLowerCase()).digest("hex");
+}
+async function saveOrganizationLogin(uid, username, role, email) {
+  if ((role !== "STAFF" && role !== "ADMIN") || !email || isTemporaryEmail(email)) return;
+  const reference = db.collection("organizationLoginAliases").doc(organizationEmailKey(email));
+  const existing = await reference.get();
+  if (existing.exists && existing.data()?.uid !== uid) throw new HttpsError("already-exists", "That email is already used by another organization account.");
+  await reference.set({
+    uid, username, role, authEmail: signInEmail(username, role), updatedAt: FieldValue.serverTimestamp(),
+  });
+}
+async function deleteOrganizationLogin(email) {
+  if (email && !isTemporaryEmail(email)) await db.collection("organizationLoginAliases").doc(organizationEmailKey(email)).delete().catch(() => {});
 }
 function profilePath(uid) { return `accounts/${uid}/profile.json`; }
 async function readProfile(uid) {
@@ -136,7 +152,9 @@ exports.adminCreateAccount = onCall(async (request) => {
   const role = normalizedRole(input.role);
   const password = String(input.password || "");
   if (password.length < 8 || password.length > 24) throw new HttpsError("invalid-argument", "Temporary password must be 8–24 characters.");
-  const email = signInEmail(username, role, input.email);
+  // Staff and Admin always keep their username alias in Firebase Auth. Their real email belongs in the private profile.
+  const authEmail = signInEmail(username, role);
+  const profileEmail = (role === "STAFF" || role === "ADMIN") && text(input.email, 254) ? signInEmail(username, role, input.email) : authEmail;
   const directory = db.collection("accountDirectory").doc(username);
   if ((await directory.get()).exists) throw new HttpsError("already-exists", "That username is already in use.");
   if ((await listEveryUser()).some((user) => text(user.displayName, 24).toLowerCase() === username)) {
@@ -148,12 +166,13 @@ exports.adminCreateAccount = onCall(async (request) => {
   }
   let created;
   try {
-    created = await auth.createUser({email, password, displayName: username, emailVerified: isTemporaryEmail(email)});
+    created = await auth.createUser({email: authEmail, password, displayName: username, emailVerified: isTemporaryEmail(authEmail)});
     await auth.setCustomUserClaims(created.uid, {role});
-    const profile = defaultProfile(username, role, input, email);
+    const profile = defaultProfile(username, role, input, profileEmail);
     await writeProfile(created.uid, profile);
     await directory.create({uid: created.uid, username, role, createdAt: FieldValue.serverTimestamp()});
-    return {uid: created.uid, username, role, email, profileComplete: profileComplete(role, profile)};
+    await saveOrganizationLogin(created.uid, username, role, profile.email);
+    return {uid: created.uid, username, role, email: authEmail, profileComplete: profileComplete(role, profile)};
   } catch (error) {
     await directory.delete().catch(() => {});
     if (created?.uid) await bucket.deleteFiles({prefix: `accounts/${created.uid}/`}).catch(() => {});
@@ -174,11 +193,42 @@ exports.completeOrganizationProfile = onCall(async (request) => {
   const phone = text(request.data?.phone, 40);
   const email = signInEmail(current?.username || user.displayName || "", role, request.data?.email);
   if (!fullName || !/^\d{4}-\d{2}-\d{2}$/.test(dob) || isTemporaryEmail(email)) throw new HttpsError("invalid-argument", "Full name, date of birth, and a real email are required.");
-  await auth.updateUser(user.uid, {email, emailVerified: false, displayName: current?.username || user.displayName});
+  // Keep the username alias as the Auth identifier; the real contact email is stored only in the profile.
+  await auth.updateUser(user.uid, {displayName: current?.username || user.displayName});
   await auth.setCustomUserClaims(user.uid, {...user.customClaims, role});
   const profile = {...defaultProfile(current?.username || user.displayName, role, {...current, fullName, dob, phone}, email), ...current, fullName, dob, phone, email, role};
+  await saveOrganizationLogin(user.uid, profile.username, role, email);
   await writeProfile(user.uid, profile);
+  if (current?.email?.toLowerCase() !== email.toLowerCase()) await deleteOrganizationLogin(current?.email);
   return {profile};
+});
+
+// Exact real-email lookup returns only the private Firebase alias needed for password authentication.
+exports.resolveOrganizationLogin = onCall(async (request) => {
+  const email = text(request.data?.email, 254).toLowerCase();
+  const role = normalizedRole(request.data?.role);
+  if (role !== "STAFF" && role !== "ADMIN" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new HttpsError("invalid-argument", "Enter a valid organization email and account type.");
+  }
+  const snapshot = await db.collection("organizationLoginAliases").doc(organizationEmailKey(email)).get();
+  const value = snapshot.data();
+  if (!snapshot.exists || value?.role !== role) throw new HttpsError("not-found", "No matching organization login was found.");
+  return {authEmail: value.authEmail};
+});
+
+// Existing organization accounts may have had their Auth email replaced by a real email. One authenticated call restores username login.
+exports.restoreOrganizationLoginAlias = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in first.");
+  const user = await auth.getUser(request.auth.uid);
+  const profile = await readProfile(user.uid);
+  const role = roleFromUser(user, profile);
+  if (role !== "STAFF" && role !== "ADMIN") return {changed: false};
+  const username = normalizedUsername(profile?.username || user.displayName);
+  const alias = signInEmail(username, role);
+  await saveOrganizationLogin(user.uid, username, role, profile?.email);
+  if (user.email?.toLowerCase() === alias) return {changed: false, alias};
+  await auth.updateUser(user.uid, {email: alias, emailVerified: true, displayName: username});
+  return {changed: true, alias};
 });
 
 async function deleteQuery(query) {
@@ -221,9 +271,10 @@ exports.adminDeleteAccount = onCall(async (request) => {
     await db.collection("messageDirectory").doc(username).delete().catch(() => {});
     await db.collection("accountDirectory").doc(username).delete().catch(() => {});
   }
+  await deleteOrganizationLogin(profile?.email);
   await bucket.deleteFiles({prefix: `accounts/${uid}/`});
   await auth.deleteUser(uid);
   return {deleted: true, uid};
 });
 
-exports._test = {normalizedUsername, normalizedRole, signInEmail, isTemporaryEmail, profileComplete};
+exports._test = {normalizedUsername, normalizedRole, signInEmail, organizationEmailKey, isTemporaryEmail, profileComplete};
