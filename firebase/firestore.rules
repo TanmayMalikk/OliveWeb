@@ -42,7 +42,7 @@ service cloud.firestore {
 
       return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
 
-        && p.keys().hasOnly(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts','address'])
+        && p.keys().hasOnly(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts','address', 'cover_app'])
 
         && p.username is string && p.username.matches('[a-z0-9_]{3,30}')
 
@@ -61,6 +61,8 @@ service cloud.firestore {
         && p.region is string && p.region.size() <= 200
 
         && p.triggerHash is string && p.triggerHash.matches('[a-f0-9]{64}')
+
+        && (!('cover_app' in p) || p.cover_app is string)
 
         && (!('address' in p) || validAddress(p.address))
 
@@ -103,7 +105,14 @@ service cloud.firestore {
 
     }
 
+    // Files Metadata: Anyone logged in can upload, but only allowed users can read/modify
+    match /files/{fileId} {
+          allow create: if request.auth != null;
+          allow read, update, delete: if request.auth != null && (request.auth.uid in resource.data.allowed_users);
+        }
+
     match /{document=**} { allow read, write: if false; }
+
 
   }
 

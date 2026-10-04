@@ -7,25 +7,40 @@ import java.util.Date
 
 //Implement User data collection schema while preserving naming conventions
 data class User(
+    //set documentsId from firestore to uid
     @DocumentId
     val uid: String = "",
     val username: String = "",
+    val fullName: String = "",
+    val affectedNames: String = "",
+    val dob: String = "",
+    val language: String = "",
+    val situation: String = "",
+    val region: String = "",
+    val triggerHash: String = "",
+    val contacts: List<Contact> = emptyList(),
+    val address: Address? = null,
 
     @PropertyName("cover_app")
     val coverApp: String = "",
-
-    @PropertyName("safe_contacts")
-    val safeContacts: List<SafeContact> = emptyList(),
-
-    @PropertyName("situation_tag")
-    val situationTag: String? = null
 )
 
-data class SafeContact(
+data class Contact(
+    val id: String = "",
     val name: String = "",
     val phone: String = "",
-    val relationship: String = ""
+    val details: String = ""
 )
+
+data class Address(
+    val line1: String = "",
+    val line2: String = "",
+    val city: String = "",
+    val province: String = "",
+    val postalCode: String = "",
+    val country: String = ""
+)
+
 //implement file collection schema
 data class FileMetadata(
     @DocumentId
