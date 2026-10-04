@@ -19,7 +19,7 @@ class FileRepository {
             val newFileId = UUID.randomUUID().toString()
 
             // 2. Define exactly where the file goes in Google's cloud buckets
-            val storagePath = "users/$ownerUid/media/$newFileId"
+            val storagePath = "accounts/$ownerUid/history/checkouts/$newFileId.json"
             val storageRef = storage.reference.child(storagePath)
 
             // 3. Upload the raw file to Storage (Server-Side Encryption automatically secures it here)
