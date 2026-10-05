@@ -1,6 +1,9 @@
+@file:Suppress("unused") // This merged repository is ready for the evidence screen that will call it later.
+
 package com.olive.app.data
 
 import android.net.Uri
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.olive.app.data.models.FileMetadata
@@ -9,17 +12,22 @@ import java.util.UUID
 
 class FileRepository {
     // Initialize our database and storage instances
+    private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
     private val storage = FirebaseStorage.getInstance()
 
     // 'suspend' allows this to run safely in the background without freezing the UI
     suspend fun uploadEvidence(ownerUid: String, fileUri: Uri, fileType: String): Boolean {
+        require(auth.currentUser?.uid == ownerUid) { "Sign in again before uploading a file" }
+        require(fileType.isNotBlank() && fileType.length <= 120) { "Choose a valid file type" }
+        var uploadedPath: String? = null
         return try {
             // 1. Generate a random unique ID for the file
             val newFileId = UUID.randomUUID().toString()
 
             // 2. Define exactly where the file goes in Google's cloud buckets
-            val storagePath = "accounts/$ownerUid/history/checkouts/$newFileId.json"
+            val storagePath = "users/$ownerUid/media/$newFileId"
+            uploadedPath = storagePath
             val storageRef = storage.reference.child(storagePath)
 
             // 3. Upload the raw file to Storage (Server-Side Encryption automatically secures it here)
@@ -42,6 +50,7 @@ class FileRepository {
             true
 
         } catch (e: Exception) {
+            uploadedPath?.let { path -> runCatching { storage.reference.child(path).delete().await() } }
             // If the upload fails (e.g., WiFi drops), log it and return false
             e.printStackTrace()
             false
