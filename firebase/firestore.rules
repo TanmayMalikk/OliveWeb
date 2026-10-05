@@ -19,11 +19,13 @@ service cloud.firestore {
 
     function contactAt(c, i) {
 
-      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','details'])
+      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details'])
 
         && c[i].id is string && c[i].id.size() <= 64
 
         && c[i].name is string && c[i].name.size() > 0 && c[i].name.size() <= 120
+
+        && (!('phone' in c[i]) || (c[i].phone is string && c[i].phone.size() <= 40))
 
         && c[i].details is string && c[i].details.size() > 0 && c[i].details.size() <= 200);
 
@@ -53,7 +55,7 @@ service cloud.firestore {
 
       return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
 
-        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','email','phone'])
+        && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','cover_app','email','phone'])
 
         && p.username is string && p.username.matches('[a-z0-9_]{3,30}')
 
@@ -75,6 +77,8 @@ service cloud.firestore {
         && (p.triggerHash.matches('[a-f0-9]{64}') || (('role' in p) && p.role in ['SAFE_CONTACT','STAFF','ADMIN'] && p.triggerHash == ''))
 
         && (!('role' in p) || p.role in ['USER','SAFE_CONTACT','STAFF','ADMIN'])
+
+        && (!('cover_app' in p) || p.cover_app is string)
 
         && (!('address' in p) || validAddress(p.address))
 
@@ -115,6 +119,24 @@ service cloud.firestore {
 
       allow delete: if owner(uid);
 
+    }
+
+    // File access lists can grant reads, but only the authenticated owner can create, edit, or delete metadata.
+    match /files/{fileId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['owner_id','storage_path','file_name','file_type','allowed_users','created_at'])
+        && request.resource.data.owner_id == request.auth.uid
+        && request.resource.data.storage_path == 'users/' + request.auth.uid + '/media/' + fileId
+        && request.resource.data.file_name is string && request.resource.data.file_name.size() <= 160
+        && request.resource.data.file_type is string && request.resource.data.file_type.size() <= 120
+        && request.resource.data.allowed_users is list
+        && request.resource.data.allowed_users.size() > 0 && request.resource.data.allowed_users.size() <= 25
+        && request.auth.uid in request.resource.data.allowed_users;
+      allow read: if signedIn() && request.auth.uid in resource.data.allowed_users;
+      allow update: if signedIn() && resource.data.owner_id == request.auth.uid
+        && request.resource.data.owner_id == resource.data.owner_id
+        && request.resource.data.storage_path == resource.data.storage_path;
+      allow delete: if signedIn() && resource.data.owner_id == request.auth.uid;
     }
 
     // Username lookup is exact and case-normalized by the app; listing the directory is never allowed.

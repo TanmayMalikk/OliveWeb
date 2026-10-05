@@ -27,9 +27,12 @@ service firebase.storage {
       allow delete: if owner(uid) && kind in ['settings', 'triggers', 'checkouts', 'private_entries'];
     }
 
-    // Raw Media: Only the exact user who owns the folder can read or write inside it
-    match /users/{userId}/media/{fileName} {
-      allow read, write: if owner(userId);
+    // Media stays in its owner's folder; the Firestore metadata controls any later sharing.
+    match /users/{userId}/media/{fileId} {
+      allow create, update: if owner(userId) && request.resource.size <= 250 * 1024 * 1024;
+      allow read: if request.auth != null
+        && request.auth.uid in firestore.get(/databases/(default)/documents/files/$(fileId)).data.allowed_users;
+      allow delete: if owner(userId);
     }
 
     match /{path=**} {
