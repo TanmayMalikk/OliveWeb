@@ -48,7 +48,7 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
         // Perform the KDF for unknown usernames too, avoiding a cheap username timing oracle.
         val verifier = account?.getString("passwordVerifier") ?: SecretVerifier.create("unavailable-account")
         check(SecretVerifier.matches(password, verifier) && account != null) { "Sign-in failed" }
-        AccountIdentity(account!!.getString("uid"), normalized)
+        AccountIdentity(account.getString("uid"), normalized)
     }
     override suspend fun profile(identity: AccountIdentity) = withContext(Dispatchers.IO) {
         vault.read().optJSONObject("profiles")?.optJSONObject(identity.uid)?.let(UserProfile::fromJson)
