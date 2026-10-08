@@ -4,8 +4,12 @@ import android.graphics.Paint
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -16,21 +20,39 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 // Keep the calculator looking like a calculator, with no account controls on the cover.
 // UI sizing/color: calculator breakpoints, display boxes, key-row weights, type sizes, and all Olive palette roles are controlled here.
 @Composable fun CalculatorCover(session: SessionViewModel, interactive: Boolean=true) {
-    val input=remember { CalculatorInput() }
+    // HARDCODED BETTER CALCULATOR NOTIFICATION SPOT: edit AppNotifications.kt, then copy the show call into the event that should send it.
+    // val notificationContext=androidx.compose.ui.platform.LocalContext.current
+    // com.olive.app.notification.AppNotifications.showBetterCalculator(notificationContext)
+    val context=LocalContext.current
+    val calculatorAccountId=session.coverAccountId ?: "guest"
+    val historyStore=remember(context,calculatorAccountId) { CalculatorHistoryStore(context,calculatorAccountId) }
+    val input=remember(historyStore) { CalculatorInput() }
+    var historyLoaded by remember(historyStore) { mutableStateOf(false) }
+    LaunchedEffect(historyStore) {
+        input.restoreHistory(withContext(Dispatchers.IO) { historyStore.load() })
+        historyLoaded=true
+    }
+    LaunchedEffect(input.history,historyLoaded) {
+        if(historyLoaded) withContext(Dispatchers.IO) { historyStore.save(input.history) }
+    }
     var solver by remember { mutableStateOf<CalculatorSolver?>(null) }
     var graphing by remember { mutableStateOf(false) }
     var tools by remember { mutableStateOf(false) }
@@ -93,13 +115,46 @@ import androidx.compose.ui.unit.sp
                 FilterChip(selected=angleMode==CalculatorAngleMode.DEGREES,onClick={angleMode=CalculatorAngleMode.DEGREES},
                     label={LocalizedText("DEG")},modifier=Modifier.testTag("calculator_degrees"))
             }
-            // UI sizing: the display gets the released scientific-panel space whenever the panel is collapsed.
-            Column(Modifier.fillMaxWidth().weight(if(scientificExpanded) .65f else 1.25f),verticalArrangement=Arrangement.Bottom,horizontalAlignment=Alignment.End) {
-                LocalizedText(if(input.expression.endsWith("=")) input.expression else "",modifier=Modifier.fillMaxWidth(),color=Muted,
-                    fontSize=if(compact) 14.sp else 17.sp,textAlign=TextAlign.End,maxLines=1)
-                LocalizedText(input.display,modifier=Modifier.fillMaxWidth().testTag("calculator_display"),color=Ink,
-                    fontSize=if(compact) { if(input.display.length>12) 25.sp else 38.sp } else { if(input.display.length>12) 31.sp else 48.sp },
-                    fontFamily=FontFamily.Monospace,textAlign=TextAlign.End,maxLines=1)
+            // UI sizing: history scrolls in its own bounded area and the clipped display can never overlap the keys.
+            Column(Modifier.fillMaxWidth().weight(if(scientificExpanded) .65f else 1.25f)) {
+                Row(Modifier.fillMaxWidth().height(if(compact) 28.dp else 32.dp),verticalAlignment=Alignment.CenterVertically) {
+                    LocalizedText("History",modifier=Modifier.weight(1f),color=Muted,style=MaterialTheme.typography.labelSmall)
+                    if(input.history.isNotEmpty()) {
+                        TextButton(onClick=input::clearHistory,modifier=Modifier.height(if(compact) 28.dp else 32.dp)
+                            .testTag("clear_calculator_history"),contentPadding=PaddingValues(horizontal=6.dp,vertical=0.dp)) {
+                            LocalizedText("Clear",fontSize=if(compact) 11.sp else 12.sp,color=OliveGreen)
+                        }
+                    }
+                }
+                if(input.history.isEmpty()) Spacer(Modifier.weight(1f)) else LazyColumn(
+                    modifier=Modifier.fillMaxWidth().weight(1f).testTag("calculator_history_list"),
+                    verticalArrangement=Arrangement.spacedBy(1.dp),
+                ) {
+                    itemsIndexed(input.history,key={ index,entry -> "$index:${entry.expression}:${entry.result}" }) { index,entry ->
+                        TextButton(onClick={input.reuse(entry)},modifier=Modifier.fillMaxWidth().heightIn(min=24.dp)
+                            .testTag("calculator_history_$index"),contentPadding=PaddingValues(horizontal=2.dp,vertical=0.dp)) {
+                            Text(entry.expression,modifier=Modifier.weight(1f),color=Muted,fontFamily=FontFamily.Monospace,
+                                fontSize=if(compact) 11.sp else 13.sp,maxLines=1,textAlign=TextAlign.Start)
+                            Text("= ${entry.result}",color=OliveGreen,fontFamily=FontFamily.Monospace,
+                                fontSize=if(compact) 11.sp else 13.sp,maxLines=1)
+                        }
+                    }
+                }
+                val displayScroll=rememberScrollState()
+                LaunchedEffect(input.display,displayScroll.maxValue) { displayScroll.scrollTo(displayScroll.maxValue) }
+                Column(
+                    modifier=Modifier.fillMaxWidth().height(if(compact) 54.dp else 68.dp).clipToBounds(),
+                    horizontalAlignment=Alignment.End,
+                    verticalArrangement=Arrangement.Bottom,
+                ) {
+                    LocalizedText(if(input.expression.endsWith("=")) input.expression else "",modifier=Modifier.fillMaxWidth(),color=Muted,
+                        fontSize=if(compact) 12.sp else 14.sp,textAlign=TextAlign.End,maxLines=1)
+                    Row(Modifier.fillMaxWidth().clipToBounds().horizontalScroll(displayScroll),horizontalArrangement=Arrangement.End) {
+                        Text(input.display,modifier=Modifier.testTag("calculator_display"),color=Ink,
+                            fontSize=if(compact) { if(input.display.length>12) 25.sp else 38.sp } else { if(input.display.length>12) 31.sp else 48.sp },
+                            fontFamily=FontFamily.Monospace,textAlign=TextAlign.End,maxLines=1,softWrap=false)
+                    }
+                }
             }
             Row(Modifier.fillMaxWidth().height(if(compact) 30.dp else 36.dp),verticalAlignment=Alignment.CenterVertically) {
                 IconButton(onClick={scientificExpanded=!scientificExpanded},modifier=Modifier.size(if(compact) 30.dp else 36.dp).testTag("scientific_toggle")) {

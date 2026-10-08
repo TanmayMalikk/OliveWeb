@@ -43,6 +43,8 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -73,6 +75,8 @@ import java.util.UUID
 
 // Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
 // UI sizing/color: this root fills the window; the 12dp quick-exit inset and OliveGreen button styling live in its Scaffold.
+internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured && usesCover
+
 @Composable fun OliveRoot(session: SessionViewModel) {
     val cover: OliveViewModel = viewModel()
     SideEffect { cover.persistCover={ cart,favorites,customizations -> session.saveFoodCover(cart,favorites,customizations) } }
@@ -105,7 +109,7 @@ import java.util.UUID
     Box(Modifier.fillMaxSize()) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(if(isCover) Modifier.fillMaxSize().testTag("cover_root") else Modifier.fillMaxSize().clearAndSetSemantics { }) {
-            if(session.usesCover) {
+            if(shouldComposeCover(session.configured,session.usesCover)) {
                 when(session.coverType) {
                     CoverType.FOOD -> OliveCover(cover,interactive=isCover,onSearch={ value ->
                         if(session.interceptSearch(value)) { cover.search(""); focus.clearFocus(); keyboard?.hide() }
@@ -124,7 +128,7 @@ import java.util.UUID
             BackHandler { keyboard?.hide(); focus.clearFocus(force=true); session.back() }
             Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
                 Scaffold(
-                    bottomBar={ if((session.screen==SessionScreen.Safe &&
+                    bottomBar={ if((session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER &&
                             !(session.page==SafePage.Messages && session.activeConversation!=null)) ||
                             (session.screen==SessionScreen.Pin && session.usesCover)) {
                         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),horizontalArrangement=Arrangement.End) {
@@ -149,7 +153,8 @@ import java.util.UUID
                             SessionScreen.OrganizationProfileSetup -> OrganizationProfileSetup(session)
                             SessionScreen.DevicePin -> DevicePin(session)
                             SessionScreen.Pin -> PinPrompt(session)
-                            SessionScreen.Safe -> SafeArea(session,exit)
+                            SessionScreen.Safe -> if(session.accountRole==AccountRole.SAFE_CONTACT)
+                                SafeContactArea(session) else SafeArea(session,exit)
                             SessionScreen.Portal -> OrganizationPortal(session)
                             SessionScreen.StorageError -> FormColumn {
                                 Heading("Unable to open local storage", "Access remains locked. Your existing data has not been replaced.")
@@ -161,7 +166,7 @@ import java.util.UUID
                 }
             }
             session.idleCountdownSeconds?.let { seconds ->
-                if(session.screen==SessionScreen.Safe) AlertDialog(
+                if(session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER) AlertDialog(
                     onDismissRequest=session::noteInteraction,
                     title={LocalizedText("Locking soon")},
                     text={LocalizedText(if(session.usesCover) "No activity. Returning to your cover in $seconds seconds." else "No activity. Locking Olive Branch in $seconds seconds.")},
@@ -197,21 +202,37 @@ import java.util.UUID
     }
 }
 // UI color/size: status copy uses the theme primary color and progress bars stretch to the available width.
-@Composable internal fun Status(session: SessionViewModel) {
-    AnimatedContent(targetState=session.message,label="status message",
+@Composable internal fun Status(session: SessionViewModel,showMessage:Boolean=true) {
+    if(showMessage) AnimatedContent(targetState=session.message,label="status message",
         transitionSpec={fadeIn(tween(160)).togetherWith(fadeOut(tween(100)))}) { status ->
         status?.let { LocalizedText(it,modifier=Modifier.testTag("session_message"),color=MaterialTheme.colorScheme.primary) }
     }
     AnimatedVisibility(session.busy,enter=fadeIn(tween(120))+expandVertically(),exit=fadeOut(tween(100))+shrinkVertically()) {
-        LinearProgressIndicator(Modifier.fillMaxWidth())
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center) {
+            CircularProgressIndicator(Modifier.size(26.dp),strokeWidth=3.dp)
+        }
     }
 }
 // UI sizing/text: shared fields fill their column; multiline fields start at three lines and all labels use localized Material text.
 @Composable internal fun Field(label: String, value: String, tag: String, secret: Boolean=false, numeric: Boolean=false,
-                             multiline: Boolean=false, enabled: Boolean=true, onFocus: (() -> Unit)?=null, onChange: (String)->Unit) {
+                             showSecretToggle: Boolean=false, multiline: Boolean=false, enabled: Boolean=true, error: String?=null,
+                             onFocus: (() -> Unit)?=null, onChange: (String)->Unit) {
+    var secretVisible by rememberSaveable(tag) { mutableStateOf(false) }
+    val secretDescription=when {
+        label.contains("pin",ignoreCase=true) -> "PIN"
+        label.contains("trigger",ignoreCase=true) -> "trigger word"
+        else -> "password"
+    }
     OutlinedTextField(value=value,onValueChange=onChange,label={LocalizedText(label)},
         modifier=Modifier.fillMaxWidth().testTag(tag).onFocusChanged { if(it.isFocused) onFocus?.invoke() },
-        enabled=enabled,singleLine=!multiline,minLines=if(multiline) 3 else 1,
-        visualTransformation=if(secret) PasswordVisualTransformation() else VisualTransformation.None,
+        enabled=enabled,singleLine=!multiline,minLines=if(multiline) 3 else 1,isError=error!=null,
+        supportingText=error?.let { message -> { LocalizedText(message,color=MaterialTheme.colorScheme.error) } },
+        visualTransformation=if(secret && !secretVisible) PasswordVisualTransformation() else VisualTransformation.None,
+        trailingIcon=if(secret && showSecretToggle) {{
+            IconButton(onClick={secretVisible=!secretVisible},modifier=Modifier.testTag("${tag}_visibility")) {
+                Icon(if(secretVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                    contentDescription=if(secretVisible) "Hide $secretDescription" else "Show $secretDescription")
+            }
+        }} else null,
         keyboardOptions=KeyboardOptions(autoCorrectEnabled=false,keyboardType=when { numeric -> KeyboardType.NumberPassword; secret -> KeyboardType.Password; else -> KeyboardType.Text }))
 }

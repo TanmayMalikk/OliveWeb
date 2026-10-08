@@ -47,6 +47,7 @@ internal fun statAxis(minValue:Double,maxValue:Double,targetTicks:Int=5,wholeNum
     return StatAxis(minimum,maximum.takeIf { it>minimum } ?: minimum+increment,increment)
 }
 
+
 // Statistical plots use typed lists and render locally, so private data never leaves the calculator.
 @Composable
 internal fun StatPlotDialog(onClose:()->Unit) {
@@ -65,7 +66,8 @@ internal fun StatPlotDialog(onClose:()->Unit) {
             OutlinedTextField(yText,{yText=it.take(500)},label={LocalizedText("Y values")},modifier=Modifier.fillMaxWidth())
         } else OutlinedTextField(xText,{xText=it.take(500)},label={LocalizedText("Data values")},modifier=Modifier.fillMaxWidth())
         Button(onClick={runCatching {
-            fun parse(text:String)=text.split(Regex("[,\\s]+")).filter { it.isNotBlank() }.map { it.toDouble() }.also { require(it.isNotEmpty()) }
+            fun parse(text:String)=normalizeCalculatorNotation(text).split(Regex("[,\\s]+")).filter { it.isNotBlank() }
+                .map(::parseCalculatorNumber).also { require(it.isNotEmpty()) }
             val x=parse(xText)
             if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) { val y=parse(yText);require(x.size==y.size) { "X and Y need the same number of values." };points=x.zip(y);values=emptyList() }
             else { values=x;points=emptyList() }

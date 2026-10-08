@@ -36,5 +36,7 @@ class GraphExpressionTest {
         assertEquals(120000.0,GraphExpression.compile("1.2E5").evaluate(0.0),1e-9)
         assertEquals(120000.0,GraphExpression.compile("1.2×10^5").evaluate(0.0),1e-9)
         assertEquals(120000.0,GraphExpression.compile("1.2x10^5").evaluate(0.0),1e-9)
+        assertEquals(100000.0,GraphExpression.compile("E5").evaluate(0.0),1e-9)
+        assertEquals(100000.0,GraphExpression.compile("e5").evaluate(0.0),1e-9)
     }
 }

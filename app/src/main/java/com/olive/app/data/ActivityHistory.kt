@@ -13,7 +13,8 @@ private fun JSONObject.putReadableTime(name: String, value: Long) =
 
 enum class PrivateEntryKind { Note, Incident }
 
-const val PRIVATE_ENTRY_TRASH_RETENTION_MS = 30L * 24L * 60L * 60L * 1000L
+// TESTING: 10 seconds, change this back to 30L * 24L * 60L * 60L * 1000L (30 days).
+const val PRIVATE_ENTRY_TRASH_RETENTION_MS = 10_000L
 
 data class PrivateEntryEdit(
     val id: String = UUID.randomUUID().toString(),
@@ -73,6 +74,11 @@ fun PrivateEntry.trashDaysRemaining(now: Long = System.currentTimeMillis()): Int
     val deleted=deletedAt ?: return 0
     val remaining=(PRIVATE_ENTRY_TRASH_RETENTION_MS-(now-deleted)).coerceAtLeast(0L)
     return ((remaining+86_399_999L)/86_400_000L).toInt()
+}
+
+fun PrivateEntry.trashSecondsRemaining(now: Long = System.currentTimeMillis()): Int {
+    val deleted=deletedAt ?: return 0
+    return ((PRIVATE_ENTRY_TRASH_RETENTION_MS-(now-deleted)).coerceAtLeast(0L)+999L).div(1_000L).toInt()
 }
 
 data class FieldChange(val field: String, val before: String, val after: String) {

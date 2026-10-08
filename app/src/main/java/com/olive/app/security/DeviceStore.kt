@@ -6,6 +6,7 @@ import org.json.JSONObject
 import java.util.UUID
 
 data class DeviceEnrollment(val uid: String, val triggerHash: String, val role: AccountRole = AccountRole.USER)
+data class DeviceSession(val enrollment:DeviceEnrollment,val profile:UserProfile)
 sealed interface PinResult {
     data object Accepted : PinResult
     data class Rejected(val failures: Int) : PinResult
@@ -13,6 +14,18 @@ sealed interface PinResult {
 
 // This is the private locker on the phone: PIN verifier, cached profile, and failed-attempt history all stay encrypted.
 class DeviceStore(private val vault: EncryptedVault, private val activityVault: EncryptedVault) {
+    // Startup needs the enrollment and profile together; decrypt the vault once instead of once per value.
+    fun currentSession():DeviceSession? {
+        val root=vault.read()
+        val uid=root.optString("activeUid")
+        val entry=root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return null
+        val savedProfile=root.optJSONObject("profiles")?.optJSONObject(uid) ?: return null
+        return DeviceSession(
+            DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role"))),
+            UserProfile.fromJson(savedProfile),
+        )
+    }
+
     fun current(): DeviceEnrollment? {
         val root = vault.read()
         val uid = root.optString("activeUid")
@@ -169,7 +182,7 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
     }
     fun privateEntries(uid: String): List<PrivateEntry> = rows(uid,"privateEntries").map(PrivateEntry::fromJson)
         .filter { it.purgedAt==null }
-    // After 30 days, erase private content but keep a tiny sync tombstone so another device cannot resurrect it.
+    // After the configured retention period, erase private content but keep a tiny sync tombstone so another device cannot resurrect it.
     fun purgeExpiredPrivateEntries(uid: String, now: Long = System.currentTimeMillis()): Boolean {
         var changed=false
         activityVault.update { root ->

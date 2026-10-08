@@ -31,5 +31,7 @@ class AdvancedCalculatorEngineTest {
         val regression=AdvancedCalculatorEngine.calculate(AdvancedTool.TwoVariableStats,"1,2,3 | 2,4,6",radians)
         assertTrue(regression.contains("correlation = 1"))
         assertTrue(AdvancedCalculatorEngine.calculate(AdvancedTool.Scientific,"1.2×10^5",radians).contains("120000"))
+        assertTrue(AdvancedCalculatorEngine.calculate(AdvancedTool.Scientific,"E5",radians).startsWith("1E5"))
+        assertTrue(AdvancedCalculatorEngine.calculate(AdvancedTool.OneVariableStats,"E5, 2e5, 3x10^5",radians).contains("mean = 200000"))
     }
 }
