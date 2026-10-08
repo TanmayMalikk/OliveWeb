@@ -69,6 +69,7 @@ import java.time.LocalDate
 import java.time.Month
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 
 // ALL ACCOUNT TYPES: role selection routes each person into the correct onboarding path.
@@ -140,7 +141,7 @@ import java.util.UUID
     var year by remember { mutableStateOf(initial?.year) }
     var month by remember { mutableStateOf(initial?.monthValue) }
     var day by remember { mutableStateOf(initial?.dayOfMonth) }
-    val locale=if(LocalOliveLanguage.current=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA
+    val locale= Locale.forLanguageTag(getLanguageTag(LocalOliveLanguage.current))
     fun setDate(y: Int?,m: Int?,d: Int?) {
         if(y!=null && m!=null && d!=null) onChange("%04d-%02d-%02d".format(java.util.Locale.ROOT,y,m,d))
     }
