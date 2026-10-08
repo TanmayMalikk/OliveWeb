@@ -39,7 +39,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@Composable private fun money(cents: Int): String = NumberFormat.getCurrencyInstance(if(LocalOliveLanguage.current=="French") Locale.CANADA_FRENCH else Locale.CANADA).format(cents / 100.0)
+@Composable private fun money(cents: Int): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag(getLanguageTag(LocalOliveLanguage.current))).format(cents / 100.0)
 
 // Change cover navigation, tabs, address popup, or checkout entry in this main food-app section.
 // UI sizing/color: the cover shell uses Cream, shared Olive colors, safe-area insets, and Material navigation sizing.
@@ -277,15 +277,17 @@ import java.util.Locale
     var open by remember { mutableStateOf(false) }
     val keyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focus=androidx.compose.ui.platform.LocalFocusManager.current
+    //TODO: add Cree to this list when Cree translation complete
+    val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese")
     Box(Modifier.fillMaxWidth()) {
         OutlinedButton(onClick={keyboard?.hide();focus.clearFocus(force=true);open=true},enabled=enabled,modifier=Modifier.fillMaxWidth().testTag("cover_language")) {
             LocalizedText("App language")
             Spacer(Modifier.weight(1f))
-            LocalizedText(if(value=="French") "Français" else "English")
+            LocalizedText(getDisplayLanguage(value))
         }
         DropdownMenu(expanded=open,onDismissRequest={open=false}) {
-            listOf("English","French").forEach { choice ->
-                DropdownMenuItem(text={LocalizedText(if(choice=="French") "Français" else "English")},onClick={onChange(choice);open=false})
+            supportedLanguages.forEach { choice ->
+                DropdownMenuItem(text={LocalizedText(getDisplayLanguage(choice))},onClick={onChange(choice);open=false})
             }
         }
     }
@@ -340,7 +342,7 @@ import java.util.Locale
                     colors=CardDefaults.cardColors(containerColor=Paper)) {
                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                         LocalizedText("Payment declined",fontWeight=FontWeight.SemiBold,color=OliveGreen)
-                        LocalizedText(DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm",if(LocalOliveLanguage.current=="French") Locale.CANADA_FRENCH else Locale.CANADA)
+                        LocalizedText(DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm",Locale.forLanguageTag(getLanguageTag(LocalOliveLanguage.current)))
                             .withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(attempt.timestamp)),color=Muted)
                         attempt.foods.forEach { LocalizedText("${it.quantity} × ${it.food}") }
                         LocalizedText(money(attempt.totalCents),fontWeight=FontWeight.SemiBold)

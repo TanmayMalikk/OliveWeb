@@ -22,6 +22,8 @@ import com.olive.app.data.DeliveryAddress
 import com.olive.app.data.OrderLine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.util.Locale
 
 private fun formatCardNumber(value: String) = value.filter(Char::isDigit).take(16).chunked(4).joinToString(" ")
 private fun formatExpiry(value: String): String {
@@ -130,7 +132,10 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
             }
             if(useShippingForBilling) LocalizedText(shipping.displayText(),style=MaterialTheme.typography.bodySmall)
             else CheckoutField("Billing address",billing,"billing_address",error=if(showErrors && billing.isBlank()) "Billing address is required." else null) { billing=it.take(500) }
-            LocalizedText("Subtotal: " + java.text.NumberFormat.getCurrencyInstance(if(LocalOliveLanguage.current=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).format(totalCents/100.0))
+            LocalizedText("Subtotal: " + NumberFormat.getCurrencyInstance(
+                Locale.forLanguageTag(
+                    getLanguageTag(LocalOliveLanguage.current)
+                )).format(totalCents/100.0))
             Button(onClick={
                 showErrors=true
                 if(formValid) {

@@ -903,7 +903,8 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun saveCoverSettings(fullName: String, selectedLanguage: String) {
         if(screen!=SessionScreen.Cover || busy) return
         recordSettingsInteraction("Cover","Pressed save account settings")
-        if(fullName.isBlank() || selectedLanguage !in setOf("English","French")) {
+        val supportedLangs = setOf("English","French","Spanish","Arabic","Tagalog","Chinese","Cree","en","fr","es","ar","tl","zh","cr")
+        if(fullName.isBlank() || selectedLanguage !in supportedLangs) {
             message="Enter your full name and preferred language."; return
         }
         val device=enrollment ?: return

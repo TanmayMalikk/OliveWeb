@@ -18,8 +18,13 @@ import androidx.compose.ui.unit.dp
             modifier=Modifier.fillMaxWidth().onFocusChanged { if(it.isFocused) session.recordSettingsInteraction("Daily Digest","Focused full name") })
         Row(verticalAlignment=Alignment.CenterVertically) {
             LocalizedText("App language",modifier=Modifier.weight(1f))
-            TextButton(onClick={session.recordSettingsInteraction("Daily Digest","Selected language");language=if(language=="French") "English" else "French"}) {
-                LocalizedText(if(language=="French") "Français" else "English")
+            TextButton(onClick={
+                session.recordSettingsInteraction("Daily Digest","Selected language")
+                val langs = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese")
+                val nextIdx = (langs.indexOf(language).takeIf { it >= 0 } ?: 0) + 1
+                language = langs[nextIdx % langs.size]
+            }) {
+                LocalizedText(getDisplayLanguage(language))
             }
         }
         Button(onClick={session.saveCoverSettings(fullName,language)},enabled=!session.busy && fullName.isNotBlank(),modifier=Modifier.fillMaxWidth()) {
