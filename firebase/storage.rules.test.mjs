@@ -1,5 +1,6 @@
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { ref, uploadString, getBytes, deleteObject } from 'firebase/storage';
+import { doc, setDoc } from 'firebase/firestore';
 import { readFile } from 'node:fs/promises';
 import { before, after, test } from 'node:test';
 
@@ -13,6 +14,11 @@ before(async () => {
       port: 9199,
       rules: await readFile(new URL('./storage.rules', import.meta.url), 'utf8'
       ),
+    },
+    firestore: {
+      host: '127.0.0.1',
+      port: 8180,
+      rules: await readFile(new URL('./firestore.rules', import.meta.url), 'utf8'),
     },
   });
 });
@@ -65,4 +71,27 @@ test('private notes and incident records belong only to their account', async ()
   await assertFails(getBytes(ref(other, path)));
   await assertFails(uploadString(ref(other, path), body, 'raw', { contentType: 'application/json' }));
   await assertSucceeds(deleteObject(ref(owner, path)));
+});
+
+test('media files follow Firestore sharing metadata', async () => {
+  const path = 'users/media-alice/media/storage-media-1';
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), 'files/storage-media-1'), {
+      owner_id: 'media-alice', storage_path: path, file_name: 'Evidence file',
+      file_type: 'image/jpeg', allowed_users: ['media-alice', 'media-bob'],
+      created_at: new Date(),
+    });
+  });
+  const alice = env.authenticatedContext('media-alice').storage();
+  const bob = env.authenticatedContext('media-bob').storage();
+  const charlie = env.authenticatedContext('media-charlie').storage();
+  const anonymous = env.unauthenticatedContext().storage();
+  await assertSucceeds(uploadString(ref(alice, path), 'private media'));
+  await assertSucceeds(getBytes(ref(alice, path)));
+  await assertSucceeds(getBytes(ref(bob, path)));
+  await assertFails(getBytes(ref(charlie, path)));
+  await assertFails(getBytes(ref(anonymous, path)));
+  await assertFails(uploadString(ref(bob, path), 'replacement'));
+  await assertFails(deleteObject(ref(bob, path)));
+  await assertSucceeds(deleteObject(ref(alice, path)));
 });

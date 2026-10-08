@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,13 +33,18 @@ import androidx.core.net.toUri
 import com.olive.app.data.CoverLocation
 import com.olive.app.data.GoogleNewsRepository
 import com.olive.app.data.NewsArticle
+import com.olive.app.data.NewsFeedCacheStore
 import com.olive.app.data.NewsScope
 import com.olive.app.data.localPublished
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 // Daily Digest refreshes local/global headlines while bookmarks stay saved separately.
 // UI sizing/color: the feed uses Cream bars, 20dp side padding, 14dp gaps, and the shared Olive typography/colors.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun NewsCover(session: SessionViewModel, locationPermissionVersion: Int=0, interactive: Boolean=true) {
     val context=LocalContext.current
+    // HARDCODED DAILY DIGEST NOTIFICATION SPOT: edit AppNotifications.kt, then copy this into the event that should send it.
+    // com.olive.app.notification.AppNotifications.showDailyDigest(context)
     var tab by remember { mutableStateOf("Today") }
     var scope by remember { mutableStateOf(NewsScope.LOCAL) }
     var query by remember { mutableStateOf("") }
@@ -50,7 +56,13 @@ import com.olive.app.data.localPublished
     val tabHistory=remember { mutableListOf<String>() }
     val saved=session.savedNews
     val fallbackPlace=session.deliveryAddress.generalLocation.ifBlank { "Canada" }
-    var currentPlace by remember { mutableStateOf(fallbackPlace) }
+    val locationPreferenceKey="custom_location_${session.coverAccountId ?: "guest"}"
+    val locationPreferences=remember(context) { context.getSharedPreferences("daily_digest_preferences",android.content.Context.MODE_PRIVATE) }
+    val feedCache=remember(context) { NewsFeedCacheStore(context.applicationContext) }
+    var customPlace by rememberSaveable(locationPreferenceKey) { mutableStateOf(locationPreferences.getString(locationPreferenceKey,"").orEmpty()) }
+    var currentPlace by rememberSaveable(locationPreferenceKey) { mutableStateOf(customPlace.ifBlank { fallbackPlace }) }
+    var locationEditorOpen by remember { mutableStateOf(false) }
+    var locationDraft by remember { mutableStateOf("") }
     // Back closes an article first, then returns through the previous news tabs.
     BackHandler(interactive) {
         when {
@@ -59,14 +71,45 @@ import com.olive.app.data.localPublished
             tab!="Today" -> { selected=null;tab="Today" }
         }
     }
-    LaunchedEffect(session.language,scope,refresh,session.coverReset,fallbackPlace,locationPermissionVersion) {
-        loading=true;newsError=false
-        if(scope==NewsScope.LOCAL) currentPlace=CoverLocation.city(context,fallbackPlace)
+    LaunchedEffect(session.language,scope,refresh,session.coverReset,fallbackPlace,locationPermissionVersion,customPlace) {
+        val cached=withContext(Dispatchers.IO) { feedCache.load(session.language,scope) }
+        if(cached!=null) {
+            articles=cached.articles
+            if(scope==NewsScope.LOCAL && customPlace.isBlank() && cached.place.isNotBlank()) currentPlace=cached.place
+        }
+        loading=articles.isEmpty();newsError=false
+        if(scope==NewsScope.LOCAL) currentPlace=customPlace.ifBlank { CoverLocation.city(context,fallbackPlace) }
         runCatching { GoogleNewsRepository().latest(session.language,scope,currentPlace) }
-            .onSuccess { articles=it;newsError=it.isEmpty() }
-            .onFailure { newsError=true }
+            .onSuccess {
+                articles=it;newsError=it.isEmpty()
+                withContext(Dispatchers.IO) { feedCache.save(session.language,scope,currentPlace,it) }
+            }
+            .onFailure { newsError=articles.isEmpty() }
         loading=false
     }
+    if(locationEditorOpen) AlertDialog(
+        onDismissRequest={locationEditorOpen=false},
+        title={LocalizedText("Change local news location")},
+        text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(locationDraft,{ value ->
+                if(!session.interceptSearch(value)) locationDraft=value.take(120) else locationDraft=""
+            },label={LocalizedText("City or region")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input"))
+            LocalizedText("This changes the local news search on this device.",color=Muted,style=MaterialTheme.typography.bodySmall)
+        }},
+        confirmButton={TextButton(onClick={
+            customPlace=locationDraft.trim();currentPlace=customPlace
+            locationPreferences.edit().putString(locationPreferenceKey,customPlace).apply()
+            locationEditorOpen=false;refresh++
+        },enabled=locationDraft.isNotBlank()) { LocalizedText("Save") }},
+        dismissButton={Row {
+            TextButton(onClick={
+                customPlace="";currentPlace=fallbackPlace
+                locationPreferences.edit().remove(locationPreferenceKey).apply()
+                locationEditorOpen=false;refresh++
+            }) { LocalizedText("Use device location") }
+            TextButton(onClick={locationEditorOpen=false}) { LocalizedText("Cancel") }
+        }},
+    )
     Scaffold(containerColor=Cream,topBar={
         TopAppBar(
             title={Column {
@@ -133,7 +176,10 @@ import com.olive.app.data.localPublished
                             Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=RoundedCornerShape(14.dp),modifier=Modifier.fillMaxWidth()) {
                                 Row(Modifier.padding(horizontal=14.dp,vertical=11.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) {
                                     Icon(Icons.Outlined.NearMe,null,tint=OliveGreen,modifier=Modifier.size(18.dp))
-                                    LocalizedText("News near $currentPlace",style=MaterialTheme.typography.bodyMedium,color=OliveGreen)
+                                    LocalizedText("News near $currentPlace",style=MaterialTheme.typography.bodyMedium,color=OliveGreen,modifier=Modifier.weight(1f))
+                                    IconButton(onClick={locationDraft=currentPlace;locationEditorOpen=true},modifier=Modifier.size(36.dp).testTag("change_news_location")) {
+                                        Icon(Icons.Outlined.Edit,"Change local news location",tint=OliveGreen,modifier=Modifier.size(18.dp))
+                                    }
                                 }
                             }
                         }

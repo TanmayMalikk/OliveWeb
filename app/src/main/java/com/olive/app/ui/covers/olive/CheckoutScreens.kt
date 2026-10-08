@@ -48,11 +48,11 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
 }
 // UI sizing: address fields stack at the shared full width so longer localized labels can wrap without narrower columns.
 @Composable fun AddressFields(value: DeliveryAddress, cityOnlyRequired: Boolean=false,
-    onFocus: ((String)->Unit)?=null, change: (DeliveryAddress)->Unit) {
+    cityError:String?=null,onFocus: ((String)->Unit)?=null, change: (DeliveryAddress)->Unit) {
     AddressAutocomplete(value,if(cityOnlyRequired) "Street address (optional)" else "Street address (required)",
         onFocus={onFocus?.invoke("Google address selection")},onChange=change)
     CheckoutField("Apartment / unit (optional)",value.line2,"address_line2",onFocus={onFocus?.invoke("Apartment / unit")}) { change(value.copy(line2=it.take(160))) }
-    CheckoutField("City (required)",value.city,"address_city",onFocus={onFocus?.invoke("City")}) { change(value.copy(city=it.take(160))) }
+    CheckoutField("City (required)",value.city,"address_city",error=cityError,onFocus={onFocus?.invoke("City")}) { change(value.copy(city=it.take(160))) }
     CheckoutField(if(cityOnlyRequired) "Province / state (optional)" else "Province / state (required)",value.province,"address_province",onFocus={onFocus?.invoke("Province / state")}) { change(value.copy(province=it.take(160))) }
     CheckoutField(if(cityOnlyRequired) "Postal / ZIP code (optional)" else "Postal / ZIP code (required)",value.postalCode,"address_postal",onFocus={onFocus?.invoke("Postal / ZIP code")}) { change(value.copy(postalCode=it.take(160))) }
     CheckoutField(if(cityOnlyRequired) "Country (optional)" else "Country (required)",value.country,"address_country",onFocus={onFocus?.invoke("Country")}) { change(value.copy(country=it.take(160))) }

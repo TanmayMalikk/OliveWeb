@@ -38,8 +38,15 @@ object SecretVerifier {
 // Change username, password, PIN, trigger, or DOB limits here, then update the matching screen message and test.
 object InputPolicy {
     fun username(value: String) = value.trim().lowercase(Locale.ROOT)
-    fun validUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{4,24}"))
-    fun validPassword(value: String) = value.length in 8..24
+    fun validUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{8,24}"))
+    // Existing accounts created under the former four-character minimum remain able to sign in.
+    fun validExistingUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{4,24}"))
+    fun passwordHasValidLength(value: String) = value.length in 8..24
+    fun passwordHasLetter(value: String) = value.any(Char::isLetter)
+    fun passwordHasNumber(value: String) = value.any(Char::isDigit)
+    fun passwordHasSpecialCharacter(value: String) = value.any { !it.isLetterOrDigit() && !it.isWhitespace() }
+    fun validPassword(value: String) = passwordHasValidLength(value) && passwordHasLetter(value) &&
+        passwordHasNumber(value) && passwordHasSpecialCharacter(value)
     fun validPin(value: String) = value.matches(Regex("[0-9]{4,6}"))
     fun validTrigger(value: String) = value.trim().length in 3..64
     fun triggerHash(value: String): String = MessageDigest.getInstance("SHA-256")

@@ -17,3 +17,14 @@ test("profile completion follows each role's required fields", () => {
   assert.equal(_test.profileComplete("STAFF", {fullName:"A",dob:"2000-01-01",email:"a@example.ca"}), true);
   assert.equal(_test.profileComplete("ADMIN", {fullName:"A",dob:"2000-01-01",email:"a@admin.olive.invalid"}), false);
 });
+
+test("new usernames require at least eight allowed characters", () => {
+  assert.equal(_test.normalizedUsername(" Valid_12 "), "valid_12");
+  assert.throws(() => _test.normalizedUsername("short_1"));
+  assert.equal(_test.normalizedExistingUsername("old_1"), "old_1");
+  assert.throws(() => _test.normalizedUsername("invalid-name"));
+  assert.equal(_test.validPassword("Abcd123!"), true);
+  assert.equal(_test.validPassword("Abcd1234"), false);
+  assert.equal(_test.validPassword("1234567!"), false);
+  assert.equal(_test.validPassword("abcdefgh!"), false);
+});
