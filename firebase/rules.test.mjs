@@ -13,7 +13,7 @@ import { before, after, test } from 'node:test';
 
 let env;
 
-const profile = { username:'alice', fullName:'Test Person', affectedNames:'', dob:'2000-01-01', language:'English', situation:'', region:'', triggerHash:'a'.repeat(64), contacts:[] };
+const profile = { username:'alice_user', fullName:'Test Person', affectedNames:'', dob:'2000-01-01', language:'English', situation:'', region:'', triggerHash:'a'.repeat(64), contacts:[] };
 
 before(async () => {
 
@@ -27,7 +27,7 @@ after(async () => { await env?.cleanup(); });
 
 test('owner can create/read a profile; another user and anonymous visitors cannot', async () => {
 
-  const alice=env.authenticatedContext('alice-uid',{email:'alice@users.olive.invalid'}).firestore();
+  const alice=env.authenticatedContext('alice-uid',{email:'alice_user@users.olive.invalid'}).firestore();
 
   const bob=env.authenticatedContext('bob-uid',{email:'bob@users.olive.invalid'}).firestore();
 
@@ -47,7 +47,7 @@ test('owner can create/read a profile; another user and anonymous visitors canno
 
 test('credentials and malformed contact data cannot be stored in profiles', async () => {
 
-  const alice=env.authenticatedContext('alice-uid',{email:'alice@users.olive.invalid'}).firestore();
+  const alice=env.authenticatedContext('alice-uid',{email:'alice_user@users.olive.invalid'}).firestore();
 
   await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,password:'forbidden'}));
 
@@ -63,7 +63,7 @@ test('credentials and malformed contact data cannot be stored in profiles', asyn
 
 
 test('required profile fields and address whitelist are enforced', async () => {
-  const owner=env.authenticatedContext('profile-test',{email:'alice@users.olive.invalid'}).firestore();
+  const owner=env.authenticatedContext('profile-test',{email:'alice_user@users.olive.invalid'}).firestore();
   const target=doc(owner,'users/profile-test');
   await assertFails(setDoc(target,{...profile,fullName:''}));
   await assertFails(setDoc(target,{...profile,dob:''}));
@@ -81,6 +81,27 @@ test('new usernames enforce bounds while existing usernames remain usable', asyn
   await assertFails(setDoc(ref,{...profile,username:'old'}));
   await env.withSecurityRulesDisabled(async context => {await setDoc(doc(context.firestore(),'users/legacy'),{...profile,username:'old'});});
   await assertSucceeds(setDoc(ref,{...profile,username:'old',situation:'Updated'}));
+});
+
+test('file metadata is owned, shareable for reads, and cannot be reshaped', async () => {
+  const alice=env.authenticatedContext('file-alice').firestore();
+  const bob=env.authenticatedContext('file-bob').firestore();
+  const charlie=env.authenticatedContext('file-charlie').firestore();
+  const target=doc(alice,'files/file-metadata-1');
+  const metadata={owner_id:'file-alice',storage_path:'users/file-alice/media/file-metadata-1',
+    file_name:'Evidence file',file_type:'image/jpeg',allowed_users:['file-alice','file-bob'],
+    created_at:serverTimestamp()};
+  await assertSucceeds(setDoc(target,metadata));
+  await assertSucceeds(getDoc(doc(bob,'files/file-metadata-1')));
+  await assertFails(getDoc(doc(charlie,'files/file-metadata-1')));
+  await assertFails(setDoc(doc(bob,'files/file-2'),{...metadata,storage_path:'users/file-alice/media/file-2'}));
+  await assertFails(setDoc(doc(alice,'files/wrong-path'),metadata));
+  await assertFails(updateDoc(doc(bob,'files/file-metadata-1'),{allowed_users:['file-alice','file-bob','file-charlie']}));
+  await assertFails(updateDoc(target,{unexpected:'not allowed'}));
+  await assertSucceeds(updateDoc(target,{allowed_users:['file-alice','file-charlie']}));
+  await assertSucceeds(getDoc(doc(charlie,'files/file-metadata-1')));
+  await assertFails(deleteDoc(doc(bob,'files/file-metadata-1')));
+  await assertSucceeds(deleteDoc(target));
 });
 
 test('friend requests become a private DM and only the sender can unsend', async () => {
@@ -123,7 +144,7 @@ test('friend requests become a private DM and only the sender can unsend', async
     friendUsername:'social_alice',createdAt:serverTimestamp()});
   const conversation={friendshipId,participantIds:['social-a','social-b'],
     participantUsernames:{'social-a':'social_alice','social-b':'social_bob'},
-    createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:''};
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:''};
   accept.set(doc(bob,'conversations/'+friendshipId),conversation);
   accept.delete(doc(bob,'friendRequests/'+requestId));
   await assertSucceeds(accept.commit());
@@ -140,7 +161,8 @@ test('friend requests become a private DM and only the sender can unsend', async
   const send=writeBatch(alice);
   send.set(messageRef,{senderUid:'social-a',senderUsername:'social_alice',body:'Private hello',
     deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()});
-  send.update(doc(alice,'conversations/'+friendshipId),{lastMessage:'Private hello',lastMessageId:'message-1',updatedAt:serverTimestamp()});
+  send.update(doc(alice,'conversations/'+friendshipId),{lastMessage:'Private hello',lastMessageId:'message-1',
+    lastSenderUid:'social-a',updatedAt:serverTimestamp()});
   await assertSucceeds(send.commit());
   await assertSucceeds(getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-1')));
   await assertFails(getDoc(doc(charlie,'conversations/'+friendshipId+'/messages/message-1')));

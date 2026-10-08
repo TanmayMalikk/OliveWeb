@@ -51,6 +51,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.testTag
@@ -64,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.olive.app.data.*
 import com.olive.app.security.InputPolicy
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Month
@@ -75,6 +77,7 @@ import java.util.UUID
 // UI sizing/color: the safe home uses the shared form grid, OliveGreen branding, Muted guidance, and responsive feature tiles.
 @Composable internal fun SafeArea(session: SessionViewModel, exit: ()->Unit) {
     val profile=session.profile ?: return
+    LaunchedEffect(session.coverAccountId) { session.ensureMessagingObservation() }
     AnimatedContent(targetState=session.page,label="safe page",
         transitionSpec={
             (fadeIn(tween(180))+slideInHorizontally(tween(180)) { it/12 })
@@ -111,7 +114,11 @@ import java.util.UUID
                             colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF7D9274),contentColor=Color.White),
                             modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_messages")) {
                             Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                                Icon(Icons.Outlined.ChatBubbleOutline,"Messages",Modifier.size(32.dp))
+                                BadgedBox(badge={
+                                    if(session.pendingMessageActionCount>0) Badge {
+                                        Text(if(session.pendingMessageActionCount>99) "99+" else session.pendingMessageActionCount.toString())
+                                    }
+                                }) { Icon(Icons.Outlined.ChatBubbleOutline,"Messages",Modifier.size(32.dp)) }
                                 LocalizedText("Messages",fontSize=18.sp,lineHeight=22.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
                             }
                         } else OutlinedButton(onClick={},enabled=false,
@@ -165,7 +172,7 @@ import java.util.UUID
 
 // Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices.
 // UI sizing: messaging switches to two panes at 720dp; the sidebar is 340dp wide and leaves 96dp for bottom controls.
-@Composable private fun MessagesScreen(session: SessionViewModel, exit: ()->Unit) {
+@Composable internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)?=null) {
     val active=session.activeConversation
     val currentUid=session.coverAccountId.orEmpty()
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -207,7 +214,7 @@ import java.util.UUID
                 Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     LocalizedText("Reconnect your account",style=MaterialTheme.typography.titleMedium)
                     LocalizedText("Your local Olive Branch account is locked safely, but Firebase needs your password again before friends and messages can load.",color=Muted)
-                    Field("Account password",reconnectPassword,"messaging_reconnect_password",secret=true,enabled=!session.messagingBusy) {
+                    Field("Account password",reconnectPassword,"messaging_reconnect_password",secret=true,showSecretToggle=true,enabled=!session.messagingBusy) {
                         reconnectPassword=it.take(128)
                     }
                     Button(onClick={session.reconnectMessaging(reconnectPassword) { reconnectPassword="" }},
@@ -269,7 +276,6 @@ import java.util.UUID
             Row(Modifier.fillMaxWidth().clickable { outgoingExpanded=!outgoingExpanded }.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
                 Icon(if(outgoingExpanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,null)
                 LocalizedText("Outgoing Friend Requests",style=MaterialTheme.typography.titleMedium)
-                Badge(Modifier.padding(start=8.dp)) { Text(session.outgoingFriendRequests.size.toString()) }
             }
         }
         if(outgoingExpanded) {
@@ -288,7 +294,11 @@ import java.util.UUID
             Row(Modifier.fillMaxWidth().clickable { friendsExpanded=!friendsExpanded }.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically) {
                 Icon(if(friendsExpanded) Icons.Outlined.KeyboardArrowDown else Icons.AutoMirrored.Outlined.KeyboardArrowRight,null)
                 LocalizedText("Friends",style=MaterialTheme.typography.titleMedium)
-                Badge(Modifier.padding(start=8.dp)) { Text(session.friends.size.toString()) }
+                if(session.friends.isNotEmpty()) Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=CircleShape,
+                    modifier=Modifier.padding(start=8.dp)) {
+                    Text(session.friends.size.toString(),Modifier.padding(horizontal=8.dp,vertical=2.dp),
+                        color=OliveGreen,style=MaterialTheme.typography.labelMedium)
+                }
             }
         }
         if(friendsExpanded) {
@@ -317,14 +327,23 @@ import java.util.UUID
 @OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
 @Composable private fun ChatPane(session: SessionViewModel, currentUid: String, showBack: Boolean,
-    exit: ()->Unit, modifier: Modifier=Modifier) {
+    exit: (() -> Unit)?, modifier: Modifier=Modifier) {
     val active=session.activeConversation ?: return
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     val listState=rememberLazyListState()
+    val imeBottom=WindowInsets.ime.getBottom(LocalDensity.current)
+    val keyboardVisible=imeBottom>0
     LaunchedEffect(session.chatMessages.size,session.chatMessages.lastOrNull()?.body) {
         if(session.chatMessages.isNotEmpty()) listState.animateScrollToItem(session.chatMessages.lastIndex)
     }
-    Column(modifier.padding(start=20.dp,end=20.dp,top=12.dp,bottom=12.dp)) {
+    LaunchedEffect(keyboardVisible) {
+        if(keyboardVisible && session.chatMessages.isNotEmpty()) {
+            delay(120)
+            listState.animateScrollToItem(session.chatMessages.lastIndex)
+        }
+    }
+    Box(modifier) {
+    Column(Modifier.fillMaxSize().padding(start=20.dp,end=20.dp,top=12.dp)) {
         Row(Modifier.fillMaxWidth().heightIn(min=76.dp).padding(vertical=8.dp),verticalAlignment=Alignment.CenterVertically,
             horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             if(showBack) IconButton(onClick=session::closeConversation,modifier=Modifier.testTag("messages_conversation_back")) {
@@ -334,10 +353,11 @@ import java.util.UUID
                 LocalizedText("Direct message",style=MaterialTheme.typography.labelLarge,color=Muted)
                 Text(active.peerUsername(currentUid).lowercase(java.util.Locale.ROOT),style=MaterialTheme.typography.titleLarge)
             }
-            Button(onClick=exit,contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp),
+            if(exit!=null) Button(onClick=exit,contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp),
                 modifier=Modifier.heightIn(min=44.dp).testTag("quick_exit")) { Text("EXIT") }
         }
         HorizontalDivider()
+        Column(Modifier.weight(1f).fillMaxWidth().imePadding().padding(bottom=10.dp)) {
         LazyColumn(Modifier.weight(1f).fillMaxWidth(),state=listState,contentPadding=PaddingValues(vertical=12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if(session.chatMessages.isEmpty()) item {
                 LocalizedText("No messages yet. Say hello when you are ready.",color=Muted,modifier=Modifier.padding(12.dp))
@@ -374,13 +394,43 @@ import java.util.UUID
             Button(onClick={session.sendMessage(draft) { draft="" }},enabled=draft.isNotBlank() && !session.messagingBusy,
                 modifier=Modifier.testTag("send_message")) { LocalizedText("Send") }
         }
+        }
+    }
+    AnimatedVisibility(visible=exit!=null && session.chatQuickExitHintVisible,
+        modifier=Modifier.matchParentSize(),enter=fadeIn(tween(180)),exit=fadeOut(tween(120))) {
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha=.24f))
+            .clickable(interactionSource=remember { MutableInteractionSource() },indication=null) {})
+    }
+    AnimatedVisibility(visible=exit!=null && session.chatQuickExitHintVisible,
+        modifier=Modifier.align(Alignment.TopEnd).padding(top=52.dp,end=16.dp,start=16.dp),
+        enter=fadeIn(tween(220))+scaleIn(tween(220),initialScale=.86f)+slideInVertically(tween(220)) { -it/5 },
+        exit=fadeOut(tween(140))+scaleOut(tween(140),targetScale=.94f)) {
+        Column(horizontalAlignment=Alignment.End) {
+            Text("▲",color=OliveGreen,fontSize=28.sp,lineHeight=18.sp,modifier=Modifier.padding(end=18.dp))
+            Surface(shape=MaterialTheme.shapes.large,color=OliveGreen,contentColor=Color.White,
+                shadowElevation=14.dp,border=BorderStroke(2.dp,Color.White.copy(alpha=.9f)),
+                modifier=Modifier.fillMaxWidth(.92f).widthIn(min=280.dp,max=360.dp).testTag("chat_quick_exit_hint")) {
+                Column(Modifier.padding(horizontal=22.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    LocalizedText("Quick exit moved here",fontSize=20.sp,lineHeight=25.sp,
+                        fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,color=Color.White)
+                    LocalizedText("While you are in a chat, use EXIT in the top-right corner.",
+                        fontSize=16.sp,lineHeight=22.sp,color=Color.White)
+                    Button(onClick=session::dismissChatQuickExitHint,
+                        colors=ButtonDefaults.buttonColors(containerColor=Color.White,contentColor=OliveGreen),
+                        modifier=Modifier.align(Alignment.End).heightIn(min=46.dp).testTag("dismiss_chat_quick_exit_hint")) {
+                        LocalizedText("Okay",fontSize=16.sp)
+                    }
+                }
+            }
+        }
+    }
     }
 }
 
 
 // Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor.
 // UI sizing/color: note editing uses 24dp sides, a 300dp minimum body field, yellow pinned icons, and an adaptive 160dp grid.
-@Composable private fun PrivateNotes(session: SessionViewModel) {
+@Composable internal fun PrivateNotes(session: SessionViewModel) {
     var editorOpen by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var kind by remember { mutableStateOf<PrivateEntryKind?>(null) }
@@ -419,7 +469,7 @@ import java.util.UUID
                     Icon(Icons.Outlined.PushPin,if(entry.pinned) "Unpin entry" else "Pin entry",tint=if(entry.pinned) Color(0xFFFFC107) else Muted)
                 }
                 if(entry!=null) IconButton(onClick={session.trashPrivateEntry(entry.id);editorOpen=false},enabled=!session.busy,
-                    modifier=Modifier.testTag("delete_private_entry")) { Icon(Icons.Outlined.DeleteOutline,"Move to ScratchPad") }
+                    modifier=Modifier.testTag("delete_private_entry")) { Icon(Icons.Outlined.DeleteOutline,"Move to Trash") }
             } }
             item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                 listOf(PrivateEntryKind.Note to "Note",PrivateEntryKind.Incident to "Incident").forEach { (value,label) ->
@@ -445,7 +495,7 @@ import java.util.UUID
     }
     val trashed=session.privateEntries.filter { it.deletedAt!=null }.sortedByDescending { it.deletedAt }
     if(trashOpen) {
-        ScratchPad(trashed,formatter,language,{ id ->
+        Trash(trashed,formatter,language,{ id ->
             session.restorePrivateEntry(id)
             trashOpen=false
         }) { trashOpen=false }
@@ -462,7 +512,7 @@ import java.util.UUID
             LocalizedText("Notes & incidents",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
             IconButton(onClick={trashOpen=true},modifier=Modifier.testTag("open_scratchpad")) {
                 BadgedBox(badge={if(trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) }}) {
-                    Icon(Icons.Outlined.DeleteOutline,"ScratchPad")
+                    Icon(Icons.Outlined.DeleteOutline,"Trash")
                 }
             }
             FilledTonalIconButton(onClick={openEditor(null)},enabled=!session.busy,modifier=Modifier.testTag("new_private_entry")) { Icon(Icons.Outlined.Add,"New note") }
@@ -479,21 +529,26 @@ import java.util.UUID
     }
 }
 
-// UI sizing/color: ScratchPad cards use a 1dp black outline, warm paper fill, 16dp padding, and Material text sizes.
-@Composable private fun ScratchPad(entries: List<PrivateEntry>, formatter: DateTimeFormatter, language: String,
+// UI sizing/color: Trash cards use a 1dp black outline, warm paper fill, 16dp padding, and Material text sizes.
+@Composable private fun Trash(entries: List<PrivateEntry>, formatter: DateTimeFormatter, language: String,
     restore: (String)->Unit, close: ()->Unit) {
-    val now=System.currentTimeMillis()
+    var now by remember(entries) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(entries) {
+        while(true) { delay(1_000L);now=System.currentTimeMillis() }
+    }
     val listState=rememberLazyListState()
     LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=112.dp),
         verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 IconButton(onClick=close,modifier=Modifier.testTag("close_scratchpad")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"All notes") }
-                LocalizedText("ScratchPad",style=MaterialTheme.typography.headlineSmall)
+                LocalizedText("Trash",style=MaterialTheme.typography.headlineSmall)
             }
-            LocalizedText("Deleted notes stay here for 30 days, then their private contents are permanently erased.",color=Muted)
+            LocalizedText(if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L)
+                "For testing, deleted notes stay here for 10 seconds before their private contents are permanently erased."
+                else "Deleted notes stay here for 30 days, then their private contents are permanently erased.",color=Muted)
         }
-        if(entries.isEmpty()) item { LocalizedText("ScratchPad is empty.",color=Muted) }
+        if(entries.isEmpty()) item { LocalizedText("Trash is empty.",color=Muted) }
         items(entries,key={it.id}) { entry ->
             Card(Modifier.animateItem().fillMaxWidth().testTag("scratchpad_entry"),border=BorderStroke(1.dp,Color.Black),
                 colors=CardDefaults.cardColors(containerColor=Color(0xFFFFFDF4))) {
@@ -501,7 +556,10 @@ import java.util.UUID
                     entry.kind?.let { LocalizedText(if(it==PrivateEntryKind.Incident) "Incident" else "Note",color=OliveGreen) }
                     if(entry.title.isNotBlank()) Text(entry.title,style=MaterialTheme.typography.titleMedium)
                     Text(entry.body,maxLines=5,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    Text("${entry.trashDaysRemaining(now)} ${translate("days remaining",language)}",style=MaterialTheme.typography.bodySmall,color=Muted)
+                    Text(if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L)
+                        "${entry.trashSecondsRemaining(now)} ${translate("seconds remaining",language)}"
+                        else "${entry.trashDaysRemaining(now)} ${translate("days remaining",language)}",
+                        style=MaterialTheme.typography.bodySmall,color=Muted)
                     Text(formatter.format(Instant.ofEpochMilli(entry.deletedAt ?: entry.updatedAt)),style=MaterialTheme.typography.bodySmall,color=Muted)
                     OutlinedButton(onClick={restore(entry.id)},modifier=Modifier.fillMaxWidth().testTag("restore_private_entry")) {
                         Icon(Icons.Outlined.RestoreFromTrash,null);Spacer(Modifier.width(8.dp));LocalizedText("Restore")
@@ -636,7 +694,7 @@ import java.util.UUID
 }
 // Edit private profile, language, and PIN-guarded trigger settings in this section.
 // UI sizing/text: settings reuse shared form spacing and Material titleLarge section headings so translated labels can wrap.
-@Composable private fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
+@Composable internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val userRole=profile.role==AccountRole.USER
     var fullName by remember { mutableStateOf(profile.fullName) }
     var affected by remember { mutableStateOf(profile.affectedNames) }
@@ -656,7 +714,7 @@ import java.util.UUID
     FormColumn {
         SafeBack(session)
         Heading("Settings","Update your profile and language at any time.")
-        OutlinedButton(onClick={session.navigate(SafePage.Contacts)},modifier=Modifier.fillMaxWidth().testTag("safe_contacts")) { LocalizedText("Safe contacts") }
+        if(userRole) OutlinedButton(onClick={session.navigate(SafePage.Contacts)},modifier=Modifier.fillMaxWidth().testTag("safe_contacts")) { LocalizedText("Safe contacts") }
         if(userRole) {
             // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
             CoverPicker(profile.coverType,!session.busy) { session.recordSettingsInteraction("Olive Branch","Selected cover app");session.changeCover(it) }
@@ -676,9 +734,9 @@ import java.util.UUID
         HorizontalDivider()
         LocalizedText("Change account password",style=MaterialTheme.typography.titleLarge)
         LocalizedText("Your username cannot be changed.")
-        Field("Current password",currentPassword,"current_password",secret=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused current password")}) { currentPassword=it.take(24) }
-        Field("New password",newPassword,"new_password",secret=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused new password")}) { newPassword=it.take(24) }
-        Field("Confirm new password",confirmPassword,"confirm_new_password",secret=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused password confirmation")}) { confirmPassword=it.take(24) }
+        Field("Current password",currentPassword,"current_password",secret=true,showSecretToggle=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused current password")}) { currentPassword=it.take(24) }
+        Field("New password",newPassword,"new_password",secret=true,showSecretToggle=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused new password")}) { newPassword=it.take(24) }
+        Field("Confirm new password",confirmPassword,"confirm_new_password",secret=true,showSecretToggle=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused password confirmation")}) { confirmPassword=it.take(24) }
         Button(onClick={session.changePassword(currentPassword,newPassword,confirmPassword);currentPassword="";newPassword="";confirmPassword=""},enabled=!session.busy,modifier=Modifier.testTag("change_password")) { LocalizedText("Change password") }
         if(userRole) {
             HorizontalDivider()
@@ -748,7 +806,7 @@ import java.util.UUID
 
 // Activity stays grouped on the overview, then See more opens one searchable category at a time.
 // UI sizing/text: activity uses 24dp page padding, 14dp row gaps, 16dp cards, titleLarge sections, and bodySmall timestamps.
-@Composable private fun ActivityHistory(session: SessionViewModel) {
+@Composable internal fun ActivityHistory(session: SessionViewModel) {
     val language=LocalOliveLanguage.current
     val formatter=DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm:ss z",
         if(language=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault())

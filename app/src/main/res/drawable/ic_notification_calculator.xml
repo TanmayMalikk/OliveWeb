@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Clean calculator outline with a solid display and large operator marks. -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M6,2.5H18C19.4,2.5 20.5,3.6 20.5,5V19C20.5,20.4 19.4,21.5 18,21.5H6C4.6,21.5 3.5,20.4 3.5,19V5C3.5,3.6 4.6,2.5 6,2.5Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6.5,5.5H17.5V9H6.5Z" />
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M8.5,12V17.5M5.8,14.8H11.2M14,12.7H17.8M14,17H17.8"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="2.1" />
+</vector>

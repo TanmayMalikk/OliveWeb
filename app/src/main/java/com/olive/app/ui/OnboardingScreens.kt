@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
@@ -28,12 +29,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.AddCircleOutline
@@ -71,6 +74,66 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
+// Each circle is one page. Completed pages fill green while future pages stay outlined.
+@Composable internal fun OnboardingProgress(completed:Int,total:Int,page:Int,pages:Int,pageComplete:List<Boolean>) {
+    if(pages<=1) return
+    Column(verticalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth().testTag("onboarding_progress")) {
+        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            repeat(pages) { index ->
+                val done=index<page || (index==page && pageComplete.getOrElse(index) { false })
+                val active=index==page
+                val circleColor by animateColorAsState(if(done) OliveGreen else Paper,tween(300),label="step_fill_$index")
+                val borderColor by animateColorAsState(if(done || active) OliveGreen else SoftGray,tween(300),label="step_border_$index")
+                val numberColor by animateColorAsState(if(done) Paper else if(active) OliveGreen else Muted,tween(300),label="step_number_$index")
+                val circleSize by animateDpAsState(if(active) 38.dp else 34.dp,tween(250),label="step_size_$index")
+                val borderWidth by animateDpAsState(if(active) 2.dp else 1.dp,tween(250),label="step_border_width_$index")
+                Surface(shape=CircleShape,color=circleColor,
+                    border=BorderStroke(borderWidth,borderColor),
+                    modifier=Modifier.size(circleSize).testTag("onboarding_step_${index+1}")) {
+                    Box(contentAlignment=Alignment.Center) {
+                        LocalizedText("${index+1}",fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            color=numberColor)
+                    }
+                }
+                if(index<pages-1) {
+                    val connectorColor by animateColorAsState(if(index<page) OliveGreen else SoftGray,tween(350),label="step_line_$index")
+                    Box(Modifier.weight(1f).height(3.dp).background(connectorColor))
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+            LocalizedText("Step ${page+1} of $pages",style=MaterialTheme.typography.labelLarge)
+            LocalizedText("$completed of $total required",style=MaterialTheme.typography.labelMedium,color=Muted)
+        }
+    }
+}
+
+// Requirement bullets begin neutral, then turn green or red as the user types.
+@Composable internal fun RequirementBullet(text:String,met:Boolean,active:Boolean) {
+    val color=when { !active -> Color.Black;met -> OliveGreen;else -> MaterialTheme.colorScheme.error }
+    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
+        LocalizedText("•",color=color,fontSize=18.sp)
+        LocalizedText(text,color=color,style=MaterialTheme.typography.bodySmall)
+        Spacer(Modifier.weight(1f))
+        AnimatedVisibility(visible=active && met,enter=fadeIn(tween(150)),exit=fadeOut(tween(100))) {
+            Icon(Icons.Outlined.CheckCircle,contentDescription="Requirement met",tint=OliveGreen,modifier=Modifier.size(18.dp))
+        }
+    }
+}
+
+// Every onboarding page ends with the same Back and Next arrow controls.
+@Composable internal fun OnboardingNavigation(back:()->Unit,next:()->Unit,last:Boolean=false,nextTag:String="onboarding_next",
+    enabled:Boolean=true,nextLabel:String?=null) {
+    Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(onClick=back,enabled=enabled,modifier=Modifier.weight(1f).testTag("onboarding_back")) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Spacer(Modifier.width(8.dp));LocalizedText("Back")
+        }
+        Button(onClick=next,enabled=enabled,modifier=Modifier.weight(1f).testTag(nextTag)) {
+            LocalizedText(nextLabel ?: if(last) "Finish" else "Next");Spacer(Modifier.width(8.dp));Icon(Icons.AutoMirrored.Outlined.ArrowForward,null)
+        }
+    }
+}
+
 // ALL ACCOUNT TYPES: role selection routes each person into the correct onboarding path.
 // USER and SAFE CONTACT can create accounts here; STAFF and ADMIN use administrator-issued logins.
 // UI sizing/text: the role menu inherits FormColumn spacing; descriptions intentionally use bodySmall and Muted so long translations can wrap.
@@ -107,6 +170,36 @@ import java.util.UUID
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
+    var submitted by remember { mutableStateOf(false) }
+    val organizationLogin=!create && session.accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN)
+    val usernameValid=if(organizationLogin && '@' in username) android.util.Patterns.EMAIL_ADDRESS.matcher(username.trim()).matches()
+        else if(create) InputPolicy.validUsername(username) else InputPolicy.validExistingUsername(username)
+    val passwordValid=if(create) InputPolicy.validPassword(password) else password.isNotEmpty()
+    val confirmationValid=!create || (confirm.isNotEmpty() && confirm==password)
+    val completed=listOf(usernameValid,passwordValid,confirmationValid).take(if(create) 3 else 2).count { it }
+    val stages=when {
+        create && session.accountRole==AccountRole.USER -> 4
+        create && session.accountRole==AccountRole.SAFE_CONTACT -> 3
+        !create && session.accountRole==AccountRole.USER -> 2
+        else -> 1
+    }
+    val totalRequired=when {
+        create && session.accountRole==AccountRole.USER -> 10
+        create && session.accountRole==AccountRole.SAFE_CONTACT -> 7
+        !create && session.accountRole==AccountRole.USER -> 4
+        else -> 2
+    }
+    val usernameError=when {
+        session.credentialFieldError==CredentialFieldError.UsernameTaken -> "Username taken"
+        submitted && !usernameValid -> "Invalid username"
+        else -> null
+    }
+    val passwordError=when {
+        session.credentialFieldError==CredentialFieldError.IncorrectPassword -> "Incorrect password"
+        submitted && !passwordValid -> if(create) "Invalid password" else "Password required"
+        else -> null
+    }
+    val confirmError=if(create && submitted && !confirmationValid) "Passwords differ" else null
     FormColumn {
         Heading(if(create) "Create your ${session.accountRole.title} account" else "${session.accountRole.title} sign in",
             if(create) "Use these credentials when setting up another device."
@@ -116,24 +209,46 @@ import java.util.UUID
                 else -> "Use the credentials issued by an administrator."
             },if(session.accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN)) "Olive Tree" else "Olive Branch")
         ModeNotice(session)
-        Field(if(!create && session.accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN)) "Username or email" else "Username",username,"username",enabled=!session.busy) { username=it.take(if(create) 24 else 254) }
-        Field("Password",password,"password",secret=true,enabled=!session.busy) { password=it.take(if(create) 24 else 128) }
-        if(create) {
-            LocalizedText("Passwords use 8–24 characters and are case-sensitive. Usernames are unique, ignore letter case, and use letters, numbers and underscores. No email or phone number needed.",style=MaterialTheme.typography.bodySmall,color=Muted)
-            Field("Confirm password",confirm,"confirm_password",secret=true,enabled=!session.busy) { confirm=it.take(24) }
-            LocalizedText("Keep your credentials somewhere safe. You can change your password later in safe Settings.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        if(stages>1) OnboardingProgress(completed,totalRequired,0,stages,
+            List(stages) { index -> index==0 && usernameValid && passwordValid && confirmationValid })
+        Field(if(organizationLogin) "Username or email" else "Username",username,"username",enabled=!session.busy,error=usernameError) {
+            username=it.take(if(create) 24 else 254);submitted=false;session.clearCredentialError()
         }
-        Status(session)
-        Button(onClick={
-            if(create && password != confirm) session.error("The passwords do not match.")
-            else session.authenticate(username,password,create)
-        },enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("credentials_submit")) { LocalizedText(if(create) "Create account" else "Sign in") }
+        if(create) {
+            // UI spacing: keep related validation bullets close together below their input field.
+            Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                RequirementBullet("8–24 characters",username.length in 8..24,username.isNotEmpty())
+                RequirementBullet("Letters, numbers or _",username.matches(Regex("[A-Za-z0-9_]+")),username.isNotEmpty())
+            }
+        }
+        Field("Password",password,"password",secret=true,showSecretToggle=true,enabled=!session.busy,error=passwordError) {
+            password=it.take(if(create) 24 else 128);submitted=false;session.clearCredentialError()
+        }
+        if(create) {
+            // UI spacing: password requirements read as one compact list.
+            Column(verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                RequirementBullet("8–24 characters",InputPolicy.passwordHasValidLength(password),password.isNotEmpty())
+                RequirementBullet("At least 1 letter",InputPolicy.passwordHasLetter(password),password.isNotEmpty())
+                RequirementBullet("At least 1 number",InputPolicy.passwordHasNumber(password),password.isNotEmpty())
+                RequirementBullet("At least 1 special character",InputPolicy.passwordHasSpecialCharacter(password),password.isNotEmpty())
+            }
+            Field("Confirm password",confirm,"confirm_password",secret=true,showSecretToggle=true,enabled=!session.busy,error=confirmError) {
+                confirm=it.take(24);submitted=false;session.clearCredentialError()
+            }
+            RequirementBullet("Passwords match",confirmationValid,password.isNotEmpty() || confirm.isNotEmpty())
+        }
+        Status(session,showMessage=session.credentialFieldError==null)
+        OnboardingNavigation(session::back,{
+            submitted=true
+            if(usernameValid && passwordValid && confirmationValid) session.authenticate(username,password,create)
+        },nextTag="credentials_submit",enabled=!session.busy,
+            nextLabel=if(create) "Create account" else "Sign in")
     }
 }
 
 // USER and SAFE CONTACT: birthday is required and saved as YYYY-MM-DD.
 // UI sizing: the three birthday buttons share one row equally with 8dp gaps and 8dp horizontal button padding.
-@Composable internal fun BirthdayPicker(value: String, tag: String, enabled: Boolean, onChange: (String)->Unit) {
+@Composable internal fun BirthdayPicker(value: String, tag: String, enabled: Boolean,error:String?=null,onChange: (String)->Unit) {
     val keyboard=LocalSoftwareKeyboardController.current
     val focus=LocalFocusManager.current
     val initial=remember { runCatching { LocalDate.parse(value) }.getOrNull() }
@@ -149,7 +264,9 @@ import java.util.UUID
         @Composable fun Choice(label: String, selected: String, options: List<Pair<String,String>>, choiceTag: String, choose: (String)->Unit) {
             var open by remember { mutableStateOf(false) }
             Box(Modifier.weight(1f)) {
-                OutlinedButton(onClick={keyboard?.hide();focus.clearFocus(force=true);open=true},enabled=enabled,modifier=Modifier.fillMaxWidth().testTag(choiceTag),contentPadding=PaddingValues(horizontal=8.dp)) {
+                OutlinedButton(onClick={keyboard?.hide();focus.clearFocus(force=true);open=true},enabled=enabled,
+                    border=if(error!=null) BorderStroke(1.dp,MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonBorder(enabled),
+                    modifier=Modifier.fillMaxWidth().testTag(choiceTag),contentPadding=PaddingValues(horizontal=8.dp)) {
                     LocalizedText(selected.ifBlank { label },maxLines=1)
                 }
                 DropdownMenu(expanded=open,onDismissRequest={open=false}) {
@@ -170,6 +287,7 @@ import java.util.UUID
             day=it.toInt();setDate(year,month,day)
         }
     }
+    error?.let { LocalizedText(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
 }
 
 // USER and SAFE CONTACT: shared profile questions live here.
@@ -188,68 +306,137 @@ import java.util.UUID
     var trigger by remember { mutableStateOf("") }
     var contactName by remember { mutableStateOf("") }
     var contactDetails by remember { mutableStateOf("") }
+    val contacts=remember(existing) { mutableStateListOf<SafeContact>().also { it.addAll(existing?.contacts.orEmpty()) } }
     var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FOOD) }
+    val pages=if(safeContact) listOf("Personal details","Location") else
+        listOf("Personal details","Location","Safe entry & cover")
+    var page by rememberSaveable(existing?.username,safeContact) { mutableIntStateOf(0) }
+    var showErrors by rememberSaveable { mutableStateOf(false) }
+    val required=listOf(fullName.isNotBlank(),InputPolicy.validDob(dob),language.isNotBlank(),address.locationValid)+
+        if(safeContact) emptyList() else listOf(InputPolicy.validTrigger(trigger))
+    val completed=required.count { it }
+    val personalValid=fullName.isNotBlank() && InputPolicy.validDob(dob) && language.isNotBlank()
+    val supportValid=contactName.isBlank()==contactDetails.isBlank()
+    val localCompletion=if(safeContact) listOf(personalValid,address.locationValid) else
+        listOf(personalValid,address.locationValid,InputPolicy.validTrigger(trigger) && supportValid)
+    val stages=if(safeContact) 3 else 4
+    val progressPage=page+1
+    val credentialCount=if(session.creatingAccount) 3 else 2
+    val totalRequired=credentialCount+required.size+if(safeContact) 0 else 2
+    val progressCompleted=credentialCount+completed
+    val pageCompletion=listOf(true)+localCompletion
+    fun pageValid()=when(pages[page]) {
+        "Personal details" -> personalValid
+        "Location" -> address.locationValid
+        "Safe entry & cover" -> InputPolicy.validTrigger(trigger) && supportValid
+        else -> true
+    }
+    fun collectedContacts()=(contacts.toList()+if(contactName.isNotBlank() && contactDetails.isNotBlank())
+        listOf(SafeContact(UUID.randomUUID().toString(),contactName.trim(),contactDetails.trim())) else emptyList()).take(25)
+    fun saveProfile()=session.saveSetupProfile(UserProfile(
+        username=session.setupUsername,fullName=fullName.trim(),affectedNames=affected.trim(),abuserName=abuserName.trim(),
+        dob=dob.trim(),language=language.trim(),situation=situation.trim(),region=address.generalLocation,
+        triggerHash=if(safeContact) "" else InputPolicy.triggerHash(trigger),
+        contacts=if(safeContact) emptyList() else collectedContacts(),
+        address=address,coverType=coverType,role=session.accountRole))
     FormColumn {
-        // USER + SAFE CONTACT: these shared identity, birthday, language, and city questions are required for both roles.
-        Heading("Your profile",if(safeContact) "Full name, date of birth, language and city are required." else "Full name, date of birth, language, city and a trigger word are required.")
-        Field("Full name (required)",fullName,"full_name",enabled=!session.busy) { fullName=it.take(120) }
-        // USER ONLY: Safe Contacts are helpers, so they are never asked for abuse details.
-        if(!safeContact) {
-            Field("Names of people experiencing abuse (optional)",affected,"affected_names",enabled=!session.busy) { affected=it.take(500) }
-            Field("Abuser's name (optional)",abuserName,"abuser_name",enabled=!session.busy) { abuserName=it.take(120) }
-        }
-        BirthdayPicker(dob,"dob",!session.busy) { dob=it }
-        LanguagePicker(language,!session.busy) { language=it }
-        if(!safeContact) Field("Brief description of your situation (optional, recommended)",situation,"situation",multiline=true,enabled=!session.busy) { situation=it.take(2000) }
-        HorizontalDivider()
-        LocalizedText("Location",style=MaterialTheme.typography.titleLarge)
-        LocalizedText("City is required. The rest of your delivery address is optional and can be added later.",style=MaterialTheme.typography.bodySmall,color=Muted)
-        AddressFields(address,cityOnlyRequired=true) { address=it }
-        // USER ONLY: the trigger opens the private app from the selected cover.
-        if(!safeContact) {
-            HorizontalDivider()
-            LocalizedText("Safe entry",style=MaterialTheme.typography.titleLarge)
-            Field("Trigger word or phrase",trigger,"trigger",secret=true,enabled=!session.busy) { trigger=it.take(64) }
-            LocalizedText("Olive and Daily Digest ignore spaces and letter case in your trigger. Other searches keep their spaces. Better Calculator uses your PIN and two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
-        }
-        // USER ONLY: Safe Contacts do not add another Safe Contact during their own onboarding.
-        if(!safeContact) {
-            LocalizedText("Safe contact · optional",style=MaterialTheme.typography.titleMedium)
-            Field("Contact name",contactName,"setup_contact_name",enabled=!session.busy) { contactName=it.take(120) }
-            Field("Contact phone or email",contactDetails,"setup_contact_details",enabled=!session.busy) { contactDetails=it.take(200) }
-            LocalizedText("Contacts can be added and edited later. Olive never contacts anyone automatically.",style=MaterialTheme.typography.bodySmall,color=Muted)
-        }
-        // USER ONLY: Safe Contacts open Olive Branch directly and therefore do not select a cover app.
-        if(!safeContact) CoverPicker(coverType,!session.busy) { chosen ->
-            if(chosen == CoverType.GAME) session.error("In development") else coverType=chosen
-        }
-        Status(session)
-        Button(onClick={
-            when {
-                fullName.isBlank() -> session.error("Enter your full name.")
-                !InputPolicy.validDob(dob) -> session.error("Use a valid date of birth in YYYY-MM-DD format.")
-                language.isBlank() -> session.error("Enter your preferred language.")
-                !address.locationValid -> session.error("Enter your city.")
-                !safeContact && !InputPolicy.validTrigger(trigger) -> session.error("Choose a trigger word or phrase of 3–64 characters.")
-                !safeContact && contactName.isBlank() != contactDetails.isBlank() -> session.error("Enter both contact fields or leave both empty.")
-                else -> session.saveSetupProfile(UserProfile(
-                    username=session.setupUsername,fullName=fullName.trim(),affectedNames=affected.trim(),abuserName=abuserName.trim(),dob=dob.trim(),language=language.trim(),
-                    situation=situation.trim(),region=address.generalLocation,triggerHash=if(safeContact) "" else InputPolicy.triggerHash(trigger),
-                    contacts=if(safeContact || contactName.isBlank()) emptyList() else listOf(SafeContact(UUID.randomUUID().toString(),contactName.trim(),contactDetails.trim())),address=address,coverType=coverType,role=session.accountRole))
+        Heading("Your profile",pages[page])
+        OnboardingProgress(progressCompleted,totalRequired,progressPage,stages,pageCompletion)
+        AnimatedContent(targetState=pages[page],label="onboarding page") { current -> when(current) {
+            "Personal details" -> Column(verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                Field("Full name (required)",fullName,"full_name",enabled=!session.busy,
+                    error=if(showErrors && fullName.isBlank()) "Name required" else null) {
+                    fullName=it.take(120);showErrors=false
+                }
+                BirthdayPicker(dob,"dob",!session.busy,error=if(showErrors && !InputPolicy.validDob(dob)) "Birthday required" else null) {
+                    dob=it;showErrors=false
+                }
+                LanguagePicker(language,!session.busy) { language=it;showErrors=false }
+                if(!safeContact) {
+                    HorizontalDivider()
+                    Field("Names of people experiencing abuse (optional)",affected,"affected_names",enabled=!session.busy) { affected=it.take(500) }
+                    Field("Abuser's name (optional)",abuserName,"abuser_name",enabled=!session.busy) { abuserName=it.take(120) }
+                    Field("Brief description (optional)",situation,"situation",multiline=true,enabled=!session.busy) { situation=it.take(2000) }
+                }
             }
-        },enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("profile_submit")) { LocalizedText("Save profile and continue") }
+            "Location" -> Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                LocalizedText("Only your city is required.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                AddressFields(address,cityOnlyRequired=true,cityError=if(showErrors && !address.locationValid) "City required" else null) {
+                    address=it;showErrors=false
+                }
+            }
+            "Safe entry & cover" -> Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
+                Field("Trigger word or phrase",trigger,"trigger",secret=true,showSecretToggle=true,enabled=!session.busy,
+                    error=if(showErrors && !InputPolicy.validTrigger(trigger)) "Invalid trigger" else null) {
+                    trigger=it.take(64);showErrors=false
+                }
+                RequirementBullet("3–64 characters",InputPolicy.validTrigger(trigger),trigger.isNotEmpty())
+                HorizontalDivider()
+                CoverPicker(coverType,!session.busy) { chosen ->
+                    if(chosen==CoverType.GAME) session.error("In development") else coverType=chosen
+                }
+                LocalizedText("Name and icon update after leaving the app.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                HorizontalDivider()
+                LocalizedText("Safe contacts · optional",style=MaterialTheme.typography.titleLarge)
+                LocalizedText("Add one or more trusted people. Olive never contacts them automatically.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                contacts.forEach { contact ->
+                    Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=MaterialTheme.shapes.medium) {
+                        Row(Modifier.fillMaxWidth().padding(start=14.dp,top=8.dp,bottom=8.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                LocalizedText(contact.name,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                LocalizedText(contact.details,color=Muted,style=MaterialTheme.typography.bodySmall)
+                            }
+                            IconButton(onClick={contacts.remove(contact)},enabled=!session.busy) {
+                                Icon(Icons.Outlined.Close,"Remove safe contact")
+                            }
+                        }
+                    }
+                }
+                Field("Contact name (optional)",contactName,"setup_contact_name",enabled=!session.busy && contacts.size<25,
+                    error=if(showErrors && !supportValid) "Complete both fields" else null) {
+                    contactName=it.take(120);showErrors=false
+                }
+                Field("Phone or email (optional)",contactDetails,"setup_contact_details",enabled=!session.busy && contacts.size<25,
+                    error=if(showErrors && !supportValid) "Complete both fields" else null) {
+                    contactDetails=it.take(200);showErrors=false
+                }
+                OutlinedButton(onClick={
+                    contacts += SafeContact(UUID.randomUUID().toString(),contactName.trim(),contactDetails.trim())
+                    contactName="";contactDetails="";showErrors=false
+                },enabled=!session.busy && contactName.isNotBlank() && contactDetails.isNotBlank() && contacts.size<25,
+                    modifier=Modifier.fillMaxWidth().testTag("add_onboarding_contact")) {
+                    Icon(Icons.Outlined.Add,null);Spacer(Modifier.width(8.dp));LocalizedText("Add another contact")
+                }
+            }
+        } }
+        Status(session)
+        val finalProfilePage=page==pages.lastIndex
+        val last=safeContact && finalProfilePage
+        OnboardingNavigation(back={showErrors=false;if(page>0) page-- else session.back()},next={
+            showErrors=true
+            if(pageValid()) {
+                showErrors=false
+                if(finalProfilePage) saveProfile() else page++
+            }
+        },last=last,nextTag=if(page==pages.lastIndex) "profile_submit" else "onboarding_next",enabled=!session.busy,
+            nextLabel=if(!safeContact && page==pages.lastIndex) "Next" else null)
     }
 }
 
 // USER ONLY: an administrator cannot know this private trigger, so a provisioned user sets it personally on first login.
 @Composable internal fun TriggerSetup(session:SessionViewModel) {
     var trigger by remember { mutableStateOf("") }
+    var showErrors by rememberSaveable { mutableStateOf(false) }
+    val valid=InputPolicy.validTrigger(trigger)
     FormColumn {
-        Heading("Set your private entry","Choose the trigger that opens Olive Branch. Your administrator cannot set or view it.")
-        Field("Trigger word or phrase",trigger,"trigger",secret=true,enabled=!session.busy) { trigger=it.take(64) }
-        LocalizedText("Olive and Daily Digest ignore spaces and letter case in your trigger. Better Calculator uses your device PIN and two equals taps.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        Heading("Set your private entry","Choose your trigger word.")
+        OnboardingProgress(if(valid) 1 else 0,1,0,1,listOf(valid))
+        Field("Trigger word or phrase",trigger,"trigger",secret=true,showSecretToggle=true,enabled=!session.busy,
+            error=if(showErrors && !valid) "Invalid trigger" else null) { trigger=it.take(64);showErrors=false }
+        RequirementBullet("3–64 characters",valid,trigger.isNotEmpty())
         Status(session)
-        Button(onClick={session.saveProvisionedTrigger(trigger)},enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("trigger_setup_submit")) { LocalizedText("Save trigger and continue") }
+        OnboardingNavigation(session::back,{showErrors=true;if(valid) session.saveProvisionedTrigger(trigger)},last=true,
+            nextTag="trigger_setup_submit",enabled=!session.busy)
     }
 }
 
@@ -260,13 +447,34 @@ import java.util.UUID
     var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
     var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
     var phone by remember(existing) { mutableStateOf(existing?.phone.orEmpty()) }
+    var page by rememberSaveable(existing?.username) { mutableIntStateOf(0) }
+    var showErrors by rememberSaveable { mutableStateOf(false) }
+    val pages=listOf("Personal details","Contact details")
+    val emailValid=android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
+    val required=listOf(fullName.isNotBlank(),InputPolicy.validDob(dob),emailValid)
+    fun pageValid()=if(page==0) fullName.isNotBlank() && InputPolicy.validDob(dob) else emailValid
     FormColumn {
-        Heading("Complete your ${session.accountRole.title} profile","Your username remains your sign-in, and this email can also be used to sign in. Phone is optional.","Olive Tree")
-        Field("Full name (required)",fullName,"organization_full_name",enabled=!session.busy) { fullName=it.take(120) }
-        BirthdayPicker(dob,"organization_dob",!session.busy) { dob=it }
-        Field("Email (required)",email,"organization_email",enabled=!session.busy) { email=it.take(254) }
-        Field("Phone (optional)",phone,"organization_phone",enabled=!session.busy) { phone=it.take(40) }
+        Heading("Complete your ${session.accountRole.title} profile",pages[page],"Olive Tree")
+        OnboardingProgress(required.count { it },required.size,page,pages.size,
+            listOf(fullName.isNotBlank() && InputPolicy.validDob(dob),emailValid))
+        if(page==0) {
+            Field("Full name (required)",fullName,"organization_full_name",enabled=!session.busy,
+                error=if(showErrors && fullName.isBlank()) "Name required" else null) { fullName=it.take(120);showErrors=false }
+            BirthdayPicker(dob,"organization_dob",!session.busy,
+                error=if(showErrors && !InputPolicy.validDob(dob)) "Birthday required" else null) { dob=it;showErrors=false }
+        } else {
+            Field("Email (required)",email,"organization_email",enabled=!session.busy,
+                error=if(showErrors && !emailValid) "Invalid email" else null) { email=it.take(254);showErrors=false }
+            Field("Phone (optional)",phone,"organization_phone",enabled=!session.busy) { phone=it.take(40) }
+        }
         Status(session)
-        Button(onClick={session.saveOrganizationProfile(fullName,dob,email,phone)},enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("organization_profile_submit")) { LocalizedText("Save and open Olive Tree") }
+        OnboardingNavigation(back={showErrors=false;if(page>0) page-- else session.back()},next={
+            showErrors=true
+            if(pageValid()) {
+                showErrors=false
+                if(page==pages.lastIndex) session.saveOrganizationProfile(fullName,dob,email,phone) else page++
+            }
+        },last=page==pages.lastIndex,nextTag=if(page==pages.lastIndex) "organization_profile_submit" else "onboarding_next",
+            enabled=!session.busy)
     }
 }

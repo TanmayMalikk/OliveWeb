@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Bold newspaper shapes stay readable when Android renders the icon very small. -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M3,4H18V19.5H5.5C4.1,19.5 3,18.4 3,17V4ZM18,8H21V17C21,18.4 19.9,19.5 18.5,19.5H18"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,7H11V12H6Z" />
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M14,7H16M14,10H16M6,15H15.5M6,17.5H13"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round"
+        android:strokeWidth="1.8" />
+</vector>
