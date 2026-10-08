@@ -132,10 +132,7 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
             }
             if(useShippingForBilling) LocalizedText(shipping.displayText(),style=MaterialTheme.typography.bodySmall)
             else CheckoutField("Billing address",billing,"billing_address",error=if(showErrors && billing.isBlank()) "Billing address is required." else null) { billing=it.take(500) }
-            LocalizedText("Subtotal: " + NumberFormat.getCurrencyInstance(
-                Locale.forLanguageTag(
-                    getLanguageTag(LocalOliveLanguage.current)
-                )).format(totalCents/100.0))
+            LocalizedText("Subtotal: " + "$%.2f".format(Locale.US, totalCents / 100.0))
             Button(onClick={
                 showErrors=true
                 if(formValid) {
