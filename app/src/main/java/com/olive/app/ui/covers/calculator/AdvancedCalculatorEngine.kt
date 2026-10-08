@@ -48,7 +48,9 @@ internal enum class AdvancedTool(val category: String, val title: String, val ex
 
 // All advanced calculations stay local on the phone. Semicolons separate expression arguments and pipes separate data sets.
 internal object AdvancedCalculatorEngine {
-    fun calculate(tool: AdvancedTool, input: String, mode: CalculatorAngleMode): String = when(tool) {
+    fun calculate(tool: AdvancedTool, rawInput: String, mode: CalculatorAngleMode): String {
+        val input=normalizeCalculatorNotation(rawInput)
+        return when(tool) {
         AdvancedTool.Expression -> number(GraphExpression.compile(input,mode).evaluate(0.0))
         AdvancedTool.FunctionValue -> semi(input,2).let { "value = ${number(GraphExpression.compile(it[0],mode).evaluate(value(it[1],mode)))}" }
         AdvancedTool.LinearSystem -> matrix(rref(matrix(input)))
@@ -80,6 +82,7 @@ internal object AdvancedCalculatorEngine {
         AdvancedTool.PolynomialRegression -> polynomialRegression(input)
         AdvancedTool.Regression -> regression(input)
     }
+    }
 
     private fun fraction(raw: String): String {
         val value=if('/' in raw) raw.split('/').let { require(it.size==2);it[0].trim().toDouble()/it[1].trim().toDouble() } else raw.trim().toDouble()
@@ -100,7 +103,7 @@ internal object AdvancedCalculatorEngine {
     }
     private fun scientific(raw: String): String {
         val value=value(raw,CalculatorAngleMode.RADIANS)
-        return "%.10e = %s".format(value,number(value))
+        return formatScientificCalculatorNumber(value)+" = "+number(value)
     }
     private fun derivative(raw: String, mode: CalculatorAngleMode): String {
         val p=semi(raw,2);val f=GraphExpression.compile(p[0],mode);val x=value(p[1],mode);val h=max(1e-6,abs(x)*1e-6)
@@ -189,9 +192,9 @@ internal object AdvancedCalculatorEngine {
     }
 
     private fun semi(raw: String, size: Int)=raw.split(';').also { require(it.size==size) { "Use semicolons exactly like the example." } }.map { it.trim() }
-    private fun list(raw: String)=raw.trim().split(Regex("[,\\s]+")).filter { it.isNotBlank() }.map { it.toDouble() }.also { require(it.isNotEmpty()) }
+    private fun list(raw: String)=raw.trim().split(Regex("[,\\s]+")).filter { it.isNotBlank() }.map(::parseCalculatorNumber).also { require(it.isNotEmpty()) }
     private fun value(raw: String, mode: CalculatorAngleMode)=GraphExpression.compile(raw,mode).evaluate(0.0)
-    private fun number(value: Double): String { require(value.isFinite()) { "The result is not a finite number." };val rounded=round(value);return if(abs(value-rounded)<1e-10 && abs(rounded)<9e15) rounded.toLong().toString() else "%.10g".format(value) }
+    private fun number(value: Double): String = formatCalculatorNumber(value)
     private fun approximateFraction(value: Double): Pair<Long,Long> { var bestN=0L;var bestD=1L;var bestError=Double.MAX_VALUE;for(d in 1L..10000L) { val n=round(value*d).toLong();val error=abs(value-n.toDouble()/d);if(error<bestError) { bestN=n;bestD=d;bestError=error };if(error<1e-10) break };val gcd=gcd(abs(bestN),bestD);return bestN/gcd to bestD/gcd }
     private tailrec fun gcd(a: Long,b: Long): Long=if(b==0L) max(1,a) else gcd(b,a%b)
 }

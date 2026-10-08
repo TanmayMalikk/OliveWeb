@@ -76,13 +76,30 @@ import java.util.UUID
 @Composable internal fun DevicePin(session: SessionViewModel) {
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
+    var showErrors by rememberSaveable { mutableStateOf(false) }
+    val pinValid=InputPolicy.validPin(pin)
+    val confirmationValid=confirm.isNotEmpty() && confirm==pin
+    val stages=if(session.creatingAccount) 4 else 2
+    val page=stages-1
+    val completedBeforePin=if(session.creatingAccount) 8 else 2
+    val totalRequired=completedBeforePin+2
     FormColumn {
-        Heading("Secure this device", "Create a 4–6 digit PIN. Your account password signs you in on another device; this PIN opens the safe area here.")
-        Field("4–6 digit PIN",pin,"new_pin",secret=true,numeric=true,enabled=!session.busy) { pin=it.filter(Char::isDigit).take(6) }
-        Field("Confirm PIN",confirm,"confirm_pin",secret=true,numeric=true,enabled=!session.busy) { confirm=it.filter(Char::isDigit).take(6) }
-        LocalizedText(if(session.usesCover) "Five incorrect attempts return you to the cover app. You can try again immediately. Failed attempts are recorded on this device." else "Five incorrect attempts keep Olive Branch locked. You can try again immediately. Failed attempts are recorded on this device.",color=Muted)
+        Heading("Secure this device", "Create your device PIN.")
+        OnboardingProgress(completedBeforePin+listOf(pinValid,confirmationValid).count { it },totalRequired,page,stages,
+            List(stages) { index -> index<page || (index==page && pinValid && confirmationValid) })
+        Field("4–6 digit PIN",pin,"new_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
+            error=if(showErrors && !pinValid) "Invalid PIN" else null) {
+            pin=it.filter(Char::isDigit).take(6);showErrors=false
+        }
+        RequirementBullet("4–6 digits",pinValid,pin.isNotEmpty())
+        Field("Confirm PIN",confirm,"confirm_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
+            error=if(showErrors && !confirmationValid) "PINs differ" else null) {
+            confirm=it.filter(Char::isDigit).take(6);showErrors=false
+        }
+        RequirementBullet("PINs match",confirmationValid,pin.isNotEmpty() || confirm.isNotEmpty())
         Status(session)
-        Button(onClick={session.createDevicePin(pin,confirm)},enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("pin_setup_submit")) { LocalizedText("Finish setup") }
+        OnboardingNavigation(session::back,{showErrors=true;if(pinValid && confirmationValid) session.createDevicePin(pin,confirm)},
+            last=true,nextTag="pin_setup_submit",enabled=!session.busy)
     }
 }
 

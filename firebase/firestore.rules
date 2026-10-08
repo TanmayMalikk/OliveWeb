@@ -111,7 +111,7 @@ service cloud.firestore {
       allow list: if false;
 
       allow create: if owner(uid) && validProfile(request.resource.data)
-        && request.resource.data.username.matches('[a-z0-9_]{4,24}');
+        && request.resource.data.username.matches('[a-z0-9_]{8,24}');
 
       allow update: if owner(uid) && validProfile(request.resource.data)
 
@@ -123,19 +123,24 @@ service cloud.firestore {
 
     // File access lists can grant reads, but only the authenticated owner can create, edit, or delete metadata.
     match /files/{fileId} {
+      function validFileMetadata(data, id) {
+        return data.keys().hasOnly(['owner_id','storage_path','file_name','file_type','allowed_users','created_at'])
+          && data.owner_id is string
+          && data.storage_path == 'users/' + data.owner_id + '/media/' + id
+          && data.file_name is string && data.file_name.size() <= 160
+          && data.file_type is string && data.file_type.size() <= 120
+          && data.allowed_users is list
+          && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25
+          && data.allowed_users.hasAny([data.owner_id]);
+      }
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['owner_id','storage_path','file_name','file_type','allowed_users','created_at'])
         && request.resource.data.owner_id == request.auth.uid
-        && request.resource.data.storage_path == 'users/' + request.auth.uid + '/media/' + fileId
-        && request.resource.data.file_name is string && request.resource.data.file_name.size() <= 160
-        && request.resource.data.file_type is string && request.resource.data.file_type.size() <= 120
-        && request.resource.data.allowed_users is list
-        && request.resource.data.allowed_users.size() > 0 && request.resource.data.allowed_users.size() <= 25
-        && request.auth.uid in request.resource.data.allowed_users;
+        && validFileMetadata(request.resource.data, fileId);
       allow read: if signedIn() && request.auth.uid in resource.data.allowed_users;
       allow update: if signedIn() && resource.data.owner_id == request.auth.uid
         && request.resource.data.owner_id == resource.data.owner_id
-        && request.resource.data.storage_path == resource.data.storage_path;
+        && request.resource.data.storage_path == resource.data.storage_path
+        && validFileMetadata(request.resource.data, fileId);
       allow delete: if signedIn() && resource.data.owner_id == request.auth.uid;
     }
 
@@ -237,10 +242,12 @@ service cloud.firestore {
     }
 
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId'])
+      return data.keys().hasOnly(['friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid'])
         && data.friendshipId == conversationId
         && data.lastMessage is string && data.lastMessage.size() <= 160
         && data.lastMessageId is string && data.lastMessageId.size() <= 128
+        && (!data.keys().hasAny(['lastSenderUid'])
+          || (data.lastSenderUid is string && data.lastSenderUid.size() <= 128))
         && existsAfter(/databases/$(database)/documents/friendships/$(data.friendshipId))
         && data.participantIds == friendshipForConversation(data).participantIds
         && data.participantUsernames == friendshipForConversation(data).participantUsernames;
@@ -253,7 +260,7 @@ service cloud.firestore {
       allow create: if conversationParticipant(request.resource.data) && validConversation(request.resource.data,conversationId);
       allow update: if conversationParticipant(resource.data)
         && validConversation(request.resource.data,conversationId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','lastMessageId','updatedAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','lastMessageId','lastSenderUid','updatedAt']);
       allow delete: if false;
 
       match /messages/{messageId} {

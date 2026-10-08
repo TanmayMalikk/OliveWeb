@@ -2,6 +2,7 @@ package com.olive.app.ui
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CalculatorInputTest {
@@ -34,7 +35,7 @@ class CalculatorInputTest {
         input.reset()
         "999999999999999999".forEach { input.press(it.toString()) }
         listOf("+","1","=").forEach { input.press(it) }
-        assertEquals("1E+18",input.display)
+        assertEquals("1E18",input.display)
     }
 
     @Test fun trigonometryUsesTheSelectedAngleModeAndDisarmsPinEntry() {
@@ -88,5 +89,32 @@ class CalculatorInputTest {
         input.reset()
         listOf("5","!","=").forEach { input.press(it) }
         assertEquals("120",input.display)
+    }
+
+    @Test fun formatsLargeAndSmallAnswersAndReusesHistory() {
+        val input=CalculatorInput()
+        listOf("1","e","1","0","=").forEach { input.press(it) }
+        assertEquals("1E10",input.display)
+        assertEquals(CalculatorHistoryEntry("1e10","1E10"),input.history.first())
+
+        input.reset()
+        listOf("2","+","3","=").forEach { input.press(it) }
+        val prior=input.history.first()
+        input.press("AC")
+        input.reuse(prior)
+        assertEquals("2+3",input.expression)
+        assertEquals("2+3",input.display)
+    }
+
+    @Test fun historyChangesArePersistedAndCanBeCleared() {
+        var persisted=emptyList<CalculatorHistoryEntry>()
+        val input=CalculatorInput(onHistoryChanged={ persisted=it })
+        listOf("2","+","2","=").forEach { input.press(it) }
+        assertEquals(input.history,persisted)
+        assertEquals(CalculatorHistoryEntry("2+2","4"),persisted.first())
+
+        input.clearHistory()
+        assertTrue(input.history.isEmpty())
+        assertTrue(persisted.isEmpty())
     }
 }

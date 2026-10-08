@@ -1,7 +1,5 @@
 package com.olive.app.ui
 
-import java.math.BigDecimal
-import java.math.RoundingMode
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -64,7 +62,7 @@ object EquationSolver {
         return combined.copyOf(degree+1)
     }
 
-    private fun normalize(value: String)=value.lowercase().replace(" ","")
+    private fun normalize(value: String)=normalizeCalculatorNotation(value).lowercase().replace(" ","")
         .replace('−','-').replace("²","^2").replace("³","^3")
 
     private fun parseSide(side: String): DoubleArray {
@@ -130,6 +128,11 @@ object EquationSolver {
             if(source[index].isDigit() || source[index]=='.') {
                 val start=index
                 while(index<source.length && (source[index].isDigit() || source[index]=='.')) index++
+                if(index<source.length && source[index]=='e') {
+                    index++
+                    if(index<source.length && source[index] in "+-") index++
+                    while(index<source.length && source[index].isDigit()) index++
+                }
                 val value=source.substring(start,index).toDoubleOrNull()
                     ?: throw IllegalArgumentException("Check the number near '${source.substring(start).take(8)}'.")
                 require(value.isFinite()) { "Use finite numbers only." }
@@ -245,7 +248,7 @@ object EquationSolver {
 
     private fun number(value: Double): String {
         val cleaned=if(abs(value)<1e-8) 0.0 else value
-        return BigDecimal.valueOf(cleaned).setScale(8,RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+        return formatCalculatorNumber(cleaned,9)
     }
 
     private data class Complex(val real: Double, val imaginary: Double=0.0) {

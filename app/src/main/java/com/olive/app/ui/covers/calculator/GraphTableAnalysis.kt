@@ -85,7 +85,7 @@ internal fun GraphTableAnalysisDialog(equations:List<String>,mode:CalculatorAngl
             if(section=="Table") {
                 GraphTableSection(startInput,{startInput=it;table=null;error=null},endInput,{endInput=it;table=null;error=null},stepInput,{stepInput=it;table=null;error=null},table,error) {
                     runCatching {
-                        buildGraphTable(equations,mode,startInput.trim().toDouble(),endInput.trim().toDouble(),stepInput.trim().toDouble())
+                        buildGraphTable(equations,mode,parseCalculatorNumber(startInput),parseCalculatorNumber(endInput),parseCalculatorNumber(stepInput))
                     }.onSuccess { table=it;error=null }.onFailure { table=null;error=it.message ?: "Check the table range." }
                 }
             } else {
@@ -102,7 +102,7 @@ internal fun GraphTableAnalysisDialog(equations:List<String>,mode:CalculatorAngl
                         runCatching {
                             val equation=equations[equationIndex]
                             when(calculation) {
-                                GraphCalculation.Value -> "Y${equationIndex+1}(${analysisInput.trim()}) = ${formatGraphNumber(GraphExpression.compile(equation,mode).evaluate(analysisInput.trim().toDouble()))}"
+                                GraphCalculation.Value -> "Y${equationIndex+1}(${analysisInput.trim()}) = ${formatGraphNumber(GraphExpression.compile(equation,mode).evaluate(parseCalculatorNumber(analysisInput)))}"
                                 GraphCalculation.Zero -> AdvancedCalculatorEngine.calculate(AdvancedTool.Zero,"$equation ; $analysisInput",mode)
                                 GraphCalculation.Minimum -> AdvancedCalculatorEngine.calculate(AdvancedTool.Minimum,"$equation ; $analysisInput",mode)
                                 GraphCalculation.Maximum -> AdvancedCalculatorEngine.calculate(AdvancedTool.Maximum,"$equation ; $analysisInput",mode)
@@ -235,5 +235,4 @@ private fun GraphAnalysisSection(
     }
 }
 
-internal fun formatGraphNumber(value:Double):String = if(!value.isFinite()) "undefined"
-    else if(abs(value-round(value))<1e-9) round(value).toLong().toString() else "%.6g".format(value)
+internal fun formatGraphNumber(value:Double):String = if(!value.isFinite()) "undefined" else formatCalculatorNumber(value,7)

@@ -8,9 +8,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.core.content.edit
 import com.olive.app.BuildConfig
 import com.olive.app.data.*
 import com.olive.app.security.*
+import com.olive.app.notification.LocalNotificationEventHandler
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -20,6 +25,11 @@ import java.util.UUID
 enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, TriggerSetup, OrganizationProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
 enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity }
 enum class ActivityCategory { Settings, Triggers, PinAttempts, Checkouts, Privacy }
+enum class CredentialFieldError { InvalidUsername, InvalidPassword, UsernameTaken, IncorrectPassword }
+
+internal fun messagingIdentityMarker(identity:AccountIdentity)="${identity.uid}:${identity.username.lowercase()}"
+internal fun shouldRegisterMessagingIdentity(savedMarker:String?,identity:AccountIdentity)=
+    savedMarker!=messagingIdentityMarker(identity)
 
 // This is the traffic controller: it keeps cover mode, setup, PIN access, and the safe side from stepping on each other.
 class SessionViewModel(application: Application) : AndroidViewModel(application) {
@@ -34,6 +44,8 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val accounts: AccountRepository = if(localMode) LocalAccountRepository(vault) else FirebaseAccountRepository()
     private val adminRepository = if(localMode) null else AdminRepository()
     private val messagingRepository = if(localMode) null else MessagingRepository()
+    private val messageReadState=application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
+    private val cloudState=application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
     var screen by mutableStateOf(SessionScreen.Loading); private set
     var page by mutableStateOf(SafePage.Home); private set
     var activityCategory by mutableStateOf<ActivityCategory?>(null); private set
@@ -51,7 +63,9 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     var incomingFriendRequests by mutableStateOf(emptyList<FriendRequest>()); private set
     var outgoingFriendRequests by mutableStateOf(emptyList<FriendRequest>()); private set
     var conversations by mutableStateOf(emptyList<ChatConversation>()); private set
+    private var readMessageVersion by mutableIntStateOf(0)
     var activeConversation by mutableStateOf<ChatConversation?>(null); private set
+    var chatQuickExitHintVisible by mutableStateOf(false); private set
     var chatMessages by mutableStateOf(emptyList<ChatMessage>()); private set
     var messagingBusy by mutableStateOf(false); private set
     var messagingNeedsReconnect by mutableStateOf(false); private set
@@ -74,6 +88,8 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     var checkoutActive by mutableStateOf(false)
     var idleCountdownSeconds by mutableStateOf<Int?>(null); private set
     var privacyBlackout by mutableStateOf(false); private set
+    var credentialFieldError by mutableStateOf<CredentialFieldError?>(null); private set
+    var creatingAccount by mutableStateOf(false); private set
     var coverReset by mutableIntStateOf(0); private set
     private var enrollment by mutableStateOf<DeviceEnrollment?>(null)
     private var pendingIdentity: AccountIdentity? = null
@@ -98,6 +114,16 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     val setupUsername get() = pendingIdentity?.username.orEmpty()
     val setupProfile get() = pendingProfile
     val usesCover get() = accountRole==AccountRole.USER
+    val unreadMessageCount: Int get() {
+        readMessageVersion
+        val uid=enrollment?.uid ?: return 0
+        return conversations.count { conversation ->
+            conversation.lastMessageId.isNotBlank() && conversation.lastSenderUid.isNotBlank() &&
+                conversation.lastSenderUid!=uid &&
+                messageReadState.getString(readMessageKey(uid,conversation.id),null)!=conversation.lastMessageId
+        }
+    }
+    val pendingMessageActionCount get()=incomingFriendRequests.size+unreadMessageCount
 
     init { load() }
     fun load() {
@@ -108,11 +134,19 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 check(BuildConfig.DEBUG || !localMode)
-                enrollment = withContext(Dispatchers.IO) {
-                    store.current() ?: if(localMode) null else accounts.authenticatedUid()?.let(store::restoreActive)
+                var restoredSession=withContext(Dispatchers.IO) { store.currentSession() }
+                if(restoredSession==null && !localMode) {
+                    restoredSession=withContext(Dispatchers.IO) {
+                        accounts.authenticatedUid()?.let { uid ->
+                            store.restoreActive(uid)
+                            store.currentSession()
+                        }
+                    }
                 }
-                enrollment?.let { device ->
-                    val saved = withContext(Dispatchers.IO) { store.profile(device.uid) }
+                enrollment=restoredSession?.enrollment
+                restoredSession?.let { restored ->
+                    val device=restored.enrollment
+                    val saved=restored.profile
                     deliveryAddress=saved.address; language=saved.language
                     coverFullName=saved.fullName; coverUsername=saved.username
                     coverType=saved.coverType
@@ -130,7 +164,6 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                     AccountRole.STAFF,AccountRole.ADMIN -> SessionScreen.Portal
                 }
                 if(enrollment?.role==AccountRole.ADMIN && !localMode) queueAdminRefresh()
-                if(enrollment?.role==AccountRole.SAFE_CONTACT) startIdleTimer()
             } catch(_: Exception) { screen = SessionScreen.StorageError }
             finally { busy = false }
         }
@@ -140,25 +173,42 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         screenHistory += screen
         screen=value
     }
-    fun selectRole(role: AccountRole) { if(!busy) { accountRole=role;message=null } }
+    fun selectRole(role: AccountRole) { if(!busy) { accountRole=role;message=null;credentialFieldError=null } }
     fun chooseNew() {
         if(busy) return
         if(accountRole==AccountRole.STAFF || accountRole==AccountRole.ADMIN) { message="Staff and Admin accounts are created by an administrator.";return }
-        message=null;openScreen(SessionScreen.NewCredentials)
+        creatingAccount=true;message=null;openScreen(SessionScreen.NewCredentials)
     }
-    fun chooseReturning() { if(!busy) { message=null; openScreen(SessionScreen.ReturningCredentials) } }
-    fun setup() { if(!busy) { message=null; openScreen(SessionScreen.Welcome) } }
+    fun chooseReturning() { if(!busy) { creatingAccount=false;message=null; openScreen(SessionScreen.ReturningCredentials) } }
+    fun setup() { if(!busy) { creatingAccount=false;message=null; openScreen(SessionScreen.Welcome) } }
     fun error(text: String) { message = text }
+    fun clearCredentialError() { credentialFieldError=null;message=null }
 
     // Account creation and returning sign-in meet here; Firebase calls live in AccountRepository.
     fun authenticate(username: String, password: String, create: Boolean) {
         if(busy) return
+        credentialFieldError=null
         val organizationEmail=accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN) && '@' in username
-        if(!organizationEmail && !InputPolicy.validUsername(username)) { message="Use 4–24 letters, numbers or underscores for your username."; return }
-        if(create && !InputPolicy.validPassword(password)) { message="Use a password of 8–24 characters."; return }
-        if(password.isEmpty()) { message="Enter your password."; return }
+        val validUsername=if(create) InputPolicy.validUsername(username) else InputPolicy.validExistingUsername(username)
+        if(!organizationEmail && !validUsername) { credentialFieldError=CredentialFieldError.InvalidUsername;message="Invalid username."; return }
+        if(create && !InputPolicy.validPassword(password)) { credentialFieldError=CredentialFieldError.InvalidPassword;message="Invalid password."; return }
+        if(password.isEmpty()) { credentialFieldError=CredentialFieldError.IncorrectPassword;message="Password required."; return }
         runOperation("Unable to sign in. Check your credentials and connection, then try again.") { token ->
-            val identity = if(create) accounts.create(username,password,accountRole) else accounts.authenticate(username,password,accountRole)
+            val identity = try {
+                if(create) accounts.create(username,password,accountRole) else accounts.authenticate(username,password,accountRole)
+            } catch(error:Exception) {
+                val details=error.message.orEmpty()
+                val usernameUnavailable=create && (error is FirebaseAuthUserCollisionException ||
+                    details.contains("unavailable",ignoreCase=true))
+                val incorrectLogin=!create && (error is FirebaseAuthInvalidCredentialsException ||
+                    error is FirebaseAuthInvalidUserException || details.contains("sign-in failed",ignoreCase=true))
+                if(!usernameUnavailable && !incorrectLogin) throw error
+                if(epoch==token) {
+                    credentialFieldError=if(usernameUnavailable) CredentialFieldError.UsernameTaken else CredentialFieldError.IncorrectPassword
+                    message=if(usernameUnavailable) "Username taken." else "Incorrect password."
+                }
+                return@runOperation
+            }
             val remote = accounts.profile(identity)
             val existing = withContext(Dispatchers.IO) {
                 if(store.pendingSync(identity.uid)) store.profile(identity.uid) else remote
@@ -182,7 +232,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                     accountRole=existing.role;language=existing.language;deliveryAddress=existing.address
                     screenHistory.clear();safePageHistory.clear()
                     if(existing.role==AccountRole.SAFE_CONTACT) {
-                        page=SafePage.Home;screen=SessionScreen.Safe;refreshHistory(saved.uid);startIdleTimer()
+                        page=SafePage.Home;screen=SessionScreen.Safe;refreshHistory(saved.uid)
                     } else {
                         screen=SessionScreen.Portal
                         if(existing.role==AccountRole.ADMIN) queueAdminRefresh()
@@ -212,7 +262,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                     enrollment=saved;profile=value;coverUsername=value.username;coverFullName=value.fullName
                     accountRole=value.role;language=value.language;deliveryAddress=value.address
                     screenHistory.clear();safePageHistory.clear();page=SafePage.Home;screen=SessionScreen.Safe
-                    refreshHistory(saved.uid);startIdleTimer()
+                    refreshHistory(saved.uid)
                     if(!localMode) loadCloudHistory(saved.uid,value.username)
                 }
             } else {
@@ -331,7 +381,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         profile?.coverType?.let { coverType=it }
         if(accountRole==AccountRole.SAFE_CONTACT) {
             page=SafePage.Home;activityCategory=null;screenHistory.clear();safePageHistory.clear()
-            message=null;stopMessaging();activeTriggerId=null;triggerJob=null;screen=SessionScreen.Safe;startIdleTimer()
+            message=null;stopMessaging();activeTriggerId=null;triggerJob=null;screen=SessionScreen.Safe
             return
         }
         screen=when(accountRole) {
@@ -344,6 +394,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         profile=null; attempts=emptyList(); message=null; pendingSync=false
         settingsHistory=emptyList();privacyHistory=emptyList();triggerHistory=emptyList();privateEntries=emptyList()
         stopMessaging()
+        if(accountRole==AccountRole.USER && !localMode) syncLocalNotificationHandler()
         activeTriggerId=null;triggerJob=null
         pendingIdentity=null; pendingProfile=null
     }
@@ -354,7 +405,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         if(enrollment==null) {
             epoch++;operationJob?.cancel();operationJob=null;busy=false;pendingIdentity=null;pendingProfile=null
             screenHistory.clear();screen=SessionScreen.Welcome;message=null
-        } else quickExit()
+        } else if(accountRole==AccountRole.USER) quickExit()
     }
     fun back() {
         if(screen == SessionScreen.Safe && page==SafePage.Messages && activeConversation!=null) closeConversation()
@@ -363,7 +414,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             page=safePageHistory.removeAt(safePageHistory.lastIndex);message=null
         }
         else if(screen == SessionScreen.Safe && page != SafePage.Home) { page=SafePage.Home;message=null }
-        else if(screen == SessionScreen.Safe || screen == SessionScreen.Pin) quickExit()
+        else if((screen == SessionScreen.Safe && accountRole==AccountRole.USER) || screen == SessionScreen.Pin) quickExit()
         else if(screenHistory.isNotEmpty()) { screen=screenHistory.removeAt(screenHistory.lastIndex);message=null }
         // Root cover/welcome/loading screens deliberately consume Back so Android does not open the phone home screen.
     }
@@ -433,8 +484,8 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun createManagedAccount(value:AdminAccountDraft) {
         val repository=adminRepository ?: return
         if(accountRole!=AccountRole.ADMIN || busy) return
-        if(!InputPolicy.validUsername(value.username)) { message="Use 4–24 letters, numbers or underscores for the username.";return }
-        if(!InputPolicy.validPassword(value.password)) { message="Use a temporary password of 8–24 characters.";return }
+        if(!InputPolicy.validUsername(value.username)) { message="Use 8–24 letters, numbers or underscores for the username.";return }
+        if(!InputPolicy.validPassword(value.password)) { message="Use 8–24 characters with a letter, number and special character.";return }
         runOperation("Unable to create the account. The username or email may already be in use.") { token ->
             repository.create(value)
             val (counts,rows)=repository.accounts()
@@ -461,18 +512,23 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 if(value==SafePage.Settings || value==SafePage.Profile || value==SafePage.Contacts)
                     recordSettingsInteraction("Olive Branch", "Opened ${value.name.lowercase()} page")
                 if(value==SafePage.Activity || value==SafePage.Notes) refreshHistory(uid)
-                if(value==SafePage.Messages) startMessaging()
+                if(value==SafePage.Messages) ensureMessagingObservation(showFeedback=true)
             }
         }
     }
 
-    // Messaging listens live while its safe page is open and stops the moment Olive Branch locks.
-    private fun startMessaging() {
+    // Friend and conversation summaries stay live while Olive Branch is unlocked so Home can show pending activity.
+    fun ensureMessagingObservation(showFeedback: Boolean=false) {
+        if(socialSubscription!=null || messagingBusy) return
+        startMessaging(showFeedback)
+    }
+
+    private fun startMessaging(showFeedback: Boolean=true) {
         stopMessaging(clearRows=false)
         val repository=messagingRepository
         val device=enrollment
         if(repository==null || device==null) {
-            message="Messaging needs a Firebase-connected build."
+            if(showFeedback) message="Messaging needs a Firebase-connected build."
             return
         }
         // A saved local account can outlive Firebase's login; reconnect it before touching private friend data.
@@ -480,34 +536,41 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         if(accounts.authenticatedUid()!=device.uid || accounts.authenticatedUsername()!=expectedUsername) {
             messagingNeedsReconnect=true
             messagingBusy=false
-            message="Enter your account password to reconnect friends and messages."
+            if(showFeedback) message="Enter your account password to reconnect friends and messages."
             return
         }
         messagingNeedsReconnect=false
         val identity=AccountIdentity(device.uid,coverUsername)
+        LocalNotificationEventHandler.pauseForegroundListeners()
         val token=epoch
-        messagingBusy=true;message=null
+        messagingBusy=true
+        if(showFeedback) message=null
         viewModelScope.launch {
             try {
-                repository.registerUser(identity)
-                if(epoch!=token || screen!=SessionScreen.Safe || page!=SafePage.Messages) return@launch
+                registerMessagingIdentity(identity)
+                if(epoch!=token || screen!=SessionScreen.Safe) return@launch
                 socialSubscription=repository.observeSocial(device.uid,{ social ->
-                    if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Messages) {
+                    if(epoch==token && screen==SessionScreen.Safe) {
                         friends=social.friends
                         incomingFriendRequests=social.incoming
                         outgoingFriendRequests=social.outgoing
                         observeFriendConversations(social.friends,token)
                         messagingBusy=false
                     }
-                },{ error -> if(epoch==token) { messagingBusy=false;message="Unable to load friend information. $error" } })
+                },{ error -> if(epoch==token) {
+                    messagingBusy=false
+                    if(showFeedback || page==SafePage.Messages) message="Unable to load friend information. $error"
+                } })
             } catch(error: CancellationException) { throw error }
             catch(error: Exception) {
                 if(epoch==token) {
                     messagingBusy=false
                     if(error is FirebaseFirestoreException && error.code==FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                         messagingNeedsReconnect=true
-                        message="Firebase needs your account password again before friends and messages can load."
-                    } else message=error.localizedMessage ?: "Unable to start messaging."
+                        if(showFeedback || page==SafePage.Messages)
+                            message="Firebase needs your account password again before friends and messages can load."
+                    } else if(showFeedback || page==SafePage.Messages)
+                        message=error.localizedMessage ?: "Unable to start messaging."
                 }
             }
         }
@@ -533,7 +596,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             } finally { if(epoch==token) messagingBusy=false }
             if(connected && epoch==token && screen==SessionScreen.Safe && page==SafePage.Messages) {
                 onConnected()
-                startMessaging()
+                startMessaging(showFeedback=true)
             }
         }
     }
@@ -544,11 +607,14 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         observedFriendshipIds=ids
         conversationSubscription?.close()
         conversationSubscription=messagingRepository?.observeConversations(ids.toList(),{ rows ->
-            if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Messages) {
+            if(epoch==token && screen==SessionScreen.Safe) {
                 conversations=rows
-                activeConversation?.let { active -> rows.firstOrNull { it.id==active.id }?.let { activeConversation=it } }
+                activeConversation?.let { active -> rows.firstOrNull { it.id==active.id }?.let { updated ->
+                    activeConversation=updated
+                    markConversationRead(updated)
+                } }
             }
-        },{ error -> if(epoch==token) message="Unable to load messages. $error" })
+        },{ error -> if(epoch==token && page==SafePage.Messages) message="Unable to load messages. $error" })
     }
 
     fun searchUsers(query: String) = runMessagingAction("Unable to search for users.") { repository,device,token ->
@@ -592,6 +658,8 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         val uid=enrollment?.uid ?: return
         if(uid !in conversation.participantIds) return
         messageSubscription?.close();chatMessages=emptyList();activeConversation=conversation;message=null
+        markConversationRead(conversation)
+        chatQuickExitHintVisible=accountRole==AccountRole.USER
         val token=epoch
         messageSubscription=messagingRepository?.observeMessages(conversation.id,{ rows ->
             if(epoch==token && activeConversation?.id==conversation.id) chatMessages=rows
@@ -637,7 +705,11 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try { block(repository,device,token) }
             catch(error: CancellationException) { throw error }
-            catch(error: Exception) { if(epoch==token) message=error.localizedMessage ?: failure }
+            catch(error: Exception) { if(epoch==token) {
+                message=if(error is FirebaseFirestoreException && error.code==FirebaseFirestoreException.Code.PERMISSION_DENIED)
+                    "$failure Firebase denied this action. Refresh the page and try again."
+                else error.localizedMessage ?: failure
+            } }
             finally { if(epoch==token) messagingBusy=false }
         }
     }
@@ -655,14 +727,14 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         }
     }
     fun noteInteraction() {
-        if(screen!=SessionScreen.Safe) return
+        if(screen!=SessionScreen.Safe || accountRole!=AccountRole.USER) return
         lastTouchAt=SystemClock.elapsedRealtime()
         idleCountdownSeconds=null
     }
     fun captureDetected(kind: String) {
         if(privacyBlackout) return
         val uid=enrollment?.uid
-        quickExit()
+        if(accountRole==AccountRole.USER) quickExit()
         privacyBlackout=true
         if(kind=="Screenshot") viewModelScope.launch {
             delay(1_500)
@@ -676,6 +748,10 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun recordingStopped() { privacyBlackout=false }
     private fun startIdleTimer() {
         idleJob?.cancel()
+        if(accountRole!=AccountRole.USER) {
+            idleCountdownSeconds=null
+            return
+        }
         noteInteraction()
         idleJob=viewModelScope.launch {
             while(screen==SessionScreen.Safe) {
@@ -697,7 +773,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
     // Cover state is local and account-scoped, so a declined checkout or app close won't empty it.
     private suspend fun restoreCoverData(uid: String) {
-        val saved=withContext(Dispatchers.IO) { coverStore.food(uid) to coverStore.news(uid) }
+        val saved=withContext(Dispatchers.IO) { coverStore.restore(uid) }
         foodCart=saved.first.cart;foodFavorites=saved.first.favorites;foodCustomizations=saved.first.customizations;savedNews=saved.second
         coverDataVersion++
     }
@@ -750,7 +826,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         if(activityCategory!=null) activityCategory=null else back()
     }
 
-    // Opening a note starts with a clean editor instead of carrying over the last ScratchPad notice.
+    // Opening a note starts with a clean editor instead of carrying over the last Trash notice.
     fun clearPrivateEntryStatus() {
         if(screen==SessionScreen.Safe && page==SafePage.Notes) message=null
     }
@@ -804,12 +880,35 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         val existing=privateEntries.firstOrNull { it.id==id && it.deletedAt==null } ?: return
         val now=System.currentTimeMillis()
         updatePrivateEntry(existing.copy(updatedAt=now,pinned=false,deletedAt=now),
-            "Unable to move this entry to ScratchPad. Please retry.","Moved to ScratchPad for 30 days.")
+            "Unable to move this entry to Trash. Please retry.",
+            if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L) "Moved to Trash for 10 seconds." else "Moved to Trash for 30 days.")
+        val uid=enrollment?.uid ?: return
+        viewModelScope.launch {
+            delay(PRIVATE_ENTRY_TRASH_RETENTION_MS+100L)
+            val purged=withContext(Dispatchers.IO) { store.purgeExpiredPrivateEntries(uid) }
+            if(purged && enrollment?.uid==uid) {
+                privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
+                queueHistorySync()
+            }
+        }
+    }
+
+    fun dismissChatQuickExitHint() {
+        chatQuickExitHintVisible=false
+    }
+    private fun readMessageKey(uid:String,conversationId:String)="read_message_${uid}_$conversationId"
+    private fun markConversationRead(conversation:ChatConversation) {
+        val uid=enrollment?.uid ?: return
+        if(conversation.lastMessageId.isBlank()) return
+        val key=readMessageKey(uid,conversation.id)
+        if(messageReadState.getString(key,null)==conversation.lastMessageId) return
+        messageReadState.edit { putString(key,conversation.lastMessageId) }
+        readMessageVersion++
     }
     fun restorePrivateEntry(id: String) {
         val existing=privateEntries.firstOrNull { it.id==id && it.deletedAt!=null } ?: return
         updatePrivateEntry(existing.copy(updatedAt=System.currentTimeMillis(),deletedAt=null),
-            "Unable to restore this entry. Please retry.","Restored from ScratchPad.")
+            "Unable to restore this entry. Please retry.","Restored from Trash.")
     }
     private fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String) {
         if(screen!=SessionScreen.Safe || page!=SafePage.Notes || busy) return
@@ -825,9 +924,11 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
     private fun loadCloudHistory(uid: String, username: String) {
         viewModelScope.launch {
+            // Paint the local cover first; cloud reconciliation does not belong on the launch critical path.
+            delay(1_000)
             val identity=AccountIdentity(uid,username)
             // Messaging registration failing must never block the existing profile/history sync path.
-            runCatching { messagingRepository?.registerUser(identity) }
+            runCatching { registerMessagingIdentity(identity) }
             runCatching {
                 accounts.profile(identity) // Reading once upgrades the existing profile object to readable JSON.
                 val records=accounts.historyRecords(identity)
@@ -957,6 +1058,21 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             finally { if(epoch==token) busy=false }
         }
     }
+
+    private suspend fun registerMessagingIdentity(identity:AccountIdentity) {
+        val marker=messagingIdentityMarker(identity)
+        if(!shouldRegisterMessagingIdentity(cloudState.getString("registered_identity",null),identity)) return
+        messagingRepository?.registerUser(identity)
+        cloudState.edit { putString("registered_identity",marker) }
+    }
+
+    // The phone watches small conversation markers locally and schedules a cover-safe notification when one changes.
+    fun syncLocalNotificationHandler() {
+        val device=enrollment ?: return
+        if(localMode) return
+        if(accounts.authenticatedUid()==device.uid)
+            LocalNotificationEventHandler.start(getApplication(),coverType,accountRole)
+    }
     // Trigger changes require the current PIN here; keep the new trigger stored as a hash.
     fun changeTrigger(trigger: String, pin: String) {
         if(screen!=SessionScreen.Safe || busy || accountRole!=AccountRole.USER) return
@@ -1024,6 +1140,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     fun signOut() {
         if((screen != SessionScreen.Safe && screen != SessionScreen.Portal) || busy || enrollment == null) return
         val uid=enrollment!!.uid
+        LocalNotificationEventHandler.cancel(getApplication())
         quickExit()
         historySyncJob?.cancel();historySyncJob=null
         busy=true
@@ -1076,7 +1193,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         val device=enrollment ?: return
         val username=profile?.username ?: return
         if(currentPassword.isEmpty()) { message="Enter your current password."; return }
-        if(!InputPolicy.validPassword(newPassword)) { message="Use a new password of 8–24 characters."; return }
+        if(!InputPolicy.validPassword(newPassword)) { message="Use 8–24 characters with a letter, number and special character."; return }
         if(newPassword!=confirmation) { message="The new passwords do not match."; return }
         runOperation("Unable to change the password. Check your current password and connection.") { token ->
             accounts.changePassword(AccountIdentity(device.uid,username),currentPassword,newPassword)
