@@ -13,7 +13,10 @@ const auth = getAuth();
 const db = getFirestore();
 const bucket = getStorage().bucket();
 const ROLES = new Set(["USER", "SAFE_CONTACT", "STAFF", "ADMIN"]);
-const USERNAME = /^[a-z0-9_]{4,24}$/;
+const USERNAME = /^[a-z0-9_]{8,24}$/;
+const EXISTING_USERNAME = /^[a-z0-9_]{4,24}$/;
+const PASSWORD = /^(?=.*\p{L})(?=.*\p{N})(?=.*[^\p{L}\p{N}\s]).{8,24}$/u;
+function validPassword(value) { return PASSWORD.test(String(value || "")); }
 const PROTECTED_USERNAME = "olive_admin";
 
 function text(value, max = 2000) {
@@ -21,7 +24,12 @@ function text(value, max = 2000) {
 }
 function normalizedUsername(value) {
   const username = text(value, 24).toLowerCase();
-  if (!USERNAME.test(username)) throw new HttpsError("invalid-argument", "Username must use 4–24 letters, numbers, or underscores.");
+  if (!USERNAME.test(username)) throw new HttpsError("invalid-argument", "Username must use 8–24 letters, numbers, or underscores.");
+  return username;
+}
+function normalizedExistingUsername(value) {
+  const username = text(value, 24).toLowerCase();
+  if (!EXISTING_USERNAME.test(username)) throw new HttpsError("invalid-argument", "That account username is invalid.");
   return username;
 }
 function normalizedRole(value) {
@@ -151,7 +159,7 @@ exports.adminCreateAccount = onCall(async (request) => {
   const username = normalizedUsername(input.username);
   const role = normalizedRole(input.role);
   const password = String(input.password || "");
-  if (password.length < 8 || password.length > 24) throw new HttpsError("invalid-argument", "Temporary password must be 8–24 characters.");
+  if (!validPassword(password)) throw new HttpsError("invalid-argument", "Temporary password must use 8–24 characters with a letter, number, and special character.");
   // Staff and Admin always keep their username alias in Firebase Auth. Their real email belongs in the private profile.
   const authEmail = signInEmail(username, role);
   const profileEmail = (role === "STAFF" || role === "ADMIN") && text(input.email, 254) ? signInEmail(username, role, input.email) : authEmail;
@@ -223,7 +231,7 @@ exports.restoreOrganizationLoginAlias = onCall(async (request) => {
   const profile = await readProfile(user.uid);
   const role = roleFromUser(user, profile);
   if (role !== "STAFF" && role !== "ADMIN") return {changed: false};
-  const username = normalizedUsername(profile?.username || user.displayName);
+  const username = normalizedExistingUsername(profile?.username || user.displayName);
   const alias = signInEmail(username, role);
   await saveOrganizationLogin(user.uid, username, role, profile?.email);
   if (user.email?.toLowerCase() === alias) return {changed: false, alias};
@@ -277,4 +285,4 @@ exports.adminDeleteAccount = onCall(async (request) => {
   return {deleted: true, uid};
 });
 
-exports._test = {normalizedUsername, normalizedRole, signInEmail, organizationEmailKey, isTemporaryEmail, profileComplete};
+exports._test = {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail, organizationEmailKey, isTemporaryEmail, profileComplete, validPassword};

@@ -37,6 +37,8 @@ data class ChatConversation(
     val participantUsernames: Map<String,String>,
     val lastMessage: String = "",
     val updatedAt: Long = 0L,
+    val lastMessageId: String = "",
+    val lastSenderUid: String = "",
 ) {
     fun peerUsername(currentUid: String) = participantUsernames.entries
         .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
@@ -139,7 +141,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             "friendUsername" to current.username.lowercase(),"createdAt" to FieldValue.serverTimestamp()))
         batch.set(conversationRef,mapOf("friendshipId" to friendshipId,"participantIds" to participantIds,
             "participantUsernames" to participantNames,"createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),"lastMessage" to "","lastMessageId" to ""))
+            "updatedAt" to FieldValue.serverTimestamp(),"lastMessage" to "","lastMessageId" to "",
+            "lastSenderUid" to ""))
         batch.delete(requestRef)
         batch.commit().await()
     }
@@ -172,6 +175,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 "updatedAt" to FieldValue.serverTimestamp(),
                 "lastMessage" to "",
                 "lastMessageId" to "",
+                "lastSenderUid" to "",
             )).await()
         return ChatConversation(friend.friendshipId,friend.friendshipId,ids,names)
     }
@@ -221,6 +225,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             "clientSentAt" to System.currentTimeMillis(),
         ))
         batch.update(conversation,mapOf("lastMessage" to body.take(160),"lastMessageId" to message.id,
+            "lastSenderUid" to sender.uid,
             "updatedAt" to FieldValue.serverTimestamp()))
         batch.commit().await()
     }
@@ -262,7 +267,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         }?.toMap().orEmpty()
         val friendshipId=row.getString("friendshipId") ?: return null
         return ChatConversation(row.id,friendshipId,ids,names,row.getString("lastMessage").orEmpty(),
-            row.getTimestamp("updatedAt")?.toDate()?.time ?: 0L)
+            row.getTimestamp("updatedAt")?.toDate()?.time ?: 0L,row.getString("lastMessageId").orEmpty(),
+            row.getString("lastSenderUid").orEmpty())
     }
 
     private fun requestId(senderUid: String, recipientUid: String)="$senderUid--$recipientUid"

@@ -1,15 +1,18 @@
 package com.olive.app
 
+import android.Manifest
 import android.os.Bundle
 import android.os.Build
 import android.app.Activity
 import android.app.ActivityManager
+import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -19,6 +22,7 @@ import androidx.core.graphics.createBitmap
 import androidx.lifecycle.Lifecycle
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
+import com.olive.app.notification.OliveNotificationManager
 import com.olive.app.ui.CoverLauncher
 import com.olive.app.ui.OliveRoot
 import com.olive.app.ui.OliveTheme
@@ -27,6 +31,8 @@ import com.olive.app.ui.SessionViewModel
 import java.util.function.Consumer
 
 internal fun shouldBlankRecentPreview(protectionEnabled:Boolean,sensitive:Boolean)=protectionEnabled && sensitive
+internal fun shouldApplyTaskIdentity(applied:Pair<CoverType,AccountRole>?,type:CoverType,role:AccountRole)=
+    applied!=(type to role)
 
 // The Android shell is intentionally thin: show Olive and lock it whenever it leaves the foreground.
 class MainActivity : ComponentActivity() {
@@ -39,8 +45,11 @@ class MainActivity : ComponentActivity() {
     private var recordingCallback: Consumer<Int>?=null
     private var recentPrivacyCover:View?=null
     private var privacyCoverEpoch=0
+    private var appliedTaskIdentity:Pair<CoverType,AccountRole>?=null
+    private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        OliveNotificationManager.createNotificationChannels(this)
         CoverLauncher.ensureStudioLauncher(this)
         applyScreenCaptureProtection()
         window.decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
@@ -48,13 +57,23 @@ class MainActivity : ComponentActivity() {
         setContent {
             val selectedCover=session.coverType
             val selectedRole=session.accountRole
+            val notificationAccountId=session.coverAccountId
             LaunchedEffect(selectedCover,selectedRole,session.screen) { applySystemBarContrast(false) }
-            LaunchedEffect(selectedCover,selectedRole) {
+            LaunchedEffect(notificationAccountId,selectedCover,selectedRole) {
                 // Update the open task now; the Home-screen alias changes after the user leaves the app.
                 updateRecentAppIdentity(selectedCover,selectedRole)
+                if(notificationAccountId!=null) requestNotificationPermissionIfNeeded()
+                session.syncLocalNotificationHandler()
             }
             OliveTheme { OliveRoot(session) }
         }
+    }
+
+    // Android 13+ needs one system prompt before cover-branded notifications can appear.
+    private fun requestNotificationPermissionIfNeeded() {
+        if(BuildConfig.FIREBASE_CONFIGURED && Build.VERSION.SDK_INT>=33 &&
+            ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
     // The second Olive slips into the background, the safe area gets covered and locked.
     override fun onPause() {
@@ -165,6 +184,8 @@ class MainActivity : ComponentActivity() {
     // Keep the recent-apps title and icon aligned with the chosen launcher cover.
     @Suppress("DEPRECATION")
     private fun updateRecentAppIdentity(type: CoverType, role: AccountRole) {
+        val identity=type to role
+        if(!shouldApplyTaskIdentity(appliedTaskIdentity,type,role)) return
         val iconId=when {
             role==AccountRole.STAFF || role==AccountRole.ADMIN -> R.mipmap.ic_launcher_tree
             role==AccountRole.SAFE_CONTACT -> R.mipmap.ic_launcher_branch
@@ -179,12 +200,15 @@ class MainActivity : ComponentActivity() {
         }
         // Android uses this title for the active task and screen-capture attribution.
         title=appTitle
-        val icon=ContextCompat.getDrawable(this,iconId) ?: return
-        val bitmap=createBitmap(108,108)
-        icon.setBounds(0,0,108,108)
-        icon.draw(Canvas(bitmap))
         if(Build.VERSION.SDK_INT>=33) setTaskDescription(ActivityManager.TaskDescription.Builder()
             .setLabel(appTitle).setIcon(iconId).build())
-        else setTaskDescription(ActivityManager.TaskDescription(appTitle,bitmap))
+        else {
+            val icon=ContextCompat.getDrawable(this,iconId) ?: return
+            val bitmap=createBitmap(108,108)
+            icon.setBounds(0,0,108,108)
+            icon.draw(Canvas(bitmap))
+            setTaskDescription(ActivityManager.TaskDescription(appTitle,bitmap))
+        }
+        appliedTaskIdentity=identity
     }
 }

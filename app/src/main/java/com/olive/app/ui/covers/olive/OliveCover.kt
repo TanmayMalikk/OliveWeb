@@ -51,6 +51,9 @@ import java.util.Locale
     configured: Boolean = false,
     session: SessionViewModel? = null,
 ) {
+    // HARDCODED OLIVE NOTIFICATION SPOT: edit AppNotifications.kt, then copy the show call into the event that should send it.
+    // val notificationContext=androidx.compose.ui.platform.LocalContext.current
+    // com.olive.app.notification.AppNotifications.showOlive(notificationContext)
     var checkoutNotice by remember { mutableStateOf(false) }
     var areaDialog by remember { mutableStateOf(false) }
     val savedAddress=session?.deliveryAddress ?: com.olive.app.data.DeliveryAddress()

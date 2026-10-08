@@ -35,6 +35,7 @@ abstract class OliveUiTestBase {
     }
     protected fun fill(tag: String, text: String) { compose.onNodeWithTag(tag).performScrollTo().performTextReplacement(text) }
     protected fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick() }
+    protected fun nextOnboarding() { click("onboarding_next") }
     protected fun chooseBirthday() {
         click("dob_year");click("dob_year_2000")
         click("dob_month");click("dob_month_1")
@@ -43,10 +44,11 @@ abstract class OliveUiTestBase {
     protected fun register(pin: String="123456",username: String="olive_tester") {
         waitFor("new_user"); click("new_user")
         fill("username",username); fill("password","test-password-123"); fill("confirm_password","test-password-123")
-        click("credentials_submit"); waitFor("profile_submit")
-        fill("full_name","Test Person"); fill("abuser_name","Test Person Causing Harm"); chooseBirthday(); fill("trigger","moon garden")
+        click("credentials_submit"); waitFor("full_name")
+        fill("full_name","Test Person");chooseBirthday();fill("abuser_name","Test Person Causing Harm");nextOnboarding()
         fill("address_line1","123 Test Street"); fill("address_city","Edmonton")
         fill("address_province","Alberta"); fill("address_postal","T5J 0N3")
+        nextOnboarding();fill("trigger","moon garden");waitFor("profile_submit")
         click("profile_submit"); waitFor("pin_setup_submit")
         fill("new_pin",pin); fill("confirm_pin",pin); click("pin_setup_submit")
         waitCover()

@@ -22,6 +22,11 @@ class EquationSolverTest {
         assertEquals("x = -2, -1, 2",EquationSolver.polynomial("(x + 1)(x^2 - 4) = 0"))
     }
 
+    @Test fun acceptsScientificNotationInSolversAndPolynomialCalculations() {
+        assertEquals("x = 1, 2",EquationSolver.quadratic("E5x^2 - 3e5x + 2x10^5 = 0"))
+        assertEquals("3E9x",EquationSolver.calculatePolynomial("E9x + 2x10^9x"))
+    }
+
     @Test fun calculatesPolynomialArithmeticAndReturnsPolynomialsOrNumbers() {
         assertEquals("2x",EquationSolver.calculatePolynomial("(x + 1) + (x - 1)"))
         assertEquals("2",EquationSolver.calculatePolynomial("(x + 1) - (x - 1)"))

@@ -26,6 +26,8 @@ fun translate(text: String, language: String): String {
     if(language!="French") return text
     french[text]?.let { return it }
     val patterns=listOf(
+        Regex("Step ([0-9]+) of ([0-9]+)") to "Étape %s sur %s",
+        Regex("([0-9]+) of ([0-9]+) required") to "%s sur %s obligatoires",
         Regex("Incorrect PIN. ([0-9]+) attempts remaining\\.") to "NIP incorrect. %s tentatives restantes.",
         Regex("PIN attempt history · ([0-9]+)") to "Historique des tentatives de NIP · %s",
         Regex("Future feature ([0-9]+)") to "Fonction future %s",
@@ -35,10 +37,60 @@ fun translate(text: String, language: String): String {
         Regex("News near (.+)") to "Actualités près de %s",
         Regex("No activity. Returning to your cover in ([0-9]+) seconds\\.") to "Aucune activité. Retour à l’application de couverture dans %s secondes."
     )
-    for((pattern,format) in patterns) pattern.matchEntire(text)?.let { return format.format(it.groupValues[1]) }
+    for((pattern,format) in patterns) pattern.matchEntire(text)?.let {
+        return format.format(*it.groupValues.drop(1).toTypedArray())
+    }
     return text
 }
 private val french = """
+Next|Suivant
+Finish|Terminer
+About you|À propos de vous
+Birthday & language|Date de naissance et langue
+Personal details|Renseignements personnels
+Contact details|Coordonnées
+Situation & support|Situation et soutien
+Safe entry & cover|Accès sécurisé et couverture
+Choose your cover app|Choisissez votre application de couverture
+Situation|Situation
+Location|Emplacement
+Safe entry|Accès sécurisé
+Safe contact|Contact de confiance
+Cover app|Application de couverture
+Letters, numbers or _|Lettres, chiffres ou _
+8–24 characters|8 à 24 caractères
+At least 1 letter|Au moins 1 lettre
+At least 1 number|Au moins 1 chiffre
+At least 1 special character|Au moins 1 caractère spécial
+Case-sensitive|Sensible à la casse
+Passwords match|Les mots de passe correspondent
+Invalid username|Nom d’utilisateur invalide
+Username taken|Nom d’utilisateur utilisé
+Invalid password|Mot de passe invalide
+Incorrect password|Mot de passe incorrect
+Password required|Mot de passe requis
+Passwords differ|Mots de passe différents
+Name required|Nom requis
+Birthday required|Date de naissance requise
+City required|Ville requise
+Invalid trigger|Déclencheur invalide
+Complete both fields|Remplissez les deux champs
+Invalid email|Courriel invalide
+Invalid PIN|NIP invalide
+PINs differ|NIP différents
+3–64 characters|3 à 64 caractères
+Spaces and case ignored|Espaces et casse ignorés
+4–6 digits|4 à 6 chiffres
+PINs match|Les NIP correspondent
+Only your city is required.|Seule votre ville est obligatoire.
+Brief description (optional)|Brève description (facultatif)
+Contact name (optional)|Nom du contact (facultatif)
+Phone or email (optional)|Téléphone ou courriel (facultatif)
+Add one or more trusted people. Olive never contacts them automatically.|Ajoutez une ou plusieurs personnes de confiance. Olive ne les contacte jamais automatiquement.
+Add another contact|Ajouter un autre contact
+Name and icon update after leaving the app.|Le nom et l’icône changent après avoir quitté l’application.
+Choose your trigger word.|Choisissez votre mot déclencheur.
+Create your device PIN.|Créez le NIP de cet appareil.
 Use shipping address|Utiliser l’adresse de livraison
 Enter a complete shipping address.|Saisissez une adresse de livraison complète.
 Recipient name is required.|Le nom du destinataire est obligatoire.
@@ -52,6 +104,10 @@ Local|Local
 Global|Monde
 Local edition|Édition locale
 Global edition|Édition mondiale
+Change local news location|Modifier l’emplacement des nouvelles locales
+City or region|Ville ou région
+This changes the local news search on this device.|Cela modifie la recherche de nouvelles locales sur cet appareil.
+Use device location|Utiliser l’emplacement de l’appareil
 Search headlines|Rechercher des manchettes
 Search saved stories|Rechercher dans les articles enregistrés
 Latest stories|Dernières nouvelles
@@ -263,7 +319,7 @@ Sign in with your existing username and password.|Connectez-vous avec votre nom 
 Username|Nom d’utilisateur
 Password|Mot de passe
 Confirm password|Confirmer le mot de passe
-Passwords use 8–24 characters and are case-sensitive. Usernames are unique, ignore letter case, and use letters, numbers and underscores. No email or phone number needed.|Les mots de passe comportent de 8 à 24 caractères et distinguent les majuscules. Les noms d’utilisateur sont uniques, sans distinction de casse, et utilisent lettres, chiffres et traits de soulignement. Aucun courriel ni numéro de téléphone requis.
+Passwords use 8–24 characters with at least one letter, number and special character. Usernames use 8–24 letters, numbers and underscores.|Les mots de passe comportent de 8 à 24 caractères avec au moins une lettre, un chiffre et un caractère spécial. Les noms d’utilisateur comportent de 8 à 24 lettres, chiffres et traits de soulignement.
 Keep your credentials somewhere safe. You can change your password later in safe Settings.|Conservez vos identifiants en lieu sûr. Vous pourrez changer votre mot de passe dans les paramètres sécurisés.
 The passwords do not match.|Les mots de passe ne correspondent pas.
 Create account|Créer le compte
@@ -323,13 +379,16 @@ Search activity between optional local date and time values.|Recherchez l’acti
 See more|Voir plus
 Notes & incidents|Notes et incidents
 Notes & incident documentation|Notes et documentation d’incidents
-ScratchPad|Bloc-notes supprimées
+Trash|Corbeille
+For testing, deleted notes stay here for 10 seconds before their private contents are permanently erased.|Pour les essais, les notes supprimées restent ici pendant 10 secondes avant que leur contenu privé soit définitivement effacé.
 Deleted notes stay here for 30 days, then their private contents are permanently erased.|Les notes supprimées restent ici pendant 30 jours, puis leur contenu privé est effacé définitivement.
-ScratchPad is empty.|Le bloc-notes supprimées est vide.
+Trash is empty.|La corbeille est vide.
 Restore|Restaurer
 days remaining|jours restants
-Moved to ScratchPad for 30 days.|Déplacé vers le bloc-notes supprimées pendant 30 jours.
-Restored from ScratchPad.|Restauré depuis le bloc-notes supprimées.
+Moved to Trash for 10 seconds.|Déplacé dans la corbeille pendant 10 secondes.
+Moved to Trash for 30 days.|Déplacé dans la corbeille pendant 30 jours.
+Restored from Trash.|Restauré depuis la corbeille.
+seconds remaining|secondes restantes
 Edit private entry|Modifier l’entrée privée
 Write private notes or document incidents. Entries are shown only inside Olive Branch and sync to your account.|Écrivez des notes privées ou documentez des incidents. Les entrées sont affichées uniquement dans Olive Branch et se synchronisent avec votre compte.
 Note|Note
@@ -411,8 +470,8 @@ Expiry · MM/YY|Expiration · MM/AA
 Security code|Code de sécurité
 Billing address|Adresse de facturation
 Place order|Passer la commande
-Use 4–24 letters, numbers or underscores for your username.|Utilisez de 4 à 24 lettres, chiffres ou traits de soulignement pour votre nom d’utilisateur.
-Use a password of 8–24 characters.|Utilisez un mot de passe de 8 à 24 caractères.
+Use 8–24 letters, numbers or underscores for your username.|Utilisez de 8 à 24 lettres, chiffres ou traits de soulignement pour votre nom d’utilisateur.
+Use 8–24 characters with a letter, number and special character.|Utilisez de 8 à 24 caractères avec une lettre, un chiffre et un caractère spécial.
 Enter your password.|Saisissez votre mot de passe.
 Unable to sign in. Check your credentials and connection, then try again.|Connexion impossible. Vérifiez vos identifiants et votre connexion, puis réessayez.
 Full name, a valid date of birth, language and location are required.|Le nom complet, une date de naissance valide, la langue et l’emplacement sont obligatoires.
@@ -430,7 +489,6 @@ Enter a trigger of 3–64 characters and your 4–6 digit PIN.|Saisissez un déc
 Unable to change the trigger. Please retry.|Impossible de changer le déclencheur. Réessayez.
 Trigger word changed.|Mot déclencheur modifié.
 Enter your current password.|Saisissez votre mot de passe actuel.
-Use a new password of 8–24 characters.|Utilisez un nouveau mot de passe de 8 à 24 caractères.
 The new passwords do not match.|Les nouveaux mots de passe ne correspondent pas.
 Unable to change the password. Check your current password and connection.|Impossible de changer le mot de passe. Vérifiez votre mot de passe actuel et votre connexion.
 Password changed.|Mot de passe modifié.

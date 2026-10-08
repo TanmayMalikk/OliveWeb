@@ -3,15 +3,16 @@ package com.olive.app.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import java.math.BigDecimal
-import java.math.MathContext
-import kotlin.math.abs
-import kotlin.math.round
+data class CalculatorHistoryEntry(val expression:String,val result:String)
 
 // Build the visible equation here and wait for equals before calculating it locally.
-class CalculatorInput {
+class CalculatorInput(
+    initialHistory:List<CalculatorHistoryEntry> = emptyList(),
+    private val onHistoryChanged:(List<CalculatorHistoryEntry>)->Unit = {},
+) {
     var display by mutableStateOf("0"); private set
     var expression by mutableStateOf(""); private set
+    var history by mutableStateOf(initialHistory); private set
     private var evaluated=false
     private var armedPin:String?=null
     private var angleMode=CalculatorAngleMode.RADIANS
@@ -95,7 +96,9 @@ class CalculatorInput {
         val normalized=source.replace('−','-')
             .replace("√","sqrt").replace("π","pi")
             .replace("sin⁻¹","asin").replace("cos⁻¹","acos").replace("tan⁻¹","atan")
-        display=runCatching { GraphExpression.compile(normalized,angleMode).evaluate(0.0).format() }.getOrDefault("Error")
+        display=runCatching { formatCalculatorNumber(GraphExpression.compile(normalized,angleMode).evaluate(0.0)) }.getOrDefault("Error")
+        if(display!="Error" && armedPin==null)
+            updateHistory(listOf(CalculatorHistoryEntry(source,display))+history)
         expression="$source ="
         evaluated=true
         return null
@@ -111,17 +114,28 @@ class CalculatorInput {
         evaluated=false
     }
 
+    fun reuse(entry:CalculatorHistoryEntry) {
+        expression=entry.expression.take(MAX_EXPRESSION_LENGTH)
+        display=expression.ifBlank { "0" }
+        evaluated=false
+        armedPin=null
+    }
+
+    fun clearHistory()=updateHistory(emptyList())
+
+    // Disk history arrives after the keypad is already interactive.
+    fun restoreHistory(value:List<CalculatorHistoryEntry>) {
+        history=if(history.isEmpty()) value else (history+value).distinct()
+    }
+
+    private fun updateHistory(value:List<CalculatorHistoryEntry>) {
+        history=value
+        onHistoryChanged(value)
+    }
+
     private fun canEndValue()=expression.lastOrNull()?.let { it.isDigit() || it==')' || it=='%' }==true
     private fun needsLeadingZero()=expression.isBlank() || expression.lastOrNull() in operatorCharacters || expression.lastOrNull()=='('
     private fun currentNumber()=expression.takeLastWhile { it.isDigit() || it=='.' }
-
-    private fun Double.format():String {
-        if(!isFinite()) return "Error"
-        val cleaned=when { abs(this)<1e-12 -> 0.0;abs(this-round(this))<1e-12 -> round(this);else -> this }
-        val number=BigDecimal.valueOf(cleaned).stripTrailingZeros()
-        val plain=number.toPlainString()
-        return if(plain.length<=18) plain else number.round(MathContext(10)).stripTrailingZeros().toString()
-    }
 
     private companion object {
         const val MAX_EXPRESSION_LENGTH=120
