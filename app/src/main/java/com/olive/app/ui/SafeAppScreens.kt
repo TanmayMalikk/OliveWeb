@@ -69,6 +69,7 @@ import java.time.LocalDate
 import java.time.Month
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 
 // USER + SAFE CONTACT: Olive Branch routes to the private profile, settings, notes, activity, and messaging features.
@@ -391,7 +392,7 @@ import java.util.UUID
     var trashOpen by remember { mutableStateOf(false) }
     val language=LocalOliveLanguage.current
     val formatter=remember(language) { DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm z",
-        if(language=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault()) }
+        Locale.forLanguageTag(getLanguageTag(language))).withZone(ZoneId.systemDefault()) }
     fun openEditor(entry: PrivateEntry?) {
         session.clearPrivateEntryStatus()
         editingId=entry?.id;kind=entry?.kind;title=entry?.title.orEmpty();body=entry?.body.orEmpty();editorOpen=true
@@ -627,10 +628,11 @@ import java.util.UUID
     var open by remember { mutableStateOf(false) }
     val keyboard=LocalSoftwareKeyboardController.current
     val focus=LocalFocusManager.current
+    val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese")
     Box {
-        OutlinedButton(onClick={keyboard?.hide();focus.clearFocus(force=true);open=true},enabled=enabled,modifier=Modifier.fillMaxWidth().testTag("language")) { LocalizedText("Language (required)"); Spacer(Modifier.weight(1f)); LocalizedText(if(value=="French") "Français" else "English") }
+        OutlinedButton(onClick={keyboard?.hide();focus.clearFocus(force=true);open=true},enabled=enabled,modifier=Modifier.fillMaxWidth().testTag("language")) { LocalizedText("Language (required)"); Spacer(Modifier.weight(1f)); LocalizedText(getDisplayLanguage(value)) }
         DropdownMenu(expanded=open,onDismissRequest={open=false}) {
-            listOf("English","French").forEach { language -> DropdownMenuItem(text={LocalizedText(if(language=="French") "Français" else "English")},onClick={onChange(language);open=false}) }
+            supportedLanguages.forEach { language -> DropdownMenuItem(text={LocalizedText(getDisplayLanguage(language))},onClick={onChange(language);open=false}) }
         }
     }
 }
@@ -706,7 +708,7 @@ import java.util.UUID
     var showTime by remember { mutableStateOf(false) }
     var pendingDate by remember { mutableStateOf<LocalDate?>(null) }
     val zone=ZoneId.systemDefault()
-    val locale=if(LocalOliveLanguage.current=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA
+    val locale= Locale.forLanguageTag(getLanguageTag(LocalOliveLanguage.current))
     val display=value?.let { DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm",locale).withZone(zone).format(Instant.ofEpochMilli(it)) }
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick={showDate=true},modifier=Modifier.weight(1f).testTag(tag),contentPadding=PaddingValues(horizontal=14.dp,vertical=12.dp)) {
@@ -751,7 +753,7 @@ import java.util.UUID
 @Composable private fun ActivityHistory(session: SessionViewModel) {
     val language=LocalOliveLanguage.current
     val formatter=DateTimeFormatter.ofPattern("MMM d, yyyy · HH:mm:ss z",
-        if(language=="French") java.util.Locale.CANADA_FRENCH else java.util.Locale.CANADA).withZone(ZoneId.systemDefault())
+        Locale.forLanguageTag(getLanguageTag(language))).withZone(ZoneId.systemDefault())
     var from by remember { mutableStateOf<Long?>(null) }
     var to by remember { mutableStateOf<Long?>(null) }
     fun inRange(time: Long)=(from==null || time>=from!!) && (to==null || time<=to!!+59_999)
