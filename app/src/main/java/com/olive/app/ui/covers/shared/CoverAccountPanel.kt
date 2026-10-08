@@ -3,7 +3,6 @@ package com.olive.app.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
@@ -16,16 +15,9 @@ import androidx.compose.ui.unit.dp
         LocalizedText("@${session.coverUsername}")
         OutlinedTextField(fullName,{fullName=it.take(120)},label={LocalizedText("Full name")},singleLine=true,
             modifier=Modifier.fillMaxWidth().onFocusChanged { if(it.isFocused) session.recordSettingsInteraction("Daily Digest","Focused full name") })
-        Row(verticalAlignment=Alignment.CenterVertically) {
-            LocalizedText("App language",modifier=Modifier.weight(1f))
-            TextButton(onClick={
-                session.recordSettingsInteraction("Daily Digest","Selected language")
-                val langs = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese")
-                val nextIdx = (langs.indexOf(language).takeIf { it >= 0 } ?: 0) + 1
-                language = langs[nextIdx % langs.size]
-            }) {
-                LocalizedText(getDisplayLanguage(language))
-            }
+        CoverLanguagePicker(value = language, enabled = !session.busy) {
+            session.recordSettingsInteraction("Daily Digest","Selected language")
+            language = it
         }
         Button(onClick={session.saveCoverSettings(fullName,language)},enabled=!session.busy && fullName.isNotBlank(),modifier=Modifier.fillMaxWidth()) {
             LocalizedText("Save account settings")

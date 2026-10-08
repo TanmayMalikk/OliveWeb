@@ -33,13 +33,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.olive.app.data.Dish
 import com.olive.app.data.OrderLine
-import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@Composable private fun money(cents: Int): String = NumberFormat.getCurrencyInstance(Locale.forLanguageTag(getLanguageTag(LocalOliveLanguage.current))).format(cents / 100.0)
+@Composable private fun money(cents: Int): String = "$%.2f".format(Locale.US, cents / 100.0)
 
 // Change cover navigation, tabs, address popup, or checkout entry in this main food-app section.
 // UI sizing/color: the cover shell uses Cream, shared Olive colors, safe-area insets, and Material navigation sizing.
@@ -273,7 +272,7 @@ import java.util.Locale
 
 // Add a cover language here only after its text is added in Localization and the safe picker.
 // UI sizing/text: this picker fills the account card so translated language names have room.
-@Composable private fun CoverLanguagePicker(value: String, enabled: Boolean, onChange: (String)->Unit) {
+@Composable internal fun CoverLanguagePicker(value: String, enabled: Boolean = true, onChange: (String)->Unit) {
     var open by remember { mutableStateOf(false) }
     val keyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val focus=androidx.compose.ui.platform.LocalFocusManager.current
