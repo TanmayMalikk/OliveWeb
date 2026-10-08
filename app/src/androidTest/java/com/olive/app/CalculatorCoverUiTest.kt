@@ -16,7 +16,9 @@ class CalculatorCoverUiTest {
     private lateinit var session:SessionViewModel
 
     @Before fun showCalculator() {
-        session=SessionViewModel(ApplicationProvider.getApplicationContext())
+        val context=ApplicationProvider.getApplicationContext<android.content.Context>()
+        context.getSharedPreferences("better_calculator_history",android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        session=SessionViewModel(context as android.app.Application)
         compose.setContent { OliveTheme { CalculatorCover(session) } }
     }
 
@@ -51,5 +53,27 @@ class CalculatorCoverUiTest {
         compose.onNodeWithTag("calc_key_sin").assertExists()
         compose.onNodeWithTag("calc_key_7").assertExists()
         compose.onNodeWithTag("calc_key_equals").assertExists()
+    }
+
+    @Test fun calculationHistoryRestoresTheSelectedExpression() {
+        compose.onNodeWithTag("calc_key_2").performClick()
+        compose.onNodeWithTag("calc_key_+").performClick()
+        compose.onNodeWithTag("calc_key_3").performClick()
+        compose.onNodeWithTag("calc_key_equals").performClick()
+        compose.onNodeWithTag("calculator_history_0").assertExists()
+        compose.onNodeWithTag("calc_key_clear").performClick()
+        compose.onNodeWithTag("calculator_history_0").performClick()
+        compose.onNodeWithTag("calculator_display").assertTextEquals("2+3")
+    }
+
+    @Test fun clearHistoryRemovesEveryVisibleCalculation() {
+        compose.onNodeWithTag("calc_key_9").performClick()
+        compose.onNodeWithTag("calc_key_equals").performClick()
+        compose.onNodeWithTag("calculator_history_0").assertExists()
+
+        compose.onNodeWithTag("clear_calculator_history").performClick()
+
+        compose.onNodeWithTag("calculator_history_0").assertDoesNotExist()
+        compose.onNodeWithTag("clear_calculator_history").assertDoesNotExist()
     }
 }

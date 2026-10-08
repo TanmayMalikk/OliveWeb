@@ -13,8 +13,19 @@ data class FoodCoverState(
 
 // Keep cover favourites, bookmarks, and cart on this phone under the account ID.
 class CoverStateStore(private val vault: EncryptedVault) {
+    // Restore all cover state from one decrypted snapshot during a cold launch.
+    fun restore(uid:String):Pair<FoodCoverState,List<NewsArticle>> {
+        val root=vault.read()
+        val item=root.optJSONObject("accounts")?.optJSONObject(uid) ?: return FoodCoverState() to emptyList()
+        return foodFrom(item) to newsFrom(item)
+    }
+
     fun food(uid: String): FoodCoverState {
         val item=vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return FoodCoverState()
+        return foodFrom(item)
+    }
+
+    private fun foodFrom(item:JSONObject):FoodCoverState {
         val cart=item.optJSONObject("cart") ?: JSONObject()
         val saved=item.optJSONArray("favorites") ?: JSONArray()
         val choices=item.optJSONObject("customizations") ?: JSONObject()
@@ -36,7 +47,12 @@ class CoverStateStore(private val vault: EncryptedVault) {
         }
     }
     fun news(uid: String): List<NewsArticle> {
-        val rows=vault.read().optJSONObject("accounts")?.optJSONObject(uid)?.optJSONArray("news") ?: JSONArray()
+        val item=vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return emptyList()
+        return newsFrom(item)
+    }
+
+    private fun newsFrom(item:JSONObject):List<NewsArticle> {
+        val rows=item.optJSONArray("news") ?: JSONArray()
         return (0 until rows.length()).mapNotNull { runCatching { NewsArticle.fromJson(rows.getJSONObject(it)) }.getOrNull() }
     }
     fun saveNews(uid: String, articles: List<NewsArticle>) {

@@ -4,7 +4,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// UI colors: change these named tokens to recolor every screen that uses the shared theme instead of editing individual composables.
+// UI colors: change these named vars to recolor every screen that uses the shared theme instead of editing individual composables.
 val OliveGreen = Color(0xFF45613C)
 val Ink = Color(0xFF253322)
 val Cream = Color(0xFFFAF9F5)

@@ -32,6 +32,8 @@ interface AccountRepository {
 class LocalAccountRepository(private val vault: EncryptedVault) : AccountRepository {
     private fun key(username: String, role: AccountRole) = "${role.name}:${InputPolicy.username(username)}"
     override suspend fun create(username: String, password: String, role: AccountRole) = withContext(Dispatchers.IO) {
+        require(InputPolicy.validUsername(username)) { "Invalid username" }
+        require(InputPolicy.validPassword(password)) { "Invalid password" }
         val identity = AccountIdentity(UUID.randomUUID().toString(), InputPolicy.username(username))
         val verifier = SecretVerifier.create(password)
         vault.update { root ->
@@ -59,6 +61,7 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
     override suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord) = Unit
     override suspend fun historyRecords(identity: AccountIdentity) = emptyList<HistoryRecord>()
     override suspend fun changePassword(identity: AccountIdentity, currentPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
+        require(InputPolicy.validPassword(newPassword)) { "Invalid password" }
         vault.update { root ->
             val records=root.getJSONObject("accounts")
             val account=AccountRole.entries.asSequence().mapNotNull { records.optJSONObject(key(identity.username,it)) }
@@ -82,6 +85,8 @@ class FirebaseAccountRepository : AccountRepository {
     private fun historyFolder(uid: String, category: String) = storage.reference.child("accounts/$uid/history/$category")
     // Change this alias only with an account migration or existing usernames will stop signing in.
     override suspend fun create(username: String, password: String, role: AccountRole): AccountIdentity {
+        require(InputPolicy.validUsername(username)) { "Invalid username" }
+        require(InputPolicy.validPassword(password)) { "Invalid password" }
         val user = auth.createUserWithEmailAndPassword(AccountPolicy.signInEmail(username,role),password).await().user ?: error("Missing account")
         user.updateProfile(com.google.firebase.auth.UserProfileChangeRequest.Builder().setDisplayName(InputPolicy.username(username)).build()).await()
         return AccountIdentity(user.uid,InputPolicy.username(username))
@@ -106,7 +111,7 @@ class FirebaseAccountRepository : AccountRepository {
             functions.getHttpsCallable("restoreOrganizationLoginAlias").call().await()
             user.reload().await()
         }
-        val accountName=user.displayName?.takeIf(InputPolicy::validUsername)
+        val accountName=user.displayName?.takeIf(InputPolicy::validExistingUsername)
             ?: user.email?.substringBefore('@')?.let(InputPolicy::username).orEmpty()
         return AccountIdentity(user.uid,accountName)
     }
@@ -163,6 +168,7 @@ class FirebaseAccountRepository : AccountRepository {
         }
     }
     override suspend fun changePassword(identity: AccountIdentity, currentPassword: String, newPassword: String) {
+        require(InputPolicy.validPassword(newPassword)) { "Invalid password" }
         val user=auth.currentUser ?: error("Sign in again before changing your password")
         check(user.uid==identity.uid) { "Sign in again before changing your password" }
         val currentEmail=user.email ?: error("This account has no sign-in email")
@@ -170,7 +176,7 @@ class FirebaseAccountRepository : AccountRepository {
         user.updatePassword(newPassword).await()
     }
     override fun authenticatedUid(): String? = auth.currentUser?.uid
-    override fun authenticatedUsername(): String? = auth.currentUser?.displayName?.takeIf(InputPolicy::validUsername)
+    override fun authenticatedUsername(): String? = auth.currentUser?.displayName?.takeIf(InputPolicy::validExistingUsername)
         ?: auth.currentUser?.email?.substringBefore('@')?.let(InputPolicy::username)
     override fun signOut() = auth.signOut()
 

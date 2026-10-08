@@ -10,8 +10,7 @@ class GraphExpression private constructor(private val root: Node) {
 
     companion object {
         fun compile(input: String, angleMode: CalculatorAngleMode=CalculatorAngleMode.RADIANS): GraphExpression {
-            val expression=input.trim().replaceFirst(Regex("^[yY]\\s*=\\s*"),"").trim()
-                .replace(Regex("(?i)([0-9]+(?:\\.[0-9]+)?)\\s*(?:x|×)\\s*10\\s*\\^\\s*([+-]?[0-9]+)")) { "${it.groupValues[1]}e${it.groupValues[2]}" }
+            val expression=normalizeCalculatorNotation(input).trim().replaceFirst(Regex("^[yY]\\s*=\\s*"),"").trim()
             require(expression.isNotBlank()) { "Enter an equation after y =." }
             return GraphExpression(Parser(expression,angleMode).parse())
         }

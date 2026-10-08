@@ -96,9 +96,9 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
         Button(onClick={session.updateOrganizationProfile(fullName,dob,email,phone)},enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { LocalizedText("Save profile") }
         HorizontalDivider()
         LocalizedText("Change password",style=MaterialTheme.typography.titleLarge)
-        Field("Current password",currentPassword,"organization_current_password",secret=true,enabled=!session.busy) { currentPassword=it.take(128) }
-        Field("New password",newPassword,"organization_new_password",secret=true,enabled=!session.busy) { newPassword=it.take(24) }
-        Field("Confirm new password",confirmation,"organization_confirm_password",secret=true,enabled=!session.busy) { confirmation=it.take(24) }
+        Field("Current password",currentPassword,"organization_current_password",secret=true,showSecretToggle=true,enabled=!session.busy) { currentPassword=it.take(128) }
+        Field("New password",newPassword,"organization_new_password",secret=true,showSecretToggle=true,enabled=!session.busy) { newPassword=it.take(24) }
+        Field("Confirm new password",confirmation,"organization_confirm_password",secret=true,showSecretToggle=true,enabled=!session.busy) { confirmation=it.take(24) }
         Button(onClick={session.changePassword(currentPassword,newPassword,confirmation)},enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { LocalizedText("Change password") }
         Status(session)
     }
@@ -145,7 +145,7 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
                 ExposedDropdownMenu(roleOpen,{roleOpen=false}) { AccountRole.entries.forEach { item -> DropdownMenuItem(text={LocalizedText(item.title)},onClick={role=item;roleOpen=false}) } }
             }
             Field("Username",username,"admin_username") { username=it.take(24) }
-            Field("Temporary password",password,"admin_password",secret=true) { password=it.take(24) }
+            Field("Temporary password",password,"admin_password",secret=true,showSecretToggle=true) { password=it.take(24) }
             HorizontalDivider();LocalizedText("Optional onboarding details",style=MaterialTheme.typography.titleMedium)
             Field("Full name",fullName,"admin_full_name") { fullName=it.take(120) }
             BirthdayPicker(dob,"admin_dob",true) { dob=it }

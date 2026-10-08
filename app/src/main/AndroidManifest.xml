@@ -6,15 +6,18 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING" />
     <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application android:allowBackup="false" android:label="@string/app_name"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/ic_app_info_blank" android:roundIcon="@drawable/ic_app_info_blank"
         android:supportsRtl="true" android:theme="@style/Theme.Olive">
         <activity android:name=".MainActivity" android:exported="false" android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
             tools:ignore="LockedOrientationActivity,DiscouragedApi" />
         <!-- Android Studio can always use this entry point, even after the user changes covers. -->
         <activity android:name=".OliveLauncher" android:exported="true" android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
             tools:ignore="LockedOrientationActivity,DiscouragedApi" />
         <activity-alias android:name=".FoodLauncher" android:targetActivity=".MainActivity"
             android:exported="true" android:enabled="true" android:label="Olive"
