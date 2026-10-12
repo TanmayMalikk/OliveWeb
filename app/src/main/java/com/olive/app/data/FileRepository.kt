@@ -51,7 +51,7 @@ class FileRepository {
 
         } catch (e: Exception) {
             uploadedPath?.let { path -> runCatching { storage.reference.child(path).delete().await() } }
-            // If the upload fails (e.g., WiFi drops), log it and return false
+            // If the upload fails (e.g., Wi-Fi drops), log it and return false
             e.printStackTrace()
             false
         }

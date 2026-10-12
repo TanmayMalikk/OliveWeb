@@ -53,7 +53,7 @@ service cloud.firestore {
 
     function validProfile(p) {
 
-      return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts'])
+      return p.keys().hasAll(['username','fullName','affectedNames','dob','language','situation','region','triggerHash','contacts', 'address', 'cover_app'])
 
         && p.keys().hasOnly(['username','fullName','affectedNames','abuserName','dob','language','situation','region','triggerHash','contacts','address','role','coverType','cover_app','email','phone'])
 

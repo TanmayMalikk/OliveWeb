@@ -53,6 +53,7 @@ data class ChatMessage(
     val unsent: Boolean = false,
 )
 
+// Required interface for the UI to close the Firestore listener when the user leaves the screen
 fun interface ChatSubscription { fun close() }
 
 // Firestore handles friend state and live DMs while message bodies stay out of its on-device disk cache.
