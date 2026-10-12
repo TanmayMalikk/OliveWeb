@@ -1,4 +1,6 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.olive
+
+import com.olive.app.ui.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -50,9 +52,6 @@ import java.util.Locale
     configured: Boolean = false,
     session: SessionViewModel? = null,
 ) {
-    // HARDCODED OLIVE NOTIFICATION SPOT: edit AppNotifications.kt, then copy the show call into the event that should send it.
-    // val notificationContext=androidx.compose.ui.platform.LocalContext.current
-    // com.olive.app.notification.AppNotifications.showOlive(notificationContext)
     var checkoutNotice by remember { mutableStateOf(false) }
     var areaDialog by remember { mutableStateOf(false) }
     val savedAddress=session?.deliveryAddress ?: com.olive.app.data.DeliveryAddress()
@@ -278,9 +277,8 @@ import java.util.Locale
 @Composable internal fun CoverLanguagePicker(value: String, enabled: Boolean = true, onChange: (String)->Unit) {
     var open by remember { mutableStateOf(false) }
     val keyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
-    val focus=androidx.compose.ui.platform.LocalFocusManager.current
-    //TODO: add Cree to this list when Cree translation complete
-    val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese")
+    val focus=LocalFocusManager.current
+    val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese", "Cree")
     Box(Modifier.fillMaxWidth()) {
         OutlinedButton(onClick={keyboard?.hide();focus.clearFocus(force=true);open=true},enabled=enabled,modifier=Modifier.fillMaxWidth().testTag("cover_language")) {
             LocalizedText("App language")

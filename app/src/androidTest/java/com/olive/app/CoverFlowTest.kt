@@ -2,7 +2,7 @@ package com.olive.app
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import com.olive.app.ui.OliveCover
+import com.olive.app.ui.covers.olive.OliveCover
 import com.olive.app.ui.OliveTheme
 import org.junit.Before
 import org.junit.Rule

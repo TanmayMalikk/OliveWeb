@@ -21,6 +21,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, TriggerSetup, OrganizationProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
 enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity }
@@ -476,7 +477,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
 
     private fun queueAdminRefresh() {
         viewModelScope.launch {
-            while(busy) delay(50)
+            while(busy) delay(50.milliseconds)
             if(screen==SessionScreen.Portal && accountRole==AccountRole.ADMIN) refreshAdminAccounts()
         }
     }
@@ -737,7 +738,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         if(accountRole==AccountRole.USER) quickExit()
         privacyBlackout=true
         if(kind=="Screenshot") viewModelScope.launch {
-            delay(1_500)
+            delay(1_500.milliseconds)
             privacyBlackout=false
         }
         if(uid==null) return
@@ -755,7 +756,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         noteInteraction()
         idleJob=viewModelScope.launch {
             while(screen==SessionScreen.Safe) {
-                delay(250)
+                delay(250.milliseconds)
                 val countdown=IdlePolicy.countdown(SystemClock.elapsedRealtime()-lastTouchAt)
                 if(countdown==0) { quickExit();break }
                 idleCountdownSeconds=countdown
@@ -884,7 +885,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L) "Moved to Trash for 10 seconds." else "Moved to Trash for 30 days.")
         val uid=enrollment?.uid ?: return
         viewModelScope.launch {
-            delay(PRIVATE_ENTRY_TRASH_RETENTION_MS+100L)
+            delay((PRIVATE_ENTRY_TRASH_RETENTION_MS+100L).milliseconds)
             val purged=withContext(Dispatchers.IO) { store.purgeExpiredPrivateEntries(uid) }
             if(purged && enrollment?.uid==uid) {
                 privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
@@ -925,7 +926,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private fun loadCloudHistory(uid: String, username: String) {
         viewModelScope.launch {
             // Paint the local cover first; cloud reconciliation does not belong on the launch critical path.
-            delay(1_000)
+            delay(1_000.milliseconds)
             val identity=AccountIdentity(uid,username)
             // Messaging registration failing must never block the existing profile/history sync path.
             runCatching { registerMessagingIdentity(identity) }
@@ -944,7 +945,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         val uid=enrollment!!.uid
         val username=coverUsername
         historySyncJob=viewModelScope.launch {
-            delay(750)
+            delay(750.milliseconds)
             historySyncMutex.withLock {
                 while(enrollment?.uid==uid) {
                     val pending=withContext(Dispatchers.IO) { store.pendingHistory(uid) }
@@ -998,7 +999,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         recordSettingsInteraction("Olive Branch","Pressed save profile settings")
         if(fullName.isBlank() || !InputPolicy.validDob(dob) || selectedLanguage.isBlank() || !address.locationValid) { message="Full name, a valid date of birth, language and city are required."; return }
         val updated=profile?.copy(fullName=fullName.trim(),affectedNames=affected.trim(),abuserName=abuserName.trim(),dob=dob,language=selectedLanguage,situation=situation.trim(),region=address.generalLocation,address=address) ?: return
-        saveSafeProfile(updated,"Saved profile settings")
+        saveSafeProfile(updated)
     }
     // Cover settings save only normal food-app details; edit their form in OliveApp.Account.
     fun saveCoverSettings(fullName: String, selectedLanguage: String) {
@@ -1025,12 +1026,12 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             if(!localMode) syncProfile(device.uid,updated,token)
         }
     }
-    private fun saveSafeProfile(updated: UserProfile, action: String) {
+    private fun saveSafeProfile(updated: UserProfile) {
         val device=enrollment ?: return
         val before=profile ?: return
         runOperation("Unable to save profile changes.") { token ->
             withContext(Dispatchers.IO) { store.cacheProfile(device.uid,updated,pending=!localMode,
-                audit=SettingsEvent(area="Olive Branch",action=action,changes=profileChanges(before,updated))) }
+                audit=SettingsEvent(area="Olive Branch",action="Saved profile settings",changes=profileChanges(before,updated))) }
             if(epoch==token) { profile=updated; coverFullName=updated.fullName; language=updated.language; deliveryAddress=updated.address; pendingSync=!localMode; message="Changes saved." }
             queueHistorySync()
             if(!localMode) syncProfile(device.uid,updated,token)
@@ -1129,7 +1130,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
     private suspend fun syncProfile(uid: String, value: UserProfile, token: Long) {
         try {
-            withTimeout(15_000) { accounts.saveProfile(AccountIdentity(uid,value.username),value) }
+            withTimeout(15_000.milliseconds) { accounts.saveProfile(AccountIdentity(uid,value.username),value) }
             withContext(Dispatchers.IO) { store.markSynced(uid) }
             if(epoch == token) { pendingSync=false; message="Changes synced." }
         } catch(e: CancellationException) { throw e }
@@ -1152,7 +1153,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                     store.forgetDevice()
                 }
                 if(!localMode) runCatching {
-                    withTimeoutOrNull(2_000) {
+                    withTimeoutOrNull(2_000.milliseconds) {
                         store.pendingHistory(uid).forEach { record ->
                             accounts.saveHistoryRecord(AccountIdentity(uid,coverUsername),record)
                             withContext(Dispatchers.IO) { store.markHistorySynced(uid,record) }
@@ -1173,7 +1174,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         operationJob=viewModelScope.launch {
             val runningJob=coroutineContext.job
             var finalFailure: String? = null
-            try { withTimeout(25_000) { block(token) } }
+            try { withTimeout(25_000.milliseconds) { block(token) } }
             catch(_: TimeoutCancellationException) { if(epoch == token) finalFailure="The operation timed out. Check your connection and retry; your account may already exist." }
             catch(e: CancellationException) { throw e }
             catch(_: Exception) { if(epoch == token) finalFailure=failure }

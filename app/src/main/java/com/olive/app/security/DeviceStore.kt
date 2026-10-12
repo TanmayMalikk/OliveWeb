@@ -143,7 +143,10 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
     }
     private fun attemptsFrom(root: JSONObject, uid: String): List<FailedAttempt> {
         val entries = root.optJSONObject("attempts")?.optJSONArray(uid) ?: JSONArray()
-        return (0 until entries.length()).map { entries.getJSONObject(it).let { FailedAttempt(it.getString("id"),it.getLong("timestamp")) } }.asReversed()
+        return (0 until entries.length()).map { index ->
+            val entry = entries.getJSONObject(index)
+            FailedAttempt(entry.getString("id"),entry.getLong("timestamp"))
+        }.asReversed()
     }
     // These histories stay encrypted on this device under the current account ID.
     fun recordSettings(uid: String, event: SettingsEvent) { activityVault.update { append(it,uid,"settingsHistory",event.toJson()) } }

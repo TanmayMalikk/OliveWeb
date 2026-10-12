@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

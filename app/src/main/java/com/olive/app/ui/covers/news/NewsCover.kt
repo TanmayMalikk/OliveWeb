@@ -1,4 +1,7 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.news
+
+import com.olive.app.ui.*
+import com.olive.app.ui.covers.shared.CoverAccountPanel
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -29,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.olive.app.data.CoverLocation
 import com.olive.app.data.GoogleNewsRepository
@@ -43,8 +47,6 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun NewsCover(session: SessionViewModel, locationPermissionVersion: Int=0, interactive: Boolean=true) {
     val context=LocalContext.current
-    // HARDCODED DAILY DIGEST NOTIFICATION SPOT: edit AppNotifications.kt, then copy this into the event that should send it.
-    // com.olive.app.notification.AppNotifications.showDailyDigest(context)
     var tab by remember { mutableStateOf("Today") }
     var scope by remember { mutableStateOf(NewsScope.LOCAL) }
     var query by remember { mutableStateOf("") }
@@ -92,19 +94,19 @@ import kotlinx.coroutines.withContext
         title={LocalizedText("Change local news location")},
         text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(locationDraft,{ value ->
-                if(!session.interceptSearch(value)) locationDraft=value.take(120) else locationDraft=""
+                locationDraft=if(!session.interceptSearch(value)) value.take(120) else ""
             },label={LocalizedText("City or region")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input"))
             LocalizedText("This changes the local news search on this device.",color=Muted,style=MaterialTheme.typography.bodySmall)
         }},
         confirmButton={TextButton(onClick={
             customPlace=locationDraft.trim();currentPlace=customPlace
-            locationPreferences.edit().putString(locationPreferenceKey,customPlace).apply()
+            locationPreferences.edit { putString(locationPreferenceKey,customPlace) }
             locationEditorOpen=false;refresh++
         },enabled=locationDraft.isNotBlank()) { LocalizedText("Save") }},
         dismissButton={Row {
             TextButton(onClick={
                 customPlace="";currentPlace=fallbackPlace
-                locationPreferences.edit().remove(locationPreferenceKey).apply()
+                locationPreferences.edit { remove(locationPreferenceKey) }
                 locationEditorOpen=false;refresh++
             }) { LocalizedText("Use device location") }
             TextButton(onClick={locationEditorOpen=false}) { LocalizedText("Cancel") }
@@ -158,8 +160,7 @@ import kotlinx.coroutines.withContext
                     } else {
                         item {
                             OutlinedTextField(query,{ value ->
-                                if(!session.interceptSearch(value)) query=value
-                                else query=""
+                                query=if(!session.interceptSearch(value)) value else ""
                             },placeholder={LocalizedText(if(tab=="Saved") "Search saved stories" else "Search headlines")},leadingIcon={Icon(Icons.Outlined.Search,null)},
                                 trailingIcon=if(query.isNotBlank()) {
                                     { IconButton(onClick={query=""}) { Icon(Icons.Outlined.Close,"Clear search") } }
