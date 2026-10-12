@@ -3,6 +3,13 @@ package com.olive.app
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import com.olive.app.ui.SessionViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Rule
 import org.junit.rules.ExternalResource
 import org.junit.rules.RuleChain
@@ -21,10 +28,20 @@ abstract class OliveUiTestBase {
             val directory=context.noBackupFilesDir
             listOf("olive-demo.vault","olive-demo.vault.bak","olive-demo.vault.new",
                 "olive-demo-activity.vault","olive-demo-activity.vault.bak","olive-demo-activity.vault.new",
-                "olive-cover.vault","olive-cover.vault.bak","olive-cover.vault.new").forEach { File(directory,it).delete() }
+                "olive-cover.vault","olive-cover.vault.bak","olive-cover.vault.new").forEach { name ->
+                val file=File(directory,name)
+                check(!file.exists() || file.delete()) { "Could not clear test store: $name" }
+            }
         }
     }
     @get:Rule val rules: RuleChain = RuleChain.outerRule(cleanStore).around(compose)
+
+    // Finish pending session writes before the next test deletes and recreates the account stores.
+    @After fun stopSessionWork() {
+        val session=ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        val sessionJob=session.viewModelScope.coroutineContext[Job] ?: return
+        runBlocking { sessionJob.cancelAndJoin() }
+    }
 
     protected fun waitFor(tag: String) {
         try { compose.waitUntil(45_000) { compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() } }

@@ -1,10 +1,8 @@
 package com.olive.app.ui
 
+import com.olive.app.ui.covers.olive.AddressFields
+
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.Manifest
-import android.content.pm.PackageManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
@@ -23,9 +21,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items as gridItems
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
@@ -47,28 +42,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.olive.app.data.*
-import com.olive.app.security.InputPolicy
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 import java.time.Instant
 import java.time.LocalDate
-import java.time.Month
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -104,30 +91,34 @@ import java.util.UUID
             listOf(1,3).forEach { first ->
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     listOf(first,first+1).forEach { number ->
-                        if(number==1) Button(onClick={session.navigate(SafePage.Notes)},
-                            colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF718669),contentColor=Color.White),
-                            modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_notes")) {
-                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                                Icon(Icons.Outlined.Description,"Notes and incidents",Modifier.size(32.dp))
-                                LocalizedText("Notes & incidents",fontSize=18.sp,lineHeight=22.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
+                        when(number) {
+                            1 -> Button(onClick={session.navigate(SafePage.Notes)},
+                                colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF718669),contentColor=Color.White),
+                                modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_notes")) {
+                                Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Outlined.Description,"Notes and incidents",Modifier.size(32.dp))
+                                    LocalizedText("Notes & incidents",fontSize=18.sp,lineHeight=22.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
+                                }
                             }
-                        } else if(number==2) Button(onClick={session.navigate(SafePage.Messages)},
-                            colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF7D9274),contentColor=Color.White),
-                            modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_messages")) {
-                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                                BadgedBox(badge={
-                                    if(session.pendingMessageActionCount>0) Badge {
-                                        Text(if(session.pendingMessageActionCount>99) "99+" else session.pendingMessageActionCount.toString())
-                                    }
-                                }) { Icon(Icons.Outlined.ChatBubbleOutline,"Messages",Modifier.size(32.dp)) }
-                                LocalizedText("Messages",fontSize=18.sp,lineHeight=22.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
+                            2 -> Button(onClick={session.navigate(SafePage.Messages)},
+                                colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF7D9274),contentColor=Color.White),
+                                modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_messages")) {
+                                Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                                    BadgedBox(badge={
+                                        if(session.pendingMessageActionCount>0) Badge {
+                                            Text(if(session.pendingMessageActionCount>99) "99+" else session.pendingMessageActionCount.toString())
+                                        }
+                                    }) { Icon(Icons.Outlined.ChatBubbleOutline,"Messages",Modifier.size(32.dp)) }
+                                    LocalizedText("Messages",fontSize=18.sp,lineHeight=22.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
+                                }
                             }
-                        } else OutlinedButton(onClick={},enabled=false,
-                            colors=ButtonDefaults.outlinedButtonColors(disabledContainerColor=Color(0xFFE7EDE2),disabledContentColor=Muted),
-                            modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("future_feature_$number")) {
-                            Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                                Icon(Icons.Outlined.AddCircleOutline,"Future feature",Modifier.size(30.dp))
-                                LocalizedText("Future feature $number",fontSize=17.sp,lineHeight=21.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
+                            else -> OutlinedButton(onClick={},enabled=false,
+                                colors=ButtonDefaults.outlinedButtonColors(disabledContainerColor=Color(0xFFE7EDE2),disabledContentColor=Muted),
+                                modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("future_feature_$number")) {
+                                Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                                    Icon(Icons.Outlined.AddCircleOutline,"Future feature",Modifier.size(30.dp))
+                                    LocalizedText("Future feature $number",fontSize=17.sp,lineHeight=21.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
+                                }
                             }
                         }
                     }
@@ -339,7 +330,7 @@ import java.util.UUID
     }
     LaunchedEffect(keyboardVisible) {
         if(keyboardVisible && session.chatMessages.isNotEmpty()) {
-            delay(120)
+            delay(120.milliseconds)
             listState.animateScrollToItem(session.chatMessages.lastIndex)
         }
     }
@@ -352,7 +343,7 @@ import java.util.UUID
             }
             Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)) {
                 LocalizedText("Direct message",style=MaterialTheme.typography.labelLarge,color=Muted)
-                Text(active.peerUsername(currentUid).lowercase(java.util.Locale.ROOT),style=MaterialTheme.typography.titleLarge)
+                Text(active.peerUsername(currentUid).lowercase(Locale.ROOT),style=MaterialTheme.typography.titleLarge)
             }
             if(exit!=null) Button(onClick=exit,contentPadding=PaddingValues(horizontal=18.dp,vertical=10.dp),
                 modifier=Modifier.heightIn(min=44.dp).testTag("quick_exit")) { Text("EXIT") }
@@ -535,7 +526,7 @@ import java.util.UUID
     restore: (String)->Unit, close: ()->Unit) {
     var now by remember(entries) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(entries) {
-        while(true) { delay(1_000L);now=System.currentTimeMillis() }
+        while(true) { delay(1_000.milliseconds);now=System.currentTimeMillis() }
     }
     val listState=rememberLazyListState()
     LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=112.dp),
@@ -686,7 +677,7 @@ import java.util.UUID
     var open by remember { mutableStateOf(false) }
     val keyboard=LocalSoftwareKeyboardController.current
     val focus=LocalFocusManager.current
-    val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese")
+    val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese", "Cree")
     Box {
         OutlinedButton(onClick={keyboard?.hide();focus.clearFocus(force=true);open=true},enabled=enabled,modifier=Modifier.fillMaxWidth().testTag("language")) { LocalizedText("Language (required)"); Spacer(Modifier.weight(1f)); LocalizedText(getDisplayLanguage(value)) }
         DropdownMenu(expanded=open,onDismissRequest={open=false}) {

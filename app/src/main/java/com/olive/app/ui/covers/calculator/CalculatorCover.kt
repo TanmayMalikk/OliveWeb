@@ -1,4 +1,5 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
+import com.olive.app.ui.*
 
 import android.graphics.Paint
 import androidx.activity.compose.BackHandler
@@ -38,9 +39,6 @@ import kotlinx.coroutines.withContext
 // Keep the calculator looking like a calculator, with no account controls on the cover.
 // UI sizing/color: calculator breakpoints, display boxes, key-row weights, type sizes, and all Olive palette roles are controlled here.
 @Composable fun CalculatorCover(session: SessionViewModel, interactive: Boolean=true) {
-    // HARDCODED BETTER CALCULATOR NOTIFICATION SPOT: edit AppNotifications.kt, then copy the show call into the event that should send it.
-    // val notificationContext=androidx.compose.ui.platform.LocalContext.current
-    // com.olive.app.notification.AppNotifications.showBetterCalculator(notificationContext)
     val context=LocalContext.current
     val calculatorAccountId=session.coverAccountId ?: "guest"
     val historyStore=remember(context,calculatorAccountId) { CalculatorHistoryStore(context,calculatorAccountId) }

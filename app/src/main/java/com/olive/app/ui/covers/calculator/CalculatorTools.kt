@@ -1,4 +1,6 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
+
+import com.olive.app.ui.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background

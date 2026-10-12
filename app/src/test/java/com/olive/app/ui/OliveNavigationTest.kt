@@ -1,5 +1,8 @@
 package com.olive.app.ui
 
+import com.olive.app.ui.covers.olive.CoverTab
+import com.olive.app.ui.covers.olive.OliveViewModel
+
 import com.olive.app.data.DemoCatalogRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
