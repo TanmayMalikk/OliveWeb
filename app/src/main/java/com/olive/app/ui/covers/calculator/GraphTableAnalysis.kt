@@ -1,4 +1,6 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
+
+import com.olive.app.ui.*
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,9 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.math.round
 
 private enum class GraphCalculation(val label:String,val inputLabel:String,val example:String) {
     Value("Value","X value","Example: 2"),

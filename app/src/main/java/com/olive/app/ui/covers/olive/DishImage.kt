@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.olive
 
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable

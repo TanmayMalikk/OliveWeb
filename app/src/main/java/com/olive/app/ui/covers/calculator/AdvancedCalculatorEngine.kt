@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
 
 import org.apache.commons.math3.complex.Complex
 import org.apache.commons.math3.linear.Array2DRowRealMatrix
@@ -38,7 +38,7 @@ internal enum class AdvancedTool(val category: String, val title: String, val ex
     MatrixDeterminant("Matrices", "Determinant", "1,2;3,4"),
     MatrixTranspose("Matrices", "Transpose", "1,2,3;4,5,6"),
     MatrixIdentity("Matrices", "Identity matrix", "3"),
-    MatrixRref("Matrices", "RREF / augmented matrix", "1,2,5;3,4,11"),
+    MatrixReducedRowEchelonForm("Matrices", "RREF / augmented matrix", "1,2,5;3,4,11"),
     MatrixRowOperation("Matrices", "Row operation", "1,2;3,4 | swap 1 2"),
     OneVariableStats("Statistics", "One-variable statistics", "1,2,2,4,8"),
     TwoVariableStats("Statistics", "Two-variable statistics", "1,2,3 | 2,4,5"),
@@ -53,7 +53,7 @@ internal object AdvancedCalculatorEngine {
         return when(tool) {
         AdvancedTool.Expression -> number(GraphExpression.compile(input,mode).evaluate(0.0))
         AdvancedTool.FunctionValue -> semi(input,2).let { "value = ${number(GraphExpression.compile(it[0],mode).evaluate(value(it[1],mode)))}" }
-        AdvancedTool.LinearSystem -> matrix(rref(matrix(input)))
+        AdvancedTool.LinearSystem -> matrix(reducedRowEchelonForm(matrix(input)))
         AdvancedTool.Fraction -> fraction(input)
         AdvancedTool.MixedFraction -> mixed(input)
         AdvancedTool.Scientific -> scientific(input)
@@ -75,7 +75,7 @@ internal object AdvancedCalculatorEngine {
         AdvancedTool.MatrixDeterminant -> number(LUDecomposition(matrix(input)).determinant)
         AdvancedTool.MatrixTranspose -> matrix(matrix(input).transpose())
         AdvancedTool.MatrixIdentity -> matrix(MatrixUtils.createRealIdentityMatrix(input.trim().toInt().also { require(it in 1..10) }))
-        AdvancedTool.MatrixRref -> matrix(rref(matrix(input)))
+        AdvancedTool.MatrixReducedRowEchelonForm -> matrix(reducedRowEchelonForm(matrix(input)))
         AdvancedTool.MatrixRowOperation -> matrixRowOperation(input)
         AdvancedTool.OneVariableStats -> oneVariable(input)
         AdvancedTool.TwoVariableStats -> twoVariable(input)
@@ -163,9 +163,9 @@ internal object AdvancedCalculatorEngine {
     }
     private fun matrix(raw: String): Array2DRowRealMatrix { val rows=raw.trim().split(';').map { row -> row.split(',').map { it.trim().toDouble() }.toDoubleArray() };require(rows.isNotEmpty() && rows.all { it.size==rows[0].size });return Array2DRowRealMatrix(rows.toTypedArray()) }
     private fun matrix(value: org.apache.commons.math3.linear.RealMatrix)=value.data.joinToString("\n") { row -> row.joinToString(prefix="[ ",postfix=" ]") { number(it) } }
-    private fun rref(source: Array2DRowRealMatrix): Array2DRowRealMatrix { val a=source.data.map { it.copyOf() }.toTypedArray();var lead=0;for(r in a.indices) { if(lead>=a[0].size) break;var i=r;while(abs(a[i][lead])<1e-10) { i++;if(i==a.size) { i=r;lead++;if(lead==a[0].size) return Array2DRowRealMatrix(a) } };val temp=a[i];a[i]=a[r];a[r]=temp;val divisor=a[r][lead];for(j in a[r].indices) a[r][j]/=divisor;for(k in a.indices) if(k!=r) { val factor=a[k][lead];for(j in a[k].indices) a[k][j]-=factor*a[r][j] };lead++ };return Array2DRowRealMatrix(a) }
+    private fun reducedRowEchelonForm(source: Array2DRowRealMatrix): Array2DRowRealMatrix { val a=source.data.map { it.copyOf() }.toTypedArray();var lead=0;for(r in a.indices) { if(lead>=a[0].size) break;var i=r;while(abs(a[i][lead])<1e-10) { i++;if(i==a.size) { i=r;lead++;if(lead==a[0].size) return Array2DRowRealMatrix(a) } };val temp=a[i];a[i]=a[r];a[r]=temp;val divisor=a[r][lead];for(j in a[r].indices) a[r][j]/=divisor;for(k in a.indices) if(k!=r) { val factor=a[k][lead];for(j in a[k].indices) a[k][j]-=factor*a[r][j] };lead++ };return Array2DRowRealMatrix(a) }
 
-    private fun oneVariable(raw: String): String { val v=list(raw);val d=DescriptiveStatistics(v.toDoubleArray());val modes=StatUtils.mode(v.toDoubleArray()).joinToString { number(it) };return "n = ${v.size}\nsum = ${number(v.sum())}\nsum of squares = ${number(v.sumOf { it*it })}\nmean = ${number(d.mean)}\nmedian = ${number(d.getPercentile(50.0))}\nmode = ${if(modes.isBlank()) "none" else modes}\nmin = ${number(d.min)}\nQ1 = ${number(d.getPercentile(25.0))}\nQ3 = ${number(d.getPercentile(75.0))}\nmax = ${number(d.max)}\nsample SD = ${number(d.standardDeviation)}\nvariance = ${number(d.variance)}" }
+    private fun oneVariable(raw: String): String { val v=list(raw);val d=DescriptiveStatistics(v.toDoubleArray());val modes=StatUtils.mode(v.toDoubleArray()).joinToString { number(it) };return "n = ${v.size}\nsum = ${number(v.sum())}\nsum of squares = ${number(v.sumOf { it*it })}\nmean = ${number(d.mean)}\nmedian = ${number(d.getPercentile(50.0))}\nmode = ${modes.ifBlank { "none" }}\nmin = ${number(d.min)}\nQ1 = ${number(d.getPercentile(25.0))}\nQ3 = ${number(d.getPercentile(75.0))}\nmax = ${number(d.max)}\nsample SD = ${number(d.standardDeviation)}\nvariance = ${number(d.variance)}" }
     private fun twoVariable(raw: String): String { val p=raw.split('|');require(p.size==2);val x=list(p[0]);val y=list(p[1]);require(x.size==y.size);val regression=SimpleRegression(true);x.indices.forEach { regression.addData(x[it],y[it]) };return "correlation = ${number(PearsonsCorrelation().correlation(x.toDoubleArray(),y.toDoubleArray()))}\ny = ${number(regression.intercept)} + ${number(regression.slope)}x\nR² = ${number(regression.rSquare)}" }
     private fun polynomialRegression(raw: String): String { val p=raw.split('|');require(p.size==3);val degree=p[0].filter { it.isDigit() }.toInt();require(degree in 1..4);val x=list(p[1]);val y=list(p[2]);require(x.size==y.size && x.size>degree);val design=Array(x.size) { row -> DoubleArray(degree+1) { col -> x[row].pow(col) } };val coefficients=org.apache.commons.math3.linear.QRDecomposition(Array2DRowRealMatrix(design)).solver.solve(org.apache.commons.math3.linear.ArrayRealVector(y.toDoubleArray())).toArray();return coefficients.indices.joinToString(" + ") { index -> "${number(coefficients[index])}${if(index==0) "" else "x^$index"}" } }
     private fun regression(raw: String): String { val p=raw.split('|');require(p.size==3);val kind=p[0].trim().lowercase();val x=list(p[1]);val y=list(p[2]);require(x.size==y.size);return when(kind) { "linear" -> twoVariable("${p[1]}|${p[2]}");"median-median" -> medianMedian(x,y);"quadratic"->polynomialRegression("degree 2|${p[1]}|${p[2]}");"cubic"->polynomialRegression("degree 3|${p[1]}|${p[2]}");"quartic"->polynomialRegression("degree 4|${p[1]}|${p[2]}");"exponential" -> transformedRegression(x,y.map { ln(it) },"y = %s e^(%s x)",true);"logarithmic" -> transformedRegression(x.map { ln(it) },y,"y = %s + %s ln(x)",false);"power" -> transformedRegression(x.map { ln(it) },y.map { ln(it) },"y = %s x^(%s)",true);"logistic" -> nonlinearRegression(x,y,doubleArrayOf(y.max(),1.0,1.0,x.average())) { t,a -> a[0]/(1+a[1]*exp(-a[2]*(t-a[3]))) };"sinusoidal" -> nonlinearRegression(x,y,doubleArrayOf((y.max()-y.min())/2,1.0,0.0,y.average())) { t,a -> a[0]*sin(a[1]*t+a[2])+a[3] };else -> error("Use linear, quadratic, cubic, quartic, exponential, logarithmic, power, logistic, sinusoidal, or median-median.") } }

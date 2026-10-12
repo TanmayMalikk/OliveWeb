@@ -1,4 +1,6 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.game
+
+import com.olive.app.ui.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -21,9 +23,6 @@ import androidx.compose.ui.unit.sp
 // The Game cover owns its own placeholder until its gameplay and safe-entry trigger are designed.
 // UI sizing/color: the placeholder uses Cream, 24dp page padding, a 52dp icon with 22dp inset, and a 32sp OliveGreen title.
 @Composable fun GameCover(interactive: Boolean=true) {
-    // HARDCODED GAME NOTIFICATION SPOT: edit AppNotifications.kt after its name/icon are final, then call it from an event.
-    // val notificationContext=androidx.compose.ui.platform.LocalContext.current
-    // com.olive.app.notification.AppNotifications.showGame(notificationContext)
     BackHandler(interactive) { }
     Column(
         Modifier.fillMaxSize().background(Cream).safeDrawingPadding().padding(24.dp).testTag("game_cover"),

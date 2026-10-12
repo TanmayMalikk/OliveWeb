@@ -17,7 +17,7 @@ import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 
 data class NewsArticle(val title: String, val summary: String, val link: String, val source: String, val published: String) {
-    fun toJson() = JSONObject().put("title",title).put("summary",summary).put("link",link).put("source",source).put("published",published)
+    fun toJson(): JSONObject = JSONObject().put("title",title).put("summary",summary).put("link",link).put("source",source).put("published",published)
     companion object { fun fromJson(json: JSONObject) = NewsArticle(json.getString("title"),json.optString("summary"),
         json.getString("link"),json.optString("source"),json.optString("published")) }
 }
