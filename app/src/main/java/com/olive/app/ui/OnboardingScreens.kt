@@ -6,9 +6,9 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
@@ -20,6 +20,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -32,31 +38,112 @@ import java.time.LocalDate
 import java.time.Month
 import java.util.Locale
 import java.util.UUID
+import kotlin.random.Random
 
-// Each circle is one page. Completed pages fill green while future pages stay outlined.
+private data class OnboardingSprig(val start:Float,val reach:Float,val rise:Float,val leafCount:Int,val lean:Float)
+
+// Numbered olives hang from the branch and mark each onboarding page.
 @Composable internal fun OnboardingProgress(completed:Int,total:Int,page:Int,pages:Int,pageComplete:List<Boolean>) {
     if(pages<=1) return
-    Column(verticalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth().testTag("onboarding_progress")) {
-        Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            repeat(pages) { index ->
-                val done=index<page || (index==page && pageComplete.getOrElse(index) { false })
-                val active=index==page
-                val circleColor by animateColorAsState(if(done) OliveGreen else Paper,tween(300),label="step_fill_$index")
-                val borderColor by animateColorAsState(if(done || active) OliveGreen else SoftGray,tween(300),label="step_border_$index")
-                val numberColor by animateColorAsState(if(done) Paper else if(active) OliveGreen else Muted,tween(300),label="step_number_$index")
-                val circleSize by animateDpAsState(if(active) 38.dp else 34.dp,tween(250),label="step_size_$index")
-                val borderWidth by animateDpAsState(if(active) 2.dp else 1.dp,tween(250),label="step_border_width_$index")
-                Surface(shape=CircleShape,color=circleColor,
-                    border=BorderStroke(borderWidth,borderColor),
-                    modifier=Modifier.size(circleSize).testTag("onboarding_step_${index+1}")) {
-                    Box(contentAlignment=Alignment.Center) {
-                        LocalizedText("${index+1}",fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold,
-                            color=numberColor)
+    // Keep each flow's leaf sizes independent of the screen width.
+    val naturalStepOffsets=remember(pages) {
+        when(pages) {
+            2 -> listOf(0f,90f)
+            3 -> listOf(0f,92f,178f)
+            4 -> listOf(0f,78f,154f,232f)
+            else -> List(pages) { it*78f }
+        }
+    }
+    // Seed each gap separately so leaves vary, but stay put across typing and page changes.
+    val sprigs=remember(pages) {
+        List(pages-1) { gap ->
+            val random=Random(pages*104729+gap*7919)
+            val firstSide=if(random.nextBoolean()) -1f else 1f
+            List(2) { index ->
+                OnboardingSprig(
+                    start=(if(index==0) .18f else .48f)+random.nextFloat()*.08f,
+                    reach=(if(index==0) .42f else .3f)+random.nextFloat()*.1f,
+                    rise=(18f+random.nextFloat()*6f)*firstSide*(if(index==0) 1f else -1f),
+                    leafCount=random.nextInt(2,4),
+                    lean=random.nextFloat()*.2f-.1f,
+                )
+            }
+        }
+    }
+    Column(verticalArrangement=Arrangement.spacedBy(2.dp),modifier=Modifier.fillMaxWidth().testTag("onboarding_progress")) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // Stretch only the stem and distribute fruit along it; artwork stays at its original size.
+            val availableSpan=(maxWidth.value-72f).coerceAtLeast(0f)
+            val stepOffsets=naturalStepOffsets.map { it/naturalStepOffsets.last()*availableSpan }
+            Box(Modifier.fillMaxWidth().height(104.dp)) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val inset=24.dp.toPx()
+                    val middle=size.height/2
+                    drawLine(OliveBrown.copy(alpha=.7f),Offset(5.dp.toPx(),middle),
+                        Offset(inset,middle),2.dp.toPx(),StrokeCap.Round)
+                    repeat(pages-1) { index ->
+                        val start=inset+stepOffsets[index].dp.toPx()
+                        val spacing=(stepOffsets[index+1]-stepOffsets[index]).dp.toPx()
+                        val end=start+spacing
+                        val grown=index<page
+                        val stemColor=if(grown) OliveBrown else OliveBrown.copy(alpha=.7f)
+                        val leafColor=if(grown) MossGreen else SageGreen
+                        val stem=Path().apply {
+                            moveTo(start,middle)
+                            cubicTo(start+spacing*.3f,middle-7.dp.toPx(),
+                                start+spacing*.7f,middle+7.dp.toPx(),end,middle)
+                        }
+                        drawPath(stem,stemColor,style=Stroke(2.dp.toPx(),cap=StrokeCap.Round))
+                        sprigs[index].forEach { sprig ->
+                            val fraction=sprig.start
+                            val bend=3*fraction*(1-fraction)*(1-2*fraction)*(-7.dp.toPx())
+                            drawOnboardingSprig(Offset(start+spacing*fraction,middle+bend),
+                                (naturalStepOffsets[index+1]-naturalStepOffsets[index]).dp.toPx(),sprig,stemColor,leafColor)
+                        }
+                    }
+                    val tipStart=inset+stepOffsets.last().dp.toPx()
+                    val tip=Path().apply {
+                        moveTo(tipStart,middle)
+                        cubicTo(tipStart+12.dp.toPx(),middle+2.dp.toPx(),
+                            size.width-12.dp.toPx(),middle-6.dp.toPx(),size.width-3.dp.toPx(),middle-12.dp.toPx())
+                    }
+                    drawPath(tip,OliveBrown.copy(alpha=.7f),style=Stroke(1.3.dp.toPx(),cap=StrokeCap.Round))
+                    drawOnboardingLeaf(Offset(size.width-20.dp.toPx(),middle-4.dp.toPx()),
+                        Offset(size.width-5.dp.toPx(),middle-26.dp.toPx()),SageGreen)
+                    // Short curved stalks attach each numbered olive to the main branch.
+                    repeat(pages) { index ->
+                        val center=inset+stepOffsets[index].dp.toPx()
+                        val side=if(index%2==0) 1f else -1f
+                        val stalk=Path().apply {
+                            moveTo(center+10.dp.toPx(),middle)
+                            cubicTo(center+4.dp.toPx(),middle+side*5.dp.toPx(),
+                                center-6.dp.toPx(),middle+side*10.dp.toPx(),
+                                center-6.dp.toPx(),middle+side*16.dp.toPx())
+                        }
+                        drawPath(stalk,OliveBrown,style=Stroke(1.5.dp.toPx(),cap=StrokeCap.Round))
                     }
                 }
-                if(index<pages-1) {
-                    val connectorColor by animateColorAsState(if(index<page) OliveGreen else SoftGray,tween(350),label="step_line_$index")
-                    Box(Modifier.weight(1f).height(3.dp).background(connectorColor))
+                repeat(pages) { index ->
+                    val done=index<page || (index==page && pageComplete.getOrElse(index) { false })
+                    val active=index==page
+                    val oliveColor by animateColorAsState(if(done) OliveGreen else PaleOlive,tween(300),label="step_fill_$index")
+                    val borderColor by animateColorAsState(if(done || active) OliveGreen else SoftGray,tween(300),label="step_border_$index")
+                    val numberColor by animateColorAsState(if(done) Paper else if(active) OliveGreen else Muted,tween(300),label="step_number_$index")
+                    val oliveWidth by animateDpAsState(if(active) 34.dp else 30.dp,tween(250),label="step_width_$index")
+                    val oliveHeight by animateDpAsState(if(active) 44.dp else 40.dp,tween(250),label="step_height_$index")
+                    val borderWidth by animateDpAsState(if(active) 2.dp else 1.dp,tween(250),label="step_border_width_$index")
+                    val oliveOffset=if(index%2==0) 24.dp else (-24).dp
+                    val oliveAngle=if(index%2==0) -18f else 18f
+                    Box(Modifier.offset(x=stepOffsets[index].dp,y=oliveOffset).width(48.dp).fillMaxHeight(),contentAlignment=Alignment.Center) {
+                        Surface(shape=RoundedCornerShape(50),color=oliveColor,
+                            border=BorderStroke(borderWidth,borderColor),
+                            modifier=Modifier.size(oliveWidth,oliveHeight).rotate(oliveAngle).testTag("onboarding_step_${index+1}")) {
+                            Box(Modifier.rotate(-oliveAngle),contentAlignment=Alignment.Center) {
+                                LocalizedText("${index+1}",fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                    color=numberColor)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -65,6 +152,42 @@ import java.util.UUID
             LocalizedText("$completed of $total required",style=MaterialTheme.typography.labelMedium,color=Muted)
         }
     }
+}
+
+// Offshoots and leaf tips lean right, giving the branch a clear direction of growth.
+private fun DrawScope.drawOnboardingSprig(base:Offset,spacing:Float,sprig:OnboardingSprig,stemColor:Color,leafColor:Color) {
+    val reach=spacing*sprig.reach
+    val rise=sprig.rise.dp.toPx()
+    fun point(x:Float,y:Float)=base+Offset(reach*x,rise*y)
+    val tip=point(1f,1f)
+    val sprigPath=Path().apply {
+        moveTo(base.x,base.y)
+        val first=point(.38f,.08f)
+        val second=point(.55f,1.05f)
+        cubicTo(first.x,first.y,second.x,second.y,tip.x,tip.y)
+    }
+    drawPath(sprigPath,stemColor,style=Stroke(1.dp.toPx(),cap=StrokeCap.Round))
+    drawOnboardingLeaf(point(.3f,.42f),point(.55f+sprig.lean,1.3f),leafColor)
+    drawOnboardingLeaf(point(.58f,.83f),point(1.03f,.96f+sprig.lean),leafColor)
+    if(sprig.leafCount==3) drawOnboardingLeaf(point(.74f,.95f),point(.94f+sprig.lean,.35f),leafColor)
+}
+
+// Two curved edges form a narrow olive leaf; its vein points back to the stem.
+private fun DrawScope.drawOnboardingLeaf(base:Offset,tip:Offset,color:Color) {
+    val direction=tip-base
+    val side=Offset(-direction.y,direction.x)/direction.getDistance()*4.dp.toPx()
+    val leaf=Path().apply {
+        moveTo(base.x,base.y)
+        val first=base+direction*.35f+side
+        val second=base+direction*.75f+side
+        cubicTo(first.x,first.y,second.x,second.y,tip.x,tip.y)
+        val third=base+direction*.75f-side
+        val fourth=base+direction*.35f-side
+        cubicTo(third.x,third.y,fourth.x,fourth.y,base.x,base.y)
+        close()
+    }
+    drawPath(leaf,color)
+    drawLine(OliveGreen.copy(alpha=.35f),base,base+direction*.8f,.6.dp.toPx(),StrokeCap.Round)
 }
 
 // Requirement bullets begin neutral, then turn green or red as the user types.
