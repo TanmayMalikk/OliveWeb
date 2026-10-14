@@ -29,6 +29,10 @@ import com.olive.app.ui.OliveTheme
 import com.olive.app.ui.SessionScreen
 import com.olive.app.ui.SessionViewModel
 import java.util.function.Consumer
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+import com.google.firebase.FirebaseApp
 
 internal fun shouldBlankRecentPreview(protectionEnabled:Boolean,sensitive:Boolean)=protectionEnabled && sensitive
 internal fun shouldApplyTaskIdentity(applied:Pair<CoverType,AccountRole>?,type:CoverType,role:AccountRole)=
@@ -49,6 +53,16 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        FirebaseApp.initializeApp(this)
+        val firebaseAppCheck = FirebaseAppCheck.getInstance()
+        firebaseAppCheck.installAppCheckProviderFactory(
+            if (BuildConfig.DEBUG) {
+                DebugAppCheckProviderFactory.getInstance()
+            } else {
+                PlayIntegrityAppCheckProviderFactory.getInstance()
+            }
+        )
+
         OliveNotificationManager.createNotificationChannels(this)
         CoverLauncher.ensureStudioLauncher(this)
         applyScreenCaptureProtection()

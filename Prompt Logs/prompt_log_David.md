@@ -79,3 +79,15 @@
 * **Prompt 1:** "I don't think we need to implement CSE on direct texts to a safe contact. I think we only need the CSE through encryptionutils.kt when the user is writing a private note or incident log, or in a group chat with a safe contact/trusted individual and support staff with the goal of implementing a safety plan for them or better understanding their circumstance (as I think these would be the most important parts that the abuser must not get a hold of). Would it be more efficient to just implement encryption for all kinds of chats or would my specified scenarios work best?"
 * **Result:** Decided to unify the encryption architecture across all messaging, treating a 1-on-1 direct message simply as a "Group Chat with two people." This prevents architectural bloat (eliminating the need for parallel secure/insecure messaging systems) and removes metadata breadcrumbs, guaranteeing an abuser cannot see when a victim is discussing basic exit strategies with a safe contact.
 * **Time Taken:** ~10 minutes.
+
+### 13. Objective: Envelope Encryption Key Generation & Public Key Syncing
+* **Core Prompt:** "Handle key generation."
+* **Resolution:** Migrated secure message routing to `SecureChatRepository.kt` and implemented `initializeConversationKeys` and `loadRoomKey` to handle 3-way asymmetric AES key wrapping. Updated the `DirectoryUser` model in `MessagingRepository.kt` to automatically upload and fetch RSA Public Keys during account registration and user searches. Established concrete testing protocols (Firestore Console verification, Two-Device verification, and local unit tests) to guarantee cryptographic integrity.
+* **Prompts Required to Resolve:** 7 prompts (Iterated through repository redeclaration conflicts, missing cryptography imports, scope/bracket syntax errors, and final testing validation).
+* **Time Taken:** ~40 minutes.
+
+### 14. Objective: Connect Key Generation to UI Flow
+* **Core Prompt:** "Let's wire up the initializeConversationKeys call to the UI flow."
+* **Resolution:** Added `decodePublicKey` to `KeyManager` to parse external X.509 Base64 strings. Updated `startConversation` in `SessionViewModel` to automatically detect new chat rooms, query the `DirectoryUser` for the contact's RSA key, and initialize the AES Room Key before launching the chat. The Client-Side Encryption pipeline is now fully integrated with the UI.
+* **Prompts Required to Resolve:** 1.
+* **Time Taken:** ~5 minutes.

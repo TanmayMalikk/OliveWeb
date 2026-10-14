@@ -6,17 +6,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.core.content.edit
-import com.olive.app.BuildConfig
-import com.olive.app.data.*
-import com.olive.app.security.*
-import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.olive.app.BuildConfig
+import com.olive.app.data.*
+import com.olive.app.notification.LocalNotificationEventHandler
+import com.olive.app.security.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -44,6 +44,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val accounts: AccountRepository = if(localMode) LocalAccountRepository(vault) else FirebaseAccountRepository()
     private val adminRepository = if(localMode) null else AdminRepository()
     private val messagingRepository = if(localMode) null else MessagingRepository()
+    private val secureChatRepository = if(localMode) null else SecureChatRepository()
     private val messageReadState=application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
     private val cloudState=application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
     var screen by mutableStateOf(SessionScreen.Loading); private set
@@ -648,9 +649,36 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         repository.cancelRequest(device.uid,request)
     }
 
-    fun startConversation(friend: Friend) = runMessagingAction("Unable to open this conversation.") { repository,device,token ->
-        val conversation=repository.conversationWith(AccountIdentity(device.uid,coverUsername),friend)
-        if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Messages) openConversation(conversation)
+    fun startConversation(friend: Friend) = runMessagingAction("Unable to open this conversation.") { repository, device, token ->
+        val secureRepo = secureChatRepository ?: return@runMessagingAction
+        val conversation = repository.conversationWith(AccountIdentity(device.uid, coverUsername), friend)
+
+        try {
+            secureRepo.loadRoomKey(conversation.id, device.uid)
+        } catch (e: Exception) { // CRITICAL: This must catch a generic Exception!
+            val friendDirectory = repository.searchUsers(friend.username, device.uid).firstOrNull()
+                ?: throw Exception("Could not retrieve the contact's public key.")
+            val myPublicKey = KeyManager.getPublicKey()
+                ?: throw Exception("Your hardware public key is missing.")
+            val friendPublicKey = KeyManager.decodePublicKey(friendDirectory.publicKey)
+
+            val publicKeysMap = mapOf(
+                device.uid to myPublicKey,
+                friend.uid to friendPublicKey
+            )
+
+            // Pass the parameters required to build the skeleton
+            secureRepo.initializeConversationKeys(
+                conversationId = conversation.id,
+                participantIds = conversation.participantIds,
+                participantUsernames = conversation.participantUsernames,
+                participantPublicKeys = publicKeysMap
+            )
+        }
+
+        if(epoch == token && screen == SessionScreen.Safe && page == SafePage.Messages) {
+            openConversation(conversation)
+        }
     }
 
     fun openConversation(conversation: ChatConversation) {
@@ -661,9 +689,27 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         markConversationRead(conversation)
         chatQuickExitHintVisible=accountRole==AccountRole.USER
         val token=epoch
-        messageSubscription=messagingRepository?.observeMessages(conversation.id,{ rows ->
-            if(epoch==token && activeConversation?.id==conversation.id) chatMessages=rows
-        },{ error -> if(epoch==token) message="Unable to load this conversation. $error" })
+
+        val secureRepo = secureChatRepository ?: return
+        viewModelScope.launch {
+            try {
+                messagingBusy = true
+                // 1. Unwrap the secure AES Room Key for this specific chat
+                val roomKey = secureRepo.loadRoomKey(conversation.id, uid)
+
+                // 2. Pass the key into the observer to decrypt incoming data in real-time
+                if (epoch == token && activeConversation?.id == conversation.id) {
+                    messageSubscription = secureRepo.observeSecureMessages(conversation.id, roomKey, { rows ->
+                        if(epoch==token && activeConversation?.id==conversation.id) chatMessages=rows
+                    }, { error -> if(epoch==token) message="Unable to load this conversation. $error" })
+                }
+            } catch(error: CancellationException) { throw error }
+            catch(error: Exception) {
+                if (epoch == token) message = "Unable to load secure room. ${error.localizedMessage}"
+            } finally {
+                if (epoch == token) messagingBusy = false
+            }
+        }
     }
 
     fun closeConversation() {
@@ -672,27 +718,44 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun sendMessage(text: String, onSent: ()->Unit = {}) {
-        val repository=messagingRepository ?: return
-        val device=enrollment ?: return
-        val conversation=activeConversation ?: return
+        val secureRepo = secureChatRepository ?: return
+        val device = enrollment ?: return
+        val conversation = activeConversation ?: return
         if(messagingBusy) return
-        val token=epoch
-        messagingBusy=true;message=null
+        val token = epoch
+        messagingBusy = true; message = null
         viewModelScope.launch {
             try {
-                repository.send(conversation.id,AccountIdentity(device.uid,coverUsername),text)
-                if(epoch==token && activeConversation?.id==conversation.id) onSent()
-            }
-            catch(error: CancellationException) { throw error }
-            catch(error: Exception) { if(epoch==token) message=error.localizedMessage ?: "Unable to send the message." }
-            finally { if(epoch==token) messagingBusy=false }
+                // Retrieve the AES key to encrypt the outgoing text
+                val roomKey = secureRepo.loadRoomKey(conversation.id, device.uid)
+                secureRepo.sendSecureMessage(conversation.id, AccountIdentity(device.uid, coverUsername), text, roomKey)
+                if(epoch == token && activeConversation?.id == conversation.id) onSent()
+            } catch(error: CancellationException) { throw error }
+            catch(error: Exception) { if(epoch == token) message = error.localizedMessage ?: "Unable to send the message." }
+            finally { if(epoch == token) messagingBusy = false }
         }
     }
 
     fun unsendMessage(chat: ChatMessage) {
-        val conversation=activeConversation ?: return
-        runMessagingAction("Unable to unsend this message.") { repository,device,_ ->
-            repository.unsend(conversation.id,chat,device.uid)
+        val conversation = activeConversation ?: return
+        val secureRepo = secureChatRepository ?: run { message="Messaging needs a Firebase-connected build.";return }
+        val device = enrollment ?: return
+        if(messagingBusy || messagingNeedsReconnect || screen!=SessionScreen.Safe || page!=SafePage.Messages) return
+        val token = epoch
+        messagingBusy = true; message = null
+        viewModelScope.launch {
+            try {
+                secureRepo.unsendSecureMessage(conversation.id, chat, device.uid)
+            } catch(error: CancellationException) { throw error }
+            catch(error: Exception) {
+                if(epoch == token) {
+                    message = if(error is FirebaseFirestoreException && error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED)
+                        "Unable to unsend this message. Firebase denied this action."
+                    else error.localizedMessage ?: "Unable to unsend this message."
+                }
+            } finally {
+                if(epoch == token) messagingBusy = false
+            }
         }
     }
 
