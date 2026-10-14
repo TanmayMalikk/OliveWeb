@@ -11,6 +11,8 @@ import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
+import java.security.KeyFactory
+import java.security.spec.X509EncodedKeySpec
 
 object KeyManager {
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
@@ -34,7 +36,7 @@ object KeyManager {
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
         )
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
-            .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
+            .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512, KeyProperties.DIGEST_SHA1)
             .setKeySize(2048)
             .build()
 
@@ -63,29 +65,48 @@ object KeyManager {
      * Wraps (Encrypts) the AES SecretKey using an RSA Public Key.
      * Returns a Base64 string safe for Firestore.
      */
-    fun wrapKey(aesKey: SecretKey, publicKey: PublicKey): String {
-        val cipher = Cipher.getInstance(RSA_MODE)
-        cipher.init(Cipher.WRAP_MODE, publicKey)
+    fun wrapKey(secretKey: javax.crypto.SecretKey, publicKey: java.security.PublicKey): String {
+        val cipher = javax.crypto.Cipher.getInstance(RSA_MODE)
 
-        val wrappedBytes = cipher.wrap(aesKey)
-        return Base64.getEncoder().encodeToString(wrappedBytes)
+        // Force the hardware chip to acknowledge the specific padding configuration
+        val spec = javax.crypto.spec.OAEPParameterSpec(
+            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA1, javax.crypto.spec.PSource.PSpecified.DEFAULT
+        )
+
+        // Use ENCRYPT_MODE instead of WRAP_MODE to bypass the Samsung hardware bug
+        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, publicKey, spec)
+        val wrappedBytes = cipher.doFinal(secretKey.encoded)
+
+        return android.util.Base64.encodeToString(wrappedBytes, android.util.Base64.NO_WRAP)
+    }
+
+    /**
+     * Converts a Base64 string from Firestore back into an RSA PublicKey.
+     */
+    fun decodePublicKey(base64Key: String): PublicKey {
+        val keyBytes = Base64.getDecoder().decode(base64Key)
+        val spec = X509EncodedKeySpec(keyBytes)
+        return KeyFactory.getInstance("RSA").generatePublic(spec)
     }
 
     /**
      * Unwraps (Decrypts) the Base64 string back into a usable AES SecretKey.
      * Uses the user's secure hardware Private Key.
      */
-    fun unwrapKey(wrappedBase64: String): SecretKey {
-        val privateKey = getPrivateKey()
-            ?: throw IllegalStateException("Private Key not found in Keystore. User must re-authenticate.")
+    fun unwrapKey(wrappedKeyBase64: String): javax.crypto.SecretKey {
+        val decodedBytes = android.util.Base64.decode(wrappedKeyBase64, android.util.Base64.NO_WRAP)
+        val cipher = javax.crypto.Cipher.getInstance(RSA_MODE)
+        val privateKey = getPrivateKey() ?: throw Exception("Private key missing")
 
-        val wrappedBytes = Base64.getDecoder().decode(wrappedBase64)
+        // Match the exact configuration used during encryption
+        val spec = javax.crypto.spec.OAEPParameterSpec(
+            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA1, javax.crypto.spec.PSource.PSpecified.DEFAULT
+        )
 
-        val cipher = Cipher.getInstance(RSA_MODE)
-        cipher.init(Cipher.UNWRAP_MODE, privateKey)
+        // Use DECRYPT_MODE instead of UNWRAP_MODE to bypass the crash, then manually rebuild the AES key
+        cipher.init(javax.crypto.Cipher.DECRYPT_MODE, privateKey, spec)
+        val decryptedBytes = cipher.doFinal(decodedBytes)
 
-        // Unwraps the bytes back into an AES SecretKey
-        return cipher.unwrap(wrappedBytes, "AES", Cipher.SECRET_KEY) as SecretKey
+        return javax.crypto.spec.SecretKeySpec(decryptedBytes, "AES")
     }
 }
-
