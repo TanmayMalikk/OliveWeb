@@ -16,10 +16,14 @@ import java.time.format.FormatStyle
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 
-data class NewsArticle(val title: String, val summary: String, val link: String, val source: String, val published: String) {
+data class NewsArticle(val title: String, val summary: String, val link: String, val source: String, val published: String,
+    val imageUrl:String="",val topic:String="",val isPaywalled:Boolean?=null,val publisherUrl:String="") {
     fun toJson(): JSONObject = JSONObject().put("title",title).put("summary",summary).put("link",link).put("source",source).put("published",published)
+        .put("imageUrl",imageUrl).put("topic",topic).put("isPaywalled",isPaywalled ?: JSONObject.NULL).put("publisherUrl",publisherUrl)
     companion object { fun fromJson(json: JSONObject) = NewsArticle(json.getString("title"),json.optString("summary"),
-        json.getString("link"),json.optString("source"),json.optString("published")) }
+        json.getString("link"),json.optString("source"),json.optString("published"),
+        json.optString("imageUrl"),json.optString("topic"),
+        if(json.isNull("isPaywalled")) null else json.optBoolean("isPaywalled"),json.optString("publisherUrl")) }
 }
 
 enum class NewsScope { LOCAL, GLOBAL }
@@ -58,7 +62,8 @@ class GoogleNewsRepository {
                             inItem=false
                             if(title.isNotBlank() && link.startsWith("https://news.google.com/")) {
                                 val clean=Html.fromHtml(summary,Html.FROM_HTML_MODE_LEGACY).toString().trim().take(240)
-                                articles += NewsArticle(title.take(250),clean,link,source.take(120),published.take(100))
+                                articles += NewsArticle(title.take(250),clean,link,source.take(120),published.take(100),
+                                    topic=fallbackNewsTopic(title,if(scope==NewsScope.LOCAL) "Local" else "World"))
                             }
                         }
                     }
@@ -71,8 +76,8 @@ class GoogleNewsRepository {
 }
 
 // Turn Google's timestamp into the phone's local time zone before showing it.
-fun NewsArticle.localPublished(language: String): String = runCatching {
+fun NewsArticle.localPublishedDate(language: String): String = runCatching {
     val locale=Locale.forLanguageTag(getLanguageTag(language))
     ZonedDateTime.parse(published,DateTimeFormatter.RFC_1123_DATE_TIME).withZoneSameInstant(java.time.ZoneId.systemDefault())
-        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM,FormatStyle.SHORT).withLocale(locale))
+        .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
 }.getOrDefault(published)
