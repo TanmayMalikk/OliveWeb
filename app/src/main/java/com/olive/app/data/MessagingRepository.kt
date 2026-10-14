@@ -9,7 +9,11 @@ import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 
-data class DirectoryUser(val uid: String, val username: String)
+data class DirectoryUser(
+    val uid: String,
+    val username: String,
+    val publicKey: String
+)
 
 data class FriendRequest(
     val id: String,
@@ -64,12 +68,25 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     }
 
     suspend fun registerUser(identity: AccountIdentity) {
-        val username=identity.username.trim().lowercase()
+        val username = identity.username.trim().lowercase()
+
+        // 1. Fetch the hardware Public Key. If it doesn't exist, generate it instantly.
+        var pubKey = com.olive.app.security.KeyManager.getPublicKey()
+        if (pubKey == null) {
+            com.olive.app.security.KeyManager.generateUserKeyPair()
+            pubKey = com.olive.app.security.KeyManager.getPublicKey()
+                ?: throw IllegalStateException("Hardware Keystore failed to generate keys.")
+        }
+
+        // 2. Encode and upload
+        val pubKeyString = java.util.Base64.getEncoder().encodeToString(pubKey.encoded)
+
         firestore.collection("messageDirectory").document(username).set(mapOf(
             "uid" to identity.uid,
             "username" to username,
+            "publicKey" to pubKeyString,
             "updatedAt" to FieldValue.serverTimestamp(),
-        ),SetOptions.merge()).await()
+        ), SetOptions.merge()).await()
     }
 
     suspend fun searchUsers(query: String, currentUid: String): List<DirectoryUser> {
@@ -78,7 +95,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         val row=firestore.collection("messageDirectory").document(normalized).get().await()
         val uid=row.getString("uid") ?: return emptyList()
         val username=row.getString("username") ?: return emptyList()
-        return if(uid==currentUid) emptyList() else listOf(DirectoryUser(uid,username))
+        val publicKey=row.getString("publicKey") ?: return emptyList()
+        return if(uid==currentUid) emptyList() else listOf(DirectoryUser(uid,username, publicKey))
     }
 
     fun observeSocial(uid: String, onUpdate: (SocialSnapshot)->Unit, onError: (String)->Unit): ChatSubscription {
@@ -193,58 +211,6 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             }
         }
         return ChatSubscription { listeners.forEach(ListenerRegistration::remove) }
-    }
-
-    fun observeMessages(conversationId: String, onUpdate: (List<ChatMessage>)->Unit, onError: (String)->Unit): ChatSubscription {
-        val listener=firestore.collection("conversations").document(conversationId).collection("messages")
-            .orderBy("sentAt").limitToLast(250).addSnapshotListener { snapshot,error ->
-                if(error!=null) { onError(error.localizedMessage ?: "Unable to load messages.");return@addSnapshotListener }
-                onUpdate(snapshot?.documents.orEmpty().mapNotNull { row ->
-                    val sender=row.getString("senderUid") ?: return@mapNotNull null
-                    val deleted=row.getBoolean("deleted") ?: false
-                    ChatMessage(row.id,sender,row.getString("senderUsername").orEmpty(),
-                        if(deleted) "Message unsent" else row.getString("body").orEmpty(),
-                        row.getTimestamp("sentAt")?.toDate()?.time ?: row.getLong("clientSentAt") ?: 0L,deleted)
-                })
-            }
-        return listener.asSubscription()
-    }
-
-    suspend fun send(conversationId: String, sender: AccountIdentity, text: String) {
-        val body=sanitizeMessage(text)
-        require(body.isNotEmpty()) { "Write a message first." }
-        require(body.length<=2_000) { "Messages can be up to 2,000 characters." }
-        val conversation=firestore.collection("conversations").document(conversationId)
-        val message=conversation.collection("messages").document()
-        val batch=firestore.batch()
-        batch.set(message,mapOf(
-            "senderUid" to sender.uid,
-            "senderUsername" to sender.username.lowercase(),
-            "body" to body,
-            "deleted" to false,
-            "sentAt" to FieldValue.serverTimestamp(),
-            "clientSentAt" to System.currentTimeMillis(),
-        ))
-        batch.update(conversation,mapOf("lastMessage" to body.take(160),"lastMessageId" to message.id,
-            "lastSenderUid" to sender.uid,
-            "updatedAt" to FieldValue.serverTimestamp()))
-        batch.commit().await()
-    }
-
-    suspend fun unsend(conversationId: String, message: ChatMessage, currentUid: String) {
-        require(message.senderUid==currentUid) { "You can only unsend messages that you sent." }
-        require(!message.unsent) { "This message is already unsent." }
-        val conversation=firestore.collection("conversations").document(conversationId)
-        val messageRef=conversation.collection("messages").document(message.id)
-        firestore.runTransaction { transaction ->
-            val savedMessage=transaction.get(messageRef)
-            val savedConversation=transaction.get(conversation)
-            check(savedMessage.exists() && savedMessage.getString("senderUid")==currentUid) { "You can only unsend messages that you sent." }
-            check(savedMessage.getBoolean("deleted")!=true) { "This message is already unsent." }
-            transaction.update(messageRef,mapOf("body" to "Message unsent","deleted" to true,"deletedAt" to FieldValue.serverTimestamp()))
-            if(savedConversation.getString("lastMessageId")==message.id) transaction.update(conversation,
-                mapOf("lastMessage" to "Message unsent","updatedAt" to FieldValue.serverTimestamp()))
-        }.await()
     }
 
     private fun requestFrom(row: DocumentSnapshot): FriendRequest? {
