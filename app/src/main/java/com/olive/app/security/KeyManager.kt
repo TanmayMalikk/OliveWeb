@@ -65,18 +65,14 @@ object KeyManager {
      * Wraps (Encrypts) the AES SecretKey using an RSA Public Key.
      * Returns a Base64 string safe for Firestore.
      */
-    fun wrapKey(secretKey: javax.crypto.SecretKey, publicKey: java.security.PublicKey): String {
-        val cipher = javax.crypto.Cipher.getInstance(RSA_MODE)
-
-        // Force the hardware chip to acknowledge the specific padding configuration
+    fun wrapKey(secretKey: SecretKey, publicKey: PublicKey): String {
+        val cipher = Cipher.getInstance(RSA_MODE)
         val spec = javax.crypto.spec.OAEPParameterSpec(
             "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA1, javax.crypto.spec.PSource.PSpecified.DEFAULT
         )
-
-        // Use ENCRYPT_MODE instead of WRAP_MODE to bypass the Samsung hardware bug
-        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, publicKey, spec)
+        // Bypass WRAP_MODE entirely
+        cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
         val wrappedBytes = cipher.doFinal(secretKey.encoded)
-
         return android.util.Base64.encodeToString(wrappedBytes, android.util.Base64.NO_WRAP)
     }
 
@@ -93,20 +89,16 @@ object KeyManager {
      * Unwraps (Decrypts) the Base64 string back into a usable AES SecretKey.
      * Uses the user's secure hardware Private Key.
      */
-    fun unwrapKey(wrappedKeyBase64: String): javax.crypto.SecretKey {
+    fun unwrapKey(wrappedKeyBase64: String): SecretKey {
         val decodedBytes = android.util.Base64.decode(wrappedKeyBase64, android.util.Base64.NO_WRAP)
-        val cipher = javax.crypto.Cipher.getInstance(RSA_MODE)
+        val cipher = Cipher.getInstance(RSA_MODE)
         val privateKey = getPrivateKey() ?: throw Exception("Private key missing")
-
-        // Match the exact configuration used during encryption
         val spec = javax.crypto.spec.OAEPParameterSpec(
             "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA1, javax.crypto.spec.PSource.PSpecified.DEFAULT
         )
-
-        // Use DECRYPT_MODE instead of UNWRAP_MODE to bypass the crash, then manually rebuild the AES key
-        cipher.init(javax.crypto.Cipher.DECRYPT_MODE, privateKey, spec)
+        // Bypass UNWRAP_MODE entirely and manually rebuild the AES key
+        cipher.init(Cipher.DECRYPT_MODE, privateKey, spec)
         val decryptedBytes = cipher.doFinal(decodedBytes)
-
-        return javax.crypto.spec.SecretKeySpec(decryptedBytes, "AES")
+        return SecretKeySpec(decryptedBytes, "AES")
     }
 }

@@ -84,7 +84,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                                     ciphertext,
                                     roomKey
                                 ) else ""
-                            } catch (e: Exception) {
+                            } catch (@Suppress("unused") ignored: Exception) { // FIX: Renamed unused 'e' to 'ignored'
                                 "Encrypted message (Decryption failed)"
                             }
                         }
@@ -158,8 +158,8 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         conversationId: String,
         participantIds: List<String>,
         participantUsernames: Map<String, String>,
-        participantPublicKeys: Map<String, java.security.PublicKey>
-    ): javax.crypto.SecretKey {
+        participantPublicKeys: Map<String, PublicKey>
+    ): SecretKey {
         val roomKey = EncryptionUtils.generateSymmetricKey()
         val wrappedRoomKeysMap = mutableMapOf<String, String>()
         val encodedPublicKeysMap = mutableMapOf<String, String>()
@@ -169,15 +169,34 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
             encodedPublicKeysMap[uid] = java.util.Base64.getEncoder().encodeToString(publicKey.encoded)
         }
 
-        // STRICT UPDATE: Only modify the exact fields allowed by your Firestore 'affectedKeys' rule
-        firestore.collection("conversations").document(conversationId)
-            .update(mapOf(
-                "roomKeys" to wrappedRoomKeysMap,
-                "participantPublicKeys" to encodedPublicKeysMap,
-                "updatedAt" to com.google.firebase.firestore.FieldValue.serverTimestamp()
-            ))
-            .await()
+        val docRef = firestore.collection("conversations").document(conversationId)
+        val snapshot = docRef.get().await()
 
+        if (snapshot.exists()) {
+            // The chat exists but the keys are missing. Use a strict update.
+            docRef.update(
+                mapOf(
+                    "roomKeys" to wrappedRoomKeysMap,
+                    "participantPublicKeys" to encodedPublicKeysMap,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        } else {
+            // The chat doesn't exist at all. Use set to build the full valid skeleton.
+            docRef.set(
+                mapOf(
+                    "friendshipId" to conversationId,
+                    "participantIds" to participantIds,
+                    "participantUsernames" to participantUsernames,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp(),
+                    "lastMessage" to "",
+                    "lastMessageId" to "",
+                    "roomKeys" to wrappedRoomKeysMap,
+                    "participantPublicKeys" to encodedPublicKeysMap
+                )
+            ).await()
+        }
         return roomKey
     }
 
@@ -185,14 +204,15 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
      * Called whenever a user opens an existing chat.
      * Pulls their specific wrapped key from Firestore and unwraps it using their hardware Private Key.
      */
-    suspend fun loadRoomKey(conversationId: String, currentUid: String): javax.crypto.SecretKey {
-        val snapshot = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+    suspend fun loadRoomKey(conversationId: String, currentUid: String): SecretKey {
+        val snapshot = FirebaseFirestore.getInstance()
             .collection("conversations")
             .document(conversationId)
             .get()
             .await()
 
-        // CRITICAL: This string must be exactly "roomKeys" to match the database
+        // FIX: Suppress the unchecked cast warning since Firestore maps lose generic types at runtime
+        @Suppress("UNCHECKED_CAST")
         val roomKeysMap = snapshot.get("roomKeys") as? Map<String, String>
             ?: throw Exception("Room keys have not been initialized.")
 
