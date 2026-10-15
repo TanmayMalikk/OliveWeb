@@ -1,0 +1,28 @@
+{
+  "Charlottetown": {
+    "Hotlines": {
+      "PEI Family Violence Prevention Services Crisis Line": {
+        "Desc": "Confidential 24/7 provincial crisis line providing safety planning, emergency shelter access, and support.",
+        "Phone": "1-800-240-9894",
+        "url": "https://www.fvps.ca/"
+      },
+      "Island Helpline": {
+        "Desc": "Free, confidential 24/7 crisis response line for mental health and domestic abuse support in PEI.",
+        "Phone": "1-800-218-2885",
+        "url": "https://www.islandhelpline.ca/"
+      }
+    },
+    "Shelters": {
+      "Anderson House": {
+        "Desc": "24/7 emergency shelter for women, children, and trans individuals fleeing domestic violence.",
+        "Phone": "902-892-0960",
+        "url": "https://www.fvps.ca/anderson-house/"
+      },
+      "Chief Mary Bernard Memorial Women's Shelter": {
+        "Desc": "Emergency shelter for women and children on PEI experiencing crisis, family violence, or homelessness.",
+        "Phone": "1-855-297-2332",
+        "url": "https://www.cmbmws.ca/"
+      }
+    }
+  }
+}

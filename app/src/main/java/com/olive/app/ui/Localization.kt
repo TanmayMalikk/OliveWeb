@@ -16,7 +16,25 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import java.util.Locale
 
-val LocalOliveLanguage = staticCompositionLocalOf { "English" }
+val LocalOliveLanguage = staticCompositionLocalOf { getSystemDefaultLanguage() }
+
+/**
+ * Detects the OS system language and matches it against supported app languages.
+ * Defaults to "English" if the OS system language is not supported.
+ */
+fun getSystemDefaultLanguage(): String {
+    val systemLocale = Locale.getDefault()
+    val lang = systemLocale.language.lowercase()
+    return when {
+        lang == "fr" -> "French"
+        lang == "es" -> "Spanish"
+        lang == "ar" -> "Arabic"
+        lang == "tl" || lang == "fil" -> "Tagalog"
+        lang == "zh" -> "Chinese"
+        lang == "en" -> "English"
+        else -> "English"
+    }
+}
 
 /**
  * Resolves a language display name or code (e.g. "French", "fr", "Español", "es") to its BCP 47 language tag.

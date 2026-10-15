@@ -1,0 +1,70 @@
+{
+  "Toronto": {
+    "Hotlines": {
+      "Assaulted Women's Helpline (AWHL)": {
+        "Desc": "Confidential 24/7 provincial crisis line for women experiencing domestic, emotional, or physical abuse.",
+        "Phone": "1-866-863-7867",
+        "url": "https://www.awhl.org/"
+      },
+      "Toronto Stop Violence Against Women Helpline": {
+        "Desc": "24/7 crisis support, safety planning, and emergency shelter referrals in the GTA.",
+        "Phone": "416-863-7867",
+        "url": "https://www.awhl.org/"
+      },
+      "Barbra Schlifer Commemorative Clinic": {
+        "Desc": "Free legal, counselling, and language support for women experiencing violence.",
+        "Phone": "416-323-9149",
+        "url": "https://schliferclinic.com/"
+      }
+    },
+    "Shelters": {
+      "Ernestine's Women's Shelter": {
+        "Desc": "Emergency shelter and 24/7 crisis line providing safe refuge, food, and legal support for women and children.",
+        "Phone": "416-746-3701",
+        "url": "https://ernestines.ca/"
+      },
+      "Red Door Family Shelter": {
+        "Desc": "Safe emergency shelter for families and women fleeing domestic abuse.",
+        "Phone": "416-510-3553",
+        "url": "https://www.reddoorshelter.ca/"
+      }
+    }
+  },
+  "Ottawa": {
+    "Hotlines": {
+      "Ottawa Distress Centre Crisis Line": {
+        "Desc": "24/7 confidential crisis line for mental health and domestic abuse support.",
+        "Phone": "613-238-3311",
+        "url": "https://www.dcottawa.on.ca/"
+      }
+    },
+    "Shelters": {
+      "Maison d'Amitié": {
+        "Desc": "24/7 French-language emergency shelter and crisis line for women and children experiencing domestic violence.",
+        "Phone": "613-747-0020",
+        "url": "https://www.maisondamitie.com/"
+      },
+      "Interval House Ottawa": {
+        "Desc": "Emergency shelter, crisis line, and advocacy for women and children fleeing abuse.",
+        "Phone": "613-224-8355",
+        "url": "https://www.intervalhouseottawa.org/"
+      }
+    }
+  },
+  "Hamilton": {
+    "Hotlines": {
+      "Interval House Hamilton Crisis Line": {
+        "Desc": "24/7 crisis support and emergency assistance for women and children fleeing violence.",
+        "Phone": "905-387-8881",
+        "url": "https://intervalhousehamilton.org/"
+      }
+    },
+    "Shelters": {
+      "Interval House Hamilton": {
+        "Desc": "24/7 safe emergency shelter, advocacy, and community support.",
+        "Phone": "905-387-8881",
+        "url": "https://intervalhousehamilton.org/"
+      }
+    }
+  }
+}
