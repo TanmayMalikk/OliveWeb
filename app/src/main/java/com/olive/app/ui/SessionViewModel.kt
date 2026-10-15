@@ -73,7 +73,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     var deliveryAddress by mutableStateOf(DeliveryAddress()); private set
     var addressPrompt by mutableStateOf(false); private set
     var addressSaveVersion by mutableIntStateOf(0); private set
-    var language by mutableStateOf("English"); private set
+    var language by mutableStateOf(getSystemDefaultLanguage()); private set
     var coverFullName by mutableStateOf(""); private set
     var coverUsername by mutableStateOf(""); private set
     var coverType by mutableStateOf(CoverType.FOOD); private set

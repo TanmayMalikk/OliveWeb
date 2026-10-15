@@ -1,0 +1,18 @@
+{
+  "Iqaluit": {
+    "Hotlines": {
+      "Kamatsiaqtut Nunavut Helpline": {
+        "Desc": "Confidential 24/7 crisis line offering support in Inuktitut and English for anyone in Nunavut experiencing distress or violence.",
+        "Phone": "1-800-265-3333",
+        "url": "http://nunavuthelpline.ca/"
+      }
+    },
+    "Shelters": {
+      "Qimaavik Women's Shelter": {
+        "Desc": "24/7 emergency shelter, crisis support, and safety planning for women and children escaping family violence.",
+        "Phone": "867-979-4500",
+        "url": "https://www.ywcaglobal.org/"
+      }
+    }
+  }
+}
