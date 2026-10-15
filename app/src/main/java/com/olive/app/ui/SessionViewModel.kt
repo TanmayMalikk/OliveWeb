@@ -32,6 +32,7 @@ internal fun shouldRegisterMessagingIdentity(savedMarker:String?,identity:Accoun
     savedMarker!=messagingIdentityMarker(identity)
 
 // This is the traffic controller: it keeps cover mode, setup, PIN access, and the safe side from stepping on each other.
+@Suppress("ConvertLongToDuration")
 class SessionViewModel(application: Application) : AndroidViewModel(application) {
     val localMode = !BuildConfig.FIREBASE_CONFIGURED
     private val vault = EncryptedVault(application, if(localMode) "demo" else "firebase")
@@ -655,7 +656,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
 
         try {
             secureRepo.loadRoomKey(conversation.id, device.uid)
-        } catch (e: Exception) { // CRITICAL: This must catch a generic Exception!
+        } catch (ignored: Exception) {
             val friendDirectory = repository.searchUsers(friend.username, device.uid).firstOrNull()
                 ?: throw Exception("Could not retrieve the contact's public key.")
             val myPublicKey = KeyManager.getPublicKey()
@@ -705,6 +706,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 }
             } catch(error: CancellationException) { throw error }
             catch(error: Exception) {
+                android.util.Log.e("OliveDebug", "openConversation failed", error)
                 if (epoch == token) message = "Unable to load secure room. ${error.localizedMessage}"
             } finally {
                 if (epoch == token) messagingBusy = false
@@ -768,7 +770,9 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try { block(repository,device,token) }
             catch(error: CancellationException) { throw error }
-            catch(error: Exception) { if(epoch==token) {
+            catch(error: Exception) {
+                android.util.Log.e("OliveDebug", "runMessagingAction failed", error)
+                if(epoch==token) {
                 message=if(error is FirebaseFirestoreException && error.code==FirebaseFirestoreException.Code.PERMISSION_DENIED)
                     "$failure Firebase denied this action. Refresh the page and try again."
                 else error.localizedMessage ?: failure
@@ -947,7 +951,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L) "Moved to Trash for 10 seconds." else "Moved to Trash for 30 days.")
         val uid=enrollment?.uid ?: return
         viewModelScope.launch {
-            delay(PRIVATE_ENTRY_TRASH_RETENTION_MS+100L)
+            delay((PRIVATE_ENTRY_TRASH_RETENTION_MS+100L))
             val purged=withContext(Dispatchers.IO) { store.purgeExpiredPrivateEntries(uid) }
             if(purged && enrollment?.uid==uid) {
                 privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
