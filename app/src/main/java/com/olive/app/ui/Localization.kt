@@ -1,5 +1,6 @@
 package com.olive.app.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
 import androidx.compose.runtime.*
@@ -146,6 +147,7 @@ fun translate(text: String, language: String, context: Context? = null): String 
     return text
 }
 
+@SuppressLint("DiscouragedApi")
 private fun getResourceString(context: Context?, langTag: String, resName: String): String? {
     if (context != null) {
         val resId = context.resources.getIdentifier(resName, "string", context.packageName)
