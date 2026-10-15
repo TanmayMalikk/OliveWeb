@@ -26,13 +26,13 @@ val LocalOliveLanguage = staticCompositionLocalOf { getSystemDefaultLanguage() }
 fun getSystemDefaultLanguage(): String {
     val systemLocale = Locale.getDefault()
     val lang = systemLocale.language.lowercase()
-    return when {
-        lang == "fr" -> "French"
-        lang == "es" -> "Spanish"
-        lang == "ar" -> "Arabic"
-        lang == "tl" || lang == "fil" -> "Tagalog"
-        lang == "zh" -> "Chinese"
-        lang == "en" -> "English"
+    return when (lang) {
+        "fr" -> "French"
+        "es" -> "Spanish"
+        "ar" -> "Arabic"
+        "tl", "fil" -> "Tagalog"
+        "zh" -> "Chinese"
+        "en" -> "English"
         else -> "English"
     }
 }
