@@ -1,0 +1,60 @@
+{
+  "Saskatoon": {
+    "Hotlines": {
+      "Saskatoon Crisis Intervention Service": {
+        "Desc": "24/7 mobile crisis response, intervention, and support for individuals and families in crisis.",
+        "Phone": "306-933-6200",
+        "url": "https://saskatooncrisis.ca/"
+      },
+      "Saskatoon Sexual Assault & Information Centre": {
+        "Desc": "24/7 crisis line providing confidential support and counselling for survivors of sexual violence.",
+        "Phone": "306-244-2294",
+        "url": "https://ssaic.ca/"
+      }
+    },
+    "Shelters": {
+      "Interval House Saskatoon": {
+        "Desc": "24/7 emergency safe shelter, safety planning, and advocacy for women and children escaping domestic abuse.",
+        "Phone": "306-244-0185",
+        "url": "https://saskatoonintervalhouse.org/"
+      }
+    }
+  },
+  "Regina": {
+    "Hotlines": {
+      "Mobile Crisis Services Regina": {
+        "Desc": "24/7 crisis response, emergency family violence intervention, and shelter referrals.",
+        "Phone": "306-757-0127",
+        "url": "https://mobilecrisis.ca/"
+      }
+    },
+    "Shelters": {
+      "Regina Transition House": {
+        "Desc": "24/7 safe emergency housing, basic needs, and support for women and children leaving violence.",
+        "Phone": "306-569-2292",
+        "url": "https://reginatransitionhouse.ca/"
+      },
+      "Sofiya House (YWCA Regina)": {
+        "Desc": "Emergency shelter and second-stage housing for women and children escaping family violence.",
+        "Phone": "306-525-2141",
+        "url": "https://regina.ywca.ca/"
+      }
+    }
+  },
+  "Prince Albert": {
+    "Hotlines": {
+      "Prince Albert Mobile Crisis Line": {
+        "Desc": "24/7 crisis line providing emergency intervention, family support, and emergency housing referrals.",
+        "Phone": "306-764-1011",
+        "url": "https://www.princealbertmobilecrisis.com/"
+      }
+    },
+    "Shelters": {
+      "Prince Albert Women's Shelter": {
+        "Desc": "Safe emergency shelter and 24/7 crisis line for women and children escaping domestic abuse.",
+        "Phone": "306-764-3331",
+        "url": "https://pawomensshelter.ca/"
+      }
+    }
+  }
+}

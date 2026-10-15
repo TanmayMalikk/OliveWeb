@@ -136,7 +136,7 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     var username by remember { mutableStateOf("") };var password by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") };var dob by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") };var phone by remember { mutableStateOf("") }
-    var language by remember { mutableStateOf("English") };var city by remember { mutableStateOf("") }
+    var language by remember { mutableStateOf(getSystemDefaultLanguage()) };var city by remember { mutableStateOf("") }
     var affected by remember { mutableStateOf("") };var abuser by remember { mutableStateOf("") };var situation by remember { mutableStateOf("") }
     AlertDialog(onDismissRequest=onDismiss,title={LocalizedText("Create account")},text={
         Column(Modifier.fillMaxWidth().heightIn(max=520.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
