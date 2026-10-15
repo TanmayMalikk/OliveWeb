@@ -148,6 +148,10 @@ fun translate(text: String, language: String, context: Context? = null): String 
 }
 
 @SuppressLint("DiscouragedApi")
+/* This warning is being surpressed since it is the best method to dynamically get the name of our string resources.
+other methods require major refactoring and changing string referecnes across the board.
+the second method requires keeping a second stringresourcemap that is maintenance heavy.
+ */
 private fun getResourceString(context: Context?, langTag: String, resName: String): String? {
     if (context != null) {
         val resId = context.resources.getIdentifier(resName, "string", context.packageName)
