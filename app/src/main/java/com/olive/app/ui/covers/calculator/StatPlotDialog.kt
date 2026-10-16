@@ -1,6 +1,8 @@
-package com.olive.app.ui
-import com.olive.app.R
+package com.olive.app.ui.covers.calculator
+
 import androidx.compose.ui.res.stringResource
+import com.olive.app.R
+import com.olive.app.ui.*
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
@@ -37,7 +39,7 @@ internal fun statAxis(minValue:Double,maxValue:Double,targetTicks:Int=5,wholeNum
     if(wholeNumbers) {
         val wholeRaw=raw.coerceAtLeast(1.0)
         val wholeMagnitude=10.0.pow(floor(log10(wholeRaw)))
-        increment=when(val wholeNormalized=wholeRaw/wholeMagnitude) {
+        increment=when(wholeRaw/wholeMagnitude) {
             in 0.0..1.0 -> 1.0
             in 1.0..2.0 -> 2.0
             in 2.0..5.0 -> 5.0
@@ -46,7 +48,7 @@ internal fun statAxis(minValue:Double,maxValue:Double,targetTicks:Int=5,wholeNum
     }
     val minimum=floor(low/increment)*increment
     val maximum=ceil(high/increment)*increment
-    return StatAxis(minimum,maximum.takeIf { it>minimum } ?: minimum+increment,increment)
+    return StatAxis(minimum,maximum.takeIf { it>minimum } ?: (minimum+increment),increment)
 }
 
 

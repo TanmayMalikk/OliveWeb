@@ -1,11 +1,9 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.olive
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.*
 import com.olive.app.data.*
 
 enum class CoverTab { Discover, Saved, Cart, Account }

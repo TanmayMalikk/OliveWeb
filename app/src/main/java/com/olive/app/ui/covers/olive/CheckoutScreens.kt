@@ -1,8 +1,9 @@
-package com.olive.app.ui
-import com.olive.app.R
-import androidx.compose.ui.res.stringResource
+package com.olive.app.ui.covers.olive
 
-import androidx.activity.compose.BackHandler
+import androidx.compose.ui.res.stringResource
+import com.olive.app.R
+import com.olive.app.ui.*
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,8 +25,8 @@ import com.olive.app.data.DeliveryAddress
 import com.olive.app.data.OrderLine
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 private fun formatCardNumber(value: String) = value.filter(Char::isDigit).take(16).chunked(4).joinToString(" ")
 private fun formatExpiry(value: String): String {
@@ -141,7 +142,7 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
                     placing=true
                     scope.launch {
                         // Give the payment screen a believable processing beat, then always decline locally.
-                        delay(1_200)
+                        delay(1_200.milliseconds)
                         historyError=runCatching { onAttempt(foods,totalCents,"We couldn’t complete your payment. No charge was made and no order was placed.") }.isFailure
                         recipient="";instructions="";cardholder="";number="";expiry="";securityCode="";billing="";shipping=DeliveryAddress()
                         placing=false;declined=true

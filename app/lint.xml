@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <issue id="MissingTranslation">
+        <!-- Hide missing Cree translation warnings while translation is unfinished; the app shows default-language text instead. -->
+        <ignore regexp=".*not translated in &quot;cr&quot; \(Cree\).*" />
+    </issue>
+</lint>

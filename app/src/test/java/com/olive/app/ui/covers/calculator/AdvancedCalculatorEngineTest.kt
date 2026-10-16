@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
 
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,9 +16,9 @@ class AdvancedCalculatorEngineTest {
     @Test fun calculatesComplexNumbersAndMatrices() {
         assertTrue(AdvancedCalculatorEngine.calculate(AdvancedTool.ComplexMath,"(2,3) + (4,-1)",radians).startsWith("6 + 2i"))
         assertTrue(AdvancedCalculatorEngine.calculate(AdvancedTool.MatrixDeterminant,"1,2;3,4",radians).contains("-2"))
-        val rref=AdvancedCalculatorEngine.calculate(AdvancedTool.MatrixRref,"1,2,5;3,4,11",radians)
-        assertTrue(rref.contains("[ 1, 0, 1 ]"))
-        assertTrue(rref.contains("[ 0, 1, 2 ]"))
+        val reducedRowEchelonForm=AdvancedCalculatorEngine.calculate(AdvancedTool.MatrixReducedRowEchelonForm,"1,2,5;3,4,11",radians)
+        assertTrue(reducedRowEchelonForm.contains("[ 1, 0, 1 ]"))
+        assertTrue(reducedRowEchelonForm.contains("[ 0, 1, 2 ]"))
         val system=AdvancedCalculatorEngine.calculate(AdvancedTool.LinearSystem,"1,1,5;2,-1,1",radians)
         assertTrue(system.contains("[ 1, 0, 2 ]"))
         assertTrue(system.contains("[ 0, 1, 3 ]"))
