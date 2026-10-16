@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">App</string>
     <string name="use_shipping_address">استخدم عنوان الشحن</string>
     <string name="enter_a_complete_shipping_address">أدخل عنوان الشحن الكامل.</string>
@@ -84,8 +84,8 @@
     <string name="enter_a_polynomial_up_to_degree_8_to_find_its_real_and_complex_roots">أدخل كثيرة الحدود حتى الدرجة 8 للعثور على جذورها الحقيقية والمعقدة.</string>
     <string name="enter_a_quadratic_equation_to_find_both_roots">أدخل معادلة تربيعية لإيجاد الجذرين.</string>
     <string name="parentheses_and_multiplication_such_as_x_2_x_3_are_supported">يتم دعم الأقواس والضرب مثل (x - 2)(x - 3).</string>
-    <string name="example_x_2_5x_6_0">مثال: x^2 - 5x + 6 = 0</string>
-    <string name="example_x_2_1_x_1">مثال: (س^2 - 1) / (س - 1)</string>
+    <string name="example_x_2_5x_6_0" tools:ignore="TypographyDashes">مثال: x^2 - 5x + 6 = 0</string>
+    <string name="example_x_2_1_x_1" tools:ignore="TypographyDashes">مثال: (س^2 - 1) / (س - 1)</string>
     <string name="equation">المعادلة</string>
     <string name="solve">حل</string>
     <string name="close">إغلاق</string>
@@ -374,7 +374,7 @@
     <string name="security_code">رمز الأمان</string>
     <string name="billing_address">عنوان إرسال الفواتير</string>
     <string name="place_order">وضع النظام</string>
-    <string name="use_4_24_letters_numbers_or_underscores_for_your_username">استخدم 4-24 حرفًا أو رقمًا أو شرطات سفلية لاسم المستخدم الخاص بك.</string>
+    <string name="use_4_24_letters_numbers_or_underscores_for_your_username" tools:ignore="TypographyDashes">استخدم 4-24 حرفًا أو رقمًا أو شرطات سفلية لاسم المستخدم الخاص بك.</string>
     <string name="use_a_password_of_8_24_characters">استخدم كلمة مرور مكونة من 8 إلى 24 حرفًا.</string>
     <string name="enter_your_password">أدخل كلمة المرور الخاصة بك.</string>
     <string name="unable_to_sign_in_check_your_credentials_and_connection_then_try_again">يتعذر تسجيل الدخول. تحقق من بيانات الاعتماد والاتصال، ثم حاول مرة أخرى.</string>
