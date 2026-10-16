@@ -3,7 +3,7 @@ package com.olive.app
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.core.app.ApplicationProvider
-import com.olive.app.ui.CalculatorCover
+import com.olive.app.ui.covers.calculator.CalculatorCover
 import com.olive.app.ui.OliveTheme
 import com.olive.app.ui.SessionViewModel
 import org.junit.Before

@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
 
 import kotlin.math.*
 
@@ -87,8 +87,7 @@ class GraphExpression private constructor(private val root: Node) {
             }
             if(source[index].isDigit() || source[index]=='.') return number()
             if(source[index].isLetter()) {
-                val name=identifier().lowercase()
-                return when(name) {
+                return when(val name=identifier().lowercase()) {
                     "x" -> Node { x -> x }
                     "pi" -> Node { PI }
                     "e" -> Node { E }

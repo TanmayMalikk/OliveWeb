@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 import java.util.UUID
+import kotlin.time.Duration.Companion.seconds
 
 data class HistoryRecord(val category: String, val id: String, val json: String)
 
@@ -13,15 +14,15 @@ private fun JSONObject.putReadableTime(name: String, value: Long) =
 
 enum class PrivateEntryKind { Note, Incident }
 
-// TESTING: 10 seconds, change this back to 30L * 24L * 60L * 60L * 1000L (30 days).
-const val PRIVATE_ENTRY_TRASH_RETENTION_MS = 10_000L
+// TESTING: 10 seconds; change to 30.days.inWholeMilliseconds for 30 days.
+val PRIVATE_ENTRY_TRASH_RETENTION_MS = 10.seconds.inWholeMilliseconds
 
 data class PrivateEntryEdit(
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
     val changes: List<FieldChange>,
 ) {
-    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp)
+    fun toJson(): JSONObject = JSONObject().put("id",id).putReadableTime("timestamp",timestamp)
         .put("changes",JSONArray().also { rows -> changes.forEach { rows.put(it.toJson()) } })
     companion object { fun fromJson(value: JSONObject): PrivateEntryEdit {
         val rows=value.optJSONArray("changes") ?: JSONArray()
@@ -43,7 +44,7 @@ data class PrivateEntry(
     val deletedAt: Long? = null,
     val purgedAt: Long? = null,
 ) {
-    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).putReadableTime("updatedAt",updatedAt)
+    fun toJson(): JSONObject = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).putReadableTime("updatedAt",updatedAt)
         .put("title",title).put("body",body).put("pinned",pinned)
         .put("edits",JSONArray().also { rows -> edits.forEach { rows.put(it.toJson()) } })
         .also {
@@ -82,7 +83,7 @@ fun PrivateEntry.trashSecondsRemaining(now: Long = System.currentTimeMillis()): 
 }
 
 data class FieldChange(val field: String, val before: String, val after: String) {
-    fun toJson() = JSONObject().put("field",field).put("before",before).put("after",after)
+    fun toJson(): JSONObject = JSONObject().put("field",field).put("before",before).put("after",after)
     companion object { fun fromJson(value: JSONObject) = FieldChange(value.getString("field"),value.optString("before"),value.optString("after")) }
 }
 
@@ -94,7 +95,7 @@ data class SettingsEvent(
     val action: String,
     val changes: List<FieldChange> = emptyList(),
 ) {
-    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("area",area)
+    fun toJson(): JSONObject = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("area",area)
         .put("action",action).put("changes",JSONArray().also { rows -> changes.forEach { rows.put(it.toJson()) } })
     companion object { fun fromJson(value: JSONObject): SettingsEvent {
         val rows=value.optJSONArray("changes") ?: JSONArray()
@@ -110,14 +111,14 @@ data class TriggerEvent(
     val pinAttempts: Int = 0,
     val lastResult: String = "No PIN attempt",
 ) {
-    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("source",source)
+    fun toJson(): JSONObject = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("source",source)
         .put("pinAttempts",pinAttempts).put("lastResult",lastResult)
     companion object { fun fromJson(value: JSONObject) = TriggerEvent(value.getString("id"),value.getLong("timestamp"),
         value.getString("source"),value.optInt("pinAttempts"),value.optString("lastResult","No PIN attempt")) }
 }
 
 data class OrderLine(val food: String, val quantity: Int) {
-    fun toJson() = JSONObject().put("food",food).put("quantity",quantity)
+    fun toJson(): JSONObject = JSONObject().put("food",food).put("quantity",quantity)
     companion object { fun fromJson(value: JSONObject) = OrderLine(value.getString("food"),value.getInt("quantity")) }
 }
 data class CheckoutEvent(
@@ -127,7 +128,7 @@ data class CheckoutEvent(
     val totalCents: Int,
     val error: String,
 ) {
-    fun toJson() = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("totalCents",totalCents)
+    fun toJson(): JSONObject = JSONObject().put("id",id).putReadableTime("timestamp",timestamp).put("totalCents",totalCents)
         .put("error",error).put("foods",JSONArray().also { rows -> foods.forEach { rows.put(it.toJson()) } })
     companion object { fun fromJson(value: JSONObject): CheckoutEvent {
         val rows=value.optJSONArray("foods") ?: JSONArray()

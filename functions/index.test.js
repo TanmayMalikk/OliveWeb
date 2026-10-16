@@ -3,6 +3,14 @@ const assert = require("node:assert/strict");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId: "olive-test", storageBucket: "olive-test.appspot.com"});
 const { _test } = require("./index");
 
+test("deployment keeps the existing callable endpoint names", () => {
+  const endpoints = require("./index");
+  const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount",
+    "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias"];
+  assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
+  names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
 test("role aliases and real organization emails are deterministic", () => {
   assert.equal(_test.signInEmail("alex_1", "USER"), "alex_1@users.olive.invalid");
   assert.equal(_test.signInEmail("alex_1", "SAFE_CONTACT"), "alex_1@safe.olive.invalid");

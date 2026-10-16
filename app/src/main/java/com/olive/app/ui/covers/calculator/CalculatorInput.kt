@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,7 +82,7 @@ class CalculatorInput(
     fun beginFunction(label:String,angleMode:CalculatorAngleMode) {
         beginFreshIfNeeded()
         this.angleMode=angleMode
-        updateEntry((expression+label+"(").take(MAX_EXPRESSION_LENGTH))
+        updateEntry(("$expression$label(").take(MAX_EXPRESSION_LENGTH))
         armedPin=null
     }
 

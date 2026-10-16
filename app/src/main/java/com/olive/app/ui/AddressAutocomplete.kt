@@ -21,6 +21,7 @@ import com.olive.app.BuildConfig
 import com.olive.app.data.DeliveryAddress
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
+import kotlin.time.Duration.Companion.milliseconds
 
 // Street typing and Google suggestions share one field so the address form never needs a second search box.
 // UI sizing/color: the address field fills its form; suggestion rows use surfaceVariant, 12dp padding, titleSmall, and bodySmall text.
@@ -42,7 +43,7 @@ import kotlinx.coroutines.tasks.await
         predictions=emptyList()
         if(selectedLine==current.line1) { selectedLine=null;return@LaunchedEffect }
         if(client==null || current.line1.trim().length<3) return@LaunchedEffect
-        delay(300)
+        delay(300.milliseconds)
         runCatching {
             client.findAutocompletePredictions(FindAutocompletePredictionsRequest.builder()
                 .setQuery(current.line1.trim()).setSessionToken(token).setRegionCode("ca").build()).await().autocompletePredictions
