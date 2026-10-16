@@ -36,7 +36,6 @@ QUALIFIER_TO_LANG = {
     "values-ar": "ar",
     "values-es": "es",
     "values-fr": "fr",
-    "values-tl": "tl",
     "values-zh": "zh-CN",
     "values-zh-rCN": "zh-CN",
     "values-zh-rTW": "zh-TW",
@@ -49,7 +48,6 @@ QUALIFIER_TO_LANG = {
     "values-hi": "hi",
     "values-en-rCA": "en",
     "values-fr-rCA": "fr",
-    "values-cr": "cr"
 }
 
 def parse_strings_xml(file_path):

@@ -560,4 +560,30 @@ Buen humor.</string>
     <string name="subtotal_amount">Subtotal: %1$s</string>
     <string name="news_near_location">Noticias cerca de %1$s</string>
     <string name="no_activity_returning_in_seconds">Ninguna actividad. Volviendo a tu cobertura en %1$d segundos.</string>
+    <string name="accounts">Cuentas</string>
+    <string name="add_another_contact">Agregar otro contacto</string>
+    <string name="calculation">Cálculo</string>
+    <string name="change_local_news_location">Cambiar la ubicación de las noticias locales</string>
+    <string name="city_or_region">Ciudad o región</string>
+    <string name="create">crear</string>
+    <string name="deg">grados</string>
+    <string name="data_values">Valores de datos</string>
+    <string name="delete_account">Eliminar cuenta</string>
+    <string name="generate_table">generar tabla</string>
+    <string name="graph_table_analysis">Tabla de gráficos y análisis</string>
+    <string name="input">Entrada</string>
+    <string name="plot">Trama</string>
+    <string name="rad">RAD</string>
+    <string name="reconnect">Reconectar</string>
+    <string name="refresh">Actualizar</string>
+    <string name="save">Guardar</string>
+    <string name="save_profile">Guardar perfil</string>
+    <string name="stat_plots">Gráficos de estadísticas</string>
+    <string name="statistical_plots">Gráficos estadísticos</string>
+    <string name="table_analysis">Tabla y análisis</string>
+    <string name="use_device_location">Usar la ubicación del dispositivo</string>
+    <string name="x_values">valores x</string>
+    <string name="y_values">valores Y</string>
+    <string name="delete_managed_account_warning">Esto elimina permanentemente la cuenta %1$s de Firebase Authentication y elimina los datos de su cuenta.</string>
+    <string name="y_one_function_per_line">Y = (una función por línea)</string>
 </resources>

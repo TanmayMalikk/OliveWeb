@@ -23,6 +23,7 @@ import androidx.lifecycle.Lifecycle
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
 import com.olive.app.notification.OliveNotificationManager
+import com.olive.app.ui.AppLocaleManager
 import com.olive.app.ui.CoverLauncher
 import com.olive.app.ui.OliveRoot
 import com.olive.app.ui.OliveTheme
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
     private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppLocaleManager.initSystemDefaultLocale()
         OliveNotificationManager.createNotificationChannels(this)
         CoverLauncher.ensureStudioLauncher(this)
         applyScreenCaptureProtection()

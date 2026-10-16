@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -92,7 +94,7 @@ import java.util.UUID
                     border=BorderStroke(borderWidth,borderColor),
                     modifier=Modifier.size(circleSize).testTag("onboarding_step_${index+1}")) {
                     Box(contentAlignment=Alignment.Center) {
-                        LocalizedText("${index+1}",fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        Text("${index+1}",fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold,
                             color=numberColor)
                     }
                 }
@@ -103,8 +105,8 @@ import java.util.UUID
             }
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-            LocalizedText("Step ${page+1} of $pages",style=MaterialTheme.typography.labelLarge)
-            LocalizedText("$completed of $total required",style=MaterialTheme.typography.labelMedium,color=Muted)
+            Text("Step ${page+1} of $pages",style=MaterialTheme.typography.labelLarge)
+            Text("$completed of $total required",style=MaterialTheme.typography.labelMedium,color=Muted)
         }
     }
 }
@@ -113,8 +115,8 @@ import java.util.UUID
 @Composable internal fun RequirementBullet(text:String,met:Boolean,active:Boolean) {
     val color=when { !active -> Color.Black;met -> OliveGreen;else -> MaterialTheme.colorScheme.error }
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-        LocalizedText("•",color=color,fontSize=18.sp)
-        LocalizedText(text,color=color,style=MaterialTheme.typography.bodySmall)
+        Text("•",color=color,fontSize=18.sp)
+        Text(text,color=color,style=MaterialTheme.typography.bodySmall)
         Spacer(Modifier.weight(1f))
         AnimatedVisibility(visible=active && met,enter=fadeIn(tween(150)),exit=fadeOut(tween(100))) {
             Icon(Icons.Outlined.CheckCircle,contentDescription="Requirement met",tint=OliveGreen,modifier=Modifier.size(18.dp))
@@ -127,10 +129,10 @@ import java.util.UUID
     enabled:Boolean=true,nextLabel:String?=null) {
     Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
         OutlinedButton(onClick=back,enabled=enabled,modifier=Modifier.weight(1f).testTag("onboarding_back")) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Spacer(Modifier.width(8.dp));LocalizedText("Back")
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.back))
         }
         Button(onClick=next,enabled=enabled,modifier=Modifier.weight(1f).testTag(nextTag)) {
-            LocalizedText(nextLabel ?: if(last) "Finish" else "Next");Spacer(Modifier.width(8.dp));Icon(Icons.AutoMirrored.Outlined.ArrowForward,null)
+            Text(nextLabel ?: if(last) "Finish" else "Next");Spacer(Modifier.width(8.dp));Icon(Icons.AutoMirrored.Outlined.ArrowForward,null)
         }
     }
 }
@@ -145,20 +147,20 @@ import java.util.UUID
         Heading("Welcome", "First, choose what kind of account you use.",if(session.accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN)) "Olive Tree" else "Olive Branch")
         ModeNotice(session)
         ExposedDropdownMenuBox(expanded=roleOpen,onExpandedChange={roleOpen=!roleOpen}) {
-            OutlinedTextField(value=session.accountRole.title,onValueChange={},readOnly=true,label={LocalizedText("Account type")},
+            OutlinedTextField(value=session.accountRole.title,onValueChange={},readOnly=true,label={Text(stringResource(R.string.account_type))},
                 trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(roleOpen)},modifier=Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).testTag("account_role"))
             ExposedDropdownMenu(expanded=roleOpen,onDismissRequest={roleOpen=false}) {
                 AccountRole.entries.forEach { role -> DropdownMenuItem(
-                    text={Column { LocalizedText(role.title);LocalizedText(role.description,style=MaterialTheme.typography.bodySmall,color=Muted) }},
+                    text={Column { Text(role.title);Text(role.description,style=MaterialTheme.typography.bodySmall,color=Muted) }},
                     onClick={session.selectRole(role);roleOpen=false},modifier=Modifier.testTag("role_${role.name.lowercase()}")) }
             }
         }
         if(session.accountRole==AccountRole.USER || session.accountRole==AccountRole.SAFE_CONTACT) {
-            Button(onClick=session::chooseNew,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("new_user")) { LocalizedText("Create a new account") }
-            OutlinedButton(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("Sign in to an existing account") }
+            Button(onClick=session::chooseNew,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("new_user")) { Text(stringResource(R.string.create_a_new_account)) }
+            OutlinedButton(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { Text(stringResource(R.string.sign_in_to_an_existing_account)) }
         } else {
-            LocalizedText("${session.accountRole.title} accounts are created by an administrator. Sign in with your username or the real email saved to your account.",color=Muted)
-            Button(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { LocalizedText("Sign in") }
+            Text("${session.accountRole.title} accounts are created by an administrator. Sign in with your username or the real email saved to your account.",color=Muted)
+            Button(onClick=session::chooseReturning,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("returning_user")) { Text(stringResource(R.string.sign_in)) }
         }
         Status(session)
     }
@@ -256,11 +258,11 @@ import java.util.UUID
     var year by remember { mutableStateOf(initial?.year) }
     var month by remember { mutableStateOf(initial?.monthValue) }
     var day by remember { mutableStateOf(initial?.dayOfMonth) }
-    val locale= Locale.forLanguageTag(getLanguageTag(LocalOliveLanguage.current))
+    val locale= remember { Locale.getDefault() }
     fun setDate(y: Int?,m: Int?,d: Int?) {
         if(y!=null && m!=null && d!=null) onChange("%04d-%02d-%02d".format(java.util.Locale.ROOT,y,m,d))
     }
-    LocalizedText("Date of birth (required)",style=MaterialTheme.typography.labelLarge)
+    Text(stringResource(R.string.date_of_birth_required),style=MaterialTheme.typography.labelLarge)
     Row(Modifier.fillMaxWidth().testTag(tag),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         @Composable fun Choice(label: String, selected: String, options: List<Pair<String,String>>, choiceTag: String, choose: (String)->Unit) {
             var open by remember { mutableStateOf(false) }
@@ -268,11 +270,11 @@ import java.util.UUID
                 OutlinedButton(onClick={keyboard?.hide();focus.clearFocus(force=true);open=true},enabled=enabled,
                     border=if(error!=null) BorderStroke(1.dp,MaterialTheme.colorScheme.error) else ButtonDefaults.outlinedButtonBorder(enabled),
                     modifier=Modifier.fillMaxWidth().testTag(choiceTag),contentPadding=PaddingValues(horizontal=8.dp)) {
-                    LocalizedText(selected.ifBlank { label },maxLines=1)
+                    Text(selected.ifBlank { label },maxLines=1)
                 }
                 DropdownMenu(expanded=open,onDismissRequest={open=false}) {
                     options.forEach { (id,text) ->
-                        DropdownMenuItem(text={LocalizedText(text)},onClick={choose(id);open=false},modifier=Modifier.testTag("${choiceTag}_$id"))
+                        DropdownMenuItem(text={Text(text)},onClick={choose(id);open=false},modifier=Modifier.testTag("${choiceTag}_$id"))
                     }
                 }
             }
@@ -288,7 +290,7 @@ import java.util.UUID
             day=it.toInt();setDate(year,month,day)
         }
     }
-    error?.let { LocalizedText(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+    error?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
 }
 
 // USER and SAFE CONTACT: shared profile questions live here.
@@ -301,7 +303,7 @@ import java.util.UUID
     var affected by remember(existing) { mutableStateOf(existing?.affectedNames.orEmpty()) }
     var abuserName by remember(existing) { mutableStateOf(existing?.abuserName.orEmpty()) }
     var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
-    var language by remember(existing) { mutableStateOf(existing?.language?.ifBlank { getSystemDefaultLanguage() } ?: getSystemDefaultLanguage()) }
+    var language by remember(existing) { mutableStateOf(existing?.language?.ifBlank { AppLocaleManager.resolveSystemDefaultLanguageName() } ?: AppLocaleManager.resolveSystemDefaultLanguageName()) }
     var situation by remember(existing) { mutableStateOf(existing?.situation.orEmpty()) }
     var address by remember(existing) { mutableStateOf(existing?.address ?: DeliveryAddress()) }
     var trigger by remember { mutableStateOf("") }
@@ -361,7 +363,7 @@ import java.util.UUID
                 }
             }
             "Location" -> Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                LocalizedText("Only your city is required.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                Text("Only your city is required.",color=Muted,style=MaterialTheme.typography.bodySmall)
                 AddressFields(address,cityOnlyRequired=true,cityError=if(showErrors && !address.locationValid) "City required" else null) {
                     address=it;showErrors=false
                 }
@@ -376,16 +378,16 @@ import java.util.UUID
                 CoverPicker(coverType,!session.busy) { chosen ->
                     if(chosen==CoverType.GAME) session.error("In development") else coverType=chosen
                 }
-                LocalizedText("Name and icon update after leaving the app.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                Text("Name and icon update after leaving the app.",color=Muted,style=MaterialTheme.typography.bodySmall)
                 HorizontalDivider()
-                LocalizedText("Safe contacts · optional",style=MaterialTheme.typography.titleLarge)
-                LocalizedText("Add one or more trusted people. Olive never contacts them automatically.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                Text("Safe contacts · optional",style=MaterialTheme.typography.titleLarge)
+                Text("Add one or more trusted people. Olive never contacts them automatically.",color=Muted,style=MaterialTheme.typography.bodySmall)
                 contacts.forEach { contact ->
                     Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=MaterialTheme.shapes.medium) {
                         Row(Modifier.fillMaxWidth().padding(start=14.dp,top=8.dp,bottom=8.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
-                                LocalizedText(contact.name,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
-                                LocalizedText(contact.details,color=Muted,style=MaterialTheme.typography.bodySmall)
+                                Text(contact.name,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
+                                Text(contact.details,color=Muted,style=MaterialTheme.typography.bodySmall)
                             }
                             IconButton(onClick={contacts.remove(contact)},enabled=!session.busy) {
                                 Icon(Icons.Outlined.Close,"Remove safe contact")
@@ -406,7 +408,7 @@ import java.util.UUID
                     contactName="";contactDetails="";showErrors=false
                 },enabled=!session.busy && contactName.isNotBlank() && contactDetails.isNotBlank() && contacts.size<25,
                     modifier=Modifier.fillMaxWidth().testTag("add_onboarding_contact")) {
-                    Icon(Icons.Outlined.Add,null);Spacer(Modifier.width(8.dp));LocalizedText("Add another contact")
+                    Icon(Icons.Outlined.Add,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.add_another_contact))
                 }
             }
         } }

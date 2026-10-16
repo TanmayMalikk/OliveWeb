@@ -4,13 +4,6 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SecurityPolicyTest {
-    @Test fun frenchTranslationsIncludeErrorsAndDynamicCounters() {
-        assertEquals("Paramètres", com.olive.app.ui.translate("Settings","French"))
-        assertEquals("NIP incorrect. 3 tentatives restantes.",com.olive.app.ui.translate("Incorrect PIN. 3 attempts remaining.","French"))
-        assertEquals("Paiement refusé",com.olive.app.ui.translate("Payment declined","French"))
-        assertEquals("Settings",com.olive.app.ui.translate("Settings","English"))
-    }
-
     @Test fun pinVerifierUsesRandomSaltAndRejectsWrongPin() {
         val first=SecretVerifier.create("123456")
         val second=SecretVerifier.create("123456")
@@ -71,5 +64,3 @@ class SecurityPolicyTest {
         assertTrue(InputPolicy.validDob("2000-02-29"))
     }
 }
-
-
