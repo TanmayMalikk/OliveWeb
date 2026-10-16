@@ -174,3 +174,20 @@ test('friend requests become a private DM and only the sender can unsend', async
   if(visible.data()?.body!=='Message unsent' || visible.data()?.deleted!==true)
     throw new Error('Unsent tombstone was not visible to both friends.');
 });
+
+test('web entry hashes are owner-only, cannot be listed, and never accept raw tokens', async () => {
+  const alice=env.authenticatedContext('entry-alice').firestore();
+  const bob=env.authenticatedContext('entry-bob').firestore();
+  const anonymous=env.unauthenticatedContext().firestore();
+  const value={tokenHash:'a'.repeat(64),updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(alice,'webEntryLinks/entry-alice'),value));
+  await assertSucceeds(getDoc(doc(alice,'webEntryLinks/entry-alice')));
+  await assertFails(getDoc(doc(bob,'webEntryLinks/entry-alice')));
+  await assertFails(getDoc(doc(anonymous,'webEntryLinks/entry-alice')));
+  await assertFails(setDoc(doc(bob,'webEntryLinks/entry-alice'),value));
+  await assertFails(getDocs(collection(alice,'webEntryLinks')));
+  await assertFails(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,token:'raw-secret'}));
+  await assertFails(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,tokenHash:'invalid'}));
+  await assertSucceeds(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,tokenHash:'b'.repeat(64)}));
+  await assertSucceeds(deleteDoc(doc(alice,'webEntryLinks/entry-alice')));
+});

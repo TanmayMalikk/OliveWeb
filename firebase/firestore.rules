@@ -3,6 +3,18 @@ rules_version = '2';
 service cloud.firestore {
 
   match /databases/{database}/documents {
+    // Web entry URLs are a discreet entry gate, never a replacement for account authentication.
+    // Each authenticated owner may rotate their own token hash; anonymous lookups are forbidden.
+    match /webEntryLinks/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['tokenHash','updatedAt'])
+        && request.resource.data.tokenHash is string
+        && request.resource.data.tokenHash.matches('[a-f0-9]{64}')
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
 
     function owner(uid) { return request.auth != null && request.auth.uid == uid; }
 

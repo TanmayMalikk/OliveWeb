@@ -1,0 +1,33 @@
+{
+  "publicOrigin": "",
+  "covers": [
+    {
+      "id": "FOOD",
+      "slug": "olive",
+      "name": "Olive",
+      "path": "/olive",
+      "origin": ""
+    },
+    {
+      "id": "NEWS",
+      "slug": "daily-digest",
+      "name": "Daily Digest",
+      "path": "/daily-digest",
+      "origin": ""
+    },
+    {
+      "id": "CALCULATOR",
+      "slug": "calculator",
+      "name": "Better Calculator",
+      "path": "/calculator",
+      "origin": ""
+    },
+    {
+      "id": "GAME",
+      "slug": "game",
+      "name": "Little Grove",
+      "path": "/game",
+      "origin": ""
+    }
+  ]
+}
