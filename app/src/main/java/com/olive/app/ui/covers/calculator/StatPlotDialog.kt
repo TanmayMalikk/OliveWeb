@@ -1,5 +1,9 @@
 package com.olive.app.ui.covers.calculator
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -61,14 +65,14 @@ internal fun StatPlotDialog(onClose:()->Unit) {
     var points by remember { mutableStateOf<List<Pair<Double,Double>>>(emptyList()) }
     var values by remember { mutableStateOf<List<Double>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest=onClose,title={Text(stringResource(R.string.statistical_plots))},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+    AlertDialog(onDismissRequest=onClose,title={Text(stringResource(R.string.statistical_plots))},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             StatPlotType.entries.forEach { item -> FilterChip(selected=type==item,onClick={type=item;points=emptyList();values=emptyList();error=null},label={Text(item.label)}) }
         }
         if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) {
-            OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.x_values))},modifier=Modifier.fillMaxWidth())
-            OutlinedTextField(yText,{yText=it.take(500)},label={Text(stringResource(R.string.y_values))},modifier=Modifier.fillMaxWidth())
-        } else OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.data_values))},modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.x_values))},modifier=Modifier.fillMaxWidth().keepVisibleWhileTyping())
+            OutlinedTextField(yText,{yText=it.take(500)},label={Text(stringResource(R.string.y_values))},modifier=Modifier.fillMaxWidth().keepVisibleWhileTyping())
+        } else OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.data_values))},modifier=Modifier.fillMaxWidth().keepVisibleWhileTyping())
         Button(onClick={runCatching {
             fun parse(text:String)=normalizeCalculatorNotation(text).split(Regex("[,\\s]+")).filter { it.isNotBlank() }
                 .map(::parseCalculatorNumber).also { require(it.isNotEmpty()) }
@@ -77,13 +81,16 @@ internal fun StatPlotDialog(onClose:()->Unit) {
             else { values=x;points=emptyList() }
         }.onSuccess { error=null }.onFailure { error=it.message ?: "Check the data values." }},modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.plot)) }
         if(points.isNotEmpty() || values.isNotEmpty()) StatPlotCanvas(type,points,values)
-        error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+        error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error) }
     }},confirmButton={TextButton(onClick=onClose) { Text(stringResource(R.string.done)) }})
 }
 
 @Composable
 private fun StatPlotCanvas(type:StatPlotType,points:List<Pair<Double,Double>>,values:List<Double>) {
-    Canvas(Modifier.fillMaxWidth().height(280.dp).background(WarmWhite)) {
+    val label=accessibilityText(type.label)
+    val description=if(points.isNotEmpty()) points.joinToString("; ") { "X: ${formatGraphNumber(it.first)}, Y: ${formatGraphNumber(it.second)}" }
+        else values.joinToString(", ",transform=::formatGraphNumber)
+    Canvas(Modifier.fillMaxWidth().height(280.dp).background(WarmWhite).semantics { contentDescription="$label: $description" }) {
         val left=42.dp.toPx();val top=16.dp.toPx();val right=size.width-12.dp.toPx();val bottom=size.height-32.dp.toPx()
         val width=(right-left).coerceAtLeast(1f);val height=(bottom-top).coerceAtLeast(1f)
         if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) {

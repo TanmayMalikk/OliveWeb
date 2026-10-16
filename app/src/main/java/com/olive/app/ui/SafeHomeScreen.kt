@@ -1,5 +1,7 @@
 package com.olive.app.ui
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
@@ -27,7 +29,7 @@ import com.olive.app.data.*
             Box(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     Text(stringResource(R.string.olive_branch),fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-                    Text(if(profile.role==AccountRole.SAFE_CONTACT) "Safe Contact space" else "Your safe space",style=MaterialTheme.typography.headlineMedium)
+                    Text(if(profile.role==AccountRole.SAFE_CONTACT) "Safe Contact space" else "Your safe space",style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
                     Text(if(profile.role==AccountRole.SAFE_CONTACT) "Use Quick exit from any page to lock Olive Branch." else "Use Quick exit from any page to lock this area and return to your cover app.",color=Muted)
                 }
                 IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.align(Alignment.TopEnd).testTag("safe_settings")) {
@@ -37,7 +39,7 @@ import com.olive.app.data.*
             ModeNotice(session)
             Button(onClick={session.navigate(SafePage.Profile)},modifier=Modifier.fillMaxWidth().testTag("safe_profile")) { Text(stringResource(R.string.my_profile)) }
             Button(onClick={session.navigate(SafePage.Activity)},modifier=Modifier.fillMaxWidth().testTag("safe_activity")) { Text(stringResource(R.string.account_activity)) }
-            Text(stringResource(R.string.private_features),style=MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.private_features),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
             // UI sizing/color: feature tiles are two-wide, at least 112dp tall, use 30–32dp icons, and 17–18sp centered labels.
             // Change the two container colors here if these tiles need different shades from the shared theme.
             SafeFeatureGrid(session)

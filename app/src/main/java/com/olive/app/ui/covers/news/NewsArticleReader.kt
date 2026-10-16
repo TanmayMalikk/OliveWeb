@@ -1,5 +1,7 @@
 package com.olive.app.ui.covers.news
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import android.graphics.Bitmap
@@ -44,6 +46,7 @@ import com.olive.app.data.isSecureNewsUrl
 // Google News and publisher redirects stay inside the reader; local files and app intents do not open.
 internal fun isNewsReaderUrlAllowed(url:String):Boolean=isSecureNewsUrl(url)
 
+// Show the publisher page in an in-app WebView; ads and subscription requirements remain controlled by the publisher.
 @Composable internal fun NewsArticleReader(article:NewsArticle,saved:Boolean,active:Boolean,
     modifier:Modifier=Modifier,onBack:()->Unit,onBookmark:()->Unit) {
     val context=LocalContext.current
@@ -152,7 +155,11 @@ internal fun isNewsReaderUrlAllowed(url:String):Boolean=isSecureNewsUrl(url)
                             if(isNewsReaderUrlAllowed(readerUrl)) loadUrl(readerUrl)
                         }
                     },
-                    update={view -> view.visibility=if(failed) View.INVISIBLE else View.VISIBLE},
+                    update={view ->
+                        view.visibility=if(failed) View.INVISIBLE else View.VISIBLE
+                        view.importantForAccessibility=if(active && !failed) View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                            else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                    },
                     onRelease={view ->
                         view.stopLoading();view.onPause();view.removeAllViews();view.destroy()
                         if(browser===view) browser=null

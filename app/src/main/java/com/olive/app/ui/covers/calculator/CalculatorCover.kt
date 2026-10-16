@@ -1,6 +1,9 @@
 package com.olive.app.ui.covers.calculator
 import com.olive.app.ui.*
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import androidx.activity.compose.BackHandler
@@ -23,7 +26,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 // Keep the calculator looking like a calculator, with no account controls on the cover.
-// UI sizing/color: calculator breakpoints, display boxes, key-row weights, type sizes, and all Olive palette roles are controlled here.
+// This shell owns responsive keypad layout; CalculatorDisplay renders history/results and ScientificKeypad dispatches keys.
 @Composable fun CalculatorCover(session: SessionViewModel, interactive: Boolean=true) {
     val context=LocalContext.current
     val calculatorAccountId=session.coverAccountId ?: "guest"
@@ -52,7 +55,7 @@ import kotlinx.coroutines.withContext
         CalculatorTools(interactive,angleMode,{angleMode=it}) { tools=false }
         return
     }
-    // The calculator has one page, so Back stays here instead of exposing the phone home screen.
+    // Graph and tool screens handle their own Back actions; Back on the main keypad stays inside the cover.
     BackHandler(interactive) { }
     BoxWithConstraints(Modifier.fillMaxSize().background(Cream).testTag("calculator_cover")) {
         val compact=maxHeight<720.dp || maxWidth<350.dp
@@ -99,7 +102,8 @@ import kotlinx.coroutines.withContext
                 rows.forEachIndexed { rowIndex,row ->
                     Row(Modifier.fillMaxWidth().weight(1f),horizontalArrangement=Arrangement.spacedBy(rowSpacing)) {
                         row.forEach { key ->
-                            CalculatorKey(key,compact,rowIndex<scientificRows.size && scientificExpanded,!session.busy) { keypad.press(key,angleMode,{inverseTrig=!inverseTrig},session::submitCalculatorPin) }
+                            CalculatorKey(key,compact,rowIndex<scientificRows.size && scientificExpanded,!session.busy,
+                                selected=if(key=="INV") inverseTrig else null) { keypad.press(key,angleMode,{inverseTrig=!inverseTrig},session::submitCalculatorPin) }
                         }
                     }
                 }
@@ -112,13 +116,24 @@ import kotlinx.coroutines.withContext
 }
 
 @Composable
-private fun RowScope.CalculatorKey(key:String,compact:Boolean,scientific:Boolean,enabled:Boolean,onClick:()->Unit) {
+private fun RowScope.CalculatorKey(key:String,compact:Boolean,scientific:Boolean,enabled:Boolean,selected:Boolean?=null,onClick:()->Unit) {
     val isOperator=key in setOf("+","−","×","÷")
     val background=when { key=="="->OliveGreen;isOperator->SageGreen;key in setOf("AC","()","%","⌫")->LightSage;scientific->PaleOlive;else->WarmWhite }
     val tag=when(key) { "="->"equals";"AC"->"clear";"⌫"->"backspace";else->key }
-    Button(onClick=onClick,enabled=enabled,modifier=Modifier.weight(1f).fillMaxHeight().testTag("calc_key_$tag"),
+    val spokenKey=accessibilityText(when(key) {
+        "=" -> "Equals";"AC" -> "Clear all";"⌫" -> "Delete digit";"−" -> "Minus";"×" -> "Multiply";"÷" -> "Divide"
+        "()" -> "Parentheses";"%" -> "Percent";"." -> "Decimal point"
+        "√" -> "Square root";"π" -> "Pi";"^" -> "Power";"!" -> "Factorial";"INV" -> "Inverse functions"
+        "sin" -> "Sine";"cos" -> "Cosine";"tan" -> "Tangent"
+        "sin⁻¹" -> "Inverse sine";"cos⁻¹" -> "Inverse cosine";"tan⁻¹" -> "Inverse tangent"
+        "x²" -> "Squared";"eˣ" -> "Exponential";"10ˣ" -> "Ten to the power";"ln" -> "Natural logarithm";"log" -> "Logarithm"
+        else -> key
+    })
+    Button(onClick=onClick,enabled=enabled,modifier=Modifier.weight(1f).fillMaxHeight().testTag("calc_key_$tag").semantics {
+        if(selected!=null) this.selected=selected
+    },
         shape=RoundedCornerShape(28.dp),contentPadding=PaddingValues(horizontal=2.dp,vertical=0.dp),
         colors=ButtonDefaults.buttonColors(containerColor=background,contentColor=if(key=="=") Paper else if(isOperator) OliveGreen else Ink)) {
-        Text(key,fontSize=if(scientific) { if(compact) 13.sp else 16.sp } else { if(compact) 19.sp else 24.sp },fontWeight=FontWeight.Medium,maxLines=1)
+        Text(key,modifier=Modifier.clearAndSetSemantics { contentDescription=spokenKey },fontSize=if(scientific) { if(compact) 13.sp else 16.sp } else { if(compact) 19.sp else 24.sp },fontWeight=FontWeight.Medium,maxLines=1)
     }
 }

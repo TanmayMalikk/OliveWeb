@@ -1,6 +1,9 @@
 package com.olive.app.ui.covers.calculator
 import com.olive.app.ui.*
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import androidx.activity.compose.BackHandler
@@ -23,7 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 // The Y= editor plots equations on an olive grid without sending equation data off the device.
-// UI sizing/color: the graph fills remaining height; grid/label colors, 32px unit scale, 11sp markings, pan, and zoom live here.
+// This screen owns equations, pan/zoom state and TalkBack graph actions; GraphDrawing renders the grid and curves.
 @Composable internal fun GraphingCalculator(interactive: Boolean, angleMode: CalculatorAngleMode,
     onAngleModeChange: (CalculatorAngleMode)->Unit, onClose: ()->Unit) {
     var equation by remember { mutableStateOf("x^2\n2x + 3") }
@@ -39,10 +42,10 @@ import androidx.compose.ui.unit.dp
         verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=onClose,modifier=Modifier.testTag("close_graph")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back") }
-            Text(stringResource(R.string.graphing_calculator),style=MaterialTheme.typography.titleLarge,color=OliveGreen,fontWeight=FontWeight.SemiBold)
+            Text(stringResource(R.string.graphing_calculator),style=MaterialTheme.typography.titleLarge,color=OliveGreen,fontWeight=FontWeight.SemiBold,modifier=Modifier.semantics { heading() })
         }
         OutlinedTextField(equation,{equation=it.take(500);error=null},label={Text(stringResource(R.string.y_one_function_per_line))},
-            placeholder={Text("x^2 - 4\n2x + 3")},minLines=2,maxLines=4,modifier=Modifier.fillMaxWidth().testTag("graph_equation"))
+            placeholder={Text("x^2 - 4\n2x + 3")},minLines=2,maxLines=4,modifier=Modifier.fillMaxWidth().testTag("graph_equation").keepVisibleWhileTyping())
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
             Text(stringResource(R.string.angle_mode),color=Muted,modifier=Modifier.weight(1f))
             FilterChip(selected=angleMode==CalculatorAngleMode.RADIANS,onClick={
@@ -68,9 +71,24 @@ import androidx.compose.ui.unit.dp
             OutlinedButton(onClick={graphTools=true},modifier=Modifier.weight(1f).testTag("graph_table_analysis")) { Text(stringResource(R.string.table_analysis)) }
             OutlinedButton(onClick={statPlots=true},modifier=Modifier.weight(1f).testTag("stat_plots")) { Text(stringResource(R.string.stat_plots)) }
         }
-        error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("graph_error")) }
+        error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("graph_error").semantics { liveRegion=LiveRegionMode.Polite }) }
         Text(plottedEquations.mapIndexed { index,item -> "Y${index+1}=$item" }.joinToString("   "),color=OliveGreen,fontWeight=FontWeight.Medium,maxLines=2)
+        val graphLabel=accessibilityText("Graph")
+        val zoomLabel=accessibilityText("Zoom")
+        val actionLabels=listOf("Zoom in","Zoom out","Pan left","Pan right","Pan up","Pan down").map { accessibilityText(it) }
         Canvas(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(18.dp)).background(WarmWhite)
+            .semantics {
+                contentDescription=graphLabel+": "+plottedEquations.joinToString("; ")
+                stateDescription="$zoomLabel: ${kotlin.math.round(zoom*100).toInt()}%; X: ${kotlin.math.round(-panOffset.x/(32f*zoom)).toInt()}; Y: ${kotlin.math.round(panOffset.y/(32f*zoom)).toInt()}"
+                if(interactive) customActions=listOf(
+                    CustomAccessibilityAction(actionLabels[0]) { zoom=(zoom*1.25f).coerceIn(.2f,5f);true },
+                    CustomAccessibilityAction(actionLabels[1]) { zoom=(zoom/1.25f).coerceIn(.2f,5f);true },
+                    CustomAccessibilityAction(actionLabels[2]) { panOffset=panOffset.copy(x=(panOffset.x+64f).coerceIn(-20_000f,20_000f));true },
+                    CustomAccessibilityAction(actionLabels[3]) { panOffset=panOffset.copy(x=(panOffset.x-64f).coerceIn(-20_000f,20_000f));true },
+                    CustomAccessibilityAction(actionLabels[4]) { panOffset=panOffset.copy(y=(panOffset.y+64f).coerceIn(-20_000f,20_000f));true },
+                    CustomAccessibilityAction(actionLabels[5]) { panOffset=panOffset.copy(y=(panOffset.y-64f).coerceIn(-20_000f,20_000f));true },
+                )
+            }
             .pointerInput(interactive) {
                 if(interactive) detectTransformGestures { _,pan,gestureZoom,_ ->
                     panOffset=Offset(

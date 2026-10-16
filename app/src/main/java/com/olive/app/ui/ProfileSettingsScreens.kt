@@ -1,5 +1,7 @@
 package com.olive.app.ui
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.covers.olive.AddressFields
@@ -64,7 +66,7 @@ import java.util.UUID
     }
 }
 
-// Same two-language picker on the safe side, kept separate so the layout stays simple.
+// Safe-side language choices come from AppLocaleManager's supported-language list.
 // UI sizing/text: the language control fills its parent so translated language names have the full form width.
 @Composable internal fun LanguagePicker(value: String, enabled: Boolean = true, onChange: (String)->Unit) {
     var open by remember { mutableStateOf(false) }
@@ -115,11 +117,11 @@ import java.util.UUID
         BirthdayPicker(dob,"settings_dob",!session.busy) { dob=it }
         LanguagePicker(language,!session.busy) { session.recordSettingsInteraction("Olive Branch","Selected language");language=it }
         if(userRole) Field("Brief description of your situation (optional, recommended)",situation,"settings_situation",multiline=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused situation")}) { situation=it.take(2000) }
-        Text("Location · city required",style=MaterialTheme.typography.titleLarge)
+        Text("Location · city required",style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
         AddressFields(address,cityOnlyRequired=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused address: $it")}) { address=it }
         Button(onClick={session.saveSettings(fullName,affected,abuserName,dob,language,situation,address)},enabled=!session.busy,modifier=Modifier.testTag("save_settings")) { Text(stringResource(R.string.save_settings)) }
         HorizontalDivider()
-        Text(stringResource(R.string.change_account_password),style=MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.change_account_password),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
         Text(stringResource(R.string.your_username_cannot_be_changed))
         Field("Current password",currentPassword,"current_password",secret=true,showSecretToggle=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused current password")}) { currentPassword=it.take(24) }
         Field("New password",newPassword,"new_password",secret=true,showSecretToggle=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused new password")}) { newPassword=it.take(24) }
@@ -127,13 +129,13 @@ import java.util.UUID
         Button(onClick={session.changePassword(currentPassword,newPassword,confirmPassword);currentPassword="";newPassword="";confirmPassword=""},enabled=!session.busy,modifier=Modifier.testTag("change_password")) { Text(stringResource(R.string.change_password)) }
         if(userRole) {
             HorizontalDivider()
-            Text(stringResource(R.string.change_device_pin),style=MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.change_device_pin),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
             Field("Current device PIN",currentDevicePin,"current_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused current PIN")}) { currentDevicePin=it.filter(Char::isDigit).take(6) }
             Field("New device PIN",newDevicePin,"new_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused new PIN")}) { newDevicePin=it.filter(Char::isDigit).take(6) }
             Field("Confirm new device PIN",confirmDevicePin,"confirm_new_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused PIN confirmation")}) { confirmDevicePin=it.filter(Char::isDigit).take(6) }
             Button(onClick={session.changePin(currentDevicePin,newDevicePin,confirmDevicePin);currentDevicePin="";newDevicePin="";confirmDevicePin=""},enabled=!session.busy,modifier=Modifier.testTag("change_device_pin")) { Text(stringResource(R.string.change_device_pin)) }
             HorizontalDivider()
-            Text(stringResource(R.string.change_trigger_word),style=MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.change_trigger_word),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
             Text(stringResource(R.string.enter_your_current_device_pin_to_change_the_trigger_word_incorrect_attempts_count_toward_the_five_attempt_limit))
             Field("New trigger word or phrase",trigger,"settings_trigger",secret=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused trigger word")}) { trigger=it.take(64) }
             Field("Current PIN",pin,"settings_pin",secret=true,numeric=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused trigger-change PIN")}) { pin=it.filter { c -> c in '0'..'9' }.take(6) }
@@ -145,7 +147,7 @@ import java.util.UUID
 
 // UI sizing/text: cover choices fill the form width and use Material button text so longer translated names can wrap.
 @Composable internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (CoverType) -> Unit) {
-    Text(stringResource(R.string.choose_your_cover_app),style=MaterialTheme.typography.titleLarge)
+    Text(stringResource(R.string.choose_your_cover_app),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
     Text(stringResource(R.string.the_app_stays_open_its_icon_and_name_update_after_you_return_to_the_home_screen),style=MaterialTheme.typography.bodySmall,color=Muted)
     CoverType.entries.forEach { type ->
         val label=when(type) {

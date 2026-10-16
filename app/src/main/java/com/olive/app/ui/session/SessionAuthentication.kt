@@ -15,12 +15,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
 
-// Owns account login and onboarding.
+// Restores enrollment, signs accounts in/out and runs onboarding; stale account-choice callbacks cannot restart setup.
 internal class SessionAuthentication(private val runtime:SessionRuntime) {
     fun load() {
         with(runtime) {
             with(state) {
                 if(busy) return
+                pinAuthorizedUid=null;pinAuthorizedEpoch=-1L
                 busy = true
                 screenHistory.clear();safePageHistory.clear()
                 screen = SessionScreen.Loading
@@ -39,10 +40,12 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
         }
     }
 
+    private fun canChooseAccount()=with(runtime) { state.screen==SessionScreen.Welcome && enrollment==null && !state.busy }
+
     fun selectRole(role: AccountRole) {
         with(runtime) {
             with(state) {
-                if(!busy) { accountRole=role;message=null;credentialFieldError=null }
+                if(canChooseAccount()) { accountRole=role;message=null;credentialFieldError=null }
             }
         }
     }
@@ -50,7 +53,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
     fun chooseNew() {
         with(runtime) {
             with(state) {
-                if(busy) return
+                if(!canChooseAccount()) return
                 if(accountRole==AccountRole.STAFF || accountRole==AccountRole.ADMIN) { message="Staff and Admin accounts are created by an administrator.";return }
                 creatingAccount=true;message=null;navigation.openScreen(SessionScreen.NewCredentials)
             }
@@ -60,7 +63,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
     fun chooseReturning() {
         with(runtime) {
             with(state) {
-                if(!busy) { creatingAccount=false;message=null; navigation.openScreen(SessionScreen.ReturningCredentials) }
+                if(canChooseAccount()) { creatingAccount=false;message=null; navigation.openScreen(SessionScreen.ReturningCredentials) }
             }
         }
     }
@@ -68,7 +71,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
     fun setup() {
         with(runtime) {
             with(state) {
-                if(!busy) { creatingAccount=false;message=null; navigation.openScreen(SessionScreen.Welcome) }
+                if(!busy && enrollment==null && screen==SessionScreen.Cover) { creatingAccount=false;message=null; navigation.openScreen(SessionScreen.Welcome) }
             }
         }
     }
@@ -92,7 +95,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
     fun authenticate(username: String, password: String, create: Boolean) {
         with(runtime) {
             with(state) {
-                if(busy) return
+                if(busy || enrollment!=null || screen !in setOf(SessionScreen.NewCredentials,SessionScreen.ReturningCredentials)) return
                 credentialFieldError=null
                 val organizationEmail=accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN) && '@' in username
                 val validUsername=if(create) InputPolicy.validUsername(username) else InputPolicy.validExistingUsername(username)
@@ -155,6 +158,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
     }
 
     fun saveSetupProfile(value: UserProfile) {
+        if(runtime.state.screen!=SessionScreen.ProfileSetup) return
         with(runtime) {
             with(state) {
                 val identity = pendingIdentity ?: return
@@ -184,6 +188,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
     }
 
     fun createDevicePin(pin: String, confirmation: String) {
+        with(runtime) { if(state.busy || state.screen!=SessionScreen.DevicePin || enrollment!=null || state.accountRole!=AccountRole.USER) return }
         with(runtime) {
             with(state) {
                 if(busy) return

@@ -1,5 +1,6 @@
 package com.olive.app.ui.covers.shared
 
+import androidx.compose.ui.semantics.*
 import com.olive.app.ui.*
 
 import androidx.compose.foundation.layout.*
@@ -20,7 +21,7 @@ import com.olive.app.R
             { fullName = it.take(120) },
             label = { Text(stringResource(R.string.full_name)) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) session.recordSettingsInteraction("Daily Digest", "Focused full name") }
+            modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) session.recordSettingsInteraction("Daily Digest", "Focused full name") }.keepVisibleWhileTyping()
         )
         Button(
             onClick = { session.saveCoverSettings(fullName, session.language) },
@@ -29,6 +30,6 @@ import com.olive.app.R
         ) {
             Text(stringResource(R.string.save_account_settings))
         }
-        session.message?.let { Text(it) }
+        session.message?.let { AccessibleMessage(it) }
     }
 }

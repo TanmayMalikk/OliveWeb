@@ -1,6 +1,9 @@
 package com.olive.app.ui.covers.calculator
 import com.olive.app.ui.*
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import androidx.compose.foundation.horizontalScroll
@@ -38,7 +41,7 @@ import androidx.compose.ui.unit.sp
                     ) {
                         itemsIndexed(input.history,key={ index,entry -> "$index:${entry.expression}:${entry.result}" }) { index,entry ->
                             TextButton(onClick={input.reuse(entry)},modifier=Modifier.fillMaxWidth().heightIn(min=24.dp)
-                                .testTag("calculator_history_$index"),contentPadding=PaddingValues(horizontal=2.dp,vertical=0.dp)) {
+                            .testTag("calculator_history_$index").semantics(mergeDescendants=true) {},contentPadding=PaddingValues(horizontal=2.dp,vertical=0.dp)) {
                                 Text(entry.expression,modifier=Modifier.weight(1f),color=Muted,fontFamily=FontFamily.Monospace,
                                     fontSize=if(compact) 11.sp else 13.sp,maxLines=1,textAlign=TextAlign.Start)
                                 Text("= ${entry.result}",color=OliveGreen,fontFamily=FontFamily.Monospace,
@@ -56,7 +59,7 @@ import androidx.compose.ui.unit.sp
                         Text(if(input.expression.endsWith("=")) input.expression else "",modifier=Modifier.fillMaxWidth(),color=Muted,
                             fontSize=if(compact) 12.sp else 14.sp,textAlign=TextAlign.End,maxLines=1)
                         Row(Modifier.fillMaxWidth().clipToBounds().horizontalScroll(displayScroll),horizontalArrangement=Arrangement.End) {
-                            Text(input.display,modifier=Modifier.testTag("calculator_display"),color=Ink,
+                        Text(input.display,modifier=Modifier.testTag("calculator_display").semantics { liveRegion=LiveRegionMode.Polite },color=Ink,
                                 fontSize=if(compact) { if(input.display.length>12) 25.sp else 38.sp } else { if(input.display.length>12) 31.sp else 48.sp },
                                 fontFamily=FontFamily.Monospace,textAlign=TextAlign.End,maxLines=1,softWrap=false)
                         }

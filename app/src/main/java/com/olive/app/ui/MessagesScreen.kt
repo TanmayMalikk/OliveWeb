@@ -1,5 +1,7 @@
 package com.olive.app.ui
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
@@ -62,7 +64,7 @@ import com.olive.app.data.*
                 IconButton(onClick=session::back,modifier=Modifier.testTag("safe_home")) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Previous safe page")
                 }
-                Text(stringResource(R.string.friends_messages),style=MaterialTheme.typography.headlineSmall)
+                Text(stringResource(R.string.friends_messages),style=MaterialTheme.typography.headlineSmall,modifier=Modifier.semantics { heading() })
             }
             if(session.localMode) Text(stringResource(R.string.messaging_needs_a_firebase_connected_build),color=Muted)
         }
@@ -83,7 +85,7 @@ import com.olive.app.data.*
         item {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(query,{if(it.length<=24) query=it},label={Text(stringResource(R.string.username))},singleLine=true,
-                    modifier=Modifier.weight(1f).testTag("message_username"))
+                    modifier=Modifier.weight(1f).testTag("message_username").keepVisibleWhileTyping())
                 Button(onClick={session.searchUsers(query)},enabled=query.isNotBlank() && !session.messagingBusy && !session.localMode && !session.messagingNeedsReconnect,
                     modifier=Modifier.testTag("search_users")) { Text(stringResource(R.string.search)) }
             }

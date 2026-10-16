@@ -7,7 +7,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.job
 import kotlin.time.Duration.Companion.milliseconds
 
-// Owns serialized operation state, cancellation and failure messages.
+// Tracks busy work with a 25-second timeout; epoch/job checks prevent canceled work from replacing current status.
 internal class SessionOperations(private val runtime:SessionRuntime) {
     fun runOperation(failure: String, block: suspend (Long) -> Unit) {
         with(runtime) {

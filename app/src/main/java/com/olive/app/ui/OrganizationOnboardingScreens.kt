@@ -25,7 +25,7 @@ import com.olive.app.security.InputPolicy
     }
 }
 
-// STAFF + ADMIN ONLY: temporary organization accounts replace their alias with a real email during first-login setup.
+// STAFF + ADMIN ONLY: first-login setup saves contact details; Firebase Auth keeps the username alias.
 @Composable internal fun OrganizationProfileSetup(session:SessionViewModel) {
     val existing=session.setupProfile
     var fullName by remember(existing) { mutableStateOf(existing?.fullName.orEmpty()) }

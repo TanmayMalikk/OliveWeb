@@ -1,6 +1,10 @@
 package com.olive.app.ui.covers.calculator
+import androidx.compose.foundation.rememberScrollState
 import com.olive.app.ui.*
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import androidx.compose.foundation.layout.*
@@ -23,14 +27,14 @@ internal enum class CalculatorSolver { Polynomial, Quadratic }
     AlertDialog(
         onDismissRequest=onClose,
         title={Text(if(quadratic) "Quadratic equation" else "Polynomial calculation")},
-        text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(equation,{equation=it.take(160);result=null;error=null},
                 label={Text(stringResource(R.string.equation))},
                 placeholder={Text(if(quadratic) "x^2 - 5x + 6 = 0" else "(x^2 - 1) / (x - 1)")},
-                singleLine=false,minLines=2,modifier=Modifier.fillMaxWidth().testTag("equation_input"))
+                singleLine=false,minLines=2,modifier=Modifier.fillMaxWidth().testTag("equation_input").keepVisibleWhileTyping())
             Text(if(quadratic) "Example: x^2 - 5x + 6 = 0" else "Example: (x^2 - 1) / (x - 1)",style=MaterialTheme.typography.bodySmall,color=Muted)
-            result?.let { Text(it,color=OliveGreen,fontWeight=FontWeight.SemiBold,modifier=Modifier.testTag("equation_result")) }
-            error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("equation_error")) }
+            result?.let { Text(it,color=OliveGreen,fontWeight=FontWeight.SemiBold,modifier=Modifier.testTag("equation_result").semantics { liveRegion=LiveRegionMode.Polite }) }
+            error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("equation_error")) }
         }},
         confirmButton={Button(onClick={
             runCatching { if(quadratic) EquationSolver.quadratic(equation) else EquationSolver.calculatePolynomial(equation) }

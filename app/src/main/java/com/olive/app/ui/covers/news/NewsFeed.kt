@@ -1,5 +1,8 @@
 package com.olive.app.ui.covers.news
 
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.hideFromAccessibility
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -57,7 +60,7 @@ internal data class NewsFeedActions(
                             "Account" -> {
                                 item {
                                     Column(verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                                        Text(stringResource(R.string.account),style=MaterialTheme.typography.headlineMedium,fontFamily=FontFamily.Serif)
+                                        Text(stringResource(R.string.account),style=MaterialTheme.typography.headlineMedium,fontFamily=FontFamily.Serif,modifier=Modifier.semantics { heading() })
                                         Text(stringResource(R.string.manage_the_profile_details_shown_in_daily_digest),color=Muted)
                                     }
                                 }
@@ -73,7 +76,7 @@ internal data class NewsFeedActions(
                                             trailingIcon=if(query.isNotBlank()) {
                                                 { IconButton(onClick={actions.search("")}) { Icon(Icons.Outlined.Close,"Clear search") } }
                                             } else null,
-                                            singleLine=true,shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().testTag("news_search"))
+                                    singleLine=true,shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().testTag("news_search").keepVisibleWhileTyping())
                                     }
                                     if(tab=="Today") item {
                                         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -82,7 +85,7 @@ internal data class NewsFeedActions(
                                         }
                                     }
                                     if(tab=="Today" && scope==NewsScope.LOCAL) item {
-                                        Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=RoundedCornerShape(14.dp),modifier=Modifier.fillMaxWidth()) {
+                                Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=RoundedCornerShape(14.dp),modifier=Modifier.fillMaxWidth().semantics(mergeDescendants=true) {}) {
                                             Row(Modifier.padding(horizontal=14.dp,vertical=11.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) {
                                                 Icon(Icons.Outlined.NearMe,null,tint=OliveGreen,modifier=Modifier.size(18.dp))
                                                 Text("News near $currentPlace",style=MaterialTheme.typography.bodyMedium,color=OliveGreen,modifier=Modifier.weight(1f))
@@ -93,13 +96,13 @@ internal data class NewsFeedActions(
                                         }
                                     }
                                     item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                                        Text(if(tab=="Saved") "Saved stories" else "Latest stories",style=MaterialTheme.typography.titleLarge,fontFamily=FontFamily.Serif,modifier=Modifier.weight(1f))
+                                        Text(if(tab=="Saved") "Saved stories" else "Latest stories",style=MaterialTheme.typography.titleLarge,fontFamily=FontFamily.Serif,modifier=(Modifier.weight(1f)).semantics { heading() })
                                         if(tab=="Saved" && saved.isNotEmpty()) Text(saved.size.toString(),color=Muted)
                                     } }
                                     if(tab=="Today") {
                                         if(loading && articles.isEmpty()) item { NewsLoadingState() }
                                         if(newsError) item {
-                                            Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant),shape=RoundedCornerShape(18.dp)) {
+                                    Card(modifier=Modifier.semantics(mergeDescendants=true) {},colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant),shape=RoundedCornerShape(18.dp)) {
                                                 Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                                                     Icon(Icons.Outlined.CloudOff,null,tint=Muted)
                                                     Text(stringResource(R.string.live_news_is_unavailable_check_your_connection_and_try_again))

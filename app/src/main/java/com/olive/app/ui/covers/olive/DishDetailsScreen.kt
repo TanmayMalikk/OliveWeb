@@ -1,5 +1,11 @@
 package com.olive.app.ui.covers.olive
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -38,13 +44,14 @@ import com.olive.app.data.Dish
             if(dish.ingredients.isNotEmpty()) {
                 Text(stringResource(R.string.customize_ingredients),style=MaterialTheme.typography.titleMedium)
                 dish.ingredients.forEach { ingredient ->
-                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                        Checkbox(checked=ingredient in vm.selectedIngredients(dish),onCheckedChange={vm.toggleIngredient(dish,ingredient)})
+                    Row(Modifier.fillMaxWidth().toggleable(value=ingredient in vm.selectedIngredients(dish),role=Role.Checkbox,
+                        onValueChange={vm.toggleIngredient(dish,ingredient)}),verticalAlignment=Alignment.CenterVertically) {
+                        Checkbox(checked=ingredient in vm.selectedIngredients(dish),onCheckedChange=null)
                         Text(ingredient)
                     }
                 }
             }
-            Text(formatDishPrice(dish.priceCents),style=MaterialTheme.typography.headlineSmall,color=OliveGreen)
+            Text(formatDishPrice(dish.priceCents),style=MaterialTheme.typography.headlineSmall,color=OliveGreen,modifier=Modifier.semantics { heading() })
             Button(onClick={vm.changeQuantity(dish.id,1)}, modifier=Modifier.fillMaxWidth().heightIn(min=54.dp),enabled=(vm.cart[dish.id] ?: 0) < 99) {
                 Text(if((vm.cart[dish.id] ?: 0) == 0) "Add to cart" else "Add another · ${vm.cart[dish.id]} in cart")
             }

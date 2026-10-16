@@ -14,15 +14,23 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 
-// Numbered olives hang from the branch and mark each onboarding page.
+// Multi-page onboarding gets a width-filling branch with page-specific leaf layouts and fixed-size olives/leaves.
+// TalkBack receives one progress summary instead of separate decorative drawing nodes.
 @Composable internal fun OnboardingProgress(completed:Int,total:Int,page:Int,pages:Int,pageComplete:List<Boolean>) {
     if(pages<=1) return
     val layout=remember(pages) { OnboardingBranchLayout(pages) }
     val naturalStepOffsets=layout.naturalStepOffsets
     val sprigs=layout.sprigs
-    Column(verticalArrangement=Arrangement.spacedBy(2.dp),modifier=Modifier.fillMaxWidth().testTag("onboarding_progress")) {
+    val stepLabel=accessibilityText("Step")
+    val completedLabel=accessibilityText("Completed requirements")
+    Column(verticalArrangement=Arrangement.spacedBy(2.dp),modifier=Modifier.fillMaxWidth().testTag("onboarding_progress").clearAndSetSemantics {
+        contentDescription="$stepLabel ${page+1} / $pages"
+        stateDescription="$completedLabel: $completed / $total"
+        progressBarRangeInfo=ProgressBarRangeInfo(completed.toFloat(),0f..total.coerceAtLeast(1).toFloat())
+    }) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // Stretch only the stem and distribute fruit along it; artwork stays at its original size.
             val availableSpan=(maxWidth.value-72f).coerceAtLeast(0f)

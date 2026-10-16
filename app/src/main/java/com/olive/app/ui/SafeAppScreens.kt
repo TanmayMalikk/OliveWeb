@@ -8,8 +8,8 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 
-// USER + SAFE CONTACT: Olive Branch routes to the private profile, settings, notes, activity, and messaging features.
-// UI sizing/color: the safe home uses the shared form grid, OliveGreen branding, Muted guidance, and responsive feature tiles.
+// Route User pages to focused screen files; Safe Contacts use their separate connection-focused shell.
+// SafeHomeScreen owns the feature tiles; individual screens own their layout and accessibility semantics.
 @Composable internal fun SafeArea(session: SessionViewModel, exit: ()->Unit) {
     val profile=session.profile ?: return
     LaunchedEffect(session.coverAccountId) { session.ensureMessagingObservation() }

@@ -27,6 +27,14 @@ class SecurityPolicyTest {
         assertEquals(1,IdlePolicy.countdown(74_999))
         assertEquals(0,IdlePolicy.countdown(75_000))
     }
+    @Test fun accessibilityCanExtendTheWarningButCannotShortenThePrivacyDefault() {
+        assertNull(IdlePolicy.countdown(59_999,60_000))
+        assertEquals(60,IdlePolicy.countdown(60_000,60_000))
+        assertEquals(45,IdlePolicy.countdown(75_000,60_000))
+        assertEquals(0,IdlePolicy.countdown(120_000,60_000))
+        assertEquals(15,IdlePolicy.countdown(60_000,0))
+        assertEquals(0,IdlePolicy.countdown(75_000,0))
+    }
     @Test fun triggerRequiresExactNormalizedMatch() {
         assertEquals(InputPolicy.triggerHash("  MY WORD  "),InputPolicy.triggerHash("my word"))
         assertEquals(InputPolicy.triggerHash("  He L P  "),InputPolicy.triggerHash("help"))

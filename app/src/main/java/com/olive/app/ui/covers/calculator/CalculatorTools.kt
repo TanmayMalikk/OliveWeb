@@ -1,5 +1,8 @@
 package com.olive.app.ui.covers.calculator
 
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -49,7 +52,7 @@ internal fun CalculatorTools(
             IconButton(onClick=onClose,modifier=Modifier.testTag("close_math_tools")) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back")
             }
-            Text("Math tools",style=MaterialTheme.typography.headlineSmall,color=OliveGreen,fontWeight=FontWeight.SemiBold)
+            Text("Math tools",style=MaterialTheme.typography.headlineSmall,color=OliveGreen,fontWeight=FontWeight.SemiBold,modifier=Modifier.semantics { heading() })
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
             Text("Angle",color=Muted,modifier=Modifier.weight(1f))
@@ -85,7 +88,7 @@ internal fun CalculatorTools(
             OutlinedTextField(
                 value=input,onValueChange={input=it.take(1200);result=null;error=null},
                 label={Text(stringResource(R.string.input))},supportingText={Text("Example: ${selected.example}")},
-                minLines=3,maxLines=9,modifier=Modifier.fillMaxWidth().testTag("advanced_tool_input"),
+                minLines=3,maxLines=9,modifier=Modifier.fillMaxWidth().testTag("advanced_tool_input").keepVisibleWhileTyping(),
             )
             Button(
                 onClick={
@@ -97,14 +100,14 @@ internal fun CalculatorTools(
                 shape=RoundedCornerShape(18.dp),
             ) { Text("Calculate",fontWeight=FontWeight.SemiBold) }
             result?.let {
-                Surface(color=LightSage,shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().testTag("advanced_tool_result")) {
+                Surface(color=LightSage,shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().testTag("advanced_tool_result").semantics(mergeDescendants=true) {}) {
                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                         Text("Result",color=OliveGreen,fontWeight=FontWeight.SemiBold)
                         Text(it,fontFamily=FontFamily.Monospace,color=Ink)
                     }
                 }
             }
-            error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("advanced_tool_error")) }
+            error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("advanced_tool_error")) }
             Spacer(Modifier.height(24.dp))
         }
     }
