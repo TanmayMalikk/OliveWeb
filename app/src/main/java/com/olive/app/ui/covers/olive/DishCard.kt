@@ -1,5 +1,12 @@
 package com.olive.app.ui.covers.olive
+import androidx.compose.ui.platform.testTag
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import com.olive.app.ui.*
 
 import androidx.compose.animation.*
@@ -16,12 +23,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.data.Dish
 
-// One bite-sized menu card with its photo, price, favourite button, and quick add.
+// Dish details form one TalkBack target; the favourite button keeps its own action and the photo is decorative.
 // UI sizing/color: dish cards use 24dp sides, 22dp corners, a 16:9 image, 16dp padding, and 18sp item names.
 @Composable internal fun DishCard(dish: Dish, vm: OliveViewModel, modifier: Modifier=Modifier) {
-    Card(onClick={vm.select(dish)},modifier=modifier.fillMaxWidth().padding(horizontal=24.dp).animateContentSize(),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=Paper)) {
+    Card(onClick={vm.select(dish)},modifier=modifier.fillMaxWidth().padding(horizontal=24.dp).animateContentSize().testTag("dish_card_${dish.id}").semantics(mergeDescendants=true) {},shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=Paper)) {
         Box {
-            DishImage(dish,Modifier.fillMaxWidth().aspectRatio(16f/9f))
+            DishImage(dish,Modifier.fillMaxWidth().aspectRatio(16f/9f).clearAndSetSemantics {})
             FilledIconButton(onClick={vm.favorite(dish.id)},modifier=Modifier.align(Alignment.TopEnd).padding(10.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=Cream)) {
                 Icon(if(dish.id in vm.favorites) Icons.Outlined.Favorite else Icons.Outlined.FavoriteBorder,if(dish.id in vm.favorites) "Unsave ${dish.name}" else "Save ${dish.name}",tint=OliveGreen)
             }

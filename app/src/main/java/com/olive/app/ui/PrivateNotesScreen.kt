@@ -1,5 +1,7 @@
 package com.olive.app.ui
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
@@ -75,7 +77,7 @@ import java.util.Locale
         LazyColumn(Modifier.fillMaxSize().oliveScrollbar(editorListState),state=editorListState,contentPadding=PaddingValues(start=24.dp,end=24.dp,top=12.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 IconButton(onClick={editorOpen=false},modifier=Modifier.testTag("private_notes_back")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"All notes") }
-                Text(if(editingId==null) "New private entry" else "Edit private entry",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
+                Text(if(editingId==null) "New private entry" else "Edit private entry",style=MaterialTheme.typography.titleLarge,modifier=(Modifier.weight(1f)).semantics { heading() })
                 if(entry!=null) IconButton(onClick={session.togglePrivateEntryPin(entry.id)},enabled=!session.busy,modifier=Modifier.testTag("private_pin_editor")) {
                     Icon(Icons.Outlined.PushPin,if(entry.pinned) "Unpin entry" else "Pin entry",tint=if(entry.pinned) Color(0xFFFFC107) else Muted)
                 }
@@ -90,7 +92,7 @@ import java.util.Locale
             } }
             item { Field("Title (optional)",title,"private_entry_title",enabled=!session.busy) { title=it.take(120) } }
             item { OutlinedTextField(value=body,onValueChange={body=it.take(10_000)},label={Text(stringResource(R.string.private_details))},
-                modifier=Modifier.fillMaxWidth().heightIn(min=300.dp).testTag("private_entry_body"),enabled=!session.busy) }
+                modifier=Modifier.fillMaxWidth().heightIn(min=300.dp).testTag("private_entry_body").keepVisibleWhileTyping(),enabled=!session.busy) }
             item { Button(onClick={
                 session.savePrivateEntry(editingId,kind,title,body)
                 if(body.isNotBlank()) editorOpen=false
@@ -120,7 +122,7 @@ import java.util.Locale
         contentPadding=PaddingValues(start=18.dp,end=18.dp,top=12.dp,bottom=112.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item(span={GridItemSpan(maxLineSpan)}) { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=session::back,modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Previous safe page") }
-            Text(stringResource(R.string.notes_incidents),style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
+            Text(stringResource(R.string.notes_incidents),style=MaterialTheme.typography.headlineSmall,modifier=(Modifier.weight(1f)).semantics { heading() })
             IconButton(onClick={trashOpen=true},modifier=Modifier.testTag("open_scratchpad")) {
                 BadgedBox(badge={if(trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) }}) {
                     Icon(Icons.Outlined.DeleteOutline,"Trash")
@@ -128,7 +130,7 @@ import java.util.Locale
             }
             FilledTonalIconButton(onClick={openEditor(null)},enabled=!session.busy,modifier=Modifier.testTag("new_private_entry")) { Icon(Icons.Outlined.Add,"New note") }
         } }
-        item(span={GridItemSpan(maxLineSpan)}) { OutlinedTextField(search,{search=it.take(200)},modifier=Modifier.fillMaxWidth().testTag("private_notes_search"),
+        item(span={GridItemSpan(maxLineSpan)}) { OutlinedTextField(search,{search=it.take(200)},modifier=Modifier.fillMaxWidth().testTag("private_notes_search").keepVisibleWhileTyping(),
             placeholder={Text(stringResource(R.string.search_notes))},leadingIcon={Icon(Icons.Outlined.Search,null)},singleLine=true,
             trailingIcon=if(search.isNotEmpty()) {{IconButton(onClick={search=""}) { Icon(Icons.Outlined.Close,"Clear search") }}} else null) }
         if(session.message!=null || session.busy) item(span={GridItemSpan(maxLineSpan)}) { Status(session) }
@@ -153,7 +155,7 @@ import java.util.Locale
         item {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 IconButton(onClick=close,modifier=Modifier.testTag("close_scratchpad")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"All notes") }
-                Text("Trash",style=MaterialTheme.typography.headlineSmall)
+                Text("Trash",style=MaterialTheme.typography.headlineSmall,modifier=Modifier.semantics { heading() })
             }
             Text(if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L)
                 "For testing, deleted notes stay here for 10 seconds before their private contents are permanently erased."
@@ -189,7 +191,7 @@ import java.util.Locale
             TextButton(onClick=close,modifier=Modifier.testTag("close_private_edit_log")) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Text(stringResource(R.string.close))
             }
-            Text(stringResource(R.string.edit_log),style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.edit_log),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
             Text(entry.title.ifBlank { stringResource(R.string.untitled_entry) },style=MaterialTheme.typography.titleMedium,color=Muted)
             Text("${entry.edits.size} ${stringResource(R.string.revisions)}",style=MaterialTheme.typography.bodySmall,color=Muted)
         }

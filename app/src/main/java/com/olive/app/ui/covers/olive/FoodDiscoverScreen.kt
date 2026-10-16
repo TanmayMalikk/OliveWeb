@@ -1,5 +1,11 @@
 package com.olive.app.ui.covers.olive
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -60,7 +66,7 @@ import androidx.compose.ui.platform.LocalFocusManager
         }
         item {
             OutlinedTextField(value=vm.query, onValueChange=onSearch,
-                modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp),
+                modifier=Modifier.fillMaxWidth().padding(horizontal=24.dp).keepVisibleWhileTyping(),
                 placeholder={Text(stringResource(R.string.search_olive_s_menu))}, leadingIcon={Icon(Icons.Outlined.Search,null)},
                 trailingIcon={if(vm.query.isNotEmpty()) IconButton(onClick={vm.search("")}) { Icon(Icons.Outlined.Close,"Clear search") }},
                 singleLine=true, shape=RoundedCornerShape(18.dp),

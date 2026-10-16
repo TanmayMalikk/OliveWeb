@@ -1,5 +1,7 @@
 package com.olive.app.ui.covers.calculator
 
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -77,7 +79,7 @@ internal fun GraphTableAnalysisDialog(equations:List<String>,mode:CalculatorAngl
     AlertDialog(
         onDismissRequest=onClose,
         title={Text(stringResource(R.string.graph_table_analysis))},
-        text={Column(Modifier.fillMaxWidth().heightIn(max=610.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        text={Column(Modifier.fillMaxWidth().heightIn(max=610.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 listOf("Table","Analyze").forEach { item ->
                     FilterChip(selected=section==item,onClick={section=item;error=null},label={Text(item)},modifier=Modifier.weight(1f))
@@ -138,7 +140,7 @@ private fun GraphTableSection(
         RangeField(step,onStepChange,"Step",Modifier.weight(1f).testTag("table_step_x"))
     }
     Button(onClick=onGenerate,modifier=Modifier.fillMaxWidth().testTag("make_graph_table")) { Text(stringResource(R.string.generate_table)) }
-    error?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+    error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
     table?.let { data ->
         Text("Values",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
         GraphValueTable(data)
@@ -147,7 +149,7 @@ private fun GraphTableSection(
 
 @Composable
 private fun RangeField(value:String,onChange:(String)->Unit,label:String,modifier:Modifier=Modifier) {
-    OutlinedTextField(value,{onChange(it.take(24))},label={Text(label)},singleLine=true,modifier=modifier)
+    OutlinedTextField(value,{onChange(it.take(24))},label={Text(label)},singleLine=true,modifier=modifier.keepVisibleWhileTyping())
 }
 
 @Composable
@@ -161,11 +163,11 @@ private fun GraphValueTable(data:GraphTableData) {
         modifier=Modifier.fillMaxWidth().height(280.dp).border(1.dp,SoftGray,RoundedCornerShape(12.dp))) {
         Box(Modifier.fillMaxSize().oliveScrollbar(vertical).oliveHorizontalScrollbar(horizontal)) {
             Column(Modifier.horizontalScroll(horizontal).verticalScroll(vertical).padding(end=7.dp,bottom=7.dp).testTag("graph_table_rows")) {
-                Row(Modifier.background(SageGreen)) {
+                Row(Modifier.background(SageGreen).testTag("graph_table_header").semantics(mergeDescendants=true) {}) {
                     data.headers.forEachIndexed { index,header -> GraphTableCell(header,index==0,true) }
                 }
                 data.rows.forEachIndexed { rowIndex,row ->
-                    Row(Modifier.background(if(rowIndex%2==0) Paper else Cream)) {
+                    Row(Modifier.background(if(rowIndex%2==0) Paper else Cream).testTag("graph_table_row_$rowIndex").semantics(mergeDescendants=true) {}) {
                         row.forEachIndexed { index,value -> GraphTableCell(value,index==0,false) }
                     }
                 }
@@ -190,7 +192,7 @@ private fun GraphAnalysisSection(
     calculation:GraphCalculation,onCalculationChange:(GraphCalculation)->Unit,analysisInput:String,onInputChange:(String)->Unit,
     result:String?,error:String?,onCalculate:()->Unit,
 ) {
-    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Text("1. Choose a function",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             equations.indices.forEach { index ->
@@ -223,11 +225,11 @@ private fun GraphAnalysisSection(
             }
         }
 
-        OutlinedTextField(analysisInput,onInputChange,label={Text(calculation.inputLabel)},supportingText={Text(calculation.example)},singleLine=true,modifier=Modifier.fillMaxWidth())
+        OutlinedTextField(analysisInput,onInputChange,label={Text(calculation.inputLabel)},supportingText={Text(calculation.example)},singleLine=true,modifier=Modifier.fillMaxWidth().keepVisibleWhileTyping())
         Button(onClick=onCalculate,modifier=Modifier.fillMaxWidth().testTag("run_graph_analysis")) { Text("Calculate ${calculation.label.lowercase()}") }
-        error?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+        error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
         result?.let {
-            Surface(color=PaleOlive,shape=RoundedCornerShape(12.dp),modifier=Modifier.fillMaxWidth().testTag("graph_analysis_result")) {
+            Surface(color=PaleOlive,shape=RoundedCornerShape(12.dp),modifier=Modifier.fillMaxWidth().testTag("graph_analysis_result").semantics(mergeDescendants=true) {}) {
                 Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     Text("Result",style=MaterialTheme.typography.labelLarge,color=OliveGreen,fontWeight=FontWeight.Bold)
                     Text(it,fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodyLarge)

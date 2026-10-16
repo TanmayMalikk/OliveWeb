@@ -1,5 +1,7 @@
 package com.olive.app.ui
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.covers.olive.AddressFields
@@ -99,7 +101,7 @@ import java.util.UUID
                 }
                 Text("Name and icon update after leaving the app.",color=Muted,style=MaterialTheme.typography.bodySmall)
                 HorizontalDivider()
-                Text("Safe contacts · optional",style=MaterialTheme.typography.titleLarge)
+                Text("Safe contacts · optional",style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
                 Text("Add one or more trusted people. Olive never contacts them automatically.",color=Muted,style=MaterialTheme.typography.bodySmall)
                 contacts.forEach { contact ->
                     Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=MaterialTheme.shapes.medium) {

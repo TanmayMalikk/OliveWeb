@@ -1,5 +1,7 @@
 package com.olive.app.ui.covers.olive
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import com.olive.app.ui.*
 
 import androidx.activity.compose.BackHandler
@@ -15,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.olive.app.data.OrderLine
 
-// Change cover navigation, tabs, address popup, or checkout entry in this main food-app section.
+// Food-cover shell: route tabs and dialogs to focused screens while OliveViewModel owns menu/cart state.
 // UI sizing/color: the cover shell uses Cream, shared Olive colors, safe-area insets, and Material navigation sizing.
 @Composable fun OliveCover(
     vm: OliveViewModel = viewModel(),

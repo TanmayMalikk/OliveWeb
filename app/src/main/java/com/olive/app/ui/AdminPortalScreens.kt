@@ -2,6 +2,8 @@ package com.olive.app.ui
 import com.olive.app.R
 import androidx.compose.ui.res.stringResource
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -44,7 +46,7 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
         Box(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(R.string.olive_tree),fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-                Text(if(admin) "Admin panel" else "Staff panel",style=MaterialTheme.typography.headlineMedium)
+                Text(if(admin) "Admin panel" else "Staff panel",style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
                 Text("Signed in as ${session.coverUsername}",color=Muted)
             }
             IconButton(onClick=onSettings,modifier=Modifier.align(Alignment.TopEnd)) { Icon(Icons.Outlined.Settings,"Account settings") }
@@ -64,7 +66,7 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back") }
-            Text(stringResource(R.string.accounts),style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.accounts),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             Button(onClick=onCreate,enabled=!session.busy,modifier=Modifier.weight(1f)) { Text(stringResource(R.string.create_account)) }
@@ -88,16 +90,16 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=18.dp).padding(bottom=40.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back") }
-            Text(stringResource(R.string.account_settings),style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.account_settings),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
         }
-        Text("Profile information",style=MaterialTheme.typography.titleLarge)
+        Text("Profile information",style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
         Field("Full name",fullName,"organization_settings_name",enabled=!session.busy) { fullName=it.take(120) }
         BirthdayPicker(dob,"organization_settings_dob",!session.busy) { dob=it }
         Field("Email",email,"organization_settings_email",enabled=!session.busy) { email=it.take(254) }
         Field("Phone (optional)",phone,"organization_settings_phone",enabled=!session.busy) { phone=it.take(40) }
         Button(onClick={session.updateOrganizationProfile(fullName,dob,email,phone)},enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.save_profile)) }
         HorizontalDivider()
-        Text(stringResource(R.string.change_password),style=MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.change_password),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
         Field("Current password",currentPassword,"organization_current_password",secret=true,showSecretToggle=true,enabled=!session.busy) { currentPassword=it.take(128) }
         Field("New password",newPassword,"organization_new_password",secret=true,showSecretToggle=true,enabled=!session.busy) { newPassword=it.take(24) }
         Field("Confirm new password",confirmation,"organization_confirm_password",secret=true,showSecretToggle=true,enabled=!session.busy) { confirmation=it.take(24) }
@@ -111,7 +113,7 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     val values=listOf("Users" to counts.users,"Safe Contacts" to counts.safeContacts,"Staff" to counts.staff,"Admins" to counts.admins)
     values.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
         row.forEach { (label,count) -> Card(Modifier.weight(1f)) { Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text(count.toString(),style=MaterialTheme.typography.titleLarge,color=OliveGreen)
+            Text(count.toString(),style=MaterialTheme.typography.titleLarge,color=OliveGreen,modifier=Modifier.semantics { heading() })
             Text(label,style=MaterialTheme.typography.bodyMedium)
         } } }
     } }

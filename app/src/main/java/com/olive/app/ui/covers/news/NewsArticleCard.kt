@@ -1,5 +1,8 @@
 package com.olive.app.ui.covers.news
 
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.hideFromAccessibility
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -34,7 +37,8 @@ import coil3.compose.AsyncImage
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 
-// Modern newspaper cards keep publisher attribution, a visible section, and the article's own photo.
+// Newspaper cards load cached/publisher metadata, show the section and article photo, and tag known paywalls without filtering.
+// Story details form one TalkBack target; the bookmark remains a separate action.
 @Composable internal fun NewsArticleCard(article:NewsArticle,language:String,saved:Boolean,onOpen:()->Unit,onBookmark:()->Unit) {
     val context=LocalContext.current
     val metadata=remember(context) { NewsMetadataRepository(context.applicationContext) }
@@ -45,8 +49,7 @@ import androidx.compose.ui.semantics.stateDescription
     }
     val topic=displayed.topic.ifBlank { fallbackNewsTopic(displayed.title) }
     var imageFailed by remember(displayed.imageUrl) { mutableStateOf(false) }
-    var imageLoaded by remember(displayed.imageUrl) { mutableStateOf(false) }
-    Card(onClick=onOpen,modifier=Modifier.animateContentSize().fillMaxWidth().testTag("news_article_card"),
+    Card(onClick=onOpen,modifier=Modifier.animateContentSize().fillMaxWidth().testTag("news_article_card").semantics(mergeDescendants=true) {},
         colors=CardDefaults.cardColors(containerColor=Cream),elevation=CardDefaults.cardElevation(defaultElevation=3.dp),
         border=BorderStroke(.7.dp,SoftGray),shape=RoundedCornerShape(20.dp)) {
         Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -75,10 +78,10 @@ import androidx.compose.ui.semantics.stateDescription
             Text(displayed.title.removeSuffix(" - ${displayed.source}"),fontFamily=FontFamily.Serif,fontWeight=FontWeight.Bold,fontSize=24.sp,
                 lineHeight=29.sp,color=Ink,maxLines=4)
             if(isSecureNewsUrl(displayed.imageUrl) && !imageFailed) AsyncImage(model=displayed.imageUrl,
-                contentDescription=displayed.title,contentScale=ContentScale.Crop,
+                contentDescription=null,contentScale=ContentScale.Crop,
                 modifier=Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(9.dp)).background(LightSage).testTag("news_article_image")
-                    .semantics { stateDescription=if(imageLoaded) "Article photo loaded" else "Article photo loading" },
-                onSuccess={imageLoaded=true},onError={imageFailed=true})
+                    .semantics { hideFromAccessibility() },
+                onError={imageFailed=true})
             if(displayed.summary.isNotBlank()) Text(displayed.summary,color=Muted,fontFamily=FontFamily.Serif,
                 fontSize=15.sp,lineHeight=21.sp,maxLines=3,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End,verticalAlignment=Alignment.CenterVertically) {

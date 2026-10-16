@@ -2,6 +2,8 @@ package com.olive.app.ui
 import com.olive.app.R
 import androidx.compose.ui.res.stringResource
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -48,7 +50,7 @@ import androidx.compose.ui.unit.sp
         Box(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.olive_branch),fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-                Text(stringResource(R.string.safe_contact),style=MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.safe_contact),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
                 Text("Stay connected with people who trust you for support.",color=Muted)
             }
             IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.align(Alignment.TopEnd).testTag("safe_contact_settings")) {
@@ -59,7 +61,7 @@ import androidx.compose.ui.unit.sp
         Button(onClick={session.navigate(SafePage.Profile)},modifier=Modifier.fillMaxWidth().testTag("safe_contact_profile")) {
             Icon(Icons.Outlined.PersonOutline,null);Spacer(Modifier.width(10.dp));Text(stringResource(R.string.my_profile))
         }
-        Text(stringResource(R.string.private_features),style=MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.private_features),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
         Button(onClick={session.navigate(SafePage.Notes)},modifier=Modifier.fillMaxWidth().heightIn(min=92.dp).testTag("safe_contact_notes"),
             colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF718669))) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {

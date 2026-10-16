@@ -4,9 +4,14 @@ import androidx.compose.runtime.*
 import com.olive.app.data.*
 import com.olive.app.ui.*
 
-// Observable presentation state. Only SessionViewModel exposes it to screens.
-internal class SessionState {
-    var screen by mutableStateOf(SessionScreen.Loading)
+// Observable screen state exposed through SessionViewModel; the screen setter also enforces the User PIN gate.
+internal class SessionState(private val canEnterSafe:()->Boolean) {
+    private var screenState by mutableStateOf(SessionScreen.Loading)
+    var screen:SessionScreen
+        get()=screenState
+        set(value) { screenState=if(value==SessionScreen.Safe && !canEnterSafe()) SessionScreen.Cover else value }
+    var pinChallengeVersion by mutableIntStateOf(0)
+    var accessibilityExitVersion by mutableIntStateOf(0)
     var page by mutableStateOf(SafePage.Home)
     var activityCategory by mutableStateOf<ActivityCategory?>(null)
     var busy by mutableStateOf(false)

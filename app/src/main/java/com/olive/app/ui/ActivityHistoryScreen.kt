@@ -1,5 +1,7 @@
 package com.olive.app.ui
 
+import androidx.compose.ui.semantics.*
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
@@ -105,7 +107,7 @@ import androidx.compose.ui.text.font.FontWeight
             }
         }
         if(selected==null || selected==ActivityCategory.Settings) {
-            item { Text(stringResource(R.string.settings_history),style=MaterialTheme.typography.titleLarge) }
+            item { Text(stringResource(R.string.settings_history),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() }) }
             if(settings.isEmpty()) item { Text(stringResource(R.string.no_settings_activity_yet)) }
             items(visible(ActivityCategory.Settings,settings),key={it.id}) { event ->
                 Card(Modifier.fillMaxWidth().testTag("settings_history_row")) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
@@ -117,7 +119,7 @@ import androidx.compose.ui.text.font.FontWeight
             if(selected==null && settings.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.Settings)}) { Text(stringResource(R.string.see_more)) } }
         }
         if(selected==null || selected==ActivityCategory.Triggers) {
-            item { HorizontalDivider();Text(stringResource(R.string.trigger_history),style=MaterialTheme.typography.titleLarge) }
+            item { HorizontalDivider();Text(stringResource(R.string.trigger_history),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() }) }
             if(triggers.isEmpty()) item { Text(stringResource(R.string.no_trigger_activity_yet)) }
             items(visible(ActivityCategory.Triggers,triggers),key={it.id}) { event ->
                 Card(Modifier.fillMaxWidth().testTag("trigger_history_row")) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
@@ -129,7 +131,7 @@ import androidx.compose.ui.text.font.FontWeight
             if(selected==null && triggers.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.Triggers)}) { Text(stringResource(R.string.see_more)) } }
         }
         if(selected==null || selected==ActivityCategory.PinAttempts) {
-            item { HorizontalDivider();Text(stringResource(R.string.pin_attempt_history),style=MaterialTheme.typography.titleLarge) }
+            item { HorizontalDivider();Text(stringResource(R.string.pin_attempt_history),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() }) }
             if(attempts.isEmpty()) item { Text(stringResource(R.string.no_failed_attempts_recorded)) }
             items(visible(ActivityCategory.PinAttempts,attempts),key={it.id}) { attempt ->
                 Card(Modifier.fillMaxWidth().testTag("attempt_row")) { Column(Modifier.padding(16.dp)) {
@@ -139,7 +141,7 @@ import androidx.compose.ui.text.font.FontWeight
             if(selected==null && attempts.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.PinAttempts)}) { Text(stringResource(R.string.see_more)) } }
         }
         if(selected==null || selected==ActivityCategory.Checkouts) {
-            item { HorizontalDivider();Text(stringResource(R.string.checkout_attempts),style=MaterialTheme.typography.titleLarge) }
+            item { HorizontalDivider();Text(stringResource(R.string.checkout_attempts),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() }) }
             if(checkouts.isEmpty()) item { Text(stringResource(R.string.no_checkout_attempts_yet)) }
             items(visible(ActivityCategory.Checkouts,checkouts),key={it.id}) { event ->
                 Card(Modifier.fillMaxWidth().testTag("safe_checkout_history_row")) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
@@ -150,7 +152,7 @@ import androidx.compose.ui.text.font.FontWeight
             if(selected==null && checkouts.size>5) item { TextButton(onClick={session.showActivityCategory(ActivityCategory.Checkouts)}) { Text(stringResource(R.string.see_more)) } }
         }
         if(selected==null || selected==ActivityCategory.Privacy) {
-            item { HorizontalDivider();Text(stringResource(R.string.privacy_events),style=MaterialTheme.typography.titleLarge) }
+            item { HorizontalDivider();Text(stringResource(R.string.privacy_events),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() }) }
             if(privacy.isEmpty()) item { Text(stringResource(R.string.no_capture_events_reported_by_android)) }
             items(visible(ActivityCategory.Privacy,privacy),key={it.id}) { event ->
                 Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(event.action);Text(formatter.format(Instant.ofEpochMilli(event.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted) } }

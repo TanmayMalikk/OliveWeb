@@ -1,5 +1,8 @@
 package com.olive.app.ui.covers.olive
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -44,8 +47,8 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
 @Composable private fun CheckoutField(label: String, value: String, tag: String, numeric: Boolean=false, secret: Boolean=false,
     error: String?=null, onFocus: (() -> Unit)?=null, change: (String)->Unit) {
     OutlinedTextField(value=value,onValueChange=change,label={Text(label)},singleLine=true,
-        modifier=Modifier.fillMaxWidth().testTag(tag).onFocusChanged { if(it.isFocused) onFocus?.invoke() },
-        isError=error!=null,supportingText=error?.let { value -> { Text(value) } },
+        modifier=Modifier.fillMaxWidth().testTag(tag).onFocusChanged { if(it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
+        isError=error!=null,supportingText=error?.let { value -> { AccessibleMessage(value) } },
         visualTransformation=if(secret) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions=KeyboardOptions(autoCorrectEnabled=false,keyboardType=if(numeric) KeyboardType.NumberPassword else KeyboardType.Text))
 }
@@ -72,15 +75,15 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
         }
     }
 }
-// Add or change address fields here; SessionViewModel handles saving and auto-close.
+// Address fields live here; SessionCoverState saves through SessionViewModel and updates addressSaveVersion to close the dialog.
 // UI sizing/text: address headings use headlineMedium and controls fill the dialog width.
 @Composable fun AddressDialog(address: DeliveryAddress, busy: Boolean, message: String?, onSave: (DeliveryAddress)->Unit, onClose: ()->Unit) {
     var draft by remember(address) { mutableStateOf(address) }
     CoverDialog(onClose) {
-        Text(stringResource(R.string.delivery_address),style=MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.delivery_address),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
         Text(stringResource(R.string.where_should_we_deliver_your_food))
         AddressFields(draft) { draft=it }
-        message?.let { Text(it) }
+        message?.let { AccessibleMessage(it) }
         Button(onClick={onSave(draft.copy(line1=draft.line1.trim(),line2=draft.line2.trim(),city=draft.city.trim(),province=draft.province.trim(),postalCode=draft.postalCode.trim(),country=draft.country.trim()))},enabled=draft.valid && !busy,modifier=Modifier.fillMaxWidth().testTag("save_address")) { Text(stringResource(R.string.save_delivery_address)) }
         if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         TextButton(onClick=onClose) { Text(stringResource(R.string.done)) }
@@ -110,27 +113,28 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
         validExpiry(expiry) && securityCode.length in 3..4 && (useShippingForBilling || billing.isNotBlank())
     CoverDialog(onClose) {
         if(declined) {
-            Text(stringResource(R.string.payment_declined),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.testTag("payment_declined"))
+            Text(stringResource(R.string.payment_declined),style=MaterialTheme.typography.headlineMedium,modifier=(Modifier.testTag("payment_declined")).semantics { heading() })
             Text(stringResource(R.string.we_couldn_t_complete_your_payment_no_charge_was_made_and_no_order_was_placed))
             if(historyError) Text(stringResource(R.string.order_history_could_not_be_saved_on_this_device),color=MaterialTheme.colorScheme.error)
             Button(onClick=onClose,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.return_to_menu)) }
         } else {
-            Text(stringResource(R.string.checkout),style=MaterialTheme.typography.headlineMedium)
-            Text(stringResource(R.string.delivery_details),style=MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.checkout),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
+            Text(stringResource(R.string.delivery_details),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
             AddressFields(shipping) { shipping=it }
             if(showErrors && !shipping.valid) Text(stringResource(R.string.enter_a_complete_shipping_address),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick={onSaveAddress(shipping)},enabled=shipping.valid,modifier=Modifier.testTag("checkout_save_address")) { Text(stringResource(R.string.save_delivery_address)) }
             CheckoutField("Recipient name",recipient,"checkout_recipient",error=if(showErrors && recipient.isBlank()) "Recipient name is required." else null) { recipient=it.take(120) }
             CheckoutField("Delivery instructions (optional)",instructions,"checkout_instructions") { instructions=it.take(500) }
             HorizontalDivider()
-            Text(stringResource(R.string.payment_details),style=MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.payment_details),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
             CheckoutField("Name on card",cardholder,"cardholder",error=if(showErrors && cardholder.isBlank()) "Name on card is required." else null) { cardholder=it.take(120) }
             // Keep card entry readable while the values remain temporary and never get saved.
             CheckoutField("Card number",number,"card_number",numeric=true,error=if(showErrors && numberDigits !in 12..16) "Enter a valid card number with no more than 16 digits." else null) { number=formatCardNumber(it) }
             CheckoutField("Expiry · MM/YY",expiry,"card_expiry",numeric=true,error=if(showErrors && !validExpiry(expiry)) "Enter a valid expiry as MM/YY." else null) { expiry=formatExpiry(it) }
             CheckoutField("Security code",securityCode,"card_cvc",numeric=true,secret=true,error=if(showErrors && securityCode.length !in 3..4) "Enter a 3 or 4 digit security code." else null) { securityCode=it.filter { c->c in '0'..'9' }.take(4) }
-            Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                Checkbox(checked=useShippingForBilling,onCheckedChange={useShippingForBilling=it},modifier=Modifier.testTag("use_shipping_address"))
+            Row(Modifier.fillMaxWidth().testTag("use_shipping_address").toggleable(value=useShippingForBilling,role=Role.Checkbox,
+                onValueChange={useShippingForBilling=it}),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                Checkbox(checked=useShippingForBilling,onCheckedChange=null)
                 Text(stringResource(R.string.use_shipping_address),modifier=Modifier.weight(1f))
             }
             if(useShippingForBilling) Text(shipping.displayText(),style=MaterialTheme.typography.bodySmall)
