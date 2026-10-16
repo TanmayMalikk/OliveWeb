@@ -221,7 +221,7 @@ def process_locale(folder_name, default_strings, delay=2.0, batch_size=20, dry_r
 
 def main():
     parser = argparse.ArgumentParser(description="Auto-translate missing Android strings.xml entries in batches.")
-    parser.add_argument("--target-locale", "-l", help="Target specific locale (e.g., 'es', 'ar', 'tl', 'zh', 'fr')")
+    parser.add_argument("--target-locale", "-l", help="Target specific locale (e.g., 'es', 'ar', 'zh', 'fr')")
     parser.add_argument("--delay", type=float, default=2.0, help="Pause in seconds between batch requests (default: 2.0s)")
     parser.add_argument("--batch-size", type=int, default=20, help="Number of strings per HTTP request (default: 20)")
     parser.add_argument("--dry-run", action="store_true", help="Preview translations without modifying XML files")

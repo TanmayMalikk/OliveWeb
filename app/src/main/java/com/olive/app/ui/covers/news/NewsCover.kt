@@ -40,6 +40,8 @@ import com.olive.app.data.NewsScope
 import com.olive.app.data.localPublished
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.core.content.edit
+
 // Daily Digest refreshes local/global headlines while bookmarks stay saved separately.
 // UI sizing/color: the feed uses Cream bars, 20dp side padding, 14dp gaps, and the shared Olive typography/colors.
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,19 +96,19 @@ import kotlinx.coroutines.withContext
         title={Text(stringResource(R.string.change_local_news_location))},
         text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(locationDraft,{ value ->
-                if(!session.interceptSearch(value)) locationDraft=value.take(120) else locationDraft=""
+                locationDraft = if(!session.interceptSearch(value)) value.take(120) else ""
             },label={Text(stringResource(R.string.city_or_region))},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input"))
             Text("This changes the local news search on this device.",color=Muted,style=MaterialTheme.typography.bodySmall)
         }},
         confirmButton={TextButton(onClick={
             customPlace=locationDraft.trim();currentPlace=customPlace
-            locationPreferences.edit().putString(locationPreferenceKey,customPlace).apply()
+            locationPreferences.edit { putString(locationPreferenceKey, customPlace) }
             locationEditorOpen=false;refresh++
         },enabled=locationDraft.isNotBlank()) { Text(stringResource(R.string.save)) }},
         dismissButton={Row {
             TextButton(onClick={
                 customPlace="";currentPlace=fallbackPlace
-                locationPreferences.edit().remove(locationPreferenceKey).apply()
+                locationPreferences.edit {remove(locationPreferenceKey)}
                 locationEditorOpen=false;refresh++
             }) { Text(stringResource(R.string.use_device_location)) }
             TextButton(onClick={locationEditorOpen=false}) { Text(stringResource(R.string.cancel)) }
@@ -160,8 +162,8 @@ import kotlinx.coroutines.withContext
                     } else {
                         item {
                             OutlinedTextField(query,{ value ->
-                                if(!session.interceptSearch(value)) query=value
-                                else query=""
+                                query = if(!session.interceptSearch(value)) value
+                                else ""
                             },placeholder={Text(if(tab=="Saved") "Search saved stories" else "Search headlines")},leadingIcon={Icon(Icons.Outlined.Search,null)},
                                 trailingIcon=if(query.isNotBlank()) {
                                     { IconButton(onClick={query=""}) { Icon(Icons.Outlined.Close,"Clear search") } }
