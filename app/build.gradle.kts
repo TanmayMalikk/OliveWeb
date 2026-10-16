@@ -4,6 +4,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+tasks.named("check") { dependsOn(rootProject.tasks.named("checkSourceSize")) }
 val firebaseConfigured = file("google-services.json").exists() && providers.gradleProperty("oliveLocalTest").orNull != "true"
 if (firebaseConfigured) pluginManager.apply("com.google.gms.google-services")
 // Optional separate output directory for checks while Android Studio indexes the default build.
