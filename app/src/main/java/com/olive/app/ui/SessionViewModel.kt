@@ -110,6 +110,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private var epoch = 0L
     private val screenHistory=mutableListOf<SessionScreen>()
     private val safePageHistory=mutableListOf<SafePage>()
+    var viewedSharedEntry by mutableStateOf<PrivateEntry?>(null); private set
     val configured get() = enrollment != null
     val coverAccountId get() = enrollment?.uid
     val sensitive get() = screen != SessionScreen.Cover || checkoutActive
@@ -941,6 +942,73 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Notes)
                 privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
             queueHistorySync()
+        }
+    }
+    // share only pointer to encrypted private note in chats
+    fun sharePrivateEntryInChat(entry: PrivateEntry) {
+        val conversation = activeConversation ?: return
+        val secureRepo = secureDocumentRepository ?: return
+        val msgRepo = messagingRepository ?: return
+        val chatRepo = secureChatRepository ?: return
+        val device = enrollment ?: return
+
+        if (messagingBusy) return
+        val token = epoch
+        messagingBusy = true; message = null
+
+        viewModelScope.launch {
+            try {
+                // 1. Identify the friend in this 1-on-1 chat
+                val friendUid = conversation.participantIds.first { it != device.uid }
+                val friendUsername = conversation.participantUsernames[friendUid] ?: throw Exception("Friend not found")
+
+                // 2. Fetch their Public Key
+                val friendDirectory = msgRepo.searchUsers(friendUsername, device.uid).firstOrNull()
+                    ?: throw Exception("Could not retrieve the contact's public key.")
+                val friendPublicKey = KeyManager.decodePublicKey(friendDirectory.publicKey)
+
+                // 3. Grant them cryptographic access to the Note
+                secureRepo.grantAccessToEntry(entry.id, device.uid, friendUid, friendPublicKey)
+
+                // 4. Send the pointer in the E2EE Chat
+                val roomKey = chatRepo.loadRoomKey(conversation.id, device.uid)
+                val pointerText = "SHARED_NOTE:${entry.id}:${entry.title}" // A formatted string the UI can parse into a special chat bubble
+                chatRepo.sendSecureMessage(conversation.id, AccountIdentity(device.uid, coverUsername), pointerText, roomKey)
+
+                if (epoch == token) message = "Note shared in chat."
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                if (epoch == token) message = error.localizedMessage ?: "Unable to share note."
+            } finally {
+                if (epoch == token) messagingBusy = false
+            }
+        }
+    }
+    fun openSharedPrivateEntry(entryId: String) {
+        val uid = enrollment?.uid ?: return
+        val secureRepo = secureDocumentRepository ?: return
+
+        if (busy) return
+        val token = epoch
+        busy = true; message = null; viewedSharedEntry = null
+
+        viewModelScope.launch {
+            try {
+                // Execute the decryption engine from the repository
+                val decryptedEntry = secureRepo.loadAndDecryptEntry(entryId, uid)
+
+                if (epoch == token) {
+                    viewedSharedEntry = decryptedEntry
+                    // Optionally route them to a specific viewer screen:
+                    // screen = SessionScreen.Safe
+                    // page = SafePage.SharedNoteViewer
+                }
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                if (epoch == token) message = error.localizedMessage ?: "Unable to decrypt this shared entry."
+            } finally {
+                if (epoch == token) busy = false
+            }
         }
     }
     fun trashPrivateEntry(id: String) {
