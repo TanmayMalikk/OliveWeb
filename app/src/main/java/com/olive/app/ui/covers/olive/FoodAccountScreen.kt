@@ -1,5 +1,11 @@
 package com.olive.app.ui.covers.olive
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -41,9 +47,9 @@ import java.util.Locale
             item { FoodEmptyState(Icons.Outlined.PersonOutline,"Welcome to Olive","Browse the menu and collect your favourites.") }
             item { Button(onClick=onSetup,modifier=Modifier.padding(horizontal=24.dp).fillMaxWidth()) { Text(stringResource(R.string.set_up_account)) } }
         } else {
-            item { Card(Modifier.padding(horizontal=24.dp).fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Paper)) {
+            item { Card(Modifier.padding(horizontal=24.dp).fillMaxWidth().testTag("cover_profile_summary").semantics(mergeDescendants=true) {},colors=CardDefaults.cardColors(containerColor=Paper)) {
                 Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.your_olive_account),style=MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.your_olive_account),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
                     Text(session?.coverFullName.orEmpty(),fontWeight=FontWeight.SemiBold,modifier=Modifier.testTag("cover_profile_name"))
                     Text("@${session?.coverUsername.orEmpty()}",color=Muted,modifier=Modifier.testTag("cover_profile_username"))
                     HorizontalDivider(Modifier.padding(vertical=4.dp))
@@ -54,11 +60,11 @@ import java.util.Locale
             } }
             item { Card(Modifier.padding(horizontal=24.dp).fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=Paper)) {
                 Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.account_settings),style=MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.account_settings),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
                     OutlinedTextField(value=fullName,onValueChange={fullName=it.take(120)},singleLine=true,label={Text(stringResource(R.string.full_name))},
-                        modifier=Modifier.fillMaxWidth().testTag("cover_full_name").onFocusChanged { if(it.isFocused) session?.recordSettingsInteraction("Olive","Focused full name") },
+                        modifier=Modifier.fillMaxWidth().testTag("cover_full_name").onFocusChanged { if(it.isFocused) session?.recordSettingsInteraction("Olive","Focused full name") }.keepVisibleWhileTyping(),
                         enabled=session?.busy!=true)
-                    session?.message?.let { Text(it,color=Muted) }
+                    session?.message?.let { AccessibleMessage(it,color=Muted) }
                     Button(onClick={session?.saveCoverSettings(fullName,selectedLanguage)},enabled=session?.busy!=true && fullName.isNotBlank(),modifier=Modifier.fillMaxWidth().testTag("cover_save_settings")) { Text(stringResource(R.string.save_account_settings)) }
                     if(session?.busy==true) LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
@@ -69,7 +75,7 @@ import java.util.Locale
             val history=session?.checkoutHistory.orEmpty()
             if(history.isEmpty()) item { Text(stringResource(R.string.no_checkout_attempts_yet),Modifier.padding(horizontal=24.dp),color=Muted) }
             items(if(showAllOrders) history else history.take(5),key={it.id}) { attempt ->
-                Card(Modifier.padding(horizontal=24.dp).fillMaxWidth().testTag("checkout_history_row"),
+                Card(Modifier.padding(horizontal=24.dp).fillMaxWidth().testTag("checkout_history_row").semantics(mergeDescendants=true) {},
                     colors=CardDefaults.cardColors(containerColor=Paper)) {
                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                         Text(stringResource(R.string.payment_declined),fontWeight=FontWeight.SemiBold,color=OliveGreen)
@@ -85,7 +91,7 @@ import java.util.Locale
                 Text(if(showAllOrders) "Show less" else "See more")
             } }
         }
-        item { Card(Modifier.padding(horizontal=24.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)) {
+        item { Card(Modifier.padding(horizontal=24.dp).semantics(mergeDescendants=true) {},colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.primaryContainer)) {
             Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.find_a_new_favourite),fontFamily=FontFamily.Serif,fontSize=24.sp)
                 Text(stringResource(R.string.fresh_bowls_stone_baked_pizza_and_little_everyday_cravings_tap_the_heart_on_a_dish_to_keep_it_close),color=Muted)

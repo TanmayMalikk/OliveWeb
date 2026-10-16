@@ -10,6 +10,8 @@ import com.olive.app.ui.session.SessionRuntime
 class SessionViewModel(application:Application):AndroidViewModel(application) {
     private val runtime=SessionRuntime(application,viewModelScope)
     val screen get()=runtime.state.screen
+    val pinChallengeVersion get()=runtime.state.pinChallengeVersion
+    val accessibilityExitVersion get()=runtime.state.accessibilityExitVersion
     val page get()=runtime.state.page
     val activityCategory get()=runtime.state.activityCategory
     val busy get()=runtime.state.busy
@@ -78,7 +80,7 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun saveSetupProfile(value: UserProfile) = runtime.auth.saveSetupProfile(value)
     fun createDevicePin(pin: String, confirmation: String) = runtime.auth.createDevicePin(pin,confirmation)
     fun interceptSearch(value: String) : Boolean = runtime.access.interceptSearch(value)
-    fun submitPin(pin: String) = runtime.access.submitPin(pin)
+    fun submitPin(pin: String,challenge:Int=pinChallengeVersion) = runtime.access.submitPin(pin,challenge)
     fun submitCalculatorPin(pin: String) = runtime.access.submitCalculatorPin(pin)
     fun quickExit() = runtime.navigation.quickExit()
     fun background() = runtime.navigation.background()

@@ -1,5 +1,12 @@
 package com.olive.app.ui.covers.olive
+import androidx.compose.ui.platform.testTag
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -32,7 +39,7 @@ import androidx.compose.ui.unit.dp
     }
 }
 
-// The cart handles quantities, subtotal, and the jump into the always-declined checkout.
+// Cart details are grouped for TalkBack with separate quantity actions; checkout always declines locally.
 // UI sizing: cart rows use 24dp sides, 72dp thumbnails, 12dp padding, and full-width checkout controls.
 @Composable internal fun FoodCartScreen(vm: OliveViewModel, checkout: () -> Unit) {
     val listState=rememberLazyListState()
@@ -43,9 +50,9 @@ import androidx.compose.ui.unit.dp
             Button(onClick={vm.navigate(CoverTab.Discover)},modifier=Modifier.padding(horizontal=24.dp).fillMaxWidth()) { Text(stringResource(R.string.explore_the_menu)) }
         }
         items(vm.dishes.filter { it.id in vm.cart },key={it.id}) { dish ->
-            Card(modifier=Modifier.animateItem().padding(horizontal=24.dp).animateContentSize(),colors=CardDefaults.cardColors(containerColor=Paper)) {
+            Card(modifier=Modifier.animateItem().padding(horizontal=24.dp).animateContentSize().testTag("cart_row_${dish.id}").semantics(mergeDescendants=true) {},colors=CardDefaults.cardColors(containerColor=Paper)) {
                 Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically) {
-                    DishImage(dish,Modifier.size(72.dp).clip(RoundedCornerShape(14.dp)))
+                    DishImage(dish,Modifier.size(72.dp).clip(RoundedCornerShape(14.dp)).clearAndSetSemantics {})
                     Column(Modifier.weight(1f).padding(start=12.dp)) {
                         Text(dish.name,fontWeight=FontWeight.SemiBold)
                         Text(formatDishPrice(dish.priceCents),color=Muted)

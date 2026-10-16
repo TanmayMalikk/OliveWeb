@@ -10,7 +10,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.milliseconds
 
-// Owns profile, password, trigger and PIN updates.
+// Saves private profile, language preference, cover choice, password, trigger, PIN and trusted-contact settings.
 internal class SessionSettings(private val runtime:SessionRuntime) {
     fun saveSettings(fullName: String, affected: String, abuserName: String, dob: String, selectedLanguage: String, situation: String, address: DeliveryAddress) {
         with(runtime) {

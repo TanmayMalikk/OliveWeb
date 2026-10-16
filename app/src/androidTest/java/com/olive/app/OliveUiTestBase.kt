@@ -14,9 +14,21 @@ import org.junit.Rule
 import org.junit.rules.ExternalResource
 import org.junit.rules.RuleChain
 import java.io.File
+import android.view.MotionEvent
+import android.os.SystemClock
 
 // Shared setup keeps every end-to-end UI test isolated and gives feature files the same common actions.
 abstract class OliveUiTestBase {
+    protected fun tapOnScreen(x:Float,y:Float) {
+        val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
+        val time=SystemClock.uptimeMillis()
+        val down=MotionEvent.obtain(time,time,MotionEvent.ACTION_DOWN,x,y,0)
+        val up=MotionEvent.obtain(time,time+32,MotionEvent.ACTION_UP,x,y,0)
+        try {
+            check(automation.injectInputEvent(down,true))
+            check(automation.injectInputEvent(up,true))
+        } finally { down.recycle();up.recycle() }
+    }
     protected val compose=createAndroidComposeRule<MainActivity>()
     private val cleanStore=object : ExternalResource() {
         override fun before() {
@@ -77,7 +89,7 @@ abstract class OliveUiTestBase {
             throw AssertionError("Expected cover; screen=${session.screen}, busy=${session.busy}, message=${session.message}\n${compose.onRoot().printToString()}",e)
         }
     }
-    protected fun trigger() { compose.onNode(hasSetTextAction()).performTextInput("moon garden"); waitFor("unlock_pin") }
+    protected fun trigger() { compose.onNode(hasSetTextAction()).performTextReplacement("moon garden"); waitFor("unlock_pin") }
     protected fun enterPin(pin: String) {
         pin.forEach { compose.onNodeWithTag("pin_digit_$it").performClick() }
         compose.onNodeWithTag("unlock_submit").performClick()

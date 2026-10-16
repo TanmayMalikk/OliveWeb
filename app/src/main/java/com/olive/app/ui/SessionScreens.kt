@@ -2,6 +2,18 @@ package com.olive.app.ui
 import com.olive.app.R
 import androidx.compose.ui.res.stringResource
 
+import android.view.View
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import com.olive.app.ui.covers.calculator.CalculatorCover
 import com.olive.app.ui.covers.game.GameCover
 import com.olive.app.ui.covers.news.NewsCover
@@ -61,6 +73,15 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
     val focus=LocalFocusManager.current
     val isCover=session.screen == SessionScreen.Cover
     val context=androidx.compose.ui.platform.LocalContext.current
+    val view=LocalView.current
+    val accessibilityScope=rememberCoroutineScope()
+    val accessibilityFocus=remember(accessibilityScope) { AccessibilityFocusCoordinator(accessibilityScope) }
+    val accessibilityRoot=(view.parent as? ComposeView) ?: view
+    val privacyHidden=session.privacyBlackout
+    SideEffect {
+        accessibilityRoot.importantForAccessibility=if(privacyHidden) View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+    }
     var locationAsked by rememberSaveable { mutableStateOf(false) }
     var locationPermissionVersion by remember { mutableIntStateOf(0) }
     val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -79,20 +100,34 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         keyboard?.hide()
         focus.clearFocus(force=true)
     }
-    Box(Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalAccessibilityFocusCoordinator provides accessibilityFocus) {
+    val coverTitle=accessibilityText(session.coverType.title)
+    val quickExitLabel=accessibilityText("Quick exit")
+    Box(Modifier.fillMaxSize().imePadding()) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
-        Box(if(isCover) Modifier.fillMaxSize().testTag("cover_root") else Modifier.fillMaxSize().clearAndSetSemantics { }) {
+        Box(if(isCover && !session.privacyBlackout) Modifier.fillMaxSize().testTag("cover_root").semantics { paneTitle=coverTitle } else Modifier.fillMaxSize().clearAndSetSemantics { }) {
+            Column(Modifier.fillMaxSize()) {
+            if(isCover && !session.privacyBlackout && session.accessibilityExitVersion>0) {
+                val returned=accessibilityText("Returned to cover").format(coverTitle)
+                Surface(color=MaterialTheme.colorScheme.primaryContainer) {
+                    key(session.accessibilityExitVersion) {
+                        AccessibleMessage(returned,Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp).testTag("cover_return_message"),color=MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                }
+            }
+            Box(Modifier.weight(1f)) {
             if(shouldComposeCover(session.configured,session.usesCover)) {
                 when(session.coverType) {
                     CoverType.FOOD -> OliveCover(cover,interactive=isCover,onSearch={ value ->
                         if(session.interceptSearch(value)) { cover.search(""); focus.clearFocus(); keyboard?.hide() }
                         else cover.search(value)
                     },onAccountSetup=session::setup,configured=session.configured, session=session)
-                    CoverType.NEWS -> NewsCover(session,locationPermissionVersion,isCover)
+                    CoverType.NEWS -> NewsCover(session,locationPermissionVersion,isCover && !session.privacyBlackout)
                     CoverType.CALCULATOR -> CalculatorCover(session,isCover)
                     CoverType.GAME -> GameCover(isCover)
                 }
             }
+            } }
         }
         if(!isCover) {
             LaunchedEffect(session.screen) {
@@ -105,18 +140,41 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                             !(session.page==SafePage.Messages && session.activeConversation!=null)) ||
                             (session.screen==SessionScreen.Pin && session.usesCover)) {
                         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),horizontalArrangement=Arrangement.End) {
-                        ExtendedFloatingActionButton(onClick=exit,modifier=Modifier.testTag("quick_exit"),
+                        ExtendedFloatingActionButton(onClick=exit,modifier=Modifier.testTag("quick_exit").semantics { contentDescription=quickExitLabel },
                             containerColor=OliveGreen,contentColor=MaterialTheme.colorScheme.onPrimary,
-                            icon={Icon(Icons.Outlined.Close,null)},text={Text(stringResource(R.string.quick_exit))})
+                            icon={Icon(Icons.Outlined.Close,null)},text={Text(stringResource(R.string.quick_exit),modifier=Modifier.clearAndSetSemantics {})})
                         }
                     } },
                 ) { padding ->
                     Box(Modifier.fillMaxSize().padding(padding)) {
                         AnimatedContent(targetState=session.screen,label="session screen",
                             transitionSpec={
-                                (fadeIn(tween(180))+scaleIn(tween(180),initialScale=.985f))
+                                // Security boundaries replace old controls immediately, without an outgoing PIN/private screen.
+                                if(initialState in setOf(SessionScreen.Pin,SessionScreen.Safe) || targetState in setOf(SessionScreen.Pin,SessionScreen.Safe))
+                                    EnterTransition.None.togetherWith(ExitTransition.None)
+                                else (fadeIn(tween(180))+scaleIn(tween(180),initialScale=.985f))
                                     .togetherWith(fadeOut(tween(120)))
-                            }) { targetScreen -> when(targetScreen) {
+                            }) { targetScreen ->
+                            val pane=accessibilityText(when(targetScreen) {
+                                SessionScreen.Pin -> "Enter PIN"
+                                SessionScreen.Safe -> when(session.page) {
+                                    SafePage.Home -> "Home";SafePage.Notes -> "Notes";SafePage.Messages -> "Messages"
+                                    SafePage.Profile -> "Profile";SafePage.Contacts -> "Contacts";SafePage.Settings -> "Settings";SafePage.Activity -> "Activity"
+                                }
+                                SessionScreen.Loading -> "Loading"
+                                SessionScreen.Welcome -> "Welcome"
+                                SessionScreen.NewCredentials -> "Create account"
+                                SessionScreen.ReturningCredentials -> "Sign in"
+                                SessionScreen.ProfileSetup,SessionScreen.OrganizationProfileSetup -> "Your profile"
+                                SessionScreen.TriggerSetup -> "Set your private entry"
+                                SessionScreen.DevicePin -> "Secure this device"
+                                SessionScreen.Portal -> "Organization portal"
+                                SessionScreen.StorageError -> "Unable to open local storage"
+                                SessionScreen.Cover -> session.coverType.title
+                            })
+                            CompositionLocalProvider(LocalAccessibilityMessagesVisible provides (targetScreen==session.screen)) {
+                            Box(Modifier.semantics { paneTitle=pane }.then(if(targetScreen!=session.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
+                            when(targetScreen) {
                             SessionScreen.Loading -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator() }
                             SessionScreen.Welcome -> Welcome(session)
                             SessionScreen.NewCredentials -> Credentials(session,true)
@@ -134,7 +192,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 Button(onClick=session::load,enabled=!session.busy) { Text(stringResource(R.string.retry)) }
                             }
                             SessionScreen.Cover -> Unit
-                        } }
+                        } } } }
                     }
                 }
             }
@@ -152,6 +210,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
             .clickable(interactionSource=remember { MutableInteractionSource() },indication=null) {}
             .testTag("privacy_blackout"))
     }
+    }
 }
 
 // UI sizing: shared forms use 24dp side/top padding, 16dp row gaps, and 112dp bottom room for Quick exit.
@@ -163,7 +222,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
 // Text/color: shared headings use a 30sp serif app label, Material headline text, and Muted helper copy.
 @Composable internal fun Heading(title: String, subtitle: String, appName: String="Olive Branch") {
     Text(appName,fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-    Text(title,style=MaterialTheme.typography.headlineMedium)
+    Text(title,modifier=Modifier.semantics { heading() },style=MaterialTheme.typography.headlineMedium)
     Text(subtitle,color=Muted)
 }
 // UI color/spacing: local-mode notices use the theme primary container with 14dp inner padding.
@@ -172,11 +231,10 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         Text(stringResource(R.string.local_test_mode_accounts_stay_on_this_installation_firebase_is_not_connected_use_fictional_information_while_testing),Modifier.padding(14.dp),style=MaterialTheme.typography.bodySmall)
     }
 }
-// UI color/size: status copy uses the theme primary color and progress bars stretch to the available width.
+// Status messages use native TalkBack focus; busy work shows a centered 26dp spinner.
 @Composable internal fun Status(session: SessionViewModel,showMessage:Boolean=true) {
-    if(showMessage) AnimatedContent(targetState=session.message,label="status message",
-        transitionSpec={fadeIn(tween(160)).togetherWith(fadeOut(tween(100)))}) { status ->
-        status?.let { Text(it,modifier=Modifier.testTag("session_message"),color=MaterialTheme.colorScheme.primary) }
+    if(showMessage) session.message?.let {
+        AccessibleMessage(it,modifier=Modifier.testTag("session_message").semantics { liveRegion=LiveRegionMode.Polite },color=MaterialTheme.colorScheme.primary)
     }
     AnimatedVisibility(session.busy,enter=fadeIn(tween(120))+expandVertically(),exit=fadeOut(tween(100))+shrinkVertically()) {
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center) {
@@ -184,7 +242,8 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         }
     }
 }
-// UI sizing/text: shared fields fill their column; multiline fields start at three lines and all labels use localized Material text.
+// Full-width fields reveal themselves above the keyboard and expose validation errors to TalkBack.
+// Callers supply label text; multiline fields start at three lines.
 @Composable internal fun Field(label: String, value: String, tag: String, secret: Boolean=false, numeric: Boolean=false,
                              showSecretToggle: Boolean=false, multiline: Boolean=false, enabled: Boolean=true, error: String?=null,
                              onFocus: (() -> Unit)?=null, onChange: (String)->Unit) {
@@ -194,10 +253,11 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         label.contains("trigger",ignoreCase=true) -> "trigger word"
         else -> "password"
     }
+    val accessibleError=error?.let { accessibilityText(it) }
     OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},
-        modifier=Modifier.fillMaxWidth().testTag(tag).onFocusChanged { if(it.isFocused) onFocus?.invoke() },
+        modifier=Modifier.fillMaxWidth().testTag(tag).semantics { if(accessibleError!=null) error(accessibleError) }.onFocusChanged { if(it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
         enabled=enabled,singleLine=!multiline,minLines=if(multiline) 3 else 1,isError=error!=null,
-        supportingText=error?.let { message -> { Text(message,color=MaterialTheme.colorScheme.error) } },
+        supportingText=error?.let { message -> { AccessibleMessage(message,modifier=Modifier.testTag("${tag}_error"),color=MaterialTheme.colorScheme.error) } },
         visualTransformation=if(secret && !secretVisible) PasswordVisualTransformation() else VisualTransformation.None,
         trailingIcon=if(secret && showSecretToggle) {{
             IconButton(onClick={secretVisible=!secretVisible},modifier=Modifier.testTag("${tag}_visibility")) {

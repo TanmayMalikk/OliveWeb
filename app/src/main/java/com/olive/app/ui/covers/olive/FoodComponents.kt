@@ -1,5 +1,11 @@
 package com.olive.app.ui.covers.olive
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import com.olive.app.ui.*
 
 import androidx.compose.animation.*
@@ -21,7 +27,7 @@ internal fun formatDishPrice(cents: Int): String = "$%.2f".format(Locale.US, cen
 
 // UI sizing/text: cover page titles use 24dp sides and a 32/37sp serif title pair.
 @Composable internal fun FoodPageTitle(title: String, subtitle: String) {
-    Column(Modifier.padding(horizontal=24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.padding(horizontal=24.dp).semantics(mergeDescendants=true) {},verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text(title,fontFamily=FontFamily.Serif,fontSize=32.sp,lineHeight=37.sp)
         Text(subtitle,color=Muted)
     }
@@ -29,7 +35,7 @@ internal fun formatDishPrice(cents: Int): String = "$%.2f".format(Locale.US, cen
 
 // UI sizing/color: empty states use 28dp padding, 14dp gaps, a 58dp themed icon circle, and centered Material text.
 @Composable internal fun FoodEmptyState(icon: ImageVector, title: String, description: String) {
-    Column(Modifier.fillMaxWidth().padding(28.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.fillMaxWidth().padding(28.dp).semantics(mergeDescendants=true) {},horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Icon(icon,null,Modifier.size(58.dp).background(MaterialTheme.colorScheme.primaryContainer,CircleShape).padding(14.dp),tint=OliveGreen)
         Text(title,style=MaterialTheme.typography.titleMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
         Text(description,color=Muted,textAlign=androidx.compose.ui.text.style.TextAlign.Center)

@@ -1,5 +1,8 @@
 package com.olive.app.ui.covers.news
 
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.hideFromAccessibility
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -84,7 +87,7 @@ import kotlinx.coroutines.withContext
         text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(locationDraft,{ value ->
                 locationDraft=if(!session.interceptSearch(value)) value.take(120) else ""
-            },label={Text(stringResource(R.string.city_or_region))},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input"))
+            },label={Text(stringResource(R.string.city_or_region))},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input").keepVisibleWhileTyping())
             Text("This changes the local news search on this device.",color=Muted,style=MaterialTheme.typography.bodySmall)
         }},
         confirmButton={TextButton(onClick={

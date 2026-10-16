@@ -2,6 +2,7 @@ package com.olive.app.ui
 import com.olive.app.R
 import androidx.compose.ui.res.stringResource
 
+import androidx.compose.ui.semantics.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
@@ -50,11 +51,16 @@ import com.olive.app.security.InputPolicy
     }
 }
 
-// USER ONLY: a cover trigger opens this local PIN interface before showing Olive Branch.
+// USER ONLY: a search trigger opens this local PIN challenge; calculator entry verifies through SessionAccess separately.
 // UI sizing/color: this screen owns the compact breakpoint, keypad dimensions, PIN-dot size, OliveGreen accents, and responsive text sizes.
 @Composable internal fun PinPrompt(session: SessionViewModel) {
-    var pin by remember { mutableStateOf("") }
+    val challenge=session.pinChallengeVersion
+    var pin by remember(challenge) { mutableStateOf("") }
     val headingScrollState=rememberScrollState()
+    val pinLabel=accessibilityText("PIN")
+    val enteredLabel=accessibilityText("Digits entered")
+    val deleteLabel=accessibilityText("Delete digit")
+    val unlockLabel=accessibilityText("Unlock")
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Sizing note: raise 650dp to switch into the compact PIN layout sooner. The 48–72dp range below is the keypad's min/max size.
         // When adding a language with longer PIN text, test this breakpoint with Android's largest font setting too.
@@ -70,10 +76,14 @@ import com.olive.app.security.InputPolicy
                 verticalArrangement=Arrangement.spacedBy(if(compact) 7.dp else 12.dp)) {
                 // These are the compact/regular PIN headings; change both together so translated text scales consistently.
                 Text(stringResource(R.string.olive_branch),fontFamily=FontFamily.Serif,fontSize=if(compact) 22.sp else 26.sp,color=OliveGreen)
-                Text(stringResource(R.string.enter_pin),modifier=Modifier.padding(top=if(compact) 12.dp else 18.dp),
+                Text(stringResource(R.string.enter_pin),modifier=Modifier.padding(top=if(compact) 12.dp else 18.dp).semantics { heading() },
                     style=if(compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium)
                 Text(stringResource(R.string.enter_your_pin),color=Muted)
-                Row(Modifier.height(if(compact) 11.dp else 14.dp).testTag("unlock_pin"),horizontalArrangement=Arrangement.spacedBy(if(compact) 8.dp else 12.dp)) {
+                Row(Modifier.height(if(compact) 11.dp else 14.dp).testTag("unlock_pin").clearAndSetSemantics {
+                    contentDescription=pinLabel
+                    stateDescription="$enteredLabel: ${pin.length}"
+                    liveRegion=LiveRegionMode.Polite
+                },horizontalArrangement=Arrangement.spacedBy(if(compact) 8.dp else 12.dp)) {
                     repeat(pin.length) {
                         Box(Modifier.size(if(compact) 11.dp else 14.dp).background(OliveGreen,CircleShape))
                     }
@@ -87,15 +97,20 @@ import com.olive.app.security.InputPolicy
                         row.forEach { key ->
                             val tag=when(key) { "⌫" -> "pin_backspace"; "↪" -> "unlock_submit"; else -> "pin_digit_$key" }
                             FilledTonalButton(onClick={
+                                // TalkBack can deliver an action from a node whose enabled state is stale.
+                                if(session.busy || session.privacyBlackout || session.screen!=SessionScreen.Pin ||
+                                    session.pinChallengeVersion!=challenge) return@FilledTonalButton
                                 when(key) {
                                     "⌫" -> pin=pin.dropLast(1)
-                                    "↪" -> { val attempt=pin;pin="";session.submitPin(attempt) }
+                                    "↪" -> if(InputPolicy.validPin(pin)) { val attempt=pin;pin="";session.submitPin(attempt,challenge) }
                                     else -> if(pin.length<6) pin+=key
                                 }
                             },enabled=!session.busy && (key!="↪" || pin.length in 4..6),
                                 modifier=Modifier.size(keySize).testTag(tag),shape=CircleShape,
                                 contentPadding=PaddingValues(0.dp)) {
-                                Text(key,fontSize=if(compact) 23.sp else if(key=="⌫" || key=="↪") 26.sp else 30.sp)
+                                Text(key,modifier=if(key=="⌫" || key=="↪") Modifier.clearAndSetSemantics {
+                                    contentDescription=if(key=="⌫") deleteLabel else unlockLabel
+                                } else Modifier,fontSize=if(compact) 23.sp else if(key=="⌫" || key=="↪") 26.sp else 30.sp)
                             }
                         }
                     }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <lint>
     <issue id="MissingTranslation">
-        <!-- Hide missing Cree translation warnings while translation is unfinished; the app shows default-language text instead. -->
+        <!-- Legacy exception for incomplete Cree resources if restored; Cree is not currently a supported language. Missing strings fall back to the default resources. -->
         <ignore regexp=".*not translated in &quot;cr&quot; \(Cree\).*" />
     </issue>
 </lint>

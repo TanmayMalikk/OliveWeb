@@ -1,5 +1,6 @@
 package com.olive.app.security
 
+import androidx.compose.ui.semantics.*
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.LocalDate
@@ -61,16 +62,19 @@ object InputPolicy {
     }.getOrDefault(false)
 }
 
-// Change the five-try rule here; keep it cooldown-free for emergency access.
+// Count five failures without a timed cooldown; keep DeviceStore's reset and SessionAccess's exit threshold aligned.
 data class GateState(val failures: Int = 0) {
     fun failed(): GateState = GateState(if (failures in 0..3) failures + 1 else if (failures == 4) 5 else 1)
 }
 
-// No touches for a minute starts a 15-second warning before the safe side locks.
+// One minute without interaction starts a warning; accessibility settings can extend its fifteen-second default.
 object IdlePolicy {
-    fun countdown(elapsedMs: Long): Int? = when {
-        elapsedMs < 60_000L -> null
-        elapsedMs >= 75_000L -> 0
-        else -> ((75_000L-elapsedMs+999L)/1000L).toInt()
+    fun countdown(elapsedMs: Long,warningDurationMs:Long=15_000L): Int? {
+        val lockAt=60_000L+warningDurationMs.coerceIn(15_000L,Int.MAX_VALUE.toLong())
+        return when {
+            elapsedMs < 60_000L -> null
+            elapsedMs >= lockAt -> 0
+            else -> ((lockAt-elapsedMs+999L)/1000L).toInt()
+        }
     }
 }

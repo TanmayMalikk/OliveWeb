@@ -1,5 +1,8 @@
 package com.olive.app.ui.covers.game
 
+import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.material3.Text
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
@@ -11,7 +14,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SportsEsports
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -28,7 +30,7 @@ import androidx.compose.ui.unit.sp
 @Composable fun GameCover(interactive: Boolean=true) {
     BackHandler(interactive) { }
     Column(
-        Modifier.fillMaxSize().background(Cream).safeDrawingPadding().padding(24.dp).testTag("game_cover"),
+        Modifier.fillMaxSize().background(Cream).safeDrawingPadding().padding(24.dp).testTag("game_cover").semantics(mergeDescendants=true) {},
         horizontalAlignment=Alignment.CenterHorizontally,
         verticalArrangement=Arrangement.Center,
     ) {

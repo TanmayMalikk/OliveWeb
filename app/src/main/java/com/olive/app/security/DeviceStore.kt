@@ -1,5 +1,6 @@
 package com.olive.app.security
 
+import androidx.compose.ui.semantics.*
 import com.olive.app.data.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -78,11 +79,14 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
             remove("pinVerifier");remove("lockedUntil");put("failures",0)
         } }
     }
-    // PIN attempt counting lives here; change the screen response in SessionViewModel.submitPin too.
+    // Verify only the active User enrollment and count failures here; SessionAccess handles routing after the result.
     fun verify(uid: String, pin: String, now: Long = System.currentTimeMillis()): PinResult {
+        require(InputPolicy.validPin(pin))
         var result: PinResult = PinResult.Rejected(0)
         vault.update { root ->
+            require(root.optString("activeUid")==uid) { "PIN account is no longer active" }
             val saved=root.getJSONObject("enrollments").getJSONObject(uid)
+            require(AccountRole.fromStored(saved.optString("role"))==AccountRole.USER) { "This account does not use a PIN" }
             val verifier=saved.getString("pinVerifier")
             val accepted=SecretVerifier.matches(pin,verifier)
             val next=if(accepted) GateState() else GateState(saved.optInt("failures")).failed()

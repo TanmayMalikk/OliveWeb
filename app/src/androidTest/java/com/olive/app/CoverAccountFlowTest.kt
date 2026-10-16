@@ -37,10 +37,9 @@ class CoverAccountFlowTest : OliveUiTestBase() {
     @Test fun coverAccountShowsOnlyDeliveryProfileAndChangesLanguage() {
         register(username="cover_account_tester")
         compose.onNodeWithText("Account").performClick()
-        compose.onNodeWithTag("cover_profile_name").assertTextEquals("Test Person")
-        compose.onNodeWithTag("cover_profile_username").assertTextEquals("@cover_account_tester")
+        compose.onNodeWithTag("cover_profile_summary").assertTextContains("Test Person").assertTextContains("@cover_account_tester")
         compose.onNodeWithTag("cover_sign_out").assertDoesNotExist()
-        compose.onNodeWithTag("cover_profile_address").assert(hasText("Edmonton",substring=true))
+        compose.onNodeWithTag("cover_profile_summary").assertTextContains("Edmonton",substring=true)
         compose.onNodeWithText("2000-01-02").assertDoesNotExist()
         compose.onNodeWithText("Test Person Causing Harm").assertDoesNotExist()
         compose.onNodeWithText("moon garden").assertDoesNotExist()
