@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import android.graphics.Paint
 import androidx.activity.compose.BackHandler
@@ -91,38 +93,38 @@ import kotlinx.coroutines.withContext
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(horizontal=if(compact) 10.dp else 16.dp,vertical=if(compact) 6.dp else 10.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                LocalizedText("Better Calculator",color=OliveGreen,fontSize=if(compact) 16.sp else 18.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
+                Text(stringResource(R.string.better_calculator),color=OliveGreen,fontSize=if(compact) 16.sp else 18.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 FilledTonalButton(onClick={solver=CalculatorSolver.Polynomial},modifier=Modifier.weight(1f).height(if(compact) 38.dp else 44.dp).testTag("polynomial_solver"),contentPadding=PaddingValues(horizontal=2.dp)) {
-                    LocalizedText("Polynomial",fontSize=if(compact) 11.sp else 13.sp,maxLines=1)
+                    Text(stringResource(R.string.polynomial),fontSize=if(compact) 11.sp else 13.sp,maxLines=1)
                 }
                 FilledTonalButton(onClick={solver=CalculatorSolver.Quadratic},modifier=Modifier.weight(1f).height(if(compact) 38.dp else 44.dp).testTag("quadratic_solver"),contentPadding=PaddingValues(horizontal=2.dp)) {
-                    LocalizedText("Quadratic",fontSize=if(compact) 11.sp else 13.sp,maxLines=1)
+                    Text(stringResource(R.string.quadratic),fontSize=if(compact) 11.sp else 13.sp,maxLines=1)
                 }
                 FilledTonalButton(onClick={graphing=true},modifier=Modifier.weight(1f).height(if(compact) 38.dp else 44.dp).testTag("graph_editor"),contentPadding=PaddingValues(horizontal=2.dp)) {
-                    LocalizedText("Y =",fontSize=if(compact) 12.sp else 14.sp)
+                    Text("Y =",fontSize=if(compact) 12.sp else 14.sp)
                 }
                 FilledTonalButton(onClick={tools=true},modifier=Modifier.weight(1f).height(if(compact) 38.dp else 44.dp).testTag("math_tools"),contentPadding=PaddingValues(horizontal=2.dp)) {
-                    LocalizedText("Tools",fontSize=if(compact) 11.sp else 13.sp,maxLines=1)
+                    Text("Tools",fontSize=if(compact) 11.sp else 13.sp,maxLines=1)
                 }
             }
             Row(Modifier.fillMaxWidth().height(if(compact) 42.dp else 48.dp),verticalAlignment=Alignment.CenterVertically) {
-                LocalizedText("Angle mode",color=Muted,modifier=Modifier.weight(1f))
+                Text(stringResource(R.string.angle_mode),color=Muted,modifier=Modifier.weight(1f))
                 FilterChip(selected=angleMode==CalculatorAngleMode.RADIANS,onClick={angleMode=CalculatorAngleMode.RADIANS},
-                    label={LocalizedText("RAD")},modifier=Modifier.testTag("calculator_radians"))
+                    label={Text(stringResource(R.string.rad))},modifier=Modifier.testTag("calculator_radians"))
                 Spacer(Modifier.width(6.dp))
                 FilterChip(selected=angleMode==CalculatorAngleMode.DEGREES,onClick={angleMode=CalculatorAngleMode.DEGREES},
-                    label={LocalizedText("DEG")},modifier=Modifier.testTag("calculator_degrees"))
+                    label={Text(stringResource(R.string.deg))},modifier=Modifier.testTag("calculator_degrees"))
             }
             // UI sizing: history scrolls in its own bounded area and the clipped display can never overlap the keys.
             Column(Modifier.fillMaxWidth().weight(if(scientificExpanded) .65f else 1.25f)) {
                 Row(Modifier.fillMaxWidth().height(if(compact) 28.dp else 32.dp),verticalAlignment=Alignment.CenterVertically) {
-                    LocalizedText("History",modifier=Modifier.weight(1f),color=Muted,style=MaterialTheme.typography.labelSmall)
+                    Text("History",modifier=Modifier.weight(1f),color=Muted,style=MaterialTheme.typography.labelSmall)
                     if(input.history.isNotEmpty()) {
                         TextButton(onClick=input::clearHistory,modifier=Modifier.height(if(compact) 28.dp else 32.dp)
                             .testTag("clear_calculator_history"),contentPadding=PaddingValues(horizontal=6.dp,vertical=0.dp)) {
-                            LocalizedText("Clear",fontSize=if(compact) 11.sp else 12.sp,color=OliveGreen)
+                            Text(stringResource(R.string.clear),fontSize=if(compact) 11.sp else 12.sp,color=OliveGreen)
                         }
                     }
                 }
@@ -147,7 +149,7 @@ import kotlinx.coroutines.withContext
                     horizontalAlignment=Alignment.End,
                     verticalArrangement=Arrangement.Bottom,
                 ) {
-                    LocalizedText(if(input.expression.endsWith("=")) input.expression else "",modifier=Modifier.fillMaxWidth(),color=Muted,
+                    Text(if(input.expression.endsWith("=")) input.expression else "",modifier=Modifier.fillMaxWidth(),color=Muted,
                         fontSize=if(compact) 12.sp else 14.sp,textAlign=TextAlign.End,maxLines=1)
                     Row(Modifier.fillMaxWidth().clipToBounds().horizontalScroll(displayScroll),horizontalArrangement=Arrangement.End) {
                         Text(input.display,modifier=Modifier.testTag("calculator_display"),color=Ink,
@@ -161,7 +163,7 @@ import kotlinx.coroutines.withContext
                     Icon(if(scientificExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
                         if(scientificExpanded) "Hide scientific operators" else "Show scientific operators")
                 }
-                LocalizedText(if(scientificExpanded) "Hide scientific operators" else "Show scientific operators",style=MaterialTheme.typography.labelSmall,color=Muted)
+                Text(if(scientificExpanded) "Hide scientific operators" else "Show scientific operators",style=MaterialTheme.typography.labelSmall,color=Muted)
             }
             val rows=if(scientificExpanded) scientificRows+baseRows else baseRows
             Column(Modifier.fillMaxWidth().weight(if(scientificExpanded) 2.15f else 1.45f),verticalArrangement=Arrangement.spacedBy(rowSpacing)) {
@@ -188,7 +190,7 @@ private fun RowScope.CalculatorKey(key:String,compact:Boolean,scientific:Boolean
     Button(onClick=onClick,enabled=enabled,modifier=Modifier.weight(1f).fillMaxHeight().testTag("calc_key_$tag"),
         shape=RoundedCornerShape(28.dp),contentPadding=PaddingValues(horizontal=2.dp,vertical=0.dp),
         colors=ButtonDefaults.buttonColors(containerColor=background,contentColor=if(key=="=") Paper else if(isOperator) OliveGreen else Ink)) {
-        LocalizedText(key,fontSize=if(scientific) { if(compact) 13.sp else 16.sp } else { if(compact) 19.sp else 24.sp },fontWeight=FontWeight.Medium,maxLines=1)
+        Text(key,fontSize=if(scientific) { if(compact) 13.sp else 16.sp } else { if(compact) 19.sp else 24.sp },fontWeight=FontWeight.Medium,maxLines=1)
     }
 }
 // The Y= editor plots equations on an olive grid without sending equation data off the device.
@@ -208,20 +210,20 @@ private fun RowScope.CalculatorKey(key:String,compact:Boolean,scientific:Boolean
         verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=onClose,modifier=Modifier.testTag("close_graph")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back") }
-            LocalizedText("Graphing Calculator",style=MaterialTheme.typography.titleLarge,color=OliveGreen,fontWeight=FontWeight.SemiBold)
+            Text(stringResource(R.string.graphing_calculator),style=MaterialTheme.typography.titleLarge,color=OliveGreen,fontWeight=FontWeight.SemiBold)
         }
-        OutlinedTextField(equation,{equation=it.take(500);error=null},label={LocalizedText("Y = (one function per line)")},
-            placeholder={LocalizedText("x^2 - 4\n2x + 3")},minLines=2,maxLines=4,modifier=Modifier.fillMaxWidth().testTag("graph_equation"))
+        OutlinedTextField(equation,{equation=it.take(500);error=null},label={Text(stringResource(R.string.y_one_function_per_line))},
+            placeholder={Text("x^2 - 4\n2x + 3")},minLines=2,maxLines=4,modifier=Modifier.fillMaxWidth().testTag("graph_equation"))
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-            LocalizedText("Angle mode",color=Muted,modifier=Modifier.weight(1f))
+            Text(stringResource(R.string.angle_mode),color=Muted,modifier=Modifier.weight(1f))
             FilterChip(selected=angleMode==CalculatorAngleMode.RADIANS,onClick={
                 onAngleModeChange(CalculatorAngleMode.RADIANS)
                 graphs=plottedEquations.map { GraphExpression.compile(it,CalculatorAngleMode.RADIANS) }
-            },label={LocalizedText("RAD")},modifier=Modifier.testTag("angle_radians"))
+            },label={Text(stringResource(R.string.rad))},modifier=Modifier.testTag("angle_radians"))
             FilterChip(selected=angleMode==CalculatorAngleMode.DEGREES,onClick={
                 onAngleModeChange(CalculatorAngleMode.DEGREES)
                 graphs=plottedEquations.map { GraphExpression.compile(it,CalculatorAngleMode.DEGREES) }
-            },label={LocalizedText("DEG")},modifier=Modifier.testTag("angle_degrees"))
+            },label={Text(stringResource(R.string.deg))},modifier=Modifier.testTag("angle_degrees"))
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
             Button(onClick={
@@ -230,15 +232,15 @@ private fun RowScope.CalculatorKey(key:String,compact:Boolean,scientific:Boolean
                         .let { lines -> lines to lines.map { GraphExpression.compile(it,angleMode) } }
                 }.onSuccess { (lines,compiled) -> graphs=compiled;plottedEquations=lines;error=null }
                     .onFailure { error=it.message ?: "Unable to graph this equation." }
-            },enabled=equation.isNotBlank(),modifier=Modifier.weight(1f).testTag("plot_equation")) { LocalizedText("Graph") }
-            TextButton(onClick={zoom=1f;panOffset=Offset.Zero},modifier=Modifier.testTag("graph_reset")) { LocalizedText("Reset") }
+            },enabled=equation.isNotBlank(),modifier=Modifier.weight(1f).testTag("plot_equation")) { Text(stringResource(R.string.graph)) }
+            TextButton(onClick={zoom=1f;panOffset=Offset.Zero},modifier=Modifier.testTag("graph_reset")) { Text(stringResource(R.string.reset)) }
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick={graphTools=true},modifier=Modifier.weight(1f).testTag("graph_table_analysis")) { LocalizedText("Table & analysis") }
-            OutlinedButton(onClick={statPlots=true},modifier=Modifier.weight(1f).testTag("stat_plots")) { LocalizedText("Stat plots") }
+            OutlinedButton(onClick={graphTools=true},modifier=Modifier.weight(1f).testTag("graph_table_analysis")) { Text(stringResource(R.string.table_analysis)) }
+            OutlinedButton(onClick={statPlots=true},modifier=Modifier.weight(1f).testTag("stat_plots")) { Text(stringResource(R.string.stat_plots)) }
         }
-        error?.let { LocalizedText(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("graph_error")) }
-        LocalizedText(plottedEquations.mapIndexed { index,item -> "Y${index+1}=$item" }.joinToString("   "),color=OliveGreen,fontWeight=FontWeight.Medium,maxLines=2)
+        error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("graph_error")) }
+        Text(plottedEquations.mapIndexed { index,item -> "Y${index+1}=$item" }.joinToString("   "),color=OliveGreen,fontWeight=FontWeight.Medium,maxLines=2)
         Canvas(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(18.dp)).background(WarmWhite)
             .pointerInput(interactive) {
                 if(interactive) detectTransformGestures { _,pan,gestureZoom,_ ->
@@ -310,7 +312,7 @@ private fun RowScope.CalculatorKey(key:String,compact:Boolean,scientific:Boolean
                 }
             }
         }
-        LocalizedText(if(angleMode==CalculatorAngleMode.RADIANS) "Trigonometric functions use radians." else "Trigonometric functions use degrees.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        Text(if(angleMode==CalculatorAngleMode.RADIANS) "Trigonometric functions use radians." else "Trigonometric functions use degrees.",style=MaterialTheme.typography.bodySmall,color=Muted)
     }
     if(graphTools) GraphTableAnalysisDialog(plottedEquations,angleMode) { graphTools=false }
     if(statPlots) StatPlotDialog { statPlots=false }
@@ -327,22 +329,22 @@ private enum class CalculatorSolver { Polynomial, Quadratic }
     val quadratic=type==CalculatorSolver.Quadratic
     AlertDialog(
         onDismissRequest=onClose,
-        title={LocalizedText(if(quadratic) "Quadratic equation" else "Polynomial calculation")},
+        title={Text(if(quadratic) "Quadratic equation" else "Polynomial calculation")},
         text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(equation,{equation=it.take(160);result=null;error=null},
-                label={LocalizedText("Equation")},
-                placeholder={LocalizedText(if(quadratic) "x^2 - 5x + 6 = 0" else "(x^2 - 1) / (x - 1)")},
+                label={Text(stringResource(R.string.equation))},
+                placeholder={Text(if(quadratic) "x^2 - 5x + 6 = 0" else "(x^2 - 1) / (x - 1)")},
                 singleLine=false,minLines=2,modifier=Modifier.fillMaxWidth().testTag("equation_input"))
-            LocalizedText(if(quadratic) "Example: x^2 - 5x + 6 = 0" else "Example: (x^2 - 1) / (x - 1)",style=MaterialTheme.typography.bodySmall,color=Muted)
-            result?.let { LocalizedText(it,color=OliveGreen,fontWeight=FontWeight.SemiBold,modifier=Modifier.testTag("equation_result")) }
-            error?.let { LocalizedText(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("equation_error")) }
+            Text(if(quadratic) "Example: x^2 - 5x + 6 = 0" else "Example: (x^2 - 1) / (x - 1)",style=MaterialTheme.typography.bodySmall,color=Muted)
+            result?.let { Text(it,color=OliveGreen,fontWeight=FontWeight.SemiBold,modifier=Modifier.testTag("equation_result")) }
+            error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("equation_error")) }
         }},
         confirmButton={Button(onClick={
             runCatching { if(quadratic) EquationSolver.quadratic(equation) else EquationSolver.calculatePolynomial(equation) }
                 .onSuccess { result=it;error=null }
                 .onFailure { result=null;error=it.message ?: "Unable to solve this equation." }
-        },enabled=equation.isNotBlank(),modifier=Modifier.testTag("solve_equation")) { LocalizedText("Solve") }},
-        dismissButton={TextButton(onClick=onClose) { LocalizedText("Close") }},
+        },enabled=equation.isNotBlank(),modifier=Modifier.testTag("solve_equation")) { Text(stringResource(R.string.solve)) }},
+        dismissButton={TextButton(onClick=onClose) { Text(stringResource(R.string.close)) }},
         containerColor=Cream,
     )
 }

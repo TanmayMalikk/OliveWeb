@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -105,7 +107,6 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         keyboard?.hide()
         focus.clearFocus(force=true)
     }
-    CompositionLocalProvider(LocalOliveLanguage provides session.language) {
     Box(Modifier.fillMaxSize()) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(if(isCover) Modifier.fillMaxSize().testTag("cover_root") else Modifier.fillMaxSize().clearAndSetSemantics { }) {
@@ -134,7 +135,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                         Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),horizontalArrangement=Arrangement.End) {
                         ExtendedFloatingActionButton(onClick=exit,modifier=Modifier.testTag("quick_exit"),
                             containerColor=OliveGreen,contentColor=MaterialTheme.colorScheme.onPrimary,
-                            icon={Icon(Icons.Outlined.Close,null)},text={LocalizedText("Quick exit")})
+                            icon={Icon(Icons.Outlined.Close,null)},text={Text(stringResource(R.string.quick_exit))})
                         }
                     } },
                 ) { padding ->
@@ -158,7 +159,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                             SessionScreen.Portal -> OrganizationPortal(session)
                             SessionScreen.StorageError -> FormColumn {
                                 Heading("Unable to open local storage", "Access remains locked. Your existing data has not been replaced.")
-                                Button(onClick=session::load,enabled=!session.busy) { LocalizedText("Retry") }
+                                Button(onClick=session::load,enabled=!session.busy) { Text(stringResource(R.string.retry)) }
                             }
                             SessionScreen.Cover -> Unit
                         } }
@@ -168,10 +169,10 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
             session.idleCountdownSeconds?.let { seconds ->
                 if(session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER) AlertDialog(
                     onDismissRequest=session::noteInteraction,
-                    title={LocalizedText("Locking soon")},
-                    text={LocalizedText(if(session.usesCover) "No activity. Returning to your cover in $seconds seconds." else "No activity. Locking Olive Branch in $seconds seconds.")},
-                    confirmButton={TextButton(onClick=session::noteInteraction) { LocalizedText("Stay here") }},
-                    dismissButton={TextButton(onClick=exit) { LocalizedText("Quick exit") }}
+                    title={Text(stringResource(R.string.locking_soon))},
+                    text={Text(if(session.usesCover) "No activity. Returning to your cover in $seconds seconds." else "No activity. Locking Olive Branch in $seconds seconds.")},
+                    confirmButton={TextButton(onClick=session::noteInteraction) { Text(stringResource(R.string.stay_here)) }},
+                    dismissButton={TextButton(onClick=exit) { Text(stringResource(R.string.quick_exit)) }}
                 )
             }
         }
@@ -179,8 +180,6 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
             .clickable(interactionSource=remember { MutableInteractionSource() },indication=null) {}
             .testTag("privacy_blackout"))
     }
-}
-
 }
 
 // UI sizing: shared forms use 24dp side/top padding, 16dp row gaps, and 112dp bottom room for Quick exit.
@@ -191,21 +190,21 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
 }
 // Text/color: shared headings use a 30sp serif app label, Material headline text, and Muted helper copy.
 @Composable internal fun Heading(title: String, subtitle: String, appName: String="Olive Branch") {
-    LocalizedText(appName,fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-    LocalizedText(title,style=MaterialTheme.typography.headlineMedium)
-    LocalizedText(subtitle,color=Muted)
+    Text(appName,fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
+    Text(title,style=MaterialTheme.typography.headlineMedium)
+    Text(subtitle,color=Muted)
 }
 // UI color/spacing: local-mode notices use the theme primary container with 14dp inner padding.
 @Composable internal fun ModeNotice(session: SessionViewModel) {
     if(session.localMode) Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=MaterialTheme.shapes.medium) {
-        LocalizedText("Local test mode: accounts stay on this installation. Firebase is not connected. Use fictional information while testing.",Modifier.padding(14.dp),style=MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.local_test_mode_accounts_stay_on_this_installation_firebase_is_not_connected_use_fictional_information_while_testing),Modifier.padding(14.dp),style=MaterialTheme.typography.bodySmall)
     }
 }
 // UI color/size: status copy uses the theme primary color and progress bars stretch to the available width.
 @Composable internal fun Status(session: SessionViewModel,showMessage:Boolean=true) {
     if(showMessage) AnimatedContent(targetState=session.message,label="status message",
         transitionSpec={fadeIn(tween(160)).togetherWith(fadeOut(tween(100)))}) { status ->
-        status?.let { LocalizedText(it,modifier=Modifier.testTag("session_message"),color=MaterialTheme.colorScheme.primary) }
+        status?.let { Text(it,modifier=Modifier.testTag("session_message"),color=MaterialTheme.colorScheme.primary) }
     }
     AnimatedVisibility(session.busy,enter=fadeIn(tween(120))+expandVertically(),exit=fadeOut(tween(100))+shrinkVertically()) {
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.Center) {
@@ -223,10 +222,10 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         label.contains("trigger",ignoreCase=true) -> "trigger word"
         else -> "password"
     }
-    OutlinedTextField(value=value,onValueChange=onChange,label={LocalizedText(label)},
+    OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},
         modifier=Modifier.fillMaxWidth().testTag(tag).onFocusChanged { if(it.isFocused) onFocus?.invoke() },
         enabled=enabled,singleLine=!multiline,minLines=if(multiline) 3 else 1,isError=error!=null,
-        supportingText=error?.let { message -> { LocalizedText(message,color=MaterialTheme.colorScheme.error) } },
+        supportingText=error?.let { message -> { Text(message,color=MaterialTheme.colorScheme.error) } },
         visualTransformation=if(secret && !secretVisible) PasswordVisualTransformation() else VisualTransformation.None,
         trailingIcon=if(secret && showSecretToggle) {{
             IconButton(onClick={secretVisible=!secretVisible},modifier=Modifier.testTag("${tag}_visibility")) {

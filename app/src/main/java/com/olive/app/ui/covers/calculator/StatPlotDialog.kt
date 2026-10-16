@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
@@ -57,24 +59,24 @@ internal fun StatPlotDialog(onClose:()->Unit) {
     var points by remember { mutableStateOf<List<Pair<Double,Double>>>(emptyList()) }
     var values by remember { mutableStateOf<List<Double>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest=onClose,title={LocalizedText("Statistical plots")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+    AlertDialog(onDismissRequest=onClose,title={Text(stringResource(R.string.statistical_plots))},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            StatPlotType.entries.forEach { item -> FilterChip(selected=type==item,onClick={type=item;points=emptyList();values=emptyList();error=null},label={LocalizedText(item.label)}) }
+            StatPlotType.entries.forEach { item -> FilterChip(selected=type==item,onClick={type=item;points=emptyList();values=emptyList();error=null},label={Text(item.label)}) }
         }
         if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) {
-            OutlinedTextField(xText,{xText=it.take(500)},label={LocalizedText("X values")},modifier=Modifier.fillMaxWidth())
-            OutlinedTextField(yText,{yText=it.take(500)},label={LocalizedText("Y values")},modifier=Modifier.fillMaxWidth())
-        } else OutlinedTextField(xText,{xText=it.take(500)},label={LocalizedText("Data values")},modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.x_values))},modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(yText,{yText=it.take(500)},label={Text(stringResource(R.string.y_values))},modifier=Modifier.fillMaxWidth())
+        } else OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.data_values))},modifier=Modifier.fillMaxWidth())
         Button(onClick={runCatching {
             fun parse(text:String)=normalizeCalculatorNotation(text).split(Regex("[,\\s]+")).filter { it.isNotBlank() }
                 .map(::parseCalculatorNumber).also { require(it.isNotEmpty()) }
             val x=parse(xText)
             if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) { val y=parse(yText);require(x.size==y.size) { "X and Y need the same number of values." };points=x.zip(y);values=emptyList() }
             else { values=x;points=emptyList() }
-        }.onSuccess { error=null }.onFailure { error=it.message ?: "Check the data values." }},modifier=Modifier.fillMaxWidth()) { LocalizedText("Plot") }
+        }.onSuccess { error=null }.onFailure { error=it.message ?: "Check the data values." }},modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.plot)) }
         if(points.isNotEmpty() || values.isNotEmpty()) StatPlotCanvas(type,points,values)
-        error?.let { LocalizedText(it,color=MaterialTheme.colorScheme.error) }
-    }},confirmButton={TextButton(onClick=onClose) { LocalizedText("Done") }})
+        error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+    }},confirmButton={TextButton(onClick=onClose) { Text(stringResource(R.string.done)) }})
 }
 
 @Composable

@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -89,33 +91,33 @@ import kotlinx.coroutines.withContext
     }
     if(locationEditorOpen) AlertDialog(
         onDismissRequest={locationEditorOpen=false},
-        title={LocalizedText("Change local news location")},
+        title={Text(stringResource(R.string.change_local_news_location))},
         text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(locationDraft,{ value ->
                 if(!session.interceptSearch(value)) locationDraft=value.take(120) else locationDraft=""
-            },label={LocalizedText("City or region")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input"))
-            LocalizedText("This changes the local news search on this device.",color=Muted,style=MaterialTheme.typography.bodySmall)
+            },label={Text(stringResource(R.string.city_or_region))},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input"))
+            Text("This changes the local news search on this device.",color=Muted,style=MaterialTheme.typography.bodySmall)
         }},
         confirmButton={TextButton(onClick={
             customPlace=locationDraft.trim();currentPlace=customPlace
             locationPreferences.edit().putString(locationPreferenceKey,customPlace).apply()
             locationEditorOpen=false;refresh++
-        },enabled=locationDraft.isNotBlank()) { LocalizedText("Save") }},
+        },enabled=locationDraft.isNotBlank()) { Text(stringResource(R.string.save)) }},
         dismissButton={Row {
             TextButton(onClick={
                 customPlace="";currentPlace=fallbackPlace
                 locationPreferences.edit().remove(locationPreferenceKey).apply()
                 locationEditorOpen=false;refresh++
-            }) { LocalizedText("Use device location") }
-            TextButton(onClick={locationEditorOpen=false}) { LocalizedText("Cancel") }
+            }) { Text(stringResource(R.string.use_device_location)) }
+            TextButton(onClick={locationEditorOpen=false}) { Text(stringResource(R.string.cancel)) }
         }},
     )
     Scaffold(containerColor=Cream,topBar={
         TopAppBar(
             title={Column {
                 // Text sizing note: 27sp is the news masthead. Keep the edition label on its own line for longer translations.
-                LocalizedText("Daily Digest",fontFamily=FontFamily.Serif,fontSize=27.sp,fontWeight=FontWeight.Bold,color=OliveGreen)
-                if(tab=="Today" && selected==null) LocalizedText(if(scope==NewsScope.LOCAL) "Local edition" else "Global edition",style=MaterialTheme.typography.labelSmall,color=Muted)
+                Text("Daily Digest",fontFamily=FontFamily.Serif,fontSize=27.sp,fontWeight=FontWeight.Bold,color=OliveGreen)
+                if(tab=="Today" && selected==null) Text(if(scope==NewsScope.LOCAL) "Local edition" else "Global edition",style=MaterialTheme.typography.labelSmall,color=Muted)
             }},
             actions={if(tab=="Today" && selected==null) IconButton(onClick={refresh++},enabled=!loading) { Icon(Icons.Outlined.Refresh,"Refresh") }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=Cream),
@@ -129,7 +131,7 @@ import kotlinx.coroutines.withContext
                     if(choice=="Account") session.recordSettingsInteraction("Daily Digest","Opened account page")
                 },
                     icon={Icon(when(choice) { "Today" -> Icons.AutoMirrored.Outlined.Article; "Saved" -> if(tab==choice) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder; else -> Icons.Outlined.PersonOutline },null)},
-                    label={LocalizedText(choice)})
+                    label={Text(choice)})
             }
         }
     }) { padding ->
@@ -141,8 +143,8 @@ import kotlinx.coroutines.withContext
                 "Account" -> {
                     item {
                         Column(verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                            LocalizedText("Account",style=MaterialTheme.typography.headlineMedium,fontFamily=FontFamily.Serif)
-                            LocalizedText("Manage the profile details shown in Daily Digest.",color=Muted)
+                            Text(stringResource(R.string.account),style=MaterialTheme.typography.headlineMedium,fontFamily=FontFamily.Serif)
+                            Text(stringResource(R.string.manage_the_profile_details_shown_in_daily_digest),color=Muted)
                         }
                     }
                     item { Card(colors=CardDefaults.cardColors(containerColor=Paper),border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline),shape=RoundedCornerShape(20.dp)) {
@@ -160,7 +162,7 @@ import kotlinx.coroutines.withContext
                             OutlinedTextField(query,{ value ->
                                 if(!session.interceptSearch(value)) query=value
                                 else query=""
-                            },placeholder={LocalizedText(if(tab=="Saved") "Search saved stories" else "Search headlines")},leadingIcon={Icon(Icons.Outlined.Search,null)},
+                            },placeholder={Text(if(tab=="Saved") "Search saved stories" else "Search headlines")},leadingIcon={Icon(Icons.Outlined.Search,null)},
                                 trailingIcon=if(query.isNotBlank()) {
                                     { IconButton(onClick={query=""}) { Icon(Icons.Outlined.Close,"Clear search") } }
                                 } else null,
@@ -176,7 +178,7 @@ import kotlinx.coroutines.withContext
                             Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=RoundedCornerShape(14.dp),modifier=Modifier.fillMaxWidth()) {
                                 Row(Modifier.padding(horizontal=14.dp,vertical=11.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)) {
                                     Icon(Icons.Outlined.NearMe,null,tint=OliveGreen,modifier=Modifier.size(18.dp))
-                                    LocalizedText("News near $currentPlace",style=MaterialTheme.typography.bodyMedium,color=OliveGreen,modifier=Modifier.weight(1f))
+                                    Text("News near $currentPlace",style=MaterialTheme.typography.bodyMedium,color=OliveGreen,modifier=Modifier.weight(1f))
                                     IconButton(onClick={locationDraft=currentPlace;locationEditorOpen=true},modifier=Modifier.size(36.dp).testTag("change_news_location")) {
                                         Icon(Icons.Outlined.Edit,"Change local news location",tint=OliveGreen,modifier=Modifier.size(18.dp))
                                     }
@@ -184,8 +186,8 @@ import kotlinx.coroutines.withContext
                             }
                         }
                         item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                            LocalizedText(if(tab=="Saved") "Saved stories" else "Latest stories",style=MaterialTheme.typography.titleLarge,fontFamily=FontFamily.Serif,modifier=Modifier.weight(1f))
-                            if(tab=="Saved" && saved.isNotEmpty()) LocalizedText(saved.size.toString(),color=Muted)
+                            Text(if(tab=="Saved") "Saved stories" else "Latest stories",style=MaterialTheme.typography.titleLarge,fontFamily=FontFamily.Serif,modifier=Modifier.weight(1f))
+                            if(tab=="Saved" && saved.isNotEmpty()) Text(saved.size.toString(),color=Muted)
                         } }
                         if(tab=="Today") {
                             if(loading && articles.isEmpty()) item { NewsLoadingState() }
@@ -193,8 +195,8 @@ import kotlinx.coroutines.withContext
                                 Card(colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant),shape=RoundedCornerShape(18.dp)) {
                                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                                         Icon(Icons.Outlined.CloudOff,null,tint=Muted)
-                                        LocalizedText("Live news is unavailable. Check your connection and try again.")
-                                        OutlinedButton(onClick={refresh++}) { LocalizedText("Retry") }
+                                        Text(stringResource(R.string.live_news_is_unavailable_check_your_connection_and_try_again))
+                                        OutlinedButton(onClick={refresh++}) { Text(stringResource(R.string.retry)) }
                                     }
                                 }
                             }
@@ -218,9 +220,9 @@ import kotlinx.coroutines.withContext
 @Composable private fun NewsScopeButton(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean,
     modifier: Modifier=Modifier, onClick: ()->Unit) {
     if(selected) Button(onClick=onClick,modifier=modifier.height(48.dp),shape=RoundedCornerShape(15.dp)) {
-        Icon(icon,null,Modifier.size(18.dp));Spacer(Modifier.width(7.dp));LocalizedText(label)
+        Icon(icon,null,Modifier.size(18.dp));Spacer(Modifier.width(7.dp));Text(label)
     } else OutlinedButton(onClick=onClick,modifier=modifier.height(48.dp),shape=RoundedCornerShape(15.dp)) {
-        Icon(icon,null,Modifier.size(18.dp));Spacer(Modifier.width(7.dp));LocalizedText(label)
+        Icon(icon,null,Modifier.size(18.dp));Spacer(Modifier.width(7.dp));Text(label)
     }
 }
 
@@ -231,18 +233,18 @@ import kotlinx.coroutines.withContext
         Column(Modifier.padding(start=18.dp,end=10.dp,top=16.dp,bottom=14.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=RoundedCornerShape(8.dp)) {
-                    LocalizedText(article.source.uppercase(),color=OliveGreen,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=8.dp,vertical=5.dp),maxLines=1)
+                    Text(article.source.uppercase(),color=OliveGreen,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=8.dp,vertical=5.dp),maxLines=1)
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick=onBookmark) { Icon(if(saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,if(saved) "Remove bookmark" else "Save article",tint=OliveGreen) }
             }
             // Card titles use 22/27sp and three lines. Raise maxLines before shrinking text when a language needs more room.
-            LocalizedText(article.title,fontFamily=FontFamily.Serif,fontSize=22.sp,lineHeight=27.sp,fontWeight=FontWeight.SemiBold,maxLines=3)
-            if(article.summary.isNotBlank()) LocalizedText(article.summary,color=Muted,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(article.title,fontFamily=FontFamily.Serif,fontSize=22.sp,lineHeight=27.sp,fontWeight=FontWeight.SemiBold,maxLines=3)
+            if(article.summary.isNotBlank()) Text(article.summary,color=Muted,maxLines=2,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Schedule,null,Modifier.size(15.dp),tint=Muted)
                 Spacer(Modifier.width(5.dp))
-                LocalizedText(article.localPublished(language),color=Muted,style=MaterialTheme.typography.bodySmall,modifier=Modifier.weight(1f))
+                Text(article.localPublished(language),color=Muted,style=MaterialTheme.typography.bodySmall,modifier=Modifier.weight(1f))
                 Icon(Icons.AutoMirrored.Outlined.ArrowForward,null,Modifier.size(18.dp),tint=OliveGreen)
             }
         }
@@ -254,23 +256,23 @@ import kotlinx.coroutines.withContext
     onBack: ()->Unit, onOpen: ()->Unit, onBookmark: ()->Unit) {
     Column(verticalArrangement=Arrangement.spacedBy(16.dp)) {
         TextButton(onClick=onBack,contentPadding=PaddingValues(horizontal=0.dp)) {
-            Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Spacer(Modifier.width(5.dp));LocalizedText("Back to stories")
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Spacer(Modifier.width(5.dp));Text(stringResource(R.string.back_to_stories))
         }
         Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=RoundedCornerShape(8.dp),modifier=Modifier.align(Alignment.Start)) {
-            LocalizedText(article.source.uppercase(),color=OliveGreen,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=9.dp,vertical=6.dp))
+            Text(article.source.uppercase(),color=OliveGreen,style=MaterialTheme.typography.labelSmall,modifier=Modifier.padding(horizontal=9.dp,vertical=6.dp))
         }
         // Full article titles can wrap freely; change 31sp and 37sp together to preserve readable line spacing.
-        LocalizedText(article.title,fontFamily=FontFamily.Serif,fontSize=31.sp,lineHeight=37.sp,fontWeight=FontWeight.SemiBold)
+        Text(article.title,fontFamily=FontFamily.Serif,fontSize=31.sp,lineHeight=37.sp,fontWeight=FontWeight.SemiBold)
         Row(verticalAlignment=Alignment.CenterVertically) {
             Icon(Icons.Outlined.Schedule,null,Modifier.size(16.dp),tint=Muted);Spacer(Modifier.width(6.dp))
-            LocalizedText(article.localPublished(language),color=Muted)
+            Text(article.localPublished(language),color=Muted)
         }
         HorizontalDivider()
-        LocalizedText(article.summary,style=MaterialTheme.typography.bodyLarge,lineHeight=26.sp)
-        Button(onClick=onOpen,modifier=Modifier.fillMaxWidth()) { Icon(Icons.AutoMirrored.Outlined.OpenInNew,null);Spacer(Modifier.width(8.dp));LocalizedText("Read full story") }
+        Text(article.summary,style=MaterialTheme.typography.bodyLarge,lineHeight=26.sp)
+        Button(onClick=onOpen,modifier=Modifier.fillMaxWidth()) { Icon(Icons.AutoMirrored.Outlined.OpenInNew,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.read_full_story)) }
         OutlinedButton(onClick=onBookmark,modifier=Modifier.fillMaxWidth()) {
             Icon(if(saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,null);Spacer(Modifier.width(8.dp))
-            LocalizedText(if(saved) "Remove bookmark" else "Save article")
+            Text(if(saved) "Remove bookmark" else "Save article")
         }
     }
 }
@@ -293,6 +295,6 @@ import kotlinx.coroutines.withContext
 @Composable private fun NewsEmptyState(message: String) {
     Column(Modifier.fillMaxWidth().padding(vertical=38.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Icon(Icons.AutoMirrored.Outlined.Article,null,Modifier.size(42.dp),tint=Muted)
-        LocalizedText(message,color=Muted,textAlign=TextAlign.Center)
+        Text(message,color=Muted,textAlign=TextAlign.Center)
     }
 }

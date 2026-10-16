@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -9,6 +11,7 @@ import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,8 +37,8 @@ import androidx.compose.ui.unit.sp
             Icon(Icons.Outlined.SportsEsports,null,Modifier.padding(22.dp).size(52.dp),tint=OliveGreen)
         }
         Spacer(Modifier.height(20.dp))
-        LocalizedText("Game",fontFamily=FontFamily.Serif,fontSize=32.sp,fontWeight=FontWeight.SemiBold,color=OliveGreen)
+        Text("Game",fontFamily=FontFamily.Serif,fontSize=32.sp,fontWeight=FontWeight.SemiBold,color=OliveGreen)
         Spacer(Modifier.height(8.dp))
-        LocalizedText("In development",color=Muted)
+        Text(stringResource(R.string.in_development),color=Muted)
     }
 }
