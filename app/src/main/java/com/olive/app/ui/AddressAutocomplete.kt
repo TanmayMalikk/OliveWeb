@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -48,8 +50,8 @@ import kotlinx.coroutines.tasks.await
     }
 
     OutlinedTextField(value=current.line1,onValueChange={onChange(current.copy(line1=it.take(160)));error=null},singleLine=true,
-        label={LocalizedText(label)},modifier=Modifier.fillMaxWidth().testTag("address_line1").onFocusChanged { if(it.isFocused) onFocus?.invoke() },
-        isError=error!=null,supportingText=error?.let { value -> { LocalizedText(value) } })
+        label={Text(label)},modifier=Modifier.fillMaxWidth().testTag("address_line1").onFocusChanged { if(it.isFocused) onFocus?.invoke() },
+        isError=error!=null,supportingText=error?.let { value -> { Text(value) } })
     if(client!=null) {
         predictions.forEach { prediction ->
             Surface(Modifier.fillMaxWidth().clickable {
@@ -68,7 +70,7 @@ import kotlinx.coroutines.tasks.await
                 }
             }
         }
-        if(predictions.isNotEmpty()) LocalizedText("Powered by Google",style=MaterialTheme.typography.labelSmall,color=Muted)
+        if(predictions.isNotEmpty()) Text(stringResource(R.string.powered_by_google),style=MaterialTheme.typography.labelSmall,color=Muted)
     }
 }
 

@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -46,9 +48,9 @@ import androidx.compose.ui.unit.sp
     FormColumn {
         Box(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                LocalizedText("Olive Branch",fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-                LocalizedText("Safe Contact",style=MaterialTheme.typography.headlineMedium)
-                LocalizedText("Stay connected with people who trust you for support.",color=Muted)
+                Text(stringResource(R.string.olive_branch),fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
+                Text(stringResource(R.string.safe_contact),style=MaterialTheme.typography.headlineMedium)
+                Text("Stay connected with people who trust you for support.",color=Muted)
             }
             IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.align(Alignment.TopEnd).testTag("safe_contact_settings")) {
                 Icon(Icons.Outlined.Settings,"Account settings")
@@ -56,14 +58,14 @@ import androidx.compose.ui.unit.sp
         }
         ModeNotice(session)
         Button(onClick={session.navigate(SafePage.Profile)},modifier=Modifier.fillMaxWidth().testTag("safe_contact_profile")) {
-            Icon(Icons.Outlined.PersonOutline,null);Spacer(Modifier.width(10.dp));LocalizedText("My profile")
+            Icon(Icons.Outlined.PersonOutline,null);Spacer(Modifier.width(10.dp));Text(stringResource(R.string.my_profile))
         }
-        LocalizedText("Private features",style=MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.private_features),style=MaterialTheme.typography.titleLarge)
         Button(onClick={session.navigate(SafePage.Notes)},modifier=Modifier.fillMaxWidth().heightIn(min=92.dp).testTag("safe_contact_notes"),
             colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF718669))) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                 Icon(Icons.Outlined.Description,"Notes and incidents",Modifier.size(32.dp))
-                LocalizedText("Notes & incidents",fontSize=18.sp)
+                Text(stringResource(R.string.notes_incidents),fontSize=18.sp)
             }
         }
         Button(onClick={session.navigate(SafePage.Messages)},modifier=Modifier.fillMaxWidth().heightIn(min=92.dp).testTag("safe_contact_messages"),
@@ -72,7 +74,7 @@ import androidx.compose.ui.unit.sp
                 BadgedBox(badge={if(session.pendingMessageActionCount>0) Badge {
                     Text(if(session.pendingMessageActionCount>99) "99+" else session.pendingMessageActionCount.toString())
                 }}) { Icon(Icons.Outlined.ChatBubbleOutline,"Messages",Modifier.size(34.dp)) }
-                LocalizedText("Messages",fontSize=18.sp,textAlign=TextAlign.Center)
+                Text(stringResource(R.string.messages),fontSize=18.sp,textAlign=TextAlign.Center)
             }
         }
         listOf(3,4).forEach { number ->
@@ -80,20 +82,20 @@ import androidx.compose.ui.unit.sp
                 colors=ButtonDefaults.outlinedButtonColors(disabledContainerColor=Color(0xFFE7EDE2),disabledContentColor=Muted)) {
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     Icon(Icons.Outlined.AddCircleOutline,"Future feature",Modifier.size(30.dp))
-                    LocalizedText("Future feature $number",fontSize=17.sp)
+                    Text("Future feature $number",fontSize=17.sp)
                 }
             }
         }
         Status(session)
         TextButton(onClick=session::signOut,enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("sign_out")) {
-            LocalizedText("Sign out on this device")
+            Text(stringResource(R.string.sign_out_on_this_device))
         }
     }
 }
 
 @Composable private fun SafeContactProfile(session:SessionViewModel,profile:com.olive.app.data.UserProfile) {
     FormColumn {
-        TextButton(onClick=session::back) { LocalizedText("Back") }
+        TextButton(onClick=session::back) { Text(stringResource(R.string.back)) }
         Heading("My profile","Your Safe Contact account information.")
         listOf(
             "Username" to profile.username,
@@ -102,8 +104,8 @@ import androidx.compose.ui.unit.sp
             "Preferred language" to profile.language,
             "Region / city / state" to profile.region,
         ).forEach { (label,value) ->
-            LocalizedText(label,style=MaterialTheme.typography.labelLarge,color=OliveGreen)
-            LocalizedText(value.ifBlank { "Not provided" })
+            Text(label,style=MaterialTheme.typography.labelLarge,color=OliveGreen)
+            Text(value.ifBlank { "Not provided" })
         }
     }
 }

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">App</string>
     <string name="use_shipping_address">Use shipping address</string>
@@ -559,4 +559,4 @@
     <string name="subtotal_amount">Subtotal: %1$s</string>
     <string name="news_near_location">News near %1$s</string>
     <string name="no_activity_returning_in_seconds">No activity. Returning to your cover in %1$d seconds.</string>
-</resources>
+<string name="accounts">Accounts</string><string name="add_another_contact">Add another contact</string><string name="calculation">Calculation</string><string name="change_local_news_location">Change local news location</string><string name="city_or_region">City or region</string><string name="create">Create</string><string name="deg">DEG</string><string name="data_values">Data values</string><string name="delete_account">Delete account</string><string name="generate_table">Generate table</string><string name="graph_table_analysis">Graph table &amp; analysis</string><string name="input">Input</string><string name="plot">Plot</string><string name="rad">RAD</string><string name="reconnect">Reconnect</string><string name="refresh">Refresh</string><string name="save">Save</string><string name="save_profile">Save profile</string><string name="stat_plots">Stat plots</string><string name="statistical_plots">Statistical plots</string><string name="table_analysis">Table &amp; analysis</string><string name="use_device_location">Use device location</string><string name="x_values">X values</string><string name="y_values">Y values</string><string name="delete_managed_account_warning">This permanently removes the %1$s account from Firebase Authentication and deletes its account data.</string><string name="y_one_function_per_line">Y = (one function per line)</string></resources>

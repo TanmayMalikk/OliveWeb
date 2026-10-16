@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -122,10 +124,10 @@ import java.util.UUID
             Column(Modifier.weight(1f).oliveScrollbar(headingScrollState).verticalScroll(headingScrollState),horizontalAlignment=Alignment.CenterHorizontally,
                 verticalArrangement=Arrangement.spacedBy(if(compact) 7.dp else 12.dp)) {
                 // These are the compact/regular PIN headings; change both together so translated text scales consistently.
-                LocalizedText("Olive Branch",fontFamily=FontFamily.Serif,fontSize=if(compact) 22.sp else 26.sp,color=OliveGreen)
-                LocalizedText("Enter PIN",modifier=Modifier.padding(top=if(compact) 12.dp else 18.dp),
+                Text(stringResource(R.string.olive_branch),fontFamily=FontFamily.Serif,fontSize=if(compact) 22.sp else 26.sp,color=OliveGreen)
+                Text(stringResource(R.string.enter_pin),modifier=Modifier.padding(top=if(compact) 12.dp else 18.dp),
                     style=if(compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium)
-                LocalizedText("Enter your PIN.",color=Muted)
+                Text(stringResource(R.string.enter_your_pin),color=Muted)
                 Row(Modifier.height(if(compact) 11.dp else 14.dp).testTag("unlock_pin"),horizontalArrangement=Arrangement.spacedBy(if(compact) 8.dp else 12.dp)) {
                     repeat(pin.length) {
                         Box(Modifier.size(if(compact) 11.dp else 14.dp).background(OliveGreen,CircleShape))
@@ -148,7 +150,7 @@ import java.util.UUID
                             },enabled=!session.busy && (key!="↪" || pin.length in 4..6),
                                 modifier=Modifier.size(keySize).testTag(tag),shape=CircleShape,
                                 contentPadding=PaddingValues(0.dp)) {
-                                LocalizedText(key,fontSize=if(compact) 23.sp else if(key=="⌫" || key=="↪") 26.sp else 30.sp)
+                                Text(key,fontSize=if(compact) 23.sp else if(key=="⌫" || key=="↪") 26.sp else 30.sp)
                             }
                         }
                     }

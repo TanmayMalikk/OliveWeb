@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -31,30 +33,30 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
         OrganizationPage.Settings -> OrganizationSettings(session,onBack={page=OrganizationPage.Dashboard})
     }
     if(createOpen) CreateAccountDialog(session,onDismiss={createOpen=false})
-    deleteTarget?.let { account -> AlertDialog(onDismissRequest={deleteTarget=null},title={LocalizedText("Delete ${account.username}?")},
-        text={LocalizedText("This permanently removes the ${account.role.title} account from Firebase Authentication and deletes its account data.")},
-        confirmButton={Button(onClick={session.deleteManagedAccount(account);deleteTarget=null},colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){LocalizedText("Delete account")}},
-        dismissButton={TextButton(onClick={deleteTarget=null}){LocalizedText("Cancel")}}) }
+    deleteTarget?.let { account -> AlertDialog(onDismissRequest={deleteTarget=null},title={Text("Delete ${account.username}?")},
+        text={Text("This permanently removes the ${account.role.title} account from Firebase Authentication and deletes its account data.")},
+        confirmButton={Button(onClick={session.deleteManagedAccount(account);deleteTarget=null},colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)){Text(stringResource(R.string.delete_account))}},
+        dismissButton={TextButton(onClick={deleteTarget=null}){Text(stringResource(R.string.cancel))}}) }
 }
 
 @Composable private fun OrganizationDashboard(session:SessionViewModel,admin:Boolean,onAccounts:()->Unit,onSettings:()->Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Box(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                LocalizedText("Olive Tree",fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
-                LocalizedText(if(admin) "Admin panel" else "Staff panel",style=MaterialTheme.typography.headlineMedium)
-                LocalizedText("Signed in as ${session.coverUsername}",color=Muted)
+                Text(stringResource(R.string.olive_tree),fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
+                Text(if(admin) "Admin panel" else "Staff panel",style=MaterialTheme.typography.headlineMedium)
+                Text("Signed in as ${session.coverUsername}",color=Muted)
             }
             IconButton(onClick=onSettings,modifier=Modifier.align(Alignment.TopEnd)) { Icon(Icons.Outlined.Settings,"Account settings") }
         }
         if(admin) AccountCountGrid(session.adminCounts)
         Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-            LocalizedText("Active chats with staff and users",style=MaterialTheme.typography.titleMedium)
-            LocalizedText("In development",color=Muted)
+            Text("Active chats with staff and users",style=MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.in_development),color=Muted)
         } }
-        if(admin) Button(onClick=onAccounts,modifier=Modifier.fillMaxWidth()) { LocalizedText("Accounts") }
+        if(admin) Button(onClick=onAccounts,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.accounts)) }
         Status(session)
-        OutlinedButton(onClick=session::signOut,enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { LocalizedText("Sign out") }
+        OutlinedButton(onClick=session::signOut,enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.sign_out)) }
     }
 }
 
@@ -62,13 +64,13 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back") }
-            LocalizedText("Accounts",style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.accounts),style=MaterialTheme.typography.headlineMedium)
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-            Button(onClick=onCreate,enabled=!session.busy,modifier=Modifier.weight(1f)) { LocalizedText("Create account") }
-            OutlinedButton(onClick=session::refreshAdminAccounts,enabled=!session.busy,modifier=Modifier.weight(1f)) { LocalizedText("Refresh") }
+            Button(onClick=onCreate,enabled=!session.busy,modifier=Modifier.weight(1f)) { Text(stringResource(R.string.create_account)) }
+            OutlinedButton(onClick=session::refreshAdminAccounts,enabled=!session.busy,modifier=Modifier.weight(1f)) { Text(stringResource(R.string.refresh)) }
         }
-        if(session.adminAccounts.isEmpty() && !session.busy) LocalizedText("No accounts found.",color=Muted)
+        if(session.adminAccounts.isEmpty() && !session.busy) Text("No accounts found.",color=Muted)
         session.adminAccounts.forEach { account -> AccountRow(account,!session.busy) { onDelete(account) } }
         Status(session)
     }
@@ -86,20 +88,20 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=18.dp).padding(bottom=40.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back") }
-            LocalizedText("Account settings",style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.account_settings),style=MaterialTheme.typography.headlineMedium)
         }
-        LocalizedText("Profile information",style=MaterialTheme.typography.titleLarge)
+        Text("Profile information",style=MaterialTheme.typography.titleLarge)
         Field("Full name",fullName,"organization_settings_name",enabled=!session.busy) { fullName=it.take(120) }
         BirthdayPicker(dob,"organization_settings_dob",!session.busy) { dob=it }
         Field("Email",email,"organization_settings_email",enabled=!session.busy) { email=it.take(254) }
         Field("Phone (optional)",phone,"organization_settings_phone",enabled=!session.busy) { phone=it.take(40) }
-        Button(onClick={session.updateOrganizationProfile(fullName,dob,email,phone)},enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { LocalizedText("Save profile") }
+        Button(onClick={session.updateOrganizationProfile(fullName,dob,email,phone)},enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.save_profile)) }
         HorizontalDivider()
-        LocalizedText("Change password",style=MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.change_password),style=MaterialTheme.typography.titleLarge)
         Field("Current password",currentPassword,"organization_current_password",secret=true,showSecretToggle=true,enabled=!session.busy) { currentPassword=it.take(128) }
         Field("New password",newPassword,"organization_new_password",secret=true,showSecretToggle=true,enabled=!session.busy) { newPassword=it.take(24) }
         Field("Confirm new password",confirmation,"organization_confirm_password",secret=true,showSecretToggle=true,enabled=!session.busy) { confirmation=it.take(24) }
-        Button(onClick={session.changePassword(currentPassword,newPassword,confirmation)},enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { LocalizedText("Change password") }
+        Button(onClick={session.changePassword(currentPassword,newPassword,confirmation)},enabled=!session.busy,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.change_password)) }
         Status(session)
     }
 }
@@ -109,8 +111,8 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     val values=listOf("Users" to counts.users,"Safe Contacts" to counts.safeContacts,"Staff" to counts.staff,"Admins" to counts.admins)
     values.chunked(2).forEach { row -> Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
         row.forEach { (label,count) -> Card(Modifier.weight(1f)) { Row(Modifier.fillMaxWidth().padding(horizontal=12.dp,vertical=9.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            LocalizedText(count.toString(),style=MaterialTheme.typography.titleLarge,color=OliveGreen)
-            LocalizedText(label,style=MaterialTheme.typography.bodyMedium)
+            Text(count.toString(),style=MaterialTheme.typography.titleLarge,color=OliveGreen)
+            Text(label,style=MaterialTheme.typography.bodyMedium)
         } } }
     } }
 }
@@ -119,12 +121,12 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                LocalizedText(account.username,style=MaterialTheme.typography.titleMedium)
-                LocalizedText(account.role.title + if(account.profileComplete) " · Setup complete" else " · Setup required",color=Muted)
-                if(account.fullName.isNotBlank()) LocalizedText(account.fullName)
-                if(account.email.isNotBlank()) LocalizedText(account.email,style=MaterialTheme.typography.bodySmall,color=Muted)
+                Text(account.username,style=MaterialTheme.typography.titleMedium)
+                Text(account.role.title + if(account.profileComplete) " · Setup complete" else " · Setup required",color=Muted)
+                if(account.fullName.isNotBlank()) Text(account.fullName)
+                if(account.email.isNotBlank()) Text(account.email,style=MaterialTheme.typography.bodySmall,color=Muted)
             }
-            TextButton(onClick=onDelete,enabled=enabled && !account.protected) { LocalizedText(if(account.protected) "Protected" else "Delete") }
+            TextButton(onClick=onDelete,enabled=enabled && !account.protected) { Text(if(account.protected) "Protected" else "Delete") }
         }
     } }
 }
@@ -136,23 +138,23 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     var username by remember { mutableStateOf("") };var password by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") };var dob by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") };var phone by remember { mutableStateOf("") }
-    var language by remember { mutableStateOf(getSystemDefaultLanguage()) };var city by remember { mutableStateOf("") }
+    var language by remember { mutableStateOf(AppLocaleManager.resolveSystemDefaultLanguageName()) };var city by remember { mutableStateOf("") }
     var affected by remember { mutableStateOf("") };var abuser by remember { mutableStateOf("") };var situation by remember { mutableStateOf("") }
-    AlertDialog(onDismissRequest=onDismiss,title={LocalizedText("Create account")},text={
+    AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.create_account))},text={
         Column(Modifier.fillMaxWidth().heightIn(max=520.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             ExposedDropdownMenuBox(expanded=roleOpen,onExpandedChange={roleOpen=!roleOpen}) {
-                OutlinedTextField(role.title,{},readOnly=true,label={LocalizedText("Account type")},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(roleOpen)},modifier=Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable))
-                ExposedDropdownMenu(roleOpen,{roleOpen=false}) { AccountRole.entries.forEach { item -> DropdownMenuItem(text={LocalizedText(item.title)},onClick={role=item;roleOpen=false}) } }
+                OutlinedTextField(role.title,{},readOnly=true,label={Text(stringResource(R.string.account_type))},trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(roleOpen)},modifier=Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable))
+                ExposedDropdownMenu(roleOpen,{roleOpen=false}) { AccountRole.entries.forEach { item -> DropdownMenuItem(text={Text(item.title)},onClick={role=item;roleOpen=false}) } }
             }
             Field("Username",username,"admin_username") { username=it.take(24) }
             Field("Temporary password",password,"admin_password",secret=true,showSecretToggle=true) { password=it.take(24) }
-            HorizontalDivider();LocalizedText("Optional onboarding details",style=MaterialTheme.typography.titleMedium)
+            HorizontalDivider();Text("Optional onboarding details",style=MaterialTheme.typography.titleMedium)
             Field("Full name",fullName,"admin_full_name") { fullName=it.take(120) }
             BirthdayPicker(dob,"admin_dob",true) { dob=it }
             if(role in setOf(AccountRole.STAFF,AccountRole.ADMIN)) {
                 Field("Email",email,"admin_email") { email=it.take(254) }
                 Field("Phone (optional)",phone,"admin_phone") { phone=it.take(40) }
-                LocalizedText("Leave required details blank to have this person finish them on first sign-in.",style=MaterialTheme.typography.bodySmall,color=Muted)
+                Text("Leave required details blank to have this person finish them on first sign-in.",style=MaterialTheme.typography.bodySmall,color=Muted)
             } else {
                 LanguagePicker(language,true) { language=it }
                 Field("City",city,"admin_city") { city=it.take(160) }
@@ -160,10 +162,10 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
                     Field("Names of people experiencing abuse (optional)",affected,"admin_affected") { affected=it.take(500) }
                     Field("Abuser's name (optional)",abuser,"admin_abuser") { abuser=it.take(120) }
                     Field("Situation (optional)",situation,"admin_situation",multiline=true) { situation=it.take(2000) }
-                    LocalizedText("The user sets their own trigger word and device PIN on first sign-in.",style=MaterialTheme.typography.bodySmall,color=Muted)
+                    Text("The user sets their own trigger word and device PIN on first sign-in.",style=MaterialTheme.typography.bodySmall,color=Muted)
                 }
             }
         }
-    },confirmButton={Button(onClick={session.createManagedAccount(AdminAccountDraft(username,password,role,fullName,dob,email,phone,language,city,affected,abuser,situation));onDismiss()}){LocalizedText("Create")}},
-        dismissButton={TextButton(onClick=onDismiss){LocalizedText("Cancel")}})
+    },confirmButton={Button(onClick={session.createManagedAccount(AdminAccountDraft(username,password,role,fullName,dob,email,phone,language,city,affected,abuser,situation));onDismiss()}){Text(stringResource(R.string.create))}},
+        dismissButton={TextButton(onClick=onDismiss){Text(stringResource(R.string.cancel))}})
 }

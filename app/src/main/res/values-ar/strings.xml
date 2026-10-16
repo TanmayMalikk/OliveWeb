@@ -560,4 +560,30 @@
     <string name="subtotal_amount">الإجمالي الفرعي: %1$s</string>
     <string name="news_near_location">أخبار بالقرب من %1$s</string>
     <string name="no_activity_returning_in_seconds">لا يوجد نشاط. سيتم الرجوع إلى غلافك خلال %1$d ثانية.</string>
+    <string name="accounts">الحسابات</string>
+    <string name="add_another_contact">أضف جهة اتصال أخرى</string>
+    <string name="calculation">الحساب</string>
+    <string name="change_local_news_location">تغيير موقع الأخبار المحلية</string>
+    <string name="city_or_region">المدينة أو المنطقة</string>
+    <string name="create">إنشاء</string>
+    <string name="deg">درجة</string>
+    <string name="data_values">قيم البيانات</string>
+    <string name="delete_account">حذف الحساب</string>
+    <string name="generate_table">توليد الجدول</string>
+    <string name="graph_table_analysis">جدول الرسم البياني والتحليل</string>
+    <string name="input">الإدخال</string>
+    <string name="plot">مؤامرة</string>
+    <string name="rad">راد</string>
+    <string name="reconnect">أعد الاتصال</string>
+    <string name="refresh">تحديث</string>
+    <string name="save">حفظ</string>
+    <string name="save_profile">حفظ الملف الشخصي</string>
+    <string name="stat_plots">المؤامرات الإحصائية</string>
+    <string name="statistical_plots">المؤامرات الإحصائية</string>
+    <string name="table_analysis">الجدول والتحليل</string>
+    <string name="use_device_location">استخدام موقع الجهاز</string>
+    <string name="x_values">قيم X</string>
+    <string name="y_values">قيم Y</string>
+    <string name="delete_managed_account_warning">يؤدي هذا إلى إزالة حساب %1$s نهائيًا من مصادقة Firebase وحذف بيانات الحساب الخاصة به.</string>
+    <string name="y_one_function_per_line">Y = (وظيفة واحدة لكل سطر)</string>
 </resources>

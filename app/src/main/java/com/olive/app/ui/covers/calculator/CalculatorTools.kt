@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -45,12 +47,12 @@ internal fun CalculatorTools(
             IconButton(onClick=onClose,modifier=Modifier.testTag("close_math_tools")) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back")
             }
-            LocalizedText("Math tools",style=MaterialTheme.typography.headlineSmall,color=OliveGreen,fontWeight=FontWeight.SemiBold)
+            Text("Math tools",style=MaterialTheme.typography.headlineSmall,color=OliveGreen,fontWeight=FontWeight.SemiBold)
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-            LocalizedText("Angle",color=Muted,modifier=Modifier.weight(1f))
-            FilterChip(selected=angleMode==CalculatorAngleMode.RADIANS,onClick={onAngleModeChange(CalculatorAngleMode.RADIANS)},label={LocalizedText("RAD")})
-            FilterChip(selected=angleMode==CalculatorAngleMode.DEGREES,onClick={onAngleModeChange(CalculatorAngleMode.DEGREES)},label={LocalizedText("DEG")})
+            Text("Angle",color=Muted,modifier=Modifier.weight(1f))
+            FilterChip(selected=angleMode==CalculatorAngleMode.RADIANS,onClick={onAngleModeChange(CalculatorAngleMode.RADIANS)},label={Text(stringResource(R.string.rad))})
+            FilterChip(selected=angleMode==CalculatorAngleMode.DEGREES,onClick={onAngleModeChange(CalculatorAngleMode.DEGREES)},label={Text(stringResource(R.string.deg))})
         }
         // Categories scroll sideways so translated labels never squeeze off the screen.
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -59,20 +61,20 @@ internal fun CalculatorTools(
                     category=item
                     selected=AdvancedTool.entries.first { it.category==item }
                     input="";result=null;error=null
-                },label={LocalizedText(item)})
+                },label={Text(item)})
             }
         }
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             ExposedDropdownMenuBox(expanded=menuOpen,onExpandedChange={menuOpen=it}) {
                 OutlinedTextField(
                     value=selected.title,onValueChange={},readOnly=true,
-                    label={LocalizedText("Calculation")},
+                    label={Text(stringResource(R.string.calculation))},
                     trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(menuOpen)},
                     modifier=Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).testTag("advanced_tool_picker"),
                 )
                 ExposedDropdownMenu(expanded=menuOpen,onDismissRequest={menuOpen=false}) {
                     AdvancedTool.entries.filter { it.category==category }.forEach { tool ->
-                        DropdownMenuItem(text={LocalizedText(tool.title)},onClick={
+                        DropdownMenuItem(text={Text(tool.title)},onClick={
                             selected=tool;input="";result=null;error=null;menuOpen=false
                         })
                     }
@@ -80,7 +82,7 @@ internal fun CalculatorTools(
             }
             OutlinedTextField(
                 value=input,onValueChange={input=it.take(1200);result=null;error=null},
-                label={LocalizedText("Input")},supportingText={LocalizedText("Example: ${selected.example}")},
+                label={Text(stringResource(R.string.input))},supportingText={Text("Example: ${selected.example}")},
                 minLines=3,maxLines=9,modifier=Modifier.fillMaxWidth().testTag("advanced_tool_input"),
             )
             Button(
@@ -91,16 +93,16 @@ internal fun CalculatorTools(
                 },
                 enabled=input.isNotBlank(),modifier=Modifier.fillMaxWidth().height(52.dp).testTag("advanced_tool_calculate"),
                 shape=RoundedCornerShape(18.dp),
-            ) { LocalizedText("Calculate",fontWeight=FontWeight.SemiBold) }
+            ) { Text("Calculate",fontWeight=FontWeight.SemiBold) }
             result?.let {
                 Surface(color=LightSage,shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().testTag("advanced_tool_result")) {
                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                        LocalizedText("Result",color=OliveGreen,fontWeight=FontWeight.SemiBold)
-                        LocalizedText(it,fontFamily=FontFamily.Monospace,color=Ink)
+                        Text("Result",color=OliveGreen,fontWeight=FontWeight.SemiBold)
+                        Text(it,fontFamily=FontFamily.Monospace,color=Ink)
                     }
                 }
             }
-            error?.let { LocalizedText(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("advanced_tool_error")) }
+            error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("advanced_tool_error")) }
             Spacer(Modifier.height(24.dp))
         }
     }

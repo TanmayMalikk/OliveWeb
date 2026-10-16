@@ -1,4 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
+import androidx.compose.ui.res.stringResource
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,11 +76,11 @@ internal fun GraphTableAnalysisDialog(equations:List<String>,mode:CalculatorAngl
 
     AlertDialog(
         onDismissRequest=onClose,
-        title={LocalizedText("Graph table & analysis")},
+        title={Text(stringResource(R.string.graph_table_analysis))},
         text={Column(Modifier.fillMaxWidth().heightIn(max=610.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 listOf("Table","Analyze").forEach { item ->
-                    FilterChip(selected=section==item,onClick={section=item;error=null},label={LocalizedText(item)},modifier=Modifier.weight(1f))
+                    FilterChip(selected=section==item,onClick={section=item;error=null},label={Text(item)},modifier=Modifier.weight(1f))
                 }
             }
             HorizontalDivider()
@@ -119,7 +121,7 @@ internal fun GraphTableAnalysisDialog(equations:List<String>,mode:CalculatorAngl
                 )
             }
         }},
-        confirmButton={TextButton(onClick=onClose) { LocalizedText("Done") }},
+        confirmButton={TextButton(onClick=onClose) { Text(stringResource(R.string.done)) }},
     )
 }
 
@@ -128,24 +130,24 @@ private fun GraphTableSection(
     start:String,onStartChange:(String)->Unit,end:String,onEndChange:(String)->Unit,step:String,onStepChange:(String)->Unit,
     table:GraphTableData?,error:String?,onGenerate:()->Unit,
 ) {
-    LocalizedText("X range",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
-    LocalizedText("Choose the first X value, last X value, and distance between rows.",style=MaterialTheme.typography.bodySmall,color=Muted)
+    Text("X range",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+    Text("Choose the first X value, last X value, and distance between rows.",style=MaterialTheme.typography.bodySmall,color=Muted)
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         RangeField(start,onStartChange,"Start X",Modifier.weight(1f).testTag("table_start_x"))
         RangeField(end,onEndChange,"End X",Modifier.weight(1f).testTag("table_end_x"))
         RangeField(step,onStepChange,"Step",Modifier.weight(1f).testTag("table_step_x"))
     }
-    Button(onClick=onGenerate,modifier=Modifier.fillMaxWidth().testTag("make_graph_table")) { LocalizedText("Generate table") }
-    error?.let { LocalizedText(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+    Button(onClick=onGenerate,modifier=Modifier.fillMaxWidth().testTag("make_graph_table")) { Text(stringResource(R.string.generate_table)) }
+    error?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
     table?.let { data ->
-        LocalizedText("Values",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+        Text("Values",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
         GraphValueTable(data)
     }
 }
 
 @Composable
 private fun RangeField(value:String,onChange:(String)->Unit,label:String,modifier:Modifier=Modifier) {
-    OutlinedTextField(value,{onChange(it.take(24))},label={LocalizedText(label)},singleLine=true,modifier=modifier)
+    OutlinedTextField(value,{onChange(it.take(24))},label={Text(label)},singleLine=true,modifier=modifier)
 }
 
 @Composable
@@ -153,7 +155,7 @@ private fun GraphValueTable(data:GraphTableData) {
     val horizontal=rememberScrollState()
     val vertical=rememberScrollState()
     LaunchedEffect(data) { horizontal.scrollTo(0);vertical.scrollTo(0) }
-    LocalizedText("Starts at X = ${data.rows.firstOrNull()?.firstOrNull().orEmpty()}",style=MaterialTheme.typography.labelMedium,color=Muted)
+    Text("Starts at X = ${data.rows.firstOrNull()?.firstOrNull().orEmpty()}",style=MaterialTheme.typography.labelMedium,color=Muted)
     // UI sizing/color: the table stays at 100% size inside a fixed 280dp viewport with a scrollbar on each axis.
     Surface(shape=RoundedCornerShape(12.dp),color=Paper,tonalElevation=2.dp,
         modifier=Modifier.fillMaxWidth().height(280.dp).border(1.dp,SoftGray,RoundedCornerShape(12.dp))) {
@@ -170,14 +172,14 @@ private fun GraphValueTable(data:GraphTableData) {
             }
         }
     }
-    LocalizedText("Use the right and bottom scrollbars to move through rows and columns.",style=MaterialTheme.typography.labelSmall,color=Muted)
+    Text("Use the right and bottom scrollbars to move through rows and columns.",style=MaterialTheme.typography.labelSmall,color=Muted)
 }
 
 @Composable
 private fun GraphTableCell(value:String,isX:Boolean,isHeader:Boolean) {
     // UI sizing/color: change these widths together if translated headers need more room.
     Box(Modifier.width(if(isX) 92.dp else 132.dp).height(42.dp).border(.5.dp,SoftGray).padding(horizontal=8.dp),contentAlignment=Alignment.Center) {
-        LocalizedText(value,fontFamily=FontFamily.Monospace,fontWeight=if(isHeader) FontWeight.Bold else FontWeight.Normal,
+        Text(value,fontFamily=FontFamily.Monospace,fontWeight=if(isHeader) FontWeight.Bold else FontWeight.Normal,
             color=if(isHeader) Ink else if(isX) OliveGreen else Ink,textAlign=TextAlign.Center,maxLines=1)
     }
 }
@@ -189,23 +191,23 @@ private fun GraphAnalysisSection(
     result:String?,error:String?,onCalculate:()->Unit,
 ) {
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        LocalizedText("1. Choose a function",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+        Text("1. Choose a function",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             equations.indices.forEach { index ->
-                FilterChip(selected=equationIndex==index,onClick={onEquationChange(index)},label={LocalizedText("Y${index+1}")})
+                FilterChip(selected=equationIndex==index,onClick={onEquationChange(index)},label={Text("Y${index+1}")})
             }
         }
         Surface(color=WarmWhite,shape=RoundedCornerShape(10.dp),modifier=Modifier.fillMaxWidth()) {
-            LocalizedText("Y${equationIndex+1} = ${equations[equationIndex]}",fontFamily=FontFamily.Monospace,modifier=Modifier.padding(12.dp))
+            Text("Y${equationIndex+1} = ${equations[equationIndex]}",fontFamily=FontFamily.Monospace,modifier=Modifier.padding(12.dp))
         }
 
-        LocalizedText("2. Choose an analysis",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+        Text("2. Choose an analysis",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
         Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
             GraphCalculation.entries.chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                     row.forEach { item ->
                         FilterChip(selected=calculation==item,onClick={onCalculationChange(item)},
-                            label={LocalizedText(item.label,fontSize=13.sp)},modifier=Modifier.weight(1f).height(34.dp))
+                            label={Text(item.label,fontSize=13.sp)},modifier=Modifier.weight(1f).height(34.dp))
                     }
                     if(row.size==1) Spacer(Modifier.weight(1f))
                 }
@@ -213,22 +215,22 @@ private fun GraphAnalysisSection(
         }
 
         if(calculation==GraphCalculation.Intersection && equations.size>1) {
-            LocalizedText("Compare with",style=MaterialTheme.typography.labelLarge)
+            Text("Compare with",style=MaterialTheme.typography.labelLarge)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                 equations.indices.filter { it!=equationIndex }.forEach { index ->
-                    FilterChip(selected=comparisonIndex==index,onClick={onComparisonChange(index)},label={LocalizedText("Y${index+1}")})
+                    FilterChip(selected=comparisonIndex==index,onClick={onComparisonChange(index)},label={Text("Y${index+1}")})
                 }
             }
         }
 
-        OutlinedTextField(analysisInput,onInputChange,label={LocalizedText(calculation.inputLabel)},supportingText={LocalizedText(calculation.example)},singleLine=true,modifier=Modifier.fillMaxWidth())
-        Button(onClick=onCalculate,modifier=Modifier.fillMaxWidth().testTag("run_graph_analysis")) { LocalizedText("Calculate ${calculation.label.lowercase()}") }
-        error?.let { LocalizedText(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
+        OutlinedTextField(analysisInput,onInputChange,label={Text(calculation.inputLabel)},supportingText={Text(calculation.example)},singleLine=true,modifier=Modifier.fillMaxWidth())
+        Button(onClick=onCalculate,modifier=Modifier.fillMaxWidth().testTag("run_graph_analysis")) { Text("Calculate ${calculation.label.lowercase()}") }
+        error?.let { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
         result?.let {
             Surface(color=PaleOlive,shape=RoundedCornerShape(12.dp),modifier=Modifier.fillMaxWidth().testTag("graph_analysis_result")) {
                 Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                    LocalizedText("Result",style=MaterialTheme.typography.labelLarge,color=OliveGreen,fontWeight=FontWeight.Bold)
-                    LocalizedText(it,fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodyLarge)
+                    Text("Result",style=MaterialTheme.typography.labelLarge,color=OliveGreen,fontWeight=FontWeight.Bold)
+                    Text(it,fontFamily=FontFamily.Monospace,style=MaterialTheme.typography.bodyLarge)
                 }
             }
         }
