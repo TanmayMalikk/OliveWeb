@@ -23,25 +23,6 @@ object AppNotifications {
     private const val TREE_DEFAULT_TITLE="Olive Tree"
     private const val TREE_DEFAULT_BODY="An account update is available."
 
-    //put your custom title and message between these quotes.
-    private const val OLIVE_CUSTOM_TITLE=""
-    private const val OLIVE_CUSTOM_BODY=""
-
-    private const val NEWS_CUSTOM_TITLE=""
-    private const val NEWS_CUSTOM_BODY=""
-
-    private const val CALCULATOR_CUSTOM_TITLE=""
-    private const val CALCULATOR_CUSTOM_BODY=""
-
-    private const val GAME_CUSTOM_TITLE=""
-    private const val GAME_CUSTOM_BODY=""
-
-    private const val BRANCH_CUSTOM_TITLE=""
-    private const val BRANCH_CUSTOM_BODY=""
-
-    private const val TREE_CUSTOM_TITLE=""
-    private const val TREE_CUSTOM_BODY=""
-
     //these stay cover-safe and never include a sender or private message text.
     private val OLIVE_SAFE_UPDATES=listOf(
         "Fresh menu updates are available.",
@@ -63,16 +44,6 @@ object AppNotifications {
         "Open the app to see what's new.",
         "New activity is waiting.",
     )
-
-    // Call one of these from the app event that should display the matching local notification.
-    fun showOlive(context:Context)=show(context,OLIVE_CUSTOM_TITLE,OLIVE_CUSTOM_BODY,CoverType.FOOD)
-    fun showDailyDigest(context:Context)=show(context,NEWS_CUSTOM_TITLE,NEWS_CUSTOM_BODY,CoverType.NEWS)
-    fun showBetterCalculator(context:Context)=show(context,CALCULATOR_CUSTOM_TITLE,CALCULATOR_CUSTOM_BODY,CoverType.CALCULATOR)
-    fun showGame(context:Context)=show(context,GAME_CUSTOM_TITLE,GAME_CUSTOM_BODY,CoverType.GAME)
-    fun showOliveBranch(context:Context)=OliveNotificationManager.showDiscreetNotification(
-        context,BRANCH_CUSTOM_TITLE,BRANCH_CUSTOM_BODY,CoverType.FOOD,AccountRole.SAFE_CONTACT)
-    fun showOliveTree(context:Context)=OliveNotificationManager.showDiscreetNotification(
-        context,TREE_CUSTOM_TITLE,TREE_CUSTOM_BODY,CoverType.FOOD,AccountRole.STAFF)
 
     fun showRandomSafeUpdate(context:Context,coverType:CoverType,role:AccountRole=AccountRole.USER,
         random:Random=Random.Default) {
@@ -117,10 +88,6 @@ object AppNotifications {
             title.orDefault(OLIVE_DEFAULT_TITLE),
             body.orDefault(OLIVE_DEFAULT_BODY),
         )
-    }
-
-    private fun show(context:Context,title:String,body:String,coverType:CoverType) {
-        OliveNotificationManager.showDiscreetNotification(context,title,body,coverType)
     }
 
     private fun String?.orDefault(fallback:String)=takeUnless { it.isNullOrBlank() } ?: fallback

@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.AddCircleOutline
@@ -34,17 +33,17 @@ import androidx.compose.ui.unit.sp
     AnimatedContent(session.page,label="safe contact page",
         transitionSpec={fadeIn(tween(180)).togetherWith(fadeOut(tween(120)))}) { page ->
         when(page) {
-            SafePage.Home -> SafeContactHome(session,profile)
+            SafePage.Home -> SafeContactHome(session)
             SafePage.Messages -> MessagesScreen(session)
             SafePage.Notes -> PrivateNotes(session)
             SafePage.Profile -> SafeContactProfile(session,profile)
             SafePage.Settings -> SettingsEditor(session,profile)
-            else -> SafeContactHome(session,profile)
+            else -> SafeContactHome(session)
         }
     }
 }
 
-@Composable private fun SafeContactHome(session:SessionViewModel,profile:com.olive.app.data.UserProfile) {
+@Composable private fun SafeContactHome(session:SessionViewModel) {
     FormColumn {
         Box(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {

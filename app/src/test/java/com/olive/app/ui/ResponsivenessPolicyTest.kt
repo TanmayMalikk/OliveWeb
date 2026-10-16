@@ -1,5 +1,8 @@
 package com.olive.app.ui
 
+import com.olive.app.ui.covers.calculator.CalculatorHistoryEntry
+import com.olive.app.ui.covers.calculator.CalculatorInput
+
 import com.olive.app.data.AccountIdentity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

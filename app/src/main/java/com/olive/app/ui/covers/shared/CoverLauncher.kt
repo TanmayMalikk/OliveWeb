@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.shared
 
 import android.content.ComponentName
 import android.content.Context

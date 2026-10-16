@@ -1,4 +1,6 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.shared
+
+import com.olive.app.ui.*
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
