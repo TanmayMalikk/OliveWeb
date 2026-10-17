@@ -106,6 +106,7 @@ class MainActivity : ComponentActivity() {
     // Coming back just refreshes screen protection; it never auto-reopens private pages.
     override fun onResume() {
         super.onResume()
+        session.refreshDeviceSecurity()
         deviceLock.resume()
         applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType,session.accountRole)

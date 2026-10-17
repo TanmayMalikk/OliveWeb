@@ -64,7 +64,7 @@ import java.util.UUID
     }
 }
 
-// Edit the private profile and PIN-guarded trigger settings; language is not an editable profile control.
+// Edit the private profile, safe-entry methods and authenticated trigger settings.
 // UI sizing/text: settings reuse shared form spacing and Material titleLarge section headings so translated labels can wrap.
 @Composable internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val uiText=rememberResourceText()
@@ -80,9 +80,6 @@ import java.util.UUID
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var currentDevicePin by remember { mutableStateOf("") }
-    var newDevicePin by remember { mutableStateOf("") }
-    var confirmDevicePin by remember { mutableStateOf("") }
     FormColumn {
         SafeBack(session)
         Heading(uiText(R.string.settings),uiText(R.string.ui_update_your_profile_details))
@@ -111,14 +108,7 @@ import java.util.UUID
         Button(onClick={session.changePassword(currentPassword,newPassword,confirmPassword);currentPassword="";newPassword="";confirmPassword=""},enabled=!session.busy,modifier=Modifier.testTag("change_password")) { Text(stringResource(R.string.change_password)) }
         if(userRole) {
             HorizontalDivider()
-            if(session.usesDeviceLock) Text(stringResource(R.string.entry_settings_device))
-            else {
-            Text(stringResource(R.string.change_device_pin),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
-            Field(uiText(R.string.current_device_pin),currentDevicePin,"current_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused current PIN")}) { currentDevicePin=it.filter(Char::isDigit).take(6) }
-            Field(uiText(R.string.new_device_pin),newDevicePin,"new_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused new PIN")}) { newDevicePin=it.filter(Char::isDigit).take(6) }
-            Field(uiText(R.string.confirm_new_device_pin),confirmDevicePin,"confirm_new_device_pin",secret=true,numeric=true,enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused PIN confirmation")}) { confirmDevicePin=it.filter(Char::isDigit).take(6) }
-            Button(onClick={session.changePin(currentDevicePin,newDevicePin,confirmDevicePin);currentDevicePin="";newDevicePin="";confirmDevicePin=""},enabled=!session.busy,modifier=Modifier.testTag("change_device_pin")) { Text(stringResource(R.string.change_device_pin)) }
-            }
+            SafeEntrySettings(session)
             HorizontalDivider()
             Text(stringResource(R.string.change_trigger_word),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
             Text(stringResource(if(session.usesDeviceLock) R.string.entry_verify_trigger else R.string.enter_your_current_device_pin_to_change_the_trigger_word_incorrect_attempts_count_toward_the_five_attempt_limit))

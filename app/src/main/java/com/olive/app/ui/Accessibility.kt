@@ -34,6 +34,9 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import android.view.ViewTreeObserver
+import kotlin.coroutines.resume
 
 // Native accessibility focus is distinct from Compose/keyboard input focus.
 // Coalesce simultaneous validation errors so the first field wins, rather than
@@ -97,8 +100,28 @@ internal val LocalAccessibilityMessagesVisible=staticCompositionLocalOf { true }
     }
     LaunchedEffect(spoken,requestFocus,visible) {
         val manager=context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-        if(visible && requestFocus && manager.isEnabled && manager.isTouchExplorationEnabled)
+        if(visible && requestFocus && manager.isEnabled && manager.isTouchExplorationEnabled) {
+            // Android authentication owns another window. Deliver feedback only after this
+            // window returns; disposal cancels the wait if quick exit changes the screen.
+            native.awaitAccessibilityWindowFocus()
             coordinator.request(native) { bringIntoView.bringIntoView() }
+        }
+    }
+}
+
+private suspend fun View.awaitAccessibilityWindowFocus() {
+    if(hasWindowFocus()) return
+    suspendCancellableCoroutine<Unit> { continuation ->
+        val observer=viewTreeObserver
+        lateinit var listener:ViewTreeObserver.OnWindowFocusChangeListener
+        fun remove() { if(observer.isAlive) observer.removeOnWindowFocusChangeListener(listener) }
+        listener=ViewTreeObserver.OnWindowFocusChangeListener { focused ->
+            if(focused && continuation.isActive) { remove();continuation.resume(Unit) }
+        }
+        observer.addOnWindowFocusChangeListener(listener)
+        continuation.invokeOnCancellation { remove() }
+        // Cover a focus change between the initial check and listener registration.
+        if(hasWindowFocus() && continuation.isActive) { remove();continuation.resume(Unit) }
     }
 }
 

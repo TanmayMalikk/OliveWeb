@@ -36,7 +36,7 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
                 if(busy || privacyBlackout || screen != SessionScreen.Pin || accountRole!=AccountRole.USER || challenge!=pinChallengeVersion) return
                 val device = enrollment ?: return
                 if(device.role!=AccountRole.USER || activeTriggerId==null) return
-                if(device.entryMethod!=SafeEntryMethod.APP_PIN) return
+                if(!device.allowsAppPin(phoneSecure())) return
                 if(!InputPolicy.validPin(pin)) { message=runtime.application.getString(R.string.enter_your_4_6_digit_pin); return }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_check_the_pin_or_record_this_attempt_access_remains_locked)) { token ->
                     val result = withContext(Dispatchers.IO) {
@@ -48,7 +48,7 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
                     }
                     if(epoch != token || screen != SessionScreen.Pin || challenge!=pinChallengeVersion) return@runOperation
                     when(result) {
-                        PinResult.Accepted -> unlockVerifiedDevice(device,token,SessionScreen.Pin,challenge)
+                        PinResult.Accepted -> unlockVerifiedDevice(device,token,SessionScreen.Pin,challenge,usingAppPin=true)
                         is PinResult.Rejected -> if(result.failures >= 5) navigation.quickExit() else {
                             message=runtime.application.getString(R.string.ui_incorrect_pin_value_attempts_remaining , 5-result.failures)
                         }
@@ -64,7 +64,7 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
                 if(busy || privacyBlackout || accountRole!=AccountRole.USER || screen!=SessionScreen.Cover || coverType!=CoverType.CALCULATOR || !InputPolicy.validPin(pin)) return
                 val device=enrollment ?: return
                 if(device.role!=AccountRole.USER) return
-                if(device.entryMethod==SafeEntryMethod.DEVICE_LOCK) {
+                if(!device.allowsAppPin(phoneSecure())) {
                     // Calculator digits open a fresh challenge; Android must still authenticate the account.
                     val event=TriggerEvent(source="Better Calculator")
                     activeTriggerId=event.id
@@ -86,7 +86,7 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
                     }
                     if(epoch!=token || screen!=SessionScreen.Cover || coverType!=CoverType.CALCULATOR) return@runOperation
                     when(result) {
-                        PinResult.Accepted -> unlockVerifiedDevice(device,token,SessionScreen.Cover)
+                        PinResult.Accepted -> unlockVerifiedDevice(device,token,SessionScreen.Cover,usingAppPin=true)
                         is PinResult.Rejected -> if(result.failures>=5) navigation.quickExit()
                     }
                 }
@@ -95,12 +95,14 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
     }
 
     // Recheck identity, screen and cancellation epoch after loading private data; exit invalidates pending unlocks.
-    internal suspend fun unlockVerifiedDevice(device:DeviceEnrollment,token:Long,expectedScreen:SessionScreen,challenge:Int?=null) {
+    internal suspend fun unlockVerifiedDevice(device:DeviceEnrollment,token:Long,expectedScreen:SessionScreen,challenge:Int?=null,usingAppPin:Boolean=false) {
         with(runtime) {
             with(state) {
+                if(usingAppPin && !device.allowsAppPin(phoneSecure())) return
                 val saved=withContext(Dispatchers.IO) { store.unlockSnapshot(device.uid) }
                 if(epoch!=token || screen!=expectedScreen || enrollment!=device || privacyBlackout ||
-                    (challenge!=null && challenge!=pinChallengeVersion)) return
+                    (challenge!=null && challenge!=pinChallengeVersion) ||
+                    (usingAppPin && !device.allowsAppPin(phoneSecure()))) return
                 pinAuthorizedUid=device.uid;pinAuthorizedEpoch=token
                 busy=false
                 profile=saved.first
