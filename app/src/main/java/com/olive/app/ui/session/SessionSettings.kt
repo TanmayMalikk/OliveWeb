@@ -108,14 +108,7 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                     if(epoch!=token || screen!=SessionScreen.Safe) return@runOperation
                     when(result) {
                         PinResult.Accepted -> {
-                            val before=profile!!
-                            val updated=before.copy(triggerHash=InputPolicy.triggerHash(trigger))
-                            withContext(Dispatchers.IO) { store.updateTrigger(device.uid,updated,!localMode,
-                                SettingsEvent(area="Olive Branch",action="Changed trigger word",changes=profileChanges(before,updated))) }
-                            enrollment=device.copy(triggerHash=updated.triggerHash)
-                            if(epoch==token) { profile=updated; message=runtime.application.getString(R.string.trigger_word_changed); pendingSync=!localMode }
-                            history.queueHistorySync()
-                            if(!localMode) syncProfile(device.uid,updated,token)
+                            saveVerifiedTrigger(device,trigger,token)
                         }
                         is PinResult.Rejected -> {
                             attempts=withContext(Dispatchers.IO) { store.attempts(device.uid) }
@@ -124,6 +117,21 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                     }
                 }
             }
+        }
+    }
+
+    internal suspend fun saveVerifiedTrigger(device:DeviceEnrollment,trigger:String,token:Long): Unit = with(runtime) {
+        with(state) {
+            if(epoch!=token || screen!=SessionScreen.Safe || enrollment?.uid!=device.uid) return@with
+            val before=profile ?: return@with
+            val updated=before.copy(triggerHash=InputPolicy.triggerHash(trigger))
+            withContext(Dispatchers.IO) { store.updateTrigger(device.uid,updated,!localMode,
+                SettingsEvent(area="Olive Branch",action="Changed trigger word",changes=profileChanges(before,updated))) }
+            if(epoch!=token || screen!=SessionScreen.Safe || enrollment?.uid!=device.uid) return@with
+            enrollment=device.copy(triggerHash=updated.triggerHash)
+            profile=updated;message=application.getString(R.string.trigger_word_changed);pendingSync=!localMode
+            history.queueHistorySync()
+            if(!localMode) syncProfile(device.uid,updated,token)
         }
     }
 

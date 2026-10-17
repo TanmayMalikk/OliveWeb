@@ -15,6 +15,10 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     val page get()=runtime.state.page
     val activityCategory get()=runtime.state.activityCategory
     val busy get()=runtime.state.busy
+    val deviceLockRequest get()=runtime.state.deviceLockRequest
+    val usesDeviceLock get()=runtime.enrollment?.entryMethod==com.olive.app.security.SafeEntryMethod.DEVICE_LOCK
+    fun authenticateDeviceLock(enroll: Boolean=false) = runtime.deviceAccess.authenticate(enroll)
+    fun changeDeviceLockTrigger(trigger: String) = runtime.deviceAccess.authenticate(false,trigger)
     val message get()=runtime.state.message
     val profile get()=runtime.state.profile
     val attempts get()=runtime.state.attempts

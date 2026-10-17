@@ -15,7 +15,7 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
         val entry=root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return null
         val savedProfile=root.optJSONObject("profiles")?.optJSONObject(uid) ?: return null
         return DeviceSession(
-            DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role"))),
+            enrollment(uid,entry),
             UserProfile.fromJson(savedProfile),
         )
     }
@@ -24,7 +24,7 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
         val root = vault.read()
         val uid = root.optString("activeUid")
         val entry = root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return null
-        return DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role")))
+        return enrollment(uid,entry)
     }
     // A package update can leave Firebase signed in while the local active pointer is missing; relink only a saved enrollment.
     fun restoreActive(uid: String): DeviceEnrollment? {
@@ -33,7 +33,7 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
             val entry=root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return@update
             if(root.optJSONObject("profiles")?.optJSONObject(uid)==null) return@update
             root.put("activeUid",uid)
-            restored=DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role")))
+            restored=enrollment(uid,entry)
         }
         return restored
     }
@@ -62,6 +62,26 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
             }))
         return DeviceEnrollment(identity.uid,profile.triggerHash,profile.role)
     }
+    private fun enrollment(uid: String, entry: JSONObject) = DeviceEnrollment(uid,entry.optString("triggerHash"),
+        AccountRole.fromStored(entry.optString("role")),SafeEntryMethod.fromStored(entry.optString("entryMethod")))
+
+    internal fun deviceLockGrant(uid: String): JSONObject {
+        val entry=vault.read().getJSONObject("enrollments").getJSONObject(uid)
+        check(SafeEntryMethod.fromStored(entry.optString("entryMethod"))==SafeEntryMethod.DEVICE_LOCK)
+        return entry.getJSONObject("deviceLockGrant")
+    }
+
+    internal fun enrollDeviceLock(identity: AccountIdentity, profile: UserProfile, grant: JSONObject): DeviceEnrollment {
+        require(profile.role==AccountRole.USER)
+        vault.update { root ->
+            root.child("enrollments").put(identity.uid,JSONObject()
+                .put("triggerHash",profile.triggerHash).put("role",profile.role.name)
+                .put("entryMethod",SafeEntryMethod.DEVICE_LOCK.name).put("deviceLockGrant",grant).put("failures",0))
+            root.child("profiles").put(identity.uid,profile.toJson())
+            root.put("activeUid",identity.uid)
+        }
+        return DeviceEnrollment(identity.uid,profile.triggerHash,profile.role,SafeEntryMethod.DEVICE_LOCK)
+    }
     // Safe contacts, staff, and admins use account login only, so their local session never stores a device PIN.
     fun enrollWithoutPin(identity: AccountIdentity, profile: UserProfile): DeviceEnrollment {
         require(profile.role!=AccountRole.USER)
@@ -86,6 +106,7 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
             require(root.optString("activeUid")==uid) { "PIN account is no longer active" }
             val saved=root.getJSONObject("enrollments").getJSONObject(uid)
             require(AccountRole.fromStored(saved.optString("role"))==AccountRole.USER) { "This account does not use a PIN" }
+            check(SafeEntryMethod.fromStored(saved.optString("entryMethod"))==SafeEntryMethod.APP_PIN)
             val verifier=saved.getString("pinVerifier")
             val accepted=SecretVerifier.matches(pin,verifier)
             val next=if(accepted) GateState() else GateState(saved.optInt("failures")).failed()
