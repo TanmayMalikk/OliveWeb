@@ -196,9 +196,9 @@ class MainActivity : ComponentActivity() {
             else -> R.mipmap.ic_launcher_food
         }
         val appTitle=when(role) {
-            AccountRole.SAFE_CONTACT -> "Olive Branch"
-            AccountRole.STAFF,AccountRole.ADMIN -> "Olive Tree"
-            AccountRole.USER -> type.title
+            AccountRole.SAFE_CONTACT -> getString(R.string.olive_branch)
+            AccountRole.STAFF,AccountRole.ADMIN -> getString(R.string.olive_tree)
+            AccountRole.USER -> getString(when(type) { CoverType.FOOD -> R.string.ui_olive_8f62f4; CoverType.NEWS -> R.string.ui_daily_digest; CoverType.CALCULATOR -> R.string.better_calculator; CoverType.GAME -> R.string.ui_game })
         }
         // Android uses this title for the active task and screen-capture attribution.
         title=appTitle

@@ -2,13 +2,17 @@ const {HttpsError} = require("firebase-functions/v2/https");
 const {createHash} = require("node:crypto");
 
 const ROLES = new Set(["USER", "SAFE_CONTACT", "STAFF", "ADMIN"]);
-const USERNAME = /^[a-z0-9_]{8,24}$/;
+const USERNAME = /^(?=.*[a-z])[a-z0-9_]{8,24}$/;
 const EXISTING_USERNAME = /^[a-z0-9_]{4,24}$/;
 const PASSWORD = /^(?=.*\p{L})(?=.*\p{N})(?=.*[^\p{L}\p{N}\s]).{8,24}$/u;
 const PROTECTED_USERNAME = "olive_admin";
 
 
-function validPassword(value) { return PASSWORD.test(String(value || "")); }
+function validPassword(value, username) {
+  const password = String(value || "");
+  return PASSWORD.test(password) && (username === undefined ||
+    !password.toLowerCase().includes(String(username).trim().toLowerCase()));
+}
 
 
 function text(value, max = 2000) {
@@ -17,7 +21,7 @@ function text(value, max = 2000) {
 
 function normalizedUsername(value) {
   const username = text(value, 24).toLowerCase();
-  if (!USERNAME.test(username)) throw new HttpsError("invalid-argument", "Username must use 8–24 letters, numbers, or underscores.");
+  if (!USERNAME.test(username)) throw new HttpsError("invalid-argument", "Username must use 8–24 letters, numbers, or underscores and include at least one letter.");
   return username;
 }
 

@@ -1,14 +1,9 @@
 package com.olive.app.ui.covers.olive
 
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.*
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.LocalizedIcon as Icon
 import com.olive.app.ui.*
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape

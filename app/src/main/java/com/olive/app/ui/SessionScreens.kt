@@ -5,7 +5,7 @@ import androidx.compose.ui.res.stringResource
 import android.view.View
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.semantics.*
+
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
@@ -56,7 +56,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.olive.app.data.*
 
 // Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
@@ -64,7 +63,8 @@ import com.olive.app.data.*
 internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured && usesCover
 
 @Composable fun OliveRoot(session: SessionViewModel) {
-    val cover: OliveViewModel = viewModel()
+    val uiText=rememberResourceText()
+    val cover: OliveViewModel = com.olive.app.ui.covers.olive.oliveViewModel()
     SideEffect { cover.persistCover={ cart,favorites,customizations -> session.saveFoodCover(cart,favorites,customizations) } }
     LaunchedEffect(session.coverAccountId,session.coverDataVersion) {
         cover.restoreCover(session.foodCart,session.foodFavorites,session.foodCustomizations)
@@ -101,21 +101,12 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         focus.clearFocus(force=true)
     }
     CompositionLocalProvider(LocalAccessibilityFocusCoordinator provides accessibilityFocus) {
-    val coverTitle=accessibilityText(session.coverType.title)
-    val quickExitLabel=accessibilityText("Quick exit")
-    Box(Modifier.fillMaxSize().imePadding()) {
+    val coverTitle=session.coverType.localizedTitle(uiText)
+    val quickExitLabel=uiText(R.string.a11y_quick_exit)
+    Box(Modifier.fillMaxSize().then(if(isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(if(isCover && !session.privacyBlackout) Modifier.fillMaxSize().testTag("cover_root").semantics { paneTitle=coverTitle } else Modifier.fillMaxSize().clearAndSetSemantics { }) {
-            Column(Modifier.fillMaxSize()) {
-            if(isCover && !session.privacyBlackout && session.accessibilityExitVersion>0) {
-                val returned=accessibilityText("Returned to cover").format(coverTitle)
-                Surface(color=MaterialTheme.colorScheme.primaryContainer) {
-                    key(session.accessibilityExitVersion) {
-                        AccessibleMessage(returned,Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp).testTag("cover_return_message"),color=MaterialTheme.colorScheme.onPrimaryContainer)
-                    }
-                }
-            }
-            Box(Modifier.weight(1f)) {
+            Box(Modifier.fillMaxSize()) {
             if(shouldComposeCover(session.configured,session.usesCover)) {
                 when(session.coverType) {
                     CoverType.FOOD -> OliveCover(cover,interactive=isCover,onSearch={ value ->
@@ -127,7 +118,13 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                     CoverType.GAME -> GameCover(isCover)
                 }
             }
-            } }
+            }
+            if(isCover && !session.privacyBlackout && session.accessibilityExitVersion>0) {
+                key(session.accessibilityExitVersion) {
+                    AccessibleMessage(uiText(R.string.a11y_returned_to_cover,coverTitle),
+                        Modifier.align(Alignment.CenterStart).size(1.dp),showText=false)
+                }
+            }
         }
         if(!isCover) {
             LaunchedEffect(session.screen) {
@@ -155,23 +152,23 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 else (fadeIn(tween(180))+scaleIn(tween(180),initialScale=.985f))
                                     .togetherWith(fadeOut(tween(120)))
                             }) { targetScreen ->
-                            val pane=accessibilityText(when(targetScreen) {
-                                SessionScreen.Pin -> "Enter PIN"
+                            val pane=when(targetScreen) {
+                                SessionScreen.Pin -> uiText(R.string.enter_pin)
                                 SessionScreen.Safe -> when(session.page) {
-                                    SafePage.Home -> "Home";SafePage.Notes -> "Notes";SafePage.Messages -> "Messages"
-                                    SafePage.Profile -> "Profile";SafePage.Contacts -> "Contacts";SafePage.Settings -> "Settings";SafePage.Activity -> "Activity"
+                                    SafePage.Home -> uiText(R.string.home);SafePage.Notes -> uiText(R.string.ui_notes);SafePage.Messages -> uiText(R.string.messages)
+                                    SafePage.Profile -> uiText(R.string.ui_profile);SafePage.Contacts -> uiText(R.string.ui_contacts);SafePage.Settings -> uiText(R.string.settings);SafePage.Activity -> uiText(R.string.ui_activity)
                                 }
-                                SessionScreen.Loading -> "Loading"
-                                SessionScreen.Welcome -> "Welcome"
-                                SessionScreen.NewCredentials -> "Create account"
-                                SessionScreen.ReturningCredentials -> "Sign in"
-                                SessionScreen.ProfileSetup,SessionScreen.OrganizationProfileSetup -> "Your profile"
-                                SessionScreen.TriggerSetup -> "Set your private entry"
-                                SessionScreen.DevicePin -> "Secure this device"
-                                SessionScreen.Portal -> "Organization portal"
-                                SessionScreen.StorageError -> "Unable to open local storage"
-                                SessionScreen.Cover -> session.coverType.title
-                            })
+                                SessionScreen.Loading -> uiText(R.string.ui_loading)
+                                SessionScreen.Welcome -> uiText(R.string.welcome)
+                                SessionScreen.NewCredentials -> uiText(R.string.create_account)
+                                SessionScreen.ReturningCredentials -> uiText(R.string.sign_in)
+                                SessionScreen.ProfileSetup,SessionScreen.OrganizationProfileSetup -> uiText(R.string.your_profile)
+                                SessionScreen.TriggerSetup -> uiText(R.string.ui_set_your_private_entry)
+                                SessionScreen.DevicePin -> uiText(R.string.secure_this_device)
+                                SessionScreen.Portal -> uiText(R.string.ui_organization_portal)
+                                SessionScreen.StorageError -> uiText(R.string.unable_to_open_local_storage)
+                                SessionScreen.Cover -> session.coverType.localizedTitle(uiText)
+                            }
                             CompositionLocalProvider(LocalAccessibilityMessagesVisible provides (targetScreen==session.screen)) {
                             Box(Modifier.semantics { paneTitle=pane }.then(if(targetScreen!=session.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
                             when(targetScreen) {
@@ -188,7 +185,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 SafeContactArea(session) else SafeArea(session,exit)
                             SessionScreen.Portal -> OrganizationPortal(session)
                             SessionScreen.StorageError -> FormColumn {
-                                Heading("Unable to open local storage", "Access remains locked. Your existing data has not been replaced.")
+                                Heading(uiText(R.string.unable_to_open_local_storage), uiText(R.string.access_remains_locked_your_existing_data_has_not_been_replaced))
                                 Button(onClick=session::load,enabled=!session.busy) { Text(stringResource(R.string.retry)) }
                             }
                             SessionScreen.Cover -> Unit
@@ -200,7 +197,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                 if(session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER) AlertDialog(
                     onDismissRequest=session::noteInteraction,
                     title={Text(stringResource(R.string.locking_soon))},
-                    text={Text(if(session.usesCover) "No activity. Returning to your cover in $seconds seconds." else "No activity. Locking Olive Branch in $seconds seconds.")},
+                    text={Text(if(session.usesCover) uiText(R.string.ui_no_activity_returning_to_your_cover_in_value_seconds , seconds) else uiText(R.string.ui_no_activity_locking_olive_branch_in_value_seconds , seconds))},
                     confirmButton={TextButton(onClick=session::noteInteraction) { Text(stringResource(R.string.stay_here)) }},
                     dismissButton={TextButton(onClick=exit) { Text(stringResource(R.string.quick_exit)) }}
                 )
@@ -220,7 +217,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         verticalArrangement=Arrangement.spacedBy(16.dp),content=content)
 }
 // Text/color: shared headings use a 30sp serif app label, Material headline text, and Muted helper copy.
-@Composable internal fun Heading(title: String, subtitle: String, appName: String="Olive Branch") {
+@Composable internal fun Heading(title: String, subtitle: String, appName: String=stringResource(R.string.olive_branch)) {
     Text(appName,fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
     Text(title,modifier=Modifier.semantics { heading() },style=MaterialTheme.typography.headlineMedium)
     Text(subtitle,color=Muted)
@@ -247,13 +244,14 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
 @Composable internal fun Field(label: String, value: String, tag: String, secret: Boolean=false, numeric: Boolean=false,
                              showSecretToggle: Boolean=false, multiline: Boolean=false, enabled: Boolean=true, error: String?=null,
                              onFocus: (() -> Unit)?=null, onChange: (String)->Unit) {
+    val uiText=rememberResourceText()
     var secretVisible by rememberSaveable(tag) { mutableStateOf(false) }
     val secretDescription=when {
-        label.contains("pin",ignoreCase=true) -> "PIN"
-        label.contains("trigger",ignoreCase=true) -> "trigger word"
-        else -> "password"
+        numeric -> uiText(R.string.a11y_pin)
+        tag.contains("trigger",ignoreCase=true) -> uiText(R.string.a11y_trigger_word)
+        else -> uiText(R.string.a11y_password)
     }
-    val accessibleError=error?.let { accessibilityText(it) }
+    val accessibleError=error
     OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},
         modifier=Modifier.fillMaxWidth().testTag(tag).semantics { if(accessibleError!=null) error(accessibleError) }.onFocusChanged { if(it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
         enabled=enabled,singleLine=!multiline,minLines=if(multiline) 3 else 1,isError=error!=null,
@@ -262,7 +260,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         trailingIcon=if(secret && showSecretToggle) {{
             IconButton(onClick={secretVisible=!secretVisible},modifier=Modifier.testTag("${tag}_visibility")) {
                 Icon(if(secretVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                    contentDescription=if(secretVisible) "Hide $secretDescription" else "Show $secretDescription")
+                    contentDescription=if(secretVisible) uiText(R.string.ui_hide_value , secretDescription) else uiText(R.string.ui_show_value , secretDescription))
             }
         }} else null,
         keyboardOptions=KeyboardOptions(autoCorrectEnabled=false,keyboardType=when { numeric -> KeyboardType.NumberPassword; secret -> KeyboardType.Password; else -> KeyboardType.Text }))

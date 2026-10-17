@@ -1,6 +1,6 @@
 package com.olive.app.ui.covers.game
+import com.olive.app.ui.rememberResourceText
 
-import androidx.compose.ui.semantics.*
 import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.material3.Text
@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 // The Game cover owns its own placeholder until its gameplay and safe-entry trigger are designed.
 // UI sizing/color: the placeholder uses Cream, 24dp page padding, a 52dp icon with 22dp inset, and a 32sp OliveGreen title.
 @Composable fun GameCover(interactive: Boolean=true) {
+    val uiText=rememberResourceText()
     BackHandler(interactive) { }
     Column(
         Modifier.fillMaxSize().background(Cream).safeDrawingPadding().padding(24.dp).testTag("game_cover").semantics(mergeDescendants=true) {},
@@ -38,7 +39,7 @@ import androidx.compose.ui.unit.sp
             Icon(Icons.Outlined.SportsEsports,null,Modifier.padding(22.dp).size(52.dp),tint=OliveGreen)
         }
         Spacer(Modifier.height(20.dp))
-        Text("Game",fontFamily=FontFamily.Serif,fontSize=32.sp,fontWeight=FontWeight.SemiBold,color=OliveGreen)
+        Text(uiText(R.string.ui_game),fontFamily=FontFamily.Serif,fontSize=32.sp,fontWeight=FontWeight.SemiBold,color=OliveGreen)
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.in_development),color=Muted)
     }

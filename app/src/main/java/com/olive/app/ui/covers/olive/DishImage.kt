@@ -25,9 +25,10 @@ private fun localDishPhoto(id: String) = when(id) {
 // Olive's homemade menu uses bundled photos so every dish still works without a network connection.
 // UI sizing/color: callers set the image aspect ratio/size; this layer crops photos to the supplied bounds and uses a themed fallback.
 @Composable fun DishImage(dish: Dish, modifier: Modifier=Modifier) {
+    val uiText=com.olive.app.ui.rememberResourceText()
     val localPhoto=localDishPhoto(dish.id)
     if(localPhoto!=0) {
-        Image(painterResource(localPhoto),dish.name,modifier,contentScale=ContentScale.Crop)
+        Image(painterResource(localPhoto),uiText.dishName(dish),modifier,contentScale=ContentScale.Crop)
         return
     }
     FoodArt(dish.art,modifier)

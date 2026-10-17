@@ -1,6 +1,5 @@
 package com.olive.app.notification
 
-import androidx.compose.material3.Text
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -29,31 +28,31 @@ object OliveNotificationManager {
     fun createNotificationChannels(context:Context) {
         val manager=context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannels(listOf(
-            NotificationChannel(CHANNEL_FOOD,"Olive Order Updates",NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description="Order status and delivery notifications for Olive"
+            NotificationChannel(CHANNEL_FOOD,context.getString(R.string.ui_olive_order_updates),NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description=context.getString(R.string.ui_order_status_and_delivery_notifications_for_olive)
             },
-            NotificationChannel(CHANNEL_NEWS,"Daily Digest Briefings",NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description="Daily headlines and news digest notifications"
+            NotificationChannel(CHANNEL_NEWS,context.getString(R.string.ui_daily_digest_briefings),NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description=context.getString(R.string.ui_daily_headlines_and_news_digest_notifications)
             },
-            NotificationChannel(CHANNEL_CALCULATOR,"Better Calculator Reminders",NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description="Utility and calculation reminders"
+            NotificationChannel(CHANNEL_CALCULATOR,context.getString(R.string.ui_better_calculator_reminders),NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description=context.getString(R.string.ui_utility_and_calculation_reminders)
             },
-            NotificationChannel(CHANNEL_GAME,"App Updates",NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description="General app activity notifications"
+            NotificationChannel(CHANNEL_GAME,context.getString(R.string.ui_app_updates),NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description=context.getString(R.string.ui_general_app_activity_notifications)
             },
-            NotificationChannel(CHANNEL_BRANCH,"Olive Branch Updates",NotificationManager.IMPORTANCE_DEFAULT),
-            NotificationChannel(CHANNEL_TREE,"Olive Tree Updates",NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(CHANNEL_BRANCH,context.getString(R.string.ui_olive_branch_updates),NotificationManager.IMPORTANCE_DEFAULT),
+            NotificationChannel(CHANNEL_TREE,context.getString(R.string.ui_olive_tree_updates),NotificationManager.IMPORTANCE_DEFAULT),
         ))
     }
 
-    internal fun contentFor(title:String?,body:String?,coverType:CoverType)=
-        AppNotifications.contentFor(title,body,coverType)
+    internal fun contentFor(title:String?,body:String?,coverType:CoverType,text:com.olive.app.ui.ResourceText)=
+        AppNotifications.contentFor(title,body,coverType,text=text)
 
     fun showDiscreetNotification(context:Context,title:String?,body:String?,coverType:CoverType=CoverType.FOOD,
         role:AccountRole=AccountRole.USER,notificationId:Int=(System.currentTimeMillis()%100000).toInt()) {
         if(Build.VERSION.SDK_INT>=33 && ContextCompat.checkSelfPermission(context,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) return
         createNotificationChannels(context)
-        val content=AppNotifications.contentFor(title,body,coverType,role)
+        val content=AppNotifications.contentFor(title,body,coverType,role,com.olive.app.ui.ResourceText(context.resources))
         val smallIcon=iconFor(coverType,role)
         val intent=Intent(context,MainActivity::class.java).apply {
             flags=Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

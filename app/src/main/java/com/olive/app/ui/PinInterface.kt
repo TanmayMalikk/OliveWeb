@@ -2,7 +2,13 @@ package com.olive.app.ui
 import com.olive.app.R
 import androidx.compose.ui.res.stringResource
 
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
@@ -22,6 +28,7 @@ import com.olive.app.security.InputPolicy
 // USER ONLY: every user device gets a local PIN; Safe Contacts, Staff, and Admins do not use this step.
 // UI sizing/text: PIN setup uses the shared form spacing and full-width fields; warning copy uses the Muted color.
 @Composable internal fun DevicePin(session: SessionViewModel) {
+    val uiText=rememberResourceText()
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var showErrors by rememberSaveable { mutableStateOf(false) }
@@ -29,22 +36,22 @@ import com.olive.app.security.InputPolicy
     val confirmationValid=confirm.isNotEmpty() && confirm==pin
     val stages=if(session.creatingAccount) 4 else 2
     val page=stages-1
-    val completedBeforePin=if(session.creatingAccount) 8 else 2
+    val completedBeforePin=if(session.creatingAccount) 7 else 2
     val totalRequired=completedBeforePin+2
     FormColumn {
-        Heading("Secure this device", "Create your device PIN.")
+        Heading(uiText(R.string.secure_this_device), uiText(R.string.ui_create_your_device_pin))
         OnboardingProgress(completedBeforePin+listOf(pinValid,confirmationValid).count { it },totalRequired,page,stages,
             List(stages) { index -> index<page || (index==page && pinValid && confirmationValid) })
-        Field("4–6 digit PIN",pin,"new_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
-            error=if(showErrors && !pinValid) "Invalid PIN" else null) {
+        Field(uiText(R.string.str_4_6_digit_pin),pin,"new_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
+            error=if(showErrors && !pinValid) uiText(R.string.ui_invalid_pin) else null) {
             pin=it.filter(Char::isDigit).take(6);showErrors=false
         }
-        RequirementBullet("4–6 digits",pinValid,pin.isNotEmpty())
-        Field("Confirm PIN",confirm,"confirm_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
-            error=if(showErrors && !confirmationValid) "PINs differ" else null) {
+        RequirementBullet(uiText(R.string.ui_4_6_digits),pinValid,pin.isNotEmpty())
+        Field(uiText(R.string.confirm_pin),confirm,"confirm_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
+            error=if(showErrors && !confirmationValid) uiText(R.string.ui_pins_differ) else null) {
             confirm=it.filter(Char::isDigit).take(6);showErrors=false
         }
-        RequirementBullet("PINs match",confirmationValid,pin.isNotEmpty() || confirm.isNotEmpty())
+        RequirementBullet(uiText(R.string.ui_pins_match),confirmationValid,pin.isNotEmpty() || confirm.isNotEmpty())
         Status(session)
         OnboardingNavigation(session::back,{showErrors=true;if(pinValid && confirmationValid) session.createDevicePin(pin,confirm)},
             last=true,nextTag="pin_setup_submit",enabled=!session.busy)
@@ -54,13 +61,14 @@ import com.olive.app.security.InputPolicy
 // USER ONLY: a search trigger opens this local PIN challenge; calculator entry verifies through SessionAccess separately.
 // UI sizing/color: this screen owns the compact breakpoint, keypad dimensions, PIN-dot size, OliveGreen accents, and responsive text sizes.
 @Composable internal fun PinPrompt(session: SessionViewModel) {
+    val uiText=rememberResourceText()
     val challenge=session.pinChallengeVersion
     var pin by remember(challenge) { mutableStateOf("") }
     val headingScrollState=rememberScrollState()
-    val pinLabel=accessibilityText("PIN")
-    val enteredLabel=accessibilityText("Digits entered")
-    val deleteLabel=accessibilityText("Delete digit")
-    val unlockLabel=accessibilityText("Unlock")
+    val pinLabel=uiText(R.string.a11y_pin)
+    val enteredLabel=uiText(R.string.a11y_digits_entered)
+    val deleteLabel=uiText(R.string.a11y_delete_digit)
+    val unlockLabel=uiText(R.string.a11y_unlock)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Sizing note: raise 650dp to switch into the compact PIN layout sooner. The 48–72dp range below is the keypad's min/max size.
         // When adding a language with longer PIN text, test this breakpoint with Android's largest font setting too.

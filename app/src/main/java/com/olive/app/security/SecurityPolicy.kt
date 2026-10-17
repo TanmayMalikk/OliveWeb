@@ -1,6 +1,5 @@
 package com.olive.app.security
 
-import androidx.compose.ui.semantics.*
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.LocalDate
@@ -39,7 +38,8 @@ object SecretVerifier {
 // Change username, password, PIN, trigger, or DOB limits here, then update the matching screen message and test.
 object InputPolicy {
     fun username(value: String) = value.trim().lowercase(Locale.ROOT)
-    fun validUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{8,24}"))
+    fun usernameHasLetter(value: String) = value.any { it in 'a'..'z' || it in 'A'..'Z' }
+    fun validUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{8,24}")) && usernameHasLetter(value)
     // Existing accounts created under the former four-character minimum remain able to sign in.
     fun validExistingUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{4,24}"))
     fun passwordHasValidLength(value: String) = value.length in 8..24
@@ -48,6 +48,10 @@ object InputPolicy {
     fun passwordHasSpecialCharacter(value: String) = value.any { !it.isLetterOrDigit() && !it.isWhitespace() }
     fun validPassword(value: String) = passwordHasValidLength(value) && passwordHasLetter(value) &&
         passwordHasNumber(value) && passwordHasSpecialCharacter(value)
+    fun passwordExcludesUsername(value: String, accountUsername: String): Boolean =
+        username(accountUsername).let { it.isNotEmpty() && !value.contains(it,ignoreCase=true) }
+    fun validAccountPassword(value: String, accountUsername: String) =
+        validPassword(value) && passwordExcludesUsername(value,accountUsername)
     fun validPin(value: String) = value.matches(Regex("[0-9]{4,6}"))
     fun validTrigger(value: String) = value.trim().length in 3..64
     fun triggerHash(value: String): String = MessageDigest.getInstance("SHA-256")
