@@ -38,7 +38,7 @@ class AndroidDeviceLock(private val activity: ComponentActivity, private val onA
                 val signal=CancellationSignal().also { cancellation=it }
                 val prompt=BiometricPrompt.Builder(activity)
                     .setTitle(activity.getString(R.string.entry_device_lock))
-                    .setSubtitle(activity.getString(if(value.challenge.enrolling) R.string.entry_confirm_setup else R.string.entry_unlock_description))
+                    .setSubtitle(subtitle(value))
                     .setAllowedAuthenticators(android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_STRONG or
                         android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL).build()
                 prompt.authenticate(BiometricPrompt.CryptoObject(checkNotNull(value.challenge.promptCipher)),signal,
@@ -53,8 +53,14 @@ class AndroidDeviceLock(private val activity: ComponentActivity, private val onA
         } catch(_:Exception) { finish(value,null) }
     }
 
+    private fun subtitle(value:DeviceLockRequest)=activity.getString(when {
+        value.settingsChange -> R.string.entry_confirm_settings
+        value.challenge.enrolling -> R.string.entry_confirm_setup
+        else -> R.string.entry_unlock_description
+    })
+
     private fun showLegacyPrompt(value:DeviceLockRequest) {
-        val builder=BiometricPrompt.Builder(activity).setTitle(activity.getString(R.string.entry_device_lock))
+        val builder=BiometricPrompt.Builder(activity).setTitle(activity.getString(R.string.entry_device_lock)).setSubtitle(subtitle(value))
         if(Build.VERSION.SDK_INT>=29) {
             @Suppress("DEPRECATION") // Android 10 uses this API for the device-credential fallback.
             builder.setDeviceCredentialAllowed(true)
@@ -80,7 +86,7 @@ class AndroidDeviceLock(private val activity: ComponentActivity, private val onA
         if(request!==value) return
         @Suppress("DEPRECATION") // Android 9/10 cannot use a credential-capable auth-per-use CryptoObject.
         val intent=activity.getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent(
-            activity.getString(R.string.entry_device_lock),activity.getString(R.string.entry_unlock_description))
+            activity.getString(R.string.entry_device_lock),subtitle(value))
         if(intent==null) { finish(value,null);return }
         awaitingCredential=true
         credentialLauncher.launch(intent)

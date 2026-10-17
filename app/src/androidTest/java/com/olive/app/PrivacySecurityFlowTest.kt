@@ -115,7 +115,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         fill("current_password","test-password-123");fill("new_password","new-password-456");fill("confirm_new_password","new-password-456");click("change_password")
         compose.waitUntil(30_000) { compose.onAllNodesWithText("Password changed.").fetchSemanticsNodes().isNotEmpty() }
         fill("current_device_pin","123456");fill("new_device_pin","654321");fill("confirm_new_device_pin","654321");click("change_device_pin")
-        compose.waitUntil(30_000) { compose.onAllNodesWithText("Device PIN changed.").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(30_000) { compose.onAllNodesWithText("Safe entry settings saved.").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("quick_exit").performClick();waitCover();unlock("654321")
     }
 }

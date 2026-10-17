@@ -2,6 +2,7 @@ package com.olive.app
 
 import android.app.KeyguardManager
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.*
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.security.*
@@ -9,8 +10,6 @@ import com.olive.app.ui.SessionScreen
 import com.olive.app.ui.SessionViewModel
 import org.junit.Assert.*
 import org.junit.Test
-import android.view.accessibility.AccessibilityNodeInfo
-import android.os.ParcelFileDescriptor
 import com.olive.app.data.UserProfile
 import com.olive.app.data.DeliveryAddress
 
@@ -29,11 +28,21 @@ class SafeEntryUiTest : OliveUiTestBase() {
     @Test fun safetyAnswerChangesRecommendationAndSeparatePinStillUnlocks() {
         entrySetup()
         compose.onNodeWithTag("entry_choose_pin").assertDoesNotExist()
+        compose.onNodeWithTag("entry_knows_pin_no")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role,Role.RadioButton)).assertIsNotSelected()
         click("entry_knows_pin_no")
+        compose.onNodeWithTag("entry_knows_pin_no").assertIsSelected()
+        compose.onNodeWithTag("entry_knows_pin_yes").assertIsNotSelected()
+        compose.onNodeWithTag("entry_recommendation")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion,LiveRegionMode.Polite))
         compose.onNodeWithTag("entry_choose_device").assertTextContains("Device lock · Recommended")
         compose.onNodeWithTag("new_pin").assertDoesNotExist()
         click("entry_knows_pin_yes")
         compose.onNodeWithTag("entry_choose_pin").assertTextContains("New PIN · Recommended")
+        click("entry_choose_pin")
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle,"New PIN")).assertExists()
+        androidx.test.espresso.Espresso.pressBack()
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle,"Protect your safe area")).assertExists()
         click("entry_choose_pin")
         fill("new_pin","123456");fill("confirm_pin","123456");click("pin_setup_submit");waitCover()
         unlock()
@@ -58,6 +67,39 @@ class SafeEntryUiTest : OliveUiTestBase() {
         assertEquals(SessionScreen.DevicePin,session.screen)
         assertFalse(session.configured)
         compose.onNodeWithTag("new_pin").assertDoesNotExist()
+    }
+
+    @Test fun deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry() {
+        val context=InstrumentationRegistry.getInstrumentation().targetContext
+        org.junit.Assume.assumeTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
+        entrySetup()
+        val session=ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        TalkBackTestSession(compose.activity).use { talkBack ->
+            compose.waitUntil(10_000) { context.getSystemService(android.view.accessibility.AccessibilityManager::class.java).isTouchExplorationEnabled }
+            fun activate(tag:String) {
+                compose.onNodeWithTag(tag).performScrollTo().performSemanticsAction(SemanticsActions.OnClick) { it() }
+            }
+            activate("entry_knows_pin_no")
+            compose.onNodeWithTag("entry_knows_pin_no").assertIsSelected()
+            repeat(2) {
+                talkBack.focused.clear()
+                activate("entry_choose_device")
+                compose.waitUntil(20_000) {
+                    val root=talkBack.automation.rootInActiveWindow
+                    root!=null && root.packageName?.toString()!="com.olive.app"
+                }
+                talkBack.automation.waitForIdle(1_000,5_000)
+                talkBack.shell("input keyevent 4")
+                compose.waitUntil(15_000) { !session.busy }
+                val cancellation=context.getString(R.string.entry_auth_cancelled)
+                compose.waitUntil(15_000) { talkBack.focused.any { it==cancellation } }
+                assertEquals(SessionScreen.DevicePin,session.screen)
+                assertFalse(session.configured)
+            }
+            // A cancelled OS prompt must leave both onboarding choices accessible.
+            compose.onNodeWithTag("entry_choose_pin").assertIsEnabled()
+            compose.onNodeWithTag("entry_choose_device").assertIsEnabled()
+        }
     }
 
     @Test fun androidKeystoreRefusesUnauthenticatedOperation() {
@@ -94,6 +136,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         shell("input keyevent 4")
         compose.waitUntil(15_000) { !session.busy }
         assertEquals(SessionScreen.Pin,session.screen)
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle,"Device lock")).assertExists()
         compose.runOnIdle { session.submitPin("123456") }
         assertEquals(SessionScreen.Pin,session.screen)
         compose.onNodeWithTag("pin_digit_1").assertDoesNotExist()
@@ -107,50 +150,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         assertEquals(SessionScreen.Cover,session.screen)
     }
 
-    private fun confirmPhonePin() {
-        waitForPhonePin()
-        // This PIN belongs only to the disposable emulator used by this test run.
-        val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
-        if(findNode(automation.rootInActiveWindow) { it.viewIdResourceName=="cred_pin_pad" }!=null) {
-            "246810".forEach { digit ->
-                val key=findNode(automation.rootInActiveWindow) { it.className?.toString()=="android.widget.Button" && it.text?.toString()==digit.toString() }
-                assertTrue("Android PIN key $digit unavailable",key?.performAction(AccessibilityNodeInfo.ACTION_CLICK)==true)
-                automation.waitForIdle(150,3_000)
-            }
-            compose.waitUntil(5_000) {
-                findNode(automation.rootInActiveWindow) { it.viewIdResourceName=="com.android.systemui:id/key_enter" && it.isEnabled }
-                    ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)==true
-            }
-        } else { shell("input text 246810");shell("input keyevent 66") }
-    }
-
-    private fun waitForPhonePin() {
-        val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
-        compose.waitUntil(20_000) {
-            val root=automation.rootInActiveWindow
-            // The cover's search box is also an EditText; only accept the system credential window.
-            if(root==null || root.packageName?.toString()=="com.olive.app") return@waitUntil false
-            val field=findNode(root) { it.className?.toString()=="android.widget.EditText" || it.viewIdResourceName=="cred_pin_pad" }
-            if(field!=null) true else {
-                findNode(root) { it.text?.toString()?.contains("Use PIN",ignoreCase=true)==true }
-                    ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                false
-            }
-        }
-        // SystemUI creates keypad nodes before its opening animation starts accepting PIN input.
-        automation.waitForIdle(1_000,5_000)
-    }
-
-
-    private fun findNode(node:AccessibilityNodeInfo?,predicate:(AccessibilityNodeInfo)->Boolean):AccessibilityNodeInfo? {
-        if(node==null) return null
-        if(predicate(node)) return node
-        for(index in 0 until node.childCount) findNode(node.getChild(index),predicate)?.let { return it }
-        return null
-    }
-
-    private fun shell(command:String) {
-        val fd=InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
-        ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes() }
-    }
+    private fun confirmPhonePin()=DeviceCredentialTestDriver(compose).confirmPhonePin()
+    private fun waitForPhonePin()=DeviceCredentialTestDriver(compose).waitForPhonePin()
+    private fun shell(command:String)=DeviceCredentialTestDriver(compose).shell(command)
 }

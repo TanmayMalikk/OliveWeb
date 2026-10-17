@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.crypto.Cipher
 
-class DeviceLockRequest internal constructor(val challenge: DeviceLockChallenge) {
+class DeviceLockRequest internal constructor(val challenge: DeviceLockChallenge,val settingsChange:Boolean=false) {
     internal val result = CompletableDeferred<Cipher?>()
     fun complete(cipher: Cipher?) { result.complete(cipher) }
 }
@@ -42,7 +42,7 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
                     keys.prepare(uid, if (enroll) null else store.deviceLockGrant(uid))
                 }
                 if (!current(token,expectedScreen,uid,enroll)) { challenge.close();return@runOperation }
-                val request = DeviceLockRequest(challenge)
+                val request = DeviceLockRequest(challenge,settingsChange=trigger!=null)
                 deviceLockRequest = request
                 try {
                     val cipher = request.result.await()

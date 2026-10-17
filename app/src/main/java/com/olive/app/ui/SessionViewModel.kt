@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.olive.app.data.*
 import com.olive.app.ui.session.SessionRuntime
+import com.olive.app.security.SafeEntryMethod
+import com.olive.app.security.allowsAppPin
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 class SessionViewModel(application:Application):AndroidViewModel(application) {
@@ -16,7 +18,14 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     val activityCategory get()=runtime.state.activityCategory
     val busy get()=runtime.state.busy
     val deviceLockRequest get()=runtime.state.deviceLockRequest
-    val usesDeviceLock get()=runtime.enrollment?.entryMethod==com.olive.app.security.SafeEntryMethod.DEVICE_LOCK
+    val preferredEntryMethod get()=runtime.enrollment?.entryMethod ?: SafeEntryMethod.APP_PIN
+    val hasAppPin get()=runtime.enrollment?.hasAppPin==true
+    val phoneHasLock get()=runtime.deviceSecure
+    val usesDeviceLock get()=preferredEntryMethod==SafeEntryMethod.DEVICE_LOCK && phoneHasLock
+    val canUseAppPin get()=runtime.enrollment?.allowsAppPin(phoneHasLock)==true
+    fun refreshDeviceSecurity() { runtime.deviceSecure=runtime.phoneSecure() }
+    fun setSafeEntryMethod(method:SafeEntryMethod,currentPin:String) = runtime.entrySettings.select(method,currentPin)
+    fun saveSafeEntryPin(currentPin:String,pin:String,confirmation:String,usePin:Boolean) = runtime.entrySettings.savePin(currentPin,pin,confirmation,usePin)
     fun authenticateDeviceLock(enroll: Boolean=false) = runtime.deviceAccess.authenticate(enroll)
     fun changeDeviceLockTrigger(trigger: String) = runtime.deviceAccess.authenticate(false,trigger)
     val message get()=runtime.state.message
