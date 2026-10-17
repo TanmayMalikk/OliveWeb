@@ -18,9 +18,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.security.InputPolicy
 
-// USER ONLY: every user device gets a local PIN; Safe Contacts, Staff, and Admins do not use this step.
+// USER ONLY: enrollment chooses a separate app PIN or Android device authentication.
+@Composable internal fun DevicePin(session: SessionViewModel) = SafeEntrySetup(session)
+
 // UI sizing/text: PIN setup uses the shared form spacing and full-width fields; warning copy uses the Muted color.
-@Composable internal fun DevicePin(session: SessionViewModel) {
+@Composable internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var showErrors by rememberSaveable { mutableStateOf(false) }
@@ -31,7 +33,7 @@ import com.olive.app.security.InputPolicy
     val completedBeforePin=if(session.creatingAccount) 8 else 2
     val totalRequired=completedBeforePin+2
     FormColumn {
-        Heading("Secure this device", "Create your device PIN.")
+        Heading(stringResource(R.string.entry_setup_title), stringResource(R.string.entry_new_pin_description))
         OnboardingProgress(completedBeforePin+listOf(pinValid,confirmationValid).count { it },totalRequired,page,stages,
             List(stages) { index -> index<page || (index==page && pinValid && confirmationValid) })
         Field("4–6 digit PIN",pin,"new_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
@@ -45,7 +47,7 @@ import com.olive.app.security.InputPolicy
         }
         RequirementBullet("PINs match",confirmationValid,pin.isNotEmpty() || confirm.isNotEmpty())
         Status(session)
-        OnboardingNavigation(session::back,{showErrors=true;if(pinValid && confirmationValid) session.createDevicePin(pin,confirm)},
+        OnboardingNavigation(onBack,{showErrors=true;if(pinValid && confirmationValid) session.createDevicePin(pin,confirm)},
             last=true,nextTag="pin_setup_submit",enabled=!session.busy)
     }
 }
@@ -53,6 +55,7 @@ import com.olive.app.security.InputPolicy
 // USER ONLY: a cover trigger opens this local PIN interface before showing Olive Branch.
 // UI sizing/color: this screen owns the compact breakpoint, keypad dimensions, PIN-dot size, OliveGreen accents, and responsive text sizes.
 @Composable internal fun PinPrompt(session: SessionViewModel) {
+    if(session.usesDeviceLock) { DeviceLockPrompt(session);return }
     var pin by remember { mutableStateOf("") }
     val headingScrollState=rememberScrollState()
     BoxWithConstraints(Modifier.fillMaxSize()) {

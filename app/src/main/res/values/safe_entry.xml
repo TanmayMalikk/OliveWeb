@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entry_setup_title">Protect your safe area</string>
+    <string name="entry_setup_description">Choose how you want to unlock the safe app on this device.</string>
+    <string name="entry_safety_question">Does the person causing harm know or have access to your phone’s PIN, pattern or password?</string>
+    <string name="entry_yes">Yes</string>
+    <string name="entry_no">No</string>
+    <string name="entry_choose_method">Choose an entry method</string>
+    <string name="entry_new_pin">New PIN</string>
+    <string name="entry_device_lock">Device lock</string>
+    <string name="entry_recommended">%1$s · Recommended</string>
+    <string name="entry_recommend_pin">Use a separate app PIN that the person causing harm does not know. Device lock can also be opened with your phone’s PIN, pattern or password.</string>
+    <string name="entry_recommend_device">Device lock is recommended if the person causing harm cannot unlock your phone.</string>
+    <string name="entry_new_pin_description">Create a separate 4–6 digit app PIN. Avoid using your phone’s PIN.</string>
+    <string name="entry_device_description">Use Android’s fingerprint, supported face recognition, or phone PIN, pattern or password. No separate app PIN is needed.</string>
+    <string name="entry_device_unavailable">Set up a screen lock in Android Settings to use Device lock, or choose New PIN.</string>
+    <string name="entry_confirm_setup">Confirm your identity to set up safe entry.</string>
+    <string name="entry_unlock_description">Confirm your identity with Android to unlock the safe area.</string>
+    <string name="entry_unlock">Unlock with device lock</string>
+    <string name="entry_use_phone_lock">Use phone screen lock</string>
+    <string name="entry_auth_failed">Android authentication could not be verified. Access remains locked. Try again, or sign in to set up safe entry again.</string>
+    <string name="entry_auth_cancelled">Authentication was cancelled or unavailable. Access remains locked.</string>
+    <string name="entry_settings_device">This device uses Android device lock. Manage its fingerprint, face recognition and screen lock in Android Settings.</string>
+    <string name="entry_verify_trigger">Confirm with device lock to change your trigger word.</string>
+    <string name="entry_invalid_trigger">Choose a trigger word or phrase of 3–64 characters.</string>
+    <string name="entry_calculator_help">For safe entry, enter your app PIN (or any 4–6 digits when using Device lock), then tap equals twice. Device lock still requires Android authentication.</string>
+</resources>
