@@ -44,6 +44,9 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -172,6 +175,11 @@ import java.util.UUID
         SafePage.Contacts -> ContactEditor(session,profile)
         SafePage.Activity -> ActivityHistory(session)
     } }
+    
+    // Mount the shared entry dialog listener at the root of the safe area to enable pop up overlay at all times a shared entry is attempted to be viewed
+    if (session.viewedSharedEntry != null) {
+        SharedEntryViewer(session)
+    }
 }
 
 // Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices.
