@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -57,6 +58,8 @@ import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -373,7 +376,27 @@ import java.util.UUID
                             Column(Modifier.weight(1f)) {
                                 Text(if(mine) session.coverUsername else chat.senderUsername,style=MaterialTheme.typography.labelSmall,
                                     color=if(mine) Color.White.copy(alpha=.78f) else Muted)
-                                Text(chat.body,fontStyle=if(chat.unsent) androidx.compose.ui.text.font.FontStyle.Italic else null)
+                                if (chat.unsent) {
+                                    Text("Message unsent", fontStyle = FontStyle.Italic, color = if(mine) Color.White.copy(alpha=.7f) else Muted)
+                                } else if (chat.body.startsWith("SHARED_NOTE:")) {
+                                    val parts = chat.body.split(":", limit = 3)
+                                    val noteId = parts.getOrNull(1) ?: ""
+                                    val noteTitle = parts.getOrNull(2) ?: "Encrypted Note"
+
+                                    Surface(
+                                        onClick = { session.openSharedPrivateEntry(noteId) },
+                                        color = if (mine) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.05f),
+                                        shape = MaterialTheme.shapes.medium,
+                                        modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()
+                                    ) {
+                                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Outlined.Lock, contentDescription = "Secure Note", modifier = Modifier.size(20.dp).padding(end = 8.dp))
+                                            Text(noteTitle, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                } else {
+                                    Text(chat.body)
+                                }
                                 if(chat.sentAt>0) Text(DateTimeFormatter.ofPattern("MMM d, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(chat.sentAt)),
                                     style=MaterialTheme.typography.labelSmall,color=if(mine) Color.White.copy(alpha=.7f) else Muted)
                             }
