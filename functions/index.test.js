@@ -31,8 +31,14 @@ test("new usernames require at least eight allowed characters", () => {
   assert.throws(() => _test.normalizedUsername("short_1"));
   assert.equal(_test.normalizedExistingUsername("old_1"), "old_1");
   assert.throws(() => _test.normalizedUsername("invalid-name"));
+  assert.throws(() => _test.normalizedUsername("12345678"));
+  assert.throws(() => _test.normalizedUsername("________"));
+  assert.equal(_test.normalizedUsername("lettersonly"), "lettersonly");
+  assert.equal(_test.normalizedExistingUsername("12345678"), "12345678");
   assert.equal(_test.validPassword("Abcd123!"), true);
   assert.equal(_test.validPassword("Abcd1234"), false);
   assert.equal(_test.validPassword("1234567!"), false);
   assert.equal(_test.validPassword("abcdefgh!"), false);
+  assert.equal(_test.validPassword("Valid_12123!", "valid_12"), false);
+  assert.equal(_test.validPassword("Other123!", "valid_12"), true);
 });

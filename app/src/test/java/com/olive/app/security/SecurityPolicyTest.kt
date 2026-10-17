@@ -4,6 +4,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SecurityPolicyTest {
+    @Test fun newUsernamesNeedALetterAndPasswordsCannotContainTheirUsername() {
+        assertFalse(InputPolicy.validUsername("12345678"))
+        assertFalse(InputPolicy.validUsername("________"))
+        assertTrue(InputPolicy.validUsername("letters_only"))
+        assertTrue(InputPolicy.validUsername("1234567a"))
+        // Existing numeric usernames remain able to sign in.
+        assertTrue(InputPolicy.validExistingUsername("12345678"))
+        assertFalse(InputPolicy.validAccountPassword("Test_user123!","test_user"))
+        assertFalse(InputPolicy.validAccountPassword("!123Test_user"," TEST_USER "))
+        assertFalse(InputPolicy.validAccountPassword("testuser","testuser"))
+        assertTrue(InputPolicy.validAccountPassword("Unrelated123!","test_user"))
+    }
     @Test fun pinVerifierUsesRandomSaltAndRejectsWrongPin() {
         val first=SecretVerifier.create("123456")
         val second=SecretVerifier.create("123456")

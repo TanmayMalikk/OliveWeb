@@ -1,6 +1,5 @@
 package com.olive.app
 
-import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.security.EncryptedVault

@@ -1,4 +1,5 @@
 package com.olive.app.ui.session
+import com.olive.app.R
 
 import com.olive.app.data.*
 import kotlinx.coroutines.Dispatchers
@@ -81,8 +82,8 @@ internal class SessionCoverState(private val runtime:SessionRuntime) {
             with(state) {
                 val device=enrollment ?: return
                 history.recordSettingsInteraction("Cover","Pressed save delivery address")
-                if(busy || !address.valid) { message="Enter a complete delivery address."; return }
-                operations.runOperation("Unable to save the address. Please retry.") { token ->
+                if(busy || !address.valid) { message=runtime.application.getString(R.string.enter_a_complete_delivery_address); return }
+                operations.runOperation(runtime.application.getString(R.string.unable_to_save_the_address_please_retry)) { token ->
                     val updated=withContext(Dispatchers.IO) {
                         val before=store.profile(device.uid)
                         val after=before.copy(address=address,region=address.generalLocation)
@@ -92,7 +93,7 @@ internal class SessionCoverState(private val runtime:SessionRuntime) {
                     }
                     if(epoch==token) {
                         deliveryAddress=address; profile=profile?.copy(address=address)
-                        addressPrompt=false; addressSaveVersion++; message="Address saved."
+                        addressPrompt=false; addressSaveVersion++; message=runtime.application.getString(R.string.address_saved)
                     }
                     history.queueHistorySync()
                     if(!localMode) settings.syncProfile(device.uid,updated,token)

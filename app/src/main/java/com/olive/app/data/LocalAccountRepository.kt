@@ -11,7 +11,7 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
     private fun key(username: String, role: AccountRole) = "${role.name}:${InputPolicy.username(username)}"
     override suspend fun create(username: String, password: String, role: AccountRole) = withContext(Dispatchers.IO) {
         require(InputPolicy.validUsername(username)) { "Invalid username" }
-        require(InputPolicy.validPassword(password)) { "Invalid password" }
+        require(InputPolicy.validAccountPassword(password,username)) { "Invalid password" }
         val identity = AccountIdentity(UUID.randomUUID().toString(), InputPolicy.username(username))
         val verifier = SecretVerifier.create(password)
         vault.update { root ->
@@ -39,7 +39,7 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
     override suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord) = Unit
     override suspend fun historyRecords(identity: AccountIdentity) = emptyList<HistoryRecord>()
     override suspend fun changePassword(identity: AccountIdentity, currentPassword: String, newPassword: String) = withContext(Dispatchers.IO) {
-        require(InputPolicy.validPassword(newPassword)) { "Invalid password" }
+        require(InputPolicy.validAccountPassword(newPassword,identity.username)) { "Invalid password" }
         vault.update { root ->
             val records=root.getJSONObject("accounts")
             val account=AccountRole.entries.asSequence().mapNotNull { records.optJSONObject(key(identity.username,it)) }

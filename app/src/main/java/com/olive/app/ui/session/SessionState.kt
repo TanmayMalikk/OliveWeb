@@ -39,6 +39,7 @@ internal class SessionState(private val canEnterSafe:()->Boolean) {
     var addressPrompt by mutableStateOf(false)
     var addressSaveVersion by mutableIntStateOf(0)
     var language by mutableStateOf(AppLocaleManager.resolveSystemDefaultLanguageName())
+    var coverDob by mutableStateOf("")
     var coverFullName by mutableStateOf("")
     var coverUsername by mutableStateOf("")
     var coverType by mutableStateOf(CoverType.FOOD)

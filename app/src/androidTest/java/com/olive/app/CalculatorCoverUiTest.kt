@@ -12,6 +12,18 @@ import org.junit.Test
 
 // This catches calculator-only crashes without needing to complete account onboarding first.
 class CalculatorCoverUiTest {
+    @Test fun resultFitsAboveKeysWithAndWithoutScientificOperators() {
+        "34646".forEach { compose.onNodeWithTag("calc_key_$it").performClick() }
+        repeat(2) {
+            val result=compose.onNodeWithTag("calculator_display")
+            val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            result.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            val bounds=result.fetchSemanticsNode().boundsInRoot
+            org.junit.Assert.assertTrue("Result clipped: $bounds vs ${layouts.first().size}", bounds.height+1>=layouts.first().size.height)
+            org.junit.Assert.assertTrue(bounds.bottom<=compose.onNodeWithTag("calc_key_%").fetchSemanticsNode().boundsInRoot.top)
+            compose.onNodeWithTag("scientific_toggle").performClick()
+        }
+    }
     @Test fun graphPanAndZoomAreAvailableAsAccessibilityActions() {
         compose.onNodeWithTag("graph_editor").performClick()
         val graph=compose.onNodeWithTag("graph_plot")

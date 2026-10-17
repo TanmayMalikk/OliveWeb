@@ -116,6 +116,7 @@ class AccessibilityUiTest:OliveUiTestBase() {
             click("Quick exit")
             compose.waitUntil(10_000) { focused.any { it=="Returned to Olive" } }
             assertEquals("Returned to Olive",automation.rootInActiveWindow.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)?.contentDescription?.toString())
+            compose.onNodeWithText("Returned to Olive").assertDoesNotExist()
             assertNull(find(automation.rootInActiveWindow,"Quick exit"))
         } finally {
             automation.setOnAccessibilityEventListener(null)
@@ -219,11 +220,13 @@ class AccessibilityUiTest:OliveUiTestBase() {
                 }
                 val context=compose.activity.createConfigurationContext(configuration)
                 OliveTheme { CompositionLocalProvider(LocalContext provides context,LocalConfiguration provides configuration) {
-                    LocalizedIcon(Icons.Outlined.Visibility,"Show password")
+                    LocalizedIcon(Icons.Outlined.Visibility,rememberResourceText()(R.string.ui_show_value,rememberResourceText()(R.string.a11y_password)))
                 } }
             }
         }
-        compose.onNodeWithContentDescription("Afficher: mot de passe").assertExists()
+        val french=android.content.res.Configuration(compose.activity.resources.configuration).apply { setLocale(java.util.Locale.FRENCH) }
+        val resources=compose.activity.createConfigurationContext(french).resources
+        compose.onNodeWithContentDescription(resources.getString(R.string.ui_show_value,resources.getString(R.string.a11y_password))).assertExists()
     }
 
     @Test fun onlyUserAccessibilityEventsCountAsActivity() {
@@ -242,8 +245,7 @@ class AccessibilityUiTest:OliveUiTestBase() {
                 setLocale(java.util.Locale.forLanguageTag(tag))
             }
             val expected=context.createConfigurationContext(configuration).getString(R.string.a11y_unlock)
-            assertEquals(expected,localizedAccessibilityText("Unlock",name,context))
+            assertEquals(expected,ResourceText(context.createConfigurationContext(configuration).resources)(R.string.a11y_unlock))
         }
-        assertEquals("Show password",localizedAccessibilityText("Show password","English",context))
     }
 }

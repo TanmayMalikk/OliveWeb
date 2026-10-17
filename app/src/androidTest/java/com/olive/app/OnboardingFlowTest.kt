@@ -3,8 +3,7 @@ package com.olive.app
 import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.security.EncryptedVault
-import com.olive.app.security.child
+
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
@@ -17,7 +16,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Invalid username").assertExists()
         compose.onNodeWithText("Invalid password").assertExists()
         compose.onNodeWithText("Passwords differ").assertExists()
-        compose.onNodeWithText("0 of 10 required",useUnmergedTree=true).assertExists()
+        compose.onNodeWithText("0 of 9 required",useUnmergedTree=true).assertExists()
         compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 4")
     }
 
@@ -26,6 +25,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         click("new_user")
         fill("username","safe_contact_test");fill("password","test-password-123");fill("confirm_password","test-password-123")
         click("credentials_submit");waitFor("full_name")
+        compose.onNodeWithTag("language").assertDoesNotExist()
         compose.onNodeWithText("Step 2 of 3",useUnmergedTree=true).assertExists()
         compose.onNodeWithTag("abuser_name").assertDoesNotExist()
         compose.onNodeWithTag("situation").assertDoesNotExist()
@@ -47,6 +47,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         waitFor("new_user");click("new_user")
         fill("username","city_only");fill("password","test-password-123");fill("confirm_password","test-password-123")
         click("credentials_submit");waitFor("full_name")
+        compose.onNodeWithTag("language").assertDoesNotExist()
         compose.onNodeWithText("Step 2 of 4",useUnmergedTree=true).assertExists()
         compose.onNodeWithTag("onboarding_step_4",useUnmergedTree=true).assertExists()
         fill("full_name","City Test");chooseBirthday();nextOnboarding()
