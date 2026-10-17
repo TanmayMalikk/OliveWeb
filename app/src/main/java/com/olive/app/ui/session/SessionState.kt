@@ -10,6 +10,7 @@ internal class SessionState {
     var page by mutableStateOf(SafePage.Home)
     var activityCategory by mutableStateOf<ActivityCategory?>(null)
     var busy by mutableStateOf(false)
+    var deviceLockRequest by mutableStateOf<DeviceLockRequest?>(null)
     var message by mutableStateOf<String?>(null)
     var profile by mutableStateOf<UserProfile?>(null)
     var attempts by mutableStateOf(emptyList<FailedAttempt>())
