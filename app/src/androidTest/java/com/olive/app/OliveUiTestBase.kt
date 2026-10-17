@@ -78,9 +78,12 @@ abstract class OliveUiTestBase {
         fill("address_line1","123 Test Street"); fill("address_city","Edmonton")
         fill("address_province","Alberta"); fill("address_postal","T5J 0N3")
         nextOnboarding();fill("trigger","moon garden");waitFor("profile_submit")
-        click("profile_submit"); waitFor("pin_setup_submit")
+        click("profile_submit"); chooseAppPin()
         fill("new_pin",pin); fill("confirm_pin",pin); click("pin_setup_submit")
         waitCover()
+    }
+    protected fun chooseAppPin() {
+        waitFor("entry_knows_pin_yes");click("entry_knows_pin_yes");click("entry_choose_pin");waitFor("pin_setup_submit")
     }
     protected fun waitCover() {
         try { compose.waitUntil(30_000) { compose.onAllNodesWithTag("cover_root").fetchSemanticsNodes().isNotEmpty() } }

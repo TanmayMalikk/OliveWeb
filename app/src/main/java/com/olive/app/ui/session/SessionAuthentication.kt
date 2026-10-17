@@ -198,18 +198,22 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                 val value = pendingProfile ?: return
                 operations.runOperation(runtime.application.getString(R.string.unable_to_save_this_device_s_pin_please_retry)) { token ->
                     val saved = withContext(Dispatchers.IO) { store.enroll(identity,value,pin) }
-                    enrollment=saved
-                    if(epoch == token) {
-                        deliveryAddress=value.address; language=value.language
-                        coverDob=value.dob;coverFullName=value.fullName; coverUsername=value.username
-                        coverType=value.coverType
-                        accountRole=value.role
-                        covers.restoreCoverData(saved.uid)
-                        navigation.quickExit()
-                        if(!localMode) history.loadCloudHistory(saved.uid,value.username)
-                    }
+                    finishEnrollment(saved,value,token)
                 }
             }
+        }
+    }
+
+    internal suspend fun finishEnrollment(saved: DeviceEnrollment, value: UserProfile, token: Long): Unit = with(runtime) {
+        with(state) {
+            if (epoch!=token || screen!=SessionScreen.DevicePin || pendingIdentity?.uid!=saved.uid) return@with
+            enrollment=saved
+            deliveryAddress=value.address;language=value.language
+            coverDob=value.dob;coverFullName=value.fullName;coverUsername=value.username
+            coverType=value.coverType;accountRole=value.role
+            covers.restoreCoverData(saved.uid)
+            navigation.quickExit()
+            if(!localMode) history.loadCloudHistory(saved.uid,value.username)
         }
     }
 

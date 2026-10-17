@@ -23,6 +23,7 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
                 if(accountRole==AccountRole.USER && screen in setOf(SessionScreen.Safe,SessionScreen.Pin)) accessibilityExitVersion++
                 epoch++
                 pinAuthorizedUid=null;pinAuthorizedEpoch=-1L
+                deviceLockRequest?.complete(null);deviceLockRequest=null
                 operationJob?.cancel();operationJob=null
                 idleJob?.cancel();idleJob=null;idleCountdownSeconds=null
                 busy=false;checkoutActive=false;coverReset++;addressPrompt=false
