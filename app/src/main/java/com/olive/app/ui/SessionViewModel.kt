@@ -46,6 +46,7 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     private val adminRepository = if(localMode) null else AdminRepository()
     private val messagingRepository = if(localMode) null else MessagingRepository()
     private val secureChatRepository = if(localMode) null else SecureChatRepository()
+    private val secureDocumentRepository = if(localMode) null else SecureDocumentRepository()
     private val messageReadState=application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
     private val cloudState=application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
     var screen by mutableStateOf(SessionScreen.Loading); private set
@@ -740,21 +741,35 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun unsendMessage(chat: ChatMessage) {
+        val uid = enrollment?.uid ?: return
+        val chatRepo = secureChatRepository ?: return
+        val secureRepo = secureDocumentRepository ?: return
         val conversation = activeConversation ?: return
-        val secureRepo = secureChatRepository ?: run { message="Messaging needs a Firebase-connected build.";return }
-        val device = enrollment ?: return
+        
         if(messagingBusy || messagingNeedsReconnect || screen!=SessionScreen.Safe || page!=SafePage.Messages) return
         val token = epoch
         messagingBusy = true; message = null
+        
         viewModelScope.launch {
             try {
-                secureRepo.unsendSecureMessage(conversation.id, chat, device.uid)
+                // If it is a shared note pointer, aggressively revoke the recipient's cryptographic access
+                if (chat.body.startsWith("SHARED_NOTE:") && !chat.unsent) {
+                    val parts = chat.body.split(":")
+                    if (parts.size >= 2) {
+                        val noteId = parts[1]
+                        val recipientUid = conversation.participantIds.first { it != uid }
+                        secureRepo.revokeAccessToEntry(noteId, recipientUid)
+                    }
+                }
+                
+                // Proceed with the normal chat unsend logic
+                chatRepo.unsendSecureMessage(conversation.id, chat, uid)
             } catch(error: CancellationException) { throw error }
             catch(error: Exception) {
                 if(epoch == token) {
                     message = if(error is FirebaseFirestoreException && error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED)
                         "Unable to unsend this message. Firebase denied this action."
-                    else error.localizedMessage ?: "Unable to unsend this message."
+                    else error.localizedMessage ?: "Unable to unsend completely."
                 }
             } finally {
                 if(epoch == token) messagingBusy = false
@@ -1010,6 +1025,9 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 if (epoch == token) busy = false
             }
         }
+    }
+    fun closeSharedPrivateEntry() {
+        viewedSharedEntry = null
     }
     fun trashPrivateEntry(id: String) {
         val existing=privateEntries.firstOrNull { it.id==id && it.deletedAt==null } ?: return
