@@ -54,7 +54,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+val cameraxVersion = "1.6.2"
+
 dependencies {
+    implementation("androidx.camera:camera-core:${cameraxVersion}")
+    implementation("androidx.camera:camera-camera2:${cameraxVersion}")
+    implementation("androidx.camera:camera-lifecycle:${cameraxVersion}")
+    implementation("androidx.camera:camera-view:${cameraxVersion}")
+    implementation("androidx.camera:camera-video:${cameraxVersion}")
+    implementation("androidx.camera:camera-extensions:${cameraxVersion}")
     implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.material3:material3")
