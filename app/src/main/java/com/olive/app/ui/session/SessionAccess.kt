@@ -36,6 +36,7 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
                 if(busy || privacyBlackout || screen != SessionScreen.Pin || accountRole!=AccountRole.USER || challenge!=pinChallengeVersion) return
                 val device = enrollment ?: return
                 if(device.role!=AccountRole.USER || activeTriggerId==null) return
+                if(device.entryMethod!=SafeEntryMethod.APP_PIN) return
                 if(!InputPolicy.validPin(pin)) { message=runtime.application.getString(R.string.enter_your_4_6_digit_pin); return }
                 operations.runOperation(runtime.application.getString(R.string.unable_to_check_the_pin_or_record_this_attempt_access_remains_locked)) { token ->
                     val result = withContext(Dispatchers.IO) {
@@ -63,6 +64,15 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
                 if(busy || privacyBlackout || accountRole!=AccountRole.USER || screen!=SessionScreen.Cover || coverType!=CoverType.CALCULATOR || !InputPolicy.validPin(pin)) return
                 val device=enrollment ?: return
                 if(device.role!=AccountRole.USER) return
+                if(device.entryMethod==SafeEntryMethod.DEVICE_LOCK) {
+                    // Calculator digits open a fresh challenge; Android must still authenticate the account.
+                    val event=TriggerEvent(source="Better Calculator")
+                    activeTriggerId=event.id
+                    triggerJob=scope.launch(Dispatchers.IO) { store.recordTrigger(device.uid,event);history.queueHistorySync() }
+                    pinChallengeVersion++
+                    message=null;screen=SessionScreen.Pin
+                    return
+                }
                 val newTrigger=if(activeTriggerId==null) TriggerEvent(source="Better Calculator").also { activeTriggerId=it.id } else null
                 val triggerId=activeTriggerId ?: return
                 operations.runOperation(runtime.application.getString(R.string.unable_to_check_the_pin_or_record_this_attempt_access_remains_locked)) { token ->
@@ -85,7 +95,7 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
     }
 
     // Recheck identity, screen and cancellation epoch after loading private data; exit invalidates pending unlocks.
-    private suspend fun unlockVerifiedDevice(device:DeviceEnrollment,token:Long,expectedScreen:SessionScreen,challenge:Int?=null) {
+    internal suspend fun unlockVerifiedDevice(device:DeviceEnrollment,token:Long,expectedScreen:SessionScreen,challenge:Int?=null) {
         with(runtime) {
             with(state) {
                 val saved=withContext(Dispatchers.IO) { store.unlockSnapshot(device.uid) }

@@ -48,6 +48,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
 
     val auth=SessionAuthentication(this)
     val access=SessionAccess(this)
+    val deviceAccess=SessionDeviceAccess(this)
     val navigation=SessionNavigation(this)
     val organization=OrganizationAccounts(this)
     val messaging=SessionMessaging(this)
@@ -77,7 +78,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     }
     val pendingMessageActionCount get()=state.incomingFriendRequests.size+unreadMessageCount
 
-    // User access requires PIN authorization for this enrollment and epoch; other roles use account sign-in.
+    // User access requires verified app-PIN or Android authentication for this enrollment and epoch.
     private fun canEnterSafe():Boolean {
         val device=enrollment
         val requiresPin=device?.role==AccountRole.USER || state.accountRole==AccountRole.USER

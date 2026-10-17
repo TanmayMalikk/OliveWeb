@@ -17,6 +17,7 @@ import androidx.activity.viewModels
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import com.olive.app.data.CoverType
@@ -27,6 +28,7 @@ import com.olive.app.ui.covers.shared.CoverLauncher
 import com.olive.app.ui.OliveRoot
 import com.olive.app.ui.OliveTheme
 import com.olive.app.ui.SessionViewModel
+import com.olive.app.ui.SessionScreen
 import java.util.function.Consumer
 
 internal fun shouldBlankRecentPreview(protectionEnabled:Boolean,sensitive:Boolean)=protectionEnabled && sensitive
@@ -35,6 +37,7 @@ internal fun shouldApplyTaskIdentity(applied:Pair<CoverType,AccountRole>?,type:C
 
 // The Android shell is intentionally thin: show Olive and lock it whenever it leaves the foreground.
 class MainActivity : ComponentActivity() {
+    private val deviceLock= com.olive.app.security.AndroidDeviceLock(this) { session.background() }
     // The resource toggle avoids hard-coding the privacy mode into this activity's control flow.
     private val screenCaptureProtectionEnabled by lazy {
         resources.getBoolean(R.bool.screen_capture_protection_enabled)
@@ -58,6 +61,11 @@ class MainActivity : ComponentActivity() {
         accessibilityContent=findViewById(android.R.id.content)
         observeAccessibilityInteractions(accessibilityContent,session::noteInteraction)
         setContent {
+            val authentication=session.deviceLockRequest
+            DisposableEffect(authentication) {
+                authentication?.let(deviceLock::show)
+                onDispose { deviceLock.cancel() }
+            }
             val selectedCover=session.coverType
             val selectedRole=session.accountRole
             val notificationAccountId=session.coverAccountId
@@ -82,7 +90,8 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        session.background()
+        // Android authentication may open the system credential screen; its cancellation keeps access locked.
+        if(!deviceLock.awaitingCredential) session.background()
         updateRecentAppIdentity(session.coverType,session.accountRole)
         super.onPause()
     }
@@ -90,13 +99,14 @@ class MainActivity : ComponentActivity() {
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        session.background()
+        if(!deviceLock.awaitingCredential) session.background()
         updateRecentAppIdentity(session.coverType,session.accountRole)
         super.onUserLeaveHint()
     }
     // Coming back just refreshes screen protection; it never auto-reopens private pages.
     override fun onResume() {
         super.onResume()
+        deviceLock.resume()
         applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType,session.accountRole)
         removeRecentPrivacyCoverAfterRedraw()
@@ -127,6 +137,10 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onStop() {
+        if(!deviceLock.awaitingCredential && (session.deviceLockRequest!=null ||
+                session.screen in setOf(SessionScreen.Pin,SessionScreen.DevicePin,SessionScreen.Safe))) {
+            deviceLock.cancel();session.background()
+        }
         if(Build.VERSION.SDK_INT>=34) screenshotCallback?.let { runCatching { unregisterScreenCaptureCallback(it) } }
         if(Build.VERSION.SDK_INT>=35) recordingCallback?.let { runCatching { windowManager.removeScreenRecordingCallback(it) } }
         screenshotCallback=null;recordingCallback=null

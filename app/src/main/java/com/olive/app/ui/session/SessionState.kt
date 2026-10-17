@@ -4,7 +4,7 @@ import androidx.compose.runtime.*
 import com.olive.app.data.*
 import com.olive.app.ui.*
 
-// Observable screen state exposed through SessionViewModel; the screen setter also enforces the User PIN gate.
+// Observable screen state exposed through SessionViewModel; the screen setter enforces the verified User entry gate.
 internal class SessionState(private val canEnterSafe:()->Boolean) {
     private var screenState by mutableStateOf(SessionScreen.Loading)
     var screen:SessionScreen
@@ -15,6 +15,7 @@ internal class SessionState(private val canEnterSafe:()->Boolean) {
     var page by mutableStateOf(SafePage.Home)
     var activityCategory by mutableStateOf<ActivityCategory?>(null)
     var busy by mutableStateOf(false)
+    var deviceLockRequest by mutableStateOf<DeviceLockRequest?>(null)
     var message by mutableStateOf<String?>(null)
     var profile by mutableStateOf<UserProfile?>(null)
     var attempts by mutableStateOf(emptyList<FailedAttempt>())

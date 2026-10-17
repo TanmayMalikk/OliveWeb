@@ -52,7 +52,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("onboarding_step_4",useUnmergedTree=true).assertExists()
         fill("full_name","City Test");chooseBirthday();nextOnboarding()
         fill("address_city","Edmonton");nextOnboarding();fill("trigger","moon garden");waitFor("profile_submit")
-        click("profile_submit");waitFor("pin_setup_submit")
+        click("profile_submit");chooseAppPin()
         fill("new_pin","1234");fill("confirm_pin","1234");click("pin_setup_submit");waitCover()
         val session=androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.SessionViewModel::class.java]
         assertEquals("Edmonton",session.deliveryAddress.city)
@@ -140,7 +140,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("username","returning_user_tester"); fill("password","wrong-password"); click("credentials_submit")
         compose.waitUntil(30_000) { compose.onAllNodesWithText("Incorrect password").fetchSemanticsNodes().isNotEmpty() }
         compose.waitUntil(30_000) { !androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.SessionViewModel::class.java].busy }
-        fill("password","test-password-123"); click("credentials_submit"); waitFor("pin_setup_submit")
+        fill("password","test-password-123"); click("credentials_submit"); chooseAppPin()
         fill("new_pin","654321"); fill("confirm_pin","654321"); click("pin_setup_submit")
         waitCover()
         compose.onNodeWithText("Discover").performClick(); waitCover()
