@@ -1,7 +1,6 @@
 package com.olive.app.ui.covers.news
+import com.olive.app.ui.rememberResourceText
 
-import androidx.compose.ui.semantics.*
-import androidx.compose.ui.semantics.hideFromAccessibility
 import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
@@ -36,6 +35,7 @@ import kotlinx.coroutines.withContext
 // UI sizing/color: the feed uses Cream bars, 20dp side padding, 14dp gaps, and the shared Olive typography/colors.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun NewsCover(session: SessionViewModel, locationPermissionVersion: Int=0, interactive: Boolean=true) {
+    val uiText=rememberResourceText()
     val context=LocalContext.current
     var tab by remember { mutableStateOf("Today") }
     var scope by remember { mutableStateOf(NewsScope.LOCAL) }
@@ -88,7 +88,7 @@ import kotlinx.coroutines.withContext
             OutlinedTextField(locationDraft,{ value ->
                 locationDraft=if(!session.interceptSearch(value)) value.take(120) else ""
             },label={Text(stringResource(R.string.city_or_region))},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input").keepVisibleWhileTyping())
-            Text("This changes the local news search on this device.",color=Muted,style=MaterialTheme.typography.bodySmall)
+            Text(uiText(R.string.ui_this_changes_the_local_news_search_on_this_device),color=Muted,style=MaterialTheme.typography.bodySmall)
         }},
         confirmButton={TextButton(onClick={
             customPlace=locationDraft.trim();currentPlace=customPlace
@@ -108,14 +108,14 @@ import kotlinx.coroutines.withContext
         TopAppBar(
             title={Column {
                 // Text sizing note: 27sp is the news masthead. Keep the edition label on its own line for longer translations.
-                Text("Daily Digest",fontFamily=FontFamily.Serif,fontSize=27.sp,fontWeight=FontWeight.Bold,color=OliveGreen)
-                if(tab=="Today" && selected==null) Text(if(scope==NewsScope.LOCAL) "Local edition" else "Global edition",style=MaterialTheme.typography.labelSmall,color=Muted)
+                Text(uiText(R.string.ui_daily_digest),fontFamily=FontFamily.Serif,fontSize=27.sp,fontWeight=FontWeight.Bold,color=OliveGreen)
+                if(tab=="Today" && selected==null) Text(if(scope==NewsScope.LOCAL) uiText(R.string.local_edition) else uiText(R.string.global_edition),style=MaterialTheme.typography.labelSmall,color=Muted)
             }},
-            actions={if(tab=="Today" && selected==null) IconButton(onClick={refresh++},enabled=!loading) { Icon(Icons.Outlined.Refresh,"Refresh") }},
+            actions={if(tab=="Today" && selected==null) IconButton(onClick={refresh++},enabled=!loading) { Icon(Icons.Outlined.Refresh,uiText(R.string.refresh)) }},
             colors=TopAppBarDefaults.topAppBarColors(containerColor=Cream),
         )
     },bottomBar={
-        NavigationBar(containerColor=Cream,tonalElevation=0.dp) {
+        NavigationBar(modifier=Modifier.testTag("cover_navigation"),containerColor=Cream,tonalElevation=0.dp) {
             listOf("Today","Saved","Account").forEach { choice ->
                 NavigationBarItem(selected=tab==choice,onClick={
                     if(choice!=tab) tabHistory += tab
@@ -123,14 +123,14 @@ import kotlinx.coroutines.withContext
                     if(choice=="Account") session.recordSettingsInteraction("Daily Digest","Opened account page")
                 },
                     icon={Icon(when(choice) { "Today" -> Icons.AutoMirrored.Outlined.Article; "Saved" -> if(tab==choice) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder; else -> Icons.Outlined.PersonOutline },null)},
-                    label={Text(choice)})
+                    label={Text(when(choice) { "Today" -> uiText(R.string.today); "Saved" -> uiText(R.string.saved); else -> uiText(R.string.account) })})
             }
         }
     }) { padding ->
         val article=selected
         if(article!=null && tab!="Account") {
             NewsArticleReader(article,saved.any { it.link==article.link },interactive,
-                modifier=Modifier.fillMaxSize().padding(padding).testTag("news_cover"),
+                modifier=Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().testTag("news_cover"),
                 onBack={selected=null},onBookmark={session.toggleNewsBookmark(article)})
         } else {
             NewsFeed(session,
@@ -141,7 +141,7 @@ import kotlinx.coroutines.withContext
                     editLocation={locationDraft=currentPlace;locationEditorOpen=true},
                     refresh={refresh++},
                     openArticle={selected=it},
-                ),Modifier.fillMaxSize().padding(padding))
+                ),Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding())
         }
     }
 }

@@ -1,6 +1,6 @@
 package com.olive.app.ui.session
+import com.olive.app.R
 
-import androidx.compose.runtime.*
 import com.olive.app.BuildConfig
 import com.olive.app.data.*
 import com.olive.app.security.*
@@ -54,7 +54,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
         with(runtime) {
             with(state) {
                 if(!canChooseAccount()) return
-                if(accountRole==AccountRole.STAFF || accountRole==AccountRole.ADMIN) { message="Staff and Admin accounts are created by an administrator.";return }
+                if(accountRole==AccountRole.STAFF || accountRole==AccountRole.ADMIN) { message=runtime.application.getString(R.string.ui_staff_and_admin_accounts_are_created_by_an_administrator);return }
                 creatingAccount=true;message=null;navigation.openScreen(SessionScreen.NewCredentials)
             }
         }
@@ -99,10 +99,11 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                 credentialFieldError=null
                 val organizationEmail=accountRole in setOf(AccountRole.STAFF,AccountRole.ADMIN) && '@' in username
                 val validUsername=if(create) InputPolicy.validUsername(username) else InputPolicy.validExistingUsername(username)
-                if(!organizationEmail && !validUsername) { credentialFieldError=CredentialFieldError.InvalidUsername;message="Invalid username."; return }
-                if(create && !InputPolicy.validPassword(password)) { credentialFieldError=CredentialFieldError.InvalidPassword;message="Invalid password."; return }
-                if(password.isEmpty()) { credentialFieldError=CredentialFieldError.IncorrectPassword;message="Password required."; return }
-                operations.runOperation("Unable to sign in. Check your credentials and connection, then try again.") { token ->
+                if(!organizationEmail && !validUsername) { credentialFieldError=CredentialFieldError.InvalidUsername;message=runtime.application.getString(R.string.ui_invalid_username_10e538); return }
+                if(create && !InputPolicy.passwordExcludesUsername(password,username)) { message=runtime.application.getString(R.string.password_excludes_username); return }
+                if(create && !InputPolicy.validAccountPassword(password,username)) { credentialFieldError=CredentialFieldError.InvalidPassword;message=runtime.application.getString(R.string.ui_invalid_password_a2df22); return }
+                if(password.isEmpty()) { credentialFieldError=CredentialFieldError.IncorrectPassword;message=runtime.application.getString(R.string.ui_password_required_ec4e2c); return }
+                operations.runOperation(runtime.application.getString(R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again)) { token ->
                     val identity = try {
                         if(create) accounts.create(username,password,accountRole) else accounts.authenticate(username,password,accountRole)
                     } catch(error:Exception) {
@@ -114,7 +115,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                         if(!usernameUnavailable && !incorrectLogin) throw error
                         if(epoch==token) {
                             credentialFieldError=if(usernameUnavailable) CredentialFieldError.UsernameTaken else CredentialFieldError.IncorrectPassword
-                            message=if(usernameUnavailable) "Username taken." else "Incorrect password."
+                            message=if(usernameUnavailable) runtime.application.getString(R.string.ui_username_taken_c04650) else runtime.application.getString(R.string.ui_incorrect_password_b68db3)
                         }
                         return@runOperation
                     }
@@ -124,10 +125,10 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                     }
                     if(epoch == token) {
                         if(existing==null && !create && (accountRole==AccountRole.STAFF || accountRole==AccountRole.ADMIN)) {
-                            accounts.signOut();message="This ${accountRole.title} account has not been provisioned by an administrator.";return@runOperation
+                            accounts.signOut();message=runtime.application.getString(R.string.ui_this_value_account_has_not_been_provisioned_by_an_administrator , accountRole.localizedTitle(ResourceText(runtime.application.resources)));return@runOperation
                         }
                         if(existing!=null && existing.role!=accountRole) {
-                            accounts.signOut();message="This account is registered as ${existing.role.title}. Select that account type to sign in.";return@runOperation
+                            accounts.signOut();message=runtime.application.getString(R.string.ui_this_account_is_registered_as_value_select_that_account_type_to_s , existing.role.localizedTitle(ResourceText(runtime.application.resources)));return@runOperation
                         }
                         pendingIdentity = identity
                         pendingProfile = existing
@@ -137,7 +138,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                             navigation.openScreen(SessionScreen.OrganizationProfileSetup)
                         } else if(existing!=null && existing.role!=AccountRole.USER) {
                             val saved=withContext(Dispatchers.IO) { store.enrollWithoutPin(identity,existing) }
-                            enrollment=saved;profile=existing;coverUsername=existing.username;coverFullName=existing.fullName
+                            enrollment=saved;profile=existing;coverUsername=existing.username;coverDob=existing.dob;coverFullName=existing.fullName
                             accountRole=existing.role;language=existing.language;deliveryAddress=existing.address
                             screenHistory.clear();safePageHistory.clear()
                             if(existing.role==AccountRole.SAFE_CONTACT) {
@@ -163,16 +164,16 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
             with(state) {
                 val identity = pendingIdentity ?: return
                 if(busy) return
-                if(value.role!=accountRole) { message="Account type mismatch.";return }
+                if(value.role!=accountRole) { message=runtime.application.getString(R.string.ui_account_type_mismatch);return }
                 if(value.fullName.isBlank() || !InputPolicy.validDob(value.dob) || value.language.isBlank() || !value.address.locationValid) {
-                    message="Full name, a valid date of birth, language and city are required."; return
+                    message=runtime.application.getString(R.string.full_name_a_valid_date_of_birth_language_and_city_are_required); return
                 }
-                operations.runOperation("Your account exists, but the profile was not saved. Retry here, or sign in again to finish setup.") { token ->
+                operations.runOperation(runtime.application.getString(R.string.your_account_exists_but_the_profile_was_not_saved_retry_here_or_sign_in_again_to_finish_setup)) { token ->
                     accounts.saveProfile(identity,value)
                     if(value.role==AccountRole.SAFE_CONTACT) {
                         val saved=withContext(Dispatchers.IO) { store.enrollWithoutPin(identity,value) }
                         if(epoch==token) {
-                            enrollment=saved;profile=value;coverUsername=value.username;coverFullName=value.fullName
+                            enrollment=saved;profile=value;coverUsername=value.username;coverDob=value.dob;coverFullName=value.fullName
                             accountRole=value.role;language=value.language;deliveryAddress=value.address
                             screenHistory.clear();safePageHistory.clear();page=SafePage.Home;screen=SessionScreen.Safe
                             history.refreshHistory(saved.uid)
@@ -192,15 +193,15 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
         with(runtime) {
             with(state) {
                 if(busy) return
-                if(!InputPolicy.validPin(pin) || pin != confirmation) { message="Enter the same 4–6 digit PIN in both fields."; return }
+                if(!InputPolicy.validPin(pin) || pin != confirmation) { message=runtime.application.getString(R.string.enter_the_same_4_6_digit_pin_in_both_fields); return }
                 val identity = pendingIdentity ?: return
                 val value = pendingProfile ?: return
-                operations.runOperation("Unable to save this device's PIN. Please retry.") { token ->
+                operations.runOperation(runtime.application.getString(R.string.unable_to_save_this_device_s_pin_please_retry)) { token ->
                     val saved = withContext(Dispatchers.IO) { store.enroll(identity,value,pin) }
                     enrollment=saved
                     if(epoch == token) {
                         deliveryAddress=value.address; language=value.language
-                        coverFullName=value.fullName; coverUsername=value.username
+                        coverDob=value.dob;coverFullName=value.fullName; coverUsername=value.username
                         coverType=value.coverType
                         accountRole=value.role
                         covers.restoreCoverData(saved.uid)
@@ -217,9 +218,9 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
             with(state) {
                 val identity=pendingIdentity ?: return
                 val existing=pendingProfile ?: return
-                if(!InputPolicy.validTrigger(trigger)) { message="Choose a trigger word or phrase of 3–64 characters.";return }
+                if(!InputPolicy.validTrigger(trigger)) { message=runtime.application.getString(R.string.choose_a_trigger_word_or_phrase_of_3_64_characters);return }
                 val updated=existing.copy(triggerHash=InputPolicy.triggerHash(trigger))
-                operations.runOperation("The trigger word could not be saved. Retry here.") { token ->
+                operations.runOperation(runtime.application.getString(R.string.ui_the_trigger_word_could_not_be_saved_retry_here)) { token ->
                     accounts.saveProfile(identity,updated)
                     withContext(Dispatchers.IO) { store.cacheProfile(identity.uid,updated) }
                     if(epoch==token) { pendingProfile=updated;navigation.openScreen(SessionScreen.DevicePin) }
@@ -252,7 +253,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                             }
                         }
                         accounts.signOut(); enrollment=null; deliveryAddress=DeliveryAddress(); language="English"
-                        coverFullName=""; coverUsername=""; coverType=CoverType.FOOD;accountRole=AccountRole.USER;profile=null
+                        coverDob="";coverFullName=""; coverUsername=""; coverType=CoverType.FOOD;accountRole=AccountRole.USER;profile=null
                         foodCart=emptyMap();foodFavorites=emptySet();foodCustomizations=emptyMap();savedNews=emptyList();coverDataVersion++
                         screen=SessionScreen.Welcome
                     } catch(_: Exception) { /* Fail closed: the interface remains locked. */ }
@@ -279,7 +280,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                 val device=restored.enrollment
                 val saved=restored.profile
                 deliveryAddress=saved.address; language=saved.language
-                coverFullName=saved.fullName; coverUsername=saved.username
+                coverDob=saved.dob;coverFullName=saved.fullName; coverUsername=saved.username
                 coverType=saved.coverType
                 accountRole=saved.role
                 covers.restoreCoverData(device.uid)

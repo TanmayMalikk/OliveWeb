@@ -1,4 +1,5 @@
 package com.olive.app.ui.session
+import com.olive.app.R
 
 import com.olive.app.data.*
 import com.olive.app.ui.*
@@ -12,7 +13,7 @@ internal class FriendActions(private val runtime:SessionRuntime) {
                         val rows=repository.searchUsers(query,device.uid)
                         if(epoch==token) {
                             userSearchResults=rows
-                            message=if(rows.isEmpty()) "No user found for that exact username." else null
+                            message=if(rows.isEmpty()) runtime.application.getString(R.string.no_user_found_for_that_exact_username) else null
                         }
                     }
             }

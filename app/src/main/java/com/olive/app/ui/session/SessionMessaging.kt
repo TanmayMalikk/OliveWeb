@@ -1,4 +1,5 @@
 package com.olive.app.ui.session
+import com.olive.app.R
 
 import androidx.core.content.edit
 import com.olive.app.data.*
@@ -27,7 +28,7 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                 val repository=messagingRepository
                 val device=enrollment
                 if(repository==null || device==null) {
-                    if(showFeedback) message="Messaging needs a Firebase-connected build."
+                    if(showFeedback) message=runtime.application.getString(R.string.messaging_needs_a_firebase_connected_build)
                     return
                 }
                 // A saved local account can outlive Firebase's login; reconnect it before touching private friend data.
@@ -35,7 +36,7 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                 if(accounts.authenticatedUid()!=device.uid || accounts.authenticatedUsername()!=expectedUsername) {
                     messagingNeedsReconnect=true
                     messagingBusy=false
-                    if(showFeedback) message="Enter your account password to reconnect friends and messages."
+                    if(showFeedback) message=runtime.application.getString(R.string.ui_enter_your_account_password_to_reconnect_friends_and_messages)
                     return
                 }
                 messagingNeedsReconnect=false
@@ -58,7 +59,7 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                             }
                         },{ error -> if(epoch==token) {
                             messagingBusy=false
-                            if(showFeedback || page==SafePage.Messages) message="Unable to load friend information. $error"
+                            if(showFeedback || page==SafePage.Messages) message=runtime.application.getString(R.string.ui_unable_to_load_friend_information_value , error)
                         } })
                     } catch(error: CancellationException) { throw error }
                     catch(error: Exception) {
@@ -67,9 +68,9 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                             if(error is FirebaseFirestoreException && error.code==FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                                 messagingNeedsReconnect=true
                                 if(showFeedback || page==SafePage.Messages)
-                                    message="Firebase needs your account password again before friends and messages can load."
+                                    message=runtime.application.getString(R.string.ui_firebase_needs_your_account_password_again_before_friends_and_mes)
                             } else if(showFeedback || page==SafePage.Messages)
-                                message=error.localizedMessage ?: "Unable to start messaging."
+                                message=runtime.application.getString(R.string.ui_unable_to_start_messaging)
                         }
                     }
                 }
@@ -94,7 +95,7 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                     catch(error: Exception) {
                         if(epoch==token) {
                             messagingNeedsReconnect=true
-                            message=error.localizedMessage ?: "Could not reconnect. Check your password and try again."
+                            message=runtime.application.getString(R.string.ui_could_not_reconnect_check_your_password_and_try_again)
                         }
                     } finally { if(epoch==token) messagingBusy=false }
                     if(connected && epoch==token && screen==SessionScreen.Safe && page==SafePage.Messages) {
@@ -121,7 +122,7 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                             conversationActions.markConversationRead(updated)
                         } }
                     }
-                },{ error -> if(epoch==token && page==SafePage.Messages) message="Unable to load messages. $error" })
+                },{ error -> if(epoch==token && page==SafePage.Messages) message=runtime.application.getString(R.string.ui_unable_to_load_messages_value , error) })
             }
         }
     }
@@ -129,7 +130,7 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
     fun runMessagingAction(failure: String, block: suspend (MessagingRepository,DeviceEnrollment,Long)->Unit) {
         with(runtime) {
             with(state) {
-                val repository=messagingRepository ?: run { message="Messaging needs a Firebase-connected build.";return }
+                val repository=messagingRepository ?: run { message=runtime.application.getString(R.string.messaging_needs_a_firebase_connected_build);return }
                 val device=enrollment ?: return
                 if(messagingBusy || messagingNeedsReconnect || screen!=SessionScreen.Safe || page!=SafePage.Messages) return
                 val token=epoch

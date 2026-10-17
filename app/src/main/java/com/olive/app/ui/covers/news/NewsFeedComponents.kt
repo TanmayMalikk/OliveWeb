@@ -1,6 +1,5 @@
 package com.olive.app.ui.covers.news
 
-import androidx.compose.ui.semantics.*
 import com.olive.app.ui.LocalizedIcon as Icon
 import com.olive.app.ui.*
 

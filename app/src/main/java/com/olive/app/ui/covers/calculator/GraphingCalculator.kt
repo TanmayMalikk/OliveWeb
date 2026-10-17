@@ -1,8 +1,15 @@
 package com.olive.app.ui.covers.calculator
+import com.olive.app.ui.rememberResourceText
 import com.olive.app.ui.*
 
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
@@ -29,6 +36,7 @@ import androidx.compose.ui.unit.dp
 // This screen owns equations, pan/zoom state and TalkBack graph actions; GraphDrawing renders the grid and curves.
 @Composable internal fun GraphingCalculator(interactive: Boolean, angleMode: CalculatorAngleMode,
     onAngleModeChange: (CalculatorAngleMode)->Unit, onClose: ()->Unit) {
+    val uiText=rememberResourceText()
     var equation by remember { mutableStateOf("x^2\n2x + 3") }
     var plottedEquations by remember { mutableStateOf(listOf("x^2","2x + 3")) }
     var graphs by remember { mutableStateOf(plottedEquations.map { GraphExpression.compile(it,angleMode) }) }
@@ -41,11 +49,11 @@ import androidx.compose.ui.unit.dp
     Column(Modifier.fillMaxSize().background(Cream).safeDrawingPadding().padding(18.dp).testTag("graphing_calculator"),
         verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment=Alignment.CenterVertically) {
-            IconButton(onClick=onClose,modifier=Modifier.testTag("close_graph")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back") }
+            IconButton(onClick=onClose,modifier=Modifier.testTag("close_graph")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,uiText(R.string.ui_back)) }
             Text(stringResource(R.string.graphing_calculator),style=MaterialTheme.typography.titleLarge,color=OliveGreen,fontWeight=FontWeight.SemiBold,modifier=Modifier.semantics { heading() })
         }
         OutlinedTextField(equation,{equation=it.take(500);error=null},label={Text(stringResource(R.string.y_one_function_per_line))},
-            placeholder={Text("x^2 - 4\n2x + 3")},minLines=2,maxLines=4,modifier=Modifier.fillMaxWidth().testTag("graph_equation").keepVisibleWhileTyping())
+            placeholder={Text(uiText(R.string.ui_x_2_4_2x_3))},minLines=2,maxLines=4,modifier=Modifier.fillMaxWidth().testTag("graph_equation").keepVisibleWhileTyping())
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
             Text(stringResource(R.string.angle_mode),color=Muted,modifier=Modifier.weight(1f))
             FilterChip(selected=angleMode==CalculatorAngleMode.RADIANS,onClick={
@@ -60,10 +68,10 @@ import androidx.compose.ui.unit.dp
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
             Button(onClick={
                 runCatching {
-                    equation.lines().map { it.trim() }.filter { it.isNotBlank() }.also { require(it.size in 1..6) { "Enter one to six functions." } }
+                    equation.lines().map { it.trim() }.filter { it.isNotBlank() }.also { require(it.size in 1..6) { uiText(R.string.ui_enter_one_to_six_functions) } }
                         .let { lines -> lines to lines.map { GraphExpression.compile(it,angleMode) } }
                 }.onSuccess { (lines,compiled) -> graphs=compiled;plottedEquations=lines;error=null }
-                    .onFailure { error=it.message ?: "Unable to graph this equation." }
+                    .onFailure { error=uiText.failure(it,R.string.ui_unable_to_graph_this_equation) }
             },enabled=equation.isNotBlank(),modifier=Modifier.weight(1f).testTag("plot_equation")) { Text(stringResource(R.string.graph)) }
             TextButton(onClick={zoom=1f;panOffset=Offset.Zero},modifier=Modifier.testTag("graph_reset")) { Text(stringResource(R.string.reset)) }
         }
@@ -73,9 +81,9 @@ import androidx.compose.ui.unit.dp
         }
         error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("graph_error").semantics { liveRegion=LiveRegionMode.Polite }) }
         Text(plottedEquations.mapIndexed { index,item -> "Y${index+1}=$item" }.joinToString("   "),color=OliveGreen,fontWeight=FontWeight.Medium,maxLines=2)
-        val graphLabel=accessibilityText("Graph")
-        val zoomLabel=accessibilityText("Zoom")
-        val actionLabels=listOf("Zoom in","Zoom out","Pan left","Pan right","Pan up","Pan down").map { accessibilityText(it) }
+        val graphLabel=uiText(R.string.a11y_graph)
+        val zoomLabel=uiText(R.string.a11y_zoom)
+        val actionLabels=listOf(uiText(R.string.a11y_zoom_in),uiText(R.string.a11y_zoom_out),uiText(R.string.a11y_pan_left),uiText(R.string.a11y_pan_right),uiText(R.string.a11y_pan_up),uiText(R.string.a11y_pan_down))
         Canvas(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(18.dp)).background(WarmWhite)
             .semantics {
                 contentDescription=graphLabel+": "+plottedEquations.joinToString("; ")
@@ -100,7 +108,7 @@ import androidx.compose.ui.unit.dp
             }.testTag("graph_plot")) {
             drawGraphPlot(graphs,zoom,panOffset)
         }
-        Text(if(angleMode==CalculatorAngleMode.RADIANS) "Trigonometric functions use radians." else "Trigonometric functions use degrees.",style=MaterialTheme.typography.bodySmall,color=Muted)
+        Text(if(angleMode==CalculatorAngleMode.RADIANS) uiText(R.string.trigonometric_functions_use_radians) else uiText(R.string.trigonometric_functions_use_degrees),style=MaterialTheme.typography.bodySmall,color=Muted)
     }
     if(graphTools) GraphTableAnalysisDialog(plottedEquations,angleMode) { graphTools=false }
     if(statPlots) StatPlotDialog { statPlots=false }

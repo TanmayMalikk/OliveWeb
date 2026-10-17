@@ -1,7 +1,6 @@
 package com.olive.app.ui
 
 import android.content.Context
-import android.content.res.Configuration
 import android.view.View
 import android.view.accessibility.AccessibilityEvent
 import android.view.ViewGroup
@@ -20,9 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalConfiguration
-import com.olive.app.R
-import java.util.Locale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -78,10 +74,11 @@ internal val LocalAccessibilityMessagesVisible=staticCompositionLocalOf { true }
 // Keep the existing Compose typography/layout, with one native accessibility
 // node over the same bounds so TalkBack receives an actual focus event. No
 // deprecated announcement API or fabricated Compose focus state is used.
+// Exit announcements can omit the visible text while retaining the native spoken focus event.
 @Composable internal fun AccessibleMessage(text:String,modifier:Modifier=Modifier,color:Color=LocalContentColor.current,
-                                         requestFocus:Boolean=true,style:TextStyle=LocalTextStyle.current) {
+                                         requestFocus:Boolean=true,style:TextStyle=LocalTextStyle.current,showText:Boolean=true) {
     val context=LocalContext.current
-    val spoken=accessibilityText(text)
+    val spoken=text
     val bringIntoView=remember { BringIntoViewRequester() }
     val scope=rememberCoroutineScope()
     val fallback=remember(scope) { AccessibilityFocusCoordinator(scope) }
@@ -92,7 +89,7 @@ internal val LocalAccessibilityMessagesVisible=staticCompositionLocalOf { true }
         ViewCompat.setScreenReaderFocusable(this,true)
     } }
     Box(modifier.bringIntoViewRequester(bringIntoView)) {
-        androidx.compose.material3.Text(text,color=color,style=style,modifier=Modifier.semantics { hideFromAccessibility() })
+        if(showText) androidx.compose.material3.Text(text,color=color,style=style,modifier=Modifier.semantics { hideFromAccessibility() })
         AndroidView(factory={native},modifier=Modifier.matchParentSize(),update={
             it.contentDescription=spoken
             it.importantForAccessibility=if(visible) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
@@ -105,99 +102,10 @@ internal val LocalAccessibilityMessagesVisible=staticCompositionLocalOf { true }
     }
 }
 
-// Direct resource references also let Android validate and retain these dynamically selected labels.
-private val accessibilityResources=mapOf(
-    "Home" to R.string.home,
-    "Welcome" to R.string.welcome,
-    "Create account" to R.string.create_account,
-    "Sign in" to R.string.sign_in,
-    "Your profile" to R.string.your_profile,
-    "Secure this device" to R.string.secure_this_device,
-    "Enter PIN" to R.string.enter_pin,
-    "Messages" to R.string.messages,
-    "Settings" to R.string.settings,
-    "Clear search" to R.string.clear_search,
-    "Refresh" to R.string.refresh,
-    "Close" to R.string.close,
-    "PIN" to R.string.a11y_pin,
-    "Digits entered" to R.string.a11y_digits_entered,
-    "Delete digit" to R.string.a11y_delete_digit,
-    "Unlock" to R.string.a11y_unlock,
-    "Step" to R.string.a11y_step,
-    "Completed requirements" to R.string.a11y_completed_requirements,
-    "Equals" to R.string.a11y_equals,
-    "Clear all" to R.string.a11y_clear_all,
-    "Minus" to R.string.a11y_minus,
-    "Multiply" to R.string.a11y_multiply,
-    "Divide" to R.string.a11y_divide,
-    "Parentheses" to R.string.a11y_parentheses,
-    "Percent" to R.string.a11y_percent,
-    "Decimal point" to R.string.a11y_decimal_point,
-    "Graph" to R.string.a11y_graph,
-    "Zoom" to R.string.a11y_zoom,
-    "Zoom in" to R.string.a11y_zoom_in,
-    "Zoom out" to R.string.a11y_zoom_out,
-    "Pan left" to R.string.a11y_pan_left,
-    "Pan right" to R.string.a11y_pan_right,
-    "Pan up" to R.string.a11y_pan_up,
-    "Pan down" to R.string.a11y_pan_down,
-    "Show" to R.string.a11y_show,
-    "Hide" to R.string.a11y_hide,
-    "password" to R.string.a11y_password,
-    "trigger word" to R.string.a11y_trigger_word,
-    "Quick exit" to R.string.a11y_quick_exit,
-    "Returned to cover" to R.string.a11y_returned_to_cover,
-    "Refresh article" to R.string.a11y_refresh_article,
-    "Back to stories" to R.string.a11y_back_to_stories,
-    "Save article" to R.string.a11y_save_article,
-    "Remove bookmark" to R.string.a11y_remove_bookmark,
-    "Message actions" to R.string.a11y_message_actions,
-    "Add one" to R.string.a11y_add_one,
-    "Remove one" to R.string.a11y_remove_one,
-    "Square root" to R.string.a11y_square_root,
-    "Pi" to R.string.a11y_pi,
-    "Power" to R.string.a11y_power,
-    "Factorial" to R.string.a11y_factorial,
-    "Inverse functions" to R.string.a11y_inverse_functions,
-    "Sine" to R.string.a11y_sine,
-    "Cosine" to R.string.a11y_cosine,
-    "Tangent" to R.string.a11y_tangent,
-    "Inverse sine" to R.string.a11y_inverse_sine,
-    "Inverse cosine" to R.string.a11y_inverse_cosine,
-    "Inverse tangent" to R.string.a11y_inverse_tangent,
-    "Squared" to R.string.a11y_squared,
-    "Exponential" to R.string.a11y_exponential,
-    "Ten to the power" to R.string.a11y_ten_to_the_power,
-    "Natural logarithm" to R.string.a11y_natural_logarithm,
-    "Logarithm" to R.string.a11y_logarithm,
-)
-
-@Composable internal fun accessibilityText(text:String):String {
-    val context=LocalContext.current
-    val configuration=LocalConfiguration.current
-    return remember(text,context,configuration) { localizedAccessibilityText(text,configuration.locales[0].toLanguageTag(),context) }
-}
-
-internal fun localizedAccessibilityText(text:String,language:String,context:Context):String {
-    val tag=if("-" in language) language else AppLocaleManager.getLanguageTag(language)
-    val locale=Locale.forLanguageTag(tag.replace("-r", "-"))
-    accessibilityResources[text]?.let { id ->
-        val resources=if(context.resources.configuration.locales[0].language==locale.language) context.resources
-            else context.createConfigurationContext(Configuration(context.resources.configuration).apply { setLocale(locale) }).resources
-        return resources.getString(id)
-    }
-    if(locale.language=="en") return text
-    listOf("Show ","Hide ","Add one ","Remove one ").firstOrNull { text.startsWith(it) }?.let { prefix ->
-        return localizedAccessibilityText(prefix.trim(),language,context)+": "+localizedAccessibilityText(text.removePrefix(prefix),language,context)
-    }
-    return text
-}
-
-// Decorative icons stay silent; mapped action labels use Android's current resource locale.
-// Labels without a matching resource keep their original text.
+// Callers resolve action labels from Android resources; decorative icons keep a null description.
 @Composable internal fun LocalizedIcon(imageVector:ImageVector,contentDescription:String?,
     modifier:Modifier=Modifier,tint:Color=LocalContentColor.current) {
-    Icon(imageVector,contentDescription?.let { accessibilityText(it) },modifier,tint)
+    Icon(imageVector,contentDescription,modifier,tint)
 }
 
 internal fun isAccessibilityUserInteraction(eventType:Int):Boolean = eventType in setOf(

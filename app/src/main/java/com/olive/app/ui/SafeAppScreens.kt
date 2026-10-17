@@ -1,11 +1,7 @@
 package com.olive.app.ui
 
-
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 
 // Route User pages to focused screen files; Safe Contacts use their separate connection-focused shell.

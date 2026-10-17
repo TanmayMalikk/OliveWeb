@@ -1,6 +1,5 @@
 package com.olive.app.ui
 
-import androidx.compose.ui.semantics.*
 import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
@@ -29,13 +28,14 @@ import java.util.Locale
 
 // Requirement bullets begin neutral, then turn green or red as the user types.
 @Composable internal fun RequirementBullet(text:String,met:Boolean,active:Boolean) {
+    val uiText=rememberResourceText()
     val color=when { !active -> Color.Black;met -> OliveGreen;else -> MaterialTheme.colorScheme.error }
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-        Text("•",color=color,fontSize=18.sp)
-        Text(text,color=color,style=MaterialTheme.typography.bodySmall)
+        Text("•",color=color,fontSize=14.sp,lineHeight=14.sp)
+        Text(text,color=color,style=MaterialTheme.typography.bodySmall,lineHeight=14.sp)
         Spacer(Modifier.weight(1f))
         AnimatedVisibility(visible=active && met,enter=fadeIn(tween(150)),exit=fadeOut(tween(100))) {
-            Icon(Icons.Outlined.CheckCircle,contentDescription="Requirement met",tint=OliveGreen,modifier=Modifier.size(18.dp))
+            Icon(Icons.Outlined.CheckCircle,contentDescription=uiText(R.string.ui_requirement_met),tint=OliveGreen,modifier=Modifier.size(14.dp))
         }
     }
 }
@@ -43,12 +43,13 @@ import java.util.Locale
 // Every onboarding page ends with the same Back and Next arrow controls.
 @Composable internal fun OnboardingNavigation(back:()->Unit,next:()->Unit,last:Boolean=false,nextTag:String="onboarding_next",
     enabled:Boolean=true,nextLabel:String?=null) {
+    val uiText=rememberResourceText()
     Row(Modifier.fillMaxWidth().padding(top=8.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
         OutlinedButton(onClick=back,enabled=enabled,modifier=Modifier.weight(1f).testTag("onboarding_back")) {
             Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.back))
         }
         Button(onClick=next,enabled=enabled,modifier=Modifier.weight(1f).testTag(nextTag)) {
-            Text(nextLabel ?: if(last) "Finish" else "Next");Spacer(Modifier.width(8.dp));Icon(Icons.AutoMirrored.Outlined.ArrowForward,null)
+            Text(nextLabel ?: if(last) uiText(R.string.ui_finish) else uiText(R.string.next));Spacer(Modifier.width(8.dp));Icon(Icons.AutoMirrored.Outlined.ArrowForward,null)
         }
     }
 }
@@ -56,13 +57,14 @@ import java.util.Locale
 // USER and SAFE CONTACT: birthday is required and saved as YYYY-MM-DD.
 // UI sizing: the three birthday buttons share one row equally with 8dp gaps and 8dp horizontal button padding.
 @Composable internal fun BirthdayPicker(value: String, tag: String, enabled: Boolean,error:String?=null,onChange: (String)->Unit) {
+    val uiText=rememberResourceText()
     val keyboard=LocalSoftwareKeyboardController.current
     val focus=LocalFocusManager.current
     val initial=remember { runCatching { LocalDate.parse(value) }.getOrNull() }
     var year by remember { mutableStateOf(initial?.year) }
     var month by remember { mutableStateOf(initial?.monthValue) }
     var day by remember { mutableStateOf(initial?.dayOfMonth) }
-    val locale= remember { Locale.getDefault() }
+    val locale=androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     fun setDate(y: Int?,m: Int?,d: Int?) {
         if(y!=null && m!=null && d!=null) onChange("%04d-%02d-%02d".format(Locale.ROOT,y,m,d))
     }
@@ -83,14 +85,14 @@ import java.util.Locale
                 }
             }
         }
-        Choice("Year",year?.toString().orEmpty(),(1950..LocalDate.now().year).reversed().map { it.toString() to it.toString() },"${tag}_year") {
+        Choice(uiText(R.string.year),year?.toString().orEmpty(),(1950..LocalDate.now().year).reversed().map { it.toString() to it.toString() },"${tag}_year") {
             year=it.toInt();setDate(year,month,day)
         }
-        Choice("Month",month?.let { Month.of(it).getDisplayName(java.time.format.TextStyle.FULL,locale) }.orEmpty(),
+        Choice(uiText(R.string.month),month?.let { Month.of(it).getDisplayName(java.time.format.TextStyle.FULL,locale) }.orEmpty(),
             (1..12).map { it.toString() to Month.of(it).getDisplayName(java.time.format.TextStyle.FULL,locale) },"${tag}_month") {
             month=it.toInt();setDate(year,month,day)
         }
-        Choice("Day",day?.toString().orEmpty(),(1..31).map { it.toString() to it.toString() },"${tag}_day") {
+        Choice(uiText(R.string.day),day?.toString().orEmpty(),(1..31).map { it.toString() to it.toString() },"${tag}_day") {
             day=it.toInt();setDate(year,month,day)
         }
     }

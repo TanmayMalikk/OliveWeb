@@ -2,7 +2,8 @@ package com.olive.app.ui
 import com.olive.app.R
 import androidx.compose.ui.res.stringResource
 
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -46,15 +47,16 @@ import androidx.compose.ui.unit.sp
 }
 
 @Composable private fun SafeContactHome(session:SessionViewModel) {
+    val uiText=rememberResourceText()
     FormColumn {
         Box(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Text(stringResource(R.string.olive_branch),fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
                 Text(stringResource(R.string.safe_contact),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
-                Text("Stay connected with people who trust you for support.",color=Muted)
+                Text(uiText(R.string.ui_stay_connected_with_people_who_trust_you_for_support),color=Muted)
             }
             IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.align(Alignment.TopEnd).testTag("safe_contact_settings")) {
-                Icon(Icons.Outlined.Settings,"Account settings")
+                Icon(Icons.Outlined.Settings,uiText(R.string.account_settings))
             }
         }
         ModeNotice(session)
@@ -65,7 +67,7 @@ import androidx.compose.ui.unit.sp
         Button(onClick={session.navigate(SafePage.Notes)},modifier=Modifier.fillMaxWidth().heightIn(min=92.dp).testTag("safe_contact_notes"),
             colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF718669))) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                Icon(Icons.Outlined.Description,"Notes and incidents",Modifier.size(32.dp))
+                Icon(Icons.Outlined.Description,uiText(R.string.ui_notes_and_incidents),Modifier.size(32.dp))
                 Text(stringResource(R.string.notes_incidents),fontSize=18.sp)
             }
         }
@@ -74,7 +76,7 @@ import androidx.compose.ui.unit.sp
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                 BadgedBox(badge={if(session.pendingMessageActionCount>0) Badge {
                     Text(if(session.pendingMessageActionCount>99) "99+" else session.pendingMessageActionCount.toString())
-                }}) { Icon(Icons.Outlined.ChatBubbleOutline,"Messages",Modifier.size(34.dp)) }
+                }}) { Icon(Icons.Outlined.ChatBubbleOutline,uiText(R.string.messages),Modifier.size(34.dp)) }
                 Text(stringResource(R.string.messages),fontSize=18.sp,textAlign=TextAlign.Center)
             }
         }
@@ -82,8 +84,8 @@ import androidx.compose.ui.unit.sp
             OutlinedButton(onClick={},enabled=false,modifier=Modifier.fillMaxWidth().heightIn(min=92.dp).testTag("safe_contact_future_feature_$number"),
                 colors=ButtonDefaults.outlinedButtonColors(disabledContainerColor=Color(0xFFE7EDE2),disabledContentColor=Muted)) {
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                    Icon(Icons.Outlined.AddCircleOutline,"Future feature",Modifier.size(30.dp))
-                    Text("Future feature $number",fontSize=17.sp)
+                    Icon(Icons.Outlined.AddCircleOutline,uiText(R.string.ui_future_feature),Modifier.size(30.dp))
+                    Text(uiText(R.string.ui_future_feature_value , number),fontSize=17.sp)
                 }
             }
         }
@@ -95,18 +97,19 @@ import androidx.compose.ui.unit.sp
 }
 
 @Composable private fun SafeContactProfile(session:SessionViewModel,profile:com.olive.app.data.UserProfile) {
+    val uiText=rememberResourceText()
     FormColumn {
         TextButton(onClick=session::back) { Text(stringResource(R.string.back)) }
-        Heading("My profile","Your Safe Contact account information.")
+        Heading(uiText(R.string.my_profile),uiText(R.string.ui_your_safe_contact_account_information))
         listOf(
-            "Username" to profile.username,
-            "Full name" to profile.fullName,
-            "Date of birth" to profile.dob,
-            "Preferred language" to profile.language,
-            "Region / city / state" to profile.region,
+            uiText(R.string.username) to profile.username,
+            uiText(R.string.full_name) to profile.fullName,
+            uiText(R.string.date_of_birth) to profile.dob,
+            uiText(R.string.preferred_language) to profile.language,
+            uiText(R.string.region_city_state) to profile.region,
         ).forEach { (label,value) ->
             Text(label,style=MaterialTheme.typography.labelLarge,color=OliveGreen)
-            Text(value.ifBlank { "Not provided" })
+            Text(value.ifBlank { uiText(R.string.not_provided) })
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.olive.app.ui
 
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
@@ -16,8 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Search
+
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,6 +52,7 @@ import com.olive.app.data.*
 
 // UI sizing/color: the sidebar uses 20dp side padding, 10dp list gaps, soft status-card colors, and Material title styles.
 @Composable private fun MessagingSidebar(session: SessionViewModel, currentUid: String, modifier: Modifier=Modifier) {
+    val uiText=rememberResourceText()
     var query by rememberSaveable { mutableStateOf("") }
     var reconnectPassword by rememberSaveable { mutableStateOf("") }
     var friendsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -62,7 +63,7 @@ import com.olive.app.data.*
         item {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 IconButton(onClick=session::back,modifier=Modifier.testTag("safe_home")) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Previous safe page")
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack,uiText(R.string.ui_previous_safe_page))
                 }
                 Text(stringResource(R.string.friends_messages),style=MaterialTheme.typography.headlineSmall,modifier=Modifier.semantics { heading() })
             }
@@ -71,9 +72,9 @@ import com.olive.app.data.*
         if(session.messagingNeedsReconnect) item {
             Surface(shape=MaterialTheme.shapes.medium,color=Color(0xFFFFF7E1),modifier=Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Text("Reconnect your account",style=MaterialTheme.typography.titleMedium)
-                    Text("Your local Olive Branch account is locked safely, but Firebase needs your password again before friends and messages can load.",color=Muted)
-                    Field("Account password",reconnectPassword,"messaging_reconnect_password",secret=true,showSecretToggle=true,enabled=!session.messagingBusy) {
+                    Text(uiText(R.string.ui_reconnect_your_account),style=MaterialTheme.typography.titleMedium)
+                    Text(uiText(R.string.ui_your_local_olive_branch_account_is_locked_safely_but_firebase_nee),color=Muted)
+                    Field(uiText(R.string.ui_account_password),reconnectPassword,"messaging_reconnect_password",secret=true,showSecretToggle=true,enabled=!session.messagingBusy) {
                         reconnectPassword=it.take(128)
                     }
                     Button(onClick={session.reconnectMessaging(reconnectPassword) { reconnectPassword="" }},
@@ -176,7 +177,7 @@ import com.olive.app.data.*
             OutlinedButton(onClick={session.openConversation(conversation)},modifier=Modifier.animateItem().fillMaxWidth().testTag("conversation_"+conversation.id)) {
                 Column(Modifier.fillMaxWidth()) {
                     Text(conversation.peerUsername(currentUid),style=MaterialTheme.typography.titleMedium)
-                    Text(conversation.lastMessage.ifBlank { "New conversation" },maxLines=1,color=Muted)
+                    Text(conversation.lastMessage.ifBlank { uiText(R.string.new_conversation) },maxLines=1,color=Muted)
                 }
             }
         }

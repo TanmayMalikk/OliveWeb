@@ -12,6 +12,21 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KeyboardVisibilityUiTest: OliveUiTestBase() {
+    @Test fun foodAndNewsNavigationStayAtTheBottomWhileTyping() {
+        register(username="cover_keyboard")
+        val foodBar=compose.onNodeWithTag("cover_navigation").fetchSemanticsNode().boundsInWindow
+        focus("food_search")
+        val foodWithKeyboard=compose.onNodeWithTag("cover_navigation").fetchSemanticsNode().boundsInWindow
+        org.junit.Assert.assertEquals(foodBar.top,foodWithKeyboard.top,1f)
+        compose.activity.runOnUiThread { compose.activity.window.insetsController?.hide(WindowInsets.Type.ime()) }
+        compose.waitUntil(10_000) { compose.activity.window.decorView.rootWindowInsets?.isVisible(WindowInsets.Type.ime())==false }
+        unlock();click("safe_settings");click("cover_choice_news")
+        compose.onNodeWithTag("quick_exit").performClick();waitFor("news_search")
+        val newsBar=compose.onNodeWithTag("cover_navigation").fetchSemanticsNode().boundsInWindow
+        focus("news_search")
+        val newsWithKeyboard=compose.onNodeWithTag("cover_navigation").fetchSemanticsNode().boundsInWindow
+        org.junit.Assert.assertEquals(newsBar.top,newsWithKeyboard.top,1f)
+    }
     private fun focus(tag:String) {
         // Requesting focus directly also exercises keyboard-next/TalkBack navigation to an offscreen field.
         compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.RequestFocus) { it() }

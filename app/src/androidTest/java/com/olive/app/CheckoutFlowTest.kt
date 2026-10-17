@@ -1,13 +1,11 @@
 package com.olive.app
 
-import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.security.EncryptedVault
-import com.olive.app.security.child
+
 import org.junit.Assert.*
 import org.junit.Test
-import java.io.File
 
 class CheckoutFlowTest : OliveUiTestBase() {
     @Test fun checkoutDeclinesDiscardsPaymentAndBackgroundClearsForm() {

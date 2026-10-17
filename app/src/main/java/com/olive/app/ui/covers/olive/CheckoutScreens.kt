@@ -1,7 +1,9 @@
 package com.olive.app.ui.covers.olive
+import com.olive.app.ui.rememberResourceText
 
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
@@ -55,13 +57,14 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
 // UI sizing: address fields stack at the shared full width so longer localized labels can wrap without narrower columns.
 @Composable fun AddressFields(value: DeliveryAddress, cityOnlyRequired: Boolean=false,
     cityError:String?=null,onFocus: ((String)->Unit)?=null, change: (DeliveryAddress)->Unit) {
-    AddressAutocomplete(value,if(cityOnlyRequired) "Street address (optional)" else "Street address (required)",
+    val uiText=rememberResourceText()
+    AddressAutocomplete(value,if(cityOnlyRequired) uiText(R.string.street_address_optional) else uiText(R.string.street_address_required),
         onFocus={onFocus?.invoke("Google address selection")},onChange=change)
-    CheckoutField("Apartment / unit (optional)",value.line2,"address_line2",onFocus={onFocus?.invoke("Apartment / unit")}) { change(value.copy(line2=it.take(160))) }
-    CheckoutField("City (required)",value.city,"address_city",error=cityError,onFocus={onFocus?.invoke("City")}) { change(value.copy(city=it.take(160))) }
-    CheckoutField(if(cityOnlyRequired) "Province / state (optional)" else "Province / state (required)",value.province,"address_province",onFocus={onFocus?.invoke("Province / state")}) { change(value.copy(province=it.take(160))) }
-    CheckoutField(if(cityOnlyRequired) "Postal / ZIP code (optional)" else "Postal / ZIP code (required)",value.postalCode,"address_postal",onFocus={onFocus?.invoke("Postal / ZIP code")}) { change(value.copy(postalCode=it.take(160))) }
-    CheckoutField(if(cityOnlyRequired) "Country (optional)" else "Country (required)",value.country,"address_country",onFocus={onFocus?.invoke("Country")}) { change(value.copy(country=it.take(160))) }
+    CheckoutField(uiText(R.string.apartment_unit_optional),value.line2,"address_line2",onFocus={onFocus?.invoke("Apartment / unit")}) { change(value.copy(line2=it.take(160))) }
+    AddressAutocomplete(value,uiText(R.string.city_required),cityOnly=true,fieldError=cityError,onFocus={onFocus?.invoke("City")},onChange=change)
+    CheckoutField(if(cityOnlyRequired) uiText(R.string.province_state_optional) else uiText(R.string.province_state_required),value.province,"address_province",onFocus={onFocus?.invoke("Province / state")}) { change(value.copy(province=it.take(160))) }
+    CheckoutField(if(cityOnlyRequired) uiText(R.string.postal_zip_code_optional) else uiText(R.string.postal_zip_code_required),value.postalCode,"address_postal",onFocus={onFocus?.invoke("Postal / ZIP code")}) { change(value.copy(postalCode=it.take(160))) }
+    CheckoutField(if(cityOnlyRequired) uiText(R.string.country_optional) else uiText(R.string.country_required),value.country,"address_country",onFocus={onFocus?.invoke("Country")}) { change(value.copy(country=it.take(160))) }
 }
 // UI sizing/color: cover dialogs fill the screen with Cream, respect system/keyboard insets, and use 24dp padding with 14dp gaps.
 @Composable private fun CoverDialog(onClose: ()->Unit, content: @Composable ColumnScope.()->Unit) {
@@ -94,6 +97,7 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
 // UI sizing/color: checkout sections use titleLarge, inline error colors, full-width buttons, and the shared dialog spacing.
 @Composable fun CheckoutDialog(address: DeliveryAddress, totalCents: Int, foods: List<OrderLine>,
     onSaveAddress: (DeliveryAddress)->Unit, onAttempt: suspend (List<OrderLine>,Int,String)->Unit, onClose: ()->Unit) {
+    val uiText=rememberResourceText()
     val scope=rememberCoroutineScope()
     var shipping by remember { mutableStateOf(address) }
     var recipient by remember { mutableStateOf("") }
@@ -123,22 +127,22 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
             AddressFields(shipping) { shipping=it }
             if(showErrors && !shipping.valid) Text(stringResource(R.string.enter_a_complete_shipping_address),color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick={onSaveAddress(shipping)},enabled=shipping.valid,modifier=Modifier.testTag("checkout_save_address")) { Text(stringResource(R.string.save_delivery_address)) }
-            CheckoutField("Recipient name",recipient,"checkout_recipient",error=if(showErrors && recipient.isBlank()) "Recipient name is required." else null) { recipient=it.take(120) }
-            CheckoutField("Delivery instructions (optional)",instructions,"checkout_instructions") { instructions=it.take(500) }
+            CheckoutField(uiText(R.string.recipient_name),recipient,"checkout_recipient",error=if(showErrors && recipient.isBlank()) uiText(R.string.recipient_name_is_required) else null) { recipient=it.take(120) }
+            CheckoutField(uiText(R.string.delivery_instructions_optional),instructions,"checkout_instructions") { instructions=it.take(500) }
             HorizontalDivider()
             Text(stringResource(R.string.payment_details),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
-            CheckoutField("Name on card",cardholder,"cardholder",error=if(showErrors && cardholder.isBlank()) "Name on card is required." else null) { cardholder=it.take(120) }
+            CheckoutField(uiText(R.string.name_on_card),cardholder,"cardholder",error=if(showErrors && cardholder.isBlank()) uiText(R.string.name_on_card_is_required) else null) { cardholder=it.take(120) }
             // Keep card entry readable while the values remain temporary and never get saved.
-            CheckoutField("Card number",number,"card_number",numeric=true,error=if(showErrors && numberDigits !in 12..16) "Enter a valid card number with no more than 16 digits." else null) { number=formatCardNumber(it) }
-            CheckoutField("Expiry · MM/YY",expiry,"card_expiry",numeric=true,error=if(showErrors && !validExpiry(expiry)) "Enter a valid expiry as MM/YY." else null) { expiry=formatExpiry(it) }
-            CheckoutField("Security code",securityCode,"card_cvc",numeric=true,secret=true,error=if(showErrors && securityCode.length !in 3..4) "Enter a 3 or 4 digit security code." else null) { securityCode=it.filter { c->c in '0'..'9' }.take(4) }
+            CheckoutField(uiText(R.string.card_number),number,"card_number",numeric=true,error=if(showErrors && numberDigits !in 12..16) uiText(R.string.enter_a_valid_card_number_with_no_more_than_16_digits) else null) { number=formatCardNumber(it) }
+            CheckoutField(uiText(R.string.expiry_mm_yy),expiry,"card_expiry",numeric=true,error=if(showErrors && !validExpiry(expiry)) uiText(R.string.enter_a_valid_expiry_as_mm_yy) else null) { expiry=formatExpiry(it) }
+            CheckoutField(uiText(R.string.security_code),securityCode,"card_cvc",numeric=true,secret=true,error=if(showErrors && securityCode.length !in 3..4) uiText(R.string.enter_a_3_or_4_digit_security_code) else null) { securityCode=it.filter { c->c in '0'..'9' }.take(4) }
             Row(Modifier.fillMaxWidth().testTag("use_shipping_address").toggleable(value=useShippingForBilling,role=Role.Checkbox,
                 onValueChange={useShippingForBilling=it}),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
                 Checkbox(checked=useShippingForBilling,onCheckedChange=null)
                 Text(stringResource(R.string.use_shipping_address),modifier=Modifier.weight(1f))
             }
             if(useShippingForBilling) Text(shipping.displayText(),style=MaterialTheme.typography.bodySmall)
-            else CheckoutField("Billing address",billing,"billing_address",error=if(showErrors && billing.isBlank()) "Billing address is required." else null) { billing=it.take(500) }
+            else CheckoutField(uiText(R.string.billing_address),billing,"billing_address",error=if(showErrors && billing.isBlank()) uiText(R.string.billing_address_is_required) else null) { billing=it.take(500) }
             Text(stringResource(R.string.subtotal) + "$%.2f".format(Locale.US, totalCents / 100.0))
             Button(onClick={
                 showErrors=true
@@ -147,12 +151,12 @@ private fun DeliveryAddress.displayText() = listOf(line1,line2,city,province,pos
                     scope.launch {
                         // Give the payment screen a believable processing beat, then always decline locally.
                         delay(1_200.milliseconds)
-                        historyError=runCatching { onAttempt(foods,totalCents,"We couldn’t complete your payment. No charge was made and no order was placed.") }.isFailure
+                        historyError=runCatching { onAttempt(foods,totalCents,uiText(R.string.we_couldn_t_complete_your_payment_no_charge_was_made_and_no_order_was_placed)) }.isFailure
                         recipient="";instructions="";cardholder="";number="";expiry="";securityCode="";billing="";shipping=DeliveryAddress()
                         placing=false;declined=true
                     }
                 }
-            },modifier=Modifier.fillMaxWidth().testTag("place_order"),enabled=!placing) { Text(if(placing) "Processing payment…" else "Place order") }
+            },modifier=Modifier.fillMaxWidth().testTag("place_order"),enabled=!placing) { Text(if(placing) uiText(R.string.processing_payment) else uiText(R.string.place_order)) }
             if(placing) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("payment_processing"))
         }
     }
