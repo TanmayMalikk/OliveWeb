@@ -19,6 +19,7 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
         with(runtime) {
             with(state) {
                 epoch++
+                deviceLockRequest?.complete(null);deviceLockRequest=null
                 operationJob?.cancel();operationJob=null
                 idleJob?.cancel();idleJob=null;idleCountdownSeconds=null
                 busy=false;checkoutActive=false;coverReset++;addressPrompt=false

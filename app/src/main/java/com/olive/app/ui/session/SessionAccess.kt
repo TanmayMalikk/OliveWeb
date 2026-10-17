@@ -32,6 +32,7 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
             with(state) {
                 if(busy || screen != SessionScreen.Pin) return
                 val device = enrollment ?: return
+                if(device.entryMethod!=SafeEntryMethod.APP_PIN) return
                 if(!InputPolicy.validPin(pin)) { message="Enter your 4–6 digit PIN."; return }
                 operations.runOperation("Unable to check the PIN or record this attempt. Access remains locked.") { token ->
                     val result = withContext(Dispatchers.IO) {
@@ -58,6 +59,14 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
             with(state) {
                 if(busy || screen!=SessionScreen.Cover || coverType!=CoverType.CALCULATOR || !InputPolicy.validPin(pin)) return
                 val device=enrollment ?: return
+                if(device.entryMethod==SafeEntryMethod.DEVICE_LOCK) {
+                    // A calculator gesture only opens authentication; entered digits cannot unlock device-lock accounts.
+                    val event=TriggerEvent(source="Better Calculator")
+                    activeTriggerId=event.id
+                    triggerJob=scope.launch(Dispatchers.IO) { store.recordTrigger(device.uid,event);history.queueHistorySync() }
+                    message=null;screen=SessionScreen.Pin
+                    return
+                }
                 val newTrigger=if(activeTriggerId==null) TriggerEvent(source="Better Calculator").also { activeTriggerId=it.id } else null
                 val triggerId=activeTriggerId ?: return
                 operations.runOperation("Unable to check the PIN or record this attempt. Access remains locked.") { token ->
@@ -79,11 +88,11 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
         }
     }
 
-    private suspend fun unlockVerifiedDevice(device:DeviceEnrollment,token:Long,expectedScreen:SessionScreen) {
+    internal suspend fun unlockVerifiedDevice(device:DeviceEnrollment,token:Long,expectedScreen:SessionScreen) {
         with(runtime) {
             with(state) {
                 val saved=withContext(Dispatchers.IO) { store.unlockSnapshot(device.uid) }
-                if(epoch!=token || screen!=expectedScreen) return
+                if(epoch!=token || screen!=expectedScreen || enrollment?.uid!=device.uid || privacyBlackout) return
                 busy=false
                 profile=saved.first
                 attempts=saved.second

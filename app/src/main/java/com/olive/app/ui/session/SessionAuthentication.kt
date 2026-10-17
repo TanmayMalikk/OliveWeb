@@ -192,18 +192,22 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                 val value = pendingProfile ?: return
                 operations.runOperation("Unable to save this device's PIN. Please retry.") { token ->
                     val saved = withContext(Dispatchers.IO) { store.enroll(identity,value,pin) }
-                    enrollment=saved
-                    if(epoch == token) {
-                        deliveryAddress=value.address; language=value.language
-                        coverFullName=value.fullName; coverUsername=value.username
-                        coverType=value.coverType
-                        accountRole=value.role
-                        covers.restoreCoverData(saved.uid)
-                        navigation.quickExit()
-                        if(!localMode) history.loadCloudHistory(saved.uid,value.username)
-                    }
+                    finishEnrollment(saved,value,token)
                 }
             }
+        }
+    }
+
+    internal suspend fun finishEnrollment(saved: DeviceEnrollment, value: UserProfile, token: Long): Unit = with(runtime) {
+        with(state) {
+            if (epoch!=token || screen!=SessionScreen.DevicePin) return@with
+            enrollment=saved
+            deliveryAddress=value.address;language=value.language
+            coverFullName=value.fullName;coverUsername=value.username
+            coverType=value.coverType;accountRole=value.role
+            covers.restoreCoverData(saved.uid)
+            navigation.quickExit()
+            if(!localMode) history.loadCloudHistory(saved.uid,value.username)
         }
     }
 

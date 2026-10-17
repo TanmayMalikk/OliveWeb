@@ -46,6 +46,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
 
     val auth=SessionAuthentication(this)
     val access=SessionAccess(this)
+    val deviceAccess=SessionDeviceAccess(this)
     val navigation=SessionNavigation(this)
     val organization=OrganizationAccounts(this)
     val messaging=SessionMessaging(this)
