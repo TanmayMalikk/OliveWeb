@@ -12,6 +12,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.security.KeyPairGenerator
 import java.security.PublicKey
+import com.olive.app.data.SecureDocumentRepository
 
 @RunWith(RobolectricTestRunner::class)
 class SecureDocumentRepositoryTest {
