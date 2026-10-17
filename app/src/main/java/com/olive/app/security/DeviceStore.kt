@@ -6,7 +6,7 @@ import org.json.JSONObject
 import java.util.UUID
 
 // This is the private locker on the phone: PIN verifier, cached profile, and failed-attempt history all stay encrypted.
-class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVault) {
+class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVault, private val phoneSecure: () -> Boolean = { true }) {
     private val histories=DeviceActivityStore(activityVault)
     // Startup needs the enrollment and profile together; decrypt the vault once instead of once per value.
     fun currentSession():DeviceSession? {
@@ -63,7 +63,7 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
         return DeviceEnrollment(identity.uid,profile.triggerHash,profile.role)
     }
     private fun enrollment(uid: String, entry: JSONObject) = DeviceEnrollment(uid,entry.optString("triggerHash"),
-        AccountRole.fromStored(entry.optString("role")),SafeEntryMethod.fromStored(entry.optString("entryMethod")))
+        AccountRole.fromStored(entry.optString("role")),SafeEntryMethod.fromStored(entry.optString("entryMethod")),entry.has("pinVerifier"))
 
     internal fun deviceLockGrant(uid: String): JSONObject {
         val entry=vault.read().getJSONObject("enrollments").getJSONObject(uid)
@@ -80,8 +80,27 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
             root.child("profiles").put(identity.uid,profile.toJson())
             root.put("activeUid",identity.uid)
         }
-        return DeviceEnrollment(identity.uid,profile.triggerHash,profile.role,SafeEntryMethod.DEVICE_LOCK)
+        return DeviceEnrollment(identity.uid,profile.triggerHash,profile.role,SafeEntryMethod.DEVICE_LOCK,false)
     }
+    // Preserve the other configured method when changing the preference or replacing a PIN.
+    internal fun updateSafeEntry(expected:DeviceEnrollment,method:SafeEntryMethod?,pin:String?,grant:JSONObject?):DeviceEnrollment {
+        require(pin==null || InputPolicy.validPin(pin))
+        val verifier=pin?.let(SecretVerifier::createPin)
+        var updated:DeviceEnrollment?=null
+        vault.update { root ->
+            check(root.optString("activeUid")==expected.uid)
+            val entry=root.getJSONObject("enrollments").getJSONObject(expected.uid)
+            check(enrollment(expected.uid,entry)==expected && expected.role==AccountRole.USER)
+            verifier?.let { entry.put("pinVerifier",it) }
+            grant?.let { entry.put("deviceLockGrant",it) }
+            val chosen=method ?: expected.entryMethod
+            check(if(chosen==SafeEntryMethod.APP_PIN) entry.has("pinVerifier") else entry.has("deviceLockGrant"))
+            entry.put("entryMethod",chosen.name).put("failures",0)
+            updated=enrollment(expected.uid,entry)
+        }
+        return checkNotNull(updated)
+    }
+
     // Safe contacts, staff, and admins use account login only, so their local session never stores a device PIN.
     fun enrollWithoutPin(identity: AccountIdentity, profile: UserProfile): DeviceEnrollment {
         require(profile.role!=AccountRole.USER)
@@ -91,7 +110,7 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
             root.child("profiles").put(identity.uid,profile.toJson())
             root.put("activeUid",identity.uid)
         }
-        return DeviceEnrollment(identity.uid,"",profile.role)
+        return DeviceEnrollment(identity.uid,"",profile.role,hasAppPin=false)
     }
     fun removePin(uid: String) {
         vault.update { root -> root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
@@ -106,7 +125,7 @@ class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVau
             require(root.optString("activeUid")==uid) { "PIN account is no longer active" }
             val saved=root.getJSONObject("enrollments").getJSONObject(uid)
             require(AccountRole.fromStored(saved.optString("role"))==AccountRole.USER) { "This account does not use a PIN" }
-            check(SafeEntryMethod.fromStored(saved.optString("entryMethod"))==SafeEntryMethod.APP_PIN)
+            check(enrollment(uid,saved).allowsAppPin(phoneSecure()))
             val verifier=saved.getString("pinVerifier")
             val accepted=SecretVerifier.matches(pin,verifier)
             val next=if(accepted) GateState() else GateState(saved.optInt("failures")).failed()

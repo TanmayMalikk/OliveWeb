@@ -153,7 +153,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                     .togetherWith(fadeOut(tween(120)))
                             }) { targetScreen ->
                             val pane=when(targetScreen) {
-                                SessionScreen.Pin -> uiText(R.string.enter_pin)
+                                SessionScreen.Pin -> uiText(if(session.usesDeviceLock || !session.canUseAppPin) R.string.entry_device_lock else R.string.enter_pin)
                                 SessionScreen.Safe -> when(session.page) {
                                     SafePage.Home -> uiText(R.string.home);SafePage.Notes -> uiText(R.string.ui_notes);SafePage.Messages -> uiText(R.string.messages)
                                     SafePage.Profile -> uiText(R.string.ui_profile);SafePage.Contacts -> uiText(R.string.ui_contacts);SafePage.Settings -> uiText(R.string.settings);SafePage.Activity -> uiText(R.string.ui_activity)
@@ -170,7 +170,8 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 SessionScreen.Cover -> session.coverType.localizedTitle(uiText)
                             }
                             CompositionLocalProvider(LocalAccessibilityMessagesVisible provides (targetScreen==session.screen)) {
-                            Box(Modifier.semantics { paneTitle=pane }.then(if(targetScreen!=session.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
+                            // Entry setup owns its pane title because choosing New PIN changes its local screen.
+                            Box((if(targetScreen==SessionScreen.DevicePin) Modifier else Modifier.semantics { paneTitle=pane }).then(if(targetScreen!=session.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
                             when(targetScreen) {
                             SessionScreen.Loading -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator() }
                             SessionScreen.Welcome -> Welcome(session)

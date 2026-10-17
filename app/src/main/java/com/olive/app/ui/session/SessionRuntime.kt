@@ -16,7 +16,9 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     val localMode = !BuildConfig.FIREBASE_CONFIGURED
     val vault = EncryptedVault(application, if(localMode) "demo" else "firebase")
     val activityVault = EncryptedVault(application, if(localMode) "demo-activity" else "firebase-activity")
-    val store = DeviceStore(vault,activityVault)
+    fun phoneSecure() = application.getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure
+    var deviceSecure by mutableStateOf(phoneSecure())
+    val store = DeviceStore(vault,activityVault,::phoneSecure)
     val coverStore=CoverStateStore(EncryptedVault(application,"cover"))
     val coverSaveMutex=Mutex()
     val foodRevisions=mutableMapOf<String,Long>()
@@ -48,6 +50,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
 
     val auth=SessionAuthentication(this)
     val access=SessionAccess(this)
+    val entrySettings=SessionEntrySettings(this)
     val deviceAccess=SessionDeviceAccess(this)
     val navigation=SessionNavigation(this)
     val organization=OrganizationAccounts(this)

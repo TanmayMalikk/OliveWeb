@@ -64,6 +64,13 @@ import com.olive.app.security.InputPolicy
 // UI sizing/color: this screen owns the compact breakpoint, keypad dimensions, PIN-dot size, OliveGreen accents, and responsive text sizes.
 @Composable internal fun PinPrompt(session: SessionViewModel) {
     if(session.usesDeviceLock) { DeviceLockPrompt(session);return }
+    if(!session.canUseAppPin) {
+        FormColumn {
+            Heading(stringResource(R.string.entry_device_lock),stringResource(R.string.entry_restore_lock))
+            Status(session)
+        }
+        return
+    }
     val uiText=rememberResourceText()
     val challenge=session.pinChallengeVersion
     var pin by remember(challenge) { mutableStateOf("") }

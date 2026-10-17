@@ -9,3 +9,7 @@ enum class SafeEntryMethod {
         fun recommended(abuserKnowsDevicePin: Boolean) = if (abuserKnowsDevicePin) APP_PIN else DEVICE_LOCK
     }
 }
+
+// A configured backup is never an alternative to an available, selected device lock.
+internal fun DeviceEnrollment.allowsAppPin(phoneSecure:Boolean):Boolean =
+    hasAppPin && (entryMethod==SafeEntryMethod.APP_PIN || !phoneSecure)
