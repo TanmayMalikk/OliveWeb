@@ -12,7 +12,7 @@ import org.junit.Test
 
 class OliveNavigationTest {
     @Test fun backReturnsThroughTabsInVisitOrder() {
-        val viewModel=OliveViewModel(DemoCatalogRepository())
+        val viewModel=OliveViewModel(DemoCatalogRepository(com.olive.app.ui.testResourceText()::invoke))
 
         viewModel.navigate(CoverTab.Saved)
         viewModel.navigate(CoverTab.Cart)
@@ -25,7 +25,7 @@ class OliveNavigationTest {
     }
 
     @Test fun backClosesADishBeforeChangingTabs() {
-        val viewModel=OliveViewModel(DemoCatalogRepository())
+        val viewModel=OliveViewModel(DemoCatalogRepository(com.olive.app.ui.testResourceText()::invoke))
         viewModel.navigate(CoverTab.Saved)
         viewModel.select(viewModel.dishes.first())
 

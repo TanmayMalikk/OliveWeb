@@ -10,13 +10,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Mutex
 
-// One lifecycle scope, account identity and cancellation epoch shared by feature controllers.
+// Shares dependencies, account identity, jobs and cancellation epoch across feature controllers.
 internal class SessionRuntime(val application:Application,val scope:CoroutineScope) {
-    val state=SessionState()
+    val state:SessionState=SessionState { canEnterSafe() }
     val localMode = !BuildConfig.FIREBASE_CONFIGURED
     val vault = EncryptedVault(application, if(localMode) "demo" else "firebase")
     val activityVault = EncryptedVault(application, if(localMode) "demo-activity" else "firebase-activity")
-    val store = DeviceStore(vault,activityVault)
+    fun phoneSecure() = application.getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure
+    var deviceSecure by mutableStateOf(phoneSecure())
+    val store = DeviceStore(vault,activityVault,::phoneSecure)
     val coverStore=CoverStateStore(EncryptedVault(application,"cover"))
     val coverSaveMutex=Mutex()
     val foodRevisions=mutableMapOf<String,Long>()
@@ -41,11 +43,15 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     val historySyncMutex=Mutex()
     var activeTriggerId: String? = null
     var epoch = 0L
+    var pinAuthorizedUid:String?=null
+    var pinAuthorizedEpoch = -1L
     val screenHistory=mutableListOf<SessionScreen>()
     val safePageHistory=mutableListOf<SafePage>()
 
     val auth=SessionAuthentication(this)
     val access=SessionAccess(this)
+    val entrySettings=SessionEntrySettings(this)
+    val deviceAccess=SessionDeviceAccess(this)
     val navigation=SessionNavigation(this)
     val organization=OrganizationAccounts(this)
     val messaging=SessionMessaging(this)
@@ -74,5 +80,12 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
         }
     }
     val pendingMessageActionCount get()=state.incomingFriendRequests.size+unreadMessageCount
+
+    // User access requires verified app-PIN or Android authentication for this enrollment and epoch.
+    private fun canEnterSafe():Boolean {
+        val device=enrollment
+        val requiresPin=device?.role==AccountRole.USER || state.accountRole==AccountRole.USER
+        return !requiresPin || (device!=null && pinAuthorizedUid==device.uid && pinAuthorizedEpoch==epoch)
+    }
 
 }

@@ -1,5 +1,7 @@
 package com.olive.app.ui.covers.news
+import com.olive.app.ui.rememberResourceText
 
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import android.graphics.Bitmap
@@ -44,8 +46,10 @@ import com.olive.app.data.isSecureNewsUrl
 // Google News and publisher redirects stay inside the reader; local files and app intents do not open.
 internal fun isNewsReaderUrlAllowed(url:String):Boolean=isSecureNewsUrl(url)
 
+// Show the publisher page in an in-app WebView; ads and subscription requirements remain controlled by the publisher.
 @Composable internal fun NewsArticleReader(article:NewsArticle,saved:Boolean,active:Boolean,
     modifier:Modifier=Modifier,onBack:()->Unit,onBookmark:()->Unit) {
+    val uiText=rememberResourceText()
     val context=LocalContext.current
     val readerUrl=remember(article.link) {
         article.publisherUrl.takeIf(::isSecureNewsUrl)
@@ -84,11 +88,11 @@ internal fun isNewsReaderUrlAllowed(url:String):Boolean=isSecureNewsUrl(url)
             }
             Spacer(Modifier.weight(1f))
             IconButton(onClick={browser?.reload()},enabled=browser!=null && !failed) {
-                Icon(Icons.Outlined.Refresh,"Refresh article")
+                Icon(Icons.Outlined.Refresh,uiText(R.string.a11y_refresh_article))
             }
             IconButton(onClick=onBookmark,modifier=Modifier.testTag("news_reader_bookmark")) {
                 Icon(if(saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                    if(saved) "Remove bookmark" else "Save article",tint=OliveGreen)
+                    if(saved) uiText(R.string.a11y_remove_bookmark) else uiText(R.string.a11y_save_article),tint=OliveGreen)
             }
         }
         Text(article.title,modifier=Modifier.padding(horizontal=20.dp),
@@ -152,7 +156,11 @@ internal fun isNewsReaderUrlAllowed(url:String):Boolean=isSecureNewsUrl(url)
                             if(isNewsReaderUrlAllowed(readerUrl)) loadUrl(readerUrl)
                         }
                     },
-                    update={view -> view.visibility=if(failed) View.INVISIBLE else View.VISIBLE},
+                    update={view ->
+                        view.visibility=if(failed) View.INVISIBLE else View.VISIBLE
+                        view.importantForAccessibility=if(active && !failed) View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                            else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                    },
                     onRelease={view ->
                         view.stopLoading();view.onPause();view.removeAllViews();view.destroy()
                         if(browser===view) browser=null
@@ -160,7 +168,7 @@ internal fun isNewsReaderUrlAllowed(url:String):Boolean=isSecureNewsUrl(url)
             }
             if(failed) Column(Modifier.fillMaxSize().background(Cream).padding(24.dp),
                 verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
-                Text("This article could not be loaded. Check your connection and try again.")
+                Text(uiText(R.string.ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag))
                 Spacer(Modifier.height(12.dp))
                 Button(onClick={
                     if(isNewsReaderUrlAllowed(readerUrl)) {

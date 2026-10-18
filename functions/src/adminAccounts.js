@@ -28,7 +28,7 @@ exports.adminCreateAccount = onCall(async (request) => {
   const username = normalizedUsername(input.username);
   const role = normalizedRole(input.role);
   const password = String(input.password || "");
-  if (!validPassword(password)) throw new HttpsError("invalid-argument", "Temporary password must use 8–24 characters with a letter, number, and special character.");
+  if (!validPassword(password, username)) throw new HttpsError("invalid-argument", "Temporary password must use 8–24 characters with a letter, number, and special character and must not contain the username.");
   // Staff and Admin always keep their username alias in Firebase Auth. Their real email belongs in the private profile.
   const authEmail = signInEmail(username, role);
   const profileEmail = (role === "STAFF" || role === "ADMIN") && text(input.email, 254) ? signInEmail(username, role, input.email) : authEmail;

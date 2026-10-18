@@ -1,5 +1,7 @@
 package com.olive.app.ui.covers.olive
+import com.olive.app.R
 
+import com.olive.app.ui.LocalizedIcon as Icon
 import com.olive.app.ui.*
 
 import androidx.activity.compose.BackHandler
@@ -11,20 +13,27 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.olive.app.data.OrderLine
 
-// Change cover navigation, tabs, address popup, or checkout entry in this main food-app section.
+// Food-cover shell: route tabs and dialogs to focused screens while OliveViewModel owns menu/cart state.
 // UI sizing/color: the cover shell uses Cream, shared Olive colors, safe-area insets, and Material navigation sizing.
 @Composable fun OliveCover(
-    vm: OliveViewModel = viewModel(),
+    vm: OliveViewModel = oliveViewModel(),
     interactive: Boolean = true,
     onSearch: (String) -> Unit = vm::search,
     onAccountSetup: () -> Unit = {},
     configured: Boolean = false,
     session: SessionViewModel? = null,
 ) {
+    val uiText=com.olive.app.ui.rememberResourceText()
+    LaunchedEffect(uiText,vm.dishes) {
+        vm.updateSearchLabels(vm.dishes.associate { dish -> dish.id to listOf(
+            uiText.dishName(dish),uiText.dishCategory(dish),uiText.dishRestaurant(dish),
+            uiText.foodFilter(dish.diet),uiText.dishDescription(dish),
+        ).joinToString(" ") })
+    }
     var checkoutNotice by remember { mutableStateOf(false) }
     var areaDialog by remember { mutableStateOf(false) }
     val savedAddress=session?.deliveryAddress ?: com.olive.app.data.DeliveryAddress()
@@ -41,12 +50,12 @@ import com.olive.app.data.OrderLine
     BackHandler(interactive) { vm.back() }
     Scaffold(
         bottomBar = {
-            NavigationBar(containerColor = Cream, tonalElevation = 0.dp) {
+            NavigationBar(modifier=Modifier.testTag("cover_navigation"),containerColor = Cream, tonalElevation = 0.dp) {
                 listOf(
-                    Triple(CoverTab.Discover, Icons.Outlined.Explore, "Discover"),
-                    Triple(CoverTab.Saved, Icons.Outlined.FavoriteBorder, "Saved"),
-                    Triple(CoverTab.Cart, Icons.Outlined.ShoppingBag, "Cart"),
-                    Triple(CoverTab.Account, Icons.Outlined.PersonOutline, "Account"),
+                    Triple(CoverTab.Discover, Icons.Outlined.Explore, uiText(R.string.discover)),
+                    Triple(CoverTab.Saved, Icons.Outlined.FavoriteBorder, uiText(R.string.saved)),
+                    Triple(CoverTab.Cart, Icons.Outlined.ShoppingBag, uiText(R.string.cart)),
+                    Triple(CoverTab.Account, Icons.Outlined.PersonOutline, uiText(R.string.account)),
                 ).forEach { (tab, icon, label) ->
                     NavigationBarItem(selected = vm.tab == tab, onClick = { vm.navigate(tab) },
                         icon = { BadgedBox(badge = {
@@ -56,7 +65,7 @@ import com.olive.app.data.OrderLine
             }
         }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
             AnimatedContent(targetState=vm.selectedDish to vm.tab,label="food cover page",
                 transitionSpec={
                     (fadeIn(tween(180))+slideInHorizontally(tween(180)) { it/10 })
@@ -76,8 +85,8 @@ import com.olive.app.data.OrderLine
         onSave={session?.saveAddress(it)},onClose={areaDialog=false;session?.dismissAddressPrompt()})
     if(checkoutNotice && interactive) CheckoutDialog(savedAddress,vm.total,
         foods=vm.dishes.filter { it.id in vm.cart }.map { dish ->
-            val choices=vm.selectedIngredients(dish).joinToString(", ")
-            OrderLine(if(choices.isBlank()) dish.name else "${dish.name} · $choices",vm.cart[dish.id] ?: 0)
+            val choices=vm.selectedIngredients(dish).joinToString(", ") { uiText.ingredient(it) }
+            OrderLine(if(choices.isBlank()) uiText.dishName(dish) else "${uiText.dishName(dish)} · $choices",vm.cart[dish.id] ?: 0)
         },
         onSaveAddress={session?.saveAddress(it)},
         onAttempt={ foods,total,error -> session?.recordCheckout(foods,total,error) },

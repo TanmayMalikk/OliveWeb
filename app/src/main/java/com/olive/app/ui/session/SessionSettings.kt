@@ -1,4 +1,5 @@
 package com.olive.app.ui.session
+import com.olive.app.R
 
 import com.olive.app.data.*
 import com.olive.app.security.*
@@ -10,41 +11,40 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.milliseconds
 
-// Owns profile, password, trigger and PIN updates.
+// Saves private profile, cover choice, password, trigger, PIN and trusted-contact settings.
 internal class SessionSettings(private val runtime:SessionRuntime) {
-    fun saveSettings(fullName: String, affected: String, abuserName: String, dob: String, selectedLanguage: String, situation: String, address: DeliveryAddress) {
+    fun saveSettings(fullName: String, affected: String, abuserName: String, dob: String, situation: String, address: DeliveryAddress) {
         with(runtime) {
             with(state) {
                 if(screen!=SessionScreen.Safe || busy) return
                 history.recordSettingsInteraction("Olive Branch","Pressed save profile settings")
-                if(fullName.isBlank() || !InputPolicy.validDob(dob) || selectedLanguage.isBlank() || !address.locationValid) { message="Full name, a valid date of birth, language and city are required."; return }
-                val updated=profile?.copy(fullName=fullName.trim(),affectedNames=affected.trim(),abuserName=abuserName.trim(),dob=dob,language=selectedLanguage,situation=situation.trim(),region=address.generalLocation,address=address) ?: return
+                if(fullName.isBlank() || !InputPolicy.validDob(dob) || !address.locationValid) { message=runtime.application.getString(R.string.ui_profile_required_fields); return }
+                val updated=profile?.copy(fullName=fullName.trim(),affectedNames=affected.trim(),abuserName=abuserName.trim(),dob=dob,situation=situation.trim(),region=address.generalLocation,address=address) ?: return
                 saveSafeProfile(updated)
             }
         }
     }
 
-    fun saveCoverSettings(fullName: String, selectedLanguage: String) {
+    fun saveCoverSettings(fullName: String, dob: String, address: DeliveryAddress) {
         with(runtime) {
             with(state) {
                 if(screen!=SessionScreen.Cover || busy) return
                 history.recordSettingsInteraction("Cover","Pressed save account settings")
-                val supportedLangs = setOf("English","French","Spanish","Arabic","Tagalog","Chinese","Cree","en","fr","es","ar","tl","zh","cr")
-                if(fullName.isBlank() || selectedLanguage !in supportedLangs) {
-                    message="Enter your full name and preferred language."; return
+                if(fullName.isBlank() || !InputPolicy.validDob(dob) || !address.locationValid) {
+                    message=runtime.application.getString(R.string.ui_profile_required_fields); return
                 }
                 val device=enrollment ?: return
-                operations.runOperation("Unable to save account settings.") { token ->
+                operations.runOperation(runtime.application.getString(R.string.unable_to_save_account_settings)) { token ->
                     val updated=withContext(Dispatchers.IO) {
                         val before=store.profile(device.uid)
-                        val after=before.copy(fullName=fullName.trim(),language=selectedLanguage)
+                        val after=before.copy(fullName=fullName.trim(),dob=dob,address=address,region=address.generalLocation)
                         store.cacheProfile(device.uid,after,pending=!localMode,
                             audit=SettingsEvent(area="Cover",action="Saved account settings",changes=profileChanges(before,after)))
                         after
                     }
                     if(epoch==token && screen==SessionScreen.Cover) {
-                        coverFullName=updated.fullName; language=updated.language
-                        pendingSync=!localMode; message="Account settings saved."
+                        coverDob=updated.dob;coverFullName=updated.fullName; language=updated.language; deliveryAddress=updated.address
+                        pendingSync=!localMode; message=runtime.application.getString(R.string.account_settings_saved)
                     }
                     history.queueHistorySync()
                     if(!localMode) syncProfile(device.uid,updated,token)
@@ -58,10 +58,10 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
             with(state) {
                 val device=enrollment ?: return
                 val before=profile ?: return
-                operations.runOperation("Unable to save profile changes.") { token ->
+                operations.runOperation(runtime.application.getString(R.string.unable_to_save_profile_changes)) { token ->
                     withContext(Dispatchers.IO) { store.cacheProfile(device.uid,updated,pending=!localMode,
                         audit=SettingsEvent(area="Olive Branch",action="Saved profile settings",changes=profileChanges(before,updated))) }
-                    if(epoch==token) { profile=updated; coverFullName=updated.fullName; language=updated.language; deliveryAddress=updated.address; pendingSync=!localMode; message="Changes saved." }
+                    if(epoch==token) { profile=updated; coverDob=updated.dob;coverFullName=updated.fullName; language=updated.language; deliveryAddress=updated.address; pendingSync=!localMode; message=runtime.application.getString(R.string.changes_saved) }
                     history.queueHistorySync()
                     if(!localMode) syncProfile(device.uid,updated,token)
                 }
@@ -73,7 +73,7 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
         with(runtime) {
             with(state) {
                 if(screen != SessionScreen.Safe || busy || accountRole!=AccountRole.USER) return
-                if(type == CoverType.GAME) { message="In development"; return }
+                if(type == CoverType.GAME) { message=runtime.application.getString(R.string.in_development); return }
                 val before=profile ?: return
                 if(type==before.coverType) return
                 val updated=before.copy(coverType=type)
@@ -85,11 +85,11 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                     try {
                         withContext(Dispatchers.IO) { store.cacheProfile(device.uid,updated,pending=!localMode,
                             audit=SettingsEvent(area="Olive Branch",action="Changed cover app",changes=profileChanges(before,updated))) }
-                        if(epoch==token) { pendingSync=!localMode;message="Cover app changed to ${type.title}." }
+                        if(epoch==token) { pendingSync=!localMode;message=runtime.application.getString(R.string.ui_cover_app_changed_to_value , type.title) }
                         history.queueHistorySync()
                         if(!localMode) syncProfile(device.uid,updated,token)
                     } catch(e: CancellationException) { throw e }
-                    catch(_: Exception) { if(epoch==token) message="Unable to change the cover app." }
+                    catch(_: Exception) { if(epoch==token) message=runtime.application.getString(R.string.ui_unable_to_change_the_cover_app) }
                     finally { if(epoch==token) busy=false }
                 }
             }
@@ -102,28 +102,36 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                 if(screen!=SessionScreen.Safe || busy || accountRole!=AccountRole.USER) return
                 history.recordSettingsInteraction("Olive Branch","Pressed change trigger word")
                 val device=enrollment ?: return
-                if(!InputPolicy.validTrigger(trigger) || !InputPolicy.validPin(pin)) { message="Enter a trigger of 3–64 characters and your 4–6 digit PIN."; return }
-                operations.runOperation("Unable to change the trigger. Please retry.") { token ->
+                if(!InputPolicy.validTrigger(trigger) || !InputPolicy.validPin(pin)) { message=runtime.application.getString(R.string.enter_a_trigger_of_3_64_characters_and_your_4_6_digit_pin); return }
+                operations.runOperation(runtime.application.getString(R.string.unable_to_change_the_trigger_please_retry)) { token ->
                     val result=withContext(Dispatchers.IO) { store.verify(device.uid,pin) }
                     if(epoch!=token || screen!=SessionScreen.Safe) return@runOperation
                     when(result) {
                         PinResult.Accepted -> {
-                            val before=profile!!
-                            val updated=before.copy(triggerHash=InputPolicy.triggerHash(trigger))
-                            withContext(Dispatchers.IO) { store.updateTrigger(device.uid,updated,!localMode,
-                                SettingsEvent(area="Olive Branch",action="Changed trigger word",changes=profileChanges(before,updated))) }
-                            enrollment=device.copy(triggerHash=updated.triggerHash)
-                            if(epoch==token) { profile=updated; message="Trigger word changed."; pendingSync=!localMode }
-                            history.queueHistorySync()
-                            if(!localMode) syncProfile(device.uid,updated,token)
+                            saveVerifiedTrigger(device,trigger,token)
                         }
                         is PinResult.Rejected -> {
                             attempts=withContext(Dispatchers.IO) { store.attempts(device.uid) }
-                            if(result.failures>=5) navigation.quickExit() else message="Incorrect PIN. ${5-result.failures} attempts remaining."
+                            if(result.failures>=5) navigation.quickExit() else message=runtime.application.getString(R.string.ui_incorrect_pin_value_attempts_remaining , 5-result.failures)
                         }
                     }
                 }
             }
+        }
+    }
+
+    internal suspend fun saveVerifiedTrigger(device:DeviceEnrollment,trigger:String,token:Long): Unit = with(runtime) {
+        with(state) {
+            if(epoch!=token || screen!=SessionScreen.Safe || enrollment?.uid!=device.uid) return@with
+            val before=profile ?: return@with
+            val updated=before.copy(triggerHash=InputPolicy.triggerHash(trigger))
+            withContext(Dispatchers.IO) { store.updateTrigger(device.uid,updated,!localMode,
+                SettingsEvent(area="Olive Branch",action="Changed trigger word",changes=profileChanges(before,updated))) }
+            if(epoch!=token || screen!=SessionScreen.Safe || enrollment?.uid!=device.uid) return@with
+            enrollment=device.copy(triggerHash=updated.triggerHash)
+            profile=updated;message=application.getString(R.string.trigger_word_changed);pendingSync=!localMode
+            history.queueHistorySync()
+            if(!localMode) syncProfile(device.uid,updated,token)
         }
     }
 
@@ -135,10 +143,10 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                 val device = enrollment ?: return
                 val before = profile ?: return
                 val updated = before.copy(contacts=value)
-                operations.runOperation("Unable to save contacts on this device. Please retry.") { token ->
+                operations.runOperation(runtime.application.getString(R.string.unable_to_save_contacts_on_this_device_please_retry)) { token ->
                     withContext(Dispatchers.IO) { store.cacheProfile(device.uid,updated,pending=!localMode,
                         audit=SettingsEvent(area="Olive Branch",action="Saved safe contacts",changes=profileChanges(before,updated))) }
-                    if(epoch == token) { profile=updated; pendingSync=!localMode; message="Contacts saved on this device." }
+                    if(epoch == token) { profile=updated; pendingSync=!localMode; message=runtime.application.getString(R.string.contacts_saved_on_this_device) }
                     history.queueHistorySync()
                     if(!localMode) syncProfile(device.uid,updated,token)
                 }
@@ -153,7 +161,7 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                 val value=profile ?: return
                 if(screen != SessionScreen.Safe || busy || localMode) return
                 history.recordSettingsInteraction("Olive Branch","Pressed sync changes")
-                operations.runOperation("Changes are saved on this device. Cloud sync is unavailable; retry when connected.") { token ->
+                operations.runOperation(runtime.application.getString(R.string.changes_are_saved_on_this_device_cloud_sync_is_unavailable_retry_when_connected)) { token ->
                     syncProfile(device.uid,value,token)
                     history.queueHistorySync()
                 }
@@ -167,10 +175,10 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                 try {
                     withTimeout(15_000.milliseconds) { accounts.saveProfile(AccountIdentity(uid,value.username),value) }
                     withContext(Dispatchers.IO) { store.markSynced(uid) }
-                    if(epoch == token) { pendingSync=false; message="Changes synced." }
+                    if(epoch == token) { pendingSync=false; message=runtime.application.getString(R.string.changes_synced) }
                 } catch(e: CancellationException) { throw e }
                 catch(_: Exception) {
-                    if(epoch == token) { pendingSync=true; message="Saved on this device. Cloud sync failed; retry when connected." }
+                    if(epoch == token) { pendingSync=true; message=runtime.application.getString(R.string.saved_on_this_device_cloud_sync_failed_retry_when_connected) }
                 }
             }
         }
@@ -184,15 +192,16 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                 if(screen==SessionScreen.Safe) history.recordSettingsInteraction(area,"Pressed change account password")
                 val device=enrollment ?: return
                 val username=profile?.username ?: return
-                if(currentPassword.isEmpty()) { message="Enter your current password."; return }
-                if(!InputPolicy.validPassword(newPassword)) { message="Use 8–24 characters with a letter, number and special character."; return }
-                if(newPassword!=confirmation) { message="The new passwords do not match."; return }
-                operations.runOperation("Unable to change the password. Check your current password and connection.") { token ->
+                if(currentPassword.isEmpty()) { message=runtime.application.getString(R.string.enter_your_current_password); return }
+                if(!InputPolicy.passwordExcludesUsername(newPassword,profile?.username ?: coverUsername)) { message=runtime.application.getString(R.string.password_excludes_username); return }
+                if(!InputPolicy.validAccountPassword(newPassword,profile?.username ?: coverUsername)) { message=runtime.application.getString(R.string.ui_use_8_24_characters_with_a_letter_number_and_special_character); return }
+                if(newPassword!=confirmation) { message=runtime.application.getString(R.string.the_new_passwords_do_not_match); return }
+                operations.runOperation(runtime.application.getString(R.string.unable_to_change_the_password_check_your_current_password_and_connection)) { token ->
                     accounts.changePassword(AccountIdentity(device.uid,username),currentPassword,newPassword)
                     withContext(Dispatchers.IO) { store.recordSettings(device.uid,SettingsEvent(area=area,
                         action="Changed account password",changes=listOf(FieldChange("Password","Hidden","Changed")))) }
                     history.queueHistorySync()
-                    if(epoch==token && screen in setOf(SessionScreen.Safe,SessionScreen.Portal)) message="Password changed."
+                    if(epoch==token && screen in setOf(SessionScreen.Safe,SessionScreen.Portal)) message=runtime.application.getString(R.string.password_changed)
                 }
             }
         }
@@ -204,19 +213,19 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                 if(screen!=SessionScreen.Safe || busy) return
                 history.recordSettingsInteraction("Olive Branch","Pressed change device PIN")
                 val device=enrollment ?: return
-                if(!InputPolicy.validPin(currentPin) || !InputPolicy.validPin(newPin)) { message="Enter 4–6 digits for both PINs."; return }
-                if(newPin!=confirmation) { message="The new PINs do not match."; return }
-                operations.runOperation("Unable to change the PIN.") { token ->
+                if(!InputPolicy.validPin(currentPin) || !InputPolicy.validPin(newPin)) { message=runtime.application.getString(R.string.enter_4_6_digits_for_both_pins); return }
+                if(newPin!=confirmation) { message=runtime.application.getString(R.string.the_new_pins_do_not_match); return }
+                operations.runOperation(runtime.application.getString(R.string.unable_to_change_the_pin)) { token ->
                     when(val result=withContext(Dispatchers.IO) { store.changePin(device.uid,currentPin,newPin) }) {
                         PinResult.Accepted -> {
                             withContext(Dispatchers.IO) { store.recordSettings(device.uid,SettingsEvent(area="Olive Branch",
                                 action="Changed device PIN",changes=listOf(FieldChange("Device PIN","Hidden","Changed")))) }
                             history.queueHistorySync()
-                            if(epoch==token && screen==SessionScreen.Safe) message="Device PIN changed."
+                            if(epoch==token && screen==SessionScreen.Safe) message=runtime.application.getString(R.string.device_pin_changed)
                         }
                         is PinResult.Rejected -> {
                             attempts=withContext(Dispatchers.IO) { store.attempts(device.uid) }
-                            if(result.failures>=5) navigation.quickExit() else message="Incorrect PIN. ${5-result.failures} attempts remaining."
+                            if(result.failures>=5) navigation.quickExit() else message=runtime.application.getString(R.string.ui_incorrect_pin_value_attempts_remaining , 5-result.failures)
                         }
                     }
                 }

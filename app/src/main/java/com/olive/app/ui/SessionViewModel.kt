@@ -5,14 +5,29 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.olive.app.data.*
 import com.olive.app.ui.session.SessionRuntime
+import com.olive.app.security.SafeEntryMethod
+import com.olive.app.security.allowsAppPin
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 class SessionViewModel(application:Application):AndroidViewModel(application) {
     private val runtime=SessionRuntime(application,viewModelScope)
     val screen get()=runtime.state.screen
+    val pinChallengeVersion get()=runtime.state.pinChallengeVersion
+    val accessibilityExitVersion get()=runtime.state.accessibilityExitVersion
     val page get()=runtime.state.page
     val activityCategory get()=runtime.state.activityCategory
     val busy get()=runtime.state.busy
+    val deviceLockRequest get()=runtime.state.deviceLockRequest
+    val preferredEntryMethod get()=runtime.enrollment?.entryMethod ?: SafeEntryMethod.APP_PIN
+    val hasAppPin get()=runtime.enrollment?.hasAppPin==true
+    val phoneHasLock get()=runtime.deviceSecure
+    val usesDeviceLock get()=preferredEntryMethod==SafeEntryMethod.DEVICE_LOCK && phoneHasLock
+    val canUseAppPin get()=runtime.enrollment?.allowsAppPin(phoneHasLock)==true
+    fun refreshDeviceSecurity() { runtime.deviceSecure=runtime.phoneSecure() }
+    fun setSafeEntryMethod(method:SafeEntryMethod,currentPin:String) = runtime.entrySettings.select(method,currentPin)
+    fun saveSafeEntryPin(currentPin:String,pin:String,confirmation:String,usePin:Boolean) = runtime.entrySettings.savePin(currentPin,pin,confirmation,usePin)
+    fun authenticateDeviceLock(enroll: Boolean=false) = runtime.deviceAccess.authenticate(enroll)
+    fun changeDeviceLockTrigger(trigger: String) = runtime.deviceAccess.authenticate(false,trigger)
     val message get()=runtime.state.message
     val profile get()=runtime.state.profile
     val attempts get()=runtime.state.attempts
@@ -36,6 +51,7 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     val addressPrompt get()=runtime.state.addressPrompt
     val addressSaveVersion get()=runtime.state.addressSaveVersion
     val language get()=runtime.state.language
+    val coverDob get()=runtime.state.coverDob
     val coverFullName get()=runtime.state.coverFullName
     val coverUsername get()=runtime.state.coverUsername
     val coverType get()=runtime.state.coverType
@@ -78,7 +94,7 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun saveSetupProfile(value: UserProfile) = runtime.auth.saveSetupProfile(value)
     fun createDevicePin(pin: String, confirmation: String) = runtime.auth.createDevicePin(pin,confirmation)
     fun interceptSearch(value: String) : Boolean = runtime.access.interceptSearch(value)
-    fun submitPin(pin: String) = runtime.access.submitPin(pin)
+    fun submitPin(pin: String,challenge:Int=pinChallengeVersion) = runtime.access.submitPin(pin,challenge)
     fun submitCalculatorPin(pin: String) = runtime.access.submitCalculatorPin(pin)
     fun quickExit() = runtime.navigation.quickExit()
     fun background() = runtime.navigation.background()
@@ -120,8 +136,8 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     suspend fun recordCheckout(foods: List<OrderLine>, totalCents: Int, error: String) = runtime.covers.recordCheckout(foods,totalCents,error)
     fun dismissAddressPrompt() = runtime.covers.dismissAddressPrompt()
     fun saveAddress(address: DeliveryAddress) = runtime.covers.saveAddress(address)
-    fun saveSettings(fullName: String, affected: String, abuserName: String, dob: String, selectedLanguage: String, situation: String, address: DeliveryAddress) = runtime.settings.saveSettings(fullName,affected,abuserName,dob,selectedLanguage,situation,address)
-    fun saveCoverSettings(fullName: String, selectedLanguage: String) = runtime.settings.saveCoverSettings(fullName,selectedLanguage)
+    fun saveSettings(fullName: String, affected: String, abuserName: String, dob: String, situation: String, address: DeliveryAddress) = runtime.settings.saveSettings(fullName,affected,abuserName,dob,situation,address)
+    fun saveCoverSettings(fullName: String, dob: String=coverDob, address: DeliveryAddress=deliveryAddress) = runtime.settings.saveCoverSettings(fullName,dob,address)
     fun changeCover(type: CoverType) = runtime.settings.changeCover(type)
     fun syncLocalNotificationHandler() = runtime.messaging.syncLocalNotificationHandler()
     fun changeTrigger(trigger: String, pin: String) = runtime.settings.changeTrigger(trigger,pin)

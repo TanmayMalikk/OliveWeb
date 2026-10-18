@@ -29,9 +29,9 @@ android {
         disable += "TypographyEllipsis" // Three periods are an intentional visual text choice.
         disable += "LockedOrientationActivity" // Olive intentionally uses a phone-first portrait layout.
     }
-    @Suppress("UnstableApiUsage") // Hide the experimental API warning; this setting includes all languages so users can switch languages in the app.
+    @Suppress("UnstableApiUsage") // AGP marks the language-split API as experimental; disabling splits keeps all translations installed.
     bundle {
-        // Every supported locale ships with the base APK because users can change language inside Olive.
+        // Include every bundled locale in the base APK so translations do not require a separate language download.
         language { enableSplit = false }
     }
     signingConfigs {
