@@ -1,5 +1,8 @@
 package com.olive.app.ui.covers.news
+import com.olive.app.ui.rememberResourceText
 
+import androidx.compose.ui.semantics.hideFromAccessibility
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.*
@@ -10,7 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Article
+
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -32,10 +35,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 
-// Modern newspaper cards keep publisher attribution, a visible section, and the article's own photo.
+// Newspaper cards load cached/publisher metadata, show the section and article photo, and tag known paywalls without filtering.
+// Story details form one TalkBack target; the bookmark remains a separate action.
 @Composable internal fun NewsArticleCard(article:NewsArticle,language:String,saved:Boolean,onOpen:()->Unit,onBookmark:()->Unit) {
+    val uiText=rememberResourceText()
     val context=LocalContext.current
     val metadata=remember(context) { NewsMetadataRepository(context.applicationContext) }
     var displayed by remember(article) { mutableStateOf(article) }
@@ -45,40 +49,39 @@ import androidx.compose.ui.semantics.stateDescription
     }
     val topic=displayed.topic.ifBlank { fallbackNewsTopic(displayed.title) }
     var imageFailed by remember(displayed.imageUrl) { mutableStateOf(false) }
-    var imageLoaded by remember(displayed.imageUrl) { mutableStateOf(false) }
-    Card(onClick=onOpen,modifier=Modifier.animateContentSize().fillMaxWidth().testTag("news_article_card"),
+    Card(onClick=onOpen,modifier=Modifier.animateContentSize().fillMaxWidth().testTag("news_article_card").semantics(mergeDescendants=true) {},
         colors=CardDefaults.cardColors(containerColor=Cream),elevation=CardDefaults.cardElevation(defaultElevation=3.dp),
         border=BorderStroke(.7.dp,SoftGray),shape=RoundedCornerShape(20.dp)) {
         Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
-                Text(displayed.source.ifBlank { "Daily Digest" },fontFamily=FontFamily.Serif,fontWeight=FontWeight.Bold,
+                Text(displayed.source.ifBlank { uiText(R.string.ui_daily_digest) },fontFamily=FontFamily.Serif,fontWeight=FontWeight.Bold,
                     fontSize=18.sp,color=Ink,modifier=Modifier.weight(1f),maxLines=2)
                 Text(displayed.localPublishedDate(language),color=Muted,style=MaterialTheme.typography.labelSmall,maxLines=2)
                 IconButton(onClick=onBookmark) { Icon(if(saved) Icons.Outlined.Bookmark else Icons.Outlined.BookmarkBorder,
-                    if(saved) "Remove bookmark" else "Save article",tint=Ink) }
+                    if(saved) uiText(R.string.a11y_remove_bookmark) else uiText(R.string.a11y_save_article),tint=Ink) }
             }
             HorizontalDivider(thickness=2.dp,color=OliveGreen)
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
                 Surface(color=PaleOlive,shape=RoundedCornerShape(8.dp),border=BorderStroke(.7.dp,OliveGreen.copy(alpha=.3f)),
                     modifier=Modifier.weight(1f,fill=false).testTag("news_article_topic")) {
-                    Text(topic,modifier=Modifier.padding(horizontal=12.dp,vertical=7.dp),color=DarkOlive,
+                    Text(when(topic) { "News" -> uiText(R.string.ui_news); "Politics" -> uiText(R.string.ui_politics); "Sports" -> uiText(R.string.ui_sports); "Business" -> uiText(R.string.ui_business); "Technology" -> uiText(R.string.ui_technology); "Health" -> uiText(R.string.ui_health); "Science" -> uiText(R.string.ui_science); "Environment" -> uiText(R.string.ui_environment); "Culture" -> uiText(R.string.culture); else -> topic },modifier=Modifier.padding(horizontal=12.dp,vertical=7.dp),color=DarkOlive,
                         fontSize=15.sp,fontWeight=FontWeight.Bold,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }
                 if(displayed.isPaywalled==true) Surface(color=WarmWhite,shape=RoundedCornerShape(8.dp),
                     border=BorderStroke(.7.dp,SoftGray),modifier=Modifier.testTag("news_article_paywall")) {
                     Row(Modifier.padding(horizontal=10.dp,vertical=7.dp),horizontalArrangement=Arrangement.spacedBy(5.dp),verticalAlignment=Alignment.CenterVertically) {
                         Icon(Icons.Outlined.Lock,null,Modifier.size(14.dp),tint=Ink)
-                        Text("Paywall",color=Ink,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.SemiBold)
+                        Text(uiText(R.string.ui_paywall),color=Ink,style=MaterialTheme.typography.labelMedium,fontWeight=FontWeight.SemiBold)
                     }
                 }
             }
             Text(displayed.title.removeSuffix(" - ${displayed.source}"),fontFamily=FontFamily.Serif,fontWeight=FontWeight.Bold,fontSize=24.sp,
                 lineHeight=29.sp,color=Ink,maxLines=4)
             if(isSecureNewsUrl(displayed.imageUrl) && !imageFailed) AsyncImage(model=displayed.imageUrl,
-                contentDescription=displayed.title,contentScale=ContentScale.Crop,
+                contentDescription=null,contentScale=ContentScale.Crop,
                 modifier=Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(9.dp)).background(LightSage).testTag("news_article_image")
-                    .semantics { stateDescription=if(imageLoaded) "Article photo loaded" else "Article photo loading" },
-                onSuccess={imageLoaded=true},onError={imageFailed=true})
+                    .semantics { hideFromAccessibility() },
+                onError={imageFailed=true})
             if(displayed.summary.isNotBlank()) Text(displayed.summary,color=Muted,fontFamily=FontFamily.Serif,
                 fontSize=15.sp,lineHeight=21.sp,maxLines=3,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End,verticalAlignment=Alignment.CenterVertically) {

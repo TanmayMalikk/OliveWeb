@@ -9,13 +9,12 @@ import com.olive.app.data.*
 enum class CoverTab { Discover, Saved, Cart, Account }
 
 // Runs Olive's own homemade menu, search, favourites, ingredient choices, and cart.
-class OliveViewModel(private val repository: CatalogRepository = DemoCatalogRepository()) : ViewModel() {
+class OliveViewModel(private val repository: CatalogRepository) : ViewModel() {
     var dishes by mutableStateOf(repository.dishes()); private set
-    var catalogMessage by mutableStateOf("Homemade by Olive Kitchen"); private set
     // The address changes delivery details only because Olive prepares every menu item itself.
     fun updateLocation(address: DeliveryAddress) {
         chooseDeliveryArea(address.label.ifBlank { address.city })
-        dishes=repository.dishes();catalogMessage="Homemade by Olive Kitchen"
+        dishes=repository.dishes()
     }
     var query by mutableStateOf(""); private set
     var category by mutableStateOf("All"); private set
@@ -31,7 +30,14 @@ class OliveViewModel(private val repository: CatalogRepository = DemoCatalogRepo
     }
     var deliveryArea by mutableStateOf(""); private set
     fun chooseDeliveryArea(value: String) { deliveryArea=value.trim().take(60) }
-    val results get() = filterDishes(dishes, query, category)
+    private var localizedSearch by mutableStateOf<Map<String,String>>(emptyMap())
+    fun updateSearchLabels(labels:Map<String,String>) { localizedSearch=labels }
+    val results get():List<Dish> {
+        val canonical=filterDishes(dishes,query,category).map { it.id }.toSet()
+        return filterDishes(dishes,"",category).filter { dish ->
+            dish.id in canonical || localizedSearch[dish.id]?.contains(query.trim(),ignoreCase=true)==true
+        }
+    }
     val total get() = cartTotal(dishes, cart)
     val itemCount get() = cart.values.sum()
     // Normal food searches filter the menu; the session layer checks the secret trigger first.

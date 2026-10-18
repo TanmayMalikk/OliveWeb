@@ -22,7 +22,7 @@ class FirebaseAccountRepository : AccountRepository {
     // Change this alias only with an account migration or existing usernames will stop signing in.
     override suspend fun create(username: String, password: String, role: AccountRole): AccountIdentity {
         require(InputPolicy.validUsername(username)) { "Invalid username" }
-        require(InputPolicy.validPassword(password)) { "Invalid password" }
+        require(InputPolicy.validAccountPassword(password,username)) { "Invalid password" }
         val user = auth.createUserWithEmailAndPassword(AccountPolicy.signInEmail(username,role),password).await().user ?: error("Missing account")
         user.updateProfile(com.google.firebase.auth.UserProfileChangeRequest.Builder().setDisplayName(InputPolicy.username(username)).build()).await()
         return AccountIdentity(user.uid,InputPolicy.username(username))
@@ -104,7 +104,7 @@ class FirebaseAccountRepository : AccountRepository {
         }
     }
     override suspend fun changePassword(identity: AccountIdentity, currentPassword: String, newPassword: String) {
-        require(InputPolicy.validPassword(newPassword)) { "Invalid password" }
+        require(InputPolicy.validAccountPassword(newPassword,identity.username)) { "Invalid password" }
         val user=auth.currentUser ?: error("Sign in again before changing your password")
         check(user.uid==identity.uid) { "Sign in again before changing your password" }
         val currentEmail=user.email ?: error("This account has no sign-in email")

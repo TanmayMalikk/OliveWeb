@@ -1,10 +1,12 @@
 package com.olive.app.ui
 
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +45,7 @@ import java.util.Locale
 // Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor.
 // UI sizing/color: note editing uses 24dp sides, a 300dp minimum body field, yellow pinned icons, and an adaptive 160dp grid.
 @Composable internal fun PrivateNotes(session: SessionViewModel) {
+    val uiText=rememberResourceText()
     var editorOpen by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var kind by remember { mutableStateOf<PrivateEntryKind?>(null) }
@@ -74,28 +77,28 @@ import java.util.Locale
         val editorListState=rememberLazyListState()
         LazyColumn(Modifier.fillMaxSize().oliveScrollbar(editorListState),state=editorListState,contentPadding=PaddingValues(start=24.dp,end=24.dp,top=12.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
             item { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                IconButton(onClick={editorOpen=false},modifier=Modifier.testTag("private_notes_back")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"All notes") }
-                Text(if(editingId==null) "New private entry" else "Edit private entry",style=MaterialTheme.typography.titleLarge,modifier=Modifier.weight(1f))
+                IconButton(onClick={editorOpen=false},modifier=Modifier.testTag("private_notes_back")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,uiText(R.string.all_notes)) }
+                Text(if(editingId==null) uiText(R.string.new_private_entry) else uiText(R.string.edit_private_entry),style=MaterialTheme.typography.titleLarge,modifier=(Modifier.weight(1f)).semantics { heading() })
                 if(entry!=null) IconButton(onClick={session.togglePrivateEntryPin(entry.id)},enabled=!session.busy,modifier=Modifier.testTag("private_pin_editor")) {
-                    Icon(Icons.Outlined.PushPin,if(entry.pinned) "Unpin entry" else "Pin entry",tint=if(entry.pinned) Color(0xFFFFC107) else Muted)
+                    Icon(Icons.Outlined.PushPin,if(entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry),tint=if(entry.pinned) Color(0xFFFFC107) else Muted)
                 }
                 if(entry!=null) IconButton(onClick={session.trashPrivateEntry(entry.id);editorOpen=false},enabled=!session.busy,
-                    modifier=Modifier.testTag("delete_private_entry")) { Icon(Icons.Outlined.DeleteOutline,"Move to Trash") }
+                    modifier=Modifier.testTag("delete_private_entry")) { Icon(Icons.Outlined.DeleteOutline,uiText(R.string.ui_move_to_trash)) }
             } }
             item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                listOf(PrivateEntryKind.Note to "Note",PrivateEntryKind.Incident to "Incident").forEach { (value,label) ->
+                listOf(PrivateEntryKind.Note to uiText(R.string.note),PrivateEntryKind.Incident to uiText(R.string.incident)).forEach { (value,label) ->
                     FilterChip(selected=kind==value,onClick={kind=if(kind==value) null else value},label={Text(label)},
                         modifier=Modifier.weight(1f).testTag("private_kind_${value.name.lowercase()}"))
                 }
             } }
-            item { Field("Title (optional)",title,"private_entry_title",enabled=!session.busy) { title=it.take(120) } }
+            item { Field(uiText(R.string.title_optional),title,"private_entry_title",enabled=!session.busy) { title=it.take(120) } }
             item { OutlinedTextField(value=body,onValueChange={body=it.take(10_000)},label={Text(stringResource(R.string.private_details))},
-                modifier=Modifier.fillMaxWidth().heightIn(min=300.dp).testTag("private_entry_body"),enabled=!session.busy) }
+                modifier=Modifier.fillMaxWidth().heightIn(min=300.dp).testTag("private_entry_body").keepVisibleWhileTyping(),enabled=!session.busy) }
             item { Button(onClick={
                 session.savePrivateEntry(editingId,kind,title,body)
                 if(body.isNotBlank()) editorOpen=false
             },enabled=!session.busy && body.isNotBlank(),modifier=Modifier.fillMaxWidth().testTag("save_private_entry")) {
-                Text(if(editingId==null) "Save private entry" else "Update private entry")
+                Text(if(editingId==null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry))
             } }
             if(entry?.edits?.isNotEmpty()==true) item { TextButton(onClick={logEntryId=entry.id},modifier=Modifier.fillMaxWidth().testTag("private_edit_log")) {
                 Text("${stringResource(R.string.edit_log)} (${entry.edits.size})")
@@ -119,23 +122,23 @@ import java.util.Locale
     LazyVerticalGrid(columns=GridCells.Adaptive(160.dp),modifier=Modifier.fillMaxSize().oliveScrollbar(notesGridState),state=notesGridState,
         contentPadding=PaddingValues(start=18.dp,end=18.dp,top=12.dp,bottom=112.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item(span={GridItemSpan(maxLineSpan)}) { Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            IconButton(onClick=session::back,modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Previous safe page") }
-            Text(stringResource(R.string.notes_incidents),style=MaterialTheme.typography.headlineSmall,modifier=Modifier.weight(1f))
+            IconButton(onClick=session::back,modifier=Modifier.testTag("safe_home")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,uiText(R.string.ui_previous_safe_page)) }
+            Text(stringResource(R.string.notes_incidents),style=MaterialTheme.typography.headlineSmall,modifier=(Modifier.weight(1f)).semantics { heading() })
             IconButton(onClick={trashOpen=true},modifier=Modifier.testTag("open_scratchpad")) {
                 BadgedBox(badge={if(trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) }}) {
-                    Icon(Icons.Outlined.DeleteOutline,"Trash")
+                    Icon(Icons.Outlined.DeleteOutline,uiText(R.string.ui_trash))
                 }
             }
-            FilledTonalIconButton(onClick={openEditor(null)},enabled=!session.busy,modifier=Modifier.testTag("new_private_entry")) { Icon(Icons.Outlined.Add,"New note") }
+            FilledTonalIconButton(onClick={openEditor(null)},enabled=!session.busy,modifier=Modifier.testTag("new_private_entry")) { Icon(Icons.Outlined.Add,uiText(R.string.ui_new_note)) }
         } }
-        item(span={GridItemSpan(maxLineSpan)}) { OutlinedTextField(search,{search=it.take(200)},modifier=Modifier.fillMaxWidth().testTag("private_notes_search"),
+        item(span={GridItemSpan(maxLineSpan)}) { OutlinedTextField(search,{search=it.take(200)},modifier=Modifier.fillMaxWidth().testTag("private_notes_search").keepVisibleWhileTyping(),
             placeholder={Text(stringResource(R.string.search_notes))},leadingIcon={Icon(Icons.Outlined.Search,null)},singleLine=true,
-            trailingIcon=if(search.isNotEmpty()) {{IconButton(onClick={search=""}) { Icon(Icons.Outlined.Close,"Clear search") }}} else null) }
+            trailingIcon=if(search.isNotEmpty()) {{IconButton(onClick={search=""}) { Icon(Icons.Outlined.Close,uiText(R.string.clear_search)) }}} else null) }
         if(session.message!=null || session.busy) item(span={GridItemSpan(maxLineSpan)}) { Status(session) }
-        if(filtered.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) { Text(if(search.isBlank()) "No private entries yet." else "No notes found.",color=Muted) }
+        if(filtered.isEmpty()) item(span={GridItemSpan(maxLineSpan)}) { Text(if(search.isBlank()) uiText(R.string.no_private_entries_yet) else uiText(R.string.no_notes_found),color=Muted) }
         if(pinned.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { Text(stringResource(R.string.pinned),style=MaterialTheme.typography.titleMedium,color=OliveGreen) }
         gridItems(pinned,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id},Modifier.animateItem()) }
-        if(others.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { Text(if(pinned.isEmpty()) "All notes" else "Others",style=MaterialTheme.typography.titleMedium) }
+        if(others.isNotEmpty()) item(span={GridItemSpan(maxLineSpan)}) { Text(if(pinned.isEmpty()) uiText(R.string.all_notes) else uiText(R.string.others),style=MaterialTheme.typography.titleMedium) }
         gridItems(others,key={it.id}) { entry -> PrivateNoteCard(entry,formatter,{openEditor(entry)},{session.togglePrivateEntryPin(entry.id)},{logEntryId=entry.id},Modifier.animateItem()) }
     }
 }
@@ -143,6 +146,7 @@ import java.util.Locale
 // UI sizing/color: Trash cards use a 1dp black outline, warm paper fill, 16dp padding, and Material text sizes.
 @Composable private fun Trash(entries: List<PrivateEntry>, formatter: DateTimeFormatter,
     restore: (String)->Unit, close: ()->Unit) {
+    val uiText=rememberResourceText()
     var now by remember(entries) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(entries) {
         while(true) { delay(1_000.milliseconds);now=System.currentTimeMillis() }
@@ -152,24 +156,24 @@ import java.util.Locale
         verticalArrangement=Arrangement.spacedBy(12.dp)) {
         item {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                IconButton(onClick=close,modifier=Modifier.testTag("close_scratchpad")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,"All notes") }
-                Text("Trash",style=MaterialTheme.typography.headlineSmall)
+                IconButton(onClick=close,modifier=Modifier.testTag("close_scratchpad")) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,uiText(R.string.all_notes)) }
+                Text(uiText(R.string.ui_trash),style=MaterialTheme.typography.headlineSmall,modifier=Modifier.semantics { heading() })
             }
             Text(if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L)
-                "For testing, deleted notes stay here for 10 seconds before their private contents are permanently erased."
-                else "Deleted notes stay here for 30 days, then their private contents are permanently erased.",color=Muted)
+                uiText(R.string.ui_for_testing_deleted_notes_stay_here_for_10_seconds_before_their_p)
+                else uiText(R.string.deleted_notes_stay_here_for_30_days_then_their_private_contents_are_permanently_erased),color=Muted)
         }
-        if(entries.isEmpty()) item { Text("Trash is empty.",color=Muted) }
+        if(entries.isEmpty()) item { Text(uiText(R.string.ui_trash_is_empty),color=Muted) }
         items(entries,key={it.id}) { entry ->
             Card(Modifier.animateItem().fillMaxWidth().testTag("scratchpad_entry"),border=BorderStroke(1.dp,Color.Black),
                 colors=CardDefaults.cardColors(containerColor=Color(0xFFFFFDF4))) {
                 Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    entry.kind?.let { Text(if(it==PrivateEntryKind.Incident) "Incident" else "Note",color=OliveGreen) }
+                    entry.kind?.let { Text(if(it==PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(R.string.note),color=OliveGreen) }
                     if(entry.title.isNotBlank()) Text(entry.title,style=MaterialTheme.typography.titleMedium)
                     Text(entry.body,maxLines=5,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     Text(if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L)
-                        "${entry.trashSecondsRemaining(now)} ${"seconds remaining"}"
-                        else "${entry.trashDaysRemaining(now)} ${stringResource(R.string.days_remaining)}",
+                        uiText(R.string.ui_value_seconds_remaining , entry.trashSecondsRemaining(now))
+                        else uiText(R.string.ui_value_days_remaining , entry.trashDaysRemaining(now)),
                         style=MaterialTheme.typography.bodySmall,color=Muted)
                     Text(formatter.format(Instant.ofEpochMilli(entry.deletedAt ?: entry.updatedAt)),style=MaterialTheme.typography.bodySmall,color=Muted)
                     OutlinedButton(onClick={restore(entry.id)},modifier=Modifier.fillMaxWidth().testTag("restore_private_entry")) {
@@ -183,13 +187,14 @@ import java.util.Locale
 
 // UI sizing/color: revision cards use 16dp padding, black outlines, soft olive badges, and small Muted timestamps.
 @Composable private fun PrivateEntryEditLog(entry: PrivateEntry, formatter: DateTimeFormatter, close: ()->Unit) {
+    val uiText=rememberResourceText()
     val listState=rememberLazyListState()
     LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=112.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         item {
             TextButton(onClick=close,modifier=Modifier.testTag("close_private_edit_log")) {
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack,null);Text(stringResource(R.string.close))
             }
-            Text(stringResource(R.string.edit_log),style=MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.edit_log),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
             Text(entry.title.ifBlank { stringResource(R.string.untitled_entry) },style=MaterialTheme.typography.titleMedium,color=Muted)
             Text("${entry.edits.size} ${stringResource(R.string.revisions)}",style=MaterialTheme.typography.bodySmall,color=Muted)
         }
@@ -212,10 +217,10 @@ import java.util.Locale
                             Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                                 Text(change.field,style=MaterialTheme.typography.labelLarge,color=OliveGreen)
                                 Text(stringResource(R.string.before),style=MaterialTheme.typography.labelSmall,color=Muted)
-                                Text(change.before.ifBlank { "Empty" })
+                                Text(change.before.ifBlank { uiText(R.string.empty) })
                                 HorizontalDivider(Modifier.padding(vertical=3.dp))
                                 Text(stringResource(R.string.after),style=MaterialTheme.typography.labelSmall,color=Muted)
-                                Text(change.after.ifBlank { "Empty" })
+                                Text(change.after.ifBlank { uiText(R.string.empty) })
                             }
                         }
                     }
@@ -228,13 +233,14 @@ import java.util.Locale
 // UI sizing/color: note cards use a 1dp outline, warm paper fill, 14dp padding, and up to three title lines.
 @Composable private fun PrivateNoteCard(entry: PrivateEntry, formatter: DateTimeFormatter,
     open: ()->Unit, pin: ()->Unit, openLog: ()->Unit, modifier: Modifier=Modifier) {
+    val uiText=rememberResourceText()
     Card(onClick=open,modifier=modifier.fillMaxWidth().testTag("private_entry_row"),
         border=BorderStroke(1.dp,Color.Black),colors=CardDefaults.cardColors(containerColor=Color(0xFFFFFDF4))) {
         Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                entry.kind?.let { Text(if(it==PrivateEntryKind.Incident) "Incident" else "Note",style=MaterialTheme.typography.labelMedium,color=OliveGreen,modifier=Modifier.weight(1f)) }
+                entry.kind?.let { Text(if(it==PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(R.string.note),style=MaterialTheme.typography.labelMedium,color=OliveGreen,modifier=Modifier.weight(1f)) }
                     ?: Spacer(Modifier.weight(1f))
-                IconButton(onClick=pin,modifier=Modifier.size(34.dp).testTag("private_pin")) { Icon(Icons.Outlined.PushPin,if(entry.pinned) "Unpin entry" else "Pin entry",tint=if(entry.pinned) Color(0xFFFFC107) else Muted) }
+                IconButton(onClick=pin,modifier=Modifier.size(34.dp).testTag("private_pin")) { Icon(Icons.Outlined.PushPin,if(entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry),tint=if(entry.pinned) Color(0xFFFFC107) else Muted) }
             }
             if(entry.title.isNotBlank()) Text(entry.title,style=MaterialTheme.typography.titleMedium,maxLines=3,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
             Text(entry.body,maxLines=8,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)

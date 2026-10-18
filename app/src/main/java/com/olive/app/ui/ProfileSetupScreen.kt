@@ -1,5 +1,8 @@
 package com.olive.app.ui
 
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 import com.olive.app.ui.covers.olive.AddressFields
@@ -24,13 +27,14 @@ import java.util.UUID
 // USER ONLY: abuse details, situation, trigger, optional safe contact, and cover-app choice are inside !safeContact blocks.
 // UI sizing/text: section titles use Material title sizes, helper text uses bodySmall, and all fields use the shared responsive form width.
 @Composable internal fun ProfileSetup(session: SessionViewModel) {
+    val uiText=rememberResourceText()
     val safeContact=session.accountRole==AccountRole.SAFE_CONTACT
     val existing=session.setupProfile
     var fullName by remember(existing) { mutableStateOf(existing?.fullName.orEmpty()) }
     var affected by remember(existing) { mutableStateOf(existing?.affectedNames.orEmpty()) }
     var abuserName by remember(existing) { mutableStateOf(existing?.abuserName.orEmpty()) }
     var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
-    var language by remember(existing) { mutableStateOf(existing?.language?.ifBlank { AppLocaleManager.resolveSystemDefaultLanguageName() } ?: AppLocaleManager.resolveSystemDefaultLanguageName()) }
+    val language=existing?.language?.ifBlank { AppLocaleManager.resolveSystemDefaultLanguageName() } ?: AppLocaleManager.resolveSystemDefaultLanguageName()
     var situation by remember(existing) { mutableStateOf(existing?.situation.orEmpty()) }
     var address by remember(existing) { mutableStateOf(existing?.address ?: DeliveryAddress()) }
     var trigger by remember { mutableStateOf("") }
@@ -38,11 +42,11 @@ import java.util.UUID
     var contactDetails by remember { mutableStateOf("") }
     val contacts=remember(existing) { mutableStateListOf<SafeContact>().also { it.addAll(existing?.contacts.orEmpty()) } }
     var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FOOD) }
-    val pages=if(safeContact) listOf("Personal details","Location") else
-        listOf("Personal details","Location","Safe entry & cover")
+    val pages=if(safeContact) listOf(uiText(R.string.ui_personal_details),uiText(R.string.location)) else
+        listOf(uiText(R.string.ui_personal_details),uiText(R.string.location),uiText(R.string.ui_safe_entry_cover))
     var page by rememberSaveable(existing?.username,safeContact) { mutableIntStateOf(0) }
     var showErrors by rememberSaveable { mutableStateOf(false) }
-    val validation=ProfileSetupValidation(safeContact,fullName,dob,language,address,trigger,contactName,contactDetails)
+    val validation=ProfileSetupValidation(safeContact,fullName,dob,address,trigger,contactName,contactDetails)
     val required=validation.requiredFields
     val completed=required.count { it }
     val supportValid=validation.supportValid
@@ -62,45 +66,44 @@ import java.util.UUID
         contacts=if(safeContact) emptyList() else collectedContacts(),
         address=address,coverType=coverType,role=session.accountRole))
     FormColumn {
-        Heading("Your profile",pages[page])
+        Heading(uiText(R.string.your_profile),pages[page])
         OnboardingProgress(progressCompleted,totalRequired,progressPage,stages,pageCompletion)
         AnimatedContent(targetState=pages[page],label="onboarding page") { current -> when(current) {
-            "Personal details" -> Column(verticalArrangement=Arrangement.spacedBy(16.dp)) {
-                Field("Full name (required)",fullName,"full_name",enabled=!session.busy,
-                    error=if(showErrors && fullName.isBlank()) "Name required" else null) {
+            uiText(R.string.ui_personal_details) -> Column(verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                Field(uiText(R.string.full_name_required),fullName,"full_name",enabled=!session.busy,
+                    error=if(showErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null) {
                     fullName=it.take(120);showErrors=false
                 }
-                BirthdayPicker(dob,"dob",!session.busy,error=if(showErrors && !InputPolicy.validDob(dob)) "Birthday required" else null) {
+                BirthdayPicker(dob,"dob",!session.busy,error=if(showErrors && !InputPolicy.validDob(dob)) uiText(R.string.ui_birthday_required) else null) {
                     dob=it;showErrors=false
                 }
-                LanguagePicker(language,!session.busy) { language=it;showErrors=false }
                 if(!safeContact) {
                     HorizontalDivider()
-                    Field("Names of people experiencing abuse (optional)",affected,"affected_names",enabled=!session.busy) { affected=it.take(500) }
-                    Field("Abuser's name (optional)",abuserName,"abuser_name",enabled=!session.busy) { abuserName=it.take(120) }
-                    Field("Brief description (optional)",situation,"situation",multiline=true,enabled=!session.busy) { situation=it.take(2000) }
+                    Field(uiText(R.string.names_of_people_experiencing_abuse_optional),affected,"affected_names",enabled=!session.busy) { affected=it.take(500) }
+                    Field(uiText(R.string.abuser_s_name_optional),abuserName,"abuser_name",enabled=!session.busy) { abuserName=it.take(120) }
+                    Field(uiText(R.string.ui_brief_description_optional),situation,"situation",multiline=true,enabled=!session.busy) { situation=it.take(2000) }
                 }
             }
-            "Location" -> Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                Text("Only your city is required.",color=Muted,style=MaterialTheme.typography.bodySmall)
-                AddressFields(address,cityOnlyRequired=true,cityError=if(showErrors && !address.locationValid) "City required" else null) {
+            uiText(R.string.location) -> Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Text(uiText(R.string.ui_only_your_city_is_required),color=Muted,style=MaterialTheme.typography.bodySmall)
+                AddressFields(address,cityOnlyRequired=true,cityError=if(showErrors && !address.locationValid) uiText(R.string.ui_city_required) else null) {
                     address=it;showErrors=false
                 }
             }
-            "Safe entry & cover" -> Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
-                Field("Trigger word or phrase",trigger,"trigger",secret=true,showSecretToggle=true,enabled=!session.busy,
-                    error=if(showErrors && !InputPolicy.validTrigger(trigger)) "Invalid trigger" else null) {
+            uiText(R.string.ui_safe_entry_cover) -> Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
+                Field(uiText(R.string.trigger_word_or_phrase),trigger,"trigger",secret=true,showSecretToggle=true,enabled=!session.busy,
+                    error=if(showErrors && !InputPolicy.validTrigger(trigger)) uiText(R.string.ui_invalid_trigger) else null) {
                     trigger=it.take(64);showErrors=false
                 }
-                RequirementBullet("3–64 characters",InputPolicy.validTrigger(trigger),trigger.isNotEmpty())
+                RequirementBullet(uiText(R.string.ui_3_64_characters),InputPolicy.validTrigger(trigger),trigger.isNotEmpty())
                 HorizontalDivider()
                 CoverPicker(coverType,!session.busy) { chosen ->
-                    if(chosen==CoverType.GAME) session.error("In development") else coverType=chosen
+                    if(chosen==CoverType.GAME) session.error(uiText(R.string.in_development)) else coverType=chosen
                 }
-                Text("Name and icon update after leaving the app.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                Text(uiText(R.string.ui_name_and_icon_update_after_leaving_the_app),color=Muted,style=MaterialTheme.typography.bodySmall)
                 HorizontalDivider()
-                Text("Safe contacts · optional",style=MaterialTheme.typography.titleLarge)
-                Text("Add one or more trusted people. Olive never contacts them automatically.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                Text(uiText(R.string.ui_safe_contacts_optional),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
+                Text(uiText(R.string.ui_add_one_or_more_trusted_people_olive_never_contacts_them_automati),color=Muted,style=MaterialTheme.typography.bodySmall)
                 contacts.forEach { contact ->
                     Surface(color=MaterialTheme.colorScheme.primaryContainer,shape=MaterialTheme.shapes.medium) {
                         Row(Modifier.fillMaxWidth().padding(start=14.dp,top=8.dp,bottom=8.dp,end=4.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -109,17 +112,17 @@ import java.util.UUID
                                 Text(contact.details,color=Muted,style=MaterialTheme.typography.bodySmall)
                             }
                             IconButton(onClick={contacts.remove(contact)},enabled=!session.busy) {
-                                Icon(Icons.Outlined.Close,"Remove safe contact")
+                                Icon(Icons.Outlined.Close,uiText(R.string.ui_remove_safe_contact))
                             }
                         }
                     }
                 }
-                Field("Contact name (optional)",contactName,"setup_contact_name",enabled=!session.busy && contacts.size<25,
-                    error=if(showErrors && !supportValid) "Complete both fields" else null) {
+                Field(uiText(R.string.ui_contact_name_optional),contactName,"setup_contact_name",enabled=!session.busy && contacts.size<25,
+                    error=if(showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null) {
                     contactName=it.take(120);showErrors=false
                 }
-                Field("Phone or email (optional)",contactDetails,"setup_contact_details",enabled=!session.busy && contacts.size<25,
-                    error=if(showErrors && !supportValid) "Complete both fields" else null) {
+                Field(uiText(R.string.ui_phone_or_email_optional),contactDetails,"setup_contact_details",enabled=!session.busy && contacts.size<25,
+                    error=if(showErrors && !supportValid) uiText(R.string.ui_complete_both_fields) else null) {
                     contactDetails=it.take(200);showErrors=false
                 }
                 OutlinedButton(onClick={
@@ -136,11 +139,11 @@ import java.util.UUID
         val last=safeContact && finalProfilePage
         OnboardingNavigation(back={showErrors=false;if(page>0) page-- else session.back()},next={
             showErrors=true
-            if(validation.isPageValid(pages[page])) {
+            if(validation.isPageValid(page)) {
                 showErrors=false
                 if(finalProfilePage) saveProfile() else page++
             }
         },last=last,nextTag=if(page==pages.lastIndex) "profile_submit" else "onboarding_next",enabled=!session.busy,
-            nextLabel=if(!safeContact && page==pages.lastIndex) "Next" else null)
+            nextLabel=if(!safeContact && page==pages.lastIndex) uiText(R.string.next) else null)
     }
 }

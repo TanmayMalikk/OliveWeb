@@ -1,6 +1,8 @@
 package com.olive.app.ui.session
 
 import android.os.SystemClock
+import android.os.Build
+import android.view.accessibility.AccessibilityManager
 import com.olive.app.data.*
 import com.olive.app.security.*
 import com.olive.app.ui.*
@@ -9,7 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
-// Owns capture handling and idle locking.
+// Handles reported captures and User inactivity; Android's accessibility timeout can extend the idle warning.
 internal class SessionPrivacy(private val runtime:SessionRuntime) {
     fun noteInteraction() {
         with(runtime) {
@@ -48,6 +50,7 @@ internal class SessionPrivacy(private val runtime:SessionRuntime) {
         }
     }
 
+    // This warning applies only while the User safe area is open; background locking remains immediate.
     fun startIdleTimer() {
         with(runtime) {
             with(state) {
@@ -60,7 +63,10 @@ internal class SessionPrivacy(private val runtime:SessionRuntime) {
                 idleJob=scope.launch {
                     while(screen==SessionScreen.Safe) {
                         delay(250.milliseconds)
-                        val countdown=IdlePolicy.countdown(SystemClock.elapsedRealtime()-lastTouchAt)
+                        val accessibility=application.getSystemService(AccessibilityManager::class.java)
+                        val warningDuration=if(Build.VERSION.SDK_INT>=29) accessibility?.getRecommendedTimeoutMillis(
+                            15_000,AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS)?.toLong() ?: 15_000L else 15_000L
+                        val countdown=IdlePolicy.countdown(SystemClock.elapsedRealtime()-lastTouchAt,warningDuration)
                         if(countdown==0) { navigation.quickExit();break }
                         idleCountdownSeconds=countdown
                     }

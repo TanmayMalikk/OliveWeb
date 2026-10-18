@@ -20,12 +20,14 @@ import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRe
 import com.olive.app.BuildConfig
 import com.olive.app.data.DeliveryAddress
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 import kotlin.time.Duration.Companion.milliseconds
 
 // Street typing and Google suggestions share one field so the address form never needs a second search box.
 // UI sizing/color: the address field fills its form; suggestion rows use surfaceVariant, 12dp padding, titleSmall, and bodySmall text.
-@Composable fun AddressAutocomplete(current: DeliveryAddress, label: String, onFocus: (() -> Unit)?=null, onChange: (DeliveryAddress)->Unit) {
+@Composable fun AddressAutocomplete(current: DeliveryAddress, label: String, onFocus: (() -> Unit)?=null, cityOnly:Boolean=false,fieldError:String?=null,onChange: (DeliveryAddress)->Unit) {
+    val uiText=rememberResourceText()
     val context=LocalContext.current
     val key=BuildConfig.PLACES_API_KEY
     var predictions by remember { mutableStateOf<List<AutocompletePrediction>>(emptyList()) }
@@ -39,20 +41,26 @@ import kotlin.time.Duration.Companion.milliseconds
         }
     }
 
-    LaunchedEffect(current.line1,token,client) {
+    var focused by remember { mutableStateOf(false) }
+    val query=if(cityOnly) current.city else current.line1
+    LaunchedEffect(query,token,client,focused) {
         predictions=emptyList()
-        if(selectedLine==current.line1) { selectedLine=null;return@LaunchedEffect }
-        if(client==null || current.line1.trim().length<3) return@LaunchedEffect
+        if(selectedLine==query) { selectedLine=null;return@LaunchedEffect }
+        if(!focused || client==null || query.trim().length<3) return@LaunchedEffect
         delay(300.milliseconds)
         runCatching {
             client.findAutocompletePredictions(FindAutocompletePredictionsRequest.builder()
-                .setQuery(current.line1.trim()).setSessionToken(token).setRegionCode("ca").build()).await().autocompletePredictions
-        }.onSuccess { predictions=it }.onFailure { error="Address suggestions are unavailable. Continue entering your address." }
+                .setQuery(query.trim()).setSessionToken(token).setRegionCode("ca")
+                .apply { if(cityOnly) setTypesFilter(listOf("locality")) }.build()).await().autocompletePredictions
+        }.onSuccess { predictions=it }.onFailure {
+            if(it is CancellationException) throw it
+            error=uiText(R.string.address_suggestions_are_unavailable_continue_entering_your_address)
+        }
     }
 
-    OutlinedTextField(value=current.line1,onValueChange={onChange(current.copy(line1=it.take(160)));error=null},singleLine=true,
-        label={Text(label)},modifier=Modifier.fillMaxWidth().testTag("address_line1").onFocusChanged { if(it.isFocused) onFocus?.invoke() },
-        isError=error!=null,supportingText=error?.let { value -> { Text(value) } })
+    OutlinedTextField(value=query,onValueChange={onChange(if(cityOnly) current.copy(city=it.take(160)) else current.copy(line1=it.take(160)));error=null},singleLine=true,
+        label={Text(label)},modifier=Modifier.fillMaxWidth().testTag(if(cityOnly) "address_city" else "address_line1").onFocusChanged { focused=it.isFocused;if(it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
+        isError=error!=null || fieldError!=null,supportingText=(fieldError ?: error)?.let { value -> { AccessibleMessage(value) } })
     if(client!=null) {
         predictions.forEach { prediction ->
             Surface(Modifier.fillMaxWidth().clickable {
@@ -60,10 +68,11 @@ import kotlin.time.Duration.Companion.milliseconds
                 val request=FetchPlaceRequest.builder(prediction.placeId,listOf(Place.Field.ADDRESS_COMPONENTS,Place.Field.FORMATTED_ADDRESS))
                     .setSessionToken(token).build()
                 client.fetchPlace(request).addOnSuccessListener { response ->
-                    val selected=response.place.toDeliveryAddress(current)
-                    selectedLine=selected.line1;onChange(selected)
+                    val resolved=response.place.toDeliveryAddress(current)
+                    val selected=if(cityOnly) current.copy(city=resolved.city,province=resolved.province,country=resolved.country) else resolved
+                    selectedLine=if(cityOnly) selected.city else selected.line1;onChange(selected)
                     token=AutocompleteSessionToken.newInstance();error=null
-                }.addOnFailureListener { error="That address could not be filled automatically. Continue entering your address." }
+                }.addOnFailureListener { error=uiText(R.string.that_address_could_not_be_filled_automatically_continue_entering_your_address) }
             },shape=MaterialTheme.shapes.small,color=MaterialTheme.colorScheme.surfaceVariant) {
                 Column(Modifier.padding(12.dp)) {
                     Text(prediction.getPrimaryText(null).toString(),style=MaterialTheme.typography.titleSmall)

@@ -38,7 +38,8 @@ object SecretVerifier {
 // Change username, password, PIN, trigger, or DOB limits here, then update the matching screen message and test.
 object InputPolicy {
     fun username(value: String) = value.trim().lowercase(Locale.ROOT)
-    fun validUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{8,24}"))
+    fun usernameHasLetter(value: String) = value.any { it in 'a'..'z' || it in 'A'..'Z' }
+    fun validUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{8,24}")) && usernameHasLetter(value)
     // Existing accounts created under the former four-character minimum remain able to sign in.
     fun validExistingUsername(value: String) = username(value).matches(Regex("[a-z0-9_]{4,24}"))
     fun passwordHasValidLength(value: String) = value.length in 8..24
@@ -47,6 +48,10 @@ object InputPolicy {
     fun passwordHasSpecialCharacter(value: String) = value.any { !it.isLetterOrDigit() && !it.isWhitespace() }
     fun validPassword(value: String) = passwordHasValidLength(value) && passwordHasLetter(value) &&
         passwordHasNumber(value) && passwordHasSpecialCharacter(value)
+    fun passwordExcludesUsername(value: String, accountUsername: String): Boolean =
+        username(accountUsername).let { it.isNotEmpty() && !value.contains(it,ignoreCase=true) }
+    fun validAccountPassword(value: String, accountUsername: String) =
+        validPassword(value) && passwordExcludesUsername(value,accountUsername)
     fun validPin(value: String) = value.matches(Regex("[0-9]{4,6}"))
     fun validTrigger(value: String) = value.trim().length in 3..64
     fun triggerHash(value: String): String = MessageDigest.getInstance("SHA-256")
@@ -61,16 +66,19 @@ object InputPolicy {
     }.getOrDefault(false)
 }
 
-// Change the five-try rule here; keep it cooldown-free for emergency access.
+// Count five failures without a timed cooldown; keep DeviceStore's reset and SessionAccess's exit threshold aligned.
 data class GateState(val failures: Int = 0) {
     fun failed(): GateState = GateState(if (failures in 0..3) failures + 1 else if (failures == 4) 5 else 1)
 }
 
-// No touches for a minute starts a 15-second warning before the safe side locks.
+// One minute without interaction starts a warning; accessibility settings can extend its fifteen-second default.
 object IdlePolicy {
-    fun countdown(elapsedMs: Long): Int? = when {
-        elapsedMs < 60_000L -> null
-        elapsedMs >= 75_000L -> 0
-        else -> ((75_000L-elapsedMs+999L)/1000L).toInt()
+    fun countdown(elapsedMs: Long,warningDurationMs:Long=15_000L): Int? {
+        val lockAt=60_000L+warningDurationMs.coerceIn(15_000L,Int.MAX_VALUE.toLong())
+        return when {
+            elapsedMs < 60_000L -> null
+            elapsedMs >= lockAt -> 0
+            else -> ((lockAt-elapsedMs+999L)/1000L).toInt()
+        }
     }
 }
