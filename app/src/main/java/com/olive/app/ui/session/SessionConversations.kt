@@ -1,4 +1,5 @@
 package com.olive.app.ui.session
+import com.olive.app.R
 
 import androidx.core.content.edit
 import com.olive.app.data.*
@@ -20,7 +21,7 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
                 val token=epoch
                 messageSubscription=messagingRepository?.observeMessages(conversation.id,{ rows ->
                     if(epoch==token && activeConversation?.id==conversation.id) chatMessages=rows
-                },{ error -> if(epoch==token) message="Unable to load this conversation. $error" })
+                },{ error -> if(epoch==token) message=runtime.application.getString(R.string.ui_unable_to_load_this_conversation_value , error) })
             }
         }
     }
@@ -49,7 +50,7 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
                         if(epoch==token && activeConversation?.id==conversation.id) onSent()
                     }
                     catch(error: CancellationException) { throw error }
-                    catch(error: Exception) { if(epoch==token) message=error.localizedMessage ?: "Unable to send the message." }
+                    catch(error: Exception) { if(epoch==token) message=runtime.application.getString(R.string.ui_unable_to_send_the_message) }
                     finally { if(epoch==token) messagingBusy=false }
                 }
             }

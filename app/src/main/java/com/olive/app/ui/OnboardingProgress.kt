@@ -1,7 +1,6 @@
 package com.olive.app.ui
+import com.olive.app.R
 
-
-import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.material3.*
@@ -14,15 +13,28 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 
-// Numbered olives hang from the branch and mark each onboarding page.
+// Multi-page onboarding gets a width-filling branch with page-specific leaf layouts and fixed-size olives/leaves.
+// TalkBack receives one progress summary instead of separate decorative drawing nodes.
 @Composable internal fun OnboardingProgress(completed:Int,total:Int,page:Int,pages:Int,pageComplete:List<Boolean>) {
+    val uiText=rememberResourceText()
     if(pages<=1) return
     val layout=remember(pages) { OnboardingBranchLayout(pages) }
     val naturalStepOffsets=layout.naturalStepOffsets
     val sprigs=layout.sprigs
-    Column(verticalArrangement=Arrangement.spacedBy(2.dp),modifier=Modifier.fillMaxWidth().testTag("onboarding_progress")) {
+    val stepLabel=uiText(R.string.a11y_step)
+    val completedLabel=uiText(R.string.a11y_completed_requirements)
+    Column(verticalArrangement=Arrangement.spacedBy(2.dp),modifier=Modifier.fillMaxWidth().testTag("onboarding_progress").clearAndSetSemantics {
+        contentDescription="$stepLabel ${page+1} / $pages"
+        stateDescription="$completedLabel: $completed / $total"
+        progressBarRangeInfo=ProgressBarRangeInfo(completed.toFloat(),0f..total.coerceAtLeast(1).toFloat())
+    }) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // Stretch only the stem and distribute fruit along it; artwork stays at its original size.
             val availableSpan=(maxWidth.value-72f).coerceAtLeast(0f)
@@ -83,8 +95,8 @@ import androidx.compose.ui.unit.dp
             }
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
-            Text("Step ${page+1} of $pages",style=MaterialTheme.typography.labelLarge)
-            Text("$completed of $total required",style=MaterialTheme.typography.labelMedium,color=Muted)
+            Text(uiText(R.string.ui_step_value_of_value , page+1, pages),style=MaterialTheme.typography.labelLarge)
+            Text(uiText(R.string.ui_value_of_value_required , completed, total),style=MaterialTheme.typography.labelMedium,color=Muted)
         }
     }
 }

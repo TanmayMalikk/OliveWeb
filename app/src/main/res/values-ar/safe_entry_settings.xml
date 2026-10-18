@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entry_restore_lock">هذا الهاتف بلا قفل شاشة ولم يتم إعداد رمز احتياطي للتطبيق. أعد تفعيل قفل الهاتف لاستخدام مصادقة الجهاز.</string>
+    <string name="entry_set_pin_first">أعد رمز التطبيق أدناه قبل اختياره طريقة للدخول.</string>
+    <string name="entry_settings_saved">تم حفظ إعدادات الدخول الآمن.</string>
+    <string name="entry_current_method">الطريقة المفضلة: %1$s</string>
+    <string name="entry_backup_description">يمكنك إعداد الطريقتين. عند اختيار قفل الجهاز، لا يتوفر رمز التطبيق إلا إذا تمت إزالة قفل شاشة الهاتف. إلغاء مصادقة Android أو فشلها لا يفعّل الرمز الاحتياطي.</string>
+    <string name="entry_use_device">إعداد قفل الجهاز واستخدامه</string>
+    <string name="entry_use_pin">استخدام رمز التطبيق المحفوظ</string>
+    <string name="entry_pin_setup">إعداد رمز التطبيق أو تغييره</string>
+    <string name="entry_save_backup">حفظ الرمز الاحتياطي</string>
+    <string name="entry_save_use_pin">حفظ رمز التطبيق واستخدامه</string>
+    <string name="entry_confirm_settings">أكد هويتك عبر Android لتغيير إعدادات الدخول الآمن.</string>
+    <string name="entry_settings_cancelled">تم إلغاء المصادقة. لم تتغير إعدادات الدخول الآمن.</string>
+    <string name="entry_settings_failed">تعذر إكمال التغيير. تحقق من طريقة الدخول المحددة وحاول مجددًا.</string>
+</resources>

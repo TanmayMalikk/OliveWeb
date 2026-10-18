@@ -40,7 +40,7 @@ class LocalSafeUpdateCheckWorker(context:Context,parameters:WorkerParameters):Co
             if(incomingUpdate) SafeUpdateNotificationScheduler.schedule(applicationContext)
             Result.success()
         } catch(_:Exception) {
-            // The short testing loop schedules its own next attempt instead of using WorkManager's longer retry backoff.
+            // If background checks are enabled, the next scheduled check handles retries instead of WorkManager backoff.
             Result.success()
         }
         if(FirebaseAuth.getInstance().currentUser!=null)
@@ -118,7 +118,7 @@ object LocalNotificationEventHandler {
             .getString("account_role",null).orEmpty(),
     )
 
-    // Live listeners handle messages immediately while Olive is running; WorkManager remains the background fallback.
+    // Live listeners detect updates while the process runs; background polling stays off unless explicitly enabled above.
     private fun startForegroundListeners(context:Context) {
         val uid=FirebaseAuth.getInstance().currentUser?.uid ?: return
         if(activeUid==uid && friendListListener!=null) return

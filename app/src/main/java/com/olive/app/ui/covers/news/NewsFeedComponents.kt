@@ -1,5 +1,6 @@
 package com.olive.app.ui.covers.news
 
+import com.olive.app.ui.LocalizedIcon as Icon
 import com.olive.app.ui.*
 
 import androidx.compose.foundation.BorderStroke

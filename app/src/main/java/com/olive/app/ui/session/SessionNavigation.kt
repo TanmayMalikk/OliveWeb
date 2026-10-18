@@ -3,7 +3,7 @@ package com.olive.app.ui.session
 import com.olive.app.data.*
 import com.olive.app.ui.*
 
-// Owns screen history, background locking and quick exit.
+// Owns navigation history and background locking; quick exit clears PIN authorization and invalidates pending operations.
 internal class SessionNavigation(private val runtime:SessionRuntime) {
     fun openScreen(value: SessionScreen) {
         with(runtime) {
@@ -15,10 +15,15 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
         }
     }
 
+    // User exits also advance the cover-focus event so TalkBack leaves the old private screen.
     fun quickExit() {
         with(runtime) {
             with(state) {
+                enrollment?.let { accountRole=it.role }
+                if(accountRole==AccountRole.USER && screen in setOf(SessionScreen.Safe,SessionScreen.Pin)) accessibilityExitVersion++
                 epoch++
+                pinAuthorizedUid=null;pinAuthorizedEpoch=-1L
+                deviceLockRequest?.complete(null);deviceLockRequest=null
                 operationJob?.cancel();operationJob=null
                 idleJob?.cancel();idleJob=null;idleCountdownSeconds=null
                 busy=false;checkoutActive=false;coverReset++;addressPrompt=false
