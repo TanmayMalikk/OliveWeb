@@ -144,4 +144,11 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
             body = body
         )
     }
+
+    /**
+     * Completely deletes an encrypted entry from the cloud.
+     */
+    suspend fun deleteEntry(entryId: String) {
+        firestore.collection("privateEntries").document(entryId).delete().await()
+    }
 }
