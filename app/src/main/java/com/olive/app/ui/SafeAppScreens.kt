@@ -43,6 +43,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.ui.window.Dialog
@@ -386,10 +387,14 @@ import java.util.UUID
                                     color=if(mine) Color.White.copy(alpha=.78f) else Muted)
                                 if (chat.unsent) {
                                     Text("Message unsent", fontStyle = FontStyle.Italic, color = if(mine) Color.White.copy(alpha=.7f) else Muted)
-                                } else if (chat.body.startsWith("SHARED_NOTE:")) {
+                                } else if (chat.body.startsWith("SHARED_NOTE:") || chat.body.startsWith("SHARED_INCIDENT:")) {
                                     val parts = chat.body.split(":", limit = 3)
+                                    val prefix = parts.getOrNull(0) ?: ""
                                     val noteId = parts.getOrNull(1) ?: ""
-                                    val noteTitle = parts.getOrNull(2) ?: "Encrypted Note"
+                                    val noteTitle = parts.getOrNull(2) ?: "Encrypted Document"
+
+                                    // Swap the icon visually based on the prefix type
+                                    val cardIcon = if (prefix == "SHARED_INCIDENT") Icons.Outlined.Warning else Icons.Outlined.Lock
 
                                     Surface(
                                         onClick = { session.openSharedPrivateEntry(noteId) },
@@ -398,7 +403,7 @@ import java.util.UUID
                                         modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth()
                                     ) {
                                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Outlined.Lock, contentDescription = "Secure Note", modifier = Modifier.size(20.dp).padding(end = 8.dp))
+                                            Icon(cardIcon, contentDescription = "Secure Document", modifier = Modifier.size(20.dp).padding(end = 8.dp))
                                             Text(noteTitle, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                                         }
                                     }
@@ -420,7 +425,16 @@ import java.util.UUID
             }
         }
         Status(session)
+        var showAttachmentPicker by remember { mutableStateOf(false) }
+
+        if (showAttachmentPicker) {
+            AttachmentPicker(session = session, onDismiss = { showAttachmentPicker = false })
+        }
+
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            IconButton(onClick = { showAttachmentPicker = true }) {
+                Icon(Icons.Outlined.Add, contentDescription = "Attach Secure Document")
+            }
             OutlinedTextField(draft,{if(it.length<=2_000) draft=it},label={LocalizedText("Message")},
                 modifier=Modifier.weight(1f).testTag("message_body"),maxLines=4)
             Button(onClick={session.sendMessage(draft) { draft="" }},enabled=draft.isNotBlank() && !session.messagingBusy,

@@ -144,6 +144,13 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.owner_id == request.auth.uid;
     }
 
+    match /privateEntries/{entryId} {
+      allow read: if signedIn() && request.auth.uid in resource.data.allowedUsers;
+      allow create: if signedIn() && request.auth.uid == request.resource.data.ownerUid;
+      allow update: if signedIn() && request.auth.uid == resource.data.ownerUid;
+      allow delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
+    }
+
     // Username lookup is exact and case-normalized by the app; listing the directory is never allowed.
     match /messageDirectory/{username} {
       allow get: if signedIn();
