@@ -935,8 +935,22 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
             updatedAt=now,kind=kind,title=cleanTitle,body=cleanBody,
             pinned=existing?.pinned ?: false,
             edits=existing?.edits.orEmpty()+if(existing==null) emptyList() else listOf(PrivateEntryEdit(timestamp=now,changes=changes)))
+            
         runOperation("Unable to save this private entry. Please retry.") { token ->
             withContext(Dispatchers.IO) { store.savePrivateEntry(uid,entry) }
+            
+            // NEW CSE CLOUD PIPELINE: Encrypt and save for the Owner ONLY
+            secureDocumentRepository?.let { repo ->
+                val myPublicKey = KeyManager.getPublicKey() ?: throw Exception("Hardware public key missing")
+                repo.saveMultiRecipientEntry(
+                    entryId = entry.id,
+                    ownerUid = uid,
+                    title = entry.title,
+                    body = entry.body,
+                    recipientPublicKeys = mapOf(uid to myPublicKey) // Exclusively wrapped for the owner
+                )
+            }
+
             if(epoch==token && screen==SessionScreen.Safe && page==SafePage.Notes) {
                 privateEntries=withContext(Dispatchers.IO) { store.privateEntries(uid) }
                 message=if(localMode) "Saved privately on this device." else "Saved privately. Syncing to your account."
@@ -985,15 +999,21 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
                 // 3. Grant them cryptographic access to the Note
                 secureRepo.grantAccessToEntry(entry.id, device.uid, friendUid, friendPublicKey)
 
-                // 4. Send the pointer in the E2EE Chat
+                // 4. Dynamically assign the prefix based on the entry kind
+                val prefix = when (entry.kind) {
+                    com.olive.app.data.PrivateEntryKind.Incident -> "SHARED_INCIDENT"
+                    else -> "SHARED_NOTE"
+                }
+
+                // 5. Send the pointer in the E2EE Chat
                 val roomKey = chatRepo.loadRoomKey(conversation.id, device.uid)
-                val pointerText = "SHARED_NOTE:${entry.id}:${entry.title}" // A formatted string the UI can parse into a special chat bubble
+                val pointerText = "$prefix:${entry.id}:${entry.title}"
                 chatRepo.sendSecureMessage(conversation.id, AccountIdentity(device.uid, coverUsername), pointerText, roomKey)
 
-                if (epoch == token) message = "Note shared in chat."
+                if (epoch == token) message = "${entry.kind?.name ?: "Note"} shared in chat."
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) {
-                if (epoch == token) message = error.localizedMessage ?: "Unable to share note."
+                if (epoch == token) message = error.localizedMessage ?: "Unable to share."
             } finally {
                 if (epoch == token) messagingBusy = false
             }
@@ -1014,13 +1034,19 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
 
                 if (epoch == token) {
                     viewedSharedEntry = decryptedEntry
-                    // Optionally route them to a specific viewer screen:
-                    // screen = SessionScreen.Safe
-                    // page = SafePage.SharedNoteViewer
                 }
             } catch (error: CancellationException) { throw error }
             catch (error: Exception) {
-                if (epoch == token) message = error.localizedMessage ?: "Unable to decrypt this shared entry."
+                if (epoch == token) {
+                    val msg = error.message ?: ""
+                    if (error is FirebaseFirestoreException && error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                        message = "You have lost access to this shared entry."
+                    } else if (msg.contains("PERMISSION_DENIED") || msg.contains("Document not found") || msg.contains("missing")) {
+                        message = "You have lost access to this shared entry."
+                    } else {
+                        message = error.localizedMessage ?: "Unable to decrypt this shared entry."
+                    }
+                }
             } finally {
                 if (epoch == token) busy = false
             }
@@ -1035,7 +1061,16 @@ class SessionViewModel(application: Application) : AndroidViewModel(application)
         updatePrivateEntry(existing.copy(updatedAt=now,pinned=false,deletedAt=now),
             "Unable to move this entry to Trash. Please retry.",
             if(PRIVATE_ENTRY_TRASH_RETENTION_MS<60_000L) "Moved to Trash for 10 seconds." else "Moved to Trash for 30 days.")
+        
         val uid=enrollment?.uid ?: return
+        
+        // When an entry is moved to the trash, also delete it from the cloud so it can no longer be accessed via shared pointers.
+        secureDocumentRepository?.let { repo ->
+            viewModelScope.launch {
+                try { repo.deleteEntry(id) } catch (e: Exception) { /* Silently fail background deletion */ }
+            }
+        }
+        
         viewModelScope.launch {
             delay((PRIVATE_ENTRY_TRASH_RETENTION_MS+100L))
             val purged=withContext(Dispatchers.IO) { store.purgeExpiredPrivateEntries(uid) }
