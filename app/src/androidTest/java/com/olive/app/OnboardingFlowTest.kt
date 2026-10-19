@@ -115,7 +115,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         assertFalse(privateBytes.contains("Updated private incident details"))
         click("safe_home")
         compose.runOnIdle { assertFalse(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
-        click("safe_settings");click("safe_contacts")
+        click("support_menu_toggle");click("support_contacts")
         fill("contact_name","Trusted Friend"); fill("contact_details","friend@example.invalid"); click("save_contact")
         compose.waitUntil(30_000) { compose.onAllNodesWithText("Trusted Friend").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Edit").performScrollTo().performClick()
@@ -129,7 +129,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("quick_exit").performClick(); waitCover()
         compose.onNodeWithText("Updated Friend").assertDoesNotExist()
         compose.activityRule.scenario.recreate(); waitCover()
-        unlock();click("safe_settings");click("safe_contacts");compose.onNodeWithText("Updated Friend").assertExists()
+        unlock();click("support_menu_toggle");click("support_contacts");compose.onNodeWithText("Updated Friend").assertExists()
         compose.onNodeWithTag("quick_exit").performClick(); waitCover()
         compose.onNodeWithText("Cart").performClick()
         compose.onNodeWithText("Garden harvest bowl").assertExists()
@@ -144,6 +144,6 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("new_pin","654321"); fill("confirm_pin","654321"); click("pin_setup_submit")
         waitCover()
         compose.onNodeWithText("Discover").performClick(); waitCover()
-        unlock("654321");click("safe_settings");click("safe_contacts");compose.onNodeWithText("Updated Friend").assertExists()
+        unlock("654321");click("support_menu_toggle");click("support_contacts");compose.onNodeWithText("Updated Friend").assertExists()
     }
 }

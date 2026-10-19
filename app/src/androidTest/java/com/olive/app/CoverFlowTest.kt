@@ -13,6 +13,7 @@ class CoverFlowTest {
     @Before fun showCover() { compose.setContent { OliveTheme { OliveCover() } } }
 
     @Test fun searchFiltersAndClears() {
+        compose.onNodeWithTag("cover_brand_food").assertIsDisplayed()
         compose.onNode(hasSetTextAction()).performTextInput("nothingmatches")
         compose.onNodeWithText("Nothing on the menu yet").assertExists()
         compose.onNodeWithContentDescription("Clear search").performClick()
