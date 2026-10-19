@@ -552,6 +552,13 @@
     <string name="unsend_message">取消发送消息</string>
     <string name="message_unsent">消息未发送</string>
     <string name="message_actions">消息操作</string>
+    <string name="share_attachment">分享附件</string><string name="select_attachment_category">选择%1$s</string>
+    <string name="private_notes">私人笔记</string><string name="incident_reports">事件报告</string><string name="saved_media">已保存的媒体</string>
+    <string name="no_private_notes_found">未找到笔记。</string><string name="untitled_note">无标题笔记</string><string name="no_incident_reports_found">未找到事件报告。</string>
+    <string name="media_uploads_not_configured">媒体上传尚未配置。</string><string name="secure_shared_entry">安全共享内容</string><string name="close_shared_entry">关闭共享内容</string>
+    <string name="attach_secure_entry">附加安全笔记或事件报告</string><string name="encrypted_document">加密文档</string><string name="shared_private_note">共享的私人笔记</string><string name="shared_incident_report">共享的事件报告</string>
+    <string name="private_entry_shared">私人内容已安全共享。</string><string name="unable_to_share_private_entry">无法分享此私人内容。</string><string name="unable_to_open_shared_entry">无法打开此共享内容。</string><string name="unable_to_open_secure_conversation">无法打开此安全对话。对方可能需要先打开更新后的应用。</string>
+    <string name="secure_message">安全消息</string><string name="encrypted_message_unavailable">加密消息不可用</string>
     <string name="incorrect_pin_attempts_remaining">PIN 码不正确。剩余 %1$d 尝试次数。</string>
     <string name="pin_attempt_history_count">PIN 尝试历史 · %1$d</string>
     <string name="future_feature_count">未来功能 %1$d</string>

@@ -8,6 +8,10 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.olive.app.security.KeyManager
+import java.util.Base64
 
 class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
     init {
@@ -17,9 +21,11 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
 
     suspend fun registerUser(identity: AccountIdentity) {
         val username=identity.username.trim().lowercase()
+        val publicKey=withContext(Dispatchers.Default) { KeyManager.getOrCreatePublicKey() }
         firestore.collection("messageDirectory").document(username).set(mapOf(
             "uid" to identity.uid,
             "username" to username,
+            "publicKey" to Base64.getEncoder().encodeToString(publicKey.encoded),
             "updatedAt" to FieldValue.serverTimestamp(),
         ),SetOptions.merge()).await()
     }
@@ -30,7 +36,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         val row=firestore.collection("messageDirectory").document(normalized).get().await()
         val uid=row.getString("uid") ?: return emptyList()
         val username=row.getString("username") ?: return emptyList()
-        return if(uid==currentUid) emptyList() else listOf(DirectoryUser(uid,username))
+        val publicKey=row.getString("publicKey").orEmpty()
+        return if(uid==currentUid) emptyList() else listOf(DirectoryUser(uid,username,publicKey))
     }
 
     fun observeSocial(uid: String, onUpdate: (SocialSnapshot)->Unit, onError: (String)->Unit): ChatSubscription {

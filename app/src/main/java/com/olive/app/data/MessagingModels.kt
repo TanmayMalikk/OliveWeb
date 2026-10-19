@@ -1,6 +1,6 @@
 package com.olive.app.data
 
-data class DirectoryUser(val uid: String, val username: String)
+data class DirectoryUser(val uid: String, val username: String, val publicKey: String = "")
 
 data class FriendRequest(
     val id: String,
