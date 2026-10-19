@@ -61,6 +61,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     val covers=SessionCoverState(this)
     val history=SessionHistory(this)
     val notes=SessionNotes(this)
+    val safety=SessionSafetyPlans(this)
     val settings=SessionSettings(this)
     val operations=SessionOperations(this)
 

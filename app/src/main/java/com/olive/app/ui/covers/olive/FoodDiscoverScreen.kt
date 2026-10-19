@@ -38,6 +38,8 @@ import androidx.compose.ui.platform.testTag
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal=24.dp, vertical=12.dp), verticalAlignment=Alignment.CenterVertically) {
                 // Cover sizing note: this 36sp value is the Olive wordmark; delivery text beside it should wrap or truncate instead of shrinking the brand.
+                Icon(Icons.Outlined.LocalDining,null,Modifier.size(30.dp).testTag("cover_brand_food"),tint=OliveGreen)
+                Spacer(Modifier.width(9.dp))
                 Text(uiText(R.string.ui_olive), fontFamily=FontFamily.Serif, fontWeight=FontWeight.Bold, fontSize=36.sp, color=OliveGreen)
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick=onDeliveryArea) {

@@ -36,6 +36,7 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     val triggerHistory get()=runtime.state.triggerHistory
     val checkoutHistory get()=runtime.state.checkoutHistory
     val privateEntries get()=runtime.state.privateEntries
+    internal val safetyPlans get()=runtime.safety
     val userSearchResults get()=runtime.state.userSearchResults
     val friends get()=runtime.state.friends
     val incomingFriendRequests get()=runtime.state.incomingFriendRequests
@@ -147,5 +148,5 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) = runtime.settings.changePassword(currentPassword,newPassword,confirmation)
     fun changePin(currentPin: String, newPin: String, confirmation: String) = runtime.settings.changePin(currentPin,newPin,confirmation)
 
-    override fun onCleared() { runtime.messaging.stopMessaging() }
+    override fun onCleared() { runtime.safety.close();runtime.messaging.stopMessaging() }
 }

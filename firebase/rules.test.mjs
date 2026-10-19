@@ -58,6 +58,8 @@ test('credentials and malformed contact data cannot be stored in profiles', asyn
   await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:Array(26).fill({id:'c',name:'Friend',details:'test'})}));
 
   await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid'}]}));
+  await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',safeToStay:true}]}));
+  await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',safeToStay:'yes'}]}));
 
 });
 

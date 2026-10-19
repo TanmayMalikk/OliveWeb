@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 // The Game cover owns its own placeholder until its gameplay and safe-entry trigger are designed.
-// UI sizing/color: the placeholder uses Cream, 24dp page padding, a 52dp icon with 22dp inset, and a 32sp OliveGreen title.
+// UI sizing/color: the placeholder uses Cream, 24dp page padding, and a game icon beside its 32sp OliveGreen title.
 @Composable fun GameCover(interactive: Boolean=true) {
     val uiText=rememberResourceText()
     BackHandler(interactive) { }
@@ -35,11 +35,12 @@ import androidx.compose.ui.unit.sp
         horizontalAlignment=Alignment.CenterHorizontally,
         verticalArrangement=Arrangement.Center,
     ) {
-        Surface(shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer) {
-            Icon(Icons.Outlined.SportsEsports,null,Modifier.padding(22.dp).size(52.dp),tint=OliveGreen)
+        Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Surface(shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer) {
+                Icon(Icons.Outlined.SportsEsports,null,Modifier.padding(12.dp).size(34.dp).testTag("cover_brand_game"),tint=OliveGreen)
+            }
+            Text(uiText(R.string.ui_game),fontFamily=FontFamily.Serif,fontSize=32.sp,fontWeight=FontWeight.SemiBold,color=OliveGreen)
         }
-        Spacer(Modifier.height(20.dp))
-        Text(uiText(R.string.ui_game),fontFamily=FontFamily.Serif,fontSize=32.sp,fontWeight=FontWeight.SemiBold,color=OliveGreen)
         Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.in_development),color=Muted)
     }
