@@ -19,9 +19,19 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
                 conversationActions.markConversationRead(conversation)
                 chatQuickExitHintVisible=accountRole==AccountRole.USER
                 val token=epoch
-                messageSubscription=messagingRepository?.observeMessages(conversation.id,{ rows ->
-                    if(epoch==token && activeConversation?.id==conversation.id) chatMessages=rows
-                },{ error -> if(epoch==token) message=runtime.application.getString(R.string.ui_unable_to_load_this_conversation_value , error) })
+                messagingBusy=true
+                scope.launch {
+                    try {
+                        val key=secureSharing.roomKey(conversation)
+                        if(epoch!=token || activeConversation?.id!=conversation.id) return@launch
+                        messageSubscription=secureChatRepository?.observeMessages(conversation.id,key,{ rows ->
+                            if(epoch==token && activeConversation?.id==conversation.id) chatMessages=rows
+                        },{ error -> if(epoch==token) message=runtime.application.getString(
+                            R.string.ui_unable_to_load_this_conversation_value,error) })
+                    } catch(error:CancellationException) { throw error }
+                    catch(_:Exception) { if(epoch==token) message=runtime.application.getString(R.string.unable_to_open_secure_conversation) }
+                    finally { if(epoch==token) messagingBusy=false }
+                }
             }
         }
     }
@@ -38,7 +48,7 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
     fun sendMessage(text: String, onSent: ()->Unit = {}) {
         with(runtime) {
             with(state) {
-                val repository=messagingRepository ?: return
+                val repository=secureChatRepository ?: return
                 val device=enrollment ?: return
                 val conversation=activeConversation ?: return
                 if(messagingBusy) return
@@ -46,7 +56,8 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
                 messagingBusy=true;message=null
                 scope.launch {
                     try {
-                        repository.send(conversation.id,AccountIdentity(device.uid,coverUsername),text)
+                        val key=secureSharing.roomKey(conversation)
+                        repository.send(conversation.id,AccountIdentity(device.uid,coverUsername),text,key)
                         if(epoch==token && activeConversation?.id==conversation.id) onSent()
                     }
                     catch(error: CancellationException) { throw error }
@@ -62,7 +73,9 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
             with(state) {
                 val conversation=activeConversation ?: return
                 messaging.runMessagingAction("Unable to unsend this message.") { repository,device,_ ->
-                    repository.unsend(conversation.id,chat,device.uid)
+                    secureSharing.revokeIfShared(chat,conversation,device.uid)
+                    secureChatRepository?.unsend(conversation.id,chat,device.uid)
+                        ?: repository.unsend(conversation.id,chat,device.uid)
                 }
             }
         }

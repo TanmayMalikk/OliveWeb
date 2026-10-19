@@ -25,4 +25,5 @@ import androidx.compose.runtime.*
         SafePage.SafetyPlan -> SafetyPlanScreen(session)
         SafePage.Documents -> SafetyDocumentsScreen(session)
     } }
+    if(session.viewedSharedEntry!=null) SharedEntryViewer(session)
 }

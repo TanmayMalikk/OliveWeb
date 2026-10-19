@@ -552,6 +552,13 @@ Buen humor.</string>
     <string name="unsend_message">Dejar enviar mensaje</string>
     <string name="message_unsent">Mensaje no enviado</string>
     <string name="message_actions">Acciones de mensaje</string>
+    <string name="share_attachment">Compartir archivo adjunto</string><string name="select_attachment_category">Seleccionar %1$s</string>
+    <string name="private_notes">Notas privadas</string><string name="incident_reports">Informes de incidentes</string><string name="saved_media">Contenido guardado</string>
+    <string name="no_private_notes_found">No se encontraron notas.</string><string name="untitled_note">Nota sin título</string><string name="no_incident_reports_found">No se encontraron informes de incidentes.</string>
+    <string name="media_uploads_not_configured">La carga de contenido aún no está configurada.</string><string name="secure_shared_entry">Elemento compartido seguro</string><string name="close_shared_entry">Cerrar elemento compartido</string>
+    <string name="attach_secure_entry">Adjuntar una nota o informe seguro</string><string name="encrypted_document">Documento cifrado</string><string name="shared_private_note">Nota privada compartida</string><string name="shared_incident_report">Informe de incidente compartido</string>
+    <string name="private_entry_shared">Elemento privado compartido de forma segura.</string><string name="unable_to_share_private_entry">No se pudo compartir este elemento privado.</string><string name="unable_to_open_shared_entry">No se pudo abrir este elemento compartido.</string><string name="unable_to_open_secure_conversation">No se pudo abrir esta conversación segura. Es posible que la otra persona deba abrir primero la aplicación actualizada.</string>
+    <string name="secure_message">Mensaje seguro</string><string name="encrypted_message_unavailable">Mensaje cifrado no disponible</string>
     <string name="incorrect_pin_attempts_remaining">PIN incorrecto. %1$d intentos restantes.</string>
     <string name="pin_attempt_history_count">Historial de intentos de PIN · %1$d</string>
     <string name="future_feature_count">Característica futura %1$d</string>

@@ -1,5 +1,5 @@
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {auth, db, bucket} = require("./firebase");
+const {auth, db, bucket, FieldValue} = require("./firebase");
 const {text, roleFromUser, PROTECTED_USERNAME} = require("./accountPolicy");
 const {readProfile, deleteOrganizationLogin, requireAdmin, listEveryUser} = require("./accountStorage");
 
@@ -42,6 +42,15 @@ exports.adminDeleteAccount = onCall(async (request) => {
   await deleteQuery(db.collection("friendRequests").where("recipientUid", "==", uid));
   await deleteQuery(db.collection("friendships").where("participantIds", "array-contains", uid));
   await deleteQuery(db.collection("conversations").where("participantIds", "array-contains", uid));
+  const privateEntries = await db.collection("privateEntries").where("allowedUsers", "array-contains", uid).get();
+  for (const entry of privateEntries.docs) {
+    if (entry.get("ownerUid") === uid) await entry.ref.delete();
+    else await entry.ref.update({
+      [`wrappedKeys.${uid}`]: FieldValue.delete(),
+      allowedUsers: FieldValue.arrayRemove(uid),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
   await deleteFriendListReferences(uid);
   await db.recursiveDelete(db.collection("friendLists").doc(uid)).catch(() => {});
   await db.collection("users").doc(uid).delete().catch(() => {});

@@ -19,6 +19,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -43,6 +46,7 @@ import java.util.Locale
     val uiText=rememberResourceText()
     val active=session.activeConversation ?: return
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
+    var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
     val listState=rememberLazyListState()
     val imeBottom=WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible=imeBottom>0
@@ -85,7 +89,7 @@ import java.util.Locale
                             Column(Modifier.weight(1f)) {
                                 Text(if(mine) session.coverUsername else chat.senderUsername,style=MaterialTheme.typography.labelSmall,
                                     color=if(mine) Color.White.copy(alpha=.78f) else Muted)
-                                Text(chat.body,fontStyle=if(chat.unsent) androidx.compose.ui.text.font.FontStyle.Italic else null)
+                                ChatMessageBody(chat,session,mine)
                                 if(chat.sentAt>0) Text(DateTimeFormatter.ofPattern(uiText(R.string.ui_mmm_d_hh_mm)).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(chat.sentAt)),
                                     style=MaterialTheme.typography.labelSmall,color=if(mine) Color.White.copy(alpha=.7f) else Muted)
                             }
@@ -102,6 +106,10 @@ import java.util.Locale
         }
         Status(session)
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Bottom,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            IconButton(onClick={showAttachmentPicker=true},enabled=!session.messagingBusy,
+                modifier=Modifier.testTag("attach_private_entry")) {
+                Icon(Icons.Outlined.AttachFile,stringResource(R.string.attach_secure_entry))
+            }
             OutlinedTextField(draft,{if(it.length<=2_000) draft=it},label={Text(stringResource(R.string.message))},
                 modifier=Modifier.weight(1f).testTag("message_body").keepVisibleWhileTyping(),maxLines=4)
             Button(onClick={session.sendMessage(draft) { draft="" }},enabled=draft.isNotBlank() && !session.messagingBusy,
@@ -131,5 +139,34 @@ import java.util.Locale
             }
         }
     }
+    if(showAttachmentPicker) AttachmentPicker(session) { showAttachmentPicker=false }
+    }
+}
+
+@Composable private fun ChatMessageBody(chat:com.olive.app.data.ChatMessage,session:SessionViewModel,mine:Boolean) {
+    val parts=chat.body.split(":",limit=3)
+    val shared=parts.firstOrNull() in setOf("SHARED_NOTE","SHARED_INCIDENT") && parts.size>=2
+    if(chat.unsent || !shared) {
+        Text(when { chat.unsent -> stringResource(R.string.message_unsent)
+            chat.body.isBlank() -> stringResource(R.string.encrypted_message_unavailable)
+            else -> chat.body },fontStyle=if(chat.unsent) androidx.compose.ui.text.font.FontStyle.Italic else null)
+        return
+    }
+    val incident=parts[0]=="SHARED_INCIDENT"
+    val title=parts.getOrNull(2).orEmpty().ifBlank { stringResource(R.string.encrypted_document) }
+    Surface(onClick={session.openSharedPrivateEntry(parts[1])},shape=MaterialTheme.shapes.medium,
+        color=if(mine) Color.White.copy(alpha=.2f) else Color.Black.copy(alpha=.05f),
+        modifier=Modifier.fillMaxWidth().padding(vertical=4.dp)) {
+        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            Icon(if(incident) Icons.Outlined.Warning else Icons.Outlined.Lock,
+                stringResource(if(incident) R.string.shared_incident_report else R.string.shared_private_note))
+            Column {
+                Text(stringResource(if(incident) R.string.shared_incident_report else R.string.shared_private_note),
+                    style=MaterialTheme.typography.labelSmall)
+                Text(title,style=MaterialTheme.typography.bodyMedium,
+                    fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+            }
+        }
     }
 }

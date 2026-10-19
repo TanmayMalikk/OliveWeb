@@ -24,6 +24,7 @@ internal class SessionState(private val canEnterSafe:()->Boolean) {
     var triggerHistory by mutableStateOf(emptyList<TriggerEvent>())
     var checkoutHistory by mutableStateOf(emptyList<CheckoutEvent>())
     var privateEntries by mutableStateOf(emptyList<PrivateEntry>())
+    var viewedSharedEntry by mutableStateOf<PrivateEntry?>(null)
     var userSearchResults by mutableStateOf(emptyList<DirectoryUser>())
     var friends by mutableStateOf(emptyList<Friend>())
     var incomingFriendRequests by mutableStateOf(emptyList<FriendRequest>())

@@ -28,6 +28,7 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
                 operationJob?.cancel();operationJob=null
                 idleJob?.cancel();idleJob=null;idleCountdownSeconds=null
                 busy=false;checkoutActive=false;coverReset++;addressPrompt=false
+                viewedSharedEntry=null
                 profile?.coverType?.let { coverType=it }
                 if(accountRole==AccountRole.SAFE_CONTACT) {
                     page=SafePage.Home;activityCategory=null;screenHistory.clear();safePageHistory.clear()
