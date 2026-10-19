@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safe_to_stay">مكان آمن للإقامة</string>
+    <string name="safe_to_stay_for">مكان آمن للإقامة مع %1$s</string>
+    <string name="safe_to_stay_description">فعّل هذا الخيار إذا وافق هذا الشخص الموثوق على إقامتك معه.</string>
+    <string name="safety_selected_contacts">المحددون لهذه الخطة: %1$d</string>
+    <string name="safety_contact_picker_help">اختر من جهات الاتصال الموثوقة أو أضف شخصًا جديدًا هنا.</string>
+    <string name="safety_include_contact">تضمين %1$s في خطة الأمان هذه</string>
+    <string name="safety_save_and_select_contact">حفظ جهة الاتصال وتحديدها</string>
+    <string name="safety_no_contacts_selected">لم يتم تحديد جهات اتصال موثوقة لهذه الخطة.</string>
+</resources>

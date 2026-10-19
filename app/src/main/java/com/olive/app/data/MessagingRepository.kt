@@ -8,54 +8,11 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.olive.app.security.KeyManager
+import java.util.Base64
 
-data class DirectoryUser(val uid: String, val username: String)
-
-data class FriendRequest(
-    val id: String,
-    val senderUid: String,
-    val senderUsername: String,
-    val recipientUid: String,
-    val recipientUsername: String,
-    val createdAt: Long,
-)
-
-data class Friend(val friendshipId: String, val uid: String, val username: String)
-
-data class SocialSnapshot(
-    val friends: List<Friend> = emptyList(),
-    val incoming: List<FriendRequest> = emptyList(),
-    val outgoing: List<FriendRequest> = emptyList(),
-)
-
-enum class FriendRelationship { AddFriend, RequestSent, IncomingRequest, Friends }
-
-data class ChatConversation(
-    val id: String,
-    val friendshipId: String,
-    val participantIds: List<String>,
-    val participantUsernames: Map<String,String>,
-    val lastMessage: String = "",
-    val updatedAt: Long = 0L,
-    val lastMessageId: String = "",
-    val lastSenderUid: String = "",
-) {
-    fun peerUsername(currentUid: String) = participantUsernames.entries
-        .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
-}
-
-data class ChatMessage(
-    val id: String,
-    val senderUid: String,
-    val senderUsername: String,
-    val body: String,
-    val sentAt: Long,
-    val unsent: Boolean = false,
-)
-
-fun interface ChatSubscription { fun close() }
-
-// Firestore handles friend state and live DMs while message bodies stay out of its on-device disk cache.
 class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
     init {
         firestore.firestoreSettings=FirebaseFirestoreSettings.Builder()
@@ -64,9 +21,11 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
 
     suspend fun registerUser(identity: AccountIdentity) {
         val username=identity.username.trim().lowercase()
+        val publicKey=withContext(Dispatchers.Default) { KeyManager.getOrCreatePublicKey() }
         firestore.collection("messageDirectory").document(username).set(mapOf(
             "uid" to identity.uid,
             "username" to username,
+            "publicKey" to Base64.getEncoder().encodeToString(publicKey.encoded),
             "updatedAt" to FieldValue.serverTimestamp(),
         ),SetOptions.merge()).await()
     }
@@ -77,7 +36,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         val row=firestore.collection("messageDirectory").document(normalized).get().await()
         val uid=row.getString("uid") ?: return emptyList()
         val username=row.getString("username") ?: return emptyList()
-        return if(uid==currentUid) emptyList() else listOf(DirectoryUser(uid,username))
+        val publicKey=row.getString("publicKey").orEmpty()
+        return if(uid==currentUid) emptyList() else listOf(DirectoryUser(uid,username,publicKey))
     }
 
     fun observeSocial(uid: String, onUpdate: (SocialSnapshot)->Unit, onError: (String)->Unit): ChatSubscription {

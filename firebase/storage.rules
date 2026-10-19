@@ -6,7 +6,7 @@ service firebase.storage {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // Change this path with AccountRepository.profileObject; keep every profile locked to its owner.
+    // Keep this path aligned with FirebaseAccountRepository.profileObject and its tests; each profile belongs to its owner.
     match /accounts/{uid}/profile.json {
       allow read: if owner(uid);
       allow create, update: if owner(uid)

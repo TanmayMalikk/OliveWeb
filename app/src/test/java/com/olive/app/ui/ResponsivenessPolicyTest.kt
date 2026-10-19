@@ -1,5 +1,8 @@
 package com.olive.app.ui
 
+import com.olive.app.ui.covers.calculator.CalculatorHistoryEntry
+import com.olive.app.ui.covers.calculator.CalculatorInput
+
 import com.olive.app.data.AccountIdentity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,9 +18,9 @@ class ResponsivenessPolicyTest {
 
     @Test fun messagingDirectoryRegistrationIsDeduplicatedPerIdentity() {
         val identity=AccountIdentity("uid-1","Olive_User")
-        assertEquals("uid-1:olive_user",messagingIdentityMarker(identity))
+        assertEquals("secure-v1:uid-1:olive_user",messagingIdentityMarker(identity))
         assertTrue(shouldRegisterMessagingIdentity(null,identity))
-        assertFalse(shouldRegisterMessagingIdentity("uid-1:olive_user",identity))
+        assertFalse(shouldRegisterMessagingIdentity("secure-v1:uid-1:olive_user",identity))
         assertTrue(shouldRegisterMessagingIdentity("uid-2:olive_user",identity))
     }
 

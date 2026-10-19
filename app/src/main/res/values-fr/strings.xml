@@ -423,7 +423,7 @@
     <string name="save_article">Enregistrer l’article</string>
     <string name="history_search">Rechercher dans l’historique</string>
     <string name="close_1">Fermer</string>
-    <string name="back">← Retour</string>
+    <string name="back">Retour</string>
     <string name="living">Vie quotidienne</string>
     <string name="food">Cuisine</string>
     <string name="home">Maison</string>
@@ -551,6 +551,13 @@
     <string name="unsend_message">Annuler l’envoi</string>
     <string name="message_unsent">Message annulé</string>
     <string name="message_actions">Actions du message</string>
+    <string name="share_attachment">Partager une pièce jointe</string><string name="select_attachment_category">Sélectionner %1$s</string>
+    <string name="private_notes">Notes privées</string><string name="incident_reports">Rapports d’incident</string><string name="saved_media">Médias enregistrés</string>
+    <string name="no_private_notes_found">Aucune note trouvée.</string><string name="untitled_note">Note sans titre</string><string name="no_incident_reports_found">Aucun rapport d’incident trouvé.</string>
+    <string name="media_uploads_not_configured">Le téléversement de médias n’est pas encore configuré.</string><string name="secure_shared_entry">Élément partagé sécurisé</string><string name="close_shared_entry">Fermer l’élément partagé</string>
+    <string name="attach_secure_entry">Joindre une note ou un rapport sécurisé</string><string name="encrypted_document">Document chiffré</string><string name="shared_private_note">Note privée partagée</string><string name="shared_incident_report">Rapport d’incident partagé</string>
+    <string name="private_entry_shared">Élément privé partagé de façon sécurisée.</string><string name="unable_to_share_private_entry">Impossible de partager cet élément privé.</string><string name="unable_to_open_shared_entry">Impossible d’ouvrir cet élément partagé.</string><string name="unable_to_open_secure_conversation">Impossible d’ouvrir cette conversation sécurisée. L’autre personne doit peut-être d’abord ouvrir l’application mise à jour.</string>
+    <string name="secure_message">Message sécurisé</string><string name="encrypted_message_unavailable">Message chiffré indisponible</string>
     <string name="incorrect_pin_attempts_remaining">NIP incorrect. %1$d tentatives restantes.</string>
     <string name="pin_attempt_history_count">Historique des tentatives de NIP · %1$d</string>
     <string name="future_feature_count">Fonction future %1$d</string>

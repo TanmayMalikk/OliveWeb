@@ -1,6 +1,13 @@
-package com.olive.app.ui
-import com.olive.app.R
+package com.olive.app.ui.covers.calculator
+import com.olive.app.ui.rememberResourceText
+
+import androidx.compose.foundation.verticalScroll
+
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.stringResource
+import com.olive.app.R
+import com.olive.app.ui.*
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
@@ -22,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import org.apache.commons.math3.distribution.NormalDistribution
 import kotlin.math.*
 
-private enum class StatPlotType(val label:String) { Scatter("Scatter"),XYLine("XY line"),Histogram("Histogram"),Box("Box plot"),ModifiedBox("Modified box"),Normal("Normal probability") }
+private enum class StatPlotType(val label:Int) { Scatter(R.string.ui_scatter),XYLine(R.string.ui_xy_line),Histogram(R.string.ui_histogram),Box(R.string.ui_box_plot),ModifiedBox(R.string.ui_modified_box),Normal(R.string.ui_normal_probability) }
 
 internal data class StatAxis(val minimum:Double,val maximum:Double,val increment:Double)
 
@@ -37,7 +44,7 @@ internal fun statAxis(minValue:Double,maxValue:Double,targetTicks:Int=5,wholeNum
     if(wholeNumbers) {
         val wholeRaw=raw.coerceAtLeast(1.0)
         val wholeMagnitude=10.0.pow(floor(log10(wholeRaw)))
-        increment=when(val wholeNormalized=wholeRaw/wholeMagnitude) {
+        increment=when(wholeRaw/wholeMagnitude) {
             in 0.0..1.0 -> 1.0
             in 1.0..2.0 -> 2.0
             in 2.0..5.0 -> 5.0
@@ -46,42 +53,46 @@ internal fun statAxis(minValue:Double,maxValue:Double,targetTicks:Int=5,wholeNum
     }
     val minimum=floor(low/increment)*increment
     val maximum=ceil(high/increment)*increment
-    return StatAxis(minimum,maximum.takeIf { it>minimum } ?: minimum+increment,increment)
+    return StatAxis(minimum,maximum.takeIf { it>minimum } ?: (minimum+increment),increment)
 }
-
 
 // Statistical plots use typed lists and render locally, so private data never leaves the calculator.
 @Composable
 internal fun StatPlotDialog(onClose:()->Unit) {
+    val uiText=rememberResourceText()
     var type by remember { mutableStateOf(StatPlotType.Scatter) }
     var xText by remember { mutableStateOf("1,2,3,4,5") }
     var yText by remember { mutableStateOf("2,4,3,7,8") }
     var points by remember { mutableStateOf<List<Pair<Double,Double>>>(emptyList()) }
     var values by remember { mutableStateOf<List<Double>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest=onClose,title={Text(stringResource(R.string.statistical_plots))},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+    AlertDialog(onDismissRequest=onClose,title={Text(stringResource(R.string.statistical_plots))},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            StatPlotType.entries.forEach { item -> FilterChip(selected=type==item,onClick={type=item;points=emptyList();values=emptyList();error=null},label={Text(item.label)}) }
+            StatPlotType.entries.forEach { item -> FilterChip(selected=type==item,onClick={type=item;points=emptyList();values=emptyList();error=null},label={Text(uiText(item.label))}) }
         }
         if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) {
-            OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.x_values))},modifier=Modifier.fillMaxWidth())
-            OutlinedTextField(yText,{yText=it.take(500)},label={Text(stringResource(R.string.y_values))},modifier=Modifier.fillMaxWidth())
-        } else OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.data_values))},modifier=Modifier.fillMaxWidth())
+            OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.x_values))},modifier=Modifier.fillMaxWidth().keepVisibleWhileTyping())
+            OutlinedTextField(yText,{yText=it.take(500)},label={Text(stringResource(R.string.y_values))},modifier=Modifier.fillMaxWidth().keepVisibleWhileTyping())
+        } else OutlinedTextField(xText,{xText=it.take(500)},label={Text(stringResource(R.string.data_values))},modifier=Modifier.fillMaxWidth().keepVisibleWhileTyping())
         Button(onClick={runCatching {
             fun parse(text:String)=normalizeCalculatorNotation(text).split(Regex("[,\\s]+")).filter { it.isNotBlank() }
                 .map(::parseCalculatorNumber).also { require(it.isNotEmpty()) }
             val x=parse(xText)
-            if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) { val y=parse(yText);require(x.size==y.size) { "X and Y need the same number of values." };points=x.zip(y);values=emptyList() }
+            if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) { val y=parse(yText);require(x.size==y.size) { uiText(R.string.ui_x_and_y_need_the_same_number_of_values) };points=x.zip(y);values=emptyList() }
             else { values=x;points=emptyList() }
-        }.onSuccess { error=null }.onFailure { error=it.message ?: "Check the data values." }},modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.plot)) }
+        }.onSuccess { error=null }.onFailure { error=uiText.failure(it,R.string.ui_check_the_data_values) }},modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.plot)) }
         if(points.isNotEmpty() || values.isNotEmpty()) StatPlotCanvas(type,points,values)
-        error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
+        error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error) }
     }},confirmButton={TextButton(onClick=onClose) { Text(stringResource(R.string.done)) }})
 }
 
 @Composable
 private fun StatPlotCanvas(type:StatPlotType,points:List<Pair<Double,Double>>,values:List<Double>) {
-    Canvas(Modifier.fillMaxWidth().height(280.dp).background(WarmWhite)) {
+    val uiText=rememberResourceText()
+    val label=uiText(type.label)
+    val description=if(points.isNotEmpty()) points.joinToString("; ") { "X: ${formatGraphNumber(it.first)}, Y: ${formatGraphNumber(it.second)}" }
+        else values.joinToString(", ",transform=::formatGraphNumber)
+    Canvas(Modifier.fillMaxWidth().height(280.dp).background(WarmWhite).semantics { contentDescription="$label: $description" }) {
         val left=42.dp.toPx();val top=16.dp.toPx();val right=size.width-12.dp.toPx();val bottom=size.height-32.dp.toPx()
         val width=(right-left).coerceAtLeast(1f);val height=(bottom-top).coerceAtLeast(1f)
         if(type==StatPlotType.Scatter || type==StatPlotType.XYLine) {

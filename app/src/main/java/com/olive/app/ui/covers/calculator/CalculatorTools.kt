@@ -1,6 +1,11 @@
-package com.olive.app.ui
-import com.olive.app.R
+package com.olive.app.ui.covers.calculator
+
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
+import com.olive.app.R
+import com.olive.app.ui.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -30,6 +35,7 @@ internal fun CalculatorTools(
     onAngleModeChange: (CalculatorAngleMode)->Unit,
     onClose: ()->Unit,
 ) {
+    val uiText=rememberResourceText()
     val categories=remember { AdvancedTool.entries.map { it.category }.distinct() }
     var category by remember { mutableStateOf(categories.first()) }
     var selected by remember { mutableStateOf(AdvancedTool.entries.first()) }
@@ -45,12 +51,12 @@ internal fun CalculatorTools(
     ) {
         Row(verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=onClose,modifier=Modifier.testTag("close_math_tools")) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack,"Back")
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack,uiText(R.string.ui_back))
             }
-            Text("Math tools",style=MaterialTheme.typography.headlineSmall,color=OliveGreen,fontWeight=FontWeight.SemiBold)
+            Text(uiText(R.string.ui_math_tools),style=MaterialTheme.typography.headlineSmall,color=OliveGreen,fontWeight=FontWeight.SemiBold,modifier=Modifier.semantics { heading() })
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-            Text("Angle",color=Muted,modifier=Modifier.weight(1f))
+            Text(uiText(R.string.ui_angle),color=Muted,modifier=Modifier.weight(1f))
             FilterChip(selected=angleMode==CalculatorAngleMode.RADIANS,onClick={onAngleModeChange(CalculatorAngleMode.RADIANS)},label={Text(stringResource(R.string.rad))})
             FilterChip(selected=angleMode==CalculatorAngleMode.DEGREES,onClick={onAngleModeChange(CalculatorAngleMode.DEGREES)},label={Text(stringResource(R.string.deg))})
         }
@@ -61,20 +67,20 @@ internal fun CalculatorTools(
                     category=item
                     selected=AdvancedTool.entries.first { it.category==item }
                     input="";result=null;error=null
-                },label={Text(item)})
+                },label={Text(uiText(item))})
             }
         }
         Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             ExposedDropdownMenuBox(expanded=menuOpen,onExpandedChange={menuOpen=it}) {
                 OutlinedTextField(
-                    value=selected.title,onValueChange={},readOnly=true,
+                    value=uiText(selected.title),onValueChange={},readOnly=true,
                     label={Text(stringResource(R.string.calculation))},
                     trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(menuOpen)},
                     modifier=Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).testTag("advanced_tool_picker"),
                 )
                 ExposedDropdownMenu(expanded=menuOpen,onDismissRequest={menuOpen=false}) {
                     AdvancedTool.entries.filter { it.category==category }.forEach { tool ->
-                        DropdownMenuItem(text={Text(tool.title)},onClick={
+                        DropdownMenuItem(text={Text(uiText(tool.title))},onClick={
                             selected=tool;input="";result=null;error=null;menuOpen=false
                         })
                     }
@@ -82,27 +88,27 @@ internal fun CalculatorTools(
             }
             OutlinedTextField(
                 value=input,onValueChange={input=it.take(1200);result=null;error=null},
-                label={Text(stringResource(R.string.input))},supportingText={Text("Example: ${selected.example}")},
-                minLines=3,maxLines=9,modifier=Modifier.fillMaxWidth().testTag("advanced_tool_input"),
+                label={Text(stringResource(R.string.input))},supportingText={Text(uiText(R.string.ui_example_value , uiText(selected.example)))},
+                minLines=3,maxLines=9,modifier=Modifier.fillMaxWidth().testTag("advanced_tool_input").keepVisibleWhileTyping(),
             )
             Button(
                 onClick={
-                    runCatching { AdvancedCalculatorEngine.calculate(selected,input,angleMode) }
+                    runCatching { AdvancedCalculatorEngine.calculate(selected,input,angleMode,uiText) }
                         .onSuccess { result=it;error=null }
-                        .onFailure { result=null;error=it.message ?: "Check the values and try again." }
+                        .onFailure { result=null;error=uiText.failure(it,R.string.ui_check_the_values_and_try_again) }
                 },
                 enabled=input.isNotBlank(),modifier=Modifier.fillMaxWidth().height(52.dp).testTag("advanced_tool_calculate"),
                 shape=RoundedCornerShape(18.dp),
-            ) { Text("Calculate",fontWeight=FontWeight.SemiBold) }
+            ) { Text(uiText(R.string.ui_calculate),fontWeight=FontWeight.SemiBold) }
             result?.let {
-                Surface(color=LightSage,shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().testTag("advanced_tool_result")) {
+                Surface(color=LightSage,shape=RoundedCornerShape(18.dp),modifier=Modifier.fillMaxWidth().testTag("advanced_tool_result").semantics(mergeDescendants=true) {}) {
                     Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                        Text("Result",color=OliveGreen,fontWeight=FontWeight.SemiBold)
+                        Text(uiText(R.string.ui_result),color=OliveGreen,fontWeight=FontWeight.SemiBold)
                         Text(it,fontFamily=FontFamily.Monospace,color=Ink)
                     }
                 }
             }
-            error?.let { Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("advanced_tool_error")) }
+            error?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.testTag("advanced_tool_error")) }
             Spacer(Modifier.height(24.dp))
         }
     }

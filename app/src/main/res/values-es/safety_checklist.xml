@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safety_checklist_hint">Marca los elementos preparados. Toca el texto para editarlo, o añade y elimina elementos.</string>
+    <string name="safety_document_hint">Incluye lo que corresponda a tu situación. Reúne documentos solo cuando sea seguro hacerlo.</string>
+    <string name="safety_add_item">Añadir elemento</string>
+    <string name="safety_add_to_section">Añadir un elemento a %1$s</string>
+    <string name="safety_empty_item">Nuevo elemento</string>
+    <string name="safety_remove_item">Eliminar elemento: %1$s</string>
+    <string name="safety_checklist_full">Esta sección está llena. Acorta o elimina un elemento antes de añadir más texto.</string>
+    <string-array name="safety_document_checklist">
+        <item>Licencia de conducir / identificación oficial con foto</item>
+        <item>Certificados de nacimiento</item>
+        <item>Pasaporte / documentos de ciudadanía o inmigración</item>
+        <item>Tarjeta de salud</item>
+        <item>Recetas médicas</item>
+        <item>Expedientes médicos, si se necesitan</item>
+        <item>Número de seguro social (SIN)</item>
+        <item>Órdenes judiciales / de protección</item>
+        <item>Documentos de matrimonio / crianza / custodia, si corresponde</item>
+        <item>Documentos bancarios / de seguros / vivienda, si se necesitan</item>
+    </string-array>
+    <string-array name="safety_grab_checklist">
+        <item>Llaves de casa y del vehículo</item>
+        <item>Teléfono y cargador</item>
+        <item>Dinero en efectivo y tarjetas bancarias</item>
+        <item>Medicamentos esenciales</item>
+        <item>Ropa básica y artículos de aseo</item>
+        <item>Esenciales de menores o mascotas, si corresponde</item>
+    </string-array>
+    <string name="safety_documents_heading">Documentos importantes</string>
+    <string name="safety_grab_heading">Esenciales para llevar rápidamente</string>
+    <string name="safety_documents_jump">Documentos</string>
+    <string name="safety_grab_jump">Para llevar</string>
+    <string name="safety_previous_notes">Notas del plan anterior</string>
+    <string name="safety_prepared_count">Preparado: %1$d / %2$d</string>
+    <string name="safety_destination_hint">¿Adónde irás?</string>
+    <string-array name="safety_destination_checklist">
+        <item>Elegir un lugar seguro al que ir.</item>
+        <item>Anotar la dirección y cómo encontrar el lugar.</item>
+        <item>Confirmar cuándo puedes llegar.</item>
+    </string-array>
+    <string name="safety_travel_hint">¿Cómo llegarás?</string>
+    <string-array name="safety_travel_checklist">
+        <item>Decidir cómo llegarás.</item>
+        <item>Confirmar quién puede ayudarte con el transporte, si hace falta.</item>
+        <item>Preparar las llaves, el dinero del viaje o el combustible cuando sea seguro hacerlo.</item>
+    </string-array>
+    <string name="safety_contacts_hint">¿A quién puedes acudir y puedes quedarte con esa persona?</string>
+    <string-array name="safety_contacts_checklist">
+        <item>Anotar el nombre y los datos de contacto seguros de una persona de confianza.</item>
+        <item>Preguntar si puedes quedarte con esa persona y por cuánto tiempo.</item>
+        <item>Acordar una forma segura de avisar o pedir ayuda.</item>
+    </string-array>
+    <string name="safety_aftercare_hint">¿Qué harás después de salir?</string>
+    <string-array name="safety_aftercare_checklist">
+        <item>Avisar de tu llegada a una persona de confianza cuando sea seguro hacerlo.</item>
+        <item>Planear alojamiento, comida y medicación para los primeros días.</item>
+        <item>Identificar los servicios de apoyo con los que quieras contactar.</item>
+    </string-array>
+</resources>

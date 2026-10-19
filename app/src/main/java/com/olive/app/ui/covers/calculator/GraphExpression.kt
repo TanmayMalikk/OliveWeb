@@ -1,4 +1,7 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
+import com.olive.app.ui.requireText
+import com.olive.app.ui.ResourceFailure
+import com.olive.app.R
 
 import kotlin.math.*
 
@@ -11,7 +14,7 @@ class GraphExpression private constructor(private val root: Node) {
     companion object {
         fun compile(input: String, angleMode: CalculatorAngleMode=CalculatorAngleMode.RADIANS): GraphExpression {
             val expression=normalizeCalculatorNotation(input).trim().replaceFirst(Regex("^[yY]\\s*=\\s*"),"").trim()
-            require(expression.isNotBlank()) { "Enter an equation after y =." }
+            requireText(expression.isNotBlank()) { ResourceFailure(R.string.ui_enter_an_equation_after_y) }
             return GraphExpression(Parser(expression,angleMode).parse())
         }
     }
@@ -24,7 +27,7 @@ class GraphExpression private constructor(private val root: Node) {
         fun parse(): Node {
             val result=addition()
             skipSpaces()
-            require(index==source.length) { "Check the equation near '${source.substring(index).take(8)}'." }
+            requireText(index==source.length) { ResourceFailure(R.string.ui_check_the_equation_near_value, source.substring(index).take(8)) }
             return result
         }
 
@@ -78,24 +81,23 @@ class GraphExpression private constructor(private val root: Node) {
 
         private fun primary(): Node {
             skipSpaces()
-            require(index<source.length) { "The equation ends too early." }
+            requireText(index<source.length) { ResourceFailure(R.string.ui_the_equation_ends_too_early) }
             if(take('(')) {
                 val inside=addition()
                 skipSpaces()
-                require(take(')')) { "Close every parenthesis." }
+                requireText(take(')')) { ResourceFailure(R.string.ui_close_every_parenthesis) }
                 return inside
             }
             if(source[index].isDigit() || source[index]=='.') return number()
             if(source[index].isLetter()) {
-                val name=identifier().lowercase()
-                return when(name) {
+                return when(val name=identifier().lowercase()) {
                     "x" -> Node { x -> x }
                     "pi" -> Node { PI }
                     "e" -> Node { E }
                     else -> function(name)
                 }
             }
-            throw IllegalArgumentException("Unexpected '${source[index]}'.")
+            throw ResourceFailure(R.string.ui_unexpected_value, source[index])
         }
 
         private fun number(): Node {
@@ -107,7 +109,7 @@ class GraphExpression private constructor(private val root: Node) {
                 while(index<source.length && source[index].isDigit()) index++
             }
             val number=source.substring(start,index).toDoubleOrNull()
-                ?: throw IllegalArgumentException("Check the number near '${source.substring(start).take(8)}'.")
+                ?: throw ResourceFailure(R.string.ui_check_the_number_near_value, source.substring(start).take(8))
             return Node { number }
         }
 
@@ -119,18 +121,18 @@ class GraphExpression private constructor(private val root: Node) {
 
         private fun function(name: String): Node {
             skipSpaces()
-            require(take('(')) { "Write $name with parentheses, like $name(x)." }
+            requireText(take('(')) { ResourceFailure(R.string.ui_write_value_with_parentheses_like_value_x, name, name) }
             val arguments=mutableListOf<Node>()
             if(!take(')')) {
                 do { arguments += addition();skipSpaces() } while(take(','))
-                require(take(')')) { "Close every parenthesis." }
+                requireText(take(')')) { ResourceFailure(R.string.ui_close_every_parenthesis) }
             }
             fun one(): Node {
-                require(arguments.size==1) { "$name needs one value." }
+                requireText(arguments.size==1) { ResourceFailure(R.string.ui_value_needs_one_value, name) }
                 return arguments[0]
             }
             fun two(): Pair<Node,Node> {
-                require(arguments.size==2) { "$name needs two values." }
+                requireText(arguments.size==2) { ResourceFailure(R.string.ui_value_needs_two_values, name) }
                 return arguments[0] to arguments[1]
             }
             return when(name) {
@@ -155,13 +157,13 @@ class GraphExpression private constructor(private val root: Node) {
                 "root" -> two().let { (a,b) -> Node { x -> a.value(x).pow(1.0/b.value(x)) } }
                 "npr" -> two().let { (a,b) -> Node { x -> permutation(a.value(x),b.value(x)) } }
                 "ncr" -> two().let { (a,b) -> Node { x -> combination(a.value(x),b.value(x)) } }
-                "random" -> { require(arguments.isEmpty()) { "random needs no values." };Node { Math.random() } }
+                "random" -> { requireText(arguments.isEmpty()) { ResourceFailure(R.string.ui_random_needs_no_values) };Node { Math.random() } }
                 "randint" -> two().let { (a,b) -> Node { x ->
                     val low=ceil(a.value(x)).toInt();val high=floor(b.value(x)).toInt()
-                    require(high>=low) { "randint needs a valid range." }
+                    requireText(high>=low) { ResourceFailure(R.string.ui_randint_needs_a_valid_range) }
                     (low..high).random().toDouble()
                 } }
-                else -> throw IllegalArgumentException("Function '$name' is not supported.")
+                else -> throw ResourceFailure(R.string.ui_function_value_is_not_supported, name)
             }
         }
 
@@ -169,17 +171,17 @@ class GraphExpression private constructor(private val root: Node) {
         private fun inverseAngle(value: Double)=if(angleMode==CalculatorAngleMode.DEGREES) Math.toDegrees(value) else value
         private fun factorial(value: Double): Double {
             val count=value.toInt()
-            require(value==count.toDouble() && count in 0..170) { "Factorial needs a whole number from 0 to 170." }
+            requireText(value==count.toDouble() && count in 0..170) { ResourceFailure(R.string.ui_factorial_needs_a_whole_number_from_0_to_170) }
             return (2..count).fold(1.0) { total,next -> total*next }
         }
         private fun permutation(nValue: Double,rValue: Double): Double {
             val n=nValue.toInt();val r=rValue.toInt()
-            require(nValue==n.toDouble() && rValue==r.toDouble() && n>=0 && r in 0..n) { "nPr needs whole numbers with 0 ≤ r ≤ n." }
+            requireText(nValue==n.toDouble() && rValue==r.toDouble() && n>=0 && r in 0..n) { ResourceFailure(R.string.ui_npr_needs_whole_numbers_with_0_r_n) }
             return ((n-r+1)..n).fold(1.0) { total,next -> total*next }
         }
         private fun combination(nValue: Double,rValue: Double): Double {
             val n=nValue.toInt();val r=rValue.toInt()
-            require(nValue==n.toDouble() && rValue==r.toDouble() && n>=0 && r in 0..n) { "nCr needs whole numbers with 0 ≤ r ≤ n." }
+            requireText(nValue==n.toDouble() && rValue==r.toDouble() && n>=0 && r in 0..n) { ResourceFailure(R.string.ui_ncr_needs_whole_numbers_with_0_r_n) }
             val use=min(r,n-r)
             return (1..use).fold(1.0) { total,next -> total*(n-use+next)/next }
         }

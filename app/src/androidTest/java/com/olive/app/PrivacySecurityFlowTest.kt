@@ -1,6 +1,5 @@
 package com.olive.app
 
-import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.security.EncryptedVault
@@ -10,6 +9,52 @@ import org.junit.Test
 import java.io.File
 
 class PrivacySecurityFlowTest : OliveUiTestBase() {
+    @Test fun staleAccountActionsAndRapidPinAttemptsCannotUnlock() {
+        register(pin="739182",username="strict_pin_tester")
+        val session=androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.SessionViewModel::class.java]
+        fun assertLocked() {
+            assertNotEquals(com.olive.app.ui.SessionScreen.Safe,session.screen)
+            assertEquals(com.olive.app.data.AccountRole.USER,session.accountRole)
+            assertNull(session.profile)
+        }
+        // These calls represent accessibility callbacks from old onboarding nodes.
+        fun staleActions() {
+            com.olive.app.data.AccountRole.entries.forEach(session::selectRole)
+            session.setup();session.chooseNew();session.chooseReturning()
+            session.createDevicePin("999999","999999")
+            session.navigate(com.olive.app.ui.SafePage.Notes)
+        }
+        compose.runOnIdle { staleActions();assertLocked();session.interceptSearch("moon garden") }
+        val obsoleteChallenge=session.pinChallengeVersion
+        repeat(5) { index ->
+            compose.runOnIdle {
+                staleActions()
+                // Many queued callbacks must start only one verification operation.
+                repeat(100) { session.submitPin("999999") }
+            }
+            compose.waitUntil(30_000) { !session.busy }
+            compose.runOnIdle {
+                assertLocked()
+                if(index<4) assertEquals("Incorrect PIN. ${4-index} attempts remaining.",session.message)
+                else assertEquals(com.olive.app.ui.SessionScreen.Cover,session.screen)
+            }
+        }
+        compose.runOnIdle {
+            session.interceptSearch("moon garden")
+            session.submitPin("739182",obsoleteChallenge)
+            assertFalse(session.busy);assertLocked()
+            // Even a correct verification cannot complete after exit/re-entry.
+            session.submitPin("739182")
+            session.quickExit();session.interceptSearch("moon garden")
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { assertLocked();session.submitPin("739182") }
+        waitFor("safe_settings")
+        compose.runOnIdle { assertNotNull(session.profile) }
+        compose.onNodeWithTag("quick_exit").performClick();waitCover()
+        compose.runOnIdle { staleActions();session.quickExit();assertLocked() }
+    }
+
     @Test fun fifthFailureAllowsImmediateRetryAndLegacyCooldownIsIgnored() {
         register(username="pin_attempt_tester")
         repeat(5) { index ->
@@ -70,7 +115,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         fill("current_password","test-password-123");fill("new_password","new-password-456");fill("confirm_new_password","new-password-456");click("change_password")
         compose.waitUntil(30_000) { compose.onAllNodesWithText("Password changed.").fetchSemanticsNodes().isNotEmpty() }
         fill("current_device_pin","123456");fill("new_device_pin","654321");fill("confirm_new_device_pin","654321");click("change_device_pin")
-        compose.waitUntil(30_000) { compose.onAllNodesWithText("Device PIN changed.").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(30_000) { compose.onAllNodesWithText("Safe entry settings saved.").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("quick_exit").performClick();waitCover();unlock("654321")
     }
 }
