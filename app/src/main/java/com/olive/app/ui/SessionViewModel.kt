@@ -36,6 +36,7 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     val triggerHistory get()=runtime.state.triggerHistory
     val checkoutHistory get()=runtime.state.checkoutHistory
     val privateEntries get()=runtime.state.privateEntries
+    val viewedSharedEntry get()=runtime.state.viewedSharedEntry
     internal val safetyPlans get()=runtime.safety
     val userSearchResults get()=runtime.state.userSearchResults
     val friends get()=runtime.state.friends
@@ -120,6 +121,9 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun closeConversation() = runtime.conversationActions.closeConversation()
     fun sendMessage(text: String, onSent: ()->Unit = {}) = runtime.conversationActions.sendMessage(text,onSent)
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
+    fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
+    fun openSharedPrivateEntry(entryId:String) = runtime.secureSharing.open(entryId)
+    fun closeSharedPrivateEntry() = runtime.secureSharing.close()
     fun noteInteraction() = runtime.privacy.noteInteraction()
     fun captureDetected(kind: String) = runtime.privacy.captureDetected(kind)
     fun recordingStopped() = runtime.privacy.recordingStopped()

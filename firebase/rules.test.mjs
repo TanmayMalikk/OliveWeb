@@ -110,9 +110,9 @@ test('friend requests become a private DM and only the sender can unsend', async
   const alice=env.authenticatedContext('social-a',{email:'social_alice@users.olive.invalid'}).firestore();
   const bob=env.authenticatedContext('social-b',{email:'social_bob@users.olive.invalid'}).firestore();
   const charlie=env.authenticatedContext('social-c',{email:'social_charlie@users.olive.invalid'}).firestore();
-  await assertSucceeds(setDoc(doc(alice,'messageDirectory/social_alice'),{uid:'social-a',username:'social_alice',updatedAt:serverTimestamp()}));
-  await assertSucceeds(setDoc(doc(bob,'messageDirectory/social_bob'),{uid:'social-b',username:'social_bob',updatedAt:serverTimestamp()}));
-  await assertSucceeds(setDoc(doc(charlie,'messageDirectory/social_charlie'),{uid:'social-c',username:'social_charlie',updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(alice,'messageDirectory/social_alice'),{uid:'social-a',username:'social_alice',publicKey:'alice-key',updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(bob,'messageDirectory/social_bob'),{uid:'social-b',username:'social_bob',publicKey:'bob-key',updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(charlie,'messageDirectory/social_charlie'),{uid:'social-c',username:'social_charlie',publicKey:'charlie-key',updatedAt:serverTimestamp()}));
 
   await assertSucceeds(getDoc(doc(alice,'messageDirectory/social_bob')));
   await assertFails(getDocs(query(collection(alice,'messageDirectory'),where('username','>=','social_b'))));
@@ -175,4 +175,38 @@ test('friend requests become a private DM and only the sender can unsend', async
   const visible=await getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-1'));
   if(visible.data()?.body!=='Message unsent' || visible.data()?.deleted!==true)
     throw new Error('Unsent tombstone was not visible to both friends.');
+
+  const roomKeys={'social-a':'wrapped-a','social-b':'wrapped-b'};
+  const participantPublicKeys={'social-a':'alice-key','social-b':'bob-key'};
+  await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),
+    {roomKeys,participantPublicKeys,updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),
+    {roomKeys:{'social-a':'replacement','social-b':'replacement'},updatedAt:serverTimestamp()}));
+  const encryptedRef=doc(alice,'conversations/'+friendshipId+'/messages/message-2');
+  await assertSucceeds(setDoc(encryptedRef,{senderUid:'social-a',senderUsername:'social_alice',
+    ciphertext:'encrypted-payload',deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+  await assertSucceeds(getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-2')));
+  await assertFails(setDoc(doc(charlie,'conversations/'+friendshipId+'/messages/message-3'),
+    {senderUid:'social-c',senderUsername:'social_charlie',ciphertext:'stolen',deleted:false,
+      sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+});
+
+test('encrypted private entries are restricted to wrapped-key recipients', async () => {
+  const owner=env.authenticatedContext('entry-owner').firestore();
+  const recipient=env.authenticatedContext('entry-recipient').firestore();
+  const stranger=env.authenticatedContext('entry-stranger').firestore();
+  const target=doc(owner,'privateEntries/secure-entry-1');
+  const entry={id:'secure-entry-1',ownerUid:'entry-owner',ciphertext:'encrypted-json',
+    wrappedKeys:{'entry-owner':'owner-key','entry-recipient':'recipient-key'},
+    allowedUsers:['entry-owner','entry-recipient'],createdAt:serverTimestamp(),updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(target,entry));
+  await assertSucceeds(getDoc(doc(recipient,'privateEntries/secure-entry-1')));
+  await assertFails(getDoc(doc(stranger,'privateEntries/secure-entry-1')));
+  await assertFails(updateDoc(doc(recipient,'privateEntries/secure-entry-1'),{ciphertext:'changed'}));
+  await assertFails(setDoc(doc(owner,'privateEntries/bad-id'),entry));
+  await assertFails(setDoc(doc(owner,'privateEntries/missing-key'),{...entry,id:'missing-key',
+    wrappedKeys:{'entry-owner':'owner-key'}}));
+  await assertSucceeds(updateDoc(target,{wrappedKeys:{'entry-owner':'owner-key'},
+    allowedUsers:['entry-owner'],updatedAt:serverTimestamp()}));
+  await assertFails(getDoc(doc(recipient,'privateEntries/secure-entry-1')));
 });
