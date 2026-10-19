@@ -586,4 +586,11 @@
     <string name="y_values">قيم Y</string>
     <string name="delete_managed_account_warning">يؤدي هذا إلى إزالة حساب %1$s نهائيًا من مصادقة Firebase وحذف بيانات الحساب الخاصة به.</string>
     <string name="y_one_function_per_line">Y = (وظيفة واحدة لكل سطر)</string>
+    <string name="camera_permission_required">مطلوب إذن الكاميرا لالتقاط الصور في غصن الزيتون.</string>
+    <string name="grant_camera_permission">منح إذن الكاميرا</string>
+    <string name="take_photo">التقط صورة</string>
+    <string name="capturing">جارٍ الالتقاط…</string>
+    <string name="error_loading_photo_preview">حدث خطأ أثناء تحميل معاينة الصورة</string>
+    <string name="captured_photo_review">مراجعة الصور الملتقطة</string>
+    <string name="take_again">خذ مرة أخرى</string>
 </resources>
