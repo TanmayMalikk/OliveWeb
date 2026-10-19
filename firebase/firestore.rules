@@ -19,13 +19,15 @@ service cloud.firestore {
 
     function contactAt(c, i) {
 
-      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details'])
+      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay'])
 
         && c[i].id is string && c[i].id.size() <= 64
 
         && c[i].name is string && c[i].name.size() > 0 && c[i].name.size() <= 120
 
         && (!('phone' in c[i]) || (c[i].phone is string && c[i].phone.size() <= 40))
+
+        && (!('safeToStay' in c[i]) || c[i].safeToStay is bool)
 
         && c[i].details is string && c[i].details.size() > 0 && c[i].details.size() <= 200);
 

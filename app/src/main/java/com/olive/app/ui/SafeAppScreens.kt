@@ -21,5 +21,8 @@ import androidx.compose.runtime.*
         SafePage.Settings -> SettingsEditor(session,profile)
         SafePage.Contacts -> ContactEditor(session,profile)
         SafePage.Activity -> ActivityHistory(session)
+        SafePage.Hotlines -> SafeResourcesScreen(session,profile)
+        SafePage.SafetyPlan -> SafetyPlanScreen(session)
+        SafePage.Documents -> SafetyDocumentsScreen(session)
     } }
 }

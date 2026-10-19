@@ -36,6 +36,7 @@ class AccessibilityUiTest:OliveUiTestBase() {
                 OliveTheme { com.olive.app.ui.covers.game.GameCover() }
             }
         }
+        compose.onNodeWithTag("cover_brand_game",useUnmergedTree=true).assertIsDisplayed()
         compose.onNodeWithTag("game_cover").assertTextContains("Game").assertTextContains("In development")
         compose.onNodeWithTag("game_cover").onChildren().assertCountEquals(0)
     }

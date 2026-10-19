@@ -8,12 +8,15 @@ import com.olive.app.ui.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -81,34 +84,26 @@ import kotlinx.coroutines.withContext
         }
         loading=false
     }
-    if(locationEditorOpen) AlertDialog(
-        onDismissRequest={locationEditorOpen=false},
-        title={Text(stringResource(R.string.change_local_news_location))},
-        text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(locationDraft,{ value ->
-                locationDraft=if(!session.interceptSearch(value)) value.take(120) else ""
-            },label={Text(stringResource(R.string.city_or_region))},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("news_location_input").keepVisibleWhileTyping())
-            Text(uiText(R.string.ui_this_changes_the_local_news_search_on_this_device),color=Muted,style=MaterialTheme.typography.bodySmall)
-        }},
-        confirmButton={TextButton(onClick={
+    if(locationEditorOpen) NewsLocationDialog(locationDraft,{ value ->
+            locationDraft=if(!session.interceptSearch(value)) value.take(120) else ""
+        },onDismiss={locationEditorOpen=false},onSave={
             customPlace=locationDraft.trim();currentPlace=customPlace
             locationPreferences.edit { putString(locationPreferenceKey,customPlace) }
             locationEditorOpen=false;refresh++
-        },enabled=locationDraft.isNotBlank()) { Text(stringResource(R.string.save)) }},
-        dismissButton={Row {
-            TextButton(onClick={
+        },onUseDeviceLocation={
                 customPlace="";currentPlace=fallbackPlace
                 locationPreferences.edit { remove(locationPreferenceKey) }
                 locationEditorOpen=false;refresh++
-            }) { Text(stringResource(R.string.use_device_location)) }
-            TextButton(onClick={locationEditorOpen=false}) { Text(stringResource(R.string.cancel)) }
-        }},
-    )
+        })
     Scaffold(containerColor=Cream,topBar={
         TopAppBar(
             title={Column {
                 // Text sizing note: 27sp is the news masthead. Keep the edition label on its own line for longer translations.
-                Text(uiText(R.string.ui_daily_digest),fontFamily=FontFamily.Serif,fontSize=27.sp,fontWeight=FontWeight.Bold,color=OliveGreen)
+                Row(verticalAlignment=Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Newspaper,null,Modifier.size(24.dp).testTag("cover_brand_news"),tint=OliveGreen)
+                    Spacer(Modifier.width(8.dp))
+                    Text(uiText(R.string.ui_daily_digest),fontFamily=FontFamily.Serif,fontSize=27.sp,fontWeight=FontWeight.Bold,color=OliveGreen)
+                }
                 if(tab=="Today" && selected==null) Text(if(scope==NewsScope.LOCAL) uiText(R.string.local_edition) else uiText(R.string.global_edition),style=MaterialTheme.typography.labelSmall,color=Muted)
             }},
             actions={if(tab=="Today" && selected==null) IconButton(onClick={refresh++},enabled=!loading) { Icon(Icons.Outlined.Refresh,uiText(R.string.refresh)) }},
@@ -142,6 +137,41 @@ import kotlinx.coroutines.withContext
                     refresh={refresh++},
                     openArticle={selected=it},
                 ),Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding())
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun NewsLocationDialog(value:String,onValueChange:(String)->Unit,onDismiss:()->Unit,onSave:()->Unit,onUseDeviceLocation:()->Unit) {
+    val uiText=rememberResourceText()
+    BasicAlertDialog(onDismissRequest=onDismiss) {
+        Surface(Modifier.fillMaxWidth().imePadding(),shape=RoundedCornerShape(28.dp),color=MaterialTheme.colorScheme.surface,
+            tonalElevation=6.dp,shadowElevation=8.dp) {
+            Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                    Surface(shape=CircleShape,color=MaterialTheme.colorScheme.primaryContainer,contentColor=OliveGreen) {
+                        Box(Modifier.size(46.dp),contentAlignment=Alignment.Center) { Icon(Icons.Outlined.LocationOn,null) }
+                    }
+                    Text(stringResource(R.string.change_local_news_location),style=MaterialTheme.typography.headlineSmall,
+                        modifier=Modifier.weight(1f))
+                }
+                Text(uiText(R.string.ui_this_changes_the_local_news_search_on_this_device),color=Muted,
+                    style=MaterialTheme.typography.bodyMedium)
+                OutlinedTextField(value,onValueChange,label={Text(stringResource(R.string.city_or_region))},
+                    leadingIcon={Icon(Icons.Outlined.Search,null)},singleLine=true,shape=RoundedCornerShape(16.dp),
+                    modifier=Modifier.fillMaxWidth().testTag("news_location_input").keepVisibleWhileTyping())
+                OutlinedButton(onClick=onUseDeviceLocation,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("news_location_device")) {
+                    Icon(Icons.Outlined.MyLocation,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.use_device_location))
+                }
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                    TextButton(onClick=onDismiss,modifier=Modifier.weight(1f).heightIn(min=48.dp).testTag("news_location_cancel")) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(onClick=onSave,enabled=value.isNotBlank(),modifier=Modifier.weight(1f).heightIn(min=48.dp).testTag("news_location_save")) {
+                        Text(stringResource(R.string.save))
+                    }
+                }
+            }
         }
     }
 }

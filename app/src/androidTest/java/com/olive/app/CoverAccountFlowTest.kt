@@ -10,10 +10,14 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         register(username="cover_switch_tester")
         unlock()
         click("safe_settings")
+        listOf("food","news","calculator","game").forEach {
+            compose.onNodeWithTag("cover_choice_icon_$it",useUnmergedTree=true).assertExists()
+        }
         click("cover_choice_news")
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("news_cover")
+        compose.onNodeWithTag("cover_brand_news").assertIsDisplayed()
         compose.onNodeWithText("Account").performClick()
         compose.onNodeWithTag("cover_dob").assertExists()
         compose.onNodeWithTag("address_city").assertTextContains("Edmonton")
@@ -26,6 +30,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("calculator_cover")
+        compose.onNodeWithTag("cover_brand_calculator").assertIsDisplayed()
         "123456".forEach { compose.onNodeWithTag("calc_key_$it").performClick() }
         compose.onNodeWithTag("calc_key_equals").performClick()
         compose.onNodeWithTag("calc_key_equals").performClick()

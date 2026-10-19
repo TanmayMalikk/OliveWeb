@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.data.*
 
-private enum class OrganizationPage { Dashboard, Accounts, Settings }
+private enum class OrganizationPage { Dashboard, Accounts, Settings, SafetyPlans }
 
 // STAFF + ADMIN: Olive Tree is the organization workspace. Only Admin accounts receive account controls.
 @Composable internal fun OrganizationPortal(session:SessionViewModel) {
@@ -32,9 +32,10 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
     var deleteTarget by remember { mutableStateOf<AdminAccountSummary?>(null) }
     BackHandler(enabled=page!=OrganizationPage.Dashboard) { page=OrganizationPage.Dashboard }
     when(page) {
-        OrganizationPage.Dashboard -> OrganizationDashboard(session,admin,onAccounts={page=OrganizationPage.Accounts},onSettings={page=OrganizationPage.Settings})
+        OrganizationPage.Dashboard -> OrganizationDashboard(session,admin,onAccounts={page=OrganizationPage.Accounts},onSettings={page=OrganizationPage.Settings},onSafetyPlans={page=OrganizationPage.SafetyPlans})
         OrganizationPage.Accounts -> OrganizationAccounts(session,onBack={page=OrganizationPage.Dashboard},onCreate={createOpen=true},onDelete={deleteTarget=it})
         OrganizationPage.Settings -> OrganizationSettings(session,onBack={page=OrganizationPage.Dashboard})
+        OrganizationPage.SafetyPlans -> SafetyConsultationsScreen(session,onBack={page=OrganizationPage.Dashboard})
     }
     if(createOpen) CreateAccountDialog(session,onDismiss={createOpen=false})
     deleteTarget?.let { account -> AlertDialog(onDismissRequest={deleteTarget=null},title={Text(uiText(R.string.ui_delete_value , account.username))},
@@ -43,7 +44,7 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
         dismissButton={TextButton(onClick={deleteTarget=null}){Text(stringResource(R.string.cancel))}}) }
 }
 
-@Composable private fun OrganizationDashboard(session:SessionViewModel,admin:Boolean,onAccounts:()->Unit,onSettings:()->Unit) {
+@Composable private fun OrganizationDashboard(session:SessionViewModel,admin:Boolean,onAccounts:()->Unit,onSettings:()->Unit,onSafetyPlans:()->Unit) {
     val uiText=rememberResourceText()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=20.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Box(Modifier.fillMaxWidth()) {
@@ -55,6 +56,7 @@ private enum class OrganizationPage { Dashboard, Accounts, Settings }
             IconButton(onClick=onSettings,modifier=Modifier.align(Alignment.TopEnd)) { Icon(Icons.Outlined.Settings,uiText(R.string.account_settings)) }
         }
         if(admin) AccountCountGrid(session.adminCounts)
+        if(!admin) Button(onClick=onSafetyPlans,modifier=Modifier.fillMaxWidth()) { Text(stringResource(R.string.safety_inbox)) }
         Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
             Text(uiText(R.string.ui_active_chats_with_staff_and_users),style=MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.in_development),color=Muted)
