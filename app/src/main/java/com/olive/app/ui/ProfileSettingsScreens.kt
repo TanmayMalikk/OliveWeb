@@ -1,6 +1,7 @@
 package com.olive.app.ui
 
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
@@ -10,6 +11,10 @@ import com.olive.app.ui.covers.olive.AddressFields
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.LocalDining
+import androidx.compose.material.icons.outlined.Newspaper
+import androidx.compose.material.icons.outlined.SportsEsports
 
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,13 +37,35 @@ import java.util.UUID
     var name by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
     FormColumn {
-        TextButton(onClick=session::back) { Icon(Icons.AutoMirrored.Outlined.ArrowBack,null); Text(stringResource(R.string.settings)) }
+        IconButton(onClick=session::back,modifier=Modifier.testTag("trusted_contacts_back")) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack,stringResource(R.string.ui_previous_safe_page))
+        }
         Heading(uiText(R.string.safe_contacts), uiText(R.string.save_trusted_people_here_olive_does_not_send_messages_or_make_calls))
+        val safeToStay=profile.contacts.filter { it.safeToStay }
+        if(safeToStay.isNotEmpty()) Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=LightSage)) {
+            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.safe_to_stay),style=MaterialTheme.typography.titleMedium,
+                    modifier=Modifier.semantics { heading() })
+                safeToStay.forEach { Text("• ${it.name}") }
+            }
+        }
         profile.contacts.forEach { contact ->
+            val safeStayDescription=stringResource(R.string.safe_to_stay_for,contact.name)
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp)) {
-                    Text(contact.name,style=MaterialTheme.typography.titleMedium)
-                    Text(contact.details)
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(contact.name,style=MaterialTheme.typography.titleMedium)
+                            Text(contact.details)
+                            if(contact.safeToStay) Text(stringResource(R.string.safe_to_stay),color=OliveGreen,
+                                style=MaterialTheme.typography.labelLarge)
+                        }
+                        Switch(checked=contact.safeToStay,onCheckedChange={ enabled ->
+                            session.saveContacts(profile.contacts.map { if(it.id==contact.id) it.copy(safeToStay=enabled) else it })
+                        },enabled=!session.busy,modifier=Modifier.testTag("safe_to_stay_${contact.id}")
+                            .semantics { contentDescription=safeStayDescription })
+                    }
+                    Text(stringResource(R.string.safe_to_stay_description),style=MaterialTheme.typography.bodySmall,color=Muted)
                     Row {
                         TextButton(onClick={session.recordSettingsInteraction("Olive Branch","Opened contact editor");editing=contact.id; name=contact.name; details=contact.details},enabled=!session.busy) { Text(stringResource(R.string.edit)) }
                         TextButton(onClick={session.recordSettingsInteraction("Olive Branch","Selected remove contact");session.saveContacts(profile.contacts.filterNot { it.id==contact.id }); if(editing==contact.id) {editing=null; name=""; details=""}},enabled=!session.busy) { Text(stringResource(R.string.remove)) }
@@ -55,7 +82,8 @@ import java.util.UUID
             if(name.isBlank() || details.isBlank()) session.error(uiText(R.string.enter_a_name_and_a_phone_number_or_email))
             else if(editing==null && profile.contacts.size>=25) session.error(uiText(R.string.you_can_save_up_to_25_contacts))
             else {
-                val contact=SafeContact(editing ?: UUID.randomUUID().toString(),name.trim(),details.trim())
+                val contact=SafeContact(editing ?: UUID.randomUUID().toString(),name.trim(),details.trim(),
+                    profile.contacts.firstOrNull { it.id==editing }?.safeToStay ?: false)
                 session.saveContacts(if(editing==null) profile.contacts+contact else profile.contacts.map { if(it.id==editing) contact else it })
                 editing=null; name=""; details=""
             }
@@ -83,7 +111,6 @@ import java.util.UUID
     FormColumn {
         SafeBack(session)
         Heading(uiText(R.string.settings),uiText(R.string.ui_update_your_profile_details))
-        if(userRole) OutlinedButton(onClick={session.navigate(SafePage.Contacts)},modifier=Modifier.fillMaxWidth().testTag("safe_contacts")) { Text(stringResource(R.string.safe_contacts)) }
         if(userRole) {
             // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
             CoverPicker(profile.coverType,!session.busy) { session.recordSettingsInteraction("Olive Branch","Selected cover app");session.changeCover(it) }
@@ -133,6 +160,13 @@ import java.util.UUID
             CoverType.CALCULATOR -> uiText(R.string.calculator_better_calculator)
         }
         OutlinedButton(onClick={onSelect(type)},enabled=enabled,modifier=Modifier.fillMaxWidth().testTag("cover_choice_${type.name.lowercase()}")) {
+            Icon(when(type) {
+                CoverType.FOOD -> Icons.Outlined.LocalDining
+                CoverType.NEWS -> Icons.Outlined.Newspaper
+                CoverType.CALCULATOR -> Icons.Outlined.Calculate
+                CoverType.GAME -> Icons.Outlined.SportsEsports
+            },null,Modifier.size(20.dp).testTag("cover_choice_icon_${type.name.lowercase()}"))
+            Spacer(Modifier.width(8.dp))
             Text(if(selected==type) "✓  $label" else label)
         }
     }

@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -69,6 +70,8 @@ import kotlinx.coroutines.withContext
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(horizontal=if(compact) 10.dp else 16.dp).padding(bottom=if(compact) 6.dp else 10.dp)) {
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Calculate,null,Modifier.size(if(compact) 18.dp else 21.dp).testTag("cover_brand_calculator"),tint=OliveGreen)
+                Spacer(Modifier.width(if(compact) 6.dp else 8.dp))
                 Text(stringResource(R.string.better_calculator),color=OliveGreen,fontSize=if(compact) 16.sp else 18.sp,fontWeight=FontWeight.SemiBold,modifier=Modifier.weight(1f))
             }
             Spacer(Modifier.height(if(compact) 6.dp else 10.dp))

@@ -19,6 +19,7 @@ import android.os.SystemClock
 
 // Shared setup keeps every end-to-end UI test isolated and gives feature files the same common actions.
 abstract class OliveUiTestBase {
+    protected open val grantLocationPermissions:Boolean get()=true
     protected fun tapOnScreen(x:Float,y:Float) {
         val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
         val time=SystemClock.uptimeMillis()
@@ -35,10 +36,13 @@ abstract class OliveUiTestBase {
             check(!BuildConfig.FIREBASE_CONFIGURED) { "These tests only run against local test accounts." }
             val instrumentation=InstrumentationRegistry.getInstrumentation()
             val context=instrumentation.targetContext
-            instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_COARSE_LOCATION)
-            instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_FINE_LOCATION)
+            if(grantLocationPermissions) {
+                instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_FINE_LOCATION)
+            }
             val directory=context.noBackupFilesDir
             listOf("olive-demo.vault","olive-demo.vault.bak","olive-demo.vault.new",
+                "olive-safety-demo.vault","olive-safety-demo.vault.bak","olive-safety-demo.vault.new",
                 "olive-demo-activity.vault","olive-demo-activity.vault.bak","olive-demo-activity.vault.new",
                 "olive-cover.vault","olive-cover.vault.bak","olive-cover.vault.new").forEach { name ->
                 val file=File(directory,name)

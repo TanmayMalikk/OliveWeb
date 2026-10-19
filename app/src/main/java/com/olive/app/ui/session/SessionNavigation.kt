@@ -21,6 +21,7 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
             with(state) {
                 enrollment?.let { accountRole=it.role }
                 if(accountRole==AccountRole.USER && screen in setOf(SessionScreen.Safe,SessionScreen.Pin)) accessibilityExitVersion++
+                safety.close()
                 epoch++
                 pinAuthorizedUid=null;pinAuthorizedEpoch=-1L
                 deviceLockRequest?.complete(null);deviceLockRequest=null

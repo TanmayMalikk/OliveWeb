@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safety_primary">Primary plan</string>
+    <string name="safety_backup">Backup plan</string>
+    <string name="safety_consult">Staff consultation</string>
+    <string name="safety_consult_description">Shares both plans with the next available staff member for editing. Staff chat is coming soon.</string>
+    <string name="safety_request">Request consultation</string>
+    <string name="safety_stop">Stop sharing</string>
+    <string name="safety_shared">Shared with %1$s</string>
+    <string name="safety_waiting">Waiting for the next available staff member.</string>
+    <string name="safety_share_queued">Request saved.</string>
+    <string name="safety_saving">Saving on this device…</string>
+    <string name="safety_saved">Saved.</string>
+    <string name="safety_sync_error">Could not update consultation details. Please try again.</string>
+    <string name="safety_storage_error">Could not save on this device. Keep this page open and retry saving.</string>
+    <string name="safety_access_revoked">This plan is no longer shared with you. Its cached copy has been removed.</string>
+    <string name="safety_account_required">Staff consultation requires a signed-in account. Your plans still work offline.</string>
+    <string name="safety_conflict">This section changed on another device. Your edit is retained. Choose which version to keep.</string>
+    <string name="safety_synced_version">Synced version: %1$s</string>
+    <string name="safety_keep_mine">Keep my edit</string>
+    <string name="safety_use_synced">Use synced version</string>
+    <string name="safety_destination">Safe destination</string>
+    <string name="safety_travel">Transportation</string>
+    <string name="safety_contacts">Trusted contact / safe place to stay</string>
+    <string name="safety_essentials">Essential items and documents</string>
+    <string name="safety_dependants">Children, dependants and pets</string>
+    <string name="safety_aftercare">After leaving</string>
+    <string name="safety_documents_intro">Keep photos, videos and pictures of documents here. Storage and uploads are coming soon; no files are collected yet.</string>
+    <string name="safety_upload">Upload files</string>
+    <string name="safety_inbox">Safety-plan consultations</string>
+    <string name="safety_inbox_empty">No safety plans are currently shared with you.</string>
+    <string name="safety_available">Available for new consultations</string>
+    <string name="safety_staff_intro">View and edit plans shared with you.</string>
+    <string name="safety_retry_save">Retry saving</string>
+    <string name="safety_back">Back</string>
+    <string name="safety_open_plan">Open plan for %1$s</string>
+    <string name="safety_source">Planning guidance: Public Health Agency of Canada. Adapt these prompts with someone you trust.</string>
+    <string name="safety_upload_document">Upload Document</string>
+    <string name="safety_upload_for">Upload document: %1$s. Coming soon.</string>
+    <string name="safety_upload_soon">Coming soon. Uploads from your safety plan will also appear here.</string>
+    <string name="safety_storage_photos">Photos</string>
+    <string name="safety_storage_videos">Videos</string>
+    <string name="safety_storage_documents">Document images</string>
+    <string name="safety_document_upload_hint">Uploads are coming soon. Uploaded files will also appear in Documents.</string>
+</resources>
