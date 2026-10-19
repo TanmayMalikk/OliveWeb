@@ -84,8 +84,8 @@
     <string name="enter_a_polynomial_up_to_degree_8_to_find_its_real_and_complex_roots">Ingresa un polinomio hasta el grado 8 para encontrar sus raíces reales y complejas.</string>
     <string name="enter_a_quadratic_equation_to_find_both_roots">Ingresa una ecuación cuadrática para encontrar ambas raíces.</string>
     <string name="parentheses_and_multiplication_such_as_x_2_x_3_are_supported">Se admiten paréntesis y multiplicaciones como (x - 2)(x - 3).</string>
-    <string name="example_x_2_5x_6_0">Ejemplo: x^2 - 5x + 6 = 0</string>
-    <string name="example_x_2_1_x_1">Ejemplo: (x^2 - 1) / (x - 1)</string>
+    <string name="example_x_2_5x_6_0">Ejemplo: x^2 – 5x + 6 = 0</string>
+    <string name="example_x_2_1_x_1">Ejemplo: (x^2 – 1) / (x - 1)</string>
     <string name="equation">Ecuación</string>
     <string name="solve">resolver</string>
     <string name="close">Cerrar</string>
@@ -586,4 +586,11 @@ Buen humor.</string>
     <string name="y_values">valores Y</string>
     <string name="delete_managed_account_warning">Esto elimina permanentemente la cuenta %1$s de Firebase Authentication y elimina los datos de su cuenta.</string>
     <string name="y_one_function_per_line">Y = (una función por línea)</string>
+    <string name="camera_permission_required">Se requiere permiso de la cámara para tomar fotografías en Olive Branch.</string>
+    <string name="grant_camera_permission">Conceder permiso a la cámara</string>
+    <string name="take_photo">tomar foto</string>
+    <string name="capturing">Capturando…</string>
+    <string name="error_loading_photo_preview">Error al cargar la vista previa de la foto</string>
+    <string name="captured_photo_review">Revisión de fotos capturadas</string>
+    <string name="take_again">Tomar de nuevo</string>
 </resources>
