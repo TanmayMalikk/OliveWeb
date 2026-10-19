@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safety_checklist_hint">Tick items as you prepare. Tap the text to edit it, or add and remove items.</string>
+    <string name="safety_document_hint">Include what applies to you. Collect documents only when it is safe to do so.</string>
+    <string name="safety_add_item">Add item</string>
+    <string name="safety_add_to_section">Add an item to %1$s</string>
+    <string name="safety_empty_item">New checklist item</string>
+    <string name="safety_remove_item">Remove item: %1$s</string>
+    <string name="safety_checklist_full">This section is full. Shorten or remove an item before adding more text.</string>
+    <string-array name="safety_document_checklist">
+        <item>Driver’s licence / government-issued photo ID</item>
+        <item>Birth certificates</item>
+        <item>Passport / citizenship / immigration documents</item>
+        <item>Health card</item>
+        <item>Prescriptions</item>
+        <item>Medical records, if needed</item>
+        <item>Social Insurance Number (SIN)</item>
+        <item>Court orders / protection orders</item>
+        <item>Marriage / parenting / custody documents, if applicable</item>
+        <item>Banking / insurance / housing records, if needed</item>
+    </string-array>
+    <string-array name="safety_grab_checklist">
+        <item>House and vehicle keys</item>
+        <item>Phone and charger</item>
+        <item>Cash and bank cards</item>
+        <item>Essential medicines</item>
+        <item>Basic clothes and toiletries</item>
+        <item>Children’s or pets’ essentials, if applicable</item>
+    </string-array>
+    <string name="safety_documents_heading">Important documents</string>
+    <string name="safety_grab_heading">Quick-grab necessities</string>
+    <string name="safety_documents_jump">Documents</string>
+    <string name="safety_grab_jump">Quick-grab</string>
+    <string name="safety_previous_notes">Previous plan notes</string>
+    <string name="safety_prepared_count">Prepared: %1$d / %2$d</string>
+    <string name="safety_destination_hint">Where will you go?</string>
+    <string-array name="safety_destination_checklist">
+        <item>Choose a safe place to go.</item>
+        <item>Write down the address and how to find it.</item>
+        <item>Check when you can arrive.</item>
+    </string-array>
+    <string name="safety_travel_hint">How will you get there?</string>
+    <string-array name="safety_travel_checklist">
+        <item>Decide how you will get there.</item>
+        <item>Confirm who can help with transport, if needed.</item>
+        <item>Prepare keys, fare or fuel when it is safe to do so.</item>
+    </string-array>
+    <string name="safety_contacts_hint">Who can you go to, and can you stay with them?</string>
+    <string-array name="safety_contacts_checklist">
+        <item>Write a trusted person’s name and safe contact details.</item>
+        <item>Ask whether you can stay with them and for how long.</item>
+        <item>Agree on a safe way to check in or ask for help.</item>
+    </string-array>
+    <string name="safety_aftercare_hint">What will you do after you leave?</string>
+    <string-array name="safety_aftercare_checklist">
+        <item>Let a trusted person know you arrived, when safe.</item>
+        <item>Plan essentials for the first few days: shelter, food and medication.</item>
+        <item>Identify support services you may want to contact.</item>
+    </string-array>
+</resources>

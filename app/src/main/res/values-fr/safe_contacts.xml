@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safe_to_stay">Hébergement sûr</string>
+    <string name="safe_to_stay_for">Hébergement sûr chez %1$s</string>
+    <string name="safe_to_stay_description">Activez cette option si cette personne de confiance a accepté de vous héberger.</string>
+    <string name="safety_selected_contacts">Sélectionnés pour ce plan : %1$d</string>
+    <string name="safety_contact_picker_help">Choisissez parmi vos contacts de confiance ou ajoutez une nouvelle personne ici.</string>
+    <string name="safety_include_contact">Inclure %1$s dans ce plan de sécurité</string>
+    <string name="safety_save_and_select_contact">Enregistrer et sélectionner</string>
+    <string name="safety_no_contacts_selected">Aucun contact de confiance n’est sélectionné pour ce plan.</string>
+</resources>

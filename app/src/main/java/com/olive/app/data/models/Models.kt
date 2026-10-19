@@ -65,3 +65,13 @@ data class FileMetadata(
     @PropertyName("created_at")
     val createdAt: Date? = null
 )
+
+data class SecureCloudEntry(
+    val id: String,
+    val ownerUid: String,
+    val ciphertext: String, // The AES-encrypted JSON of title, body, and edits
+    val wrappedKeys: Map<String, String>, // Map of UID -> RSA-wrapped AES Key
+    val allowedUsers: List<String>, // Array of UIDs for Firestore security rules
+    val createdAt: Long,
+    val updatedAt: Long
+)

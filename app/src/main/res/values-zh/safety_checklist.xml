@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safety_checklist_hint">准备好后勾选项目。点击文字即可编辑，也可以添加或删除项目。</string>
+    <string name="safety_document_hint">选择适合你情况的项目。仅在安全的情况下收集文件。</string>
+    <string name="safety_add_item">添加项目</string>
+    <string name="safety_add_to_section">在%1$s中添加项目</string>
+    <string name="safety_empty_item">新清单项目</string>
+    <string name="safety_remove_item">删除项目：%1$s</string>
+    <string name="safety_checklist_full">此部分已满。请缩短或删除项目后再添加文字。</string>
+    <string-array name="safety_document_checklist">
+        <item>驾照／政府签发的带照片身份证件</item>
+        <item>出生证明</item>
+        <item>护照／公民身份或移民文件</item>
+        <item>健康卡</item>
+        <item>处方</item>
+        <item>医疗记录（如需要）</item>
+        <item>社会保险号码（SIN）</item>
+        <item>法院命令／保护令</item>
+        <item>婚姻／育儿／监护权文件（如适用）</item>
+        <item>银行／保险／住房记录（如需要）</item>
+    </string-array>
+    <string-array name="safety_grab_checklist">
+        <item>住所和车辆钥匙</item>
+        <item>手机和充电器</item>
+        <item>现金和银行卡</item>
+        <item>必需药物</item>
+        <item>基本衣物和洗漱用品</item>
+        <item>儿童或宠物必需品（如适用）</item>
+    </string-array>
+    <string name="safety_documents_heading">重要文件</string>
+    <string name="safety_grab_heading">随手携带的必需品</string>
+    <string name="safety_documents_jump">文件</string>
+    <string name="safety_grab_jump">随身必需品</string>
+    <string name="safety_previous_notes">之前的计划笔记</string>
+    <string name="safety_prepared_count">已准备：%1$d / %2$d</string>
+    <string name="safety_destination_hint">您要去哪里？</string>
+    <string-array name="safety_destination_checklist">
+        <item>选择一个安全的去处。</item>
+        <item>记下地址和前往路线。</item>
+        <item>确认您可以到达的时间。</item>
+    </string-array>
+    <string name="safety_travel_hint">您将如何到达？</string>
+    <string-array name="safety_travel_checklist">
+        <item>决定如何到达目的地。</item>
+        <item>如有需要，确认谁能帮助安排交通。</item>
+        <item>在安全的情况下准备钥匙、车费或燃油。</item>
+    </string-array>
+    <string name="safety_contacts_hint">您可以去找谁，能否与对方暂住？</string>
+    <string-array name="safety_contacts_checklist">
+        <item>记下可信赖的人的姓名和安全联系方式。</item>
+        <item>询问能否与对方暂住，以及可以住多久。</item>
+        <item>约定安全报平安或求助的方式。</item>
+    </string-array>
+    <string name="safety_aftercare_hint">离开之后您要做什么？</string>
+    <string-array name="safety_aftercare_checklist">
+        <item>在安全的情况下向可信赖的人报平安。</item>
+        <item>安排最初几天的住处、食物和药物。</item>
+        <item>确定您可能想联系的支持服务。</item>
+    </string-array>
+</resources>

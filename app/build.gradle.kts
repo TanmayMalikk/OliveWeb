@@ -4,8 +4,10 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+tasks.named("check") { dependsOn(rootProject.tasks.named("checkSourceSize")) }
 val firebaseConfigured = file("google-services.json").exists() && providers.gradleProperty("oliveLocalTest").orNull != "true"
-if (firebaseConfigured) apply(plugin = "com.google.gms.google-services")
+if (firebaseConfigured) pluginManager.apply("com.google.gms.google-services")
 // Optional separate output directory for checks while Android Studio indexes the default build.
 providers.gradleProperty("oliveBuildDir").orNull?.let { layout.buildDirectory.set(file(it)) }
 val localProperties = Properties().apply {
@@ -22,6 +24,16 @@ val releaseKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword"
 val releaseSigningReady = releaseKeys.all { !releaseProperties.getProperty(it).isNullOrBlank() }
 
 android {
+    lint {
+        disable += "TypographyDashes" // ASCII hyphens are an intentional visual text choice.
+        disable += "TypographyEllipsis" // Three periods are an intentional visual text choice.
+        disable += "LockedOrientationActivity" // Olive intentionally uses a phone-first portrait layout.
+    }
+    @Suppress("UnstableApiUsage") // AGP marks the language-split API as experimental; disabling splits keeps all translations installed.
+    bundle {
+        // Include every bundled locale in the base APK so translations do not require a separate language download.
+        language { enableSplit = false }
+    }
     signingConfigs {
         if (releaseSigningReady) create("oliveRelease") {
             storeFile = rootProject.file(releaseProperties.getProperty("storeFile"))
@@ -64,6 +76,10 @@ dependencies {
     implementation("androidx.camera:camera-video:${cameraxVersion}")
     implementation("androidx.camera:camera-extensions:${cameraxVersion}")
     implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    // App and instrumented tests both need the same Compose version constraints.
+    listOf("implementation", "androidTestImplementation").forEach { configuration ->
+        add(configuration, platform("androidx.compose:compose-bom:2026.09.00"))
+    }
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
@@ -71,7 +87,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
-    implementation(platform("com.google.firebase:firebase-bom:34.19.0"))
+    implementation(platform("com.google.firebase:firebase-bom:35.0.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-firestore")
@@ -79,10 +95,13 @@ dependencies {
     implementation("com.google.android.libraries.places:places:6.0.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
     implementation("org.apache.commons:commons-math3:3.6.1")
+    implementation("org.jsoup:jsoup:1.23.2")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.3")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    testImplementation("org.robolectric:robolectric:4.17")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
@@ -90,6 +109,8 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 val verifyReleaseConfiguration = tasks.register("verifyReleaseConfiguration") {
+    group = "verification"
+    description = "Checks that Firebase and release-signing files are available before a release build."
     doLast {
         check(firebaseConfigured) { "Release requires app/google-services.json. Local test accounts are debug-only." }
         check(releaseSigningReady) { "Release requires keystore.properties. See docs/DISTRIBUTION.md." }

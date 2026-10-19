@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entry_setup_title">Protégez votre espace sécurisé</string>
+    <string name="entry_setup_description">Choisissez comment déverrouiller l’application sécurisée sur cet appareil.</string>
+    <string name="entry_safety_question">La personne qui vous fait du mal connaît-elle le code, le schéma ou le mot de passe de votre téléphone, ou peut-elle y accéder ?</string>
+    <string name="entry_yes">Oui</string>
+    <string name="entry_no">Non</string>
+    <string name="entry_choose_method">Choisissez une méthode d’accès</string>
+    <string name="entry_new_pin">Nouveau code PIN</string>
+    <string name="entry_device_lock">Verrouillage de l’appareil</string>
+    <string name="entry_recommended">%1$s · Recommandé</string>
+    <string name="entry_recommend_pin">Utilisez un code PIN distinct que cette personne ne connaît pas. Le verrouillage de l’appareil accepte aussi le code, le schéma ou le mot de passe du téléphone.</string>
+    <string name="entry_recommend_device">Le verrouillage de l’appareil est recommandé si cette personne ne peut pas déverrouiller votre téléphone.</string>
+    <string name="entry_new_pin_description">Créez un code PIN distinct de 4 à 6 chiffres. Évitez le code de votre téléphone.</string>
+    <string name="entry_device_description">Utilisez l’empreinte digitale, la reconnaissance faciale compatible ou le code, schéma ou mot de passe Android. Aucun code PIN distinct n’est nécessaire.</string>
+    <string name="entry_device_unavailable">Configurez un verrouillage dans les paramètres Android ou choisissez Nouveau code PIN.</string>
+    <string name="entry_confirm_setup">Confirmez votre identité pour configurer l’accès sécurisé.</string>
+    <string name="entry_unlock_description">Confirmez votre identité avec Android pour déverrouiller l’espace sécurisé.</string>
+    <string name="entry_unlock">Déverrouiller avec l’appareil</string>
+    <string name="entry_use_phone_lock">Utiliser le verrouillage du téléphone</string>
+    <string name="entry_auth_failed">L’authentification Android n’a pas pu être vérifiée. L’accès reste verrouillé. Réessayez ou reconnectez-vous pour reconfigurer l’accès sécurisé.</string>
+    <string name="entry_auth_cancelled">Authentification annulée ou indisponible. L’accès reste verrouillé.</string>
+    <string name="entry_settings_device">Cet appareil utilise le verrouillage Android. Gérez les empreintes, la reconnaissance faciale et le verrouillage dans les paramètres Android.</string>
+    <string name="entry_verify_trigger">Confirmez avec le verrouillage de l’appareil pour modifier le mot déclencheur.</string>
+    <string name="entry_invalid_trigger">Choisissez un mot ou une phrase de 3 à 64 caractères.</string>
+    <string name="entry_calculator_help">Pour accéder à l’espace sécurisé, saisissez votre code PIN (ou 4 à 6 chiffres quelconques avec le verrouillage de l’appareil), puis appuyez deux fois sur égal. Le verrouillage exige toujours l’authentification Android.</string>
+</resources>

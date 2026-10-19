@@ -19,13 +19,15 @@ service cloud.firestore {
 
     function contactAt(c, i) {
 
-      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details'])
+      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay'])
 
         && c[i].id is string && c[i].id.size() <= 64
 
         && c[i].name is string && c[i].name.size() > 0 && c[i].name.size() <= 120
 
         && (!('phone' in c[i]) || (c[i].phone is string && c[i].phone.size() <= 40))
+
+        && (!('safeToStay' in c[i]) || c[i].safeToStay is bool)
 
         && c[i].details is string && c[i].details.size() > 0 && c[i].details.size() <= 200);
 
@@ -144,13 +146,36 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.owner_id == request.auth.uid;
     }
 
+    match /privateEntries/{entryId} {
+      function validPrivateEntry(data) {
+        return data.keys().hasOnly(['id','ownerUid','ciphertext','wrappedKeys','allowedUsers','createdAt','updatedAt'])
+          && data.id == entryId
+          && data.ownerUid is string
+          && data.ciphertext is string && data.ciphertext.size() > 0
+          && data.wrappedKeys is map
+          && data.allowedUsers is list && data.allowedUsers.size() > 0 && data.allowedUsers.size() <= 25
+          && data.allowedUsers.hasAny([data.ownerUid])
+          && data.wrappedKeys.keys().hasAll(data.allowedUsers)
+          && data.wrappedKeys.keys().hasOnly(data.allowedUsers);
+      }
+      allow read: if signedIn() && request.auth.uid in resource.data.allowedUsers;
+      allow create: if signedIn() && request.auth.uid == request.resource.data.ownerUid
+        && validPrivateEntry(request.resource.data);
+      allow update: if signedIn() && request.auth.uid == resource.data.ownerUid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && validPrivateEntry(request.resource.data);
+      allow delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
+    }
+
     // Username lookup is exact and case-normalized by the app; listing the directory is never allowed.
     match /messageDirectory/{username} {
       allow get: if signedIn();
       allow list: if false;
       allow create, update: if owner(request.resource.data.uid)
-        && request.resource.data.keys().hasOnly(['uid','username','updatedAt'])
+        && request.resource.data.keys().hasOnly(['uid','username','publicKey','updatedAt'])
         && request.resource.data.username == username
+        && request.resource.data.publicKey is string && request.resource.data.publicKey.size() > 0
+        && request.resource.data.publicKey.size() <= 1000
         && validMessageUsername(username)
         && validMessagingEmail(username);
       allow delete: if owner(resource.data.uid);
@@ -242,7 +267,7 @@ service cloud.firestore {
     }
 
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid'])
+      return data.keys().hasOnly(['friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys'])
         && data.friendshipId == conversationId
         && data.lastMessage is string && data.lastMessage.size() <= 160
         && data.lastMessageId is string && data.lastMessageId.size() <= 128
@@ -253,6 +278,17 @@ service cloud.firestore {
         && data.participantUsernames == friendshipForConversation(data).participantUsernames;
     }
 
+    function validConversationKeys(data) {
+      return data.roomKeys is map && data.participantPublicKeys is map
+        && data.roomKeys.keys().hasAll(data.participantIds) && data.roomKeys.keys().hasOnly(data.participantIds)
+        && data.participantPublicKeys.keys().hasAll(data.participantIds)
+        && data.participantPublicKeys.keys().hasOnly(data.participantIds)
+        && data.roomKeys[data.participantIds[0]] is string && data.roomKeys[data.participantIds[0]].size() <= 1000
+        && data.roomKeys[data.participantIds[1]] is string && data.roomKeys[data.participantIds[1]].size() <= 1000
+        && data.participantPublicKeys[data.participantIds[0]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[0]])).data.publicKey
+        && data.participantPublicKeys[data.participantIds[1]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[1]])).data.publicKey;
+    }
+
     match /conversations/{conversationId} {
       allow get: if signedIn()
         && request.auth.uid in get(/databases/$(database)/documents/friendships/$(conversationId)).data.participantIds;
@@ -260,7 +296,12 @@ service cloud.firestore {
       allow create: if conversationParticipant(request.resource.data) && validConversation(request.resource.data,conversationId);
       allow update: if conversationParticipant(resource.data)
         && validConversation(request.resource.data,conversationId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','lastMessageId','lastSenderUid','updatedAt']);
+        && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','lastMessageId','lastSenderUid','updatedAt'])
+          || (!resource.data.keys().hasAny(['roomKeys','participantPublicKeys'])
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roomKeys','participantPublicKeys','updatedAt'])
+            && validConversationKeys(request.resource.data))
+        );
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -269,23 +310,26 @@ service cloud.firestore {
         }
         allow read: if conversationParticipant(parentConversation());
         allow create: if conversationParticipant(parentConversation())
-          && request.resource.data.keys().hasOnly(['senderUid','senderUsername','body','deleted','sentAt','clientSentAt'])
+          && request.resource.data.keys().hasOnly(['senderUid','senderUsername','body','ciphertext','deleted','sentAt','clientSentAt'])
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderUsername is string
           && validMessagingEmail(request.resource.data.senderUsername)
-          && request.resource.data.body is string && request.resource.data.body.size() > 0
-          && request.resource.data.body.size() <= 2000
+          && ((request.resource.data.body is string && request.resource.data.body.size() > 0
+              && request.resource.data.body.size() <= 2000 && !request.resource.data.keys().hasAny(['ciphertext']))
+            || (request.resource.data.ciphertext is string && request.resource.data.ciphertext.size() > 0
+              && request.resource.data.ciphertext.size() <= 12000 && !request.resource.data.keys().hasAny(['body'])))
           && request.resource.data.deleted == false
           && request.resource.data.clientSentAt is int;
         allow update: if conversationParticipant(parentConversation())
           && resource.data.senderUid == request.auth.uid
           && resource.data.deleted == false && request.resource.data.deleted == true
-          && request.resource.data.body == 'Message unsent'
+          && ((!resource.data.keys().hasAny(['ciphertext']) && request.resource.data.body == 'Message unsent')
+            || (resource.data.keys().hasAny(['ciphertext']) && request.resource.data.ciphertext == 'Message unsent'))
           && request.resource.data.senderUid == resource.data.senderUid
           && request.resource.data.senderUsername == resource.data.senderUsername
           && request.resource.data.sentAt == resource.data.sentAt
           && request.resource.data.clientSentAt == resource.data.clientSentAt
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body','deleted','deletedAt']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body','ciphertext','deleted','deletedAt']);
         allow delete: if false;
       }
     }

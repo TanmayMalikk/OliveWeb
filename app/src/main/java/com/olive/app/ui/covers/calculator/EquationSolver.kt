@@ -1,4 +1,7 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
+import com.olive.app.ui.requireText
+import com.olive.app.ui.ResourceFailure
+import com.olive.app.R
 
 import kotlin.math.PI
 import kotlin.math.abs
@@ -14,7 +17,7 @@ object EquationSolver {
 
     fun quadratic(equation: String): String {
         val coefficients=parse(equation)
-        require(coefficients.lastIndex==2) { "Enter a quadratic equation with an x² term." }
+        requireText(coefficients.lastIndex==2) { ResourceFailure(R.string.ui_enter_a_quadratic_equation_with_an_x_term) }
         val c=coefficients[0]
         val b=coefficients[1]
         val a=coefficients[2]
@@ -40,16 +43,16 @@ object EquationSolver {
 
     fun calculatePolynomial(expression: String): String {
         val cleaned=normalize(expression)
-        require(cleaned.isNotBlank()) { "Enter a polynomial calculation first." }
-        require('=' !in cleaned) { "Enter a calculation without an equals sign." }
+        requireText(cleaned.isNotBlank()) { ResourceFailure(R.string.ui_enter_a_polynomial_calculation_first) }
+        requireText('=' !in cleaned) { ResourceFailure(R.string.ui_enter_a_calculation_without_an_equals_sign) }
         return formatPolynomial(PolynomialParser(cleaned).parse())
     }
 
     private fun parse(equation: String): DoubleArray {
         val cleaned=normalize(equation)
-        require(cleaned.isNotBlank()) { "Enter an equation first." }
+        requireText(cleaned.isNotBlank()) { ResourceFailure(R.string.ui_enter_an_equation_first) }
         val sides=cleaned.split('=')
-        require(sides.size<=2 && sides.none(String::isBlank)) { "Use one equals sign with an expression on each side." }
+        requireText(sides.size<=2 && sides.none(String::isBlank)) { ResourceFailure(R.string.ui_use_one_equals_sign_with_an_expression_on_each_side) }
         val left=parseSide(sides[0])
         val right=parseSide(sides.getOrElse(1) { "0" })
         val combined=DoubleArray(max(left.size,right.size)) { index ->
@@ -57,8 +60,8 @@ object EquationSolver {
         }
         var degree=combined.lastIndex
         while(degree>0 && abs(combined[degree])<EPSILON) degree--
-        require(degree>0) { "The equation must contain x." }
-        require(degree<=MAX_DEGREE) { "Use a polynomial with degree $MAX_DEGREE or lower." }
+        requireText(degree>0) { ResourceFailure(R.string.ui_the_equation_must_contain_x) }
+        requireText(degree<=MAX_DEGREE) { ResourceFailure(R.string.ui_use_a_polynomial_with_degree_value_or_lower, MAX_DEGREE) }
         return combined.copyOf(degree+1)
     }
 
@@ -73,9 +76,9 @@ object EquationSolver {
         private var index=0
 
         fun parse(): DoubleArray {
-            require(source.isNotBlank()) { "Enter terms such as (x - 2)(x - 3)." }
+            requireText(source.isNotBlank()) { ResourceFailure(R.string.ui_enter_terms_such_as_x_2_x_3) }
             val result=addition()
-            require(index==source.length) { "Check the equation near '${source.substring(index).take(8)}'." }
+            requireText(index==source.length) { ResourceFailure(R.string.ui_check_the_equation_near_value, source.substring(index).take(8)) }
             return result
         }
 
@@ -110,18 +113,18 @@ object EquationSolver {
             val start=index
             while(index<source.length && source[index].isDigit()) index++
             val exponent=source.substring(start,index).toIntOrNull()
-                ?: throw IllegalArgumentException("Use a whole-number exponent after ^.")
-            require(exponent in 0..MAX_DEGREE) { "Use exponents from 0 to $MAX_DEGREE." }
+                ?: throw ResourceFailure(R.string.ui_use_a_whole_number_exponent_after)
+            requireText(exponent in 0..MAX_DEGREE) { ResourceFailure(R.string.ui_use_exponents_from_0_to_value, MAX_DEGREE) }
             var result=doubleArrayOf(1.0)
             repeat(exponent) { result=multiply(result,base) }
             return result
         }
 
         private fun primary(): DoubleArray {
-            require(index<source.length) { "The equation ends too early." }
+            requireText(index<source.length) { ResourceFailure(R.string.ui_the_equation_ends_too_early) }
             if(take('(')) {
                 val value=addition()
-                require(take(')')) { "Close every parenthesis." }
+                requireText(take(')')) { ResourceFailure(R.string.ui_close_every_parenthesis) }
                 return value
             }
             if(source[index]=='x') { index++;return doubleArrayOf(0.0,1.0) }
@@ -134,11 +137,11 @@ object EquationSolver {
                     while(index<source.length && source[index].isDigit()) index++
                 }
                 val value=source.substring(start,index).toDoubleOrNull()
-                    ?: throw IllegalArgumentException("Check the number near '${source.substring(start).take(8)}'.")
-                require(value.isFinite()) { "Use finite numbers only." }
+                    ?: throw ResourceFailure(R.string.ui_check_the_number_near_value, source.substring(start).take(8))
+                requireText(value.isFinite()) { ResourceFailure(R.string.ui_use_finite_numbers_only) }
                 return doubleArrayOf(value)
             }
-            throw IllegalArgumentException("Unexpected '${source[index]}'.")
+            throw ResourceFailure(R.string.ui_unexpected_value, source[index])
         }
 
         private fun startsPrimary()=index<source.length && (source[index]=='(' || source[index]=='x' || source[index]=='.' || source[index].isDigit())
@@ -159,7 +162,7 @@ object EquationSolver {
             val result=DoubleArray(left.lastIndex+right.lastIndex+1)
             left.forEachIndexed { leftPower,leftValue -> right.forEachIndexed { rightPower,rightValue ->
                 val power=leftPower+rightPower
-                require(power<=MAX_DEGREE || abs(leftValue*rightValue)<EPSILON) { "Use a polynomial with degree $MAX_DEGREE or lower." }
+                requireText(power<=MAX_DEGREE || abs(leftValue*rightValue)<EPSILON) { ResourceFailure(R.string.ui_use_a_polynomial_with_degree_value_or_lower, MAX_DEGREE) }
                 if(power<=MAX_DEGREE) result[power]+=leftValue*rightValue
             } }
             return trim(result.copyOf(minOf(result.size,MAX_DEGREE+1)))
@@ -168,9 +171,9 @@ object EquationSolver {
         private fun divide(dividend: DoubleArray, divisor: DoubleArray): DoubleArray {
             val cleanDividend=trim(dividend)
             val cleanDivisor=trim(divisor)
-            require(cleanDivisor.any { abs(it)>=EPSILON }) { "Cannot divide by zero." }
+            requireText(cleanDivisor.any { abs(it)>=EPSILON }) { ResourceFailure(R.string.ui_cannot_divide_by_zero) }
             if(cleanDividend.lastIndex<cleanDivisor.lastIndex) {
-                require(cleanDividend.all { abs(it)<EPSILON }) { "This division does not simplify to a polynomial." }
+                requireText(cleanDividend.all { abs(it)<EPSILON }) { ResourceFailure(R.string.ui_this_division_does_not_simplify_to_a_polynomial) }
                 return doubleArrayOf(0.0)
             }
             val remainder=cleanDividend.copyOf()
@@ -180,7 +183,7 @@ object EquationSolver {
                 quotient[power]=factor
                 cleanDivisor.forEachIndexed { divisorPower,value -> remainder[divisorPower+power]-=factor*value }
             }
-            require(remainder.all { abs(it)<1e-7 }) { "This division leaves a remainder and does not simplify to a polynomial." }
+            requireText(remainder.all { abs(it)<1e-7 }) { ResourceFailure(R.string.ui_this_division_leaves_a_remainder_and_does_not_simplify_to_a_polyn) }
             return trim(quotient)
         }
 

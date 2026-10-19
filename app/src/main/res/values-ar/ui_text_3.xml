@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_two_variable_statistics">إحصائيات ذات متغيرين</string>
+    <string name="ui_1_2_3_2_4_5">1,2,3 | 2,4,5</string>
+    <string name="ui_polynomial_regression">الانحدار متعدد الحدود</string>
+    <string name="ui_degree_2_1_2_3_2_5_10">درجة 2 | 1,2,3 | 2,5,10</string>
+    <string name="ui_other_regression">تراجع آخر</string>
+    <string name="ui_exponential_1_2_3_2_4_8">exponential | 1,2,3 | 2,4,8</string>
+    <string name="ui_basic">الأساسية</string>
+    <string name="ui_algebra">الجبر</string>
+    <string name="ui_calculus">حساب التفاضل والتكامل</string>
+    <string name="ui_complex">معقدة</string>
+    <string name="ui_matrices">المصفوفات</string>
+    <string name="ui_statistics">الإحصائيات</string>
+    <string name="ui_username_taken_c04650">تم أخذ اسم المستخدم.</string>
+    <string name="ui_incorrect_password_b68db3">كلمة مرور غير صحيحة.</string>
+    <string name="ui_unable_to_send_the_message">غير قادر على إرسال الرسالة.</string>
+    <string name="ui_unable_to_start_messaging">غير قادر على بدء المراسلة.</string>
+    <string name="ui_could_not_reconnect_check_your_password_and_try_again">تعذر إعادة الاتصال. تحقق من كلمة المرور وحاول مرة أخرى.</string>
+    <string name="ui_no_zero_was_found_in_that_interval">لم يتم العثور على صفر في تلك الفترة.</string>
+    <string name="ui_use_semicolons_exactly_like_the_example">استخدم الفواصل المنقوطة تمامًا مثل المثال.</string>
+    <string name="ui_the_result_is_not_a_finite_number">والنتيجة ليست عددا محدودا.</string>
+    <string name="ui_enter_a_quadratic_equation_with_an_x_term">أدخل معادلة تربيعية بحد x².</string>
+    <string name="ui_enter_a_polynomial_calculation_first">أدخل حساب متعدد الحدود أولاً.</string>
+    <string name="ui_enter_a_calculation_without_an_equals_sign">أدخل عملية حسابية بدون علامة يساوي.</string>
+    <string name="ui_enter_an_equation_first">أدخل معادلة أولاً.</string>
+    <string name="ui_use_one_equals_sign_with_an_expression_on_each_side">استخدم علامة يساوي واحدة مع عبارة على كل جانب.</string>
+    <string name="ui_the_equation_must_contain_x">يجب أن تحتوي المعادلة على x.</string>
+    <string name="ui_use_a_polynomial_with_degree_value_or_lower">استخدم كثيرة الحدود بدرجة %1$s أو أقل.</string>
+    <string name="ui_enter_terms_such_as_x_2_x_3">أدخل مصطلحات مثل (س - 2)(س - 3).</string>
+    <string name="ui_check_the_equation_near_value">تحقق من المعادلة القريبة من \"%1$s\".</string>
+    <string name="ui_use_exponents_from_0_to_value">استخدم الأسس من 0 إلى %1$s.</string>
+    <string name="ui_the_equation_ends_too_early">تنتهي المعادلة مبكرًا جدًا.</string>
+    <string name="ui_close_every_parenthesis">أغلق كل قوس.</string>
+    <string name="ui_use_finite_numbers_only">استخدم أرقامًا محدودة فقط.</string>
+    <string name="ui_cannot_divide_by_zero">لا يمكن القسمة على صفر.</string>
+    <string name="ui_this_division_does_not_simplify_to_a_polynomial">لا يتم تبسيط هذا التقسيم إلى كثير الحدود.</string>
+    <string name="ui_this_division_leaves_a_remainder_and_does_not_simplify_to_a_polyn">يترك هذا التقسيم باقيًا ولا يتم تبسيطه إلى كثيرة الحدود.</string>
+    <string name="ui_use_a_whole_number_exponent_after">استخدم أسًا للرقم الصحيح بعد ^.</string>
+    <string name="ui_check_the_number_near_value">تحقق من الرقم بالقرب من \"%1$s\".</string>
+    <string name="ui_unexpected_value">غير متوقع \"%1$s\".</string>
+    <string name="ui_enter_an_equation_after_y">أدخل معادلة بعد y =.</string>
+    <string name="ui_write_value_with_parentheses_like_value_x">اكتب %1$s بين قوسين، مثل %2$s(x).</string>
+    <string name="ui_value_needs_one_value">%1$s يحتاج إلى قيمة واحدة.</string>
+    <string name="ui_value_needs_two_values">%1$s يحتاج إلى قيمتين.</string>
+    <string name="ui_random_needs_no_values">عشوائي لا يحتاج إلى قيم.</string>
+    <string name="ui_randint_needs_a_valid_range">randint يحتاج إلى نطاق صالح.</string>
+    <string name="ui_factorial_needs_a_whole_number_from_0_to_170">يحتاج المضروب إلى عدد صحيح من 0 إلى 170.</string>
+    <string name="ui_npr_needs_whole_numbers_with_0_r_n">يحتاج nPr إلى أرقام صحيحة ذات 0 ≥ r ≥ n.</string>
+    <string name="ui_ncr_needs_whole_numbers_with_0_r_n">يحتاج nCr إلى أرقام صحيحة ذات 0 ≥ r ≥ n.</string>
+    <string name="ui_function_value_is_not_supported">الوظيفة \'%1$s\' غير مدعومة.</string>
+    <string name="ui_graph_at_least_one_equation_first">ارسم معادلة واحدة على الأقل أولاً.</string>
+    <string name="ui_use_valid_numbers_for_the_range">استخدم أرقامًا صالحة للنطاق.</string>
+    <string name="ui_end_x_must_be_greater_than_or_equal_to_start_x">يجب أن تكون النهاية X أكبر من أو تساوي البداية X.</string>
+    <string name="ui_step_must_be_greater_than_zero">يجب أن تكون الخطوة أكبر من الصفر.</string>
+    <string name="ui_choose_a_range_that_creates_500_rows_or_fewer">اختر نطاقًا يؤدي إلى إنشاء 500 صف أو أقل.</string>
+    <string name="ui_graph_at_least_two_equations_first">قم برسم معادلتين على الأقل أولاً.</string>
+    <string name="ui_none">لا أحد</string>
+    <string name="ui_value_value_0c813d">القيمة = %1$s</string>
+    <string name="ui_h_value_left_value_right_value">h=%1$s: اليسار %2$s، اليمين %3$s</string>
+    <string name="ui_z_value_real_value_imaginary_value_conjugate_value_magnitude_valu">z = %1$s\nحقيقي = %2$s\nتخيلي = %3$s\nمرافق = %4$s\nحجم = %5$s\nزاوية = %6$s راد\nقطبية = %7$s ∠ %8$s</string>
+    <string name="ui_power_value_roots_value">الطاقة = %1$s\nالجذور:\n%2$s</string>
+    <string name="ui_n_value_sum_value_sum_of_squares_value_mean_value_median_value_mo">n = %1$s\nsum = %2$s\nمجموع المربعات = %3$s\nالمتوسط = %4$s\nالوسيط = %5$s\nالوضع = %6$s\nmin = %7$s\nQ1 = %8$s\nQ3 = %9$s\nmax = %10$s\nنموذج SD = %11$s\nالتباين = %12$s</string>
+    <string name="ui_correlation_value_y_value_valuex_r_value">الارتباط = %1$s\ny = %2$s + %3$sx\nR² = %4$s</string>
+    <string name="ui_olive_order_update">تحديث طلب الزيتون</string>
+    <string name="ui_your_order_is_being_prepared">طلبك قيد الإعداد.</string>
+    <string name="ui_new_headlines_are_available">عناوين جديدة متاحة.</string>
+    <string name="ui_a_calculator_reminder_is_available">يتوفر تذكير بالآلة الحاسبة.</string>
+    <string name="ui_a_new_update_is_available">تحديث جديد متاح.</string>
+    <string name="ui_an_account_update_is_available">تحديث الحساب متاح.</string>
+    <string name="ui_fresh_menu_updates_are_available">تتوفر تحديثات القائمة الطازجة.</string>
+    <string name="ui_see_what_s_new_from_olive">شاهد الجديد من الزيتون.</string>
+    <string name="ui_new_kitchen_picks_are_ready_to_browse">اختيارات المطبخ الجديدة جاهزة للتصفح.</string>
+    <string name="ui_your_latest_digest_is_ready">أحدث ملخصك جاهز.</string>
+    <string name="ui_there_are_new_stories_to_browse">هناك قصص جديدة للتصفح.</string>
+    <string name="ui_a_calculator_update_is_available">يتوفر تحديث الآلة الحاسبة.</string>
+    <string name="ui_your_calculation_tools_are_ready">أدوات الحساب الخاصة بك جاهزة.</string>
+    <string name="ui_open_better_calculator_for_an_update">افتح حاسبة أفضل للحصول على تحديث.</string>
+    <string name="ui_open_the_app_to_see_what_s_new">افتح التطبيق لمعرفة الجديد.</string>
+    <string name="ui_new_activity_is_waiting">نشاط جديد في انتظارك.</string>
+    <string name="ui_olive_order_updates">تحديثات طلب الزيتون</string>
+    <string name="ui_order_status_and_delivery_notifications_for_olive">حالة الطلب وإخطارات التسليم للزيتون</string>
+    <string name="ui_daily_digest_briefings">ملخصات الملخص اليومي</string>
+    <string name="ui_daily_headlines_and_news_digest_notifications">العناوين اليومية وإخطارات ملخص الأخبار</string>
+    <string name="ui_better_calculator_reminders">تذكيرات أفضل للآلة الحاسبة</string>
+    <string name="ui_utility_and_calculation_reminders">تذكيرات بالفائدة والحساب</string>
+    <string name="ui_app_updates">تحديثات التطبيق</string>
+    <string name="ui_general_app_activity_notifications">إشعارات نشاط التطبيق العامة</string>
+    <string name="ui_olive_branch_updates">تحديثات غصن الزيتون</string>
+    <string name="ui_olive_tree_updates">تحديثات شجرة الزيتون</string>
+    <string name="ui_news">أخبار</string>
+    <string name="ui_politics">سياسة</string>
+    <string name="ui_sports">الرياضة</string>
+    <string name="ui_business">الأعمال</string>
+    <string name="ui_technology">التكنولوجيا</string>
+    <string name="ui_health">الصحة</string>
+    <string name="ui_science">العلوم</string>
+    <string name="ui_environment">البيئة</string>
+    <string name="ui_x_2_4_2x_3">x^2 - 4\n2x + 3</string>
+    <string name="ui_error">خطأ</string>
+    <string name="ui_undefined">غير معرّف</string>
+    <string name="ui_update_your_profile_details">حدّث بيانات ملفك الشخصي.</string>
+    <string name="ui_profile_required_fields">الاسم الكامل وتاريخ ميلاد صحيح والمدينة مطلوبة.</string>
+    <string name="password_excludes_username">يجب ألا تحتوي كلمة المرور على اسم المستخدم.</string>
+</resources>

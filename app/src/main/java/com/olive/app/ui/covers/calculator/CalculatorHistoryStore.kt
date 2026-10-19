@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
 
 import android.content.Context
 import androidx.core.content.edit
@@ -19,6 +19,7 @@ internal class CalculatorHistoryStore(context:Context,accountId:String) {
                 val expression=item.optString(EXPRESSION).take(120)
                 val result=item.optString(RESULT).take(120)
                 if(expression.isNotBlank() && result.isNotBlank()) add(CalculatorHistoryEntry(expression,result))
+                if(size==CALCULATOR_HISTORY_LIMIT) break
             }
         }
     }.getOrDefault(emptyList())
@@ -29,7 +30,7 @@ internal class CalculatorHistoryStore(context:Context,accountId:String) {
             return
         }
         val array=JSONArray()
-        entries.forEach { entry ->
+        entries.take(CALCULATOR_HISTORY_LIMIT).forEach { entry ->
             array.put(JSONObject().put(EXPRESSION,entry.expression).put(RESULT,entry.result))
         }
         preferences.edit { putString(historyKey,array.toString()) }
