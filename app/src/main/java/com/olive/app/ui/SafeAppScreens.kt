@@ -76,6 +76,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
 
 // USER + SAFE CONTACT: Olive Branch routes to the private profile, settings, notes, activity, and messaging features.
 // UI sizing/color: the safe home uses the shared form grid, OliveGreen branding, Muted guidance, and responsive feature tiles.
@@ -101,6 +102,7 @@ import java.util.UUID
             ModeNotice(session)
             Button(onClick={session.navigate(SafePage.Profile)},modifier=Modifier.fillMaxWidth().testTag("safe_profile")) { Text(stringResource(R.string.my_profile)) }
             Button(onClick={session.navigate(SafePage.Activity)},modifier=Modifier.fillMaxWidth().testTag("safe_activity")) { Text(stringResource(R.string.account_activity)) }
+            Button(onClick={session.navigate(SafePage.Camera)},modifier=Modifier.fillMaxWidth().testTag("safe_camera")) { Text("Test Camera") }
             Text(stringResource(R.string.private_features),style=MaterialTheme.typography.titleLarge)
             // UI sizing/color: feature tiles are two-wide, at least 112dp tall, use 30–32dp icons, and 17–18sp centered labels.
             // Change the two container colors here if these tiles need different shades from the shared theme.
@@ -171,6 +173,7 @@ import java.util.UUID
         SafePage.Settings -> SettingsEditor(session,profile)
         SafePage.Contacts -> ContactEditor(session,profile)
         SafePage.Activity -> ActivityHistory(session)
+        SafePage.Camera -> CameraScreen(session)
     } }
 }
 
@@ -342,7 +345,7 @@ import java.util.UUID
     }
     LaunchedEffect(keyboardVisible) {
         if(keyboardVisible && session.chatMessages.isNotEmpty()) {
-            delay(120)
+            delay(120.milliseconds)
             listState.animateScrollToItem(session.chatMessages.lastIndex)
         }
     }
@@ -537,7 +540,7 @@ import java.util.UUID
     restore: (String)->Unit, close: ()->Unit) {
     var now by remember(entries) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(entries) {
-        while(true) { delay(1_000L);now=System.currentTimeMillis() }
+        while(true) { delay(1_000L.milliseconds);now=System.currentTimeMillis() }
     }
     val listState=rememberLazyListState()
     LazyColumn(Modifier.fillMaxSize().oliveScrollbar(listState),state=listState,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=12.dp,bottom=112.dp),

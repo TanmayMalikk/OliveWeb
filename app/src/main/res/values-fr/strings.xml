@@ -84,8 +84,8 @@
     <string name="enter_a_polynomial_up_to_degree_8_to_find_its_real_and_complex_roots">Saisissez un polynôme de degré 8 ou moins pour trouver ses racines réelles et complexes.</string>
     <string name="enter_a_quadratic_equation_to_find_both_roots">Saisissez une équation quadratique pour trouver ses deux racines.</string>
     <string name="parentheses_and_multiplication_such_as_x_2_x_3_are_supported">Les parenthèses et la multiplication, comme (x - 2)(x - 3), sont prises en charge.</string>
-    <string name="example_x_2_5x_6_0">Exemple : x^2 - 5x + 6 = 0</string>
-    <string name="example_x_2_1_x_1">Exemple : (x^2 - 1) / (x - 1)</string>
+    <string name="example_x_2_5x_6_0">Exemple : x^2 – 5x + 6 = 0</string>
+    <string name="example_x_2_1_x_1">Exemple : (x^2 – 1) / (x - 1)</string>
     <string name="equation">Équation</string>
     <string name="solve">Résoudre</string>
     <string name="close">Fermer</string>
@@ -562,7 +562,7 @@
     <string name="accounts">Comptes</string>
     <string name="add_another_contact">Ajouter un autre contact</string>
     <string name="calculation">Calcul</string>
-    <string name="change_local_news_location">Changer l\'emplacement des informations locales</string>
+    <string name="change_local_news_location">Changer l\\\'emplacement des informations locales</string>
     <string name="city_or_region">Ville ou région</string>
     <string name="create">Créer</string>
     <string name="deg">DEG</string>
@@ -580,9 +580,16 @@
     <string name="stat_plots">Graphiques statistiques</string>
     <string name="statistical_plots">Graphiques statistiques</string>
     <string name="table_analysis">Tableau &amp; analyse</string>
-    <string name="use_device_location">Utiliser l\'emplacement de l\'appareil</string>
+    <string name="use_device_location">Utiliser l\\\'emplacement de l\\'appareil</string>
     <string name="x_values">Valeurs X</string>
     <string name="y_values">Valeurs Y</string>
-    <string name="delete_managed_account_warning">Cela supprime définitivement le compte %1$s de l\'authentification Firebase et supprime les données de son compte.</string>
+    <string name="delete_managed_account_warning">Cela supprime définitivement le compte %1$s de l\\\'authentification Firebase et supprime les données de son compte.</string>
     <string name="y_one_function_per_line">Y = (une fonction par ligne)</string>
+    <string name="camera_permission_required">L\'autorisation de l\'appareil photo est requise pour prendre des photos à Olive Branch.</string>
+    <string name="grant_camera_permission">Accorder l\'autorisation à la caméra</string>
+    <string name="take_photo">Prendre une photo</string>
+    <string name="capturing">Capturer…</string>
+    <string name="error_loading_photo_preview">Erreur lors du chargement de l\'aperçu de la photo</string>
+    <string name="captured_photo_review">Examen des photos capturées</string>
+    <string name="take_again">Reprendre</string>
 </resources>
