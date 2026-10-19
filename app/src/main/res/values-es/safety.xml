@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safety_primary">Plan principal</string>
+    <string name="safety_backup">Plan de respaldo</string>
+    <string name="safety_consult">Consulta con el personal</string>
+    <string name="safety_consult_description">Comparte ambos planes con el siguiente miembro del personal disponible para editarlos. El chat estará disponible próximamente.</string>
+    <string name="safety_request">Solicitar consulta</string>
+    <string name="safety_stop">Dejar de compartir</string>
+    <string name="safety_shared">Compartido con %1$s</string>
+    <string name="safety_waiting">Esperando al siguiente miembro del personal disponible.</string>
+    <string name="safety_share_queued">Solicitud guardada.</string>
+    <string name="safety_saving">Guardando en este dispositivo…</string>
+    <string name="safety_saved">Guardado.</string>
+    <string name="safety_sync_error">No se pudieron actualizar los detalles de la consulta. Inténtalo de nuevo.</string>
+    <string name="safety_storage_error">No se pudo guardar en este dispositivo. Mantén esta página abierta y reintenta.</string>
+    <string name="safety_access_revoked">Este plan ya no se comparte contigo. Se eliminó su copia en caché.</string>
+    <string name="safety_account_required">La consulta requiere iniciar sesión en una cuenta. Tus planes siguen disponibles sin conexión.</string>
+    <string name="safety_conflict">Esta sección cambió en otro dispositivo. Tu edición se conserva. Elige qué versión guardar.</string>
+    <string name="safety_synced_version">Versión sincronizada: %1$s</string>
+    <string name="safety_keep_mine">Conservar mi edición</string>
+    <string name="safety_use_synced">Usar versión sincronizada</string>
+    <string name="safety_destination">Destino seguro</string>
+    <string name="safety_travel">Transporte</string>
+    <string name="safety_contacts">Contacto de confianza / alojamiento seguro</string>
+    <string name="safety_essentials">Objetos y documentos esenciales</string>
+    <string name="safety_dependants">Menores, dependientes y mascotas</string>
+    <string name="safety_aftercare">Después de salir</string>
+    <string name="safety_documents_intro">Guarda aquí fotos, vídeos e imágenes de documentos. El almacenamiento y las cargas estarán disponibles próximamente; aún no se recopilan archivos.</string>
+    <string name="safety_upload">Subir archivos</string>
+    <string name="safety_inbox">Consultas de planes de seguridad</string>
+    <string name="safety_inbox_empty">Actualmente no se comparte ningún plan de seguridad contigo.</string>
+    <string name="safety_available">Disponible para nuevas consultas</string>
+    <string name="safety_staff_intro">Consulta y edita los planes compartidos contigo.</string>
+    <string name="safety_retry_save">Reintentar guardado</string>
+    <string name="safety_back">Atrás</string>
+    <string name="safety_open_plan">Abrir plan de %1$s</string>
+    <string name="safety_source">Orientación: Agencia de Salud Pública de Canadá. Adapta estas indicaciones con alguien de confianza.</string>
+    <string name="safety_upload_document">Subir documento</string>
+    <string name="safety_upload_for">Subir documento: %1$s. Próximamente.</string>
+    <string name="safety_upload_soon">Próximamente. Los documentos subidos desde tu plan también aparecerán aquí.</string>
+    <string name="safety_storage_photos">Fotos</string>
+    <string name="safety_storage_videos">Vídeos</string>
+    <string name="safety_storage_documents">Imágenes de documentos</string>
+    <string name="safety_document_upload_hint">Las cargas estarán disponibles próximamente. Los archivos también aparecerán en Documentos.</string>
+</resources>

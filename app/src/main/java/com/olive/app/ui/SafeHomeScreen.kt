@@ -10,7 +10,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.AddCircleOutline
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.data.*
@@ -56,40 +62,38 @@ import com.olive.app.data.*
 
 @Composable private fun SafeFeatureGrid(session:SessionViewModel) {
     val uiText=rememberResourceText()
-    listOf(1,3).forEach { first ->
+    listOf(0,2).forEach { first ->
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            listOf(first,first+1).forEach { number ->
-                when(number) {
-                    1 -> Button(onClick={session.navigate(SafePage.Notes)},
-                        colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF718669),contentColor=Color.White),
-                        modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_notes")) {
-                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                            Icon(Icons.Outlined.Description,uiText(R.string.ui_notes_and_incidents),Modifier.size(32.dp))
-                            Text(stringResource(R.string.notes_incidents),fontSize=18.sp,lineHeight=22.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
+            listOf(first,first+1).forEach { index ->
+                val page=listOf(SafePage.Notes,SafePage.Messages,SafePage.SafetyPlan,SafePage.Documents)[index]
+                val label=listOf(R.string.notes_incidents,R.string.messages,R.string.support_safety_plan,R.string.support_documents)[index]
+                val icon=listOf(Icons.Outlined.Description,Icons.Outlined.ChatBubbleOutline,Icons.Outlined.HealthAndSafety,Icons.Outlined.FolderOpen)[index]
+                val tag=listOf("safe_notes","safe_messages","safe_safety_plan","safe_documents")[index]
+                SafeFeatureTile(label=uiText(label),icon={
+                    if(page==SafePage.Messages) BadgedBox(badge={
+                        if(session.pendingMessageActionCount>0) Badge {
+                            Text(if(session.pendingMessageActionCount>99) "99+" else session.pendingMessageActionCount.toString())
                         }
-                    }
-                    2 -> Button(onClick={session.navigate(SafePage.Messages)},
-                        colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF7D9274),contentColor=Color.White),
-                        modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("safe_messages")) {
-                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                            BadgedBox(badge={
-                                if(session.pendingMessageActionCount>0) Badge {
-                                    Text(if(session.pendingMessageActionCount>99) "99+" else session.pendingMessageActionCount.toString())
-                                }
-                            }) { Icon(Icons.Outlined.ChatBubbleOutline,uiText(R.string.messages),Modifier.size(32.dp)) }
-                            Text(stringResource(R.string.messages),fontSize=18.sp,lineHeight=22.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
-                        }
-                    }
-                    else -> OutlinedButton(onClick={},enabled=false,
-                        colors=ButtonDefaults.outlinedButtonColors(disabledContainerColor=Color(0xFFE7EDE2),disabledContentColor=Muted),
-                        modifier=Modifier.weight(1f).heightIn(min=112.dp).testTag("future_feature_$number")) {
-                        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                            Icon(Icons.Outlined.AddCircleOutline,uiText(R.string.ui_future_feature),Modifier.size(30.dp))
-                            Text(uiText(R.string.ui_future_feature_value , number),fontSize=17.sp,lineHeight=21.sp,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2)
-                        }
-                    }
-                }
+                    }) { Icon(icon,uiText(label),Modifier.size(27.dp)) }
+                    else Icon(icon,uiText(label),Modifier.size(27.dp))
+                },enabled=index<2 || session.accountRole==AccountRole.USER,onClick={session.navigate(page)},
+                    modifier=Modifier.weight(1f).testTag(tag))
             }
+        }
+    }
+}
+
+@Composable private fun SafeFeatureTile(label:String,icon:@Composable ()->Unit,enabled:Boolean,onClick:()->Unit,modifier:Modifier=Modifier) {
+    Surface(onClick=onClick,enabled=enabled,modifier=modifier.heightIn(min=112.dp),shape=RoundedCornerShape(24.dp),
+        color=if(enabled) Color(0xFFF4F6EF) else Color(0xFFE9EDE5),contentColor=if(enabled) OliveGreen else Muted,
+        border=BorderStroke(1.dp,if(enabled) OliveGreen.copy(alpha=.25f) else Muted.copy(alpha=.18f)),tonalElevation=if(enabled) 2.dp else 0.dp) {
+        Column(Modifier.fillMaxSize().padding(horizontal=12.dp,vertical=14.dp),horizontalAlignment=Alignment.CenterHorizontally,
+            verticalArrangement=Arrangement.Center) {
+            Surface(shape=CircleShape,color=if(enabled) Color(0xFFDDE7D6) else Color(0xFFDDE2D9),contentColor=if(enabled) OliveGreen else Muted) {
+                Box(Modifier.size(46.dp),contentAlignment=Alignment.Center) { icon() }
+            }
+            Spacer(Modifier.height(9.dp))
+            Text(label,fontSize=16.sp,lineHeight=20.sp,fontWeight=FontWeight.SemiBold,textAlign=TextAlign.Center,maxLines=2)
         }
     }
 }

@@ -3,8 +3,8 @@ package com.olive.app.data
 import org.json.JSONArray
 import org.json.JSONObject
 
-// One trusted person, kept simple: a name plus whatever phone or email the user trusts.
-data class SafeContact(val id: String, val name: String, val details: String)
+// A trusted person can optionally be marked as someone who can provide a safe place to stay.
+data class SafeContact(val id:String,val name:String,val details:String,val safeToStay:Boolean=false)
 // The account role decides which onboarding flow and app shell this person receives.
 enum class AccountRole(val title: String, val description: String) {
     USER("User", "The person using the private cover and safe app"),
@@ -41,7 +41,9 @@ data class UserProfile(
         "address" to address.toMap(),
         "username" to username, "fullName" to fullName, "affectedNames" to affectedNames, "abuserName" to abuserName,
         "dob" to dob, "language" to language, "situation" to situation, "region" to region,
-        "triggerHash" to triggerHash, "contacts" to contacts.map { mapOf("id" to it.id,"name" to it.name,"details" to it.details) },
+        "triggerHash" to triggerHash, "contacts" to contacts.map {
+            mapOf("id" to it.id,"name" to it.name,"details" to it.details,"safeToStay" to it.safeToStay)
+        },
         "coverType" to coverType.name, "role" to role.name, "email" to email, "phone" to phone,
     )
     fun toJson() = JSONObject(toMap())
@@ -51,7 +53,7 @@ data class UserProfile(
             return UserProfile(j.optString("username"), j.optString("fullName"), j.optString("affectedNames"),j.optString("abuserName"),
                 j.optString("dob"), j.optString("language"), j.optString("situation"), j.optString("region"),
                 j.optString("triggerHash"), (0 until contacts.length()).map {
-                    val c = contacts.getJSONObject(it); SafeContact(c.getString("id"),c.getString("name"),c.getString("details"))
+                    val c = contacts.getJSONObject(it); SafeContact(c.getString("id"),c.getString("name"),c.getString("details"),c.optBoolean("safeToStay"))
                 }, DeliveryAddress.fromJson(j.optJSONObject("address")), CoverType.fromStored(j.optString("coverType")),
                 AccountRole.fromStored(j.optString("role")),j.optString("email"),j.optString("phone"))
         }
