@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 
@@ -53,46 +54,44 @@ fun Modifier.oliveHorizontalScrollbar(state: ScrollState): Modifier = drawWithCo
     drawRoundRect(ScrollThumb,Offset(thumbLeft,y),Size(thumbWidth,height),CornerRadius(height))
 }
 
-// Lazy lists report visible rows instead of pixel scroll range, so this estimates the thumb from those rows.
+// Include partial rows so the thumb follows each scroll pixel instead of jumping between item indices.
 fun Modifier.oliveScrollbar(state: LazyListState): Modifier = drawWithContent {
     drawContent()
-    val info = state.layoutInfo
-    val total = info.totalItemsCount
-    val visible = info.visibleItemsInfo
-    if (total <= 0 || visible.isEmpty() || visible.size >= total) return@drawWithContent
-
-    val width = 4.dp.toPx()
-    val edge = 3.dp.toPx()
-    val trackHeight = size.height - edge * 2
-    val visibleShare = (visible.size.toFloat() / total).coerceIn(0.08f, 1f)
-    val thumbHeight = max(28.dp.toPx(), trackHeight * visibleShare).coerceAtMost(trackHeight)
-    val lastStart = (total - visible.size).coerceAtLeast(1)
-    val progress = (state.firstVisibleItemIndex.toFloat() / lastStart).coerceIn(0f, 1f)
-    val thumbTop = edge + (trackHeight - thumbHeight) * progress
-    val x = size.width - width - edge
-
-    drawRoundRect(ScrollTrack, Offset(x, edge), Size(width, trackHeight), CornerRadius(width))
-    drawRoundRect(ScrollThumb, Offset(x, thumbTop), Size(width, thumbHeight), CornerRadius(width))
+    val info=state.layoutInfo
+    val first=info.visibleItemsInfo.firstOrNull() ?: return@drawWithContent
+    val last=info.visibleItemsInfo.lastOrNull() ?: return@drawWithContent
+    val start=first.index+(info.viewportStartOffset-first.offset).toFloat()
+        .div((first.size+info.mainAxisItemSpacing).coerceAtLeast(1)).coerceIn(0f,1f)
+    val end=last.index+(info.viewportEndOffset-last.offset).toFloat()
+        .div((last.size+info.mainAxisItemSpacing).coerceAtLeast(1)).coerceIn(0f,1f)
+    drawLazyScrollbar(start,end,info.totalItemsCount,state.canScrollBackward,state.canScrollForward)
 }
 
-// Notes use a grid, so they get the same indicator with grid-aware scroll progress.
+// Measure partial grid rows together; full-width headings and incomplete rows retain their actual item counts.
 fun Modifier.oliveScrollbar(state: LazyGridState): Modifier = drawWithContent {
     drawContent()
-    val info = state.layoutInfo
-    val total = info.totalItemsCount
-    val visible = info.visibleItemsInfo
-    if (total <= 0 || visible.isEmpty() || visible.size >= total) return@drawWithContent
+    val info=state.layoutInfo
+    val rows=info.visibleItemsInfo.filter { it.row>=0 }.groupBy { it.row }.toSortedMap()
+    val first=rows.entries.firstOrNull() ?: return@drawWithContent
+    val last=rows.entries.lastOrNull() ?: return@drawWithContent
+    val start=first.value.minOf { it.index }+first.value.size*(info.viewportStartOffset-first.value.minOf { it.offset.y }).toFloat()
+        .div((first.value.maxOf { it.size.height }+info.mainAxisItemSpacing).coerceAtLeast(1)).coerceIn(0f,1f)
+    val end=last.value.minOf { it.index }+last.value.size*(info.viewportEndOffset-last.value.minOf { it.offset.y }).toFloat()
+        .div((last.value.maxOf { it.size.height }+info.mainAxisItemSpacing).coerceAtLeast(1)).coerceIn(0f,1f)
+    drawLazyScrollbar(start,end,info.totalItemsCount,state.canScrollBackward,state.canScrollForward)
+}
 
-    val width = 4.dp.toPx()
-    val edge = 3.dp.toPx()
-    val trackHeight = size.height - edge * 2
-    val visibleShare = (visible.size.toFloat() / total).coerceIn(0.08f, 1f)
-    val thumbHeight = max(28.dp.toPx(), trackHeight * visibleShare).coerceAtMost(trackHeight)
-    val lastStart = (total - visible.size).coerceAtLeast(1)
-    val progress = (state.firstVisibleItemIndex.toFloat() / lastStart).coerceIn(0f, 1f)
-    val thumbTop = edge + (trackHeight - thumbHeight) * progress
-    val x = size.width - width - edge
-
-    drawRoundRect(ScrollTrack, Offset(x, edge), Size(width, trackHeight), CornerRadius(width))
-    drawRoundRect(ScrollThumb, Offset(x, thumbTop), Size(width, thumbHeight), CornerRadius(width))
+private fun DrawScope.drawLazyScrollbar(start:Float,end:Float,total:Int,canBack:Boolean,canForward:Boolean) {
+    if(total<=0 || (!canBack && !canForward)) return
+    val width=4.dp.toPx()
+    val edge=3.dp.toPx()
+    val trackHeight=size.height-edge*2
+    if(trackHeight<=0f) return
+    val visible=(end-start).coerceIn(0f,total.toFloat())
+    val thumbHeight=max(28.dp.toPx(),trackHeight*visible/total).coerceAtMost(trackHeight)
+    val range=(total-visible).coerceAtLeast(.001f)
+    val progress=when { !canBack -> 0f; !canForward -> 1f; else -> (start/range).coerceIn(0f,1f) }
+    val x=size.width-width-edge
+    drawRoundRect(ScrollTrack,Offset(x,edge),Size(width,trackHeight),CornerRadius(width))
+    drawRoundRect(ScrollThumb,Offset(x,edge+(trackHeight-thumbHeight)*progress),Size(width,thumbHeight),CornerRadius(width))
 }

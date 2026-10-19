@@ -34,6 +34,10 @@ exports.adminDeleteAccount = onCall(async (request) => {
     for (const user of users) if (roleFromUser(user, await readProfile(user.uid)) === "ADMIN") adminCount++;
     if (adminCount <= 1) throw new HttpsError("failed-precondition", "The last Admin account cannot be deleted.");
   }
+  await db.recursiveDelete(db.collection("safetyPlans").doc(uid));
+  const sharedPlans = await db.collection("safetyPlans").where("staffUid", "==", uid).get();
+  for (const plan of sharedPlans.docs) await plan.ref.update({staffUid: "", staffName: "", consultationRequested: true});
+  await db.collection("safetyStaff").doc(uid).delete();
   await deleteQuery(db.collection("friendRequests").where("senderUid", "==", uid));
   await deleteQuery(db.collection("friendRequests").where("recipientUid", "==", uid));
   await deleteQuery(db.collection("friendships").where("participantIds", "array-contains", uid));

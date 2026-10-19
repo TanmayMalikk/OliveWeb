@@ -7,7 +7,6 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalView
 
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -21,10 +20,6 @@ import com.olive.app.ui.covers.olive.OliveCover
 import com.olive.app.ui.covers.olive.OliveViewModel
 
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.Manifest
-import android.content.pm.PackageManager
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
@@ -35,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.*
@@ -47,7 +41,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
@@ -62,7 +55,7 @@ import com.olive.app.data.*
 // UI sizing/color: this root fills the window; the 12dp quick-exit inset and OliveGreen button styling live in its Scaffold.
 internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured && usesCover
 
-@Composable fun OliveRoot(session: SessionViewModel) {
+@Composable fun OliveRoot(session: SessionViewModel,locationPermissionVersion:Int=0) {
     val uiText=rememberResourceText()
     val cover: OliveViewModel = com.olive.app.ui.covers.olive.oliveViewModel()
     SideEffect { cover.persistCover={ cart,favorites,customizations -> session.saveFoodCover(cart,favorites,customizations) } }
@@ -72,7 +65,6 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
     val keyboard=LocalSoftwareKeyboardController.current
     val focus=LocalFocusManager.current
     val isCover=session.screen == SessionScreen.Cover
-    val context=androidx.compose.ui.platform.LocalContext.current
     val view=LocalView.current
     val accessibilityScope=rememberCoroutineScope()
     val accessibilityFocus=remember(accessibilityScope) { AccessibilityFocusCoordinator(accessibilityScope) }
@@ -82,19 +74,6 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         accessibilityRoot.importantForAccessibility=if(privacyHidden) View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
     }
-    var locationAsked by rememberSaveable { mutableStateOf(false) }
-    var locationPermissionVersion by remember { mutableIntStateOf(0) }
-    val locationPermission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        locationAsked=true;locationPermissionVersion++
-    }
-    LaunchedEffect(isCover,session.configured) {
-        // Ask once per app run; every cover can use location and still works if permission is denied.
-        if(isCover && session.configured && !locationAsked &&
-            ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED) {
-            locationAsked=true
-            locationPermission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION))
-        }
-    }
     val exit: () -> Unit = {
         session.quickExit()
         keyboard?.hide()
@@ -102,7 +81,10 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
     }
     CompositionLocalProvider(LocalAccessibilityFocusCoordinator provides accessibilityFocus) {
     val coverTitle=session.coverType.localizedTitle(uiText)
-    val quickExitLabel=uiText(R.string.a11y_quick_exit)
+    val showSupport=session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER
+    val showQuickExit=(showSupport && !(session.page==SafePage.Messages && session.activeConversation!=null)) ||
+        (session.screen==SessionScreen.Pin && session.usesCover)
+    var supportExpanded by remember(session.screen,session.page,session.coverAccountId) { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().then(if(isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(if(isCover && !session.privacyBlackout) Modifier.fillMaxSize().testTag("cover_root").semantics { paneTitle=coverTitle } else Modifier.fillMaxSize().clearAndSetSemantics { }) {
@@ -132,16 +114,9 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
             }
             BackHandler { keyboard?.hide(); focus.clearFocus(force=true); session.back() }
             Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-                Scaffold(
-                    bottomBar={ if((session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER &&
-                            !(session.page==SafePage.Messages && session.activeConversation!=null)) ||
-                            (session.screen==SessionScreen.Pin && session.usesCover)) {
-                        Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),horizontalArrangement=Arrangement.End) {
-                        ExtendedFloatingActionButton(onClick=exit,modifier=Modifier.testTag("quick_exit").semantics { contentDescription=quickExitLabel },
-                            containerColor=OliveGreen,contentColor=MaterialTheme.colorScheme.onPrimary,
-                            icon={Icon(Icons.Outlined.Close,null)},text={Text(stringResource(R.string.quick_exit),modifier=Modifier.clearAndSetSemantics {})})
-                        }
-                    } },
+                Box(Modifier.fillMaxSize()) {
+                Scaffold(modifier=if(supportExpanded) Modifier.clearAndSetSemantics {} else Modifier,
+                    bottomBar={ if(showQuickExit || showSupport) Spacer(Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp)) },
                 ) { padding ->
                     Box(Modifier.fillMaxSize().padding(padding)) {
                         AnimatedContent(targetState=session.screen,label="session screen",
@@ -156,7 +131,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 SessionScreen.Pin -> uiText(if(session.usesDeviceLock || !session.canUseAppPin) R.string.entry_device_lock else R.string.enter_pin)
                                 SessionScreen.Safe -> when(session.page) {
                                     SafePage.Home -> uiText(R.string.home);SafePage.Notes -> uiText(R.string.ui_notes);SafePage.Messages -> uiText(R.string.messages)
-                                    SafePage.Profile -> uiText(R.string.ui_profile);SafePage.Contacts -> uiText(R.string.ui_contacts);SafePage.Settings -> uiText(R.string.settings);SafePage.Activity -> uiText(R.string.ui_activity)
+                                    SafePage.Profile -> uiText(R.string.ui_profile);SafePage.Contacts -> uiText(R.string.ui_contacts);SafePage.Settings -> uiText(R.string.settings);SafePage.Activity -> uiText(R.string.ui_activity);SafePage.Hotlines -> uiText(R.string.support_hotlines);SafePage.SafetyPlan -> uiText(R.string.support_safety_plan);SafePage.Documents -> uiText(R.string.support_documents)
                                 }
                                 SessionScreen.Loading -> uiText(R.string.ui_loading)
                                 SessionScreen.Welcome -> uiText(R.string.welcome)
@@ -169,7 +144,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 SessionScreen.StorageError -> uiText(R.string.unable_to_open_local_storage)
                                 SessionScreen.Cover -> session.coverType.localizedTitle(uiText)
                             }
-                            CompositionLocalProvider(LocalAccessibilityMessagesVisible provides (targetScreen==session.screen)) {
+                            CompositionLocalProvider(LocalAccessibilityMessagesVisible provides (targetScreen==session.screen && !supportExpanded)) {
                             // Entry setup owns its pane title because choosing New PIN changes its local screen.
                             Box((if(targetScreen==SessionScreen.DevicePin) Modifier else Modifier.semantics { paneTitle=pane }).then(if(targetScreen!=session.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
                             when(targetScreen) {
@@ -192,6 +167,8 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                             SessionScreen.Cover -> Unit
                         } } } }
                     }
+                }
+                SafeSupportControls(session,exit,showQuickExit,showSupport,supportExpanded) { supportExpanded=it }
                 }
             }
             session.idleCountdownSeconds?.let { seconds ->

@@ -1,24 +1,24 @@
 package com.olive.app
 
 import com.olive.app.ui.observeAccessibilityInteractions
-import android.Manifest
 import android.app.ActivityManager
 import android.os.Bundle
 import android.os.Build
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
@@ -49,7 +49,10 @@ class MainActivity : ComponentActivity() {
     private var privacyCoverEpoch=0
     private var appliedTaskIdentity:Pair<CoverType,AccountRole>?=null
     private lateinit var accessibilityContent:ViewGroup
-    private val notificationPermissionLauncher=registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    private var locationPermissionVersion by mutableIntStateOf(0)
+    private val permissions=AppPermissions(this,{ !session.localMode },{ session.accountRole==AccountRole.USER }) {
+        locationPermissionVersion++;session.syncLocalNotificationHandler()
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppLocaleManager.initSystemDefaultLocale()
@@ -73,25 +76,22 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(notificationAccountId,selectedCover,selectedRole) {
                 // Update the open task now; the Home-screen alias changes after the user leaves the app.
                 updateRecentAppIdentity(selectedCover,selectedRole)
-                if(notificationAccountId!=null) requestNotificationPermissionIfNeeded()
+                if(notificationAccountId!=null) permissions.afterOnboarding()
                 session.syncLocalNotificationHandler()
             }
-            OliveTheme { OliveRoot(session) }
+            CompositionLocalProvider(com.olive.app.ui.LocalLocationPermissionRequest provides permissions::requestLocation) {
+                OliveTheme { OliveRoot(session,locationPermissionVersion) }
+            }
         }
     }
 
-    // Android 13+ needs one system prompt before cover-branded notifications can appear.
-    private fun requestNotificationPermissionIfNeeded() {
-        if(!session.localMode && Build.VERSION.SDK_INT>=33 &&
-            ContextCompat.checkSelfPermission(this,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-    }
     // Leaving the foreground locks the User safe area; the resource flag controls the extra native privacy cover.
     override fun onPause() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        // Android authentication may open the system credential screen; its cancellation keeps access locked.
-        if(!deviceLock.awaitingCredential) session.background()
+        // Authentication and runtime permission dialogs temporarily own another window.
+        // Home/onStop still lock the safe area; a permission result never restores a private screen.
+        if(!deviceLock.awaitingCredential && !permissions.awaitingResult) session.background()
         updateRecentAppIdentity(session.coverType,session.accountRole)
         super.onPause()
     }
@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        if(!deviceLock.awaitingCredential) session.background()
+        if(!deviceLock.awaitingCredential && !permissions.awaitingResult) session.background()
         updateRecentAppIdentity(session.coverType,session.accountRole)
         super.onUserLeaveHint()
     }
