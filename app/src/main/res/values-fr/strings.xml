@@ -587,7 +587,7 @@
     <string name="stat_plots">Graphiques statistiques</string>
     <string name="statistical_plots">Graphiques statistiques</string>
     <string name="table_analysis">Tableau &amp; analyse</string>
-    <string name="use_device_location">Utiliser l\\\'emplacement de l\\'appareil</string>
+    <string name="use_device_location">Utiliser l\\\'emplacement de l\\\'appareil</string>
     <string name="x_values">Valeurs X</string>
     <string name="y_values">Valeurs Y</string>
     <string name="delete_managed_account_warning">Cela supprime définitivement le compte %1$s de l\\\'authentification Firebase et supprime les données de son compte.</string>
