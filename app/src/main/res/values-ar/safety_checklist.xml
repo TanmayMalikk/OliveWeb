@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safety_checklist_hint">حدّد العناصر التي أعددتها. اضغط على النص لتعديله، أو أضف العناصر واحذفها.</string>
+    <string name="safety_document_hint">أدرج ما ينطبق عليك. اجمع الوثائق فقط عندما يكون ذلك آمنًا.</string>
+    <string name="safety_add_item">إضافة عنصر</string>
+    <string name="safety_add_to_section">إضافة عنصر إلى %1$s</string>
+    <string name="safety_empty_item">عنصر جديد</string>
+    <string name="safety_remove_item">حذف العنصر: %1$s</string>
+    <string name="safety_checklist_full">هذا القسم ممتلئ. اختصر عنصرًا أو احذفه قبل إضافة مزيد من النص.</string>
+    <string-array name="safety_document_checklist">
+        <item>رخصة القيادة / هوية رسمية تحمل صورة</item>
+        <item>شهادات الميلاد</item>
+        <item>جواز السفر / وثائق الجنسية أو الهجرة</item>
+        <item>البطاقة الصحية</item>
+        <item>الوصفات الطبية</item>
+        <item>السجلات الطبية عند الحاجة</item>
+        <item>رقم التأمين الاجتماعي (SIN)</item>
+        <item>أوامر المحكمة / أوامر الحماية</item>
+        <item>وثائق الزواج / الرعاية الأبوية / الحضانة عند الاقتضاء</item>
+        <item>السجلات المصرفية / التأمين / السكن عند الحاجة</item>
+    </string-array>
+    <string-array name="safety_grab_checklist">
+        <item>مفاتيح المنزل والمركبة</item>
+        <item>الهاتف والشاحن</item>
+        <item>النقود والبطاقات المصرفية</item>
+        <item>الأدوية الأساسية</item>
+        <item>ملابس أساسية وأدوات نظافة</item>
+        <item>ضروريات الأطفال أو الحيوانات الأليفة عند الاقتضاء</item>
+    </string-array>
+    <string name="safety_documents_heading">الوثائق المهمة</string>
+    <string name="safety_grab_heading">الضروريات التي تؤخذ بسرعة</string>
+    <string name="safety_documents_jump">الوثائق</string>
+    <string name="safety_grab_jump">ضروريات سريعة</string>
+    <string name="safety_previous_notes">ملاحظات الخطة السابقة</string>
+    <string name="safety_prepared_count">تم التجهيز: %1$d / %2$d</string>
+    <string name="safety_destination_hint">إلى أين ستذهب؟</string>
+    <string-array name="safety_destination_checklist">
+        <item>اختر مكانًا آمنًا للذهاب إليه.</item>
+        <item>دوّن العنوان وكيفية العثور على المكان.</item>
+        <item>تحقق من موعد إمكانية وصولك.</item>
+    </string-array>
+    <string name="safety_travel_hint">كيف ستصل إلى هناك؟</string>
+    <string-array name="safety_travel_checklist">
+        <item>حدد كيف ستصل إلى المكان.</item>
+        <item>تأكد ممن يمكنه مساعدتك في النقل عند الحاجة.</item>
+        <item>جهّز المفاتيح أو أجرة المواصلات أو الوقود عندما يكون ذلك آمنًا.</item>
+    </string-array>
+    <string name="safety_contacts_hint">إلى من يمكنك اللجوء، وهل يمكنك الإقامة معه؟</string>
+    <string-array name="safety_contacts_checklist">
+        <item>دوّن اسم شخص موثوق وبيانات آمنة للتواصل معه.</item>
+        <item>اسأل إن كان بإمكانك الإقامة معه ولأي مدة.</item>
+        <item>اتفقا على طريقة آمنة للاطمئنان أو طلب المساعدة.</item>
+    </string-array>
+    <string name="safety_aftercare_hint">ماذا ستفعل بعد المغادرة؟</string>
+    <string-array name="safety_aftercare_checklist">
+        <item>أخبر شخصًا موثوقًا بوصولك عندما يكون ذلك آمنًا.</item>
+        <item>خطط للسكن والطعام والأدوية في الأيام الأولى.</item>
+        <item>حدد خدمات الدعم التي قد ترغب في التواصل معها.</item>
+    </string-array>
+</resources>

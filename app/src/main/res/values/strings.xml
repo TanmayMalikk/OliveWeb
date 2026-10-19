@@ -423,7 +423,7 @@
     <string name="save_article">Save article</string>
     <string name="history_search">History search</string>
     <string name="close_1">Close</string>
-    <string name="back">← Back</string>
+    <string name="back">Back</string>
     <string name="living">Living</string>
     <string name="food">Food</string>
     <string name="home">Home</string>
@@ -475,7 +475,7 @@
     <string name="no_tag">No tag</string>
     <string name="no_changes_to_save">No changes to save.</string>
     <string name="search_notes">Search notes</string>
-    <string name="no_notes_found">No notes found.</string>
+    <string name="no_private_notes_found">No notes found.</string>
     <string name="pinned">Pinned</string>
     <string name="others">Others</string>
     <string name="all_notes">All notes</string>
@@ -551,6 +551,26 @@
     <string name="unsend_message">Unsend message</string>
     <string name="message_unsent">Message unsent</string>
     <string name="message_actions">Message actions</string>
+    <string name="share_attachment">Share attachment</string>
+    <string name="select_attachment_category">Select %1$s</string>
+    <string name="private_notes">Private notes</string>
+    <string name="incident_reports">Incident reports</string>
+    <string name="saved_media">Saved media</string>
+    <string name="no_notes_found">No notes found.</string>
+    <string name="untitled_note">Untitled note</string>
+    <string name="no_incident_reports_found">No incident reports found.</string>
+    <string name="media_uploads_not_configured">Media uploads are not yet configured.</string>
+    <string name="secure_shared_entry">Secure shared entry</string>
+    <string name="close_shared_entry">Close shared entry</string>
+    <string name="attach_secure_entry">Attach a secure note or incident report</string>
+    <string name="encrypted_document">Encrypted document</string>
+    <string name="shared_private_note">Shared private note</string>
+    <string name="shared_incident_report">Shared incident report</string>
+    <string name="private_entry_shared">Private entry shared securely.</string>
+    <string name="unable_to_share_private_entry">Unable to share this private entry.</string>
+    <string name="unable_to_open_shared_entry">Unable to open this shared entry.</string>
+    <string name="unable_to_open_secure_conversation">Unable to open this secure conversation. The other person may need to open the updated app first.</string>
+    <string name="secure_message">Secure message</string><string name="encrypted_message_unavailable">Encrypted message unavailable</string>
     <string name="incorrect_pin_attempts_remaining">Incorrect PIN. %1$d attempts remaining.</string>
     <string name="pin_attempt_history_count">PIN attempt history · %1$d</string>
     <string name="future_feature_count">Future feature %1$d</string>

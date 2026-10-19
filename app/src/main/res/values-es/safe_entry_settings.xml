@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entry_restore_lock">Este teléfono no tiene bloqueo de pantalla ni un PIN de respaldo configurado. Restablece el bloqueo del teléfono para usar la autenticación del dispositivo.</string>
+    <string name="entry_set_pin_first">Configura un PIN abajo antes de elegirlo como método de acceso.</string>
+    <string name="entry_settings_saved">Ajustes de acceso seguro guardados.</string>
+    <string name="entry_current_method">Método preferido: %1$s</string>
+    <string name="entry_backup_description">Puedes configurar ambos métodos. Si eliges el bloqueo del dispositivo, el PIN de la aplicación solo estará disponible si se elimina el bloqueo del teléfono. Cancelar o fallar la autenticación de Android no activa el PIN de respaldo.</string>
+    <string name="entry_use_device">Configurar y usar el bloqueo del dispositivo</string>
+    <string name="entry_use_pin">Usar el PIN guardado</string>
+    <string name="entry_pin_setup">Configurar o cambiar el PIN</string>
+    <string name="entry_save_backup">Guardar PIN de respaldo</string>
+    <string name="entry_save_use_pin">Guardar y usar el PIN</string>
+    <string name="entry_confirm_settings">Confirma tu identidad con Android para cambiar los ajustes de acceso seguro.</string>
+    <string name="entry_settings_cancelled">Autenticación cancelada. Los ajustes de acceso seguro no se cambiaron.</string>
+    <string name="entry_settings_failed">No se pudo completar el cambio. Comprueba el método seleccionado e inténtalo de nuevo.</string>
+</resources>

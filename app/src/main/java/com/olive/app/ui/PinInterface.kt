@@ -2,80 +2,35 @@ package com.olive.app.ui
 import com.olive.app.R
 import androidx.compose.ui.res.stringResource
 
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.AccessTime
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.AddCircleOutline
-import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.RestoreFromTrash
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.core.content.ContextCompat
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.olive.app.data.*
 import com.olive.app.security.InputPolicy
-import java.time.Instant
-import java.time.LocalDate
-import java.time.Month
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.UUID
 
-// USER ONLY: every user device gets a local PIN; Safe Contacts, Staff, and Admins do not use this step.
+// USER ONLY: enrollment chooses a separate app PIN or Android device authentication.
+@Composable internal fun DevicePin(session: SessionViewModel) = SafeEntrySetup(session)
+
 // UI sizing/text: PIN setup uses the shared form spacing and full-width fields; warning copy uses the Muted color.
-@Composable internal fun DevicePin(session: SessionViewModel) {
+@Composable internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
+    val uiText=rememberResourceText()
     var pin by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var showErrors by rememberSaveable { mutableStateOf(false) }
@@ -83,33 +38,47 @@ import java.util.UUID
     val confirmationValid=confirm.isNotEmpty() && confirm==pin
     val stages=if(session.creatingAccount) 4 else 2
     val page=stages-1
-    val completedBeforePin=if(session.creatingAccount) 8 else 2
+    val completedBeforePin=if(session.creatingAccount) 7 else 2
     val totalRequired=completedBeforePin+2
     FormColumn {
-        Heading("Secure this device", "Create your device PIN.")
+        Heading(uiText(R.string.entry_setup_title), uiText(R.string.entry_new_pin_description))
         OnboardingProgress(completedBeforePin+listOf(pinValid,confirmationValid).count { it },totalRequired,page,stages,
             List(stages) { index -> index<page || (index==page && pinValid && confirmationValid) })
-        Field("4–6 digit PIN",pin,"new_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
-            error=if(showErrors && !pinValid) "Invalid PIN" else null) {
+        Field(uiText(R.string.str_4_6_digit_pin),pin,"new_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
+            error=if(showErrors && !pinValid) uiText(R.string.ui_invalid_pin) else null) {
             pin=it.filter(Char::isDigit).take(6);showErrors=false
         }
-        RequirementBullet("4–6 digits",pinValid,pin.isNotEmpty())
-        Field("Confirm PIN",confirm,"confirm_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
-            error=if(showErrors && !confirmationValid) "PINs differ" else null) {
+        RequirementBullet(uiText(R.string.ui_4_6_digits),pinValid,pin.isNotEmpty())
+        Field(uiText(R.string.confirm_pin),confirm,"confirm_pin",secret=true,numeric=true,showSecretToggle=true,enabled=!session.busy,
+            error=if(showErrors && !confirmationValid) uiText(R.string.ui_pins_differ) else null) {
             confirm=it.filter(Char::isDigit).take(6);showErrors=false
         }
-        RequirementBullet("PINs match",confirmationValid,pin.isNotEmpty() || confirm.isNotEmpty())
+        RequirementBullet(uiText(R.string.ui_pins_match),confirmationValid,pin.isNotEmpty() || confirm.isNotEmpty())
         Status(session)
-        OnboardingNavigation(session::back,{showErrors=true;if(pinValid && confirmationValid) session.createDevicePin(pin,confirm)},
+        OnboardingNavigation(onBack,{showErrors=true;if(pinValid && confirmationValid) session.createDevicePin(pin,confirm)},
             last=true,nextTag="pin_setup_submit",enabled=!session.busy)
     }
 }
 
-// USER ONLY: a cover trigger opens this local PIN interface before showing Olive Branch.
+// USER ONLY: a search trigger opens this local PIN challenge; calculator entry verifies through SessionAccess separately.
 // UI sizing/color: this screen owns the compact breakpoint, keypad dimensions, PIN-dot size, OliveGreen accents, and responsive text sizes.
 @Composable internal fun PinPrompt(session: SessionViewModel) {
-    var pin by remember { mutableStateOf("") }
+    if(session.usesDeviceLock) { DeviceLockPrompt(session);return }
+    if(!session.canUseAppPin) {
+        FormColumn {
+            Heading(stringResource(R.string.entry_device_lock),stringResource(R.string.entry_restore_lock))
+            Status(session)
+        }
+        return
+    }
+    val uiText=rememberResourceText()
+    val challenge=session.pinChallengeVersion
+    var pin by remember(challenge) { mutableStateOf("") }
     val headingScrollState=rememberScrollState()
+    val pinLabel=uiText(R.string.a11y_pin)
+    val enteredLabel=uiText(R.string.a11y_digits_entered)
+    val deleteLabel=uiText(R.string.a11y_delete_digit)
+    val unlockLabel=uiText(R.string.a11y_unlock)
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Sizing note: raise 650dp to switch into the compact PIN layout sooner. The 48–72dp range below is the keypad's min/max size.
         // When adding a language with longer PIN text, test this breakpoint with Android's largest font setting too.
@@ -125,10 +94,14 @@ import java.util.UUID
                 verticalArrangement=Arrangement.spacedBy(if(compact) 7.dp else 12.dp)) {
                 // These are the compact/regular PIN headings; change both together so translated text scales consistently.
                 Text(stringResource(R.string.olive_branch),fontFamily=FontFamily.Serif,fontSize=if(compact) 22.sp else 26.sp,color=OliveGreen)
-                Text(stringResource(R.string.enter_pin),modifier=Modifier.padding(top=if(compact) 12.dp else 18.dp),
+                Text(stringResource(R.string.enter_pin),modifier=Modifier.padding(top=if(compact) 12.dp else 18.dp).semantics { heading() },
                     style=if(compact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium)
                 Text(stringResource(R.string.enter_your_pin),color=Muted)
-                Row(Modifier.height(if(compact) 11.dp else 14.dp).testTag("unlock_pin"),horizontalArrangement=Arrangement.spacedBy(if(compact) 8.dp else 12.dp)) {
+                Row(Modifier.height(if(compact) 11.dp else 14.dp).testTag("unlock_pin").clearAndSetSemantics {
+                    contentDescription=pinLabel
+                    stateDescription="$enteredLabel: ${pin.length}"
+                    liveRegion=LiveRegionMode.Polite
+                },horizontalArrangement=Arrangement.spacedBy(if(compact) 8.dp else 12.dp)) {
                     repeat(pin.length) {
                         Box(Modifier.size(if(compact) 11.dp else 14.dp).background(OliveGreen,CircleShape))
                     }
@@ -142,15 +115,20 @@ import java.util.UUID
                         row.forEach { key ->
                             val tag=when(key) { "⌫" -> "pin_backspace"; "↪" -> "unlock_submit"; else -> "pin_digit_$key" }
                             FilledTonalButton(onClick={
+                                // TalkBack can deliver an action from a node whose enabled state is stale.
+                                if(session.busy || session.privacyBlackout || session.screen!=SessionScreen.Pin ||
+                                    session.pinChallengeVersion!=challenge) return@FilledTonalButton
                                 when(key) {
                                     "⌫" -> pin=pin.dropLast(1)
-                                    "↪" -> { val attempt=pin;pin="";session.submitPin(attempt) }
+                                    "↪" -> if(InputPolicy.validPin(pin)) { val attempt=pin;pin="";session.submitPin(attempt,challenge) }
                                     else -> if(pin.length<6) pin+=key
                                 }
                             },enabled=!session.busy && (key!="↪" || pin.length in 4..6),
                                 modifier=Modifier.size(keySize).testTag(tag),shape=CircleShape,
                                 contentPadding=PaddingValues(0.dp)) {
-                                Text(key,fontSize=if(compact) 23.sp else if(key=="⌫" || key=="↪") 26.sp else 30.sp)
+                                Text(key,modifier=if(key=="⌫" || key=="↪") Modifier.clearAndSetSemantics {
+                                    contentDescription=if(key=="⌫") deleteLabel else unlockLabel
+                                } else Modifier,fontSize=if(compact) 23.sp else if(key=="⌫" || key=="↪") 26.sp else 30.sp)
                             }
                         }
                     }

@@ -424,7 +424,7 @@
     <string name="save_article">حفظ المادة</string>
     <string name="history_search">بحث التاريخ</string>
     <string name="close_1">إغلاق</string>
-    <string name="back">← العودة</string>
+    <string name="back">العودة</string>
     <string name="living">المعيشة</string>
     <string name="food">طعام</string>
     <string name="home">الصفحة الرئيسية</string>
@@ -552,6 +552,13 @@
     <string name="unsend_message">إلغاء إرسال الرسالة</string>
     <string name="message_unsent">لم يتم إرسال الرسالة</string>
     <string name="message_actions">إجراءات الرسالة</string>
+    <string name="share_attachment">مشاركة مرفق</string><string name="select_attachment_category">اختيار %1$s</string>
+    <string name="private_notes">ملاحظات خاصة</string><string name="incident_reports">تقارير الحوادث</string><string name="saved_media">الوسائط المحفوظة</string>
+    <string name="no_private_notes_found">لم يتم العثور على ملاحظات.</string><string name="untitled_note">ملاحظة بلا عنوان</string><string name="no_incident_reports_found">لم يتم العثور على تقارير حوادث.</string>
+    <string name="media_uploads_not_configured">لم يتم إعداد رفع الوسائط بعد.</string><string name="secure_shared_entry">عنصر مشترك آمن</string><string name="close_shared_entry">إغلاق العنصر المشترك</string>
+    <string name="attach_secure_entry">إرفاق ملاحظة أو تقرير آمن</string><string name="encrypted_document">مستند مشفر</string><string name="shared_private_note">ملاحظة خاصة مشتركة</string><string name="shared_incident_report">تقرير حادث مشترك</string>
+    <string name="private_entry_shared">تمت مشاركة العنصر الخاص بأمان.</string><string name="unable_to_share_private_entry">تعذرت مشاركة هذا العنصر الخاص.</string><string name="unable_to_open_shared_entry">تعذر فتح هذا العنصر المشترك.</string><string name="unable_to_open_secure_conversation">تعذر فتح هذه المحادثة الآمنة. قد يحتاج الشخص الآخر إلى فتح التطبيق المحدّث أولاً.</string>
+    <string name="secure_message">رسالة آمنة</string><string name="encrypted_message_unavailable">الرسالة المشفرة غير متاحة</string>
     <string name="incorrect_pin_attempts_remaining">رقم التعريف الشخصي غير صحيح. %1$d المحاولات المتبقية.</string>
     <string name="pin_attempt_history_count">سجل محاولات رقم التعريف الشخصي · %1$d</string>
     <string name="future_feature_count">الميزة المستقبلية %1$d</string>

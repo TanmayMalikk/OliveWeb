@@ -12,8 +12,8 @@ import com.olive.app.data.NewsScope
 import com.olive.app.data.UserProfile
 import com.olive.app.security.DeviceStore
 import com.olive.app.security.EncryptedVault
-import com.olive.app.ui.CalculatorHistoryEntry
-import com.olive.app.ui.CalculatorHistoryStore
+import com.olive.app.ui.covers.calculator.CalculatorHistoryEntry
+import com.olive.app.ui.covers.calculator.CalculatorHistoryStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull

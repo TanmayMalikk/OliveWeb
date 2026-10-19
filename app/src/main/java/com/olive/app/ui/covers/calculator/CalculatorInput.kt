@@ -1,8 +1,10 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+internal const val CALCULATOR_HISTORY_LIMIT=5
+
 data class CalculatorHistoryEntry(val expression:String,val result:String)
 
 // Build the visible equation here and wait for equals before calculating it locally.
@@ -12,7 +14,7 @@ class CalculatorInput(
 ) {
     var display by mutableStateOf("0"); private set
     var expression by mutableStateOf(""); private set
-    var history by mutableStateOf(initialHistory); private set
+    var history by mutableStateOf(initialHistory.take(CALCULATOR_HISTORY_LIMIT)); private set
     private var evaluated=false
     private var armedPin:String?=null
     private var angleMode=CalculatorAngleMode.RADIANS
@@ -82,7 +84,7 @@ class CalculatorInput(
     fun beginFunction(label:String,angleMode:CalculatorAngleMode) {
         beginFreshIfNeeded()
         this.angleMode=angleMode
-        updateEntry((expression+label+"(").take(MAX_EXPRESSION_LENGTH))
+        updateEntry(("$expression$label(").take(MAX_EXPRESSION_LENGTH))
         armedPin=null
     }
 
@@ -125,12 +127,12 @@ class CalculatorInput(
 
     // Disk history arrives after the keypad is already interactive.
     fun restoreHistory(value:List<CalculatorHistoryEntry>) {
-        history=if(history.isEmpty()) value else (history+value).distinct()
+        updateHistory((if(history.isEmpty()) value else (history+value).distinct()).take(CALCULATOR_HISTORY_LIMIT))
     }
 
     private fun updateHistory(value:List<CalculatorHistoryEntry>) {
-        history=value
-        onHistoryChanged(value)
+        history=value.take(CALCULATOR_HISTORY_LIMIT)
+        onHistoryChanged(history)
     }
 
     private fun canEndValue()=expression.lastOrNull()?.let { it.isDigit() || it==')' || it=='%' }==true

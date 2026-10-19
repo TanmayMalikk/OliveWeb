@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entry_setup_title">Protege tu área segura</string>
+    <string name="entry_setup_description">Elige cómo desbloquear la aplicación segura en este dispositivo.</string>
+    <string name="entry_safety_question">¿La persona que te hace daño conoce o tiene acceso al PIN, patrón o contraseña de tu teléfono?</string>
+    <string name="entry_yes">Sí</string>
+    <string name="entry_no">No</string>
+    <string name="entry_choose_method">Elige un método de acceso</string>
+    <string name="entry_new_pin">Nuevo PIN</string>
+    <string name="entry_device_lock">Bloqueo del dispositivo</string>
+    <string name="entry_recommended">%1$s · Recomendado</string>
+    <string name="entry_recommend_pin">Usa un PIN distinto que esa persona no conozca. El bloqueo del dispositivo también acepta el PIN, patrón o contraseña del teléfono.</string>
+    <string name="entry_recommend_device">Se recomienda el bloqueo del dispositivo si esa persona no puede desbloquear tu teléfono.</string>
+    <string name="entry_new_pin_description">Crea un PIN independiente de 4 a 6 dígitos. Evita usar el PIN del teléfono.</string>
+    <string name="entry_device_description">Usa la huella, el reconocimiento facial compatible o el PIN, patrón o contraseña de Android. No hace falta un PIN independiente.</string>
+    <string name="entry_device_unavailable">Configura un bloqueo de pantalla en los ajustes de Android o elige Nuevo PIN.</string>
+    <string name="entry_confirm_setup">Confirma tu identidad para configurar el acceso seguro.</string>
+    <string name="entry_unlock_description">Confirma tu identidad con Android para desbloquear el área segura.</string>
+    <string name="entry_unlock">Desbloquear con el dispositivo</string>
+    <string name="entry_use_phone_lock">Usar bloqueo del teléfono</string>
+    <string name="entry_auth_failed">No se pudo verificar la autenticación de Android. El acceso sigue bloqueado. Inténtalo de nuevo o inicia sesión para configurar otra vez el acceso seguro.</string>
+    <string name="entry_auth_cancelled">Autenticación cancelada o no disponible. El acceso sigue bloqueado.</string>
+    <string name="entry_settings_device">Este dispositivo usa el bloqueo de Android. Gestiona las huellas, el reconocimiento facial y el bloqueo en los ajustes de Android.</string>
+    <string name="entry_verify_trigger">Confirma con el bloqueo del dispositivo para cambiar la palabra de acceso.</string>
+    <string name="entry_invalid_trigger">Elige una palabra o frase de 3 a 64 caracteres.</string>
+    <string name="entry_calculator_help">Para entrar al área segura, escribe tu PIN (o de 4 a 6 dígitos cualesquiera con el bloqueo del dispositivo) y pulsa igual dos veces. El bloqueo aún requiere autenticación de Android.</string>
+</resources>

@@ -1,4 +1,4 @@
-package com.olive.app.ui
+package com.olive.app.ui.covers.calculator
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -6,6 +6,19 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CalculatorInputTest {
+    @Test fun historyRetainsOnlyFiveNewestCalculationsIncludingRestoredEntries() {
+        var saved=emptyList<CalculatorHistoryEntry>()
+        val old=(1..9).map { CalculatorHistoryEntry("$it+1","${it+1}") }
+        val input=CalculatorInput(old) { saved=it }
+        assertEquals(old.take(5),input.history)
+        input.restoreHistory(old)
+        assertEquals(old.take(5),saved)
+        listOf("9","+","9","=").forEach { input.press(it) }
+        assertEquals(5,input.history.size)
+        assertEquals(CalculatorHistoryEntry("9+9","18"),input.history.first())
+        assertEquals(old.take(4),input.history.drop(1))
+        assertEquals(input.history,saved)
+    }
     @Test fun enteredPinRequiresTwoConsecutiveEqualsTaps() {
         val input=CalculatorInput()
         "123456".forEach { assertNull(input.press(it.toString())) }
