@@ -98,6 +98,7 @@ dependencies {
     implementation("org.jsoup:jsoup:1.23.2")
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.31.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
