@@ -50,6 +50,12 @@ class LocationMapMotionUiTest {
         assertTrue(state.contains("\\\"markers\\\":1"))
         assertTrue(state.contains("\\\"trail\\\":3"))
         assertTrue(state.contains("53.547"))
+
+        compose.runOnIdle { points.value=listOf(points.value.single().copy(live=false,lastKnown=true)) }
+        compose.waitForIdle();Thread.sleep(250)
+        val lastKnown=evaluate("JSON.stringify({red:!!markers['moving-user'].getElement().querySelector('.olive-last-known-dot'),animation:getComputedStyle(markers['moving-user'].getElement().firstChild).animationName})")
+        assertTrue(lastKnown.contains("\\\"red\\\":true"))
+        assertTrue(lastKnown.contains("\\\"animation\\\":\\\"none\\\""))
     }
 
     private fun webView():WebView?=findWebView(compose.activity.window.decorView)
