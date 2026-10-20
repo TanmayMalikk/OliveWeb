@@ -4,13 +4,23 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.olive.app.data.MapLocationPoint
+import com.olive.app.data.LocationTrailPoint
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 internal object LiveLocationState {
     private val mutable=MutableStateFlow<MapLocationPoint?>(null)
     val current=mutable.asStateFlow()
-    internal fun update(value:MapLocationPoint?) { mutable.value=value }
+    internal fun update(value:MapLocationPoint?) {
+        if(value==null) { mutable.value=null;return }
+        val cutoff=value.updatedAt-TRAIL_WINDOW_MILLIS
+        val prior=mutable.value?.takeIf { it.uid==value.uid }?.trail.orEmpty().filter { it.updatedAt>=cutoff }
+        val next=LocationTrailPoint(value.latitude,value.longitude,value.updatedAt)
+        mutable.value=value.copy(trail=(prior+next).distinctBy { it.updatedAt }.takeLast(MAX_TRAIL_POINTS))
+    }
+
+    private const val TRAIL_WINDOW_MILLIS=30*60_000L
+    private const val MAX_TRAIL_POINTS=1_000
 }
 
 /** Persists and controls a live-location session independently from the tracking service lifecycle. */
@@ -35,6 +45,7 @@ internal object LiveLocationController {
         val intent=Intent(context,LiveLocationService::class.java).putExtra(LiveLocationService.OWNER_UID,uid)
             .putExtra(LiveLocationService.DISPLAY_NAME,name).putExtra(LiveLocationService.CONTACT_UIDS,contactUids.toTypedArray())
             .putExtra(LiveLocationService.EXPIRES_AT,expiresAt)
+            .putExtra(LiveLocationService.RESET_TRAIL,true)
         ContextCompat.startForegroundService(context,intent)
     }
 
