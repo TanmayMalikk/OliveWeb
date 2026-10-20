@@ -48,7 +48,8 @@ import kotlin.math.roundToInt
         val encoded=JSONArray().apply { points.forEach { point -> put(JSONObject().apply {
             put("uid",point.uid);put("name",point.name);put("latitude",point.latitude);put("longitude",point.longitude)
             put("label",if(point.lastKnown) "${point.name} · $lastKnownLabel" else point.name)
-            put("live",point.live);put("own",point.uid==ownPointUid);point.accuracy?.let { put("accuracy",it.toDouble()) }
+            put("live",point.live);put("lastKnown",point.lastKnown);put("own",point.uid==ownPointUid)
+            point.accuracy?.let { put("accuracy",it.toDouble()) }
             put("trail",JSONArray().apply { point.trail.forEach { trailPoint -> put(JSONObject().apply {
                 put("latitude",trailPoint.latitude);put("longitude",trailPoint.longitude);put("updatedAt",trailPoint.updatedAt)
             }) } })

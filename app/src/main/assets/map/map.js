@@ -17,10 +17,11 @@ const trails={};
 let accuracyCircle=null;
 let points=[];
 function markerIcon(point){
-  const className=point.live?'olive-live-dot':'olive-contact-dot';
-  const size=point.live?24:22;
+  const className=point.live?'olive-live-dot':(point.lastKnown?'olive-last-known-dot':'olive-contact-dot');
+  const size=(point.live||point.lastKnown)?24:22;
   return L.divIcon({className:'olive-live-marker',html:'<div class="'+className+'"></div>',iconSize:[size,size],iconAnchor:[size/2,size/2]});
 }
+function markerStyle(point){return point.live?'live':(point.lastKnown?'last-known':'contact');}
 function animateMarker(uid,marker,target,duration){
   if(markerAnimations[uid]) cancelAnimationFrame(markerAnimations[uid]);
   const start=marker.getLatLng();
@@ -45,10 +46,11 @@ window.oliveSetPoints=function(next,moveCamera){
     let marker=markers[uid];
     if(!marker){
       marker=L.marker(target,{icon:markerIcon(point)}).addTo(map);
-      marker._oliveLive=point.live;
+      marker._oliveStyle=markerStyle(point);
       markers[uid]=marker;
     }else{
-      if(marker._oliveLive!==point.live){marker.setIcon(markerIcon(point));marker._oliveLive=point.live;}
+      const style=markerStyle(point);
+      if(marker._oliveStyle!==style){marker.setIcon(markerIcon(point));marker._oliveStyle=style;}
       const oldTarget=markerTargets[uid];
       if(!oldTarget||oldTarget[0]!==target[0]||oldTarget[1]!==target[1]) animateMarker(uid,marker,target,1800);
     }
