@@ -25,33 +25,20 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.olive.app.R
 import com.olive.app.data.*
-import kotlinx.coroutines.launch
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
 
 @Composable internal fun SafetyDocumentsScreen(session:SessionViewModel) {
     val context=LocalContext.current;val uid=session.coverAccountId ?: return
-    val repository=remember { SafetyDocumentRepository() };val scope=rememberCoroutineScope()
-    var files by remember(uid) { mutableStateOf(emptyList<SafetyDocument>()) }
-    var loading by remember(uid) { mutableStateOf(false) };var error by remember { mutableStateOf<String?>(null) }
+    val controller=session.documents
+    val state=controller.state
     var filter by rememberSaveable { mutableStateOf(DocumentFilter.All) };var sharing by remember { mutableStateOf<SafetyDocument?>(null) }
     val unableUpload=stringResource(R.string.documents_upload_failed)
     val noViewer=stringResource(R.string.documents_no_viewer)
-    suspend fun refresh() {
-        if(session.localMode) return
-        loading=true
-        runCatching { repository.listFor(uid) }.onSuccess { files=it }.onFailure { error=it.localizedMessage }
-        loading=false
-    }
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if(uri!=null) scope.launch {
-            loading=true;error=null
-            runCatching { repository.upload(context,uri,AccountIdentity(uid,session.coverUsername)) }
-                .onSuccess { refresh() }.onFailure { error=it.localizedMessage ?: unableUpload }
-            loading=false
-        }
+        if(uri!=null) controller.upload(uri,AccountIdentity(uid,session.coverUsername),unableUpload)
     }
-    LaunchedEffect(uid) { refresh() }
+    LaunchedEffect(uid,session.localMode) { controller.load(uid,session.localMode) }
     Column(Modifier.fillMaxSize().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().padding(top=8.dp),verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=session::back,modifier=Modifier.testTag("documents_back")) {
@@ -65,7 +52,7 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
         }
         Button(onClick={picker.launch(arrayOf("image/*","video/*","application/pdf","text/plain",
             "application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"))},
-            enabled=!loading && !session.localMode,modifier=Modifier.fillMaxWidth().testTag("documents_upload")) {
+            enabled=!state.loading && !session.localMode,modifier=Modifier.fillMaxWidth().testTag("documents_upload")) {
             Icon(Icons.Outlined.UploadFile,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.documents_add))
         }
         if(session.localMode) Text(stringResource(R.string.documents_account_required),color=Muted)
@@ -84,15 +71,15 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
                 }
             }
         }
-        if(loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-        error?.let { AccessibleMessage(it) }
-        val shown=files.filter { file -> when(filter) {
+        if(state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        state.error?.let { AccessibleMessage(it) }
+        val shown=state.files.filter { file -> when(filter) {
             DocumentFilter.All -> true
             DocumentFilter.Photos -> file.mimeType.startsWith("image/")
             DocumentFilter.Videos -> file.mimeType.startsWith("video/")
             DocumentFilter.Documents -> !file.mimeType.startsWith("image/") && !file.mimeType.startsWith("video/")
         } }
-        if(!loading && shown.isEmpty()) Surface(Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.large,color=LightSage) {
+        if(!state.loading && shown.isEmpty()) Surface(Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.large,color=LightSage) {
             Column(Modifier.padding(20.dp),horizontalAlignment=Alignment.CenterHorizontally,
                 verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Icon(Icons.Outlined.FolderOpen,null,Modifier.size(36.dp),tint=OliveGreen)
@@ -103,30 +90,18 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(),contentPadding=PaddingValues(bottom=24.dp),
             verticalArrangement=Arrangement.spacedBy(10.dp)) {
             items(shown,key={it.id}) { file ->
-                SafetyDocumentCard(file,uid,session.friends,onOpen={scope.launch {
-                    loading=true;error=null
+                SafetyDocumentCard(file,uid,session.friends,onOpen={controller.download(file) { local ->
                     runCatching {
-                        val local=repository.download(context,file)
                         val uri=FileProvider.getUriForFile(context,"${context.packageName}.documents",local)
                         context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri,file.mimeType)
                             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
-                    }.onFailure { failure -> error=if(failure is ActivityNotFoundException) noViewer else failure.localizedMessage }
-                    loading=false
-                }},onShare={sharing=file},onDelete={scope.launch {
-                    loading=true;error=null
-                    runCatching { repository.delete(file,uid) }.onSuccess { refresh() }.onFailure { error=it.localizedMessage }
-                    loading=false
-                }})
+                    }.onFailure { failure -> controller.reportError(if(failure is ActivityNotFoundException) noViewer else failure.localizedMessage) }
+                }},onShare={sharing=file},onDelete={controller.delete(file,uid)})
             }
         }
     }
     sharing?.let { file -> DocumentSharingDialog(file,uid,session.friends,session.profile?.contacts.orEmpty(),onDismiss={sharing=null}) { recipients ->
-        scope.launch {
-            loading=true;error=null
-            runCatching { repository.share(file,uid,recipients) }.onSuccess { sharing=null;refresh() }
-                .onFailure { error=it.localizedMessage }
-            loading=false
-        }
+        controller.share(file,uid,recipients) { sharing=null }
     } }
 }
 

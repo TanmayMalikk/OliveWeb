@@ -5,8 +5,9 @@ import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
 // Callable Functions verify current Auth roles and sharing on every read and write; no plaintext Firestore disk cache.
-internal class SafetyPlanRepository {
-    private val functions=FirebaseFunctions.getInstance("northamerica-northeast1")
+internal class SafetyPlanRepository(
+    private val functions:FirebaseFunctions=FirebaseFunctions.getInstance("northamerica-northeast1"),
+) {
     private suspend fun call(name:String,data:Map<String,Any> = emptyMap()):JSONObject {
         val result=functions.getHttpsCallable(name).call(data).await().data as? Map<*,*> ?: error("Invalid response")
         return JSONObject(result)
