@@ -1,0 +1,70 @@
+package com.olive.app
+
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebView
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import com.olive.app.data.LocationTrailPoint
+import com.olive.app.data.MapLocationPoint
+import com.olive.app.ui.InteractiveLocationMap
+import com.olive.app.ui.OliveTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+class LocationMapMotionUiTest {
+    @get:Rule val compose=createAndroidComposeRule<MainActivity>()
+
+    @Test fun markerAndTrailUpdateWithoutRecreatingMap() {
+        val started=System.currentTimeMillis()
+        val first=LocationTrailPoint(53.5461,-113.4937,started)
+        val points=mutableStateOf(listOf(MapLocationPoint("moving-user","You",first.latitude,first.longitude,
+            first.updatedAt,true,8f,trail=listOf(first))))
+        compose.activity.setContent { OliveTheme { InteractiveLocationMap(points.value,Modifier.fillMaxSize(),"moving-user") } }
+        compose.waitUntil(25_000) { compose.onAllNodesWithTag("map_zoom_in").fetchSemanticsNodes().isNotEmpty() }
+        var original:WebView?=null
+        compose.runOnIdle { original=webView() }
+        assertNotNull(original)
+
+        val trail=listOf(first,
+            LocationTrailPoint(53.5465,-113.4931,started+2_000),
+            LocationTrailPoint(53.5470,-113.4925,started+4_000))
+        compose.runOnIdle { points.value=listOf(MapLocationPoint("moving-user","You",trail.last().latitude,
+            trail.last().longitude,trail.last().updatedAt,true,7f,trail=trail)) }
+        compose.waitForIdle()
+        Thread.sleep(2_100)
+
+        var sameWebView=false
+        compose.runOnIdle { sameWebView=original===webView() }
+        assertTrue(sameWebView)
+        val state=evaluate("JSON.stringify({markers:Object.keys(markers).length,trail:trails['moving-user'].getLatLngs().length,latitude:points[0].latitude})")
+        assertTrue(state.contains("\\\"markers\\\":1"))
+        assertTrue(state.contains("\\\"trail\\\":3"))
+        assertTrue(state.contains("53.547"))
+    }
+
+    private fun webView():WebView?=findWebView(compose.activity.window.decorView)
+
+    private fun findWebView(view:View):WebView? {
+        if(view is WebView) return view
+        if(view is ViewGroup) for(index in 0 until view.childCount) findWebView(view.getChildAt(index))?.let { return it }
+        return null
+    }
+
+    private fun evaluate(script:String):String {
+        val latch=CountDownLatch(1);var result=""
+        compose.activity.runOnUiThread { webView()?.evaluateJavascript(script) { value -> result=value;latch.countDown() } }
+        assertTrue(latch.await(5,TimeUnit.SECONDS))
+        assertEquals(false,result.isBlank())
+        return result
+    }
+}

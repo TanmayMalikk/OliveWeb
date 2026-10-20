@@ -222,16 +222,24 @@ test('live coordinates are overwritten by their owner and readable only by autho
   const path='liveLocations/live-owner';
   const location={displayName:'Owner',latitude:53.5461,longitude:-113.4937,accuracy:8,
     updatedAt:Date.now(),active:true,authorized:{'live-contact':true}};
+  const trailPath='liveLocationTrails/live-owner';
+  const trail={'1770000000000':{latitude:53.5460,longitude:-113.4938,updatedAt:1770000000000},
+    '1770000002000':{latitude:53.5461,longitude:-113.4937,updatedAt:1770000002000}};
   await assertSucceeds(set(ref(owner,path),location));
+  await assertSucceeds(set(ref(owner,trailPath),trail));
   await assertSucceeds(get(ref(contact,path)));
+  await assertSucceeds(get(ref(contact,trailPath)));
   await assertFails(get(ref(stranger,path)));
+  await assertFails(get(ref(stranger,trailPath)));
   await assertFails(set(ref(contact,path),{...location,latitude:0}));
+  await assertFails(set(ref(owner,trailPath+'/bad'),{latitude:200,longitude:0,updatedAt:Date.now()}));
   await assertSucceeds(set(ref(owner,path),{...location,latitude:53.55,updatedAt:Date.now()}));
   await assertSucceeds(set(ref(owner,path),{...location,active:false}));
   const retained=await assertSucceeds(get(ref(contact,path)));
   if(retained.val()?.active!==false || retained.val()?.latitude!==location.latitude)
     throw new Error('The authorized contact could not read the retained last-known location.');
   await assertSucceeds(remove(ref(owner,path)));
+  await assertSucceeds(remove(ref(owner,trailPath)));
 });
 
 test('encrypted private entries are restricted to wrapped-key recipients', async () => {
