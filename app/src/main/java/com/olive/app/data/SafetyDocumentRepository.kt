@@ -16,22 +16,31 @@ data class SafetyDocument(
     val allowedUsers:List<String>,val createdAt:Long=0,
 )
 
+interface SafetyDocumentDataSource {
+    suspend fun listFor(uid:String):List<SafetyDocument>
+    suspend fun getFor(uid:String,id:String):SafetyDocument
+    suspend fun upload(context:Context,uri:Uri,owner:AccountIdentity):SafetyDocument
+    suspend fun share(document:SafetyDocument,ownerUid:String,recipientUids:List<String>)
+    suspend fun delete(document:SafetyDocument,ownerUid:String)
+    suspend fun download(context:Context,document:SafetyDocument):File
+}
+
 class SafetyDocumentRepository(
     private val firestore:FirebaseFirestore=FirebaseFirestore.getInstance(),
     private val storage:FirebaseStorage=FirebaseStorage.getInstance(),
-) {
-    suspend fun listFor(uid:String):List<SafetyDocument> = firestore.collection("files")
+):SafetyDocumentDataSource {
+    override suspend fun listFor(uid:String):List<SafetyDocument> = firestore.collection("files")
         .whereArrayContains("allowed_users",uid).get().await().documents.mapNotNull(::documentFrom)
         .sortedByDescending { it.createdAt }
 
-    suspend fun getFor(uid:String,id:String):SafetyDocument {
+    override suspend fun getFor(uid:String,id:String):SafetyDocument {
         val document=documentFrom(firestore.collection("files").document(id).get().await())
             ?: error("File is no longer available")
         require(uid in document.allowedUsers) { "You no longer have access to this file" }
         return document
     }
 
-    suspend fun upload(context:Context,uri:Uri,owner:AccountIdentity):SafetyDocument {
+    override suspend fun upload(context:Context,uri:Uri,owner:AccountIdentity):SafetyDocument {
         val resolver=context.contentResolver
         val mime=resolver.getType(uri)?.take(120)?.ifBlank { null } ?: "application/octet-stream"
         require(mime.startsWith("image/") || mime.startsWith("video/") || mime in DOCUMENT_TYPES) { "Unsupported file type" }
@@ -57,7 +66,7 @@ class SafetyDocumentRepository(
         return SafetyDocument(id,owner.uid,path,name,mime,listOf(owner.uid),System.currentTimeMillis())
     }
 
-    suspend fun share(document:SafetyDocument,ownerUid:String,recipientUids:List<String>) {
+    override suspend fun share(document:SafetyDocument,ownerUid:String,recipientUids:List<String>) {
         require(document.ownerUid==ownerUid && recipientUids.distinct().size<=10)
         firestore.collection("files").document(document.id).update("allowed_users",listOf(ownerUid)+recipientUids.distinct()).await()
     }
@@ -75,13 +84,13 @@ class SafetyDocumentRepository(
             .update("allowed_users",FieldValue.arrayRemove(recipientUid)).await()
     }
 
-    suspend fun delete(document:SafetyDocument,ownerUid:String) {
+    override suspend fun delete(document:SafetyDocument,ownerUid:String) {
         require(document.ownerUid==ownerUid)
         storage.reference.child(document.storagePath).delete().await()
         firestore.collection("files").document(document.id).delete().await()
     }
 
-    suspend fun download(context:Context,document:SafetyDocument):File {
+    override suspend fun download(context:Context,document:SafetyDocument):File {
         val folder=File(context.cacheDir,"opened-documents").apply { mkdirs() }
         folder.listFiles()?.filter { System.currentTimeMillis()-it.lastModified()>CACHE_LIFETIME }?.forEach(File::delete)
         val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }

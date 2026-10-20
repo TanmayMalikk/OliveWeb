@@ -195,8 +195,6 @@ import kotlinx.coroutines.launch
 
 @Composable private fun SharedMediaMessage(id:String,name:String,session:SessionViewModel,mine:Boolean) {
     val context=LocalContext.current
-    val scope=rememberCoroutineScope()
-    val repository=remember { SafetyDocumentRepository() }
     var opening by remember(id) { mutableStateOf(false) }
     val openFailed=stringResource(R.string.documents_open_failed)
     val noViewer=stringResource(R.string.documents_no_viewer)
@@ -204,16 +202,13 @@ import kotlinx.coroutines.launch
         val uid=session.coverAccountId ?: return@Surface
         if(opening) return@Surface
         opening=true
-        scope.launch {
+        session.documents.openShared(uid,id,{ document,local ->
             runCatching {
-                val document=repository.getFor(uid,id)
-                val local=repository.download(context,document)
                 val uri=FileProvider.getUriForFile(context,"${context.packageName}.documents",local)
                 context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri,document.mimeType)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
             }.onFailure { failure -> session.error(if(failure is ActivityNotFoundException) noViewer else openFailed) }
-            opening=false
-        }
+        },{ opening=false })
     },enabled=!opening,shape=MaterialTheme.shapes.medium,
         color=if(mine) Color.White.copy(alpha=.2f) else Color.Black.copy(alpha=.05f),
         modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).testTag("shared_media_$id")) {

@@ -40,3 +40,28 @@ tasks.register<CheckSourceSize>("checkSourceSize") {
             "**/node_modules/**","**/build/**","**/build-*/**","**/dist/**","**/.next/**")
     })
 }
+
+tasks.register("checkArchitecture") {
+    group="verification"
+    description="Prevents safe-area Compose screens from constructing data and Firebase dependencies."
+    val screens=fileTree(rootDir) {
+        include("app/src/main/java/com/olive/app/ui/*.kt")
+        exclude("app/src/main/java/com/olive/app/ui/SessionViewModel.kt")
+    }
+    inputs.files(screens)
+    doLast {
+        val repositoryConstruction=Regex("\\b[A-Z][A-Za-z0-9]*Repository\\s*\\(")
+        val violations=screens.files.flatMap { file ->
+            file.readLines().mapIndexedNotNull { index,line ->
+                when {
+                    repositoryConstruction.containsMatchIn(line) -> "${file.relativeTo(rootDir)}:${index+1} constructs a repository"
+                    line.contains("import com.google.firebase") -> "${file.relativeTo(rootDir)}:${index+1} imports Firebase"
+                    else -> null
+                }
+            }
+        }
+        if(violations.isNotEmpty()) throw GradleException(violations.joinToString("\n",
+            prefix="UI architecture boundary violations:\n"))
+        logger.lifecycle("Architecture check passed: safe-area screens depend on controllers rather than data implementations.")
+    }
+}

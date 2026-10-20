@@ -13,8 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.PrivateEntryKind
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.SafetyDocumentRepository
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
@@ -29,16 +27,10 @@ fun AttachmentPicker(
 ) {
     var selectedCategory by remember { mutableStateOf<AttachmentCategory?>(null) }
     val uid=session.coverAccountId
-    val mediaRepository=remember { SafetyDocumentRepository() }
-    var media by remember(uid) { mutableStateOf(emptyList<SafetyDocument>()) }
-    var mediaLoading by remember { mutableStateOf(false) }
-    var mediaError by remember { mutableStateOf(false) }
+    val documentState=session.documents.state
     LaunchedEffect(selectedCategory,uid) {
         if(selectedCategory!=AttachmentCategory.Media || uid==null || session.localMode) return@LaunchedEffect
-        mediaLoading=true;mediaError=false
-        runCatching { mediaRepository.listFor(uid).filter { it.ownerUid==uid } }
-            .onSuccess { media=it }.onFailure { mediaError=true }
-        mediaLoading=false
+        session.documents.load(uid,false)
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -110,9 +102,10 @@ fun AttachmentPicker(
                             }
                         }
                         AttachmentCategory.Media -> {
-                            if(mediaLoading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-                            if(mediaError) item { Text(stringResource(R.string.documents_load_failed),Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error) }
-                            if(!mediaLoading && !mediaError && media.isEmpty()) item {
+                            val media=documentState.files.filter { it.ownerUid==uid }
+                            if(documentState.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                            if(documentState.error!=null) item { Text(stringResource(R.string.documents_load_failed),Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error) }
+                            if(!documentState.loading && documentState.error==null && media.isEmpty()) item {
                                 Text(stringResource(if(session.localMode) R.string.documents_account_required else R.string.documents_empty),
                                     Modifier.padding(16.dp))
                             }
