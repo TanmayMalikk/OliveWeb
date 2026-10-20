@@ -21,8 +21,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.olive.app.R
 import com.olive.app.data.*
+import com.olive.app.ocr.PaddleOcrManager
+import com.olive.app.ocr.OcrResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
@@ -163,21 +169,99 @@ import kotlin.time.Duration.Companion.seconds
 }
 
 @Composable internal fun SafetyDocumentsScreen(session:SessionViewModel) {
+    val context = LocalContext.current
+    var activeCameraCategory by remember { mutableStateOf<String?>(null) }
+    var uploadChoiceCategory by remember { mutableStateOf<String?>(null) }
+    var ocrResultDialog by remember { mutableStateOf<OcrResult?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    val ocrManager = remember { PaddleOcrManager(context) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            coroutineScope.launch(Dispatchers.IO) {
+                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                if (bytes != null) {
+                    val result = ocrManager.recognizeDocument(bytes)
+                    withContext(Dispatchers.Main) {
+                        ocrResultDialog = result
+                    }
+                }
+            }
+        }
+    }
+
+    if (activeCameraCategory != null) {
+        Box(Modifier.fillMaxSize()) {
+            CameraScreen(session)
+        }
+        return
+    }
+
     FormColumn {
         SafetyBackButton(onClick=session::back,tag="safe_home")
-        Heading(stringResource(R.string.support_documents),stringResource(R.string.safety_documents_intro))
+        Heading(stringResource(R.string.support_documents), "Upload or capture documents for PaddleOCR validity checking.")
         listOf("photos" to R.string.safety_storage_photos,"videos" to R.string.safety_storage_videos,
             "documents" to R.string.safety_storage_documents).forEach { (category,label) ->
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     Text(stringResource(label),style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
-                    Text(stringResource(R.string.safety_upload_soon),style=MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick={},enabled=false,modifier=Modifier.testTag("safety_upload_$category")) {
+                    Text("Ready for PaddleOCR document validity check",style=MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick={ uploadChoiceCategory = category },enabled=true,modifier=Modifier.testTag("safety_upload_$category")) {
                         Text(stringResource(R.string.safety_upload))
                     }
                 }
             }
         }
+    }
+
+    if (uploadChoiceCategory != null) {
+        AlertDialog(
+            onDismissRequest = { uploadChoiceCategory = null },
+            title = { Text("Upload Document") },
+            text = { Text("Choose how you would like to provide the document for PaddleOCR validity checking.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val cat = uploadChoiceCategory
+                    uploadChoiceCategory = null
+                    activeCameraCategory = cat
+                }) {
+                    Text("Take Picture")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    uploadChoiceCategory = null
+                    galleryLauncher.launch("image/*")
+                }) {
+                    Text("Upload Image")
+                }
+            }
+        )
+    }
+
+    if (ocrResultDialog != null) {
+        val res = ocrResultDialog!!
+        AlertDialog(
+            onDismissRequest = { ocrResultDialog = null },
+            title = { Text("PaddleOCR Document Check") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Status: ${if (res.success) "Valid ✓" else "Failed"}")
+                    Text("Extracted Text:\n${res.extractedText}", style = MaterialTheme.typography.bodySmall)
+                    if (res.detectedFields.isNotEmpty()) {
+                        Text("Detected Fields:", style = MaterialTheme.typography.labelMedium)
+                        res.detectedFields.forEach { (k, v) ->
+                            Text("• $k: $v", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { ocrResultDialog = null }) {
+                    Text("Done")
+                }
+            }
+        )
     }
 }
 
