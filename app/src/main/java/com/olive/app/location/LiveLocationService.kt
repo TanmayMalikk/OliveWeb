@@ -25,8 +25,11 @@ class LiveLocationService:Service() {
     private var expiresAt=0L
     private val expiryHandler=Handler(Looper.getMainLooper())
     private val expireSharing=Runnable { stopSharing() }
+    private var rootReference:DatabaseReference?=null
     private var liveReference:DatabaseReference?=null
+    private var trailReference:DatabaseReference?=null
     private var lastUploaded:Location?=null;private var lastUploadAt=0L;private var lastMotionAt=0L
+    private var lastTrailPruneAt=0L
     private val callback=object:LocationCallback() {
         override fun onLocationResult(result:LocationResult) { result.lastLocation?.let(::handleLocation) }
     }
@@ -54,12 +57,18 @@ class LiveLocationService:Service() {
         if(ownerUid.isBlank() || expiresAt<=System.currentTimeMillis()) { stopSharing();return START_NOT_STICKY }
         expiryHandler.removeCallbacks(expireSharing)
         expiryHandler.postDelayed(expireSharing,(expiresAt-System.currentTimeMillis()).coerceAtLeast(1L))
-        liveReference=runCatching { LocationDatabase.instance().reference.child("liveLocations").child(ownerUid) }.getOrNull()
+        rootReference=runCatching { LocationDatabase.instance().reference }.getOrNull()
+        liveReference=rootReference?.child("liveLocations")?.child(ownerUid)
+        trailReference=rootReference?.child("liveLocationTrails")?.child(ownerUid)
+        if(intent?.getBooleanExtra(RESET_TRAIL,false)==true) {
+            trailReference?.removeValue()
+            LiveLocationState.update(null)
+        }
         liveReference?.onDisconnect()?.updateChildren(mapOf("active" to false))
         startForeground(NOTIFICATION_ID,notification())
         if(!hasPermission()) { stopSharing();return START_NOT_STICKY }
-        val request=LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,5_000L)
-            .setMinUpdateIntervalMillis(5_000L).setMaxUpdateDelayMillis(10_000L).setMinUpdateDistanceMeters(3f)
+        val request=LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,MOVING_SAMPLE_MILLIS)
+            .setMinUpdateIntervalMillis(1_000L).setMaxUpdateDelayMillis(3_000L).setMinUpdateDistanceMeters(1f)
             .setWaitForAccurateLocation(true).build()
         fused.removeLocationUpdates(callback)
         try { fused.requestLocationUpdates(request,callback,mainLooper) }
@@ -68,20 +77,37 @@ class LiveLocationService:Service() {
     }
 
     private fun handleLocation(location:Location) {
-        val now=System.currentTimeMillis();val moved=lastUploaded?.distanceTo(location)?.let { it>=10f } ?: true
+        val now=System.currentTimeMillis();val moved=lastUploaded?.distanceTo(location)?.let { it>=3f } ?: true
         if(expiresAt<=now) { stopSharing();return }
         if(moved || location.speed>=.7f) lastMotionAt=now
         if(lastMotionAt==0L) lastMotionAt=now
         val stationary=now-lastMotionAt>=120_000L
-        val interval=if(stationary) 180_000L else 10_000L
+        val interval=if(stationary) STATIONARY_UPLOAD_MILLIS else MOVING_UPLOAD_MILLIS
         if(lastUploaded!=null && !moved && now-lastUploadAt<interval) return
         lastUploaded=location;lastUploadAt=now
         val point=MapLocationPoint(ownerUid,displayName,location.latitude,location.longitude,now,true,location.accuracy)
-        LiveLocationState.update(point)
-        liveReference?.setValue(mapOf(
-            "displayName" to displayName,"latitude" to location.latitude,"longitude" to location.longitude,
-            "accuracy" to location.accuracy.toDouble(),"updatedAt" to ServerValue.TIMESTAMP,"active" to true,
-            "authorized" to authorized.associateWith { true }))
+        rootReference?.updateChildren(mapOf(
+            "liveLocations/$ownerUid/displayName" to displayName,
+            "liveLocations/$ownerUid/latitude" to location.latitude,
+            "liveLocations/$ownerUid/longitude" to location.longitude,
+            "liveLocations/$ownerUid/accuracy" to location.accuracy.toDouble(),
+            "liveLocations/$ownerUid/updatedAt" to ServerValue.TIMESTAMP,
+            "liveLocations/$ownerUid/active" to true,
+            "liveLocations/$ownerUid/authorized" to authorized.associateWith { true },
+            "liveLocationTrails/$ownerUid/$now" to mapOf(
+                "latitude" to location.latitude,"longitude" to location.longitude,"updatedAt" to now)))
+            ?.addOnSuccessListener { LiveLocationState.update(point) }
+        pruneExpiredTrail(now)
+    }
+
+    private fun pruneExpiredTrail(now:Long) {
+        if(now-lastTrailPruneAt<TRAIL_PRUNE_INTERVAL_MILLIS) return
+        lastTrailPruneAt=now
+        trailReference?.orderByKey()?.endAt((now-TRAIL_WINDOW_MILLIS).toString())?.get()
+            ?.addOnSuccessListener { snapshot ->
+                val removals=snapshot.children.associate { it.key.orEmpty() to null }
+                if(removals.isNotEmpty()) trailReference?.updateChildren(removals)
+            }
     }
 
     private fun stopSharing() {
@@ -126,6 +152,12 @@ class LiveLocationService:Service() {
     companion object {
         const val OWNER_UID="owner_uid";const val DISPLAY_NAME="display_name";const val CONTACT_UIDS="contact_uids"
         const val EXPIRES_AT="expires_at";const val STOP="stop";const val PING="ping"
+        const val RESET_TRAIL="reset_trail"
         private const val CHANNEL_ID="olive_live_location";private const val NOTIFICATION_ID=4102
+        private const val MOVING_SAMPLE_MILLIS=2_000L
+        private const val MOVING_UPLOAD_MILLIS=2_000L
+        private const val STATIONARY_UPLOAD_MILLIS=180_000L
+        private const val TRAIL_WINDOW_MILLIS=30*60_000L
+        private const val TRAIL_PRUNE_INTERVAL_MILLIS=60_000L
     }
 }

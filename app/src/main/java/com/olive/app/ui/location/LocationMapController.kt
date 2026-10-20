@@ -1,6 +1,7 @@
 package com.olive.app.ui.location
 
 import android.content.Context
+import android.location.Location
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -9,6 +10,8 @@ import com.olive.app.location.LiveLocationController
 import com.olive.app.location.LiveLocationState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 
 internal data class LocationMapConfiguration(
     val identity:AccountIdentity,
@@ -74,9 +77,16 @@ internal class LocationMapController(
             if(configuration.profile.role==AccountRole.USER && requestPermission()) {
                 while(isActive) {
                     DeviceLocation.currentCoordinates(applicationContext)?.let { fix -> if(token==generation) {
-                        state=state.copy(ownPoint=MapLocationPoint(uid,configuration.youLabel,fix.latitude,fix.longitude,fix.timestamp,true,fix.accuracy))
+                        val previous=state.ownPoint
+                        val trail=previous?.trail.orEmpty().filter { it.updatedAt>=System.currentTimeMillis()-TRAIL_WINDOW_MILLIS }.toMutableList()
+                        val moved=previous==null || FloatArray(1).also { result -> Location.distanceBetween(
+                            previous.latitude,previous.longitude,fix.latitude,fix.longitude,result) }[0]>=MIN_TRAIL_DISTANCE_METERS
+                        if(moved && trail.lastOrNull()?.updatedAt!=fix.timestamp)
+                            trail += LocationTrailPoint(fix.latitude,fix.longitude,fix.timestamp)
+                        state=state.copy(ownPoint=MapLocationPoint(uid,configuration.youLabel,fix.latitude,fix.longitude,
+                            fix.timestamp,true,fix.accuracy,trail=trail.takeLast(MAX_TRAIL_POINTS)))
                     } }
-                    delay(10_000L)
+                    delay(MAP_LOCATION_REFRESH_MILLIS)
                 }
             } else if(configuration.profile.role==AccountRole.SAFE_CONTACT) {
                 val coordinates=GeoapifyClient.coordinates(configuration.profile.address)
@@ -113,12 +123,16 @@ internal class LocationMapController(
             state=state.copy(working=true,error=null)
             if(!requestPermission()) state=state.copy(working=false,error=permissionError)
             else try {
-                checkNotNull(repository).setLiveRecipients(configuration.identity.uid,recipients)
                 val end=System.currentTimeMillis()+durationMillis
+                val startedAt=System.currentTimeMillis()
                 LiveLocationController.start(applicationContext,configuration.identity.uid,configuration.profile.fullName,state.selected,end)
+                withTimeout(20_000L) { LiveLocationState.current.filterNotNull()
+                    .first { it.uid==configuration.identity.uid && it.updatedAt>=startedAt } }
+                checkNotNull(repository).setLiveRecipients(configuration.identity.uid,recipients)
                 state=state.copy(working=false,liveActive=true,expiresAt=end)
                 watchExpiry()
             } catch(failure:Exception) {
+                LiveLocationController.stop(applicationContext)
                 runCatching { repository?.setLiveRecipients(configuration.identity.uid,emptyList()) }
                 state=state.copy(working=false,error=failure.localizedMessage ?: startError)
             }
@@ -153,5 +167,11 @@ internal class LocationMapController(
         }
     }
 
-    private companion object { const val MAX_SHARED_CONTACTS=10 }
+    private companion object {
+        const val MAX_SHARED_CONTACTS=10
+        const val MAP_LOCATION_REFRESH_MILLIS=2_000L
+        const val TRAIL_WINDOW_MILLIS=30*60_000L
+        const val MIN_TRAIL_DISTANCE_METERS=2f
+        const val MAX_TRAIL_POINTS=1_000
+    }
 }

@@ -7,8 +7,11 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
+data class LocationTrailPoint(val latitude:Double,val longitude:Double,val updatedAt:Long)
+
 data class MapLocationPoint(val uid:String,val name:String,val latitude:Double,val longitude:Double,
-    val updatedAt:Long,val live:Boolean,val accuracy:Float?=null,val lastKnown:Boolean=false)
+    val updatedAt:Long,val live:Boolean,val accuracy:Float?=null,val lastKnown:Boolean=false,
+    val trail:List<LocationTrailPoint> = emptyList())
 
 internal object LocationDatabase {
     fun instance():FirebaseDatabase {
@@ -101,15 +104,22 @@ private class LiveLocationSharingDataSource(
     fun observe(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription {
         val points=mutableMapOf<String,MapLocationPoint>();val database=runCatching(databaseProvider).getOrNull()
             ?: return ChatSubscription { }
+        val trails=mutableMapOf<String,MutableMap<String,LocationTrailPoint>>()
         fun publish()=onUpdate(points.values.filter { it.lastKnown || System.currentTimeMillis()-it.updatedAt<5*60_000 }.sortedBy { it.name })
-        val liveListeners=mutableMapOf<String,Pair<DatabaseReference,ValueEventListener>>()
+        fun attachTrail(uid:String) {
+            val trail=trails[uid].orEmpty().values.sortedBy { it.updatedAt }
+            points[uid]?.let { points[uid]=it.copy(trail=trail);publish() }
+        }
+        val liveListeners=mutableMapOf<String,LiveSubscription>()
         val shareListeners=friends.map { friend ->
             firestore.collection("liveLocationShares").document(friend.uid).collection("recipients").document(currentUid)
                 .addSnapshotListener { share,_ ->
-                    liveListeners.remove(friend.uid)?.let { (reference,listener) -> reference.removeEventListener(listener) }
-                    points.remove(friend.uid);publish()
+                    liveListeners.remove(friend.uid)?.close()
+                    points.remove(friend.uid);trails.remove(friend.uid);publish()
                     if(share?.exists()!=true) return@addSnapshotListener
                     val reference=database.reference.child("liveLocations").child(friend.uid)
+                    val trailQuery=database.reference.child("liveLocationTrails").child(friend.uid)
+                        .orderByChild("updatedAt").startAt((System.currentTimeMillis()-TRAIL_WINDOW_MILLIS).toDouble())
                     val listener=object:ValueEventListener {
                         override fun onDataChange(snapshot:DataSnapshot) {
                             val latitude=snapshot.child("latitude").getValue(Double::class.java)
@@ -119,20 +129,47 @@ private class LiveLocationSharingDataSource(
                             if(latitude!=null && longitude!=null && snapshot.child("authorized").child(currentUid).getValue(Boolean::class.java)==true)
                                 points[friend.uid]=MapLocationPoint(friend.uid,snapshot.child("displayName").getValue(String::class.java)
                                     ?: friend.username,latitude,longitude,updated,active,
-                                    snapshot.child("accuracy").getValue(Double::class.java)?.toFloat(),!active)
+                                    snapshot.child("accuracy").getValue(Double::class.java)?.toFloat(),!active,
+                                    trails[friend.uid].orEmpty().values.sortedBy { it.updatedAt })
                             else points.remove(friend.uid)
                             publish()
                         }
                         override fun onCancelled(error:DatabaseError) { points.remove(friend.uid);publish() }
                     }
-                    liveListeners[friend.uid]=reference to listener;reference.addValueEventListener(listener)
+                    val trailListener=object:ChildEventListener {
+                        override fun onChildAdded(snapshot:DataSnapshot,previousChildName:String?)=update(snapshot)
+                        override fun onChildChanged(snapshot:DataSnapshot,previousChildName:String?)=update(snapshot)
+                        override fun onChildRemoved(snapshot:DataSnapshot) {
+                            trails[friend.uid]?.remove(snapshot.key);attachTrail(friend.uid)
+                        }
+                        override fun onChildMoved(snapshot:DataSnapshot,previousChildName:String?)=Unit
+                        override fun onCancelled(error:DatabaseError)=Unit
+                        private fun update(snapshot:DataSnapshot) {
+                            val latitude=snapshot.child("latitude").getValue(Double::class.java) ?: return
+                            val longitude=snapshot.child("longitude").getValue(Double::class.java) ?: return
+                            val updated=snapshot.child("updatedAt").getValue(Long::class.java) ?: return
+                            if(updated<System.currentTimeMillis()-TRAIL_WINDOW_MILLIS) return
+                            trails.getOrPut(friend.uid) { mutableMapOf() }[snapshot.key.orEmpty()]=
+                                LocationTrailPoint(latitude,longitude,updated)
+                            attachTrail(friend.uid)
+                        }
+                    }
+                    liveListeners[friend.uid]=LiveSubscription(reference,listener,trailQuery,trailListener)
+                    reference.addValueEventListener(listener);trailQuery.addChildEventListener(trailListener)
                 }
         }
         return ChatSubscription {
             shareListeners.forEach { it.remove() }
-            liveListeners.values.forEach { (reference,listener) -> reference.removeEventListener(listener) }
+            liveListeners.values.forEach(LiveSubscription::close)
         }
     }
+
+    private data class LiveSubscription(val location:DatabaseReference,val locationListener:ValueEventListener,
+        val trail:Query,val trailListener:ChildEventListener) {
+        fun close() { location.removeEventListener(locationListener);trail.removeEventListener(trailListener) }
+    }
+
+    private companion object { const val TRAIL_WINDOW_MILLIS=30*60_000L }
 }
 
 internal interface LocationSharingDataSource {
