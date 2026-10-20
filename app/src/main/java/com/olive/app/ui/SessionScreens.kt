@@ -132,6 +132,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 SessionScreen.Safe -> when(session.page) {
                                     SafePage.Home -> uiText(R.string.home);SafePage.Notes -> uiText(R.string.ui_notes);SafePage.Messages -> uiText(R.string.messages)
                                     SafePage.Profile -> uiText(R.string.ui_profile);SafePage.Contacts -> uiText(R.string.ui_contacts);SafePage.Settings -> uiText(R.string.settings);SafePage.Activity -> uiText(R.string.ui_activity);SafePage.Hotlines -> uiText(R.string.support_hotlines);SafePage.SafetyPlan -> uiText(R.string.support_safety_plan);SafePage.Documents -> uiText(R.string.support_documents)
+                                    SafePage.OcrTest -> "PaddleOCR Test"
                                 }
                                 SessionScreen.Loading -> uiText(R.string.ui_loading)
                                 SessionScreen.Welcome -> uiText(R.string.welcome)
