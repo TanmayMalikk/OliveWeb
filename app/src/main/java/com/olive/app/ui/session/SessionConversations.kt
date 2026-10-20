@@ -17,7 +17,8 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
                 if(uid !in conversation.participantIds) return
                 messageSubscription?.close();chatMessages=emptyList();activeConversation=conversation;message=null
                 conversationActions.markConversationRead(conversation)
-                chatQuickExitHintVisible=accountRole==AccountRole.USER
+                chatQuickExitHintVisible=accountRole==AccountRole.USER && !chatQuickExitHintShown
+                if(chatQuickExitHintVisible) chatQuickExitHintShown=true
                 val token=epoch
                 messagingBusy=true
                 scope.launch {

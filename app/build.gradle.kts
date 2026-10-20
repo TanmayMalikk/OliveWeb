@@ -14,8 +14,10 @@ val localProperties = Properties().apply {
     val source = rootProject.file("local.properties")
     if (source.exists()) source.inputStream().use { load(it) }
 }
-val placesApiKey = localProperties.getProperty("PLACES_API_KEY").orEmpty()
-require(placesApiKey.matches(Regex("[A-Za-z0-9_-]*"))) { "PLACES_API_KEY contains unsupported characters" }
+val geoapifyApiKey = localProperties.getProperty("GEOAPIFY_API_KEY").orEmpty()
+require(geoapifyApiKey.matches(Regex("[A-Za-z0-9_-]*"))) { "GEOAPIFY_API_KEY contains unsupported characters" }
+val realtimeDatabaseUrl = localProperties.getProperty("REALTIME_DATABASE_URL").orEmpty()
+require(realtimeDatabaseUrl.isBlank() || realtimeDatabaseUrl.startsWith("https://")) { "REALTIME_DATABASE_URL must use HTTPS" }
 val releaseProperties = Properties().apply {
     val source = rootProject.file("keystore.properties")
     if (source.exists()) source.inputStream().use { load(it) }
@@ -57,7 +59,8 @@ android {
         versionCode = 2
         versionName = "0.2.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
-        buildConfigField("String", "PLACES_API_KEY", "\"$placesApiKey\"")
+        buildConfigField("String", "GEOAPIFY_API_KEY", "\"$geoapifyApiKey\"")
+        buildConfigField("String", "REALTIME_DATABASE_URL", "\"$realtimeDatabaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -72,18 +75,20 @@ dependencies {
         add(configuration, platform("androidx.compose:compose-bom:2026.09.00"))
     }
     implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
-    implementation(platform("com.google.firebase:firebase-bom:35.0.0"))
+    implementation(platform("com.google.firebase:firebase-bom:35.0.2"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-functions")
-    implementation("com.google.android.libraries.places:places:6.0.2")
+    implementation("com.google.firebase:firebase-database")
+    implementation("com.google.android.gms:play-services-location:21.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
     implementation("org.apache.commons:commons-math3:3.6.1")
     implementation("org.jsoup:jsoup:1.23.2")

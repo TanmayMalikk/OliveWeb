@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="location_last_known">Dernière position connue</string>
+    <string name="powered_by_geoapify">Fourni par Geoapify</string>
+    <string name="location_map">Carte de localisation</string>
+    <string name="location_map_user_help">Voyez votre position actuelle et les emplacements enregistrés partagés par vos contacts sûrs. Le partage en direct commence seulement après avoir choisi les contacts ci-dessous.</string>
+    <string name="location_map_contact_help">Voyez les positions en direct que vos amis ont partagées avec vous. Votre repère utilise l’emplacement enregistré lors de la création du compte.</string>
+    <string name="location_map_accessibility">Carte interactive. Faites glisser pour vous déplacer, pincez pour zoomer ou sélectionnez un repère pour connaître son nom.</string>
+    <string name="location_map_unavailable">La carte n’a pas pu être chargée. Vérifiez votre connexion et réessayez.</string>
+    <string name="location_zoom_in">Agrandir</string>
+    <string name="location_zoom_out">Réduire</string>
+    <string name="recenter_map">Recentrer la carte</string>
+    <string name="you">Vous</string>
+    <string name="your_saved_location">Votre emplacement enregistré</string>
+    <string name="share_live_location_with">Partager la position en direct avec</string>
+    <string name="location_contacts_selected">%1$d contacts sur 10 sélectionnés</string>
+    <string name="location_no_friends">Ajoutez et acceptez un ami avant de partager votre position.</string>
+    <string name="start_sharing_location">Commencer le partage en direct</string>
+    <string name="stop_sharing_location">Arrêter le partage</string>
+    <string name="location_permission_required">L’autorisation de localisation est requise pour afficher et partager votre position en direct.</string>
+    <string name="location_start_failed">Le partage de la position en direct n’a pas pu démarrer.</string>
+    <string name="location_firebase_required">Le partage en direct est disponible lorsque vous êtes connecté au projet Firebase configuré.</string>
+    <string name="share_saved_location">Partager l’emplacement enregistré</string>
+    <string name="share_saved_location_help">Partagez l’emplacement enregistré lors de la création du compte avec vos amis acceptés. Votre appareil n’est pas suivi en continu.</string>
+    <string name="location_saved_address_unavailable">L’emplacement enregistré n’a pas pu être placé sur la carte. Sélectionnez une suggestion d’adresse dans les paramètres du compte et réessayez.</string>
+    <string name="location_waiting">En attente d’un emplacement disponible.</string>
+    <string name="location_notification_channel">Partage de position en direct</string>
+    <string name="location_notification_title">Le partage de position est actif</string>
+    <string name="location_notification_text">Les contacts sûrs sélectionnés peuvent voir votre position actuelle.</string>
+    <string name="location_choose_duration">Pendant combien de temps souhaitez-vous partager votre position ?</string>
+    <string name="location_one_hour">1 heure</string>
+    <string name="location_hours">%1$d heures</string>
+    <string name="location_custom_hours">Durée personnalisée en heures</string>
+    <string name="location_custom_range">Entrez de 1 à 720 heures.</string>
+    <string name="location_share_for_custom">Partager</string>
+    <string name="location_sharing_until">Partage jusqu’à %1$s</string>
+    <string name="location_ten_seconds_testing">10 secondes (test)</string>
+</resources>

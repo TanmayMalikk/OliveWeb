@@ -27,6 +27,10 @@ internal class SafetyPlanStore(context:Context,localMode:Boolean) {
         }
         return checkNotNull(updated)
     }
+    fun write(actorUid:String,ownerUid:String,value:SafetyPlan) {
+        require(value.ownerUid==ownerUid)
+        vault.update { root -> root.child(actorUid).put(ownerUid,value.toJson()) }
+    }
     fun all(actorUid:String):List<SafetyPlan> {
         val actor=vault.read().optJSONObject(actorUid) ?: return emptyList()
         return actor.keys().asSequence().mapNotNull { actor.optJSONObject(it)?.let(SafetyPlan::fromJson) }.toList()

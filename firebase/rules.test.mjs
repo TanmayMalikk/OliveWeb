@@ -4,6 +4,7 @@ import {
   doc, setDoc, getDoc, collection, getDocs, query, where,
   serverTimestamp, writeBatch, updateDoc, deleteDoc
 } from 'firebase/firestore';
+import { ref, set, get, remove } from 'firebase/database';
 
 import { readFile } from 'node:fs/promises';
 
@@ -17,7 +18,9 @@ const profile = { username:'alice_user', fullName:'Test Person', affectedNames:'
 
 before(async () => {
 
-  env = await initializeTestEnvironment({ projectId:'demo-olive-rules', firestore:{host:'127.0.0.1',port:8180,rules:await readFile(new URL('./firestore.rules', import.meta.url),'utf8')} });
+  env = await initializeTestEnvironment({ projectId:'demo-olive-rules',
+    firestore:{host:'127.0.0.1',port:8180,rules:await readFile(new URL('./firestore.rules', import.meta.url),'utf8')},
+    database:{host:'127.0.0.1',port:9100,rules:await readFile(new URL('./database.rules.json', import.meta.url),'utf8')} });
 
 });
 
@@ -59,6 +62,9 @@ test('credentials and malformed contact data cannot be stored in profiles', asyn
 
   await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid'}]}));
   await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',safeToStay:true}]}));
+  await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',linkedUid:'friend-uid'}]}));
+  await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',linkedUid:5}]}));
+  await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',linkedUid:'x'.repeat(129)}]}));
   await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',safeToStay:'yes'}]}));
 
 });
@@ -127,6 +133,7 @@ test('friend requests become a private DM and only the sender can unsend', async
   await assertSucceeds(deleteDoc(doc(alice,'friendRequests/'+requestId)));
   await assertSucceeds(setDoc(doc(alice,'friendRequests/'+requestId),request));
   await assertFails(setDoc(doc(alice,'friendRequests/'+requestId),request));
+
   await assertFails(setDoc(doc(alice,'friendRequests/social-a--social-a'),{...request,recipientUid:'social-a',
     recipientUsername:'social_alice',friendshipId:'social-a--social-a'}));
   await assertFails(setDoc(doc(bob,'friendRequests/social-b--social-a'),{senderUid:'social-b',
@@ -155,8 +162,25 @@ test('friend requests become a private DM and only the sender can unsend', async
   await assertFails(getDocs(collection(charlie,'friendLists/social-a/friends')));
   await assertFails(setDoc(doc(alice,'friendRequests/'+requestId),request));
 
+  const sharedLocation=doc(alice,'sharedLocations/social-a/recipients/social-b');
+  await assertSucceeds(setDoc(sharedLocation,{ownerUid:'social-a',recipientUid:'social-b',friendshipId,
+    contactName:'Alice',latitude:53.5461,longitude:-113.4937,label:'Edmonton, Alberta',updatedAt:serverTimestamp()}));
+  await assertSucceeds(getDoc(doc(bob,'sharedLocations/social-a/recipients/social-b')));
+  await assertFails(getDoc(doc(charlie,'sharedLocations/social-a/recipients/social-b')));
+  await assertFails(setDoc(doc(bob,'sharedLocations/social-a/recipients/social-b'),{
+    ownerUid:'social-a',recipientUid:'social-b',friendshipId,contactName:'Changed',latitude:0,longitude:0,label:'',updatedAt:serverTimestamp()}));
+
+  const liveShare=doc(alice,'liveLocationShares/social-a/recipients/social-b');
+  await assertSucceeds(setDoc(liveShare,{ownerUid:'social-a',recipientUid:'social-b',friendshipId,createdAt:serverTimestamp()}));
+  await assertSucceeds(getDoc(doc(bob,'liveLocationShares/social-a/recipients/social-b')));
+  await assertFails(getDoc(doc(charlie,'liveLocationShares/social-a/recipients/social-b')));
+  await assertFails(setDoc(doc(bob,'liveLocationShares/social-a/recipients/social-b'),{
+    ownerUid:'social-a',recipientUid:'social-b',friendshipId,createdAt:serverTimestamp()}));
+
   await assertSucceeds(getDoc(doc(alice,'conversations/'+friendshipId)));
-  await assertFails(getDocs(query(collection(alice,'conversations'),where('participantIds','array-contains','social-a'))));
+  await assertSucceeds(getDocs(query(collection(alice,'conversations'),where('participantIds','array-contains','social-a'))));
+  await assertFails(getDocs(collection(alice,'conversations')));
+  await assertFails(getDocs(query(collection(alice,'conversations'),where('participantIds','array-contains','social-b'))));
   await assertFails(getDoc(doc(charlie,'conversations/'+friendshipId)));
 
   const messageRef=doc(alice,'conversations/'+friendshipId+'/messages/message-1');
@@ -189,6 +213,25 @@ test('friend requests become a private DM and only the sender can unsend', async
   await assertFails(setDoc(doc(charlie,'conversations/'+friendshipId+'/messages/message-3'),
     {senderUid:'social-c',senderUsername:'social_charlie',ciphertext:'stolen',deleted:false,
       sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+});
+
+test('live coordinates are overwritten by their owner and readable only by authorized contacts', async () => {
+  const owner=env.authenticatedContext('live-owner').database();
+  const contact=env.authenticatedContext('live-contact').database();
+  const stranger=env.authenticatedContext('live-stranger').database();
+  const path='liveLocations/live-owner';
+  const location={displayName:'Owner',latitude:53.5461,longitude:-113.4937,accuracy:8,
+    updatedAt:Date.now(),active:true,authorized:{'live-contact':true}};
+  await assertSucceeds(set(ref(owner,path),location));
+  await assertSucceeds(get(ref(contact,path)));
+  await assertFails(get(ref(stranger,path)));
+  await assertFails(set(ref(contact,path),{...location,latitude:0}));
+  await assertSucceeds(set(ref(owner,path),{...location,latitude:53.55,updatedAt:Date.now()}));
+  await assertSucceeds(set(ref(owner,path),{...location,active:false}));
+  const retained=await assertSucceeds(get(ref(contact,path)));
+  if(retained.val()?.active!==false || retained.val()?.latitude!==location.latitude)
+    throw new Error('The authorized contact could not read the retained last-known location.');
+  await assertSucceeds(remove(ref(owner,path)));
 });
 
 test('encrypted private entries are restricted to wrapped-key recipients', async () => {
