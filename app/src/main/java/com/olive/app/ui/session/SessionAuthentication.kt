@@ -256,7 +256,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                                     accounts.saveHistoryRecord(AccountIdentity(uid,coverUsername),record)
                                     withContext(Dispatchers.IO) { store.markHistorySynced(uid,record) }
                                 }
-                                LocationSharingRepository(application).setLiveRecipients(uid,emptyList())
+                                locationSharingRepository?.setLiveRecipients(uid,emptyList())
                             }
                         }
                         accounts.signOut(); enrollment=null; deliveryAddress=DeliveryAddress(); language="English"

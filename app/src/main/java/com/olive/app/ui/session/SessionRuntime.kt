@@ -29,6 +29,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     val secureChatRepository = if(localMode) null else SecureChatRepository()
     val secureDocumentRepository = if(localMode) null else SecureDocumentRepository()
     val safetyDocumentRepository = if(localMode) null else SafetyDocumentRepository()
+    val locationSharingRepository = if(localMode) null else LocationSharingRepository(application)
     val messageReadState=application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
     val cloudState=application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
     var enrollment by mutableStateOf<DeviceEnrollment?>(null)

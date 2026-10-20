@@ -14,7 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -22,66 +21,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.olive.app.R
-import com.olive.app.data.*
-import com.olive.app.location.LiveLocationController
-import com.olive.app.location.LiveLocationState
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.isActive
+import com.olive.app.data.AccountIdentity
+import com.olive.app.data.AccountRole
+import com.olive.app.ui.location.LocationMapConfiguration
 import androidx.compose.ui.platform.testTag
 
 @Composable internal fun LocationMapScreen(session:SessionViewModel) {
-    val context=LocalContext.current;val profile=session.profile ?: return;val uid=session.coverAccountId ?: return
-    val repository=remember(context) { LocationSharingRepository(context.applicationContext) }
+    val profile=session.profile ?: return;val uid=session.coverAccountId ?: return
+    val controller=session.locationMap
     val requestPermission=LocalLocationPermissionRequest.current
     val youLabel=stringResource(R.string.you)
     val savedLocationLabel=stringResource(R.string.your_saved_location)
     val permissionRequired=stringResource(R.string.location_permission_required)
     val startFailed=stringResource(R.string.location_start_failed)
-    val scope=rememberCoroutineScope()
-    val ownLive by LiveLocationState.current.collectAsState()
-    var ownPoint by remember(uid) { mutableStateOf<MapLocationPoint?>(null) }
-    var contactPoints by remember(uid) { mutableStateOf(emptyList<MapLocationPoint>()) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var working by remember { mutableStateOf(false) }
-    var selected by remember(uid) { mutableStateOf(LiveLocationController.selected(context).intersect(session.friends.map { it.uid }.toSet())) }
-    var liveActive by remember(uid) { mutableStateOf(LiveLocationController.active(context)) }
-    var expiresAt by remember(uid) { mutableLongStateOf(LiveLocationController.expiresAt(context)) }
     var durationDialog by remember { mutableStateOf(false) }
-    var staticSharing by remember(uid) { mutableStateOf(repository.staticSharingEnabled(uid)) }
-
-    LaunchedEffect(uid,profile.role,youLabel,savedLocationLabel) {
-        if(profile.role==AccountRole.USER && requestPermission()) {
-            while(currentCoroutineContext().isActive) {
-                DeviceLocation.currentCoordinates(context)?.let { fix ->
-                    ownPoint=MapLocationPoint(uid,youLabel,fix.latitude,fix.longitude,fix.timestamp,true,fix.accuracy)
-                }
-                delay(10_000L)
-            }
-        } else if(profile.role==AccountRole.SAFE_CONTACT) {
-            val coordinates=GeoapifyClient.coordinates(profile.address) ?: DeviceLocation.coordinatesForAddress(context,profile.address)
-            coordinates?.let { (lat,lon) ->
-                ownPoint=MapLocationPoint(uid,savedLocationLabel,lat,lon,System.currentTimeMillis(),false)
-            }
-            if(staticSharing && !session.localMode) runCatching { repository.setStaticSharing(AccountIdentity(uid,profile.username),profile,session.friends,true) }
-        }
+    val configuration=LocationMapConfiguration(AccountIdentity(uid,profile.username),profile,session.friends,
+        session.localMode,youLabel,savedLocationLabel)
+    LaunchedEffect(uid,profile,session.friends,youLabel,savedLocationLabel,session.localMode) {
+        controller.open(configuration,requestPermission)
     }
-    DisposableEffect(uid,session.friends,profile.role) {
-        val subscription=if(session.localMode) ChatSubscription { } else if(profile.role==AccountRole.USER)
-            repository.observeStaticContacts(uid,session.friends) { contactPoints=it }
-        else repository.observeLiveFriends(uid,session.friends) { contactPoints=it }
-        onDispose { subscription.close() }
-    }
-    val displayedOwn=if(profile.role==AccountRole.USER) ownLive ?: ownPoint else ownPoint
-    val points=listOfNotNull(displayedOwn)+contactPoints
-
-    LaunchedEffect(liveActive,expiresAt) {
-        while(liveActive) {
-            if(expiresAt<=System.currentTimeMillis()) liveActive=false
-            delay(1_000L)
-        }
-    }
+    DisposableEffect(controller) { onDispose(controller::closeMap) }
+    val state=controller.state
+    val displayedOwn=state.displayedOwn(profile.role)
+    val points=listOfNotNull(displayedOwn)+state.contacts
 
     Column(Modifier.fillMaxSize().padding(horizontal=18.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -101,15 +63,15 @@ import androidx.compose.ui.platform.testTag
             Surface(Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.large,color=Color(0xFFF3F6F0)) {
                 Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     Text(stringResource(R.string.share_live_location_with),style=MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.location_contacts_selected,selected.size),style=MaterialTheme.typography.bodySmall,color=Muted)
+                    Text(stringResource(R.string.location_contacts_selected,state.selected.size),style=MaterialTheme.typography.bodySmall,color=Muted)
                     if(session.friends.isEmpty()) Text(stringResource(R.string.location_no_friends),color=Muted)
                     else LazyColumn(Modifier.fillMaxWidth().heightIn(max=140.dp)) {
                         items(session.friends,key={it.uid}) { friend ->
-                            val checked=friend.uid in selected
+                            val checked=friend.uid in state.selected
                             val trusted=profile.contacts.firstOrNull { it.linkedUid==friend.uid }
                             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                                Checkbox(checked,{ enabled -> selected=if(enabled) selected+friend.uid else selected-friend.uid },
-                                    enabled=!liveActive && (checked || selected.size<MAX_SHARED_CONTACTS))
+                                Checkbox(checked,{ enabled -> controller.selectContact(friend.uid,enabled) },
+                                    enabled=!state.liveActive && (checked || state.selected.size<MAX_SHARED_CONTACTS))
                                 Column(Modifier.weight(1f)) {
                                     Text(trusted?.name ?: friend.username)
                                     if(trusted!=null) Text("@${friend.username}",style=MaterialTheme.typography.bodySmall,color=Muted)
@@ -117,34 +79,18 @@ import androidx.compose.ui.platform.testTag
                             }
                         }
                     }
-                    if(liveActive) Text(stringResource(R.string.location_sharing_until,formatShareTime(expiresAt)),
+                    if(state.liveActive) Text(stringResource(R.string.location_sharing_until,formatShareTime(state.expiresAt)),
                         style=MaterialTheme.typography.bodySmall,color=OliveGreen)
                 }
             }
-            if(!liveActive) Button(onClick={durationDialog=true},enabled=selected.isNotEmpty() && !working && !session.localMode,
+            if(!state.liveActive) Button(onClick={durationDialog=true},enabled=state.selected.isNotEmpty() && !state.working && !session.localMode,
                 modifier=Modifier.fillMaxWidth().testTag("start_location_sharing")) {
                 Icon(Icons.Outlined.LocationOn,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.start_sharing_location))
-            } else Button(onClick={
-                LiveLocationController.stop(context);liveActive=false;expiresAt=0L
-            },modifier=Modifier.fillMaxWidth().testTag("stop_location_sharing"),
+            } else Button(onClick=controller::stopSharing,modifier=Modifier.fillMaxWidth().testTag("stop_location_sharing"),
                 colors=ButtonDefaults.buttonColors(containerColor=MaterialTheme.colorScheme.error)) { Text(stringResource(R.string.stop_sharing_location)) }
             if(durationDialog) ShareDurationDialog(onDismiss={durationDialog=false},onSelected={ durationMillis ->
                 durationDialog=false
-                scope.launch {
-                working=true;error=null
-                try {
-                    if(!requestPermission()) error=permissionRequired
-                    else try {
-                        repository.setLiveRecipients(uid,session.friends.filter { it.uid in selected })
-                        val end=System.currentTimeMillis()+durationMillis
-                        LiveLocationController.start(context,uid,profile.fullName,selected,end)
-                        expiresAt=end;liveActive=true
-                    } catch(failure:Exception) {
-                        runCatching { repository.setLiveRecipients(uid,emptyList()) }
-                        error=failure.localizedMessage ?: startFailed
-                    }
-                } finally { working=false }
-                }
+                controller.startSharing(configuration,durationMillis,requestPermission,permissionRequired,startFailed)
             })
             if(session.localMode) Text(stringResource(R.string.location_firebase_required),style=MaterialTheme.typography.bodySmall,color=Muted)
         } else {
@@ -153,15 +99,11 @@ import androidx.compose.ui.platform.testTag
                     Text(stringResource(R.string.share_saved_location),style=MaterialTheme.typography.titleMedium)
                     Text(stringResource(R.string.share_saved_location_help),style=MaterialTheme.typography.bodySmall,color=Muted)
                 }
-                Switch(staticSharing,{ enabled -> scope.launch {
-                    working=true;error=null
-                    runCatching { repository.setStaticSharing(AccountIdentity(uid,profile.username),profile,session.friends,enabled) }
-                        .onSuccess { staticSharing=enabled }.onFailure { error=it.localizedMessage }
-                    working=false
-                } },enabled=!working && !session.localMode,modifier=Modifier.testTag("share_saved_location"))
+                Switch(state.staticSharing,{ enabled -> controller.updateStaticSharing(configuration,enabled) },
+                    enabled=!state.working && !session.localMode,modifier=Modifier.testTag("share_saved_location"))
             }
         }
-        error?.let { AccessibleMessage(it) }
+        state.error?.let { AccessibleMessage(it) }
     }
 }
 

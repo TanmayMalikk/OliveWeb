@@ -19,18 +19,41 @@ internal object LocationDatabase {
     }
 }
 
-// Static safe-contact pins live in Firestore; only User live coordinates use Realtime Database.
-internal class LocationSharingRepository(private val context:Context,private val firestore:FirebaseFirestore=FirebaseFirestore.getInstance()) {
-    private val preferences=context.getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE)
-    fun staticSharingEnabled(uid:String)=preferences.getBoolean("static_$uid",false)
+internal class SavedLocationUnavailableException:IllegalStateException("Saved location is unavailable")
 
-    suspend fun setStaticSharing(identity:AccountIdentity,profile:UserProfile,friends:List<Friend>,enabled:Boolean) {
+internal interface LocationSharingPreferences {
+    fun staticSharingEnabled(uid:String):Boolean
+    fun setStaticSharingEnabled(uid:String,enabled:Boolean)
+}
+
+private class AndroidLocationSharingPreferences(context:Context):LocationSharingPreferences {
+    private val values=context.getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE)
+    override fun staticSharingEnabled(uid:String)=values.getBoolean("static_$uid",false)
+    override fun setStaticSharingEnabled(uid:String,enabled:Boolean) { values.edit().putBoolean("static_$uid",enabled).apply() }
+}
+
+internal fun interface AddressCoordinateResolver {
+    suspend fun coordinates(address:DeliveryAddress):Pair<Double,Double>?
+}
+
+private class AndroidAddressCoordinateResolver(private val context:Context):AddressCoordinateResolver {
+    override suspend fun coordinates(address:DeliveryAddress)=GeoapifyClient.coordinates(address)
+        ?: DeviceLocation.coordinatesForAddress(context,address)
+}
+
+private class StaticLocationSharingDataSource(
+    private val preferences:LocationSharingPreferences,
+    private val resolver:AddressCoordinateResolver,
+    private val firestore:FirebaseFirestore,
+) {
+    fun enabled(uid:String)=preferences.staticSharingEnabled(uid)
+
+    suspend fun update(identity:AccountIdentity,profile:UserProfile,friends:List<Friend>,enabled:Boolean) {
         val collection=firestore.collection("sharedLocations").document(identity.uid).collection("recipients")
         val old=collection.get().await()
         val batch=firestore.batch();old.documents.forEach { batch.delete(it.reference) }
         if(enabled) {
-            val coordinates=GeoapifyClient.coordinates(profile.address) ?: DeviceLocation.coordinatesForAddress(context,profile.address)
-                ?: error(context.getString(com.olive.app.R.string.location_saved_address_unavailable))
+            val coordinates=resolver.coordinates(profile.address) ?: throw SavedLocationUnavailableException()
             friends.forEach { friend ->
                 batch.set(collection.document(friend.uid),mapOf(
                     "ownerUid" to identity.uid,"recipientUid" to friend.uid,"friendshipId" to friend.friendshipId,
@@ -38,10 +61,34 @@ internal class LocationSharingRepository(private val context:Context,private val
                     "label" to profile.address.generalLocation,"updatedAt" to FieldValue.serverTimestamp()))
             }
         }
-        batch.commit().await();preferences.edit().putBoolean("static_${identity.uid}",enabled).apply()
+        batch.commit().await()
+        preferences.setStaticSharingEnabled(identity.uid,enabled)
     }
 
-    suspend fun setLiveRecipients(ownerUid:String,friends:List<Friend>) {
+    fun observe(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription {
+        val points=mutableMapOf<String,MapLocationPoint>()
+        fun publish()=onUpdate(points.values.sortedBy { it.name })
+        val listeners=friends.map { friend ->
+            firestore.collection("sharedLocations").document(friend.uid).collection("recipients").document(currentUid)
+                .addSnapshotListener { row,_ ->
+                    if(row?.exists()==true) {
+                        val latitude=row.getDouble("latitude");val longitude=row.getDouble("longitude")
+                        if(latitude!=null && longitude!=null) points[friend.uid]=MapLocationPoint(friend.uid,
+                            row.getString("contactName") ?: friend.username,latitude,longitude,
+                            row.getTimestamp("updatedAt")?.toDate()?.time ?: 0L,false)
+                    } else points.remove(friend.uid)
+                    publish()
+                }
+        }
+        return ChatSubscription { listeners.forEach { it.remove() } }
+    }
+}
+
+private class LiveLocationSharingDataSource(
+    private val firestore:FirebaseFirestore,
+    private val databaseProvider:()->FirebaseDatabase,
+) {
+    suspend fun setRecipients(ownerUid:String,friends:List<Friend>) {
         require(friends.size<=10)
         val collection=firestore.collection("liveLocationShares").document(ownerUid).collection("recipients")
         val old=collection.get().await();val batch=firestore.batch();old.documents.forEach { batch.delete(it.reference) }
@@ -51,28 +98,10 @@ internal class LocationSharingRepository(private val context:Context,private val
         batch.commit().await()
     }
 
-    fun observeStaticContacts(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription {
-        val points=mutableMapOf<String,MapLocationPoint>()
-        fun publish()=onUpdate(points.values.sortedBy { it.name })
-        val listeners=friends.map { friend ->
-            firestore.collection("sharedLocations").document(friend.uid).collection("recipients").document(currentUid)
-                .addSnapshotListener { row,_ ->
-                    if(row?.exists()==true) {
-                        val lat=row.getDouble("latitude");val lon=row.getDouble("longitude")
-                        if(lat!=null && lon!=null) points[friend.uid]=MapLocationPoint(friend.uid,row.getString("contactName") ?: friend.username,
-                            lat,lon,row.getTimestamp("updatedAt")?.toDate()?.time ?: 0L,false)
-                    } else points.remove(friend.uid)
-                    publish()
-                }
-        }
-        return ChatSubscription { listeners.forEach { it.remove() } }
-    }
-
-    fun observeLiveFriends(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription {
-        val points=mutableMapOf<String,MapLocationPoint>();val database=runCatching { LocationDatabase.instance() }.getOrNull()
+    fun observe(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription {
+        val points=mutableMapOf<String,MapLocationPoint>();val database=runCatching(databaseProvider).getOrNull()
             ?: return ChatSubscription { }
-        fun publish()=onUpdate(points.values.filter { it.lastKnown || System.currentTimeMillis()-it.updatedAt<5*60_000 }
-            .sortedBy { it.name })
+        fun publish()=onUpdate(points.values.filter { it.lastKnown || System.currentTimeMillis()-it.updatedAt<5*60_000 }.sortedBy { it.name })
         val liveListeners=mutableMapOf<String,Pair<DatabaseReference,ValueEventListener>>()
         val shareListeners=friends.map { friend ->
             firestore.collection("liveLocationShares").document(friend.uid).collection("recipients").document(currentUid)
@@ -83,12 +112,14 @@ internal class LocationSharingRepository(private val context:Context,private val
                     val reference=database.reference.child("liveLocations").child(friend.uid)
                     val listener=object:ValueEventListener {
                         override fun onDataChange(snapshot:DataSnapshot) {
-                            val lat=snapshot.child("latitude").getValue(Double::class.java);val lon=snapshot.child("longitude").getValue(Double::class.java)
+                            val latitude=snapshot.child("latitude").getValue(Double::class.java)
+                            val longitude=snapshot.child("longitude").getValue(Double::class.java)
                             val updated=snapshot.child("updatedAt").getValue(Long::class.java) ?: 0L
                             val active=snapshot.child("active").getValue(Boolean::class.java)==true
-                            if(lat!=null && lon!=null && snapshot.child("authorized").child(currentUid).getValue(Boolean::class.java)==true)
-                                points[friend.uid]=MapLocationPoint(friend.uid,snapshot.child("displayName").getValue(String::class.java) ?: friend.username,
-                                    lat,lon,updated,active,snapshot.child("accuracy").getValue(Double::class.java)?.toFloat(),!active)
+                            if(latitude!=null && longitude!=null && snapshot.child("authorized").child(currentUid).getValue(Boolean::class.java)==true)
+                                points[friend.uid]=MapLocationPoint(friend.uid,snapshot.child("displayName").getValue(String::class.java)
+                                    ?: friend.username,latitude,longitude,updated,active,
+                                    snapshot.child("accuracy").getValue(Double::class.java)?.toFloat(),!active)
                             else points.remove(friend.uid)
                             publish()
                         }
@@ -102,4 +133,33 @@ internal class LocationSharingRepository(private val context:Context,private val
             liveListeners.values.forEach { (reference,listener) -> reference.removeEventListener(listener) }
         }
     }
+}
+
+internal interface LocationSharingDataSource {
+    fun staticSharingEnabled(uid:String):Boolean
+    suspend fun setStaticSharing(identity:AccountIdentity,profile:UserProfile,friends:List<Friend>,enabled:Boolean)
+    suspend fun setLiveRecipients(ownerUid:String,friends:List<Friend>)
+    fun observeStaticContacts(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription
+    fun observeLiveFriends(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription
+}
+
+/** Small facade over independent static-pin and live-location stores. */
+internal class LocationSharingRepository private constructor(
+    private val staticLocations:StaticLocationSharingDataSource,
+    private val liveLocations:LiveLocationSharingDataSource,
+):LocationSharingDataSource {
+    constructor(context:Context,firestore:FirebaseFirestore=FirebaseFirestore.getInstance()):this(
+        StaticLocationSharingDataSource(AndroidLocationSharingPreferences(context.applicationContext),
+            AndroidAddressCoordinateResolver(context.applicationContext),firestore),
+        LiveLocationSharingDataSource(firestore,LocationDatabase::instance),
+    )
+
+    override fun staticSharingEnabled(uid:String)=staticLocations.enabled(uid)
+    override suspend fun setStaticSharing(identity:AccountIdentity,profile:UserProfile,friends:List<Friend>,enabled:Boolean)=
+        staticLocations.update(identity,profile,friends,enabled)
+    override suspend fun setLiveRecipients(ownerUid:String,friends:List<Friend>)=liveLocations.setRecipients(ownerUid,friends)
+    override fun observeStaticContacts(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit)=
+        staticLocations.observe(currentUid,friends,onUpdate)
+    override fun observeLiveFriends(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit)=
+        liveLocations.observe(currentUid,friends,onUpdate)
 }
