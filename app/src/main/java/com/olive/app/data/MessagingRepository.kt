@@ -8,9 +8,8 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import com.olive.app.security.KeyManager
+import java.security.PublicKey
 import java.util.Base64
 
 class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
@@ -19,13 +18,17 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build()).build()
     }
 
-    suspend fun registerUser(identity: AccountIdentity) {
+    suspend fun registerUser(identity: AccountIdentity, publicKey: PublicKey = KeyManager.getOrCreatePublicKey()) {
         val username=identity.username.trim().lowercase()
-        val publicKey=withContext(Dispatchers.Default) { KeyManager.getOrCreatePublicKey() }
-        firestore.collection("messageDirectory").document(username).set(mapOf(
+        val encodedKey=Base64.getEncoder().encodeToString(publicKey.encoded)
+        val reference=firestore.collection("messageDirectory").document(username)
+        val current=reference.get().await()
+        if(current.getString("uid")==identity.uid && current.getString("username")==username &&
+            current.getString("publicKey")==encodedKey) return
+        reference.set(mapOf(
             "uid" to identity.uid,
             "username" to username,
-            "publicKey" to Base64.getEncoder().encodeToString(publicKey.encoded),
+            "publicKey" to encodedKey,
             "updatedAt" to FieldValue.serverTimestamp(),
         ),SetOptions.merge()).await()
     }
@@ -140,18 +143,16 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return ChatConversation(friend.friendshipId,friend.friendshipId,ids,names)
     }
 
-    fun observeConversations(friendshipIds: List<String>, onUpdate: (List<ChatConversation>)->Unit, onError: (String)->Unit): ChatSubscription {
+    fun observeConversations(currentUid:String,friendshipIds: List<String>, onUpdate: (List<ChatConversation>)->Unit, onError: (String)->Unit): ChatSubscription {
         if(friendshipIds.isEmpty()) { onUpdate(emptyList());return ChatSubscription {} }
-        val rows=mutableMapOf<String,ChatConversation>()
-        val listeners=friendshipIds.distinct().map { id ->
-            firestore.collection("conversations").document(id).addSnapshotListener { snapshot,error ->
+        val allowedIds=friendshipIds.toSet()
+        val listener=firestore.collection("conversations").whereArrayContains("participantIds",currentUid)
+            .addSnapshotListener { snapshot,error ->
                 if(error!=null) { onError(error.localizedMessage ?: "Unable to load conversations.");return@addSnapshotListener }
-                val conversation=snapshot?.takeIf(DocumentSnapshot::exists)?.let(::conversationFrom)
-                if(conversation==null) rows.remove(id) else rows[id]=conversation
-                onUpdate(rows.values.sortedByDescending { it.updatedAt })
-            }
+                onUpdate(snapshot?.documents.orEmpty().filter { it.id in allowedIds }
+                    .mapNotNull(::conversationFrom).sortedByDescending { it.updatedAt })
         }
-        return ChatSubscription { listeners.forEach(ListenerRegistration::remove) }
+        return listener.asSubscription()
     }
 
     fun observeMessages(conversationId: String, onUpdate: (List<ChatMessage>)->Unit, onError: (String)->Unit): ChatSubscription {

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="powered_by_geoapify">Powered by Geoapify</string>
+    <string name="location_map">Map view</string>
+    <string name="location_last_known">Last known location</string>
+    <string name="location_map_user_help">See your current location and saved pins shared by your safe contacts. Live sharing starts only when you choose contacts below.</string>
+    <string name="location_map_contact_help">See live locations that friends have shared with you. Your own marker uses the location saved during account setup.</string>
+    <string name="location_map_accessibility">Interactive location map. Drag to move, pinch to zoom, or select a marker for its name.</string>
+    <string name="location_map_unavailable">The map could not load. Check your connection and try again.</string>
+    <string name="location_zoom_in">Zoom in</string>
+    <string name="location_zoom_out">Zoom out</string>
+    <string name="you">You</string>
+    <string name="your_saved_location">Your saved location</string>
+    <string name="share_live_location_with">Share live location with</string>
+    <string name="location_contacts_selected">%1$d of 10 contacts selected</string>
+    <string name="location_no_friends">Add and accept a friend before sharing location.</string>
+    <string name="start_sharing_location">Start sharing live location</string>
+    <string name="stop_sharing_location">Stop sharing</string>
+    <string name="location_permission_required">Location permission is required to show and share your live location.</string>
+    <string name="location_start_failed">Live location sharing could not be started.</string>
+    <string name="location_firebase_required">Live sharing is available when signed in to the configured Firebase project.</string>
+    <string name="share_saved_location">Share saved location</string>
+    <string name="share_saved_location_help">Share the location saved during account creation with your accepted friends. Your device is not continuously tracked.</string>
+    <string name="location_saved_address_unavailable">The saved location could not be placed on the map. Select an address suggestion in account settings and try again.</string>
+    <string name="location_waiting">Waiting for an available location.</string>
+    <string name="location_notification_channel">Live location sharing</string>
+    <string name="location_notification_title">Location sharing is active</string>
+    <string name="location_notification_text">Selected safe contacts can view your current location.</string>
+    <string name="recenter_map">Recenter map</string>
+    <string name="location_services_disabled" translatable="false">Device location is turned off. Please enable location services in your device settings.</string>
+    <string name="location_choose_duration">How long do you want to share your location?</string>
+    <string name="location_one_hour">1 hour</string>
+    <string name="location_hours">%1$d hours</string>
+    <string name="location_custom_hours">Custom hours</string>
+    <string name="location_custom_range">Enter 1 to 720 hours.</string>
+    <string name="location_share_for_custom">Share</string>
+    <string name="location_sharing_until">Sharing until %1$s</string>
+    <string name="location_ten_seconds_testing">10 seconds (testing)</string>
+</resources>

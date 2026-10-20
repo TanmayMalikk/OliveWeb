@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.PrivateEntryKind
+import com.olive.app.data.SafetyDocument
+import com.olive.app.data.SafetyDocumentRepository
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
@@ -25,8 +27,19 @@ fun AttachmentPicker(
     // mediaViewModel: MediaViewModel
     onDismiss: () -> Unit
 ) {
-    // This state controls the "Drill Down" UI
     var selectedCategory by remember { mutableStateOf<AttachmentCategory?>(null) }
+    val uid=session.coverAccountId
+    val mediaRepository=remember { SafetyDocumentRepository() }
+    var media by remember(uid) { mutableStateOf(emptyList<SafetyDocument>()) }
+    var mediaLoading by remember { mutableStateOf(false) }
+    var mediaError by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedCategory,uid) {
+        if(selectedCategory!=AttachmentCategory.Media || uid==null || session.localMode) return@LaunchedEffect
+        mediaLoading=true;mediaError=false
+        runCatching { mediaRepository.listFor(uid).filter { it.ownerUid==uid } }
+            .onSuccess { media=it }.onFailure { mediaError=true }
+        mediaLoading=false
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -97,9 +110,27 @@ fun AttachmentPicker(
                             }
                         }
                         AttachmentCategory.Media -> {
-                            //ToDO change after implementing media uploads
-                            item { Text(stringResource(R.string.media_uploads_not_configured), Modifier.padding(16.dp)) }
-                            // In Phase 2, this will iterate through mediaViewModel.savedMedia
+                            if(mediaLoading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                            if(mediaError) item { Text(stringResource(R.string.documents_load_failed),Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error) }
+                            if(!mediaLoading && !mediaError && media.isEmpty()) item {
+                                Text(stringResource(if(session.localMode) R.string.documents_account_required else R.string.documents_empty),
+                                    Modifier.padding(16.dp))
+                            }
+                            items(media,key={it.id}) { document ->
+                                ListItem(
+                                    headlineContent={Text(document.name,maxLines=2)},
+                                    supportingContent={Text(document.mimeType)},
+                                    leadingContent={Icon(when {
+                                        document.mimeType.startsWith("image/")->Icons.Outlined.Image
+                                        document.mimeType.startsWith("video/")->Icons.Outlined.Videocam
+                                        else->Icons.Outlined.Description
+                                    },null)},
+                                    modifier=Modifier.clickable {
+                                        session.shareSafetyDocumentInChat(document)
+                                        onDismiss()
+                                    }
+                                )
+                            }
                         }
                         null -> {}
                     }

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="location_last_known">最後已知位置</string>
+    <string name="powered_by_geoapify">由 Geoapify 提供支持</string>
+    <string name="location_map">位置地图</string>
+    <string name="location_map_user_help">查看您的当前位置以及安全联系人分享的已保存位置。只有在下方选择联系人后，才会开始实时共享。</string>
+    <string name="location_map_contact_help">查看好友与您分享的实时位置。您自己的标记使用创建账户时保存的位置。</string>
+    <string name="location_map_accessibility">交互式位置地图。拖动可移动地图，双指缩放，或选择标记查看名称。</string>
+    <string name="location_map_unavailable">无法加载地图。请检查网络连接后重试。</string>
+    <string name="location_zoom_in">放大</string>
+    <string name="location_zoom_out">缩小</string>
+    <string name="recenter_map">重新居中地图</string>
+    <string name="you">您</string>
+    <string name="your_saved_location">您保存的位置</string>
+    <string name="share_live_location_with">实时位置共享对象</string>
+    <string name="location_contacts_selected">已选择 10 位联系人中的 %1$d 位</string>
+    <string name="location_no_friends">请先添加并接受好友，再共享位置。</string>
+    <string name="start_sharing_location">开始共享实时位置</string>
+    <string name="stop_sharing_location">停止共享</string>
+    <string name="location_permission_required">需要位置权限才能显示和共享您的实时位置。</string>
+    <string name="location_start_failed">无法开始共享实时位置。</string>
+    <string name="location_firebase_required">登录已配置的 Firebase 项目后即可使用实时共享。</string>
+    <string name="share_saved_location">共享已保存的位置</string>
+    <string name="share_saved_location_help">与已接受的好友共享创建账户时保存的位置。您的设备不会被持续跟踪。</string>
+    <string name="location_saved_address_unavailable">无法在地图上显示已保存的位置。请在账户设置中选择地址建议，然后重试。</string>
+    <string name="location_waiting">正在等待可用位置。</string>
+    <string name="location_notification_channel">实时位置共享</string>
+    <string name="location_notification_title">位置共享已开启</string>
+    <string name="location_notification_text">所选安全联系人可以查看您的当前位置。</string>
+    <string name="location_choose_duration">您想共享位置多长时间？</string>
+    <string name="location_one_hour">1 小时</string>
+    <string name="location_hours">%1$d 小时</string>
+    <string name="location_custom_hours">自定义小时数</string>
+    <string name="location_custom_range">请输入 1 到 720 小时。</string>
+    <string name="location_share_for_custom">共享</string>
+    <string name="location_sharing_until">共享至 %1$s</string>
+    <string name="location_ten_seconds_testing">10 秒（测试）</string>
+</resources>

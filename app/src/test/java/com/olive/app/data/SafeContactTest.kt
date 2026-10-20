@@ -2,6 +2,7 @@ package com.olive.app.data
 
 import org.json.JSONObject
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -12,13 +13,16 @@ class SafeContactTest {
         triggerHash="a".repeat(64),contacts=listOf(contact))
 
     @Test fun safeToStaySurvivesProfileStorageRoundTrip() {
-        val restored=UserProfile.fromJson(profile(SafeContact("friend","Trusted Friend","555-0100",true)).toJson())
+        val restored=UserProfile.fromJson(profile(SafeContact("friend","Trusted Friend","555-0100",true,"friend-uid")).toJson())
         assertTrue(restored.contacts.single().safeToStay)
+        assertEquals("friend-uid",restored.contacts.single().linkedUid)
     }
 
     @Test fun contactsSavedBeforeSafeToStayDefaultToFalse() {
         val legacy=JSONObject(profile(SafeContact("friend","Trusted Friend","555-0100")).toJson().toString())
         legacy.getJSONArray("contacts").getJSONObject(0).remove("safeToStay")
+        legacy.getJSONArray("contacts").getJSONObject(0).remove("linkedUid")
         assertFalse(UserProfile.fromJson(legacy).contacts.single().safeToStay)
+        assertEquals("",UserProfile.fromJson(legacy).contacts.single().linkedUid)
     }
 }

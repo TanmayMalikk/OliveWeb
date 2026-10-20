@@ -1,6 +1,7 @@
 package com.olive.app
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.ComponentActivity
@@ -23,7 +24,7 @@ internal fun nextOnboardingPermission(notificationsNeeded:Boolean,notificationsA
 // One owner serializes onboarding prompts and explicit location requests; neither permission is required to use Olive.
 internal class AppPermissions(private val activity:ComponentActivity,private val notificationsEnabled:()->Boolean,private val locationEnabled:()->Boolean,
     private val onChanged:()->Unit) {
-    private val preferences by lazy { activity.getSharedPreferences("olive_permissions",android.content.Context.MODE_PRIVATE) }
+    private val preferences by lazy { activity.getSharedPreferences("olive_permissions", Context.MODE_PRIVATE) }
     private var notificationPrompt=false
     private var locationPrompt=false
     private var locationResult:CompletableDeferred<Boolean>?=null
@@ -34,6 +35,16 @@ internal class AppPermissions(private val activity:ComponentActivity,private val
     }
     private val location=activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         locationPrompt=false
+        if(hasLocation() && Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q && !hasBackgroundLocation()) {
+            launchBackgroundLocation()
+        } else {
+            val pending=locationResult;locationResult=null
+            pending?.complete(hasLocation())
+            onChanged()
+        }
+    }
+    private val backgroundLocation=activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        locationPrompt=false
         val pending=locationResult;locationResult=null
         pending?.complete(hasLocation())
         onChanged()
@@ -41,6 +52,12 @@ internal class AppPermissions(private val activity:ComponentActivity,private val
     fun hasLocation()=listOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION).any {
         ContextCompat.checkSelfPermission(activity,it)==PackageManager.PERMISSION_GRANTED
     }
+    private fun hasPreciseLocation()=
+        ContextCompat.checkSelfPermission(activity,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED
+    fun hasBackgroundLocation()=if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q) {
+        ContextCompat.checkSelfPermission(activity,Manifest.permission.ACCESS_BACKGROUND_LOCATION)==PackageManager.PERMISSION_GRANTED
+    } else true
+
     fun afterOnboarding() {
         activity.lifecycleScope.launch {
             activity.lifecycle.withResumed {
@@ -48,7 +65,7 @@ internal class AppPermissions(private val activity:ComponentActivity,private val
                 val needsNotifications=notificationsEnabled() && Build.VERSION.SDK_INT>=33 &&
                     ContextCompat.checkSelfPermission(activity,Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED
                 when(nextOnboardingPermission(needsNotifications,preferences.getBoolean("notifications_asked",false),
-                    hasLocation() || !locationEnabled(),preferences.getBoolean("location_asked",false))) {
+                    (hasLocation() && hasBackgroundLocation()) || !locationEnabled(),preferences.getBoolean("location_asked",false))) {
                     OnboardingPermission.Notifications -> if(Build.VERSION.SDK_INT>=33) {
                         preferences.edit { putBoolean("notifications_asked",true) }
                         notificationPrompt=true
@@ -61,7 +78,7 @@ internal class AppPermissions(private val activity:ComponentActivity,private val
         }
     }
     suspend fun requestLocation():Boolean {
-        if(hasLocation()) return true
+        if(hasPreciseLocation() && hasBackgroundLocation()) return true
         locationResult?.let { return it.await() }
         val pending=CompletableDeferred<Boolean>().also { locationResult=it }
         try {
@@ -75,8 +92,32 @@ internal class AppPermissions(private val activity:ComponentActivity,private val
         preferences.edit { putBoolean("location_asked",true) }
         locationPrompt=true
         if(locationResult==null) locationResult=CompletableDeferred()
-        try { location.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION)) }
-        catch(_:IllegalStateException) {
+        try {
+            if(!hasPreciseLocation()) {
+                location.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION))
+            } else if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q && !hasBackgroundLocation()) {
+                launchBackgroundLocation()
+            } else {
+                locationPrompt=false
+                locationResult?.complete(true)
+                locationResult=null
+            }
+        } catch(_:IllegalStateException) {
+            locationPrompt=false;locationResult?.complete(false);locationResult=null
+        }
+    }
+    private fun launchBackgroundLocation() {
+        locationPrompt=true
+        if(locationResult==null) locationResult=CompletableDeferred()
+        try {
+            if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.Q) {
+                backgroundLocation.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            } else {
+                locationPrompt=false
+                locationResult?.complete(true)
+                locationResult=null
+            }
+        } catch(_:IllegalStateException) {
             locationPrompt=false;locationResult?.complete(false);locationResult=null
         }
     }

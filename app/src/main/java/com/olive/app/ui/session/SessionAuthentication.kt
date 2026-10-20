@@ -5,6 +5,7 @@ import com.olive.app.BuildConfig
 import com.olive.app.data.*
 import com.olive.app.security.*
 import com.olive.app.ui.*
+import com.olive.app.location.LiveLocationController
 import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
@@ -239,6 +240,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                 if((screen != SessionScreen.Safe && screen != SessionScreen.Portal) || busy || enrollment == null) return
                 val uid=enrollment!!.uid
                 LocalNotificationEventHandler.cancel(application)
+                if(LiveLocationController.active(application)) LiveLocationController.stop(application)
                 navigation.quickExit()
                 historySyncJob?.cancel();historySyncJob=null
                 busy=true
@@ -254,6 +256,7 @@ internal class SessionAuthentication(private val runtime:SessionRuntime) {
                                     accounts.saveHistoryRecord(AccountIdentity(uid,coverUsername),record)
                                     withContext(Dispatchers.IO) { store.markHistorySynced(uid,record) }
                                 }
+                                LocationSharingRepository(application).setLiveRecipients(uid,emptyList())
                             }
                         }
                         accounts.signOut(); enrollment=null; deliveryAddress=DeliveryAddress(); language="English"

@@ -122,6 +122,7 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun sendMessage(text: String, onSent: ()->Unit = {}) = runtime.conversationActions.sendMessage(text,onSent)
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
     fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
+    fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
     fun openSharedPrivateEntry(entryId:String) = runtime.secureSharing.open(entryId)
     fun closeSharedPrivateEntry() = runtime.secureSharing.close()
     fun noteInteraction() = runtime.privacy.noteInteraction()
