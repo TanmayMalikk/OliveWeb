@@ -158,7 +158,7 @@ class AccessibilityUiTest:OliveUiTestBase() {
         }
         compose.waitUntil(5_000) { observed.get()>0 }
     }
-    @Test fun chatTipIsModalAndQuickExitRemainsAvailableInsideIt() {
+    @Test fun chatTipAppearsOncePointsToExitAndHidesTheFloatingMenu() {
         register();unlock()
         val session=ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -167,10 +167,18 @@ class AccessibilityUiTest:OliveUiTestBase() {
             session.openConversation(ChatConversation("a11y-chat","fixture",listOf(uid,"peer"),mapOf(uid to "olive_tester","peer" to "Test Friend")))
         }
         waitFor("chat_quick_exit_hint")
-        compose.onNode(isDialog()).assertExists()
-        compose.onNodeWithTag("chat_hint_quick_exit").performClick()
-        waitCover()
+        compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
+        compose.onNodeWithTag("chat_hint_quick_exit").assertDoesNotExist()
+        compose.onNodeWithTag("dismiss_chat_quick_exit_hint").performClick()
         compose.onNodeWithTag("chat_quick_exit_hint").assertDoesNotExist()
+        compose.runOnIdle {
+            session.closeConversation()
+            val uid=requireNotNull(session.coverAccountId)
+            session.openConversation(ChatConversation("a11y-chat","fixture",listOf(uid,"peer"),mapOf(uid to "olive_tester","peer" to "Test Friend")))
+        }
+        compose.onNodeWithTag("chat_quick_exit_hint").assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").performClick()
+        waitCover()
     }
     @Test fun pinActionsAndDigitCountAreSpokenWithoutExposingThePin() {
         register();trigger()

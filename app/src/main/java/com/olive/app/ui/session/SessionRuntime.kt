@@ -28,6 +28,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     val messagingRepository = if(localMode) null else MessagingRepository()
     val secureChatRepository = if(localMode) null else SecureChatRepository()
     val secureDocumentRepository = if(localMode) null else SecureDocumentRepository()
+    val safetyDocumentRepository = if(localMode) null else SafetyDocumentRepository()
     val messageReadState=application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
     val cloudState=application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
     var enrollment by mutableStateOf<DeviceEnrollment?>(null)
@@ -41,6 +42,8 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     var conversationSubscription: ChatSubscription? = null
     var messageSubscription: ChatSubscription? = null
     var observedFriendshipIds=emptySet<String>()
+    var chatQuickExitHintShown=false
+    var verifiedMessagingIdentityMarker:String?=null
     var lastTouchAt=0L
     val historySyncMutex=Mutex()
     var activeTriggerId: String? = null

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>olive-map-loading</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org">
+  <link rel="stylesheet" href="leaflet.css">
+  <style>
+    html,body{height:100%;width:100%;margin:0;background:#f1ede4}
+    #map{height:100vh;width:100%;min-height:100%;margin:0;background:#f1ede4}
+    .leaflet-control-attribution{font:11px sans-serif}
+    .olive-live-marker{background:transparent;border:0}
+    .olive-live-dot{width:18px;height:18px;border-radius:50%;background:#c52b25;border:3px solid #fff;
+      box-shadow:0 0 0 2px rgba(117,22,19,.5);animation:olivePulse 2.4s ease-in-out infinite}
+    .olive-contact-dot{width:16px;height:16px;border-radius:50%;background:#466c3d;border:3px solid #fff;
+      box-shadow:0 0 0 2px rgba(39,68,33,.35)}
+    @keyframes olivePulse{0%,100%{transform:scale(.9);opacity:.72;box-shadow:0 0 0 2px rgba(117,22,19,.45)}
+      50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(197,43,37,.12)}}
+    @media (prefers-reduced-motion:reduce){.olive-live-dot{animation:none}}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="leaflet.js"></script>
+  <script src="map.js"></script>
+</body>
+</html>

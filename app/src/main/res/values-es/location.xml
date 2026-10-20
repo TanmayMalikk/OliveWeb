@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="location_last_known">Última ubicación conocida</string>
+    <string name="powered_by_geoapify">Con tecnología de Geoapify</string>
+    <string name="location_map">Mapa de ubicación</string>
+    <string name="location_map_user_help">Consulta tu ubicación actual y los puntos guardados que comparten tus contactos seguros. La ubicación en vivo solo se comparte cuando eliges contactos abajo.</string>
+    <string name="location_map_contact_help">Consulta las ubicaciones en vivo que tus amistades compartieron contigo. Tu marcador usa la ubicación guardada al crear la cuenta.</string>
+    <string name="location_map_accessibility">Mapa interactivo. Arrastra para moverte, pellizca para ampliar o selecciona un marcador para conocer su nombre.</string>
+    <string name="location_map_unavailable">No se pudo cargar el mapa. Comprueba tu conexión e inténtalo de nuevo.</string>
+    <string name="location_zoom_in">Acercar</string>
+    <string name="location_zoom_out">Alejar</string>
+    <string name="recenter_map">Volver a centrar el mapa</string>
+    <string name="you">Tú</string>
+    <string name="your_saved_location">Tu ubicación guardada</string>
+    <string name="share_live_location_with">Compartir ubicación en vivo con</string>
+    <string name="location_contacts_selected">%1$d de 10 contactos seleccionados</string>
+    <string name="location_no_friends">Añade y acepta una amistad antes de compartir tu ubicación.</string>
+    <string name="start_sharing_location">Empezar a compartir en vivo</string>
+    <string name="stop_sharing_location">Dejar de compartir</string>
+    <string name="location_permission_required">Se requiere el permiso de ubicación para mostrar y compartir tu ubicación en vivo.</string>
+    <string name="location_start_failed">No se pudo iniciar el uso compartido de ubicación en vivo.</string>
+    <string name="location_firebase_required">La ubicación en vivo está disponible al iniciar sesión en el proyecto Firebase configurado.</string>
+    <string name="share_saved_location">Compartir ubicación guardada</string>
+    <string name="share_saved_location_help">Comparte con tus amistades aceptadas la ubicación guardada al crear la cuenta. El dispositivo no se rastrea continuamente.</string>
+    <string name="location_saved_address_unavailable">No se pudo colocar la ubicación guardada en el mapa. Selecciona una sugerencia de dirección en los ajustes de la cuenta e inténtalo de nuevo.</string>
+    <string name="location_waiting">Esperando una ubicación disponible.</string>
+    <string name="location_notification_channel">Ubicación en vivo compartida</string>
+    <string name="location_notification_title">La ubicación se está compartiendo</string>
+    <string name="location_notification_text">Los contactos seguros seleccionados pueden ver tu ubicación actual.</string>
+    <string name="location_choose_duration">¿Durante cuánto tiempo quieres compartir tu ubicación?</string>
+    <string name="location_one_hour">1 hora</string>
+    <string name="location_hours">%1$d horas</string>
+    <string name="location_custom_hours">Horas personalizadas</string>
+    <string name="location_custom_range">Ingresa entre 1 y 720 horas.</string>
+    <string name="location_share_for_custom">Compartir</string>
+    <string name="location_sharing_until">Compartiendo hasta las %1$s</string>
+    <string name="location_ten_seconds_testing">10 segundos (prueba)</string>
+</resources>

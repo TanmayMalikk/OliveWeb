@@ -17,6 +17,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
+import android.content.Intent
+import androidx.core.content.ContextCompat
+import com.olive.app.location.LiveLocationController
+import com.olive.app.location.LiveLocationService
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
@@ -111,6 +115,9 @@ class MainActivity : ComponentActivity() {
         applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType,session.accountRole)
         removeRecentPrivacyCoverAfterRedraw()
+        if(LiveLocationController.active(this)) {
+            ContextCompat.startForegroundService(this, Intent(this, LiveLocationService::class.java).setAction(LiveLocationService.PING))
+        }
     }
     override fun onUserInteraction() {
         super.onUserInteraction()

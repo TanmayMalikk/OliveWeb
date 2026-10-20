@@ -19,7 +19,7 @@ service cloud.firestore {
 
     function contactAt(c, i) {
 
-      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay'])
+      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay','linkedUid'])
 
         && c[i].id is string && c[i].id.size() <= 64
 
@@ -29,6 +29,8 @@ service cloud.firestore {
 
         && (!('safeToStay' in c[i]) || c[i].safeToStay is bool)
 
+        && (!('linkedUid' in c[i]) || (c[i].linkedUid is string && c[i].linkedUid.size() <= 128))
+
         && c[i].details is string && c[i].details.size() > 0 && c[i].details.size() <= 200);
 
     }
@@ -37,7 +39,7 @@ service cloud.firestore {
 
       return a is map && a.keys().hasAll(['line1','line2','city','province','postalCode','country'])
 
-        && a.keys().hasOnly(['line1','line2','city','province','postalCode','country'])
+        && a.keys().hasOnly(['line1','line2','city','province','postalCode','country','latitude','longitude'])
 
         && a.line1 is string && a.line1.size() <= 160
 
@@ -49,7 +51,11 @@ service cloud.firestore {
 
         && a.postalCode is string && a.postalCode.size() <= 160
 
-        && a.country is string && a.country.size() <= 160;
+        && a.country is string && a.country.size() <= 160
+
+        && (!('latitude' in a) || (a.latitude is number && a.latitude >= -90 && a.latitude <= 90))
+
+        && (!('longitude' in a) || (a.longitude is number && a.longitude >= -180 && a.longitude <= 180));
 
     }
 
@@ -258,6 +264,44 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Safe contacts explicitly share only their saved onboarding location with individual accepted friends.
+    match /sharedLocations/{ownerUid}/recipients/{recipientUid} {
+      function validSharedLocation(data) {
+        return data.keys().hasOnly(['ownerUid','recipientUid','friendshipId','contactName','latitude','longitude','label','updatedAt'])
+          && data.ownerUid == ownerUid && data.recipientUid == recipientUid && ownerUid != recipientUid
+          && data.friendshipId is string
+          && exists(/databases/$(database)/documents/friendships/$(data.friendshipId))
+          && ownerUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+          && recipientUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+          && data.contactName is string && data.contactName.size() > 0 && data.contactName.size() <= 120
+          && data.latitude is number && data.latitude >= -90 && data.latitude <= 90
+          && data.longitude is number && data.longitude >= -180 && data.longitude <= 180
+          && data.label is string && data.label.size() <= 500
+          && data.updatedAt is timestamp;
+      }
+      allow get: if signedIn() && (request.auth.uid == ownerUid || request.auth.uid == recipientUid);
+      allow list: if owner(ownerUid);
+      allow create, update: if owner(ownerUid) && validSharedLocation(request.resource.data);
+      allow delete: if owner(ownerUid);
+    }
+
+    // Presence records let an authorized contact begin listening before the first live coordinate arrives.
+    match /liveLocationShares/{ownerUid}/recipients/{recipientUid} {
+      function validLiveShare(data) {
+        return data.keys().hasOnly(['ownerUid','recipientUid','friendshipId','createdAt'])
+          && data.ownerUid == ownerUid && data.recipientUid == recipientUid && ownerUid != recipientUid
+          && data.friendshipId is string
+          && exists(/databases/$(database)/documents/friendships/$(data.friendshipId))
+          && ownerUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+          && recipientUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+          && data.createdAt is timestamp;
+      }
+      allow get: if signedIn() && (request.auth.uid == ownerUid || request.auth.uid == recipientUid);
+      allow list: if owner(ownerUid);
+      allow create, update: if owner(ownerUid) && validLiveShare(request.resource.data);
+      allow delete: if owner(ownerUid);
+    }
+
     function conversationParticipant(data) {
       return signedIn() && data.participantIds is list && request.auth.uid in data.participantIds;
     }
@@ -290,9 +334,11 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
-      allow get: if signedIn()
-        && request.auth.uid in get(/databases/$(database)/documents/friendships/$(conversationId)).data.participantIds;
-      allow list: if false;
+      // Collection listeners must constrain participantIds to the authenticated UID.
+      // Firestore rejects unfiltered and other-user queries because it cannot prove this predicate.
+      allow get: if conversationParticipant(resource.data);
+      allow list: if signedIn()
+        && request.auth.uid in resource.data.participantIds;
       allow create: if conversationParticipant(request.resource.data) && validConversation(request.resource.data,conversationId);
       allow update: if conversationParticipant(resource.data)
         && validConversation(request.resource.data,conversationId)
