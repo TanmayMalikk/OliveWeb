@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 
 /*
    OcrTestScreen: A dedicated, isolated testing screen for PaddleOCR document checking.
-   Tests strictly against actual user-provided document photos (.png / .jpg) in assets and displays extracted identity fields.
+   Displays the raw extracted text from the document for debugging and inspection.
  */
 @Composable
 fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back) {
@@ -57,7 +57,7 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                 }
             }
 
-            Text("Place your actual document image (e.g. test_doc.png or test_doc.jpg) into your project's assets/ or assets/OCRmodels/ folder, then click below to test.", style = MaterialTheme.typography.bodyMedium)
+            Text("Place your actual document image (e.g. test_doc.png or test_doc.jpg) into your project's assets/ or assets/models/ folder, then click below to test.", style = MaterialTheme.typography.bodyMedium)
 
             Button(
                 onClick = {
@@ -74,7 +74,7 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                     if (sampleBytes != null) {
                         runOcrOnBytes(sampleBytes)
                     } else {
-                        statusMessage = "Error: No test image found. Please add test_doc.png or test_doc.jpg to your assets/ or assets/OCRmodels/ folder."
+                        statusMessage = "Error: No test image found. Please add test_doc.png or test_doc.jpg to your assets/ or assets/models/ folder."
                     }
                 },
                 enabled = !isRunning,
@@ -89,31 +89,25 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                 val res = ocrResult!!
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("OCR Results Output", style = MaterialTheme.typography.titleMedium)
-
-                        // Prominently display Name and ID Number extracted from document
-                        val holderName = res.detectedFields["holder_name"] ?: "Not detected"
-                        val docNumber = res.detectedFields["document_number"] ?: "Not detected"
+                        Text("Raw OCR Text Output", style = MaterialTheme.typography.titleMedium)
 
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("👤 Holder Name: $holderName", style = MaterialTheme.typography.titleSmall)
-                                Text("🆔 ID / Passport Number: $docNumber", style = MaterialTheme.typography.titleSmall)
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("📄 Full Extracted Text:", style = MaterialTheme.typography.labelMedium)
+                                Text(res.extractedText, style = MaterialTheme.typography.bodyMedium)
                             }
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("Success: ${res.success}")
                         Text("Confidence: ${(res.confidence * 100).toInt()}%")
-                        HorizontalDivider()
-                        Text("Extracted Text:", style = MaterialTheme.typography.labelMedium)
-                        Text(res.extractedText, style = MaterialTheme.typography.bodySmall)
+                        
                         if (res.detectedFields.isNotEmpty()) {
                             HorizontalDivider()
-                            Text("Detected Fields:", style = MaterialTheme.typography.labelMedium)
+                            Text("Parsed Fields:", style = MaterialTheme.typography.labelMedium)
                             res.detectedFields.forEach { (k, v) ->
                                 Text("• $k: $v", style = MaterialTheme.typography.bodySmall)
                             }
