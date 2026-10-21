@@ -1,16 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="safe_contact_home_title">支持面板</string>
-    <string name="safe_contact_home_help">保持联系，并在您信任的人联系时及时回应。</string>
-    <string name="safe_contact_actions">您的工具</string>
-    <string name="safe_contact_messages_help">查找可信联系人，并集中管理对话。</string>
-    <string name="safe_contact_location_help">查看好友选择与您分享的实时位置。</string>
-    <string name="safe_contact_notes_help">保存您自己的私人笔记和事件记录。</string>
-    <string name="safe_contact_profile_help">查看账户并更新个人资料。</string>
-    <string name="safe_contact_connections">联系人</string>
-    <string name="safe_contact_connections_help">好友请求和对话会在收到后显示在这里。</string>
-    <string name="safe_contact_manage_connections">管理好友和消息</string>
-    <string name="safe_contact_changes_waiting">个人资料更改已保存在此设备上，正在等待同步。</string>
+<string name="safe_contact_home_help">保持联系，并在您信任的人联系时及时回应。</string>
+<string name="safe_contact_messages_help">查找可信联系人，并集中管理对话。</string>
+<string name="safe_contact_notes_help">保存您自己的私人笔记和事件记录。</string>
+<string name="safe_contact_changes_waiting">个人资料更改已保存在此设备上，正在等待同步。</string>
     <string name="safe_contact_profile_intro">查看与您的安全联系人账户关联的信息。</string>
     <string name="safe_contact_edit_profile">编辑个人资料和账户设置</string>
     <string name="safe_contact_safety_plan_help">查看用户与您分享的安全计划。</string>

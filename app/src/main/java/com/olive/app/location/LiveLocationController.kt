@@ -3,6 +3,7 @@ package com.olive.app.location
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import com.olive.app.data.MapLocationPoint
 import com.olive.app.data.LocationTrailPoint
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,9 +42,10 @@ internal object LiveLocationController {
         require(contactUids.size<=10)
         require(expiresAt>System.currentTimeMillis())
         LiveLocationKeyStore(context).save(uid,key)
-        context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putBoolean("live_active",true)
-            .putString("live_owner_uid",uid).putString("live_owner_name",name).putStringSet("live_contacts",contactUids)
-            .putLong("live_expires_at",expiresAt).apply()
+        context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit {
+            putBoolean("live_active",true).putString("live_owner_uid",uid).putString("live_owner_name",name)
+                .putStringSet("live_contacts",contactUids).putLong("live_expires_at",expiresAt)
+        }
         val intent=Intent(context,LiveLocationService::class.java).putExtra(LiveLocationService.OWNER_UID,uid)
             .putExtra(LiveLocationService.DISPLAY_NAME,name).putExtra(LiveLocationService.CONTACT_UIDS,contactUids.toTypedArray())
             .putExtra(LiveLocationService.EXPIRES_AT,expiresAt)
@@ -57,8 +59,8 @@ internal object LiveLocationController {
         val contacts=preferences.getStringSet("live_contacts",emptySet()).orEmpty()
         context.startService(Intent(context,LiveLocationService::class.java).setAction(LiveLocationService.STOP)
             .putExtra(LiveLocationService.OWNER_UID,ownerUid).putExtra(LiveLocationService.CONTACT_UIDS,contacts.toTypedArray()))
-        preferences.edit().putBoolean("live_active",false).remove("live_owner_uid").remove("live_owner_name")
-            .remove("live_contacts").remove("live_expires_at").apply()
+        preferences.edit { putBoolean("live_active",false).remove("live_owner_uid").remove("live_owner_name")
+            .remove("live_contacts").remove("live_expires_at") }
         ownerUid?.let { LiveLocationKeyStore(context).remove(it) }
     }
 }

@@ -1,6 +1,7 @@
 package com.olive.app.data
 
 import android.content.Context
+import androidx.core.content.edit
 import com.google.firebase.FirebaseApp
 import com.google.firebase.database.*
 import com.google.firebase.firestore.FieldValue
@@ -36,7 +37,7 @@ internal interface LocationSharingPreferences {
 private class AndroidLocationSharingPreferences(context:Context):LocationSharingPreferences {
     private val values=context.getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE)
     override fun staticSharingEnabled(uid:String)=values.getBoolean("static_$uid",false)
-    override fun setStaticSharingEnabled(uid:String,enabled:Boolean) { values.edit().putBoolean("static_$uid",enabled).apply() }
+    override fun setStaticSharingEnabled(uid:String,enabled:Boolean) { values.edit { putBoolean("static_$uid",enabled) } }
 }
 
 internal fun interface AddressCoordinateResolver {

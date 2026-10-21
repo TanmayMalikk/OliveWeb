@@ -44,7 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
             Icon(Icons.Outlined.CalendarMonth,null);Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f),horizontalAlignment=Alignment.Start) {
                 Text(label,style=MaterialTheme.typography.labelMedium)
-                Text(display ?: uiText(R.string.not_selected),color=if(value==null) Muted else MaterialTheme.colorScheme.onSurface)
+                Text(display ?: uiText(R.string.olive_not_selected),color=if(value==null) Muted else MaterialTheme.colorScheme.onSurface)
             }
             Icon(Icons.Outlined.AccessTime,null)
         }

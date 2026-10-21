@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -120,7 +121,7 @@ private const val MAX_SHARED_CONTACTS=10
             listOf(1L,2L,8L,24L).forEach { hours ->
                 OutlinedButton(onClick={onSelected(hours*60*60*1000)},modifier=Modifier.fillMaxWidth()) {
                     Text(if(hours==1L) stringResource(R.string.location_one_hour)
-                        else stringResource(R.string.location_hours,hours))
+                        else pluralStringResource(R.plurals.location_hours, hours.toInt(), hours))
                 }
             }
             OutlinedTextField(custom,{custom=it.filter(Char::isDigit).take(2)},singleLine=true,

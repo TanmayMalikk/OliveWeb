@@ -81,7 +81,6 @@ internal val LocalAccessibilityMessagesVisible=staticCompositionLocalOf { true }
 @Composable internal fun AccessibleMessage(text:String,modifier:Modifier=Modifier,color:Color=LocalContentColor.current,
                                          requestFocus:Boolean=true,style:TextStyle=LocalTextStyle.current,showText:Boolean=true) {
     val context=LocalContext.current
-    val spoken=text
     val bringIntoView=remember { BringIntoViewRequester() }
     val scope=rememberCoroutineScope()
     val fallback=remember(scope) { AccessibilityFocusCoordinator(scope) }
@@ -94,11 +93,11 @@ internal val LocalAccessibilityMessagesVisible=staticCompositionLocalOf { true }
     Box(modifier.bringIntoViewRequester(bringIntoView)) {
         if(showText) androidx.compose.material3.Text(text,color=color,style=style,modifier=Modifier.semantics { hideFromAccessibility() })
         AndroidView(factory={native},modifier=Modifier.matchParentSize(),update={
-            it.contentDescription=spoken
+            it.contentDescription=text
             it.importantForAccessibility=if(visible) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         })
     }
-    LaunchedEffect(spoken,requestFocus,visible) {
+    LaunchedEffect(text,requestFocus,visible) {
         val manager=context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
         if(visible && requestFocus && manager.isEnabled && manager.isTouchExplorationEnabled) {
             // Android authentication owns another window. Deliver feedback only after this
@@ -111,7 +110,7 @@ internal val LocalAccessibilityMessagesVisible=staticCompositionLocalOf { true }
 
 private suspend fun View.awaitAccessibilityWindowFocus() {
     if(hasWindowFocus()) return
-    suspendCancellableCoroutine<Unit> { continuation ->
+    suspendCancellableCoroutine { continuation ->
         val observer=viewTreeObserver
         lateinit var listener:ViewTreeObserver.OnWindowFocusChangeListener
         fun remove() { if(observer.isAlive) observer.removeOnWindowFocusChangeListener(listener) }

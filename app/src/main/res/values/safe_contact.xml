@@ -1,16 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="safe_contact_home_title">Support dashboard</string>
-    <string name="safe_contact_home_help">Stay connected and respond when someone you trust reaches out.</string>
-    <string name="safe_contact_actions">Your tools</string>
-    <string name="safe_contact_messages_help">Find trusted connections and keep conversations together.</string>
-    <string name="safe_contact_location_help">View live locations that friends have chosen to share.</string>
-    <string name="safe_contact_notes_help">Keep your own private notes and incident records.</string>
-    <string name="safe_contact_profile_help">Review your account and update personal details.</string>
-    <string name="safe_contact_connections">Connections</string>
-    <string name="safe_contact_connections_help">Friend requests and conversations appear here as they arrive.</string>
-    <string name="safe_contact_manage_connections">Manage friends and messages</string>
-    <string name="safe_contact_changes_waiting">Profile changes are saved on this device and waiting to sync.</string>
+<string name="safe_contact_home_help">Stay connected and respond when someone you trust reaches out.</string>
+<string name="safe_contact_messages_help">Find trusted connections and keep conversations together.</string>
+<string name="safe_contact_notes_help">Keep your own private notes and incident records.</string>
+<string name="safe_contact_changes_waiting">Profile changes are saved on this device and waiting to sync.</string>
     <string name="safe_contact_profile_intro">Review the information connected to your Safe Contact account.</string>
     <string name="safe_contact_edit_profile">Edit profile and account settings</string>
     <string name="safe_contact_safety_plan_help">View safety plans that users have shared with you.</string>
