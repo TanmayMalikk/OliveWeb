@@ -5,7 +5,11 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.database.*
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.olive.app.security.EncryptionUtils
+import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
+import javax.crypto.SecretKey
 
 data class LocationTrailPoint(val latitude:Double,val longitude:Double,val updatedAt:Long)
 
@@ -58,10 +62,14 @@ private class StaticLocationSharingDataSource(
         if(enabled) {
             val coordinates=resolver.coordinates(profile.address) ?: throw SavedLocationUnavailableException()
             friends.forEach { friend ->
+                val key=EncryptionUtils.generateSymmetricKey()
+                val publicKey=friendPublicKey(firestore,friend)
+                val payload=JSONObject().put("name",profile.fullName).put("latitude",coordinates.first)
+                    .put("longitude",coordinates.second).put("label",profile.address.generalLocation).toString()
                 batch.set(collection.document(friend.uid),mapOf(
                     "ownerUid" to identity.uid,"recipientUid" to friend.uid,"friendshipId" to friend.friendshipId,
-                    "contactName" to profile.fullName,"latitude" to coordinates.first,"longitude" to coordinates.second,
-                    "label" to profile.address.generalLocation,"updatedAt" to FieldValue.serverTimestamp()))
+                    "ciphertext" to EncryptionUtils.encryptText(payload,key),"wrappedKey" to KeyManager.wrapKey(key,publicKey),
+                    "updatedAt" to FieldValue.serverTimestamp()))
             }
         }
         batch.commit().await()
@@ -75,10 +83,14 @@ private class StaticLocationSharingDataSource(
             firestore.collection("sharedLocations").document(friend.uid).collection("recipients").document(currentUid)
                 .addSnapshotListener { row,_ ->
                     if(row?.exists()==true) {
-                        val latitude=row.getDouble("latitude");val longitude=row.getDouble("longitude")
-                        if(latitude!=null && longitude!=null) points[friend.uid]=MapLocationPoint(friend.uid,
-                            row.getString("contactName") ?: friend.username,latitude,longitude,
+                        val decoded=runCatching {
+                            val key=KeyManager.unwrapKey(checkNotNull(row.getString("wrappedKey")))
+                            JSONObject(EncryptionUtils.decryptText(checkNotNull(row.getString("ciphertext")),key))
+                        }.getOrNull()
+                        if(decoded!=null) points[friend.uid]=MapLocationPoint(friend.uid,
+                            decoded.optString("name",friend.username),decoded.getDouble("latitude"),decoded.getDouble("longitude"),
                             row.getTimestamp("updatedAt")?.toDate()?.time ?: 0L,false)
+                        else points.remove(friend.uid)
                     } else points.remove(friend.uid)
                     publish()
                 }
@@ -91,14 +103,18 @@ private class LiveLocationSharingDataSource(
     private val firestore:FirebaseFirestore,
     private val databaseProvider:()->FirebaseDatabase,
 ) {
-    suspend fun setRecipients(ownerUid:String,friends:List<Friend>) {
+    suspend fun setRecipients(ownerUid:String,friends:List<Friend>):SecretKey? {
         require(friends.size<=10)
         val collection=firestore.collection("liveLocationShares").document(ownerUid).collection("recipients")
         val old=collection.get().await();val batch=firestore.batch();old.documents.forEach { batch.delete(it.reference) }
+        if(friends.isEmpty()) { batch.commit().await();return null }
+        val key=EncryptionUtils.generateSymmetricKey()
         friends.forEach { friend -> batch.set(collection.document(friend.uid),mapOf(
             "ownerUid" to ownerUid,"recipientUid" to friend.uid,"friendshipId" to friend.friendshipId,
+            "wrappedKey" to KeyManager.wrapKey(key,friendPublicKey(firestore,friend)),
             "createdAt" to FieldValue.serverTimestamp())) }
         batch.commit().await()
+        return key
     }
 
     fun observe(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription {
@@ -117,19 +133,21 @@ private class LiveLocationSharingDataSource(
                     liveListeners.remove(friend.uid)?.close()
                     points.remove(friend.uid);trails.remove(friend.uid);publish()
                     if(share?.exists()!=true) return@addSnapshotListener
+                    val key=runCatching { KeyManager.unwrapKey(checkNotNull(share.getString("wrappedKey"))) }.getOrNull()
+                        ?: return@addSnapshotListener
                     val reference=database.reference.child("liveLocations").child(friend.uid)
                     val trailQuery=database.reference.child("liveLocationTrails").child(friend.uid)
                         .orderByChild("updatedAt").startAt((System.currentTimeMillis()-TRAIL_WINDOW_MILLIS).toDouble())
                     val listener=object:ValueEventListener {
                         override fun onDataChange(snapshot:DataSnapshot) {
-                            val latitude=snapshot.child("latitude").getValue(Double::class.java)
-                            val longitude=snapshot.child("longitude").getValue(Double::class.java)
                             val updated=snapshot.child("updatedAt").getValue(Long::class.java) ?: 0L
                             val active=snapshot.child("active").getValue(Boolean::class.java)==true
-                            if(latitude!=null && longitude!=null && snapshot.child("authorized").child(currentUid).getValue(Boolean::class.java)==true)
-                                points[friend.uid]=MapLocationPoint(friend.uid,snapshot.child("displayName").getValue(String::class.java)
-                                    ?: friend.username,latitude,longitude,updated,active,
-                                    snapshot.child("accuracy").getValue(Double::class.java)?.toFloat(),!active,
+                            val decoded=runCatching { JSONObject(EncryptionUtils.decryptText(
+                                checkNotNull(snapshot.child("ciphertext").getValue(String::class.java)),key)) }.getOrNull()
+                            if(decoded!=null && snapshot.child("authorized").child(currentUid).getValue(Boolean::class.java)==true)
+                                points[friend.uid]=MapLocationPoint(friend.uid,decoded.optString("name",friend.username),
+                                    decoded.getDouble("latitude"),decoded.getDouble("longitude"),updated,active,
+                                    decoded.optDouble("accuracy").takeIf { !it.isNaN() }?.toFloat(),!active,
                                     trails[friend.uid].orEmpty().values.sortedBy { it.updatedAt })
                             else points.remove(friend.uid)
                             publish()
@@ -145,12 +163,12 @@ private class LiveLocationSharingDataSource(
                         override fun onChildMoved(snapshot:DataSnapshot,previousChildName:String?)=Unit
                         override fun onCancelled(error:DatabaseError)=Unit
                         private fun update(snapshot:DataSnapshot) {
-                            val latitude=snapshot.child("latitude").getValue(Double::class.java) ?: return
-                            val longitude=snapshot.child("longitude").getValue(Double::class.java) ?: return
                             val updated=snapshot.child("updatedAt").getValue(Long::class.java) ?: return
                             if(updated<System.currentTimeMillis()-TRAIL_WINDOW_MILLIS) return
+                            val decoded=runCatching { JSONObject(EncryptionUtils.decryptText(
+                                checkNotNull(snapshot.child("ciphertext").getValue(String::class.java)),key)) }.getOrNull() ?: return
                             trails.getOrPut(friend.uid) { mutableMapOf() }[snapshot.key.orEmpty()]=
-                                LocationTrailPoint(latitude,longitude,updated)
+                                LocationTrailPoint(decoded.getDouble("latitude"),decoded.getDouble("longitude"),updated)
                             attachTrail(friend.uid)
                         }
                     }
@@ -175,7 +193,7 @@ private class LiveLocationSharingDataSource(
 internal interface LocationSharingDataSource {
     fun staticSharingEnabled(uid:String):Boolean
     suspend fun setStaticSharing(identity:AccountIdentity,profile:UserProfile,friends:List<Friend>,enabled:Boolean)
-    suspend fun setLiveRecipients(ownerUid:String,friends:List<Friend>)
+    suspend fun setLiveRecipients(ownerUid:String,friends:List<Friend>):SecretKey?
     fun observeStaticContacts(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription
     fun observeLiveFriends(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit):ChatSubscription
 }
@@ -200,3 +218,11 @@ internal class LocationSharingRepository private constructor(
     override fun observeLiveFriends(currentUid:String,friends:List<Friend>,onUpdate:(List<MapLocationPoint>)->Unit)=
         liveLocations.observe(currentUid,friends,onUpdate)
 }
+
+private suspend fun friendPublicKey(firestore:FirebaseFirestore,friend:Friend)=
+    firestore.collection("messageDirectory").document(friend.username.lowercase()).get().await().let { row ->
+        require(row.getString("uid")==friend.uid) { "Contact encryption identity is unavailable" }
+        KeyManager.decodePublicKey(row.getString("publicKey").orEmpty().ifBlank {
+            error("Contact encryption key is unavailable")
+        })
+    }

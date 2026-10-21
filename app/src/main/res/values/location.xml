@@ -27,12 +27,14 @@
     <string name="location_notification_title">Location sharing is active</string>
     <string name="location_notification_text">Selected safe contacts can view your current location.</string>
     <string name="recenter_map">Recenter map</string>
+    <string name="location_follow_user">Keep user centered</string>
+    <string name="location_stop_following">Stop following user</string>
     <string name="location_services_disabled" translatable="false">Device location is turned off. Please enable location services in your device settings.</string>
     <string name="location_choose_duration">How long do you want to share your location?</string>
     <string name="location_one_hour">1 hour</string>
     <string name="location_hours">%1$d hours</string>
     <string name="location_custom_hours">Custom hours</string>
-    <string name="location_custom_range">Enter 1 to 720 hours.</string>
+    <string name="location_custom_range">Enter 1 to 72 hours.</string>
     <string name="location_share_for_custom">Share</string>
     <string name="location_sharing_until">Sharing until %1$s</string>
     <string name="location_ten_seconds_testing">10 seconds (testing)</string>

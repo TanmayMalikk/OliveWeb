@@ -10,6 +10,8 @@
     <string name="location_zoom_in">Agrandir</string>
     <string name="location_zoom_out">Réduire</string>
     <string name="recenter_map">Recentrer la carte</string>
+    <string name="location_follow_user">Garder l’utilisateur au centre</string>
+    <string name="location_stop_following">Arrêter de suivre l’utilisateur</string>
     <string name="you">Vous</string>
     <string name="your_saved_location">Votre emplacement enregistré</string>
     <string name="share_live_location_with">Partager la position en direct avec</string>
@@ -31,7 +33,7 @@
     <string name="location_one_hour">1 heure</string>
     <string name="location_hours">%1$d heures</string>
     <string name="location_custom_hours">Durée personnalisée en heures</string>
-    <string name="location_custom_range">Entrez de 1 à 720 heures.</string>
+    <string name="location_custom_range">Entrez de 1 à 72 heures.</string>
     <string name="location_share_for_custom">Partager</string>
     <string name="location_sharing_until">Partage jusqu’à %1$s</string>
     <string name="location_ten_seconds_testing">10 secondes (test)</string>

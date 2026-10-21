@@ -10,6 +10,8 @@
     <string name="location_zoom_in">放大</string>
     <string name="location_zoom_out">缩小</string>
     <string name="recenter_map">重新居中地图</string>
+    <string name="location_follow_user">保持用户居中</string>
+    <string name="location_stop_following">停止跟随用户</string>
     <string name="you">您</string>
     <string name="your_saved_location">您保存的位置</string>
     <string name="share_live_location_with">实时位置共享对象</string>
@@ -31,7 +33,7 @@
     <string name="location_one_hour">1 小时</string>
     <string name="location_hours">%1$d 小时</string>
     <string name="location_custom_hours">自定义小时数</string>
-    <string name="location_custom_range">请输入 1 到 720 小时。</string>
+    <string name="location_custom_range">请输入 1 到 72 小时。</string>
     <string name="location_share_for_custom">共享</string>
     <string name="location_sharing_until">共享至 %1$s</string>
     <string name="location_ten_seconds_testing">10 秒（测试）</string>

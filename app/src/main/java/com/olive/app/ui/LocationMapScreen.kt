@@ -111,7 +111,7 @@ private const val MAX_SHARED_CONTACTS=10
 
 @Composable internal fun ShareDurationDialog(onDismiss:()->Unit,onSelected:(Long)->Unit) {
     var custom by remember { mutableStateOf("") }
-    val customHours=custom.toLongOrNull()?.takeIf { it in 1..720 }
+    val customHours=custom.toLongOrNull()?.takeIf { it in 1..72 }
     AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.location_choose_duration))},
         text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick={onSelected(10_000L)},modifier=Modifier.fillMaxWidth().testTag("location_duration_10_seconds")) {
@@ -123,11 +123,13 @@ private const val MAX_SHARED_CONTACTS=10
                         else stringResource(R.string.location_hours,hours))
                 }
             }
-            OutlinedTextField(custom,{custom=it.filter(Char::isDigit).take(3)},singleLine=true,
+            OutlinedTextField(custom,{custom=it.filter(Char::isDigit).take(2)},singleLine=true,
                 label={Text(stringResource(R.string.location_custom_hours))},
                 supportingText={Text(stringResource(R.string.location_custom_range))},
-                keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),modifier=Modifier.fillMaxWidth())
-        }},confirmButton={TextButton(onClick={customHours?.let { onSelected(it*60*60*1000) }},enabled=customHours!=null) {
+                keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),
+                modifier=Modifier.fillMaxWidth().testTag("location_custom_hours"))
+        }},confirmButton={TextButton(onClick={customHours?.let { onSelected(it*60*60*1000) }},enabled=customHours!=null,
+            modifier=Modifier.testTag("location_custom_confirm")) {
             Text(stringResource(R.string.location_share_for_custom))
         }},dismissButton={TextButton(onClick=onDismiss) { Text(stringResource(R.string.cancel)) }})
 }

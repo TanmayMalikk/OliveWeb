@@ -125,10 +125,10 @@ internal class LocationMapController(
             else try {
                 val end=System.currentTimeMillis()+durationMillis
                 val startedAt=System.currentTimeMillis()
-                LiveLocationController.start(applicationContext,configuration.identity.uid,configuration.profile.fullName,state.selected,end)
+                val key=checkNotNull(checkNotNull(repository).setLiveRecipients(configuration.identity.uid,recipients))
+                LiveLocationController.start(applicationContext,configuration.identity.uid,configuration.profile.fullName,state.selected,end,key)
                 withTimeout(20_000L) { LiveLocationState.current.filterNotNull()
                     .first { it.uid==configuration.identity.uid && it.updatedAt>=startedAt } }
-                checkNotNull(repository).setLiveRecipients(configuration.identity.uid,recipients)
                 state=state.copy(working=false,liveActive=true,expiresAt=end)
                 watchExpiry()
             } catch(failure:Exception) {
