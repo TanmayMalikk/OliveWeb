@@ -19,17 +19,17 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
             java.util.Base64.getEncoder().encodeToString(key.encoded)
         }
         val ref=firestore.collection("conversations").document(conversation.id)
-        val currentWrapped=ref.get().await().wrappedKey(currentUid)
-        if(currentWrapped!=null) return KeyManager.unwrapKey(currentWrapped)
         val selected=firestore.runTransaction { transaction ->
             val snapshot=transaction.get(ref)
-            snapshot.wrappedKey(currentUid) ?: run {
+            val savedKeys=snapshot.participantPublicKeys()
+            if(savedKeys==encodedPublicKeys) snapshot.wrappedKey(currentUid) ?: error("Secure conversation key unavailable.")
+            else {
                 transaction.update(ref,mapOf("roomKeys" to wrapped,"participantPublicKeys" to encodedPublicKeys,
                     "updatedAt" to FieldValue.serverTimestamp()))
                 wrapped.getValue(currentUid)
             }
         }.await()
-        return if(selected==wrapped[currentUid]) generated else KeyManager.unwrapKey(selected)
+        return KeyManager.unwrapKey(selected)
     }
 
     suspend fun loadRoomKey(conversationId:String,currentUid:String):SecretKey {
@@ -94,4 +94,8 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
     @Suppress("UNCHECKED_CAST")
     private fun com.google.firebase.firestore.DocumentSnapshot.wrappedKey(uid:String)=
         (get("roomKeys") as? Map<String,String>)?.get(uid)
+
+    @Suppress("UNCHECKED_CAST")
+    private fun com.google.firebase.firestore.DocumentSnapshot.participantPublicKeys()=
+        get("participantPublicKeys") as? Map<String,String>
 }

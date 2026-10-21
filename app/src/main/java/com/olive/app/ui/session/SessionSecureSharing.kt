@@ -7,6 +7,8 @@ import com.olive.app.data.ChatMessage
 import com.olive.app.data.PrivateEntry
 import com.olive.app.data.PrivateEntryKind
 import com.olive.app.data.SafetyDocument
+import com.olive.app.ui.location.LocationMapConfiguration
+import com.olive.app.ui.location.LocationMapController
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -98,6 +100,22 @@ internal class SessionSecureSharing(private val runtime:SessionRuntime) {
                 }
                 finally { if(epoch==token) messagingBusy=false }
             }
+        } }
+    }
+
+    fun shareLiveLocation(durationMillis:Long,controller:LocationMapController,requestPermission:suspend ()->Boolean) {
+        with(runtime) { with(state) {
+            val conversation=activeConversation ?: return
+            val device=enrollment ?: return
+            val profile=profile ?: return
+            if(profile.role!=com.olive.app.data.AccountRole.USER || messagingBusy) return
+            val peerUid=conversation.participantIds.firstOrNull { it!=device.uid } ?: return
+            val friend=friends.firstOrNull { it.uid==peerUid } ?: return
+            val configuration=LocationMapConfiguration(AccountIdentity(device.uid,coverUsername),profile,listOf(friend),localMode,
+                application.getString(R.string.you),application.getString(R.string.your_saved_location))
+            controller.startSharingWith(configuration,listOf(friend),durationMillis,requestPermission,
+                application.getString(R.string.location_permission_required),application.getString(R.string.location_start_failed),
+                onError={ message=it })
         } }
     }
 

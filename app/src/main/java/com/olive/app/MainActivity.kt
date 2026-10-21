@@ -33,6 +33,7 @@ import com.olive.app.ui.OliveRoot
 import com.olive.app.ui.OliveTheme
 import com.olive.app.ui.SessionViewModel
 import com.olive.app.ui.SessionScreen
+import com.olive.app.ui.SafePage
 import java.util.function.Consumer
 
 internal fun shouldBlankRecentPreview(protectionEnabled:Boolean,sensitive:Boolean)=protectionEnabled && sensitive
@@ -76,7 +77,7 @@ class MainActivity : ComponentActivity() {
             val selectedCover=session.coverType
             val selectedRole=session.accountRole
             val notificationAccountId=session.coverAccountId
-            LaunchedEffect(selectedCover,selectedRole,session.screen) { applySystemBarContrast() }
+            LaunchedEffect(selectedCover,selectedRole,session.screen,session.page) { applySystemBarContrast() }
             LaunchedEffect(notificationAccountId,selectedCover,selectedRole) {
                 // Update the open task now; the Home-screen alias changes after the user leaves the app.
                 updateRecentAppIdentity(selectedCover,selectedRole)
@@ -95,7 +96,7 @@ class MainActivity : ComponentActivity() {
         applyScreenCaptureProtection()
         // Authentication and runtime permission dialogs temporarily own another window.
         // Home/onStop still lock the safe area; a permission result never restores a private screen.
-        if(!deviceLock.awaitingCredential && !permissions.awaitingResult) session.background()
+        if(!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.background()
         updateRecentAppIdentity(session.coverType,session.accountRole)
         super.onPause()
     }
@@ -103,7 +104,7 @@ class MainActivity : ComponentActivity() {
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        if(!deviceLock.awaitingCredential && !permissions.awaitingResult) session.background()
+        if(!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.background()
         updateRecentAppIdentity(session.coverType,session.accountRole)
         super.onUserLeaveHint()
     }
@@ -145,7 +146,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onStop() {
-        if(!deviceLock.awaitingCredential && (session.deviceLockRequest!=null ||
+        if(!deviceLock.awaitingCredential && !session.externalFilePickerOpen && (session.deviceLockRequest!=null ||
                 session.screen in setOf(SessionScreen.Pin,SessionScreen.DevicePin,SessionScreen.Safe))) {
             deviceLock.cancel();session.background()
         }
@@ -197,12 +198,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // All current pages use light backgrounds, so their system bars use dark icons.
     private fun applySystemBarContrast() {
         val transparent=Color.TRANSPARENT
+        val camera=session.screen==SessionScreen.Safe && session.page==SafePage.Camera
         enableEdgeToEdge(
-            statusBarStyle=SystemBarStyle.light(transparent,transparent),
-            navigationBarStyle=SystemBarStyle.light(transparent,transparent),
+            statusBarStyle=if(camera) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent,transparent),
+            navigationBarStyle=if(camera) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent,transparent),
         )
     }
 

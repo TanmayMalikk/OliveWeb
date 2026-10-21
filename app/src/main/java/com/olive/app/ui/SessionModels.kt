@@ -5,7 +5,7 @@ import java.security.MessageDigest
 import java.util.Base64
 
 enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, TriggerSetup, OrganizationProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
-enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, Documents, Location }
+enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, Documents, Camera, Location }
 enum class ActivityCategory { Settings, Triggers, PinAttempts, Checkouts, Privacy }
 enum class CredentialFieldError { InvalidUsername, InvalidPassword, UsernameTaken, IncorrectPassword }
 

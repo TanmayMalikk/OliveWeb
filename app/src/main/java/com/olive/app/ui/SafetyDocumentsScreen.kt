@@ -1,7 +1,5 @@
 package com.olive.app.ui
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -9,36 +7,50 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import com.olive.app.R
 import com.olive.app.data.*
+import java.io.File
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun SafetyDocumentsScreen(session:SessionViewModel) {
-    val context=LocalContext.current;val uid=session.coverAccountId ?: return
+    val uid=session.coverAccountId ?: return
     val controller=session.documents
     val state=controller.state
     var filter by rememberSaveable { mutableStateOf(DocumentFilter.All) };var sharing by remember { mutableStateOf<SafetyDocument?>(null) }
+    var opened by remember { mutableStateOf<Pair<SafetyDocument,File>?>(null) }
+    var choosingUpload by rememberSaveable { mutableStateOf(false) }
     val unableUpload=stringResource(R.string.documents_upload_failed)
-    val noViewer=stringResource(R.string.documents_no_viewer)
-    val picker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    fun finishSelection(uri:android.net.Uri?) {
+        session.endExternalFilePicker()
         if(uri!=null) controller.upload(uri,AccountIdentity(uid,session.coverUsername),unableUpload)
     }
+    val mediaPicker=rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia(),::finishSelection)
+    val documentPicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(),::finishSelection)
+    fun launchProtectedPicker(action:()->Unit) {
+        choosingUpload=false;session.beginExternalFilePicker()
+        runCatching(action).onFailure { session.endExternalFilePicker();controller.reportError(unableUpload) }
+    }
     LaunchedEffect(uid,session.localMode) { controller.load(uid,session.localMode) }
+    opened?.let { (document,localFile) ->
+        SafetyDocumentViewer(document,localFile) {
+            localFile.delete()
+            opened=null
+        }
+        return
+    }
     Column(Modifier.fillMaxSize().padding(horizontal=16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().padding(top=8.dp),verticalAlignment=Alignment.CenterVertically) {
             IconButton(onClick=session::back,modifier=Modifier.testTag("documents_back")) {
@@ -50,8 +62,7 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
                 Text(stringResource(R.string.documents_storage_help),style=MaterialTheme.typography.bodySmall,color=Muted)
             }
         }
-        Button(onClick={picker.launch(arrayOf("image/*","video/*","application/pdf","text/plain",
-            "application/msword","application/vnd.openxmlformats-officedocument.wordprocessingml.document"))},
+        Button(onClick={choosingUpload=true},
             enabled=!state.loading && !session.localMode,modifier=Modifier.fillMaxWidth().testTag("documents_upload")) {
             Icon(Icons.Outlined.UploadFile,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.documents_add))
         }
@@ -91,11 +102,7 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
             verticalArrangement=Arrangement.spacedBy(10.dp)) {
             items(shown,key={it.id}) { file ->
                 SafetyDocumentCard(file,uid,session.friends,onOpen={controller.download(file) { local ->
-                    runCatching {
-                        val uri=FileProvider.getUriForFile(context,"${context.packageName}.documents",local)
-                        context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri,file.mimeType)
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
-                    }.onFailure { failure -> controller.reportError(if(failure is ActivityNotFoundException) noViewer else failure.localizedMessage) }
+                    opened=file to local
                 }},onShare={sharing=file},onDelete={controller.delete(file,uid)})
             }
         }
@@ -103,6 +110,26 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
     sharing?.let { file -> DocumentSharingDialog(file,uid,session.friends,session.profile?.contacts.orEmpty(),onDismiss={sharing=null}) { recipients ->
         controller.share(file,uid,recipients) { sharing=null }
     } }
+    if(choosingUpload) ModalBottomSheet(onDismissRequest={choosingUpload=false}) {
+        Column(Modifier.fillMaxWidth().padding(horizontal=20.dp).padding(bottom=32.dp),
+            verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.documents_choose_source),style=MaterialTheme.typography.headlineSmall,
+                modifier=Modifier.semantics { heading() })
+            Text(stringResource(R.string.documents_choose_source_help),style=MaterialTheme.typography.bodyMedium,color=Muted)
+            Button(onClick={launchProtectedPicker {
+                mediaPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+            }},modifier=Modifier.fillMaxWidth().testTag("documents_choose_media")) {
+                Icon(Icons.Outlined.PermMedia,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.documents_choose_media))
+            }
+            OutlinedButton(onClick={launchProtectedPicker {
+                documentPicker.launch(arrayOf("application/pdf","text/plain","application/msword",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+            }},modifier=Modifier.fillMaxWidth().testTag("documents_choose_document")) {
+                Icon(Icons.Outlined.Description,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.documents_choose_document))
+            }
+            TextButton(onClick={choosingUpload=false},modifier=Modifier.align(Alignment.End)) { Text(stringResource(R.string.cancel)) }
+        }
+    }
 }
 
 @Composable private fun SafetyDocumentCard(file:SafetyDocument,currentUid:String,friends:List<Friend>,onOpen:()->Unit,
@@ -123,7 +150,7 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
                 }
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                Button(onClick=onOpen,modifier=Modifier.weight(1f)) { Icon(Icons.AutoMirrored.Outlined.OpenInNew,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.open)) }
+                Button(onClick=onOpen,modifier=Modifier.weight(1f)) { Icon(Icons.Outlined.Visibility,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.open)) }
                 if(own) OutlinedButton(onClick=onShare,modifier=Modifier.weight(1f)) { Icon(Icons.Outlined.Share,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.share)) }
                 if(own) IconButton(onClick=onDelete) { Icon(Icons.Outlined.Delete,stringResource(R.string.remove)) }
             }
