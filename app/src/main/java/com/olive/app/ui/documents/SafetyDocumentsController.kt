@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 internal data class SafetyDocumentsState(
     val ownerUid:String?=null,
@@ -62,7 +63,7 @@ internal class SafetyDocumentsController(
     fun uploadCaptured(file:File,name:String,mimeType:String,identity:AccountIdentity,fallbackError:String,onComplete:()->Unit) =
         run(refreshAfter=true,fallbackError=fallbackError,onComplete={ file.delete();onComplete() }) {
             val timeout=if(mimeType.startsWith("image/")) PHOTO_UPLOAD_TIMEOUT else VIDEO_UPLOAD_TIMEOUT
-            checkNotNull(withTimeoutOrNull(timeout) {
+            checkNotNull(withTimeoutOrNull(timeout.milliseconds) {
                 checkNotNull(repository).uploadFile(file,name,mimeType,identity)
             }) { fallbackError }
         }

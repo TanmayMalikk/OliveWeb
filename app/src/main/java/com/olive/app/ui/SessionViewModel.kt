@@ -84,7 +84,6 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     val setupUsername get()=runtime.setupUsername
     val setupProfile get()=runtime.setupProfile
     val usesCover get()=runtime.usesCover
-    val unreadMessageCount get()=runtime.unreadMessageCount
     val pendingMessageActionCount get()=runtime.pendingMessageActionCount
     @Volatile var externalFilePickerOpen=false
         private set

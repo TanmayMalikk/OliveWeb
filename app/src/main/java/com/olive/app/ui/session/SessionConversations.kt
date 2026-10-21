@@ -62,7 +62,7 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
                         if(epoch==token && activeConversation?.id==conversation.id) onSent()
                     }
                     catch(error: CancellationException) { throw error }
-                    catch(error: Exception) { if(epoch==token) message=runtime.application.getString(R.string.ui_unable_to_send_the_message) }
+                    catch(_: Exception) { if(epoch==token) message=runtime.application.getString(R.string.ui_unable_to_send_the_message) }
                     finally { if(epoch==token) messagingBusy=false }
                 }
             }
@@ -90,13 +90,7 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
         }
     }
 
-    fun readMessageKey(uid:String,conversationId:String): String {
-        with(runtime) {
-            with(state) {
-                return "read_message_${uid}_$conversationId"
-            }
-        }
-    }
+    fun readMessageKey(uid:String,conversationId:String)="read_message_${uid}_$conversationId"
 
     fun markConversationRead(conversation:ChatConversation) {
         with(runtime) {

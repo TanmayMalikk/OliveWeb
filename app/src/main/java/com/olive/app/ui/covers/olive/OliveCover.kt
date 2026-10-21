@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.OrderLine
+import com.olive.app.data.DeliveryAddress
 
 // Food-cover shell: route tabs and dialogs to focused screens while OliveViewModel owns menu/cart state.
 // UI sizing/color: the cover shell uses Cream, shared Olive colors, safe-area insets, and Material navigation sizing.
@@ -27,7 +28,7 @@ import com.olive.app.data.OrderLine
     configured: Boolean = false,
     session: SessionViewModel? = null,
 ) {
-    val uiText=com.olive.app.ui.rememberResourceText()
+    val uiText=rememberResourceText()
     LaunchedEffect(uiText,vm.dishes) {
         vm.updateSearchLabels(vm.dishes.associate { dish -> dish.id to listOf(
             uiText.dishName(dish),uiText.dishCategory(dish),uiText.dishRestaurant(dish),
@@ -36,7 +37,7 @@ import com.olive.app.data.OrderLine
     }
     var checkoutNotice by remember { mutableStateOf(false) }
     var areaDialog by remember { mutableStateOf(false) }
-    val savedAddress=session?.deliveryAddress ?: com.olive.app.data.DeliveryAddress()
+    val savedAddress=session?.deliveryAddress ?: DeliveryAddress()
     LaunchedEffect(savedAddress) { vm.updateLocation(savedAddress) }
     LaunchedEffect(session?.coverReset) { checkoutNotice=false;areaDialog=false;vm.returnToCover() }
     LaunchedEffect(session?.addressPrompt) { if(session?.addressPrompt==true) areaDialog=true }

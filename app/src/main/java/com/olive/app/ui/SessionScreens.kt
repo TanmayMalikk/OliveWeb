@@ -233,9 +233,8 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         tag.contains("trigger",ignoreCase=true) -> uiText(R.string.a11y_trigger_word)
         else -> uiText(R.string.a11y_password)
     }
-    val accessibleError=error
     OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},
-        modifier=Modifier.fillMaxWidth().testTag(tag).semantics { if(accessibleError!=null) error(accessibleError) }.onFocusChanged { if(it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
+        modifier=Modifier.fillMaxWidth().testTag(tag).semantics { error?.let { error(it) } }.onFocusChanged { if(it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
         enabled=enabled,singleLine=!multiline,minLines=if(multiline) 3 else 1,isError=error!=null,
         supportingText=error?.let { message -> { AccessibleMessage(message,modifier=Modifier.testTag("${tag}_error"),color=MaterialTheme.colorScheme.error) } },
         visualTransformation=if(secret && !secretVisible) PasswordVisualTransformation() else VisualTransformation.None,

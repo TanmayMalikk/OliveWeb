@@ -22,7 +22,6 @@ class CameraViewModel(application:Application):AndroidViewModel(application) {
     private val _error=MutableStateFlow<String?>(null)
     val error=_error.asStateFlow()
     private val _frontFacing=MutableStateFlow(false)
-    val frontFacing=_frontFacing.asStateFlow()
 
     fun bind(owner:LifecycleOwner,preview:PreviewView) {
         viewModelScope.launch {
@@ -70,5 +69,5 @@ class CameraViewModel(application:Application):AndroidViewModel(application) {
     fun stopVideo()=camera.stopVideo()
     fun clearError() { _error.value=null }
     fun leaveCamera() { camera.unbind();_ready.value=false;_recording.value=false;_busy.value=false }
-    override fun onCleared() { camera.release();super.onCleared() }
+    override fun onCleared() { camera.release() }
 }

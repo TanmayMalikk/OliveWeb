@@ -30,10 +30,6 @@ internal data class DeviceCoordinates(val latitude:Double,val longitude:Double,v
 
 // A cancellable, one-off lookup for nearby resources. Coordinates and the result never update the account.
 internal object DeviceLocation {
-    suspend fun coordinates(context:Context):Pair<Double,Double>? {
-        return currentCoordinates(context)?.let { it.latitude to it.longitude }
-    }
-
     suspend fun currentCoordinates(context:Context):DeviceCoordinates? {
         if(ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED &&
             ContextCompat.checkSelfPermission(context,Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED) return null

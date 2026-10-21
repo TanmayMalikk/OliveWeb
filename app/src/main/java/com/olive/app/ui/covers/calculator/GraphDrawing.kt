@@ -2,7 +2,6 @@ package com.olive.app.ui.covers.calculator
 import com.olive.app.ui.*
 
 import android.graphics.Paint
-import androidx.compose.foundation.layout.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
