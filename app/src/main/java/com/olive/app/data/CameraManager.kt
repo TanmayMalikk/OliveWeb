@@ -7,6 +7,7 @@ import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
@@ -32,30 +33,20 @@ class CameraManager(private val context:Context) {
     private var videoCapture:VideoCapture<Recorder>?=null
     private var recording:Recording?=null
 
-    suspend fun bindCamera(lifecycleOwner:LifecycleOwner,previewView:PreviewView,frontFacing:Boolean=false):Unit = suspendCancellableCoroutine { continuation ->
-        val future=ProcessCameraProvider.getInstance(context)
-        continuation.invokeOnCancellation { future.cancel(true) }
-        future.addListener({
-            try {
-                val cameraProvider=future.get()
-                val rotation=previewView.display?.rotation
-                val previewBuilder=Preview.Builder()
-                val imageBuilder=ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                val recorderBuilder=Recorder.Builder().setQualitySelector(QualitySelector.from(Quality.HD))
-                if(rotation!=null) { previewBuilder.setTargetRotation(rotation);imageBuilder.setTargetRotation(rotation) }
-                val preview=previewBuilder.build().also { it.surfaceProvider=previewView.surfaceProvider }
-                imageCapture=imageBuilder.build()
-                videoCapture=VideoCapture.withOutput(recorderBuilder.build())
-                cameraProvider.unbindAll()
-                val selector=if(frontFacing) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
-                cameraProvider.bindToLifecycle(lifecycleOwner,selector,
-                    preview,imageCapture,videoCapture)
-                provider=cameraProvider
-                if(continuation.isActive) continuation.resume(Unit)
-            } catch(error:Exception) {
-                if(continuation.isActive) continuation.resumeWithException(error)
-            }
-        },ContextCompat.getMainExecutor(context))
+    suspend fun bindCamera(lifecycleOwner:LifecycleOwner,previewView:PreviewView,frontFacing:Boolean=false) {
+        val cameraProvider=ProcessCameraProvider.awaitInstance(context)
+        val rotation=previewView.display?.rotation
+        val previewBuilder=Preview.Builder()
+        val imageBuilder=ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+        val recorderBuilder=Recorder.Builder().setQualitySelector(QualitySelector.from(Quality.HD))
+        if(rotation!=null) { previewBuilder.setTargetRotation(rotation);imageBuilder.setTargetRotation(rotation) }
+        val preview=previewBuilder.build().also { it.surfaceProvider=previewView.surfaceProvider }
+        imageCapture=imageBuilder.build()
+        videoCapture=VideoCapture.withOutput(recorderBuilder.build())
+        cameraProvider.unbindAll()
+        val selector=if(frontFacing) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+        cameraProvider.bindToLifecycle(lifecycleOwner,selector,preview,imageCapture,videoCapture)
+        provider=cameraProvider
     }
 
     suspend fun capturePhoto(file:File):File = suspendCancellableCoroutine { continuation ->

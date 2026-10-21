@@ -55,20 +55,16 @@ internal class FriendActions(private val runtime:SessionRuntime) {
 
     fun declineFriendRequest(request: FriendRequest) {
         with(runtime) {
-            with(state) {
-                return messaging.runMessagingAction("Unable to decline this friend request.") { repository,device,_ ->
-                        repository.declineRequest(device.uid,request)
-                    }
+            return messaging.runMessagingAction("Unable to decline this friend request.") { repository,device,_ ->
+                repository.declineRequest(device.uid,request)
             }
         }
     }
 
     fun cancelFriendRequest(request: FriendRequest) {
         with(runtime) {
-            with(state) {
-                return messaging.runMessagingAction("Unable to cancel this friend request.") { repository,device,_ ->
-                        repository.cancelRequest(device.uid,request)
-                    }
+            return messaging.runMessagingAction("Unable to cancel this friend request.") { repository,device,_ ->
+                repository.cancelRequest(device.uid,request)
             }
         }
     }

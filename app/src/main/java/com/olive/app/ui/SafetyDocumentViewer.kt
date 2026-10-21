@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.core.graphics.createBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -126,7 +127,7 @@ private fun renderPdfPage(file:File,index:Int):PdfPage {
             val safeIndex=index.coerceIn(0,(renderer.pageCount-1).coerceAtLeast(0))
             renderer.openPage(safeIndex).use { page ->
                 val ratio=(1600f/page.width).coerceAtMost(2f)
-                val bitmap=Bitmap.createBitmap((page.width*ratio).toInt(),(page.height*ratio).toInt(),Bitmap.Config.ARGB_8888)
+                val bitmap=createBitmap((page.width*ratio).toInt(),(page.height*ratio).toInt())
                 bitmap.eraseColor(android.graphics.Color.WHITE)
                 page.render(bitmap,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                 return PdfPage(bitmap,renderer.pageCount)

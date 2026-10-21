@@ -33,10 +33,13 @@ class SafetyPlanSyncWorker(context:Context,parameters:WorkerParameters):Coroutin
         } catch(_:TimeoutCancellationException) { Result.retry() }
         catch(cancelled:CancellationException) { throw cancelled }
         catch(error:FirebaseFunctionsException) {
-            if(error.code==FirebaseFunctionsException.Code.PERMISSION_DENIED && actor!=owner) {
-                SafetyPlanStore(applicationContext,false).remove(actor,owner);Result.success()
-            } else if(error.code in setOf(FirebaseFunctionsException.Code.INVALID_ARGUMENT,FirebaseFunctionsException.Code.NOT_FOUND)) Result.failure()
-            else Result.retry()
+            when {
+                error.code==FirebaseFunctionsException.Code.PERMISSION_DENIED && actor!=owner -> {
+                    SafetyPlanStore(applicationContext,false).remove(actor,owner);Result.success()
+                }
+                error.code in setOf(FirebaseFunctionsException.Code.INVALID_ARGUMENT,FirebaseFunctionsException.Code.NOT_FOUND) -> Result.failure()
+                else -> Result.retry()
+            }
         } catch(_:Exception) { Result.retry() }
     }
     companion object {

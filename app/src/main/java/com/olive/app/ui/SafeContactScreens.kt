@@ -39,7 +39,7 @@ import com.olive.app.ui.LocalizedIcon as Icon
     AnimatedContent(session.page,label="safe contact page",
         transitionSpec={fadeIn(tween(180)).togetherWith(fadeOut(tween(120)))}) { page ->
         when(page) {
-            SafePage.Home -> SafeContactHome(session,profile)
+            SafePage.Home -> SafeContactHome(session)
             SafePage.Messages -> MessagesScreen(session)
             SafePage.Notes -> PrivateNotes(session)
             SafePage.Profile -> SafeContactProfile(session,profile)
@@ -48,13 +48,13 @@ import com.olive.app.ui.LocalizedIcon as Icon
             SafePage.SafetyPlan -> SafeContactSafetyPlansScreen(session)
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
-            else -> SafeContactHome(session,profile)
+            else -> SafeContactHome(session)
         }
     }
     if(session.viewedSharedEntry!=null) SharedEntryViewer(session)
 }
 
-@Composable private fun SafeContactHome(session:SessionViewModel,profile:UserProfile) {
+@Composable private fun SafeContactHome(session:SessionViewModel) {
     val uiText=rememberResourceText()
     FormColumn {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Top) {

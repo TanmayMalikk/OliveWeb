@@ -12,6 +12,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 internal data class LocationMapConfiguration(
     val identity:AccountIdentity,
@@ -86,7 +88,7 @@ internal class LocationMapController(
                         state=state.copy(ownPoint=MapLocationPoint(uid,configuration.youLabel,fix.latitude,fix.longitude,
                             fix.timestamp,true,fix.accuracy,trail=trail.takeLast(MAX_TRAIL_POINTS)))
                     } }
-                    delay(MAP_LOCATION_REFRESH_MILLIS)
+                    delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
                 }
             } else if(configuration.profile.role==AccountRole.SAFE_CONTACT) {
                 val coordinates=GeoapifyClient.coordinates(configuration.profile.address)
@@ -133,7 +135,7 @@ internal class LocationMapController(
                 val startedAt=System.currentTimeMillis()
                 val key=checkNotNull(checkNotNull(repository).setLiveRecipients(configuration.identity.uid,recipients))
                 LiveLocationController.start(applicationContext,configuration.identity.uid,configuration.profile.fullName,state.selected,end,key)
-                withTimeout(20_000L) { LiveLocationState.current.filterNotNull()
+                withTimeout(20.seconds) { LiveLocationState.current.filterNotNull()
                     .first { it.uid==configuration.identity.uid && it.updatedAt>=startedAt } }
                 state=state.copy(working=false,liveActive=true,expiresAt=end)
                 watchExpiry()
@@ -169,7 +171,7 @@ internal class LocationMapController(
         expiryJob=scope.launch {
             while(state.liveActive && isActive) {
                 if(state.expiresAt<=System.currentTimeMillis()) state=state.copy(liveActive=false)
-                delay(1_000L)
+                delay(1.seconds)
             }
         }
     }

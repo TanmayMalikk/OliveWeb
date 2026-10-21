@@ -45,7 +45,7 @@ internal object GeoapifyClient {
         val address=DeliveryAddress(line1=line1.take(160),city=city.take(160),province=row.optString("state_code").ifBlank { row.optString("state") }.take(160),
             postalCode=row.optString("postcode").take(160),country=row.optString("country").ifBlank { "Canada" }.take(160),latitude=lat,longitude=lon)
         val formatted=row.optString("formatted").ifBlank { listOf(line1,city,address.province).filter(String::isNotBlank).joinToString(", ") }
-        val primary=if(line1.isNotBlank()) line1 else city.ifBlank { formatted.substringBefore(',') }
+        val primary=line1.ifBlank { city.ifBlank { formatted.substringBefore(',') } }
         return AddressSuggestion(row.optString("place_id",formatted),primary,formatted.removePrefix(primary).trimStart(',', ' '),address)
     }
 

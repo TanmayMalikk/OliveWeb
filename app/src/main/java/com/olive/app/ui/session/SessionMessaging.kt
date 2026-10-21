@@ -94,7 +94,7 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                         check(identity.uid==device.uid) { "This device is linked to an older account. Sign out, then sign in again." }
                         connected=true;messagingNeedsReconnect=false
                     } catch(error: CancellationException) { throw error }
-                    catch(error: Exception) {
+                    catch(_: Exception) {
                         if(epoch==token) {
                             messagingNeedsReconnect=true
                             message=runtime.application.getString(R.string.ui_could_not_reconnect_check_your_password_and_try_again)
@@ -178,16 +178,14 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
 
     suspend fun registerMessagingIdentity(identity:AccountIdentity) {
         with(runtime) {
-            with(state) {
-                val publicKey=withContext(Dispatchers.Default) { KeyManager.getOrCreatePublicKey() }
-                val marker=messagingIdentityMarker(identity,publicKey.encoded)
-                val savedMarker=cloudState.getString("registered_identity",null)
-                if(verifiedMessagingIdentityMarker==marker &&
-                    !shouldRegisterMessagingIdentity(savedMarker,identity,publicKey.encoded)) return
-                messagingRepository?.registerUser(identity,publicKey)
-                cloudState.edit { putString("registered_identity",marker) }
-                verifiedMessagingIdentityMarker=marker
-            }
+            val publicKey=withContext(Dispatchers.Default) { KeyManager.getOrCreatePublicKey() }
+            val marker=messagingIdentityMarker(identity,publicKey.encoded)
+            val savedMarker=cloudState.getString("registered_identity",null)
+            if(verifiedMessagingIdentityMarker==marker &&
+                !shouldRegisterMessagingIdentity(savedMarker,identity,publicKey.encoded)) return
+            messagingRepository?.registerUser(identity,publicKey)
+            cloudState.edit { putString("registered_identity",marker) }
+            verifiedMessagingIdentityMarker=marker
         }
     }
 

@@ -8,6 +8,7 @@ import com.olive.app.ui.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.seconds
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
 internal class SessionSafetyPlans(private val runtime:SessionRuntime) {
@@ -71,20 +72,21 @@ internal class SessionSafetyPlans(private val runtime:SessionRuntime) {
     fun shareWithContacts(friends:List<Friend>) {
         if(!authorized() || runtime.state.accountRole!=AccountRole.USER || runtime.localMode || friends.size>10) return
         val draft=plan ?: return
-        val actor=runtime.coverAccountId;val token=generation
+        val actor=runtime.coverAccountId ?: return
+        val token=generation
         saving++;error=null
         runtime.scope.launch {
             try {
                 repository.sync(draft)
                 val updated=repository.shareContacts(friends)
-                if(current(checkNotNull(actor),checkNotNull(actor),token)) {
+                if(current(actor,actor,token)) {
                     plan=updated
                     error=null
-                    withContext(Dispatchers.IO) { store.write(checkNotNull(actor),checkNotNull(actor),updated) }
+                    withContext(Dispatchers.IO) { store.write(actor,actor,updated) }
                 }
             } catch(cancelled:CancellationException) { throw cancelled }
-            catch(_:Exception) { if(actor!=null && current(actor,actor,token)) error=R.string.safety_sync_error }
-            finally { if(actor!=null && current(actor,actor,token)) saving=(saving-1).coerceAtLeast(0) }
+            catch(_:Exception) { if(current(actor,actor,token)) error=R.string.safety_sync_error }
+            finally { if(current(actor,actor,token)) saving=(saving-1).coerceAtLeast(0) }
         }
     }
     fun refreshSharedPlans() {
@@ -128,7 +130,7 @@ internal class SessionSafetyPlans(private val runtime:SessionRuntime) {
         val token=generation
         try {
             if(!runtime.localMode && hasSafetyConnection(runtime.application)) {
-                withTimeout(35_000) { withContext(Dispatchers.IO) { syncSafetyPlan(store,repository,actor,owner) } }
+                withTimeout(35.seconds) { withContext(Dispatchers.IO) { syncSafetyPlan(store,repository,actor,owner) } }
             }
             val saved=withContext(Dispatchers.IO) { store.read(actor,owner) }
             if(current(actor,owner,token) && saving==0) { plan=saved;error=null }
@@ -144,13 +146,13 @@ internal class SessionSafetyPlans(private val runtime:SessionRuntime) {
     }
     suspend fun refreshConsultations() {
         if(!authorized() || runtime.state.accountRole!=AccountRole.STAFF || runtime.localMode) return
-        val actor=runtime.coverAccountId
+        val actor=runtime.coverAccountId ?: return
         try {
-            val cached=withContext(Dispatchers.IO) { store.all(checkNotNull(actor)) }
+            val cached=withContext(Dispatchers.IO) { store.all(actor) }
             if(authorized() && actor==runtime.coverAccountId) consultations=cached.map { SafetyConsultation(it.ownerUid,it.ownerName) }
             if(!hasSafetyConnection(runtime.application)) return
             val result=repository.consultations()
-            withContext(Dispatchers.IO) { cached.filter { old -> result.second.none { it.ownerUid==old.ownerUid } }.forEach { store.remove(checkNotNull(actor),it.ownerUid) } }
+            withContext(Dispatchers.IO) { cached.filter { old -> result.second.none { it.ownerUid==old.ownerUid } }.forEach { store.remove(actor,it.ownerUid) } }
             if(authorized() && actor==runtime.coverAccountId) { available=result.first;consultations=result.second;error=null }
         } catch(cancelled:CancellationException) { throw cancelled }
         catch(_:Exception) { if(authorized() && actor==runtime.coverAccountId) error=R.string.safety_sync_error }

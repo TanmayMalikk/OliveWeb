@@ -30,6 +30,7 @@ import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.seconds
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable internal fun InteractiveLocationMap(points:List<MapLocationPoint>,modifier:Modifier=Modifier,
@@ -43,7 +44,7 @@ import kotlin.math.roundToInt
     val followTargetUid=points.firstOrNull { it.live || it.lastKnown }?.uid ?: ownPointUid
 
     LaunchedEffect(attempt) {
-        delay(15_000)
+        delay(15.seconds)
         if(loadState==MapLoadState.Loading) loadState=MapLoadState.Error
     }
 

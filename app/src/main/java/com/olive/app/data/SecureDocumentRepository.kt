@@ -74,14 +74,14 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
      */
     suspend fun revokeAccessToEntry(entryId: String, recipientUid: String) {
         firestore.collection("privateEntries").document(entryId).update(
-            "wrappedKeys.${recipientUid}", com.google.firebase.firestore.FieldValue.delete(),
-            "allowedUsers", com.google.firebase.firestore.FieldValue.arrayRemove(recipientUid),
+            "wrappedKeys.${recipientUid}", FieldValue.delete(),
+            "allowedUsers", FieldValue.arrayRemove(recipientUid),
             "updatedAt", FieldValue.serverTimestamp()
         ).await()
     }
 
     /**
-     * Grants a new recipient access to an existing encrypted entry.
+     * Grants access to an existing encrypted entry for a new recipient.
      * Extracts the AES key using the owner's private key, wraps it for the recipient, and updates Firestore.
      */
     suspend fun grantAccessToEntry(
