@@ -47,6 +47,7 @@ import com.olive.app.ui.LocalizedIcon as Icon
             SafePage.Location -> LocationMapScreen(session)
             SafePage.SafetyPlan -> SafeContactSafetyPlansScreen(session)
             SafePage.Documents -> SafetyDocumentsScreen(session)
+            SafePage.Camera -> CameraScreen(session)
             else -> SafeContactHome(session,profile)
         }
     }
@@ -63,8 +64,14 @@ import com.olive.app.ui.LocalizedIcon as Icon
                     modifier=Modifier.semantics { heading() })
                 Text(stringResource(R.string.safe_contact_home_help),color=Muted)
             }
-            IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.testTag("safe_contact_settings")) {
-                Icon(Icons.Outlined.Settings,uiText(R.string.account_settings))
+            Row {
+                IconButton(onClick={session.navigate(SafePage.Camera)},enabled=!session.localMode,
+                    modifier=Modifier.testTag("safe_contact_camera")) {
+                    Icon(Icons.Outlined.PhotoCamera,stringResource(R.string.camera_title))
+                }
+                IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.testTag("safe_contact_settings")) {
+                    Icon(Icons.Outlined.Settings,uiText(R.string.account_settings))
+                }
             }
         }
         ModeNotice(session)

@@ -1,7 +1,5 @@
 package com.olive.app.ui
 
-import android.content.ActivityNotFoundException
-import android.content.Intent
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
@@ -26,6 +24,7 @@ import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.NorthEast
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -46,7 +44,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import androidx.core.content.FileProvider
+import com.olive.app.data.SafetyDocument
+import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
@@ -56,6 +55,7 @@ import androidx.core.content.FileProvider
     val active=session.activeConversation ?: return
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
+    var openedMedia by remember { mutableStateOf<Pair<SafetyDocument,File>?>(null) }
     val listState=rememberLazyListState()
     val imeBottom=WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible=imeBottom>0
@@ -67,6 +67,10 @@ import androidx.core.content.FileProvider
             delay(120.milliseconds)
             listState.animateScrollToItem(session.chatMessages.lastIndex)
         }
+    }
+    openedMedia?.let { (document,file) ->
+        SafetyDocumentViewer(document,file) { file.delete();openedMedia=null }
+        return
     }
     Box(modifier) {
     Column(Modifier.fillMaxSize().padding(start=20.dp,end=20.dp,top=12.dp)) {
@@ -98,7 +102,7 @@ import androidx.core.content.FileProvider
                             Column(Modifier.weight(1f)) {
                                 Text(if(mine) session.coverUsername else chat.senderUsername,style=MaterialTheme.typography.labelSmall,
                                     color=if(mine) Color.White.copy(alpha=.78f) else Muted)
-                                ChatMessageBody(chat,session,mine)
+                                ChatMessageBody(chat,session,mine) { document,file -> openedMedia=document to file }
                                 if(chat.sentAt>0) Text(DateTimeFormatter.ofPattern(uiText(R.string.ui_mmm_d_hh_mm)).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(chat.sentAt)),
                                     style=MaterialTheme.typography.labelSmall,color=if(mine) Color.White.copy(alpha=.7f) else Muted)
                             }
@@ -159,10 +163,23 @@ import androidx.core.content.FileProvider
     }
 }
 
-@Composable private fun ChatMessageBody(chat:com.olive.app.data.ChatMessage,session:SessionViewModel,mine:Boolean) {
+@Composable private fun ChatMessageBody(chat:com.olive.app.data.ChatMessage,session:SessionViewModel,mine:Boolean,
+    onOpenMedia:(SafetyDocument,File)->Unit) {
     val parts=chat.body.split(":",limit=3)
     if(!chat.unsent && parts.firstOrNull()=="SHARED_MEDIA" && parts.size>=2) {
-        SharedMediaMessage(parts[1],parts.getOrNull(2).orEmpty(),session,mine)
+        SharedMediaMessage(parts[1],parts.getOrNull(2).orEmpty(),session,mine,onOpenMedia)
+        return
+    }
+    if(!chat.unsent && parts.firstOrNull()=="SHARED_LOCATION") {
+        Surface(onClick={session.navigate(SafePage.Location)},shape=MaterialTheme.shapes.medium,
+            color=if(mine) Color.White.copy(alpha=.2f) else Color.Black.copy(alpha=.05f),
+            modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).testTag("shared_live_location")) {
+            Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.LocationOn,stringResource(R.string.shared_live_location))
+                Column { Text(stringResource(R.string.shared_live_location),style=MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.open_location_map),fontWeight=androidx.compose.ui.text.font.FontWeight.Bold) }
+            }
+        }
         return
     }
     val shared=parts.firstOrNull() in setOf("SHARED_NOTE","SHARED_INCIDENT") && parts.size>=2
@@ -191,22 +208,14 @@ import androidx.core.content.FileProvider
     }
 }
 
-@Composable private fun SharedMediaMessage(id:String,name:String,session:SessionViewModel,mine:Boolean) {
-    val context=LocalContext.current
+@Composable private fun SharedMediaMessage(id:String,name:String,session:SessionViewModel,mine:Boolean,
+    onOpen:(SafetyDocument,File)->Unit) {
     var opening by remember(id) { mutableStateOf(false) }
-    val openFailed=stringResource(R.string.documents_open_failed)
-    val noViewer=stringResource(R.string.documents_no_viewer)
     Surface(onClick={
         val uid=session.coverAccountId ?: return@Surface
         if(opening) return@Surface
         opening=true
-        session.documents.openShared(uid,id,{ document,local ->
-            runCatching {
-                val uri=FileProvider.getUriForFile(context,"${context.packageName}.documents",local)
-                context.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri,document.mimeType)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
-            }.onFailure { failure -> session.error(if(failure is ActivityNotFoundException) noViewer else openFailed) }
-        },{ opening=false })
+        session.documents.openShared(uid,id,{ document,local -> onOpen(document,local) },{ opening=false })
     },enabled=!opening,shape=MaterialTheme.shapes.medium,
         color=if(mine) Color.White.copy(alpha=.2f) else Color.Black.copy(alpha=.05f),
         modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).testTag("shared_media_$id")) {

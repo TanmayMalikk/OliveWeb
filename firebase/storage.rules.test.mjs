@@ -1,5 +1,5 @@
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { ref, uploadString, getBytes, deleteObject } from 'firebase/storage';
+import { ref, uploadString, getBytes, deleteObject, updateMetadata } from 'firebase/storage';
 import { doc, setDoc } from 'firebase/firestore';
 import { readFile } from 'node:fs/promises';
 import { before, after, test } from 'node:test';
@@ -73,7 +73,7 @@ test('private notes and incident records belong only to their account', async ()
   await assertSucceeds(deleteObject(ref(owner, path)));
 });
 
-test('media files follow Firestore sharing metadata', async () => {
+test('media files follow protected object sharing metadata', async () => {
   const path = 'users/media-alice/media/storage-media-1';
   await env.withSecurityRulesDisabled(async context => {
     await setDoc(doc(context.firestore(), 'files/storage-media-1'), {
@@ -86,12 +86,25 @@ test('media files follow Firestore sharing metadata', async () => {
   const bob = env.authenticatedContext('media-bob').storage();
   const charlie = env.authenticatedContext('media-charlie').storage();
   const anonymous = env.unauthenticatedContext().storage();
-  await assertSucceeds(uploadString(ref(alice, path), 'private media'));
+  await assertSucceeds(uploadString(ref(alice, path), 'private media', 'raw', {
+    customMetadata: {'access_media-alice':'true','access_media-bob':'true'},
+  }));
   await assertSucceeds(getBytes(ref(alice, path)));
   await assertSucceeds(getBytes(ref(bob, path)));
   await assertFails(getBytes(ref(charlie, path)));
   await assertFails(getBytes(ref(anonymous, path)));
   await assertFails(uploadString(ref(bob, path), 'replacement'));
+  await assertFails(updateMetadata(ref(bob,path),{customMetadata:{'access_media-charlie':'true'}}));
   await assertFails(deleteObject(ref(bob, path)));
   await assertSucceeds(deleteObject(ref(alice, path)));
+});
+
+test('media owners can read their own object before sharing metadata is available', async () => {
+  const path = 'users/private-owner/media/private-media-1';
+  const owner = env.authenticatedContext('private-owner').storage();
+  const other = env.authenticatedContext('another-user').storage();
+  await assertSucceeds(uploadString(ref(owner, path), 'private media'));
+  await assertSucceeds(getBytes(ref(owner, path)));
+  await assertFails(getBytes(ref(other, path)));
+  await assertSucceeds(deleteObject(ref(owner, path)));
 });

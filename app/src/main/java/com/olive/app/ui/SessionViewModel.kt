@@ -86,6 +86,8 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     val usesCover get()=runtime.usesCover
     val unreadMessageCount get()=runtime.unreadMessageCount
     val pendingMessageActionCount get()=runtime.pendingMessageActionCount
+    @Volatile var externalFilePickerOpen=false
+        private set
 
     init { runtime.auth.load() }
 
@@ -104,6 +106,8 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun submitCalculatorPin(pin: String) = runtime.access.submitCalculatorPin(pin)
     fun quickExit() = runtime.navigation.quickExit()
     fun background() = runtime.navigation.background()
+    fun beginExternalFilePicker() { externalFilePickerOpen=true }
+    fun endExternalFilePicker() { externalFilePickerOpen=false }
     fun back() = runtime.navigation.back()
     fun saveProvisionedTrigger(trigger:String) = runtime.auth.saveProvisionedTrigger(trigger)
     fun saveOrganizationProfile(fullName:String,dob:String,email:String,phone:String) = runtime.organization.saveOrganizationProfile(fullName,dob,email,phone)
@@ -127,6 +131,8 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
     fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
     fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
+    fun shareLiveLocationInChat(durationMillis:Long,requestPermission:suspend ()->Boolean) =
+        runtime.secureSharing.shareLiveLocation(durationMillis,locationMap,requestPermission)
     fun openSharedPrivateEntry(entryId:String) = runtime.secureSharing.open(entryId)
     fun closeSharedPrivateEntry() = runtime.secureSharing.close()
     fun noteInteraction() = runtime.privacy.noteInteraction()

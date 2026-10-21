@@ -346,6 +346,10 @@ service cloud.firestore {
           || (!resource.data.keys().hasAny(['roomKeys','participantPublicKeys'])
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roomKeys','participantPublicKeys','updatedAt'])
             && validConversationKeys(request.resource.data))
+          || (resource.data.keys().hasAll(['roomKeys','participantPublicKeys'])
+            && resource.data.participantPublicKeys != request.resource.data.participantPublicKeys
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roomKeys','participantPublicKeys','updatedAt'])
+            && validConversationKeys(request.resource.data))
         );
       allow delete: if false;
 

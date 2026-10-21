@@ -118,10 +118,16 @@ internal class LocationMapController(
     fun startSharing(configuration:LocationMapConfiguration,durationMillis:Long,requestPermission:suspend ()->Boolean,
         permissionError:String,startError:String) {
         val recipients=configuration.friends.filter { it.uid in state.selected }
+        startSharingWith(configuration,recipients,durationMillis,requestPermission,permissionError,startError)
+    }
+
+    fun startSharingWith(configuration:LocationMapConfiguration,recipients:List<Friend>,durationMillis:Long,
+        requestPermission:suspend ()->Boolean,permissionError:String,startError:String,
+        onError:(String)->Unit = {}) {
         if(configuration.localMode || recipients.isEmpty() || state.working) return
         scope.launch {
-            state=state.copy(working=true,error=null)
-            if(!requestPermission()) state=state.copy(working=false,error=permissionError)
+            state=state.copy(working=true,error=null,selected=recipients.mapTo(mutableSetOf()) { it.uid })
+            if(!requestPermission()) { state=state.copy(working=false,error=permissionError);onError(permissionError) }
             else try {
                 val end=System.currentTimeMillis()+durationMillis
                 val startedAt=System.currentTimeMillis()
@@ -134,7 +140,8 @@ internal class LocationMapController(
             } catch(failure:Exception) {
                 LiveLocationController.stop(applicationContext)
                 runCatching { repository?.setLiveRecipients(configuration.identity.uid,emptyList()) }
-                state=state.copy(working=false,error=failure.localizedMessage ?: startError)
+                val text=failure.localizedMessage ?: startError
+                state=state.copy(working=false,error=text);onError(text)
             }
         }
     }

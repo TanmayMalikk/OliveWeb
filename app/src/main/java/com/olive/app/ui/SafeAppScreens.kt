@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
         SafePage.Hotlines -> SafeResourcesScreen(session,profile)
         SafePage.SafetyPlan -> SafetyPlanScreen(session)
         SafePage.Documents -> SafetyDocumentsScreen(session)
+        SafePage.Camera -> CameraScreen(session)
         SafePage.Location -> LocationMapScreen(session)
     } }
     if(session.viewedSharedEntry!=null) SharedEntryViewer(session)
