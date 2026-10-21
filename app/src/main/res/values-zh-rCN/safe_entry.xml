@@ -20,8 +20,7 @@
     <string name="entry_use_phone_lock">使用手机屏幕锁定</string>
     <string name="entry_auth_failed">无法验证 Android 身份认证。访问仍被锁定。请重试，或登录以重新设置安全进入方式。</string>
     <string name="entry_auth_cancelled">身份认证已取消或不可用。访问仍被锁定。</string>
-    <string name="entry_settings_device">此设备使用 Android 设备锁。请在 Android 设置中管理指纹、人脸识别和屏幕锁定。</string>
-    <string name="entry_verify_trigger">通过设备锁确认身份以更改触发词。</string>
+<string name="entry_verify_trigger">通过设备锁确认身份以更改触发词。</string>
     <string name="entry_invalid_trigger">请选择 3 至 64 个字符的触发词或短语。</string>
     <string name="entry_calculator_help">要进入安全区域，请输入应用 PIN 码（使用设备锁时可输入任意 4 至 6 位数字），然后点按两次等号。设备锁仍需 Android 身份认证。</string>
 </resources>

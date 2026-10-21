@@ -20,8 +20,7 @@
     <string name="entry_use_phone_lock">Use phone screen lock</string>
     <string name="entry_auth_failed">Android authentication could not be verified. Access remains locked. Try again, or sign in to set up safe entry again.</string>
     <string name="entry_auth_cancelled">Authentication was cancelled or unavailable. Access remains locked.</string>
-    <string name="entry_settings_device">This device uses Android device lock. Manage its fingerprint, face recognition and screen lock in Android Settings.</string>
-    <string name="entry_verify_trigger">Confirm with device lock to change your trigger word.</string>
+<string name="entry_verify_trigger">Confirm with device lock to change your trigger word.</string>
     <string name="entry_invalid_trigger">Choose a trigger word or phrase of 3–64 characters.</string>
     <string name="entry_calculator_help">For safe entry, enter your app PIN (or any 4–6 digits when using Device lock), then tap equals twice. Device lock still requires Android authentication.</string>
 </resources>

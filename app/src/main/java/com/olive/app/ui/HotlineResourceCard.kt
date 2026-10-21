@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.HotlineResource
+import com.olive.app.data.HotlineResourceKind
 import com.olive.app.data.hotlineDialNumber
 
 @Composable internal fun HotlineResourceCard(resource:HotlineResource,onOpen:(String,Boolean)->Unit) {
@@ -25,7 +26,10 @@ import com.olive.app.data.hotlineDialNumber
         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Column(Modifier.semantics(mergeDescendants=true) {},verticalArrangement=Arrangement.spacedBy(6.dp)) {
                 Text(resource.name,style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
-                Text(if(resource.city.isNotBlank()) resource.city else hotlineRegionName(resource.region),color=OliveGreen,style=MaterialTheme.typography.labelLarge)
+                Text(stringResource(if(resource.kind==HotlineResourceKind.Hotline) R.string.support_resource_hotline else R.string.support_resource_shelter),
+                    color=OliveGreen,style=MaterialTheme.typography.labelLarge)
+                Text("${resource.city}, ${hotlineRegionName(resource.region)}",style=MaterialTheme.typography.bodySmall,color=Muted)
+                Text(resource.description,style=MaterialTheme.typography.bodyMedium)
                 Text(resource.phone,style=MaterialTheme.typography.headlineSmall)
             }
             FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {

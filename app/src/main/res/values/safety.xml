@@ -25,9 +25,7 @@
     <string name="safety_essentials">Essential items and documents</string>
     <string name="safety_dependants">Children, dependants and pets</string>
     <string name="safety_aftercare">After leaving</string>
-    <string name="safety_documents_intro">Keep photos, videos and pictures of documents here. Storage and uploads are coming soon; no files are collected yet.</string>
-    <string name="safety_upload">Upload files</string>
-    <string name="safety_inbox">Safety-plan consultations</string>
+<string name="safety_inbox">Safety-plan consultations</string>
     <string name="safety_inbox_empty">No safety plans are currently shared with you.</string>
     <string name="safety_available">Available for new consultations</string>
     <string name="safety_staff_intro">View and edit plans shared with you.</string>
@@ -37,8 +35,7 @@
     <string name="safety_source">Planning guidance: Public Health Agency of Canada. Adapt these prompts with someone you trust.</string>
     <string name="safety_upload_document">Upload Document</string>
     <string name="safety_upload_for">Upload document: %1$s. Coming soon.</string>
-    <string name="safety_upload_soon">Coming soon. Uploads from your safety plan will also appear here.</string>
-    <string name="safety_storage_photos">Photos</string>
+<string name="safety_storage_photos">Photos</string>
     <string name="safety_storage_videos">Videos</string>
     <string name="safety_storage_documents">Document images</string>
     <string name="safety_document_upload_hint">Uploads are coming soon. Uploaded files will also appear in Documents.</string>

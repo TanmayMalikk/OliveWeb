@@ -19,7 +19,7 @@ service cloud.firestore {
 
     function contactAt(c, i) {
 
-      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay'])
+      return c.size() <= i || (c[i] is map && c[i].keys().hasOnly(['id','name','phone','details','safeToStay','linkedUid'])
 
         && c[i].id is string && c[i].id.size() <= 64
 
@@ -29,6 +29,8 @@ service cloud.firestore {
 
         && (!('safeToStay' in c[i]) || c[i].safeToStay is bool)
 
+        && (!('linkedUid' in c[i]) || (c[i].linkedUid is string && c[i].linkedUid.size() <= 128))
+
         && c[i].details is string && c[i].details.size() > 0 && c[i].details.size() <= 200);
 
     }
@@ -37,7 +39,7 @@ service cloud.firestore {
 
       return a is map && a.keys().hasAll(['line1','line2','city','province','postalCode','country'])
 
-        && a.keys().hasOnly(['line1','line2','city','province','postalCode','country'])
+        && a.keys().hasOnly(['line1','line2','city','province','postalCode','country','latitude','longitude'])
 
         && a.line1 is string && a.line1.size() <= 160
 
@@ -49,7 +51,11 @@ service cloud.firestore {
 
         && a.postalCode is string && a.postalCode.size() <= 160
 
-        && a.country is string && a.country.size() <= 160;
+        && a.country is string && a.country.size() <= 160
+
+        && (!('latitude' in a) || (a.latitude is number && a.latitude >= -90 && a.latitude <= 90))
+
+        && (!('longitude' in a) || (a.longitude is number && a.longitude >= -180 && a.longitude <= 180));
 
     }
 
@@ -258,6 +264,43 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Safe contacts explicitly share only their saved onboarding location with individual accepted friends.
+    match /sharedLocations/{ownerUid}/recipients/{recipientUid} {
+      function validSharedLocation(data) {
+          return data.keys().hasOnly(['ownerUid','recipientUid','friendshipId','ciphertext','wrappedKey','updatedAt'])
+          && data.ownerUid == ownerUid && data.recipientUid == recipientUid && ownerUid != recipientUid
+          && data.friendshipId is string
+          && exists(/databases/$(database)/documents/friendships/$(data.friendshipId))
+          && ownerUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+          && recipientUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+            && data.ciphertext is string && data.ciphertext.size() > 0 && data.ciphertext.size() <= 4000
+            && data.wrappedKey is string && data.wrappedKey.size() > 0 && data.wrappedKey.size() <= 1000
+          && data.updatedAt is timestamp;
+      }
+      allow get: if signedIn() && (request.auth.uid == ownerUid || request.auth.uid == recipientUid);
+      allow list: if owner(ownerUid);
+      allow create, update: if owner(ownerUid) && validSharedLocation(request.resource.data);
+      allow delete: if owner(ownerUid);
+    }
+
+    // Presence records let an authorized contact begin listening before the first live coordinate arrives.
+    match /liveLocationShares/{ownerUid}/recipients/{recipientUid} {
+      function validLiveShare(data) {
+          return data.keys().hasOnly(['ownerUid','recipientUid','friendshipId','wrappedKey','createdAt'])
+          && data.ownerUid == ownerUid && data.recipientUid == recipientUid && ownerUid != recipientUid
+          && data.friendshipId is string
+          && exists(/databases/$(database)/documents/friendships/$(data.friendshipId))
+          && ownerUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+          && recipientUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+            && data.wrappedKey is string && data.wrappedKey.size() > 0 && data.wrappedKey.size() <= 1000
+          && data.createdAt is timestamp;
+      }
+      allow get: if signedIn() && (request.auth.uid == ownerUid || request.auth.uid == recipientUid);
+      allow list: if owner(ownerUid);
+      allow create, update: if owner(ownerUid) && validLiveShare(request.resource.data);
+      allow delete: if owner(ownerUid);
+    }
+
     function conversationParticipant(data) {
       return signedIn() && data.participantIds is list && request.auth.uid in data.participantIds;
     }
@@ -290,9 +333,11 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
-      allow get: if signedIn()
-        && request.auth.uid in get(/databases/$(database)/documents/friendships/$(conversationId)).data.participantIds;
-      allow list: if false;
+      // Collection listeners must constrain participantIds to the authenticated UID.
+      // Firestore rejects unfiltered and other-user queries because it cannot prove this predicate.
+      allow get: if conversationParticipant(resource.data);
+      allow list: if signedIn()
+        && request.auth.uid in resource.data.participantIds;
       allow create: if conversationParticipant(request.resource.data) && validConversation(request.resource.data,conversationId);
       allow update: if conversationParticipant(resource.data)
         && validConversation(request.resource.data,conversationId)
@@ -314,10 +359,9 @@ service cloud.firestore {
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderUsername is string
           && validMessagingEmail(request.resource.data.senderUsername)
-          && ((request.resource.data.body is string && request.resource.data.body.size() > 0
-              && request.resource.data.body.size() <= 2000 && !request.resource.data.keys().hasAny(['ciphertext']))
-            || (request.resource.data.ciphertext is string && request.resource.data.ciphertext.size() > 0
-              && request.resource.data.ciphertext.size() <= 12000 && !request.resource.data.keys().hasAny(['body'])))
+            && request.resource.data.ciphertext is string && request.resource.data.ciphertext.size() > 0
+            && request.resource.data.ciphertext.size() <= 12000
+            && !request.resource.data.keys().hasAny(['body'])
           && request.resource.data.deleted == false
           && request.resource.data.clientSentAt is int;
         allow update: if conversationParticipant(parentConversation())

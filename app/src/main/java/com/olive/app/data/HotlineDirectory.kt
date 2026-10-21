@@ -5,21 +5,37 @@ import java.net.URI
 import java.text.Normalizer
 import java.util.Locale
 
-// Provider facts live in a source-attributed asset, separate from localized interface copy.
-data class HotlineResource(val id:String,val region:String,val city:String,val name:String,
-    val phone:String,val website:String,val source:String,val phoneUri:String)
+enum class HotlineResourceKind { Hotline, Shelter }
 
-class HotlineDirectory private constructor(val checkedOn:String,val resources:List<HotlineResource>,
-    private val cities:Map<String,String>,private val provinceAliases:Map<String,String>) {
+data class HotlineResource(
+    val id:String,
+    val region:String,
+    val city:String,
+    val name:String,
+    val description:String,
+    val kind:HotlineResourceKind,
+    val phone:String,
+    val website:String,
+    val source:String,
+    val phoneUri:String,
+)
+
+/** Searchable view of Lars's province-specific hotline and shelter datasets. */
+class HotlineDirectory private constructor(
+    val checkedOn:String,
+    val resources:List<HotlineResource>,
+    private val cities:Map<String,String>,
+) {
     fun isCanada(address:DeliveryAddress):Boolean {
         val country=normalize(address.country)
         return country in setOf("canada","ca","can","كندا","加拿大") ||
             (country.isBlank() && inferRegion(address)!=null)
     }
+
     fun regionFor(address:DeliveryAddress):String? = if(isCanada(address)) inferRegion(address) else null
+
     private fun inferRegion(address:DeliveryAddress):String? {
         val province=normalize(address.province).removePrefix("ca ")
-        provinceAliases[province]?.let { return it }
         CanadianRegion.entries.firstOrNull { region -> region.aliases.any { normalize(it)==province } }?.let { return it.code }
         val postal=address.postalCode.uppercase(Locale.ROOT).filter(Char::isLetterOrDigit)
         if(postal.matches(Regex("[ABCEGHJ-NPRSTVXY][0-9][A-Z][0-9][A-Z][0-9]"))) {
@@ -30,56 +46,105 @@ class HotlineDirectory private constructor(val checkedOn:String,val resources:Li
         }
         return cities[normalize(address.city)]
     }
+
     fun matching(region:String,city:String,query:String=""):List<HotlineResource> {
-        val normalized=normalize(query)
+        val normalizedQuery=normalize(query)
+        val normalizedCity=normalize(city)
         val digits=query.filter(Char::isDigit)
+        val restrictToCity=normalizedCity.isNotBlank() && resources.any {
+            it.region==region && normalize(it.city)==normalizedCity
+        }
         return resources.filter { item ->
-            (item.region=="CA" || item.region==region) &&
-                (item.city.isBlank() || normalize(item.city)==normalize(city)) &&
-                (normalized.isBlank() || normalized.split(' ').all { it in normalize("${item.name} ${item.city} ${item.phone}") } ||
-                    (digits.isNotEmpty() && query.all { it.isDigit() || it in " +-()" } && digits in item.phone.filter(Char::isDigit)))
-        }.sortedWith(compareBy<HotlineResource> { if(it.city.isNotBlank()) 0 else if(it.region!="CA") 1 else 2 }.thenBy { it.name })
+            (region=="CA" || item.region==region) &&
+                (!restrictToCity || normalize(item.city)==normalizedCity) &&
+                (normalizedQuery.isBlank() || normalizedQuery.split(' ').all {
+                    it in normalize("${item.name} ${item.description} ${item.city} ${item.phone} ${item.kind.name}")
+                } || (digits.isNotEmpty() && query.all { it.isDigit() || it in " +-()" } &&
+                    digits in item.phone.filter(Char::isDigit)))
+        }.sortedWith(compareBy<HotlineResource> { if(normalize(it.city)==normalizedCity) 0 else 1 }
+            .thenBy { it.kind }.thenBy { it.name })
     }
+
     companion object {
+        private const val DATASET_DATE="2026-10-15"
+
         fun normalize(value:String)=Normalizer.normalize(value,Normalizer.Form.NFD).replace(Regex("\\p{M}+"),"")
             .lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+")," ").trim()
-        fun parse(text:String,cityText:String):HotlineDirectory {
-            val root=JSONObject(text)
-            val array=root.getJSONArray("resources")
-            val items=(0 until array.length()).map { index ->
-                val row=array.getJSONObject(index)
-                val website=row.getString("website");val source=row.getString("source")
-                require(listOf(website,source).all { URI(it).let { uri -> uri.scheme=="https" && !uri.host.isNullOrBlank() } })
-                val phone=row.getString("phone")
-                require(phone.matches(Regex("[0-9+() -]+")))
-                val phoneUri=row.optString("phoneUri","tel:"+phone.filter { it.isDigit() || it=='+' })
-                require(phoneUri.startsWith("tel:") && phoneUri.substringAfter("tel:").substringBefore('?').filter(Char::isDigit)==phone.filter(Char::isDigit))
-                val region=row.getString("region")
-                require(region=="CA" || CanadianRegion.entries.any { it.code==region })
-                HotlineResource(row.getString("id"),region,row.optString("city"),row.getString("name"),phone,website,source,phoneUri)
+
+        fun parseProvinceFiles(files:Map<String,String>):HotlineDirectory {
+            val expected=CanadianRegion.entries.map { it.code }.toSet()
+            require(files.keys==expected) { "A hotline dataset is required for every Canadian province and territory" }
+            val cities=mutableMapOf<String,String>()
+            val resources=files.toSortedMap().flatMap { (region,text) ->
+                val root=JSONObject(text)
+                root.keys().asSequence().toList().sorted().flatMap { city ->
+                    cities[normalize(city)]=region
+                    val groups=root.getJSONObject(city)
+                    groups.keys().asSequence().toList().sorted().flatMap { group ->
+                        val kind=when(group) {
+                            "Hotlines" -> HotlineResourceKind.Hotline
+                            "Shelters" -> HotlineResourceKind.Shelter
+                            else -> error("Unsupported hotline group: $group")
+                        }
+                        val entries=groups.getJSONObject(group)
+                        entries.keys().asSequence().toList().sorted().map { name ->
+                            val row=entries.getJSONObject(name)
+                            val phone=row.getString("Phone")
+                            require(phone.matches(Regex("[0-9+() -]+")))
+                            val website=secureWebsite(row.getString("url"))
+                            HotlineResource(
+                                id=listOf(region,city,group,name).joinToString("-") { slug(it) },
+                                region=region,
+                                city=city,
+                                name=name,
+                                description=row.getString("Desc"),
+                                kind=kind,
+                                phone=phone,
+                                website=website,
+                                source=website,
+                                phoneUri="tel:"+phone.filter { it.isDigit() || it=='+' },
+                            )
+                        }
+                    }
+                }
             }
-            require(items.map { it.id }.distinct().size==items.size)
-            val cityRoot=JSONObject(cityText)
-            val cities=cityRoot.keys().asSequence().associate { normalize(it) to cityRoot.getString(it) }
-            val aliasRoot=root.optJSONObject("provinceAliases") ?: JSONObject()
-            val aliases=aliasRoot.keys().asSequence().associate { normalize(it) to aliasRoot.getString(it) }
-            require(aliases.values.all { code -> CanadianRegion.entries.any { it.code==code } })
-            return HotlineDirectory(root.getString("checkedOn"),items,cities,aliases)
+            require(resources.map { it.id }.distinct().size==resources.size)
+            return HotlineDirectory(DATASET_DATE,resources,cities)
         }
+
+        private fun secureWebsite(value:String):String {
+            val normalized=when {
+                value.startsWith("https://",true) -> value
+                value.startsWith("http://",true) -> "https://"+value.substringAfter("://")
+                !value.contains("://") -> "https://$value"
+                else -> value
+            }
+            val uri=URI(normalized)
+            require(uri.scheme=="https" && !uri.host.isNullOrBlank())
+            return normalized
+        }
+
+        private fun slug(value:String)=normalize(value).replace(' ','-')
     }
 }
 
 // Place-name aliases recognize saved addresses; translated display names are Android resources.
 enum class CanadianRegion(val code:String,vararg val aliases:String) {
-    AB("AB","AB","Alberta"),BC("BC","BC","British Columbia","Colombie-Britannique"),
-    MB("MB","MB","Manitoba"),NB("NB","NB","New Brunswick","Nouveau-Brunswick"),
-    NL("NL","NL","Newfoundland and Labrador","Terre-Neuve-et-Labrador"),
-    NS("NS","NS","Nova Scotia","Nouvelle-Écosse"),NT("NT","NT","Northwest Territories","Territoires du Nord-Ouest"),
-    NU("NU","NU","Nunavut"),ON("ON","ON","Ontario"),PE("PE","PE","PEI","Prince Edward Island","Île-du-Prince-Édouard"),
-    QC("QC","QC","Quebec","Québec"),SK("SK","SK","Saskatchewan"),YT("YT","YT","Yukon")
+    AB("AB","AB","Alberta","ألبرتا","艾伯塔省"),
+    BC("BC","BC","British Columbia","Colombie-Britannique","Columbia Británica","كولومبيا البريطانية","不列颠哥伦比亚省"),
+    MB("MB","MB","Manitoba","مانيتوبا","马尼托巴省"),
+    NB("NB","NB","New Brunswick","Nouveau-Brunswick","Nuevo Brunswick","نيو برونزويك","新不伦瑞克省"),
+    NL("NL","NL","Newfoundland and Labrador","Terre-Neuve-et-Labrador","Terranova y Labrador","نيوفاوندلاند ولابرادور","纽芬兰与拉布拉多省"),
+    NS("NS","NS","Nova Scotia","Nouvelle-Écosse","Nueva Escocia","نوفا سكوشا","新斯科舍省"),
+    NT("NT","NT","Northwest Territories","Territoires du Nord-Ouest","Territorios del Noroeste","الأقاليم الشمالية الغربية","西北地区"),
+    NU("NU","NU","Nunavut","نونافوت","努纳武特地区"),
+    ON("ON","ON","Ontario","أونتاريو","安大略省"),
+    PE("PE","PE","PEI","Prince Edward Island","Île-du-Prince-Édouard","Isla del Príncipe Eduardo","جزيرة الأمير إدوارد","爱德华王子岛省"),
+    QC("QC","QC","Quebec","Québec","كيبيك","魁北克省"),
+    SK("SK","SK","Saskatchewan","ساسكاتشوان","萨斯喀彻温省"),
+    YT("YT","YT","Yukon","Yukón","يوكون","育空地区")
 }
 
-// Dial only the published number, never tracking parameters or embedded dial commands.
 internal fun hotlineDialNumber(value:String):String? {
     if(!value.startsWith("tel:")) return null
     return value.removePrefix("tel:").substringBefore('?').takeIf { it.matches(Regex("[+]?[0-9]+")) }

@@ -25,9 +25,7 @@
     <string name="safety_essentials">Objetos y documentos esenciales</string>
     <string name="safety_dependants">Menores, dependientes y mascotas</string>
     <string name="safety_aftercare">Después de salir</string>
-    <string name="safety_documents_intro">Guarda aquí fotos, vídeos e imágenes de documentos. El almacenamiento y las cargas estarán disponibles próximamente; aún no se recopilan archivos.</string>
-    <string name="safety_upload">Subir archivos</string>
-    <string name="safety_inbox">Consultas de planes de seguridad</string>
+<string name="safety_inbox">Consultas de planes de seguridad</string>
     <string name="safety_inbox_empty">Actualmente no se comparte ningún plan de seguridad contigo.</string>
     <string name="safety_available">Disponible para nuevas consultas</string>
     <string name="safety_staff_intro">Consulta y edita los planes compartidos contigo.</string>
@@ -37,8 +35,7 @@
     <string name="safety_source">Orientación: Agencia de Salud Pública de Canadá. Adapta estas indicaciones con alguien de confianza.</string>
     <string name="safety_upload_document">Subir documento</string>
     <string name="safety_upload_for">Subir documento: %1$s. Próximamente.</string>
-    <string name="safety_upload_soon">Próximamente. Los documentos subidos desde tu plan también aparecerán aquí.</string>
-    <string name="safety_storage_photos">Fotos</string>
+<string name="safety_storage_photos">Fotos</string>
     <string name="safety_storage_videos">Vídeos</string>
     <string name="safety_storage_documents">Imágenes de documentos</string>
     <string name="safety_document_upload_hint">Las cargas estarán disponibles próximamente. Los archivos también aparecerán en Documentos.</string>

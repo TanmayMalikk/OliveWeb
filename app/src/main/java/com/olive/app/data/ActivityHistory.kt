@@ -156,7 +156,7 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
     if(before.triggerHash!=after.triggerHash) add(FieldChange("Trigger word","Hidden","Changed"))
     if(before.contacts!=after.contacts) {
         fun summary(contacts: List<SafeContact>) = contacts.joinToString("; ") {
-            "${it.name}: ${it.details}${if(it.safeToStay) " (Safe to stay)" else ""}"
+            "${it.name}: ${it.details}${if(it.safeToStay) " (Safe to stay)" else ""}${if(it.linkedUid.isNotBlank()) " (Linked chat account)" else ""}"
         }
         add(FieldChange("Safe contacts",summary(before.contacts),summary(after.contacts)))
     }

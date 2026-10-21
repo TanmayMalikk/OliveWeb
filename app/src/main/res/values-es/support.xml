@@ -50,4 +50,6 @@
     <string name="support_device_location_current">Ubicación del dispositivo: %1$s</string>
     <string name="support_saved_location_current">Ubicación guardada: %1$s</string>
     <string name="support_location_permissions">Permisos de la aplicación</string>
+    <string name="support_resource_hotline">Línea de ayuda</string>
+    <string name="support_resource_shelter">Refugio</string>
 </resources>
