@@ -30,8 +30,10 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     val secureDocumentRepository = if(localMode) null else SecureDocumentRepository()
     val safetyDocumentRepository = if(localMode) null else SafetyDocumentRepository()
     val locationSharingRepository = if(localMode) null else LocationSharingRepository(application)
-    val messageReadState=application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
-    val cloudState=application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
+    val messageReadState:android.content.SharedPreferences=
+        application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
+    val cloudState:android.content.SharedPreferences=
+        application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
     var enrollment by mutableStateOf<DeviceEnrollment?>(null)
     var pendingIdentity: AccountIdentity? = null
     var pendingProfile: UserProfile? = null
@@ -89,7 +91,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     }
     val pendingMessageActionCount get()=state.incomingFriendRequests.size+unreadMessageCount
 
-    // User access requires verified app-PIN or Android authentication for this enrollment and epoch.
+    // User access requires a verified app PIN or Android authentication for this enrollment and epoch.
     private fun canEnterSafe():Boolean {
         val device=enrollment
         val requiresPin=device?.role==AccountRole.USER || state.accountRole==AccountRole.USER

@@ -28,7 +28,7 @@ import kotlin.time.Duration.Companion.milliseconds
         suggestions=emptyList()
         if(selectedText==query) { selectedText=null;return@LaunchedEffect }
         if(!focused || query.trim().length<3 || !GeoapifyClient.configured) return@LaunchedEffect
-        delay(500.milliseconds)
+        delay(200.milliseconds)
         runCatching { GeoapifyClient.autocomplete(query,cityOnly) }
             .onSuccess { suggestions=it }
             .onFailure { if(it is CancellationException) throw it else error=uiText(R.string.address_suggestions_are_unavailable_continue_entering_your_address) }

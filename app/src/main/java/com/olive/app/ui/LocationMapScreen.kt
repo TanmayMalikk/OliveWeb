@@ -95,7 +95,7 @@ import androidx.compose.ui.platform.testTag
             })
             if(session.localMode) Text(stringResource(R.string.location_firebase_required),style=MaterialTheme.typography.bodySmall,color=Muted)
         } else {
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.share_saved_location),style=MaterialTheme.typography.titleMedium)
                     Text(stringResource(R.string.share_saved_location_help),style=MaterialTheme.typography.bodySmall,color=Muted)

@@ -154,7 +154,7 @@ class SafetyDocumentRepository(
     private fun documentFrom(row:DocumentSnapshot):SafetyDocument? {
         val owner=row.getString("owner_id") ?: return null
         return SafetyDocument(row.id,owner,row.getString("storage_path").orEmpty(),row.getString("file_name").orEmpty(),
-            row.getString("file_type").orEmpty(),(row.get("allowed_users") as? List<*>)?.mapNotNull { it as? String }.orEmpty(),
+            row.getString("file_type").orEmpty(),(row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty(),
             row.getTimestamp("created_at")?.toDate()?.time ?: 0)
     }
 

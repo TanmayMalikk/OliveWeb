@@ -2,7 +2,6 @@ package com.olive.app.location
 
 import android.Manifest
 import android.app.*
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
@@ -52,7 +51,7 @@ class LiveLocationService:Service() {
             requestImmediateLocation()
             return START_REDELIVER_INTENT
         }
-        val preferences=getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE)
+        val preferences=getSharedPreferences("olive_location_sharing",MODE_PRIVATE)
         ownerUid=intent?.getStringExtra(OWNER_UID) ?: preferences.getString("live_owner_uid",null).orEmpty()
         displayName=intent?.getStringExtra(DISPLAY_NAME) ?: preferences.getString("live_owner_name",null).orEmpty()
         authorized=intent?.getStringArrayExtra(CONTACT_UIDS)?.take(10)?.toSet()
@@ -127,7 +126,7 @@ class LiveLocationService:Service() {
             reference?.updateChildren(mapOf("active" to false))
             LiveLocationKeyStore(this).remove(ownerUid)
         }
-        getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE).edit {
+        getSharedPreferences("olive_location_sharing",MODE_PRIVATE).edit {
             putBoolean("live_active",false).remove("live_owner_uid").remove("live_owner_name")
                 .remove("live_contacts").remove("live_expires_at")
         }

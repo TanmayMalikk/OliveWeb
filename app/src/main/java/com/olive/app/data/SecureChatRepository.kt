@@ -32,12 +32,6 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
         return KeyManager.unwrapKey(selected)
     }
 
-    suspend fun loadRoomKey(conversationId:String,currentUid:String):SecretKey {
-        val snapshot=firestore.collection("conversations").document(conversationId).get().await()
-        val wrapped=snapshot.wrappedKey(currentUid) ?: error("Secure conversation key unavailable.")
-        return KeyManager.unwrapKey(wrapped)
-    }
-
     suspend fun send(conversationId:String,sender:AccountIdentity,text:String,roomKey:SecretKey) {
         val body=text.trim().filter { it=='\n' || it=='\t' || it>=' ' }
         require(body.isNotEmpty())
@@ -83,7 +77,7 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
             val savedMessage=transaction.get(messageRef)
             val savedConversation=transaction.get(conversation)
             check(savedMessage.getString("senderUid")==currentUid && savedMessage.getBoolean("deleted")!=true)
-            val updates=mutableMapOf<String,Any>("deleted" to true,"deletedAt" to FieldValue.serverTimestamp())
+            val updates=mutableMapOf("deleted" to true,"deletedAt" to FieldValue.serverTimestamp())
             if(savedMessage.contains("ciphertext")) updates["ciphertext"]="Message unsent" else updates["body"]="Message unsent"
             transaction.update(messageRef,updates)
             if(savedConversation.getString("lastMessageId")==message.id) transaction.update(conversation,mapOf(

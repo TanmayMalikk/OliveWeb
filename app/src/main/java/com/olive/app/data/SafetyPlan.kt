@@ -9,7 +9,7 @@ internal val SAFETY_FIELD_KEYS=listOf("primary","backup").flatMap { plan -> SAFE
 
 internal data class SafetyField(val value:String,val revision:Long=0,val mutationId:String?=null,
     val conflictValue:String?=null,val conflictRevision:Long?=null) {
-    fun toJson()=JSONObject().put("value",value).put("revision",revision).put("mutationId",mutationId)
+    fun toJson():JSONObject=JSONObject().put("value",value).put("revision",revision).put("mutationId",mutationId)
         .put("conflictValue",conflictValue).put("conflictRevision",conflictRevision)
     companion object {
         fun fromJson(json:JSONObject)=SafetyField(json.getString("value"),json.optLong("revision"),
@@ -23,7 +23,7 @@ internal data class SafetyPlan(val ownerUid:String,val ownerName:String,val fiel
     val hasEdits get()=fields.values.any { it.mutationId!=null }
     val hasConflicts get()=fields.values.any { it.conflictRevision!=null }
     val pending get()=hasEdits || shareAction.isNotEmpty()
-    fun toJson()=JSONObject().put("ownerUid",ownerUid).put("ownerName",ownerName)
+    fun toJson():JSONObject=JSONObject().put("ownerUid",ownerUid).put("ownerName",ownerName)
         .put("fields",JSONObject().also { json -> fields.forEach { (key,field) -> json.put(key,field.toJson()) } })
         .put("staffUid",staffUid).put("staffName",staffName).put("consultationRequested",consultationRequested).put("shareAction",shareAction)
         .put("safeContactUids",org.json.JSONArray(safeContactUids)).put("safeContactNames",JSONObject(safeContactNames))

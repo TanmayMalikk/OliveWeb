@@ -62,21 +62,19 @@ internal class SessionHistory(private val runtime:SessionRuntime) {
 
     fun loadCloudHistory(uid: String, username: String) {
         with(runtime) {
-            with(state) {
-                scope.launch {
-                    // Paint the local cover first; cloud reconciliation does not belong on the launch critical path.
-                    delay(1_000.milliseconds)
-                    val identity=AccountIdentity(uid,username)
-                    // Messaging registration failing must never block the existing profile/history sync path.
-                    runCatching { messaging.registerMessagingIdentity(identity) }
-                    runCatching {
-                        accounts.profile(identity) // Reading once upgrades the existing profile object to readable JSON.
-                        val records=accounts.historyRecords(identity)
-                        withContext(Dispatchers.IO) { store.mergeHistory(uid,records) }
-                        refreshHistory(uid)
-                    }
-                    queueHistorySync()
+            scope.launch {
+                // Paint the local cover first; cloud reconciliation does not belong on the launch critical path.
+                delay(1_000.milliseconds)
+                val identity=AccountIdentity(uid,username)
+                // Messaging registration failing must never block the existing profile/history sync path.
+                runCatching { messaging.registerMessagingIdentity(identity) }
+                runCatching {
+                    accounts.profile(identity) // Reading once upgrades the existing profile object to readable JSON.
+                    val records=accounts.historyRecords(identity)
+                    withContext(Dispatchers.IO) { store.mergeHistory(uid,records) }
+                    refreshHistory(uid)
                 }
+                queueHistorySync()
             }
         }
     }
