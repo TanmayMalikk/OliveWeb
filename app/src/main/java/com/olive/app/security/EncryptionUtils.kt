@@ -64,6 +64,39 @@ object EncryptionUtils {
     }
 
     /**
+     * Encrypts binary data with AES-GCM.
+     *
+     * The returned payload contains the random IV followed by the authenticated ciphertext:
+     * [12-byte IV][ciphertext and 16-byte authentication tag].
+     */
+    fun encryptBytes(plaintext: ByteArray, secretKey: SecretKey): ByteArray {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        val iv = ByteArray(IV_LENGTH).apply { SecureRandom().nextBytes(this) }
+        val parameterSpec = GCMParameterSpec(TAG_LENGTH, iv)
+
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, parameterSpec)
+        val ciphertext = cipher.doFinal(plaintext)
+
+        return iv + ciphertext
+    }
+
+    /**
+     * Decrypts and authenticates a payload produced by [encryptBytes].
+     */
+    fun decryptBytes(encryptedPayload: ByteArray, secretKey: SecretKey): ByteArray {
+        val minimumPayloadLength = IV_LENGTH + TAG_LENGTH / Byte.SIZE_BITS
+        require(encryptedPayload.size >= minimumPayloadLength) { "Encrypted payload is too short" }
+
+        val iv = encryptedPayload.copyOfRange(0, IV_LENGTH)
+        val ciphertext = encryptedPayload.copyOfRange(IV_LENGTH, encryptedPayload.size)
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        val parameterSpec = GCMParameterSpec(TAG_LENGTH, iv)
+
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, parameterSpec)
+        return cipher.doFinal(ciphertext)
+    }
+
+    /**
      * Helper functions to convert the raw AES key into a string
      * so it can be securely wrapped/stored later.
      */
