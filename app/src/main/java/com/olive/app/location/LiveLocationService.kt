@@ -12,17 +12,20 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.*
-import com.google.firebase.database.ServerValue
 import com.google.firebase.database.DatabaseReference
 import com.olive.app.R
 import com.olive.app.data.LocationDatabase
 import com.olive.app.data.MapLocationPoint
+import com.olive.app.security.EncryptionUtils
+import org.json.JSONObject
+import javax.crypto.SecretKey
 
 // Foreground tracking adapts network uploads while Android continues sampling for renewed movement.
 class LiveLocationService:Service() {
     private lateinit var fused:FusedLocationProviderClient
     private var ownerUid="";private var displayName="";private var authorized=emptySet<String>()
     private var expiresAt=0L
+    private var sessionKey:SecretKey?=null
     private val expiryHandler=Handler(Looper.getMainLooper())
     private val expireSharing=Runnable { stopSharing() }
     private var rootReference:DatabaseReference?=null
@@ -54,7 +57,8 @@ class LiveLocationService:Service() {
         authorized=intent?.getStringArrayExtra(CONTACT_UIDS)?.take(10)?.toSet()
             ?: preferences.getStringSet("live_contacts",emptySet()).orEmpty().take(10).toSet()
         expiresAt=intent?.getLongExtra(EXPIRES_AT,0L)?.takeIf { it>0L } ?: preferences.getLong("live_expires_at",0L)
-        if(ownerUid.isBlank() || expiresAt<=System.currentTimeMillis()) { stopSharing();return START_NOT_STICKY }
+        sessionKey=ownerUid.takeIf(String::isNotBlank)?.let { LiveLocationKeyStore(this).load(it) }
+        if(ownerUid.isBlank() || sessionKey==null || expiresAt<=System.currentTimeMillis()) { stopSharing();return START_NOT_STICKY }
         expiryHandler.removeCallbacks(expireSharing)
         expiryHandler.postDelayed(expireSharing,(expiresAt-System.currentTimeMillis()).coerceAtLeast(1L))
         rootReference=runCatching { LocationDatabase.instance().reference }.getOrNull()
@@ -86,16 +90,16 @@ class LiveLocationService:Service() {
         if(lastUploaded!=null && !moved && now-lastUploadAt<interval) return
         lastUploaded=location;lastUploadAt=now
         val point=MapLocationPoint(ownerUid,displayName,location.latitude,location.longitude,now,true,location.accuracy)
+        val key=sessionKey ?: return
+        val locationPayload=JSONObject().put("name",displayName).put("latitude",location.latitude)
+            .put("longitude",location.longitude).put("accuracy",location.accuracy.toDouble()).toString()
+        val trailPayload=JSONObject().put("latitude",location.latitude).put("longitude",location.longitude).toString()
         rootReference?.updateChildren(mapOf(
-            "liveLocations/$ownerUid/displayName" to displayName,
-            "liveLocations/$ownerUid/latitude" to location.latitude,
-            "liveLocations/$ownerUid/longitude" to location.longitude,
-            "liveLocations/$ownerUid/accuracy" to location.accuracy.toDouble(),
-            "liveLocations/$ownerUid/updatedAt" to ServerValue.TIMESTAMP,
-            "liveLocations/$ownerUid/active" to true,
-            "liveLocations/$ownerUid/authorized" to authorized.associateWith { true },
+            "liveLocations/$ownerUid" to mapOf(
+                "ciphertext" to EncryptionUtils.encryptText(locationPayload,key),"updatedAt" to now,
+                "active" to true,"authorized" to authorized.associateWith { true }),
             "liveLocationTrails/$ownerUid/$now" to mapOf(
-                "latitude" to location.latitude,"longitude" to location.longitude,"updatedAt" to now)))
+                "ciphertext" to EncryptionUtils.encryptText(trailPayload,key),"updatedAt" to now)))
             ?.addOnSuccessListener { LiveLocationState.update(point) }
         pruneExpiredTrail(now)
     }
@@ -118,6 +122,7 @@ class LiveLocationService:Service() {
                 ?: runCatching { LocationDatabase.instance().reference.child("liveLocations").child(ownerUid) }.getOrNull()
             reference?.onDisconnect()?.cancel()
             reference?.updateChildren(mapOf("active" to false))
+            LiveLocationKeyStore(this).remove(ownerUid)
         }
         getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE).edit().putBoolean("live_active",false)
             .remove("live_owner_uid").remove("live_owner_name").remove("live_contacts").remove("live_expires_at").apply()

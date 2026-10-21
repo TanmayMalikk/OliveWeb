@@ -73,10 +73,10 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
         with(runtime) {
             with(state) {
                 val conversation=activeConversation ?: return
-                messaging.runMessagingAction("Unable to unsend this message.") { repository,device,_ ->
+                messaging.runMessagingAction("Unable to unsend this message.") { _,device,_ ->
                     secureSharing.revokeIfShared(chat,conversation,device.uid)
-                    secureChatRepository?.unsend(conversation.id,chat,device.uid)
-                        ?: repository.unsend(conversation.id,chat,device.uid)
+                    checkNotNull(secureChatRepository) { "Secure messaging unavailable" }
+                        .unsend(conversation.id,chat,device.uid)
                 }
             }
         }

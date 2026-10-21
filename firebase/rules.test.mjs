@@ -112,9 +112,9 @@ test('file metadata is owned, shareable for reads, and cannot be reshaped', asyn
   await assertSucceeds(deleteDoc(target));
 });
 
-test('friend requests become a private DM and only the sender can unsend', async () => {
+test('users and safe contacts get encrypted private DMs and only the sender can unsend', async () => {
   const alice=env.authenticatedContext('social-a',{email:'social_alice@users.olive.invalid'}).firestore();
-  const bob=env.authenticatedContext('social-b',{email:'social_bob@users.olive.invalid'}).firestore();
+  const bob=env.authenticatedContext('social-b',{email:'social_bob@safe.olive.invalid'}).firestore();
   const charlie=env.authenticatedContext('social-c',{email:'social_charlie@users.olive.invalid'}).firestore();
   await assertSucceeds(setDoc(doc(alice,'messageDirectory/social_alice'),{uid:'social-a',username:'social_alice',publicKey:'alice-key',updatedAt:serverTimestamp()}));
   await assertSucceeds(setDoc(doc(bob,'messageDirectory/social_bob'),{uid:'social-b',username:'social_bob',publicKey:'bob-key',updatedAt:serverTimestamp()}));
@@ -164,18 +164,21 @@ test('friend requests become a private DM and only the sender can unsend', async
 
   const sharedLocation=doc(alice,'sharedLocations/social-a/recipients/social-b');
   await assertSucceeds(setDoc(sharedLocation,{ownerUid:'social-a',recipientUid:'social-b',friendshipId,
-    contactName:'Alice',latitude:53.5461,longitude:-113.4937,label:'Edmonton, Alberta',updatedAt:serverTimestamp()}));
+    ciphertext:'encrypted-static-location',wrappedKey:'wrapped-static-key',updatedAt:serverTimestamp()}));
   await assertSucceeds(getDoc(doc(bob,'sharedLocations/social-a/recipients/social-b')));
   await assertFails(getDoc(doc(charlie,'sharedLocations/social-a/recipients/social-b')));
   await assertFails(setDoc(doc(bob,'sharedLocations/social-a/recipients/social-b'),{
-    ownerUid:'social-a',recipientUid:'social-b',friendshipId,contactName:'Changed',latitude:0,longitude:0,label:'',updatedAt:serverTimestamp()}));
+    ownerUid:'social-a',recipientUid:'social-b',friendshipId,ciphertext:'changed',wrappedKey:'changed',updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(alice,'sharedLocations/social-a/recipients/social-b'),{
+    ownerUid:'social-a',recipientUid:'social-b',friendshipId,latitude:53.5461,longitude:-113.4937,updatedAt:serverTimestamp()}));
 
   const liveShare=doc(alice,'liveLocationShares/social-a/recipients/social-b');
-  await assertSucceeds(setDoc(liveShare,{ownerUid:'social-a',recipientUid:'social-b',friendshipId,createdAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(liveShare,{ownerUid:'social-a',recipientUid:'social-b',friendshipId,
+    wrappedKey:'wrapped-live-key',createdAt:serverTimestamp()}));
   await assertSucceeds(getDoc(doc(bob,'liveLocationShares/social-a/recipients/social-b')));
   await assertFails(getDoc(doc(charlie,'liveLocationShares/social-a/recipients/social-b')));
   await assertFails(setDoc(doc(bob,'liveLocationShares/social-a/recipients/social-b'),{
-    ownerUid:'social-a',recipientUid:'social-b',friendshipId,createdAt:serverTimestamp()}));
+    ownerUid:'social-a',recipientUid:'social-b',friendshipId,wrappedKey:'changed',createdAt:serverTimestamp()}));
 
   await assertSucceeds(getDoc(doc(alice,'conversations/'+friendshipId)));
   await assertSucceeds(getDocs(query(collection(alice,'conversations'),where('participantIds','array-contains','social-a'))));
@@ -183,22 +186,9 @@ test('friend requests become a private DM and only the sender can unsend', async
   await assertFails(getDocs(query(collection(alice,'conversations'),where('participantIds','array-contains','social-b'))));
   await assertFails(getDoc(doc(charlie,'conversations/'+friendshipId)));
 
-  const messageRef=doc(alice,'conversations/'+friendshipId+'/messages/message-1');
-  const send=writeBatch(alice);
-  send.set(messageRef,{senderUid:'social-a',senderUsername:'social_alice',body:'Private hello',
-    deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()});
-  send.update(doc(alice,'conversations/'+friendshipId),{lastMessage:'Private hello',lastMessageId:'message-1',
-    lastSenderUid:'social-a',updatedAt:serverTimestamp()});
-  await assertSucceeds(send.commit());
-  await assertSucceeds(getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-1')));
-  await assertFails(getDoc(doc(charlie,'conversations/'+friendshipId+'/messages/message-1')));
-  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-1'),
-    {body:'Message unsent',deleted:true,deletedAt:serverTimestamp()}));
-  await assertSucceeds(updateDoc(messageRef,{body:'Message unsent',deleted:true,deletedAt:serverTimestamp()}));
-  await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),{lastMessage:'Message unsent',updatedAt:serverTimestamp()}));
-  const visible=await getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-1'));
-  if(visible.data()?.body!=='Message unsent' || visible.data()?.deleted!==true)
-    throw new Error('Unsent tombstone was not visible to both friends.');
+  const plaintextRef=doc(alice,'conversations/'+friendshipId+'/messages/plaintext-message');
+  await assertFails(setDoc(plaintextRef,{senderUid:'social-a',senderUsername:'social_alice',body:'Private hello',
+    deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
 
   const roomKeys={'social-a':'wrapped-a','social-b':'wrapped-b'};
   const participantPublicKeys={'social-a':'alice-key','social-b':'bob-key'};
@@ -210,33 +200,46 @@ test('friend requests become a private DM and only the sender can unsend', async
   await assertSucceeds(setDoc(encryptedRef,{senderUid:'social-a',senderUsername:'social_alice',
     ciphertext:'encrypted-payload',deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
   await assertSucceeds(getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-2')));
+  await assertFails(setDoc(doc(bob,'conversations/'+friendshipId+'/messages/safe-contact-plaintext'),
+    {senderUid:'social-b',senderUsername:'social_bob',body:'Unencrypted reply',deleted:false,
+      sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+  await assertSucceeds(setDoc(doc(bob,'conversations/'+friendshipId+'/messages/safe-contact-encrypted'),
+    {senderUid:'social-b',senderUsername:'social_bob',ciphertext:'encrypted-safe-contact-reply',deleted:false,
+      sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-2'),
+    {ciphertext:'Message unsent',deleted:true,deletedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(encryptedRef,{ciphertext:'Message unsent',deleted:true,deletedAt:serverTimestamp()}));
+  const visible=await getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-2'));
+  if(visible.data()?.ciphertext!=='Message unsent' || visible.data()?.deleted!==true)
+    throw new Error('Encrypted unsent tombstone was not visible to both friends.');
   await assertFails(setDoc(doc(charlie,'conversations/'+friendshipId+'/messages/message-3'),
     {senderUid:'social-c',senderUsername:'social_charlie',ciphertext:'stolen',deleted:false,
       sentAt:serverTimestamp(),clientSentAt:Date.now()}));
 });
 
-test('live coordinates are overwritten by their owner and readable only by authorized contacts', async () => {
+test('encrypted live coordinates are overwritten by their owner and readable only by authorized contacts', async () => {
   const owner=env.authenticatedContext('live-owner').database();
   const contact=env.authenticatedContext('live-contact').database();
   const stranger=env.authenticatedContext('live-stranger').database();
   const path='liveLocations/live-owner';
-  const location={displayName:'Owner',latitude:53.5461,longitude:-113.4937,accuracy:8,
-    updatedAt:Date.now(),active:true,authorized:{'live-contact':true}};
+  const location={ciphertext:'encrypted-current-location',updatedAt:Date.now(),active:true,
+    authorized:{'live-contact':true}};
   const trailPath='liveLocationTrails/live-owner';
-  const trail={'1770000000000':{latitude:53.5460,longitude:-113.4938,updatedAt:1770000000000},
-    '1770000002000':{latitude:53.5461,longitude:-113.4937,updatedAt:1770000002000}};
+  const trail={'1770000000000':{ciphertext:'encrypted-trail-one',updatedAt:1770000000000},
+    '1770000002000':{ciphertext:'encrypted-trail-two',updatedAt:1770000002000}};
   await assertSucceeds(set(ref(owner,path),location));
   await assertSucceeds(set(ref(owner,trailPath),trail));
   await assertSucceeds(get(ref(contact,path)));
   await assertSucceeds(get(ref(contact,trailPath)));
   await assertFails(get(ref(stranger,path)));
   await assertFails(get(ref(stranger,trailPath)));
-  await assertFails(set(ref(contact,path),{...location,latitude:0}));
-  await assertFails(set(ref(owner,trailPath+'/bad'),{latitude:200,longitude:0,updatedAt:Date.now()}));
-  await assertSucceeds(set(ref(owner,path),{...location,latitude:53.55,updatedAt:Date.now()}));
+  await assertFails(set(ref(contact,path),{...location,ciphertext:'changed'}));
+  await assertFails(set(ref(owner,trailPath+'/bad'),{latitude:53.55,longitude:-113.49,updatedAt:Date.now()}));
+  await assertFails(set(ref(owner,path),{...location,latitude:53.55,longitude:-113.49}));
+  await assertSucceeds(set(ref(owner,path),{...location,ciphertext:'encrypted-new-location',updatedAt:Date.now()}));
   await assertSucceeds(set(ref(owner,path),{...location,active:false}));
   const retained=await assertSucceeds(get(ref(contact,path)));
-  if(retained.val()?.active!==false || retained.val()?.latitude!==location.latitude)
+  if(retained.val()?.active!==false || retained.val()?.ciphertext!=='encrypted-current-location')
     throw new Error('The authorized contact could not read the retained last-known location.');
   await assertSucceeds(remove(ref(owner,path)));
   await assertSucceeds(remove(ref(owner,trailPath)));

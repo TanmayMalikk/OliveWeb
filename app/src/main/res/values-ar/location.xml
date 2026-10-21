@@ -10,6 +10,8 @@
     <string name="location_zoom_in">تكبير</string>
     <string name="location_zoom_out">تصغير</string>
     <string name="recenter_map">إعادة توسيط الخريطة</string>
+    <string name="location_follow_user">إبقاء المستخدم في المنتصف</string>
+    <string name="location_stop_following">إيقاف متابعة المستخدم</string>
     <string name="you">أنت</string>
     <string name="your_saved_location">موقعك المحفوظ</string>
     <string name="share_live_location_with">مشاركة الموقع المباشر مع</string>
@@ -31,7 +33,7 @@
     <string name="location_one_hour">ساعة واحدة</string>
     <string name="location_hours">%1$d ساعات</string>
     <string name="location_custom_hours">عدد ساعات مخصص</string>
-    <string name="location_custom_range">أدخل من ساعة واحدة إلى 720 ساعة.</string>
+    <string name="location_custom_range">أدخل من ساعة واحدة إلى 72 ساعة.</string>
     <string name="location_share_for_custom">مشاركة</string>
     <string name="location_sharing_until">تتم المشاركة حتى %1$s</string>
     <string name="location_ten_seconds_testing">10 ثوانٍ (للاختبار)</string>

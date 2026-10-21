@@ -10,6 +10,8 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CenterFocusStrong
+import androidx.compose.material.icons.outlined.LocationSearching
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.*
@@ -38,6 +40,8 @@ import kotlin.math.roundToInt
     val webView=remember { arrayOfNulls<WebView>(1) }
     var loadState by remember { mutableStateOf(MapLoadState.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
+    var following by remember { mutableStateOf(false) }
+    val followTargetUid=points.firstOrNull { it.live || it.lastKnown }?.uid ?: ownPointUid
 
     LaunchedEffect(attempt) {
         delay(15_000)
@@ -62,8 +66,9 @@ import kotlin.math.roundToInt
         view.evaluateJavascript("window.oliveResizeTo&&window.oliveResizeTo($cssHeight);",null)
     }
 
-    LaunchedEffect(points,loadState,attempt) {
-        if(loadState==MapLoadState.Ready) webView[0]?.let { updatePoints(it,false) }
+    LaunchedEffect(following,followTargetUid,loadState,attempt) {
+        if(loadState==MapLoadState.Ready) webView[0]?.evaluateJavascript(
+            "window.oliveSetFollow($following,${JSONObject.quote(followTargetUid.orEmpty())});",null)
     }
 
     Box(modifier.semantics { contentDescription=description }) {
@@ -86,7 +91,7 @@ import kotlin.math.roundToInt
                     }
                     webViewClient=object:WebViewClient() {
                         override fun onPageFinished(view:WebView,url:String) {
-                            view.post { resizeMap(view);updatePoints(view,true) }
+                            view.post { resizeMap(view) }
                         }
                         override fun shouldOverrideUrlLoading(view:WebView,request:WebResourceRequest)=true
                         override fun onReceivedError(view:WebView,request:WebResourceRequest,error:WebResourceError) {
@@ -123,6 +128,11 @@ import kotlin.math.roundToInt
                 SmallFloatingActionButton(onClick={webView[0]?.evaluateJavascript("window.oliveRecenter();",null)},
                     modifier=Modifier.testTag("recenter_map")) {
                     Icon(Icons.Outlined.MyLocation,stringResource(R.string.recenter_map))
+                }
+                SmallFloatingActionButton(onClick={if(followTargetUid!=null) following=!following},
+                    modifier=Modifier.testTag("follow_user_location")) {
+                    Icon(if(following) Icons.Outlined.CenterFocusStrong else Icons.Outlined.LocationSearching,
+                        stringResource(if(following) R.string.location_stop_following else R.string.location_follow_user))
                 }
             }
         }

@@ -30,4 +30,14 @@ class LocationMapUiTest:OliveUiTestBase() {
         compose.onNodeWithTag("location_duration_10_seconds").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(10_000L,selected) }
     }
+
+    @Test fun customSharingDurationIsCappedAtSeventyTwoHours() {
+        var selected=0L
+        compose.activity.setContent { OliveTheme { ShareDurationDialog(onDismiss={},onSelected={selected=it}) } }
+        compose.onNodeWithTag("location_custom_hours").performTextReplacement("73")
+        compose.onNodeWithTag("location_custom_confirm").assertIsNotEnabled()
+        compose.onNodeWithTag("location_custom_hours").performTextReplacement("72")
+        compose.onNodeWithTag("location_custom_confirm").assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals(72L*60*60*1_000,selected) }
+    }
 }
