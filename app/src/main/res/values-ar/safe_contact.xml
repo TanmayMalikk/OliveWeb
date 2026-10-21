@@ -1,16 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="safe_contact_home_title">لوحة الدعم</string>
-    <string name="safe_contact_home_help">ابقَ على اتصال واستجب عندما يتواصل معك شخص تثق به.</string>
-    <string name="safe_contact_actions">أدواتك</string>
-    <string name="safe_contact_messages_help">اعثر على جهات الاتصال الموثوقة واحتفظ بمحادثاتك في مكان واحد.</string>
-    <string name="safe_contact_location_help">اعرض المواقع المباشرة التي اختار الأصدقاء مشاركتها.</string>
-    <string name="safe_contact_notes_help">احتفظ بملاحظاتك الخاصة وسجلات الحوادث.</string>
-    <string name="safe_contact_profile_help">راجع حسابك وحدّث بياناتك الشخصية.</string>
-    <string name="safe_contact_connections">جهات الاتصال</string>
-    <string name="safe_contact_connections_help">تظهر طلبات الصداقة والمحادثات هنا عند وصولها.</string>
-    <string name="safe_contact_manage_connections">إدارة الأصدقاء والرسائل</string>
-    <string name="safe_contact_changes_waiting">تم حفظ تغييرات الملف الشخصي على هذا الجهاز وهي بانتظار المزامنة.</string>
+<string name="safe_contact_home_help">ابقَ على اتصال واستجب عندما يتواصل معك شخص تثق به.</string>
+<string name="safe_contact_messages_help">اعثر على جهات الاتصال الموثوقة واحتفظ بمحادثاتك في مكان واحد.</string>
+<string name="safe_contact_notes_help">احتفظ بملاحظاتك الخاصة وسجلات الحوادث.</string>
+<string name="safe_contact_changes_waiting">تم حفظ تغييرات الملف الشخصي على هذا الجهاز وهي بانتظار المزامنة.</string>
     <string name="safe_contact_profile_intro">راجع المعلومات المرتبطة بحساب جهة الاتصال الآمنة.</string>
     <string name="safe_contact_edit_profile">تعديل الملف الشخصي وإعدادات الحساب</string>
     <string name="safe_contact_safety_plan_help">اعرض خطط السلامة التي شاركها المستخدمون معك.</string>

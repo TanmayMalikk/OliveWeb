@@ -32,7 +32,6 @@ import org.json.JSONObject
 import kotlin.math.roundToInt
 
 @SuppressLint("SetJavaScriptEnabled")
-@Suppress("DEPRECATION")
 @Composable internal fun InteractiveLocationMap(points:List<MapLocationPoint>,modifier:Modifier=Modifier,
     ownPointUid:String?=points.firstOrNull()?.uid) {
     val description=stringResource(R.string.location_map_accessibility)
@@ -81,8 +80,6 @@ import kotlin.math.roundToInt
                     settings.domStorageEnabled=false
                     settings.allowContentAccess=false
                     settings.allowFileAccess=true
-                    settings.allowFileAccessFromFileURLs=false
-                    settings.allowUniversalAccessFromFileURLs=false
                     settings.setSupportZoom(false)
                     webChromeClient=object:WebChromeClient() {
                         override fun onReceivedTitle(view:WebView,title:String?) {

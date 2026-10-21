@@ -112,7 +112,8 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                         }
                         is PinResult.Rejected -> {
                             attempts=withContext(Dispatchers.IO) { store.attempts(device.uid) }
-                            if(result.failures>=5) navigation.quickExit() else message=runtime.application.getString(R.string.ui_incorrect_pin_value_attempts_remaining , 5-result.failures)
+                            if(result.failures>=5) navigation.quickExit() else message=runtime.application.resources.getQuantityString(
+                                R.plurals.ui_incorrect_pin_value_attempts_remaining,5-result.failures,5-result.failures)
                         }
                     }
                 }
@@ -225,7 +226,8 @@ internal class SessionSettings(private val runtime:SessionRuntime) {
                         }
                         is PinResult.Rejected -> {
                             attempts=withContext(Dispatchers.IO) { store.attempts(device.uid) }
-                            if(result.failures>=5) navigation.quickExit() else message=runtime.application.getString(R.string.ui_incorrect_pin_value_attempts_remaining , 5-result.failures)
+                            if(result.failures>=5) navigation.quickExit() else message=runtime.application.resources.getQuantityString(
+                                R.plurals.ui_incorrect_pin_value_attempts_remaining,5-result.failures,5-result.failures)
                         }
                     }
                 }

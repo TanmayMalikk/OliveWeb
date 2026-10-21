@@ -11,6 +11,7 @@ import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import com.google.android.gms.location.*
 import com.google.firebase.database.DatabaseReference
 import com.olive.app.R
@@ -124,8 +125,10 @@ class LiveLocationService:Service() {
             reference?.updateChildren(mapOf("active" to false))
             LiveLocationKeyStore(this).remove(ownerUid)
         }
-        getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE).edit().putBoolean("live_active",false)
-            .remove("live_owner_uid").remove("live_owner_name").remove("live_contacts").remove("live_expires_at").apply()
+        getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE).edit {
+            putBoolean("live_active",false).remove("live_owner_uid").remove("live_owner_name")
+                .remove("live_contacts").remove("live_expires_at")
+        }
         LiveLocationState.update(null);stopForeground(STOP_FOREGROUND_REMOVE);stopSelf()
     }
     private fun requestImmediateLocation() {

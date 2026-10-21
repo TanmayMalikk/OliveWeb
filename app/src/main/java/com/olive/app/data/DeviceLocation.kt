@@ -9,7 +9,6 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Build
 import android.os.CancellationSignal
-import android.os.SystemClock
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
@@ -46,12 +45,12 @@ internal object DeviceLocation {
         }
     }
 
-    suspend fun coordinatesForAddress(context:Context,address:DeliveryAddress):Pair<Double,Double>? = withContext(Dispatchers.IO) {
-        if(!Geocoder.isPresent()) return@withContext null
+    suspend fun coordinatesForAddress(context:Context,address:DeliveryAddress):Pair<Double,Double>? {
+        if(!Geocoder.isPresent()) return null
         val query=listOf(address.line1,address.city,address.province,address.postalCode,address.country).filter(String::isNotBlank).joinToString(", ")
-        if(query.isBlank()) return@withContext null
-        @Suppress("DEPRECATION")
-        runCatching { Geocoder(context,Locale.getDefault()).getFromLocationName(query,1)?.firstOrNull()?.let { it.latitude to it.longitude } }.getOrNull()
+        if(query.isBlank()) return null
+        val address=forwardGeocode(Geocoder(context,Locale.getDefault()),query) ?: return null
+        return address.latitude to address.longitude
     }
 
     suspend fun address(context:Context):DeliveryAddress? {
@@ -114,10 +113,31 @@ internal object DeviceLocation {
                     override fun onError(errorMessage:String?) { if(continuation.isActive) continuation.resume(null) }
                 })
             }.onFailure { if(continuation.isActive) continuation.resume(null) }
-        } else withContext(Dispatchers.IO) {
-            @Suppress("DEPRECATION") // Android 9–12 have only the synchronous Geocoder API; keep it off the UI thread.
-            geocoder.getFromLocation(location.latitude,location.longitude,1)?.firstOrNull()
-        }
+        } else legacyReverseGeocode(geocoder,location)
+    }
+
+    private suspend fun forwardGeocode(geocoder:Geocoder,query:String):Address? =
+        if(Build.VERSION.SDK_INT>=33) suspendCancellableCoroutine { continuation ->
+            runCatching {
+                geocoder.getFromLocationName(query,1,object:Geocoder.GeocodeListener {
+                    override fun onGeocode(addresses:MutableList<Address>) {
+                        if(continuation.isActive) continuation.resume(addresses.firstOrNull())
+                    }
+                    override fun onError(errorMessage:String?) { if(continuation.isActive) continuation.resume(null) }
+                })
+            }.onFailure { if(continuation.isActive) continuation.resume(null) }
+        } else legacyForwardGeocode(geocoder,query)
+
+    @Suppress("DEPRECATION")
+    private suspend fun legacyForwardGeocode(geocoder:Geocoder,query:String):Address? = withContext(Dispatchers.IO) {
+        // Android 9–12 expose only this blocking overload, so it must run away from the UI thread.
+        runCatching { geocoder.getFromLocationName(query,1)?.firstOrNull() }.getOrNull()
+    }
+
+    @Suppress("DEPRECATION")
+    private suspend fun legacyReverseGeocode(geocoder:Geocoder,location:Location):Address? = withContext(Dispatchers.IO) {
+        // Android 9–12 expose only this blocking overload, so it must run away from the UI thread.
+        runCatching { geocoder.getFromLocation(location.latitude,location.longitude,1)?.firstOrNull() }.getOrNull()
     }
 
     private const val MAX_CACHED_LOCATION_AGE_MS=5*60*1_000L

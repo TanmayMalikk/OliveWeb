@@ -22,17 +22,18 @@
     <string name="share_saved_location">Share saved location</string>
     <string name="share_saved_location_help">Share the location saved during account creation with your accepted friends. Your device is not continuously tracked.</string>
     <string name="location_saved_address_unavailable">The saved location could not be placed on the map. Select an address suggestion in account settings and try again.</string>
-    <string name="location_waiting">Waiting for an available location.</string>
-    <string name="location_notification_channel">Live location sharing</string>
+<string name="location_notification_channel">Live location sharing</string>
     <string name="location_notification_title">Location sharing is active</string>
     <string name="location_notification_text">Selected safe contacts can view your current location.</string>
     <string name="recenter_map">Recenter map</string>
     <string name="location_follow_user">Keep user centered</string>
     <string name="location_stop_following">Stop following user</string>
-    <string name="location_services_disabled" translatable="false">Device location is turned off. Please enable location services in your device settings.</string>
-    <string name="location_choose_duration">How long do you want to share your location?</string>
+<string name="location_choose_duration">How long do you want to share your location?</string>
     <string name="location_one_hour">1 hour</string>
-    <string name="location_hours">%1$d hours</string>
+    <plurals name="location_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
     <string name="location_custom_hours">Custom hours</string>
     <string name="location_custom_range">Enter 1 to 72 hours.</string>
     <string name="location_share_for_custom">Share</string>

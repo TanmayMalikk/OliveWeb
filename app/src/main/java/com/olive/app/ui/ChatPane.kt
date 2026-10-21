@@ -47,8 +47,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import androidx.core.content.FileProvider
-import com.olive.app.data.SafetyDocumentRepository
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.

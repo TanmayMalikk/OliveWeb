@@ -1,16 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="safe_contact_home_title">Tableau de soutien</string>
-    <string name="safe_contact_home_help">Restez en contact et répondez lorsqu’une personne de confiance vous contacte.</string>
-    <string name="safe_contact_actions">Vos outils</string>
-    <string name="safe_contact_messages_help">Trouvez vos contacts de confiance et regroupez vos conversations.</string>
-    <string name="safe_contact_location_help">Voyez les positions en direct que vos amis ont choisi de partager.</string>
-    <string name="safe_contact_notes_help">Conservez vos notes privées et vos rapports d’incident.</string>
-    <string name="safe_contact_profile_help">Consultez votre compte et mettez à jour vos renseignements.</string>
-    <string name="safe_contact_connections">Connexions</string>
-    <string name="safe_contact_connections_help">Les demandes d’amitié et les conversations apparaissent ici.</string>
-    <string name="safe_contact_manage_connections">Gérer les amis et les messages</string>
-    <string name="safe_contact_changes_waiting">Les modifications sont enregistrées sur cet appareil et attendent la synchronisation.</string>
+<string name="safe_contact_home_help">Restez en contact et répondez lorsqu’une personne de confiance vous contacte.</string>
+<string name="safe_contact_messages_help">Trouvez vos contacts de confiance et regroupez vos conversations.</string>
+<string name="safe_contact_notes_help">Conservez vos notes privées et vos rapports d’incident.</string>
+<string name="safe_contact_changes_waiting">Les modifications sont enregistrées sur cet appareil et attendent la synchronisation.</string>
     <string name="safe_contact_profile_intro">Consultez les renseignements associés à votre compte de contact de confiance.</string>
     <string name="safe_contact_edit_profile">Modifier le profil et les paramètres</string>
     <string name="safe_contact_safety_plan_help">Consultez les plans de sécurité que des utilisateurs ont partagés avec vous.</string>

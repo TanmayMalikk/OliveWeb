@@ -60,8 +60,7 @@
     <string name="ui_birthday_required">需要生日</string>
     <string name="ui_email_required">电子邮件（必填）</string>
     <string name="ui_invalid_email">电子邮件无效</string>
-    <string name="ui_create_your_device_pin">创建您的设备 PIN。</string>
-    <string name="ui_invalid_pin">PIN 码无效</string>
+<string name="ui_invalid_pin">PIN 码无效</string>
     <string name="ui_4_6_digits">4–6 位数字</string>
     <string name="ui_pins_differ">PIN 码不同</string>
     <string name="ui_pins_match">PIN 码匹配</string>
@@ -84,12 +83,7 @@
     <string name="ui_contact_name_optional">联系人姓名（可选）</string>
     <string name="ui_complete_both_fields">完成两个字段</string>
     <string name="ui_phone_or_email_optional">电话或电子邮件（可选）</string>
-    <string name="ui_stay_connected_with_people_who_trust_you_for_support">与信任您并提供支持的人保持联系。</string>
-    <string name="ui_notes_and_incidents">笔记和事件</string>
-    <string name="ui_future_feature">未来的功能</string>
-    <string name="ui_future_feature_value">未来功能 %1$s</string>
-    <string name="ui_your_safe_contact_account_information">您的安全联系帐户信息。</string>
-    <string name="ui_use_quick_exit_from_any_page_to_lock_olive_branch">使用从任何页面快速退出来锁定橄榄枝。</string>
+<string name="ui_use_quick_exit_from_any_page_to_lock_olive_branch">使用从任何页面快速退出来锁定橄榄枝。</string>
     <string name="ui_leaving_the_app_locks_olive_branch">离开应用程序会锁定橄榄枝。</string>
     <string name="ui_notes">注释</string>
     <string name="ui_profile">公司简介</string>
@@ -154,7 +148,9 @@
     <string name="ui_value_account_created">%1$s 帐户已创建。</string>
     <string name="ui_unable_to_delete_this_account">无法删除该帐户。</string>
     <string name="ui_value_was_deleted">%1$s 已删除。</string>
-    <string name="ui_incorrect_pin_value_attempts_remaining">PIN 码不正确。剩余 %1$d 尝试次数。</string>
+    <plurals name="ui_incorrect_pin_value_attempts_remaining">
+        <item quantity="other">PIN 码不正确。剩余 %1$d 次尝试。</item>
+    </plurals>
     <string name="ui_staff_and_admin_accounts_are_created_by_an_administrator">员工和管理员帐户由管理员创建。</string>
     <string name="ui_invalid_username_10e538">用户名无效。</string>
     <string name="ui_invalid_password_a2df22">密码无效。</string>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="ui_quinoa">藜麦</string>
     <string name="ui_cucumber">黄瓜</string>
     <string name="ui_tomato">番茄</string>
@@ -136,7 +136,7 @@
     <string name="ui_fraction_decimal">分数/小数</string>
     <string name="ui_1_25_or_7_4">1.25 或 7/4</string>
     <string name="ui_mixed_improper_fraction">带分数/假分数</string>
-    <string name="ui_2_1_3_or_7_3">2 1/3 或 7/3</string>
+    <string name="ui_2_1_3_or_7_3" tools:ignore="TypographyFractions">2 1/3 或 7/3</string>
     <string name="ui_scientific_notation">科学计数法</string>
     <string name="ui_1_2e5_or_1_2_10_5">1.2E5或1.2×10^5</string>
     <string name="ui_numerical_derivative">数值导数</string>

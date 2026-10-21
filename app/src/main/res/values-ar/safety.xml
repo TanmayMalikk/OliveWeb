@@ -25,9 +25,7 @@
     <string name="safety_essentials">الأغراض والوثائق الأساسية</string>
     <string name="safety_dependants">الأطفال والمعالون والحيوانات الأليفة</string>
     <string name="safety_aftercare">بعد المغادرة</string>
-    <string name="safety_documents_intro">احتفظ بالصور ومقاطع الفيديو وصور الوثائق هنا. سيتوفر التخزين والرفع قريبًا؛ لا يتم جمع أي ملفات بعد.</string>
-    <string name="safety_upload">رفع الملفات</string>
-    <string name="safety_inbox">استشارات خطط الأمان</string>
+<string name="safety_inbox">استشارات خطط الأمان</string>
     <string name="safety_inbox_empty">لا توجد خطط أمان مشتركة معك حاليًا.</string>
     <string name="safety_available">متاح للاستشارات الجديدة</string>
     <string name="safety_staff_intro">اعرض الخطط المشتركة معك وعدّلها.</string>
@@ -37,8 +35,7 @@
     <string name="safety_source">إرشادات التخطيط: وكالة الصحة العامة الكندية. عدّل هذه الإرشادات مع شخص تثق به.</string>
     <string name="safety_upload_document">رفع الوثيقة</string>
     <string name="safety_upload_for">رفع الوثيقة: %1$s. قريبًا.</string>
-    <string name="safety_upload_soon">قريبًا. ستظهر هنا أيضًا الوثائق التي ترفعها من خطة السلامة.</string>
-    <string name="safety_storage_photos">الصور</string>
+<string name="safety_storage_photos">الصور</string>
     <string name="safety_storage_videos">مقاطع الفيديو</string>
     <string name="safety_storage_documents">صور الوثائق</string>
     <string name="safety_document_upload_hint">سيتوفر الرفع قريبًا. ستظهر الملفات المرفوعة أيضًا في الوثائق.</string>

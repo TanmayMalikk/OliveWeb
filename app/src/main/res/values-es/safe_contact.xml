@@ -1,16 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="safe_contact_home_title">Panel de apoyo</string>
-    <string name="safe_contact_home_help">Manténgase en contacto y responda cuando alguien de confianza se comunique.</string>
-    <string name="safe_contact_actions">Sus herramientas</string>
-    <string name="safe_contact_messages_help">Encuentre contactos de confianza y mantenga sus conversaciones organizadas.</string>
-    <string name="safe_contact_location_help">Vea las ubicaciones en vivo que sus amistades decidieron compartir.</string>
-    <string name="safe_contact_notes_help">Guarde sus propias notas privadas y registros de incidentes.</string>
-    <string name="safe_contact_profile_help">Revise su cuenta y actualice sus datos personales.</string>
-    <string name="safe_contact_connections">Conexiones</string>
-    <string name="safe_contact_connections_help">Las solicitudes de amistad y las conversaciones aparecen aquí.</string>
-    <string name="safe_contact_manage_connections">Administrar amistades y mensajes</string>
-    <string name="safe_contact_changes_waiting">Los cambios se guardaron en este dispositivo y esperan sincronizarse.</string>
+<string name="safe_contact_home_help">Manténgase en contacto y responda cuando alguien de confianza se comunique.</string>
+<string name="safe_contact_messages_help">Encuentre contactos de confianza y mantenga sus conversaciones organizadas.</string>
+<string name="safe_contact_notes_help">Guarde sus propias notas privadas y registros de incidentes.</string>
+<string name="safe_contact_changes_waiting">Los cambios se guardaron en este dispositivo y esperan sincronizarse.</string>
     <string name="safe_contact_profile_intro">Revise la información vinculada a su cuenta de contacto seguro.</string>
     <string name="safe_contact_edit_profile">Editar perfil y configuración</string>
     <string name="safe_contact_safety_plan_help">Vea los planes de seguridad que los usuarios compartieron con usted.</string>
