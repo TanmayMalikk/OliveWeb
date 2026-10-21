@@ -25,8 +25,13 @@ fun AttachmentPicker(
     // mediaViewModel: MediaViewModel
     onDismiss: () -> Unit
 ) {
-    // This state controls the "Drill Down" UI
     var selectedCategory by remember { mutableStateOf<AttachmentCategory?>(null) }
+    val uid=session.coverAccountId
+    val documentState=session.documents.state
+    LaunchedEffect(selectedCategory,uid) {
+        if(selectedCategory!=AttachmentCategory.Media || uid==null || session.localMode) return@LaunchedEffect
+        session.documents.load(uid,false)
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -97,9 +102,28 @@ fun AttachmentPicker(
                             }
                         }
                         AttachmentCategory.Media -> {
-                            //ToDO change after implementing media uploads
-                            item { Text(stringResource(R.string.media_uploads_not_configured), Modifier.padding(16.dp)) }
-                            // In Phase 2, this will iterate through mediaViewModel.savedMedia
+                            val media=documentState.files.filter { it.ownerUid==uid }
+                            if(documentState.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                            if(documentState.error!=null) item { Text(stringResource(R.string.documents_load_failed),Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error) }
+                            if(!documentState.loading && documentState.error==null && media.isEmpty()) item {
+                                Text(stringResource(if(session.localMode) R.string.documents_account_required else R.string.documents_empty),
+                                    Modifier.padding(16.dp))
+                            }
+                            items(media,key={it.id}) { document ->
+                                ListItem(
+                                    headlineContent={Text(document.name,maxLines=2)},
+                                    supportingContent={Text(document.mimeType)},
+                                    leadingContent={Icon(when {
+                                        document.mimeType.startsWith("image/")->Icons.Outlined.Image
+                                        document.mimeType.startsWith("video/")->Icons.Outlined.Videocam
+                                        else->Icons.Outlined.Description
+                                    },null)},
+                                    modifier=Modifier.clickable {
+                                        session.shareSafetyDocumentInChat(document)
+                                        onDismiss()
+                                    }
+                                )
+                            }
                         }
                         null -> {}
                     }

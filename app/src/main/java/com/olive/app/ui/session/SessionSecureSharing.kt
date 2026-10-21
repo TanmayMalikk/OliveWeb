@@ -6,6 +6,7 @@ import com.olive.app.data.ChatConversation
 import com.olive.app.data.ChatMessage
 import com.olive.app.data.PrivateEntry
 import com.olive.app.data.PrivateEntryKind
+import com.olive.app.data.SafetyDocument
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -65,6 +66,41 @@ internal class SessionSecureSharing(private val runtime:SessionRuntime) {
         } }
     }
 
+    fun share(document:SafetyDocument) {
+        with(runtime) { with(state) {
+            val conversation=activeConversation ?: return
+            val device=enrollment ?: return
+            val documents=safetyDocumentRepository ?: return
+            val chat=secureChatRepository ?: return
+            if(messagingBusy || document.ownerUid!=device.uid) return
+            val token=epoch
+            messagingBusy=true;message=null
+            scope.launch {
+                var newlyGrantedRecipient:String?=null
+                try {
+                    val recipient=conversation.participantIds.first { it!=device.uid }
+                    if(recipient !in document.allowedUsers) newlyGrantedRecipient=recipient
+                    documents.grantAccess(document,device.uid,recipient)
+                    chat.send(conversation.id,AccountIdentity(device.uid,coverUsername),
+                        "SHARED_MEDIA:${document.id}:${document.name}",roomKey(conversation))
+                    if(epoch==token) message=runtime.application.getString(R.string.documents_shared_in_chat)
+                } catch(error:CancellationException) {
+                    newlyGrantedRecipient?.let { recipient -> runCatching {
+                        documents.revokeAccess(document.id,device.uid,recipient)
+                    } }
+                    throw error
+                }
+                catch(_:Exception) {
+                    newlyGrantedRecipient?.let { recipient -> runCatching {
+                        documents.revokeAccess(document.id,device.uid,recipient)
+                    } }
+                    if(epoch==token) message=runtime.application.getString(R.string.documents_share_failed)
+                }
+                finally { if(epoch==token) messagingBusy=false }
+            }
+        } }
+    }
+
     fun open(entryId:String) {
         with(runtime) { with(state) {
             val uid=enrollment?.uid ?: return
@@ -85,6 +121,12 @@ internal class SessionSecureSharing(private val runtime:SessionRuntime) {
 
     suspend fun revokeIfShared(message:ChatMessage,conversation:ChatConversation,currentUid:String) {
         val parts=message.body.split(":",limit=3)
+        if(parts.firstOrNull()=="SHARED_MEDIA") {
+            val entryId=parts.getOrNull(1) ?: return
+            val recipient=conversation.participantIds.firstOrNull { it!=currentUid } ?: return
+            runtime.safetyDocumentRepository?.revokeAccess(entryId,currentUid,recipient)
+            return
+        }
         if(parts.firstOrNull() !in setOf("SHARED_NOTE","SHARED_INCIDENT")) return
         val entryId=parts.getOrNull(1) ?: return
         val recipient=conversation.participantIds.firstOrNull { it!=currentUid } ?: return

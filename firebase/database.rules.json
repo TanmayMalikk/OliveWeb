@@ -1,0 +1,33 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "liveLocations": {
+      "$ownerUid": {
+        ".read": "auth != null && (auth.uid === $ownerUid || data.child('authorized').child(auth.uid).val() === true)",
+        ".write": "auth != null && auth.uid === $ownerUid",
+        ".validate": "!newData.exists() || newData.hasChildren(['ciphertext','updatedAt','active','authorized'])",
+        "ciphertext": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 4096" },
+        "updatedAt": { ".validate": "newData.isNumber()" },
+        "active": { ".validate": "newData.isBoolean()" },
+        "authorized": {
+          "$contactUid": { ".validate": "newData.val() === true && $contactUid !== $ownerUid" }
+        },
+        "$other": { ".validate": false }
+      }
+    },
+    "liveLocationTrails": {
+      "$ownerUid": {
+        ".read": "auth != null && (auth.uid === $ownerUid || root.child('liveLocations').child($ownerUid).child('authorized').child(auth.uid).val() === true)",
+        ".write": "auth != null && auth.uid === $ownerUid",
+        ".indexOn": ["updatedAt"],
+        "$pointId": {
+          ".validate": "newData.hasChildren(['ciphertext','updatedAt'])",
+          "ciphertext": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 2048" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      }
+    }
+  }
+}

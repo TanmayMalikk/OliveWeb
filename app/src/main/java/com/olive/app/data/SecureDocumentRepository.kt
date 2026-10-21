@@ -2,6 +2,7 @@ package com.olive.app.data
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
@@ -34,9 +35,13 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         }.toString()
 
         val documentRef=firestore.collection("privateEntries").document(entryId)
-        val existing=documentRef.get().await()
+        // A first-time read of a missing protected document is denied by Firestore rules.
+        // Treat that specific result as a new share; existing owner documents remain readable.
+        val existing=try { documentRef.get().await() } catch(error:FirebaseFirestoreException) {
+            if(error.code==FirebaseFirestoreException.Code.PERMISSION_DENIED) null else throw error
+        }
         @Suppress("UNCHECKED_CAST")
-        val existingWrapped=existing.get("wrappedKeys") as? Map<String,String> ?: emptyMap()
+        val existingWrapped=existing?.get("wrappedKeys") as? Map<String,String> ?: emptyMap()
         val documentKey:SecretKey = existingWrapped[ownerUid]?.let(KeyManager::unwrapKey)
             ?: EncryptionUtils.generateSymmetricKey()
 
@@ -56,7 +61,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
             "ciphertext" to ciphertext,
             "wrappedKeys" to wrappedKeysMap,
             "allowedUsers" to wrappedKeysMap.keys.toList(),
-            "createdAt" to (existing.get("createdAt") ?: FieldValue.serverTimestamp()),
+            "createdAt" to (existing?.get("createdAt") ?: FieldValue.serverTimestamp()),
             "updatedAt" to FieldValue.serverTimestamp()
         )
 

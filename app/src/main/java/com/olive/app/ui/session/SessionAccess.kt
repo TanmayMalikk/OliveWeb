@@ -50,7 +50,8 @@ internal class SessionAccess(private val runtime:SessionRuntime) {
                     when(result) {
                         PinResult.Accepted -> unlockVerifiedDevice(device,token,SessionScreen.Pin,challenge,usingAppPin=true)
                         is PinResult.Rejected -> if(result.failures >= 5) navigation.quickExit() else {
-                            message=runtime.application.getString(R.string.ui_incorrect_pin_value_attempts_remaining , 5-result.failures)
+                            message=runtime.application.resources.getQuantityString(
+                                R.plurals.ui_incorrect_pin_value_attempts_remaining,5-result.failures,5-result.failures)
                         }
                     }
                 }

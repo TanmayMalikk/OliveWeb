@@ -33,15 +33,19 @@ internal class DeviceLockKey(private val namespace: String) {
                     spec.setUserAuthenticationParameters(0,
                         KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL)
                 } else {
-                    // Android 9/10 require a short validity window for the system credential fallback.
-                    @Suppress("DEPRECATION") // The replacement API starts at Android 11.
-                    spec.setUserAuthenticationValidityDurationSeconds(10)
+                    configureLegacyAuthentication(spec)
                 }
                 init(spec.build()); generateKey()
             }
         }
         return try { DeviceLockChallenge(uid, key, saved?.let { JSONObject(it.toString()) },keyId,alias) }
         catch(error:Exception) { if(saved==null) keys.deleteEntry(alias);throw error }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun configureLegacyAuthentication(spec:KeyGenParameterSpec.Builder) {
+        // Android 9/10 require this API; setUserAuthenticationParameters starts at Android 11.
+        spec.setUserAuthenticationValidityDurationSeconds(10)
     }
 }
 

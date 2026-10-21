@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="safe_contact_home_help">保持联系，并在您信任的人联系时及时回应。</string>
+<string name="safe_contact_messages_help">查找可信联系人，并集中管理对话。</string>
+<string name="safe_contact_notes_help">保存您自己的私人笔记和事件记录。</string>
+<string name="safe_contact_changes_waiting">个人资料更改已保存在此设备上，正在等待同步。</string>
+    <string name="safe_contact_profile_intro">查看与您的安全联系人账户关联的信息。</string>
+    <string name="safe_contact_edit_profile">编辑个人资料和账户设置</string>
+    <string name="safe_contact_safety_plan_help">查看用户与您分享的安全计划。</string>
+    <string name="safe_contact_documents_help">保存自己的文件，并打开与您分享的文档。</string>
+    <string name="safe_contact_shared_plans_intro">打开用户明确分享给您账户的计划。</string>
+    <string name="safe_contact_no_shared_plans">没有共享的安全计划</string>
+    <string name="safe_contact_no_shared_plans_help">连接的用户选择与您分享计划后，计划会显示在这里。</string>
+    <string name="safe_contact_shared_user">已连接用户</string>
+    <string name="safe_contact_view_shared_plan">查看共享计划</string>
+    <string name="safety_share_safe_contacts">与安全联系人分享</string>
+    <string name="safety_share_safe_contacts_help">只有您选择的已接受好友才能打开此计划。您可以随时移除访问权限。</string>
+    <string name="safety_save_sharing">保存分享权限</string>
+    <string name="documents_storage_help">集中保存照片、视频和重要文档。</string>
+    <string name="documents_add">上传文件</string>
+    <string name="documents_upload_failed">无法上传文件。</string>
+    <string name="documents_load_failed">无法加载已保存的文件。</string>
+    <string name="documents_open_failed">无法打开此安全文件。</string>
+    <string name="documents_share_failed">无法分享此安全文件。</string>
+    <string name="documents_shared_in_chat">已分享安全文件。</string>
+    <string name="shared_secure_file">共享的安全文件</string>
+    <string name="trusted_link_title">聊天账户</string>
+    <string name="trusted_link_help">将此联系人与一位已接受的好友关联。Olive 不会自动匹配账户。</string>
+    <string name="trusted_link_no_friends">请先在消息中添加并接受好友，再关联账户。</string>
+    <string name="trusted_link_to">已关联 @%1$s</string>
+    <string name="trusted_link_unavailable">关联的账户已不是已接受的好友</string>
+    <string name="trusted_link_none">关联聊天账户</string>
+    <string name="trusted_unlink">取消关联账户</string>
+    <string name="documents_account_required">文件存储需要登录在线账户。</string> 
+    <string name="documents_all">全部</string>
+    <string name="documents_empty">这里还没有文件</string>
+    <string name="documents_empty_help">上传自己的文件，或请连接的用户与您分享文件。</string>
+    <string name="documents_yours">您的文件</string>
+    <string name="documents_shared_by">由 %1$s 分享</string>
+    <string name="documents_no_viewer">此设备上没有可打开该文件类型的应用。</string>
+    <string name="documents_share_title">分享此文件</string>
+    <string name="documents_share_help">最多选择 10 位已接受好友。只有所选账户才能打开此文件。</string>
+    <string name="open">打开</string>
+    <string name="share">分享</string>
+</resources>

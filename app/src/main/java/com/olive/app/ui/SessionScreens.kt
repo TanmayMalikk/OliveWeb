@@ -81,7 +81,8 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
     }
     CompositionLocalProvider(LocalAccessibilityFocusCoordinator provides accessibilityFocus) {
     val coverTitle=session.coverType.localizedTitle(uiText)
-    val showSupport=session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER
+    val inActiveChat=session.page==SafePage.Messages && session.activeConversation!=null
+    val showSupport=session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER && !inActiveChat
     val showQuickExit=(showSupport && !(session.page==SafePage.Messages && session.activeConversation!=null)) ||
         (session.screen==SessionScreen.Pin && session.usesCover)
     var supportExpanded by remember(session.screen,session.page,session.coverAccountId) { mutableStateOf(false) }
@@ -131,7 +132,7 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 SessionScreen.Pin -> uiText(if(session.usesDeviceLock || !session.canUseAppPin) R.string.entry_device_lock else R.string.enter_pin)
                                 SessionScreen.Safe -> when(session.page) {
                                     SafePage.Home -> uiText(R.string.home);SafePage.Notes -> uiText(R.string.ui_notes);SafePage.Messages -> uiText(R.string.messages)
-                                    SafePage.Profile -> uiText(R.string.ui_profile);SafePage.Contacts -> uiText(R.string.ui_contacts);SafePage.Settings -> uiText(R.string.settings);SafePage.Activity -> uiText(R.string.ui_activity);SafePage.Hotlines -> uiText(R.string.support_hotlines);SafePage.SafetyPlan -> uiText(R.string.support_safety_plan);SafePage.Documents -> uiText(R.string.support_documents)
+                                    SafePage.Profile -> uiText(R.string.ui_profile);SafePage.Contacts -> uiText(R.string.ui_contacts);SafePage.Settings -> uiText(R.string.settings);SafePage.Activity -> uiText(R.string.ui_activity);SafePage.Hotlines -> uiText(R.string.support_hotlines);SafePage.SafetyPlan -> uiText(R.string.support_safety_plan);SafePage.Documents -> uiText(R.string.support_documents);SafePage.Location -> uiText(R.string.location_map)
                                 }
                                 SessionScreen.Loading -> uiText(R.string.ui_loading)
                                 SessionScreen.Welcome -> uiText(R.string.welcome)
