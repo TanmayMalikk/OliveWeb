@@ -42,6 +42,8 @@ abstract class OliveUiTestBase {
                 if(android.os.Build.VERSION.SDK_INT>=android.os.Build.VERSION_CODES.Q)
                     instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
             }
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.CAMERA)
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName,android.Manifest.permission.RECORD_AUDIO)
             val directory=context.noBackupFilesDir
             listOf("olive-demo.vault","olive-demo.vault.bak","olive-demo.vault.new",
                 "olive-safety-demo.vault","olive-safety-demo.vault.bak","olive-safety-demo.vault.new",

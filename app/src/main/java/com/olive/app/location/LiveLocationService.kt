@@ -50,7 +50,7 @@ class LiveLocationService:Service() {
             lastMotionAt=System.currentTimeMillis()
             lastUploadAt=0L
             requestImmediateLocation()
-            return START_STICKY
+            return START_REDELIVER_INTENT
         }
         val preferences=getSharedPreferences("olive_location_sharing",Context.MODE_PRIVATE)
         ownerUid=intent?.getStringExtra(OWNER_UID) ?: preferences.getString("live_owner_uid",null).orEmpty()
@@ -78,7 +78,9 @@ class LiveLocationService:Service() {
         fused.removeLocationUpdates(callback)
         try { fused.requestLocationUpdates(request,callback,mainLooper) }
         catch(_:SecurityException) { stopSharing();return START_NOT_STICKY }
-        return START_STICKY
+        // Redeliver the encrypted session configuration if Android reclaims this process. The service is
+        // independent of the activity task, so swiping the app away does not end an active timed share.
+        return START_REDELIVER_INTENT
     }
 
     private fun handleLocation(location:Location) {
@@ -150,18 +152,18 @@ class LiveLocationService:Service() {
             getString(R.string.location_notification_channel),NotificationManager.IMPORTANCE_LOW))
     }
     private fun notification():Notification {
-        val stop=PendingIntent.getService(this,1,Intent(this,LiveLocationService::class.java).setAction(STOP),PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         return NotificationCompat.Builder(this,CHANNEL_ID).setSmallIcon(R.drawable.ic_app_info_blank)
             .setContentTitle(getString(R.string.location_notification_title)).setContentText(getString(R.string.location_notification_text))
-            .setOngoing(true).setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .addAction(0,getString(R.string.stop_sharing_location),stop).build()
+            .setOngoing(true).setOnlyAlertOnce(true).setSilent(true).setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
     }
 
     companion object {
         const val OWNER_UID="owner_uid";const val DISPLAY_NAME="display_name";const val CONTACT_UIDS="contact_uids"
         const val EXPIRES_AT="expires_at";const val STOP="stop";const val PING="ping"
         const val RESET_TRAIL="reset_trail"
-        private const val CHANNEL_ID="olive_live_location";private const val NOTIFICATION_ID=4102
+        private const val CHANNEL_ID="olive_live_location_v3";private const val NOTIFICATION_ID=4102
         private const val MOVING_SAMPLE_MILLIS=2_000L
         private const val MOVING_UPLOAD_MILLIS=2_000L
         private const val STATIONARY_UPLOAD_MILLIS=180_000L

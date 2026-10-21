@@ -196,6 +196,14 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
     {roomKeys,participantPublicKeys,updatedAt:serverTimestamp()}));
   await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),
     {roomKeys:{'social-a':'replacement','social-b':'replacement'},updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(alice,'messageDirectory/social_alice'),
+    {publicKey:'alice-key-rotated',updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),{
+    roomKeys:{'social-a':'wrapped-a-rotated','social-b':'wrapped-b-rotated'},
+    participantPublicKeys:{'social-a':'alice-key-rotated','social-b':'bob-key'},updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),{
+    roomKeys:{'social-a':'unauthorized-replacement','social-b':'unauthorized-replacement'},
+    participantPublicKeys:{'social-a':'alice-key-rotated','social-b':'bob-key'},updatedAt:serverTimestamp()}));
   const encryptedRef=doc(alice,'conversations/'+friendshipId+'/messages/message-2');
   await assertSucceeds(setDoc(encryptedRef,{senderUid:'social-a',senderUsername:'social_alice',
     ciphertext:'encrypted-payload',deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
