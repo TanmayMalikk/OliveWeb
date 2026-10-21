@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
 import com.paddle.ocr.PaddleOCR
+import com.paddle.ocr.PaddleOCRConfig
+import com.paddle.ocr.EngineConfig
+import com.paddle.ocr.model.OCRResult
 import com.paddle.ocr.util.OpenCVUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -13,32 +16,47 @@ data class OcrResult(
     val success: Boolean,
     val extractedText: String,
     val confidence: Float,
+    val rawResults: List<OCRResult> = emptyList(),
     val detectedFields: Map<String, String> = emptyMap()
 )
 
 /*
 Class PaddleOcrManager
     Purpose: Delegates directly to the official com.paddle.ocr.PaddleOCR SDK module,
-    initializing OpenCV native libraries in init to prevent UnsatisfiedLinkError.
+    returning pure raw text output without per-line confidence annotations.
  */
 class PaddleOcrManager(private val context: Context) {
 
     private var paddleOcr: PaddleOCR? = null
 
-    init {
-        try {
-            // Initialize OpenCV native libraries immediately upon instantiation
-            OpenCVUtils.init(context.applicationContext)
-        } catch (e: Exception) {
-            Log.e("PaddleOcrManager", "Failed to initialize OpenCV in init", e)
-        }
-    }
-
     private suspend fun ensureInitialized(): PaddleOCR {
         if (paddleOcr == null) {
             try {
                 OpenCVUtils.init(context.applicationContext)
-                paddleOcr = PaddleOCR.create(context)
+                paddleOcr = PaddleOCR.create(
+                    context = context,
+                    config = PaddleOCRConfig(
+                        detImgMode = "BGR",
+                        detLimitSideLen = 960,
+                        detLimitType = "max",
+                        detMaxSideLimit = 960,
+                        detThresh = 0.3f,
+                        detBoxThresh = 0.6f,
+                        detUnclipRatio = 1.5f,
+                        detMaxCandidates = 3000,
+                        detUseDilation = false,
+                        detScoreMode = "fast",
+                        detBoxType = "quad",
+                        recScoreThresh = 0.0f,
+                        recBatchSize = 1,
+                    ),
+                    engineConfig = EngineConfig(
+                        numThreads = 4
+                    ),
+                    detModelAssetPath = "models/det/inference.onnx",
+                    recModelAssetPath = "models/rec/inference.onnx",
+                    recConfigAssetPath = "models/rec/inference.yml"
+                )
             } catch (e: Exception) {
                 Log.e("PaddleOcrManager", "Failed to initialize PaddleOCR instance", e)
                 throw e
@@ -61,20 +79,22 @@ class PaddleOcrManager(private val context: Context) {
             val ocr = ensureInitialized()
             val runResult = ocr.recognize(imageBytes)
 
+            // Return pure raw text lines without confidence annotations
             val extractedText = runResult.results.joinToString("\n") { it.text }
+                .ifBlank { "No text recognized from document." }
+
             val avgConfidence = if (runResult.results.isNotEmpty()) {
                 runResult.results.map { it.confidence }.average().toFloat()
             } else {
                 0.95f
             }
 
-            val fields = parseFields(extractedText)
-
             OcrResult(
                 success = true,
-                extractedText = extractedText.ifBlank { "No text recognized from document." },
+                extractedText = extractedText,
                 confidence = avgConfidence,
-                detectedFields = fields
+                rawResults = runResult.results,
+                detectedFields = mapOf("line_count" to runResult.lineCount.toString())
             )
         } catch (e: Exception) {
             Log.e("PaddleOcrManager", "PaddleOCR SDK recognition failed", e)
@@ -88,47 +108,24 @@ class PaddleOcrManager(private val context: Context) {
             val runResult = ocr.recognize(bitmap)
 
             val extractedText = runResult.results.joinToString("\n") { it.text }
+                .ifBlank { "No text recognized from bitmap." }
+
             val avgConfidence = if (runResult.results.isNotEmpty()) {
                 runResult.results.map { it.confidence }.average().toFloat()
             } else {
                 0.95f
             }
 
-            val fields = parseFields(extractedText)
-
             OcrResult(
                 success = true,
-                extractedText = extractedText.ifBlank { "No text recognized from bitmap." },
+                extractedText = extractedText,
                 confidence = avgConfidence,
-                detectedFields = fields
+                rawResults = runResult.results,
+                detectedFields = mapOf("line_count" to runResult.lineCount.toString())
             )
         } catch (e: Exception) {
             Log.e("PaddleOcrManager", "PaddleOCR SDK recognition failed", e)
             OcrResult(false, "OCR Error: ${e.localizedMessage ?: "Unknown exception"}", 0f)
         }
-    }
-
-    private fun parseFields(text: String): Map<String, String> {
-        val fields = mutableMapOf<String, String>()
-        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
-        
-        for (line in lines) {
-            val upper = line.uppercase()
-            if (upper.contains("NO") || upper.contains("ID") || upper.contains("DL") || upper.contains("LICENSE") || upper.any { it.isDigit() }) {
-                if (!fields.containsKey("document_number") && line.length >= 5) {
-                    fields["document_number"] = line
-                }
-            }
-            if (upper.contains("NAME") || upper.contains("HOLDER") || upper.contains("FULL")) {
-                if (!fields.containsKey("holder_name")) {
-                    fields["holder_name"] = line
-                }
-            }
-        }
-
-        if (!fields.containsKey("document_number")) fields["document_number"] = lines.firstOrNull { it.any { c -> c.isDigit() } } ?: "Not detected"
-        if (!fields.containsKey("holder_name")) fields["holder_name"] = lines.firstOrNull { it != fields["document_number"] && !it.any { c -> c.isDigit() } } ?: "Not detected"
-
-        return fields
     }
 }
