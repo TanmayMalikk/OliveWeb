@@ -7,6 +7,7 @@ import com.olive.app.data.MapLocationPoint
 import com.olive.app.data.LocationTrailPoint
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import javax.crypto.SecretKey
 
 internal object LiveLocationState {
     private val mutable=MutableStateFlow<MapLocationPoint?>(null)
@@ -36,9 +37,10 @@ internal object LiveLocationController {
     fun expiresAt(context:Context)=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
         .getLong("live_expires_at",0L)
 
-    fun start(context:Context,uid:String,name:String,contactUids:Set<String>,expiresAt:Long) {
+    fun start(context:Context,uid:String,name:String,contactUids:Set<String>,expiresAt:Long,key:SecretKey) {
         require(contactUids.size<=10)
         require(expiresAt>System.currentTimeMillis())
+        LiveLocationKeyStore(context).save(uid,key)
         context.getSharedPreferences(PREFS,Context.MODE_PRIVATE).edit().putBoolean("live_active",true)
             .putString("live_owner_uid",uid).putString("live_owner_name",name).putStringSet("live_contacts",contactUids)
             .putLong("live_expires_at",expiresAt).apply()
@@ -57,5 +59,6 @@ internal object LiveLocationController {
             .putExtra(LiveLocationService.OWNER_UID,ownerUid).putExtra(LiveLocationService.CONTACT_UIDS,contacts.toTypedArray()))
         preferences.edit().putBoolean("live_active",false).remove("live_owner_uid").remove("live_owner_name")
             .remove("live_contacts").remove("live_expires_at").apply()
+        ownerUid?.let { LiveLocationKeyStore(context).remove(it) }
     }
 }

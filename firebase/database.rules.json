@@ -6,11 +6,8 @@
       "$ownerUid": {
         ".read": "auth != null && (auth.uid === $ownerUid || data.child('authorized').child(auth.uid).val() === true)",
         ".write": "auth != null && auth.uid === $ownerUid",
-        ".validate": "!newData.exists() || newData.hasChildren(['displayName','latitude','longitude','accuracy','updatedAt','active','authorized'])",
-        "displayName": { ".validate": "newData.isString() && newData.val().length <= 120" },
-        "latitude": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
-        "longitude": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
-        "accuracy": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        ".validate": "!newData.exists() || newData.hasChildren(['ciphertext','updatedAt','active','authorized'])",
+        "ciphertext": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 4096" },
         "updatedAt": { ".validate": "newData.isNumber()" },
         "active": { ".validate": "newData.isBoolean()" },
         "authorized": {
@@ -25,9 +22,8 @@
         ".write": "auth != null && auth.uid === $ownerUid",
         ".indexOn": ["updatedAt"],
         "$pointId": {
-          ".validate": "newData.hasChildren(['latitude','longitude','updatedAt'])",
-          "latitude": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
-          "longitude": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+          ".validate": "newData.hasChildren(['ciphertext','updatedAt'])",
+          "ciphertext": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 2048" },
           "updatedAt": { ".validate": "newData.isNumber()" },
           "$other": { ".validate": false }
         }

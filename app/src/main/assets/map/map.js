@@ -16,6 +16,8 @@ const markerTargets={};
 const trails={};
 let accuracyCircle=null;
 let points=[];
+let followEnabled=false;
+let followUid=null;
 function markerIcon(point){
   const className=point.live?'olive-live-dot':(point.lastKnown?'olive-last-known-dot':'olive-contact-dot');
   const size=(point.live||point.lastKnown)?24:22;
@@ -30,6 +32,7 @@ function animateMarker(uid,marker,target,duration){
     const progress=Math.min(1,(now-began)/duration);
     const eased=1-Math.pow(1-progress,3);
     marker.setLatLng([start.lat+(target[0]-start.lat)*eased,start.lng+(target[1]-start.lng)*eased]);
+    if(followEnabled&&followUid===uid) map.panTo(marker.getLatLng(),{animate:false});
     if(progress<1) markerAnimations[uid]=requestAnimationFrame(frame);
     else delete markerAnimations[uid];
   }
@@ -88,4 +91,12 @@ window.oliveZoomIn=function(){map.zoomIn();};
 window.oliveZoomOut=function(){map.zoomOut();};
 window.oliveRecenter=function(){
   if(points.length) map.setView([points[0].latitude,points[0].longitude],14);
+};
+window.oliveSetFollow=function(enabled,uid){
+  followEnabled=!!enabled;
+  followUid=uid||null;
+  if(followEnabled){
+    const target=points.find(point=>(point.uid||point.name)===followUid);
+    if(target) map.panTo([target.latitude,target.longitude],{animate:true,duration:.5});
+  }
 };

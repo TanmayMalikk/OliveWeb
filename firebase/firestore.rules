@@ -267,16 +267,14 @@ service cloud.firestore {
     // Safe contacts explicitly share only their saved onboarding location with individual accepted friends.
     match /sharedLocations/{ownerUid}/recipients/{recipientUid} {
       function validSharedLocation(data) {
-        return data.keys().hasOnly(['ownerUid','recipientUid','friendshipId','contactName','latitude','longitude','label','updatedAt'])
+          return data.keys().hasOnly(['ownerUid','recipientUid','friendshipId','ciphertext','wrappedKey','updatedAt'])
           && data.ownerUid == ownerUid && data.recipientUid == recipientUid && ownerUid != recipientUid
           && data.friendshipId is string
           && exists(/databases/$(database)/documents/friendships/$(data.friendshipId))
           && ownerUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
           && recipientUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
-          && data.contactName is string && data.contactName.size() > 0 && data.contactName.size() <= 120
-          && data.latitude is number && data.latitude >= -90 && data.latitude <= 90
-          && data.longitude is number && data.longitude >= -180 && data.longitude <= 180
-          && data.label is string && data.label.size() <= 500
+            && data.ciphertext is string && data.ciphertext.size() > 0 && data.ciphertext.size() <= 4000
+            && data.wrappedKey is string && data.wrappedKey.size() > 0 && data.wrappedKey.size() <= 1000
           && data.updatedAt is timestamp;
       }
       allow get: if signedIn() && (request.auth.uid == ownerUid || request.auth.uid == recipientUid);
@@ -288,12 +286,13 @@ service cloud.firestore {
     // Presence records let an authorized contact begin listening before the first live coordinate arrives.
     match /liveLocationShares/{ownerUid}/recipients/{recipientUid} {
       function validLiveShare(data) {
-        return data.keys().hasOnly(['ownerUid','recipientUid','friendshipId','createdAt'])
+          return data.keys().hasOnly(['ownerUid','recipientUid','friendshipId','wrappedKey','createdAt'])
           && data.ownerUid == ownerUid && data.recipientUid == recipientUid && ownerUid != recipientUid
           && data.friendshipId is string
           && exists(/databases/$(database)/documents/friendships/$(data.friendshipId))
           && ownerUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
           && recipientUid in get(/databases/$(database)/documents/friendships/$(data.friendshipId)).data.participantIds
+            && data.wrappedKey is string && data.wrappedKey.size() > 0 && data.wrappedKey.size() <= 1000
           && data.createdAt is timestamp;
       }
       allow get: if signedIn() && (request.auth.uid == ownerUid || request.auth.uid == recipientUid);
@@ -360,10 +359,9 @@ service cloud.firestore {
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderUsername is string
           && validMessagingEmail(request.resource.data.senderUsername)
-          && ((request.resource.data.body is string && request.resource.data.body.size() > 0
-              && request.resource.data.body.size() <= 2000 && !request.resource.data.keys().hasAny(['ciphertext']))
-            || (request.resource.data.ciphertext is string && request.resource.data.ciphertext.size() > 0
-              && request.resource.data.ciphertext.size() <= 12000 && !request.resource.data.keys().hasAny(['body'])))
+            && request.resource.data.ciphertext is string && request.resource.data.ciphertext.size() > 0
+            && request.resource.data.ciphertext.size() <= 12000
+            && !request.resource.data.keys().hasAny(['body'])
           && request.resource.data.deleted == false
           && request.resource.data.clientSentAt is int;
         allow update: if conversationParticipant(parentConversation())
