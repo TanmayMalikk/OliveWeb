@@ -5,12 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.olive.app.data.*
 import com.olive.app.ui.session.SessionRuntime
+import com.olive.app.ui.documents.SafetyDocumentsController
+import com.olive.app.ui.location.LocationMapController
 import com.olive.app.security.SafeEntryMethod
 import com.olive.app.security.allowsAppPin
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 class SessionViewModel(application:Application):AndroidViewModel(application) {
     private val runtime=SessionRuntime(application,viewModelScope)
+    internal val documents=SafetyDocumentsController(application,viewModelScope,runtime.safetyDocumentRepository)
+    internal val locationMap=LocationMapController(application,viewModelScope,runtime.locationSharingRepository)
     val screen get()=runtime.state.screen
     val pinChallengeVersion get()=runtime.state.pinChallengeVersion
     val accessibilityExitVersion get()=runtime.state.accessibilityExitVersion
@@ -122,6 +126,7 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun sendMessage(text: String, onSent: ()->Unit = {}) = runtime.conversationActions.sendMessage(text,onSent)
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
     fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
+    fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
     fun openSharedPrivateEntry(entryId:String) = runtime.secureSharing.open(entryId)
     fun closeSharedPrivateEntry() = runtime.secureSharing.close()
     fun noteInteraction() = runtime.privacy.noteInteraction()
@@ -148,9 +153,9 @@ class SessionViewModel(application:Application):AndroidViewModel(application) {
     fun changeTrigger(trigger: String, pin: String) = runtime.settings.changeTrigger(trigger,pin)
     fun saveContacts(value: List<SafeContact>) = runtime.settings.saveContacts(value)
     fun sync() = runtime.settings.sync()
-    fun signOut() = runtime.auth.signOut()
+    fun signOut() { documents.clear();locationMap.clear();runtime.auth.signOut() }
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) = runtime.settings.changePassword(currentPassword,newPassword,confirmation)
     fun changePin(currentPin: String, newPin: String, confirmation: String) = runtime.settings.changePin(currentPin,newPin,confirmation)
 
-    override fun onCleared() { runtime.safety.close();runtime.messaging.stopMessaging() }
+    override fun onCleared() { documents.clear();locationMap.clear();runtime.safety.close();runtime.messaging.stopMessaging() }
 }

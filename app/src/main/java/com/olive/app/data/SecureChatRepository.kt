@@ -66,7 +66,7 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
                         row.getString("ciphertext")!=null -> runCatching {
                             EncryptionUtils.decryptText(row.getString("ciphertext").orEmpty(),roomKey)
                         }.getOrDefault("")
-                        else -> row.getString("body").orEmpty()
+                        else -> ""
                     }
                     ChatMessage(row.id,sender,row.getString("senderUsername").orEmpty(),body,
                         row.getTimestamp("sentAt")?.toDate()?.time ?: row.getLong("clientSentAt") ?: 0L,deleted)

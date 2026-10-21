@@ -50,4 +50,6 @@
     <string name="support_device_location_current">设备位置：%1$s</string>
     <string name="support_saved_location_current">已保存的位置：%1$s</string>
     <string name="support_location_permissions">应用权限设置</string>
+    <string name="support_resource_hotline">求助热线</string>
+    <string name="support_resource_shelter">庇护所</string>
 </resources>

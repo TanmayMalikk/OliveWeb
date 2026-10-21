@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.CancellationSignal
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.Lifecycle
 import com.olive.app.R
 import com.olive.app.ui.session.DeviceLockRequest
@@ -62,8 +63,7 @@ class AndroidDeviceLock(private val activity: ComponentActivity, private val onA
     private fun showLegacyPrompt(value:DeviceLockRequest) {
         val builder=BiometricPrompt.Builder(activity).setTitle(activity.getString(R.string.entry_device_lock)).setSubtitle(subtitle(value))
         if(Build.VERSION.SDK_INT>=29) {
-            @Suppress("DEPRECATION") // Android 10 uses this API for the device-credential fallback.
-            builder.setDeviceCredentialAllowed(true)
+            allowLegacyDeviceCredential(builder)
         } else builder.setNegativeButton(activity.getString(R.string.entry_use_phone_lock),activity.mainExecutor) { _,_ ->
             launchCredential(value)
         }
@@ -84,13 +84,24 @@ class AndroidDeviceLock(private val activity: ComponentActivity, private val onA
 
     private fun launchCredential(value:DeviceLockRequest) {
         if(request!==value) return
-        @Suppress("DEPRECATION") // Android 9/10 cannot use a credential-capable auth-per-use CryptoObject.
-        val intent=activity.getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent(
-            activity.getString(R.string.entry_device_lock),subtitle(value))
+        val intent=createLegacyCredentialIntent(value)
         if(intent==null) { finish(value,null);return }
         awaitingCredential=true
         credentialLauncher.launch(intent)
     }
+
+    @Suppress("DEPRECATION")
+    @RequiresApi(29)
+    private fun allowLegacyDeviceCredential(builder:BiometricPrompt.Builder) {
+        // Android 10 has no allowed-authenticators replacement; this path never runs on Android 11+.
+        builder.setDeviceCredentialAllowed(true)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun createLegacyCredentialIntent(value:DeviceLockRequest)=
+        // Android 9/10 cannot use a credential-capable auth-per-use CryptoObject.
+        activity.getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent(
+            activity.getString(R.string.entry_device_lock),subtitle(value))
 
     private fun finish(value:DeviceLockRequest,cipher:javax.crypto.Cipher?) {
         if(request!==value) return

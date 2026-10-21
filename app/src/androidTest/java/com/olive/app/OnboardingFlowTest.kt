@@ -38,9 +38,15 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Safe Contact").assertExists()
         compose.onNodeWithTag("safe_contact_messages").assertExists()
         compose.onNodeWithTag("safe_contact_notes").assertExists()
+        compose.onNodeWithTag("safe_contact_safety_plan").assertExists()
+        compose.onNodeWithTag("safe_contact_documents").assertExists()
+        compose.onNodeWithTag("safe_contact_manage_connections").assertDoesNotExist()
+        compose.onNodeWithTag("sign_out").assertDoesNotExist()
         compose.onNodeWithTag("safe_contact_activity").assertDoesNotExist()
         compose.onNodeWithTag("change_device_pin").assertDoesNotExist()
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+        click("safe_contact_settings");waitFor("save_settings")
+        compose.onNodeWithTag("sign_out").assertExists()
     }
 
     @Test fun onboardingNeedsCityButNotAFullDeliveryAddress() {

@@ -9,6 +9,8 @@ import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // Connects account messaging and manages live subscriptions.
 internal class SessionMessaging(private val runtime:SessionRuntime) {
@@ -114,15 +116,20 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                 if(ids==observedFriendshipIds) return
                 observedFriendshipIds=ids
                 conversationSubscription?.close()
-                conversationSubscription=messagingRepository?.observeConversations(ids.toList(),{ rows ->
+                conversationSubscription=messagingRepository?.observeConversations(deviceUid(),ids.toList(),{ rows ->
                     if(epoch==token && screen==SessionScreen.Safe) {
+                        if(conversationLoadFailed) message=null
+                        conversationLoadFailed=false
                         conversations=rows
                         activeConversation?.let { active -> rows.firstOrNull { it.id==active.id }?.let { updated ->
                             activeConversation=updated
                             conversationActions.markConversationRead(updated)
                         } }
                     }
-                },{ error -> if(epoch==token && page==SafePage.Messages) message=runtime.application.getString(R.string.ui_unable_to_load_messages_value , error) })
+                },{ error -> if(epoch==token && page==SafePage.Messages) {
+                    conversationLoadFailed=true
+                    message=runtime.application.getString(R.string.ui_unable_to_load_messages_value,error)
+                } })
             }
         }
     }
@@ -155,6 +162,7 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
                 socialSubscription?.close();socialSubscription=null
                 conversationSubscription?.close();conversationSubscription=null
                 observedFriendshipIds=emptySet()
+                conversationLoadFailed=false
                 messageSubscription?.close();messageSubscription=null
                 activeConversation=null;chatMessages=emptyList();messagingBusy=false
                 messagingNeedsReconnect=false
@@ -166,13 +174,19 @@ internal class SessionMessaging(private val runtime:SessionRuntime) {
         }
     }
 
+    private fun deviceUid()=runtime.enrollment?.uid ?: error("No active account")
+
     suspend fun registerMessagingIdentity(identity:AccountIdentity) {
         with(runtime) {
             with(state) {
-                val marker=messagingIdentityMarker(identity)
-                if(!shouldRegisterMessagingIdentity(cloudState.getString("registered_identity",null),identity)) return
-                messagingRepository?.registerUser(identity)
+                val publicKey=withContext(Dispatchers.Default) { KeyManager.getOrCreatePublicKey() }
+                val marker=messagingIdentityMarker(identity,publicKey.encoded)
+                val savedMarker=cloudState.getString("registered_identity",null)
+                if(verifiedMessagingIdentityMarker==marker &&
+                    !shouldRegisterMessagingIdentity(savedMarker,identity,publicKey.encoded)) return
+                messagingRepository?.registerUser(identity,publicKey)
                 cloudState.edit { putString("registered_identity",marker) }
+                verifiedMessagingIdentityMarker=marker
             }
         }
     }

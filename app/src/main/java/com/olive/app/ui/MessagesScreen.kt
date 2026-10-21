@@ -177,10 +177,10 @@ import com.olive.app.data.*
             OutlinedButton(onClick={session.openConversation(conversation)},modifier=Modifier.animateItem().fillMaxWidth().testTag("conversation_"+conversation.id)) {
                 Column(Modifier.fillMaxWidth()) {
                     Text(conversation.peerUsername(currentUid),style=MaterialTheme.typography.titleMedium)
-                    Text(when(conversation.lastMessage) {
-                        "Secure message" -> uiText(R.string.secure_message)
-                        "Message unsent" -> uiText(R.string.message_unsent)
-                        else -> conversation.lastMessage.ifBlank { uiText(R.string.new_conversation) }
+                    Text(when {
+                        conversation.lastMessage=="Message unsent" -> uiText(R.string.message_unsent)
+                        conversation.lastMessageId.isNotBlank() -> uiText(R.string.secure_message)
+                        else -> uiText(R.string.new_conversation)
                     },maxLines=1,color=Muted)
                 }
             }

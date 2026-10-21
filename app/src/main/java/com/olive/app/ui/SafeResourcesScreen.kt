@@ -35,8 +35,11 @@ internal val LocalLocationPermissionRequest=staticCompositionLocalOf<suspend ()-
     val context=LocalContext.current
     val directory by produceState<Result<HotlineDirectory>?>(null,context) {
         value=withContext(Dispatchers.IO) { runCatching {
-            HotlineDirectory.parse(context.assets.open("hotlines/resources.json").bufferedReader().use { it.readText() },
-                context.assets.open("hotlines/cities.json").bufferedReader().use { it.readText() })
+            val files=context.assets.list("hotlines/provinces").orEmpty().associate { name ->
+                name.removePrefix("Resources").removeSuffix(".json") to
+                    context.assets.open("hotlines/provinces/$name").bufferedReader().use { it.readText() }
+            }
+            HotlineDirectory.parseProvinceFiles(files)
         } }
     }
     val catalog=directory?.getOrNull()
