@@ -62,11 +62,11 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
             Button(
                 onClick = {
                     val sampleBytes = runCatching {
-                        context.assets.open("OCRmodels/test_doc.png").use { it.readBytes() }
+                        context.assets.open("models/test_doc.png").use { it.readBytes() }
                     }.getOrNull() ?: runCatching {
                         context.assets.open("test_doc.png").use { it.readBytes() }
                     }.getOrNull() ?: runCatching {
-                        context.assets.open("OCRmodels/test_doc.jpg").use { it.readBytes() }
+                        context.assets.open("models/test_doc.jpg").use { it.readBytes() }
                     }.getOrNull() ?: runCatching {
                         context.assets.open("test_doc.jpg").use { it.readBytes() }
                     }.getOrNull()
