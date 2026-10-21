@@ -37,7 +37,7 @@ internal fun CalculatorTools(
 ) {
     val uiText=rememberResourceText()
     val categories=remember { AdvancedTool.entries.map { it.category }.distinct() }
-    var category by remember { mutableStateOf(categories.first()) }
+    var category by remember { mutableIntStateOf(categories.first()) }
     var selected by remember { mutableStateOf(AdvancedTool.entries.first()) }
     var input by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<String?>(null) }

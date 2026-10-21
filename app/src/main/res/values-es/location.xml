@@ -25,13 +25,16 @@
     <string name="share_saved_location">Compartir ubicación guardada</string>
     <string name="share_saved_location_help">Comparte con tus amistades aceptadas la ubicación guardada al crear la cuenta. El dispositivo no se rastrea continuamente.</string>
     <string name="location_saved_address_unavailable">No se pudo colocar la ubicación guardada en el mapa. Selecciona una sugerencia de dirección en los ajustes de la cuenta e inténtalo de nuevo.</string>
-    <string name="location_waiting">Esperando una ubicación disponible.</string>
-    <string name="location_notification_channel">Ubicación en vivo compartida</string>
+<string name="location_notification_channel">Ubicación en vivo compartida</string>
     <string name="location_notification_title">La ubicación se está compartiendo</string>
     <string name="location_notification_text">Los contactos seguros seleccionados pueden ver tu ubicación actual.</string>
     <string name="location_choose_duration">¿Durante cuánto tiempo quieres compartir tu ubicación?</string>
     <string name="location_one_hour">1 hora</string>
-    <string name="location_hours">%1$d horas</string>
+    <plurals name="location_hours">
+        <item quantity="one">%1$d hora</item>
+        <item quantity="many">%1$d horas</item>
+        <item quantity="other">%1$d horas</item>
+    </plurals>
     <string name="location_custom_hours">Horas personalizadas</string>
     <string name="location_custom_range">Ingresa entre 1 y 72 horas.</string>
     <string name="location_share_for_custom">Compartir</string>

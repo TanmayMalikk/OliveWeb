@@ -58,7 +58,8 @@ internal class SessionEntrySettings(private val runtime:SessionRuntime) {
                 if(!current()) return@runOperation
                 if(result is PinResult.Rejected) {
                     if(result.failures>=5) navigation.quickExit()
-                    else state.message=application.getString(R.string.ui_incorrect_pin_value_attempts_remaining,5-result.failures)
+                    else state.message=application.resources.getQuantityString(
+                        R.plurals.ui_incorrect_pin_value_attempts_remaining,5-result.failures,5-result.failures)
                     return@runOperation
                 }
             }
