@@ -1,4 +1,7 @@
 package com.olive.app.ui.covers.calculator
+import com.olive.app.ui.requireText
+import com.olive.app.ui.ResourceFailure
+import com.olive.app.R
 
 import java.math.BigDecimal
 import java.math.MathContext
@@ -20,7 +23,7 @@ internal fun parseCalculatorNumber(raw:String):Double = normalizeCalculatorNotat
 
 // Large and tiny answers avoid long runs of zeroes while ordinary values stay easy to read.
 internal fun formatCalculatorNumber(value:Double,significantDigits:Int=10):String {
-    require(value.isFinite()) { "The result is not a finite number." }
+    requireText(value.isFinite()) { ResourceFailure(R.string.ui_the_result_is_not_a_finite_number) }
     if(value==0.0) return "0"
     val magnitude=abs(value)
     if(magnitude !in 1e-6..<1e9) {
@@ -31,7 +34,7 @@ internal fun formatCalculatorNumber(value:Double,significantDigits:Int=10):Strin
 }
 
 internal fun formatScientificCalculatorNumber(value:Double,significantDigits:Int=10):String {
-    require(value.isFinite()) { "The result is not a finite number." }
+    requireText(value.isFinite()) { ResourceFailure(R.string.ui_the_result_is_not_a_finite_number) }
     if(value==0.0) return "0E0"
     val parts=String.format(Locale.US,"%.${significantDigits.coerceIn(2,15)-1}E",value).split('E')
     val mantissa=parts[0].trimEnd('0').trimEnd('.')

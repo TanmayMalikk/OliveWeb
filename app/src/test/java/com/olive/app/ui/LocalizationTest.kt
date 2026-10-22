@@ -34,8 +34,7 @@ class LocalizationTest {
         val resDir = findResDir()
         assertTrue("Base res directory must exist", resDir.exists())
 
-        // Target languages to verify (ignoring Cree / values-cr for now per instructions)
-        val targetLocales = listOf("values-fr", "values-es", "values-ar", "values-tl", "values-zh")
+        val targetLocales = listOf("values-fr", "values-es", "values-ar", "values-zh-rCN")
 
         // 1. Check default English strings.xml
         val defaultStringsFile = File(resDir, "values/strings.xml")
@@ -57,31 +56,17 @@ class LocalizationTest {
     }
 
     @Test
-    fun verifyLanguageTagAndDisplayResolution() {
-        assertEquals("en", getLanguageTag("English"))
-        assertEquals("fr", getLanguageTag("French"))
-        assertEquals("es", getLanguageTag("Spanish"))
-        assertEquals("ar", getLanguageTag("Arabic"))
-        assertEquals("tl", getLanguageTag("Tagalog"))
-        assertEquals("zh", getLanguageTag("Chinese"))
+    fun verifyAppLocaleManagerResolution() {
+        assertEquals("en", AppLocaleManager.getLanguageTag("English"))
+        assertEquals("fr", AppLocaleManager.getLanguageTag("French"))
+        assertEquals("es", AppLocaleManager.getLanguageTag("Spanish"))
+        assertEquals("ar", AppLocaleManager.getLanguageTag("Arabic"))
+        assertEquals("zh-rCN", AppLocaleManager.getLanguageTag("Chinese"))
 
-        assertEquals("Français", getDisplayLanguage("French"))
-        assertEquals("Español", getDisplayLanguage("Spanish"))
-        assertEquals("العربية", getDisplayLanguage("Arabic"))
-        assertEquals("Tagalog", getDisplayLanguage("Tagalog"))
-        assertEquals("中文", getDisplayLanguage("Chinese"))
-        assertEquals("English", getDisplayLanguage("English"))
-    }
-
-    @Test
-    fun verifyLanguageSwappingAndTranslationResolution() {
-        val testLanguages = listOf("English", "French", "Spanish", "Arabic", "Tagalog", "Chinese")
-        for (lang in testLanguages) {
-            val tag = getLanguageTag(lang)
-            val translatedLabel = translate("App language", lang)
-            assertNotNull("Translation for 'App language' in $lang should not be null", translatedLabel)
-            assertTrue("Translation for 'App language' in $lang should not be blank", translatedLabel.isNotBlank())
-            assertFalse("Tag for $lang should not be empty", tag.isEmpty())
-        }
+        assertEquals("Français", AppLocaleManager.getDisplayLanguage("French"))
+        assertEquals("Español", AppLocaleManager.getDisplayLanguage("Spanish"))
+        assertEquals("العربية", AppLocaleManager.getDisplayLanguage("Arabic"))
+        assertEquals("中文", AppLocaleManager.getDisplayLanguage("Chinese"))
+        assertEquals("English", AppLocaleManager.getDisplayLanguage("English"))
     }
 }

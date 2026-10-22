@@ -4,6 +4,14 @@ import { Button, Field, Form, Modal, Empty, Logo } from "./components";
 import { useSession } from "./session";
 import { cloudMode, firebase } from "./services/accounts";
 import type { Role } from "./domain";
+import {
+  loadPlan,
+  safetySections,
+  saveField,
+  setStaffAvailability,
+  staffConsultations,
+  type SafetyPlan,
+} from "./services/safety-plans";
 interface Account {
   uid: string;
   username: string;
@@ -20,6 +28,11 @@ export default function Portal() {
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<Account | null>(null);
+  const [consultations, setConsultations] = useState<
+    { ownerUid: string; ownerName: string; updatedAt: number }[]
+  >([]);
+  const [available, setAvailable] = useState(true);
+  const [plan, setPlan] = useState<SafetyPlan | null>(null);
   async function call(name: string, input: unknown = {}) {
     if (!cloudMode)
       throw new Error(
@@ -35,6 +48,12 @@ export default function Portal() {
   }
   useEffect(() => {
     if (s.profile?.role === "ADMIN") void s.perform(refresh);
+    if (s.profile?.role === "STAFF")
+      void s.perform(async () => {
+        const value = await staffConsultations();
+        setConsultations(value.plans);
+        setAvailable(value.available);
+      });
   }, []);
   return (
     <div className="page-width private-shell portal">
@@ -124,13 +143,89 @@ export default function Portal() {
             </div>
           </>
         ) : (
-          <Empty title="Your organization profile.">
-            <p>{s.profile?.fullName}</p>
-            <p>{s.profile?.email}</p>
-            <p>
-              Only administrators can create, list, or delete managed accounts.
-            </p>
-          </Empty>
+          <>
+            <section className="panel safety-plan-summary">
+              <div>
+                <h2>Safety-plan consultations</h2>
+                <p>
+                  {available
+                    ? "Available for new requests"
+                    : "Not accepting new requests"}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                disabled={s.busy}
+                onClick={() =>
+                  void s.perform(async () => {
+                    const value = await setStaffAvailability(!available);
+                    setAvailable(value.available);
+                  })
+                }
+              >
+                {available ? "Pause availability" : "Become available"}
+              </Button>
+            </section>
+            {!consultations.length ? (
+              <Empty title="No active consultations.">
+                New assigned plans will appear here.
+              </Empty>
+            ) : (
+              <div className="panel-list">
+                {consultations.map((item) => (
+                  <button
+                    className="panel text-link"
+                    key={item.ownerUid}
+                    onClick={() =>
+                      void s.perform(async () =>
+                        setPlan(await loadPlan(item.ownerUid)),
+                      )
+                    }
+                  >
+                    Open {item.ownerName || "shared plan"}
+                  </button>
+                ))}
+              </div>
+            )}
+            {plan && (
+              <section className="panel safety-plan-group">
+                <h2>{plan.ownerName || "Shared"} plan</h2>
+                <div className="form-grid">
+                  {(["primary", "backup"] as const).flatMap((kind) =>
+                    safetySections.map((section) => {
+                      const key = `${kind}_${section}`;
+                      return (
+                        <label className="field" key={key}>
+                          <span>
+                            {kind} · {section}
+                          </span>
+                          <textarea
+                            maxLength={4000}
+                            defaultValue={plan.fields[key]?.value ?? ""}
+                            onBlur={(event) => {
+                              if (
+                                event.target.value === plan.fields[key]?.value
+                              )
+                                return;
+                              void s.perform(async () =>
+                                setPlan(
+                                  await saveField(
+                                    plan,
+                                    key,
+                                    event.target.value,
+                                  ),
+                                ),
+                              );
+                            }}
+                          />
+                        </label>
+                      );
+                    }),
+                  )}
+                </div>
+              </section>
+            )}
+          </>
         )}
         <Button variant="quiet" onClick={() => void s.perform(s.signOut)}>
           Sign out

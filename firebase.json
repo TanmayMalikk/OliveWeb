@@ -1,5 +1,6 @@
 {
   "functions": { "source": "functions" },
   "firestore": { "rules": "firebase/firestore.rules" },
+  "database": { "rules": "firebase/database.rules.json" },
   "storage": { "rules": "firebase/storage.rules" }
 }

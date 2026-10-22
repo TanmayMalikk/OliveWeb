@@ -3,8 +3,7 @@ package com.olive.app
 import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.security.EncryptedVault
-import com.olive.app.security.child
+
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
@@ -17,7 +16,8 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Invalid username").assertExists()
         compose.onNodeWithText("Invalid password").assertExists()
         compose.onNodeWithText("Passwords differ").assertExists()
-        compose.onNodeWithText("0 of 10 required").assertExists()
+        compose.onNodeWithText("0 of 9 required",useUnmergedTree=true).assertExists()
+        compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 4")
     }
 
     @Test fun safeContactGetsShorterOnboardingAndNoCover() {
@@ -25,7 +25,8 @@ class OnboardingFlowTest : OliveUiTestBase() {
         click("new_user")
         fill("username","safe_contact_test");fill("password","test-password-123");fill("confirm_password","test-password-123")
         click("credentials_submit");waitFor("full_name")
-        compose.onNodeWithText("Step 2 of 3").assertExists()
+        compose.onNodeWithTag("language").assertDoesNotExist()
+        compose.onNodeWithText("Step 2 of 3",useUnmergedTree=true).assertExists()
         compose.onNodeWithTag("abuser_name").assertDoesNotExist()
         compose.onNodeWithTag("situation").assertDoesNotExist()
         compose.onNodeWithTag("trigger").assertDoesNotExist()
@@ -37,20 +38,27 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Safe Contact").assertExists()
         compose.onNodeWithTag("safe_contact_messages").assertExists()
         compose.onNodeWithTag("safe_contact_notes").assertExists()
+        compose.onNodeWithTag("safe_contact_safety_plan").assertExists()
+        compose.onNodeWithTag("safe_contact_documents").assertExists()
+        compose.onNodeWithTag("safe_contact_manage_connections").assertDoesNotExist()
+        compose.onNodeWithTag("sign_out").assertDoesNotExist()
         compose.onNodeWithTag("safe_contact_activity").assertDoesNotExist()
         compose.onNodeWithTag("change_device_pin").assertDoesNotExist()
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+        click("safe_contact_settings");waitFor("save_settings")
+        compose.onNodeWithTag("sign_out").assertExists()
     }
 
     @Test fun onboardingNeedsCityButNotAFullDeliveryAddress() {
         waitFor("new_user");click("new_user")
         fill("username","city_only");fill("password","test-password-123");fill("confirm_password","test-password-123")
         click("credentials_submit");waitFor("full_name")
-        compose.onNodeWithText("Step 2 of 4").assertExists()
-        compose.onNodeWithTag("onboarding_step_4").assertExists()
+        compose.onNodeWithTag("language").assertDoesNotExist()
+        compose.onNodeWithText("Step 2 of 4",useUnmergedTree=true).assertExists()
+        compose.onNodeWithTag("onboarding_step_4",useUnmergedTree=true).assertExists()
         fill("full_name","City Test");chooseBirthday();nextOnboarding()
         fill("address_city","Edmonton");nextOnboarding();fill("trigger","moon garden");waitFor("profile_submit")
-        click("profile_submit");waitFor("pin_setup_submit")
+        click("profile_submit");chooseAppPin()
         fill("new_pin","1234");fill("confirm_pin","1234");click("pin_setup_submit");waitCover()
         val session=androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.SessionViewModel::class.java]
         assertEquals("Edmonton",session.deliveryAddress.city)
@@ -113,16 +121,21 @@ class OnboardingFlowTest : OliveUiTestBase() {
         assertFalse(privateBytes.contains("Updated private incident details"))
         click("safe_home")
         compose.runOnIdle { assertFalse(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
-        click("safe_settings");click("safe_contacts")
+        click("support_menu_toggle");click("support_contacts")
         fill("contact_name","Trusted Friend"); fill("contact_details","friend@example.invalid"); click("save_contact")
         compose.waitUntil(30_000) { compose.onAllNodesWithText("Trusted Friend").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Edit").performScrollTo().performClick()
         fill("contact_name","Updated Friend"); click("save_contact")
-        compose.waitUntil(30_000) { compose.onAllNodesWithText("Updated Friend").fetchSemanticsNodes().isNotEmpty() }
+        // The draft field already contains this text before saving. Wait for the saved profile,
+        // rather than letting Quick exit cancel an in-flight write after matching the draft.
+        val savedSession=androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.SessionViewModel::class.java]
+        compose.waitUntil(30_000) {
+            !savedSession.busy && savedSession.profile?.contacts?.any { it.name=="Updated Friend" }==true
+        }
         compose.onNodeWithTag("quick_exit").performClick(); waitCover()
         compose.onNodeWithText("Updated Friend").assertDoesNotExist()
         compose.activityRule.scenario.recreate(); waitCover()
-        unlock();click("safe_settings");click("safe_contacts");compose.onNodeWithText("Updated Friend").assertExists()
+        unlock();click("support_menu_toggle");click("support_contacts");compose.onNodeWithText("Updated Friend").assertExists()
         compose.onNodeWithTag("quick_exit").performClick(); waitCover()
         compose.onNodeWithText("Cart").performClick()
         compose.onNodeWithText("Garden harvest bowl").assertExists()
@@ -133,10 +146,10 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("username","returning_user_tester"); fill("password","wrong-password"); click("credentials_submit")
         compose.waitUntil(30_000) { compose.onAllNodesWithText("Incorrect password").fetchSemanticsNodes().isNotEmpty() }
         compose.waitUntil(30_000) { !androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.SessionViewModel::class.java].busy }
-        fill("password","test-password-123"); click("credentials_submit"); waitFor("pin_setup_submit")
+        fill("password","test-password-123"); click("credentials_submit"); chooseAppPin()
         fill("new_pin","654321"); fill("confirm_pin","654321"); click("pin_setup_submit")
         waitCover()
         compose.onNodeWithText("Discover").performClick(); waitCover()
-        unlock("654321");click("safe_settings");click("safe_contacts");compose.onNodeWithText("Updated Friend").assertExists()
+        unlock("654321");click("support_menu_toggle");click("support_contacts");compose.onNodeWithText("Updated Friend").assertExists()
     }
 }

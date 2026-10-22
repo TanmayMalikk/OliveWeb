@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safety_primary">主要计划</string>
+    <string name="safety_backup">备用计划</string>
+    <string name="safety_consult">工作人员咨询</string>
+    <string name="safety_consult_description">将两份计划分享给下一位有空的工作人员，以便协助编辑。工作人员聊天功能即将推出。</string>
+    <string name="safety_request">请求咨询</string>
+    <string name="safety_stop">停止共享</string>
+    <string name="safety_shared">已与 %1$s 共享</string>
+    <string name="safety_waiting">正在等待下一位有空的工作人员。</string>
+    <string name="safety_share_queued">请求已保存。</string>
+    <string name="safety_saving">正在保存到此设备…</string>
+    <string name="safety_saved">已保存。</string>
+    <string name="safety_sync_error">无法更新咨询信息。请重试。</string>
+    <string name="safety_storage_error">无法保存到此设备。请保持此页面打开并重试保存。</string>
+    <string name="safety_access_revoked">此计划已不再与你共享。缓存副本已删除。</string>
+    <string name="safety_account_required">咨询需要登录账户。您的计划仍可离线使用。</string>
+    <string name="safety_conflict">其他设备已更改此部分。你的编辑已保留。请选择要保留的版本。</string>
+    <string name="safety_synced_version">已同步版本：%1$s</string>
+    <string name="safety_keep_mine">保留我的编辑</string>
+    <string name="safety_use_synced">使用已同步版本</string>
+    <string name="safety_destination">安全去处</string>
+    <string name="safety_travel">交通安排</string>
+    <string name="safety_contacts">可信赖的人 / 安全住处</string>
+    <string name="safety_essentials">必需品和重要文件</string>
+    <string name="safety_dependants">儿童、受抚养者和宠物</string>
+    <string name="safety_aftercare">离开之后</string>
+<string name="safety_inbox">安全计划咨询</string>
+    <string name="safety_inbox_empty">目前没有与你共享的安全计划。</string>
+    <string name="safety_available">可接受新的咨询</string>
+    <string name="safety_staff_intro">查看和编辑与您共享的计划。</string>
+    <string name="safety_retry_save">重试保存</string>
+    <string name="safety_back">返回</string>
+    <string name="safety_open_plan">打开 %1$s 的计划</string>
+    <string name="safety_source">规划参考：加拿大公共卫生局。请与可信的人一起调整这些提示。</string>
+    <string name="safety_upload_document">上传文件</string>
+    <string name="safety_upload_for">上传文件：%1$s。即将推出。</string>
+<string name="safety_storage_photos">照片</string>
+    <string name="safety_storage_videos">视频</string>
+    <string name="safety_storage_documents">文件图片</string>
+    <string name="safety_document_upload_hint">上传功能即将推出。上传的文件也会显示在“文件”中。</string>
+</resources>

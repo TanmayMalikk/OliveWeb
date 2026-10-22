@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ui_two_variable_statistics">Two-variable statistics</string>
+    <string name="ui_1_2_3_2_4_5">1,2,3 | 2,4,5</string>
+    <string name="ui_polynomial_regression">Polynomial regression</string>
+    <string name="ui_degree_2_1_2_3_2_5_10">degree 2 | 1,2,3 | 2,5,10</string>
+    <string name="ui_other_regression">Other regression</string>
+    <string name="ui_exponential_1_2_3_2_4_8">exponential | 1,2,3 | 2,4,8</string>
+    <string name="ui_basic">Basic</string>
+    <string name="ui_algebra">Algebra</string>
+    <string name="ui_calculus">Calculus</string>
+    <string name="ui_complex">Complex</string>
+    <string name="ui_matrices">Matrices</string>
+    <string name="ui_statistics">Statistics</string>
+    <string name="ui_username_taken_c04650">Username taken.</string>
+    <string name="ui_incorrect_password_b68db3">Incorrect password.</string>
+    <string name="ui_unable_to_send_the_message">Unable to send the message.</string>
+    <string name="ui_unable_to_start_messaging">Unable to start messaging.</string>
+    <string name="ui_could_not_reconnect_check_your_password_and_try_again">Could not reconnect. Check your password and try again.</string>
+    <string name="ui_no_zero_was_found_in_that_interval">No zero was found in that interval.</string>
+    <string name="ui_use_semicolons_exactly_like_the_example">Use semicolons exactly like the example.</string>
+    <string name="ui_the_result_is_not_a_finite_number">The result is not a finite number.</string>
+    <string name="ui_enter_a_quadratic_equation_with_an_x_term">Enter a quadratic equation with an x² term.</string>
+    <string name="ui_enter_a_polynomial_calculation_first">Enter a polynomial calculation first.</string>
+    <string name="ui_enter_a_calculation_without_an_equals_sign">Enter a calculation without an equals sign.</string>
+    <string name="ui_enter_an_equation_first">Enter an equation first.</string>
+    <string name="ui_use_one_equals_sign_with_an_expression_on_each_side">Use one equals sign with an expression on each side.</string>
+    <string name="ui_the_equation_must_contain_x">The equation must contain x.</string>
+    <string name="ui_use_a_polynomial_with_degree_value_or_lower">Use a polynomial with degree %1$s or lower.</string>
+    <string name="ui_enter_terms_such_as_x_2_x_3">Enter terms such as (x - 2)(x - 3).</string>
+    <string name="ui_check_the_equation_near_value">Check the equation near \'%1$s\'.</string>
+    <string name="ui_use_exponents_from_0_to_value">Use exponents from 0 to %1$s.</string>
+    <string name="ui_the_equation_ends_too_early">The equation ends too early.</string>
+    <string name="ui_close_every_parenthesis">Close every parenthesis.</string>
+    <string name="ui_use_finite_numbers_only">Use finite numbers only.</string>
+    <string name="ui_cannot_divide_by_zero">Cannot divide by zero.</string>
+    <string name="ui_this_division_does_not_simplify_to_a_polynomial">This division does not simplify to a polynomial.</string>
+    <string name="ui_this_division_leaves_a_remainder_and_does_not_simplify_to_a_polyn">This division leaves a remainder and does not simplify to a polynomial.</string>
+    <string name="ui_use_a_whole_number_exponent_after">Use a whole-number exponent after ^.</string>
+    <string name="ui_check_the_number_near_value">Check the number near \'%1$s\'.</string>
+    <string name="ui_unexpected_value">Unexpected \'%1$s\'.</string>
+    <string name="ui_enter_an_equation_after_y">Enter an equation after y =.</string>
+    <string name="ui_write_value_with_parentheses_like_value_x">Write %1$s with parentheses, like %2$s(x).</string>
+    <string name="ui_value_needs_one_value">%1$s needs one value.</string>
+    <string name="ui_value_needs_two_values">%1$s needs two values.</string>
+    <string name="ui_random_needs_no_values">random needs no values.</string>
+    <string name="ui_randint_needs_a_valid_range">randint needs a valid range.</string>
+    <string name="ui_factorial_needs_a_whole_number_from_0_to_170">Factorial needs a whole number from 0 to 170.</string>
+    <string name="ui_npr_needs_whole_numbers_with_0_r_n">nPr needs whole numbers with 0 ≤ r ≤ n.</string>
+    <string name="ui_ncr_needs_whole_numbers_with_0_r_n">nCr needs whole numbers with 0 ≤ r ≤ n.</string>
+    <string name="ui_function_value_is_not_supported">Function \'%1$s\' is not supported.</string>
+    <string name="ui_graph_at_least_one_equation_first">Graph at least one equation first.</string>
+    <string name="ui_use_valid_numbers_for_the_range">Use valid numbers for the range.</string>
+    <string name="ui_end_x_must_be_greater_than_or_equal_to_start_x">End X must be greater than or equal to Start X.</string>
+    <string name="ui_step_must_be_greater_than_zero">Step must be greater than zero.</string>
+    <string name="ui_choose_a_range_that_creates_500_rows_or_fewer">Choose a range that creates 500 rows or fewer.</string>
+    <string name="ui_graph_at_least_two_equations_first">Graph at least two equations first.</string>
+    <string name="ui_none">none</string>
+    <string name="ui_value_value_0c813d">value = %1$s</string>
+    <string name="ui_h_value_left_value_right_value">h=%1$s: left %2$s, right %3$s</string>
+    <string name="ui_z_value_real_value_imaginary_value_conjugate_value_magnitude_valu">z = %1$s\nreal = %2$s\nimaginary = %3$s\nconjugate = %4$s\nmagnitude = %5$s\nangle = %6$s rad\npolar = %7$s ∠ %8$s</string>
+    <string name="ui_power_value_roots_value">power = %1$s\nroots:\n%2$s</string>
+    <string name="ui_n_value_sum_value_sum_of_squares_value_mean_value_median_value_mo">n = %1$s\nsum = %2$s\nsum of squares = %3$s\nmean = %4$s\nmedian = %5$s\nmode = %6$s\nmin = %7$s\nQ1 = %8$s\nQ3 = %9$s\nmax = %10$s\nsample SD = %11$s\nvariance = %12$s</string>
+    <string name="ui_correlation_value_y_value_valuex_r_value">correlation = %1$s\ny = %2$s + %3$sx\nR² = %4$s</string>
+    <string name="ui_olive_order_update">Olive Order Update</string>
+    <string name="ui_your_order_is_being_prepared">Your order is being prepared.</string>
+    <string name="ui_new_headlines_are_available">New headlines are available.</string>
+    <string name="ui_a_calculator_reminder_is_available">A calculator reminder is available.</string>
+    <string name="ui_a_new_update_is_available">A new update is available.</string>
+    <string name="ui_an_account_update_is_available">An account update is available.</string>
+    <string name="ui_fresh_menu_updates_are_available">Fresh menu updates are available.</string>
+    <string name="ui_see_what_s_new_from_olive">See what\'s new from Olive.</string>
+    <string name="ui_new_kitchen_picks_are_ready_to_browse">New kitchen picks are ready to browse.</string>
+    <string name="ui_your_latest_digest_is_ready">Your latest digest is ready.</string>
+    <string name="ui_there_are_new_stories_to_browse">There are new stories to browse.</string>
+    <string name="ui_a_calculator_update_is_available">A calculator update is available.</string>
+    <string name="ui_your_calculation_tools_are_ready">Your calculation tools are ready.</string>
+    <string name="ui_open_better_calculator_for_an_update">Open Better Calculator for an update.</string>
+    <string name="ui_open_the_app_to_see_what_s_new">Open the app to see what\'s new.</string>
+    <string name="ui_new_activity_is_waiting">New activity is waiting.</string>
+    <string name="ui_olive_order_updates">Olive Order Updates</string>
+    <string name="ui_order_status_and_delivery_notifications_for_olive">Order status and delivery notifications for Olive</string>
+    <string name="ui_daily_digest_briefings">Daily Digest Briefings</string>
+    <string name="ui_daily_headlines_and_news_digest_notifications">Daily headlines and news digest notifications</string>
+    <string name="ui_better_calculator_reminders">Better Calculator Reminders</string>
+    <string name="ui_utility_and_calculation_reminders">Utility and calculation reminders</string>
+    <string name="ui_app_updates">App Updates</string>
+    <string name="ui_general_app_activity_notifications">General app activity notifications</string>
+    <string name="ui_olive_branch_updates">Olive Branch Updates</string>
+    <string name="ui_olive_tree_updates">Olive Tree Updates</string>
+    <string name="ui_news">News</string>
+    <string name="ui_politics">Politics</string>
+    <string name="ui_sports">Sports</string>
+    <string name="ui_business">Business</string>
+    <string name="ui_technology">Technology</string>
+    <string name="ui_health">Health</string>
+    <string name="ui_science">Science</string>
+    <string name="ui_environment">Environment</string>
+    <string name="ui_x_2_4_2x_3">x^2 - 4\n2x + 3</string>
+    <string name="ui_error">Error</string>
+    <string name="ui_undefined">Undefined</string>
+    <string name="ui_update_your_profile_details">Update your profile details.</string>
+    <string name="ui_profile_required_fields">Full name, a valid date of birth and city are required.</string>
+    <string name="password_excludes_username">Password must not contain your username.</string>
+</resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entry_restore_lock">Ce téléphone n’a pas de verrouillage et aucun code PIN de secours n’est configuré. Rétablissez le verrouillage du téléphone pour utiliser l’authentification de l’appareil.</string>
+    <string name="entry_set_pin_first">Configurez un code PIN ci-dessous avant de le choisir comme méthode d’accès.</string>
+    <string name="entry_settings_saved">Paramètres d’accès sécurisé enregistrés.</string>
+    <string name="entry_current_method">Méthode préférée : %1$s</string>
+    <string name="entry_backup_description">Vous pouvez configurer les deux méthodes. Si le verrouillage de l’appareil est choisi, le code PIN de l’application est disponible uniquement si le verrouillage du téléphone est supprimé. Annuler ou échouer l’authentification Android n’active pas le code PIN de secours.</string>
+    <string name="entry_use_device">Configurer et utiliser le verrouillage de l’appareil</string>
+    <string name="entry_use_pin">Utiliser le code PIN enregistré</string>
+    <string name="entry_pin_setup">Configurer ou modifier le code PIN</string>
+    <string name="entry_save_backup">Enregistrer le code PIN de secours</string>
+    <string name="entry_save_use_pin">Enregistrer et utiliser le code PIN</string>
+    <string name="entry_confirm_settings">Confirmez votre identité avec Android pour modifier les paramètres d’accès sécurisé.</string>
+    <string name="entry_settings_cancelled">Authentification annulée. Vos paramètres d’accès sécurisé restent inchangés.</string>
+    <string name="entry_settings_failed">Impossible de terminer la modification. Vérifiez la méthode sélectionnée et réessayez.</string>
+</resources>

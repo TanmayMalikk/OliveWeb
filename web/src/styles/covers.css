@@ -1165,10 +1165,196 @@
   touch-action: manipulation;
   user-select: none;
 }
-.flight-stage svg {
+.flight-stage > svg {
   display: block;
   width: 100%;
   height: auto;
+}
+.crossing-arena {
+  display: grid;
+  place-items: center;
+}
+.crossing-stage {
+  position: relative;
+  width: min(100%, 35rem);
+  aspect-ratio: 7 / 8;
+  overflow: hidden;
+  border: 1px solid #c5ceb6;
+  border-radius: 1rem;
+  background: #e6eddb;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+.crossing-stage > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.crossing-stage:focus-visible {
+  box-shadow: inset 0 0 0 3px #78935f;
+}
+.crossing-lane {
+  animation: crossing-lane-in 0.22s ease-out both;
+}
+.crossing-vehicle-body {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: crossing-cart-bob 0.38s ease-in-out infinite alternate;
+}
+.crossing-wheel {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: crossing-wheel-turn 0.45s linear infinite;
+}
+.crossing-dust {
+  animation: crossing-dust 0.55s ease-out infinite;
+}
+.crossing-tree circle {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: crossing-tree-sway 2.4s ease-in-out infinite alternate;
+}
+.crossing-wave {
+  animation: crossing-water-flow 1.8s linear infinite;
+}
+.crossing-lilypad > * {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: crossing-lily-bob 1.6s ease-in-out infinite alternate;
+}
+.crossing-train {
+  animation: crossing-train-rumble 0.12s ease-in-out infinite alternate;
+}
+.crossing-player-hop {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+  animation: crossing-hop 0.18s ease-out;
+}
+.crossing-crashed {
+  animation: crossing-crash 0.28s ease-out;
+}
+@keyframes crossing-lane-in {
+  from {
+    opacity: 0.65;
+  }
+}
+@keyframes crossing-cart-bob {
+  to {
+    transform: translateY(-1.5px);
+  }
+}
+@keyframes crossing-wheel-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes crossing-dust {
+  from {
+    opacity: 0.7;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+@keyframes crossing-tree-sway {
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes crossing-water-flow {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+@keyframes crossing-lily-bob {
+  to {
+    transform: translateY(1.5px) rotate(1.5deg);
+  }
+}
+@keyframes crossing-train-rumble {
+  to {
+    transform: translateY(-1px);
+  }
+}
+@keyframes crossing-hop {
+  45% {
+    transform: translateY(-11px) scale(0.94, 1.06);
+  }
+  80% {
+    transform: translateY(1px) scale(1.06, 0.94);
+  }
+}
+@keyframes crossing-crash {
+  25% {
+    transform: translateX(-5px);
+  }
+  55% {
+    transform: translateX(5px);
+  }
+  80% {
+    transform: translateX(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .crossing-lane,
+  .crossing-vehicle-body,
+  .crossing-wheel,
+  .crossing-dust,
+  .crossing-tree circle,
+  .crossing-wave,
+  .crossing-lilypad > *,
+  .crossing-train,
+  .crossing-player-hop,
+  .crossing-crashed {
+    animation: none;
+  }
+}
+.crossing-bottom {
+  align-items: center;
+}
+.crossing-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+.crossing-round-actions {
+  display: grid;
+  gap: 0.35rem;
+}
+.crossing-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 2.5rem);
+  grid-template-rows: repeat(2, 2.5rem);
+  gap: 0.2rem;
+}
+.crossing-pad button {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  border: 1px solid #c3cdb1;
+  border-radius: 0.65rem;
+  background: #eef1e3;
+  color: #425936;
+  cursor: pointer;
+}
+.crossing-pad button:first-child {
+  grid-column: 2;
+}
+.crossing-pad button:nth-child(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+.crossing-pad button:nth-child(3) {
+  grid-column: 2;
+  grid-row: 2;
+}
+.crossing-pad button:nth-child(4) {
+  grid-column: 3;
+  grid-row: 2;
 }
 .flight-overlay {
   position: absolute;
@@ -1189,6 +1375,19 @@
 .flight-overlay > span {
   font-size: 0.8rem;
   line-height: 1.6;
+}
+.flight-overlay > .button {
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.flight-overlay > .button > svg {
+  width: 16px;
+  height: 16px;
 }
 .flight-instructions {
   margin: 0.85rem 0 0;
@@ -1285,6 +1484,7 @@
     font-size: clamp(1.4rem, 3.2svh, 2rem);
   }
   .flight-arena,
+  .crossing-arena,
   .memory-arena {
     flex: 1;
     min-height: 0;
@@ -1302,9 +1502,15 @@
     max-height: 100%;
     border-radius: 0.85rem;
   }
-  .flight-stage svg {
+  .flight-stage > svg {
     width: 100%;
     height: 100%;
+  }
+  .crossing-stage {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0.85rem;
   }
   .flight-overlay {
     padding: 1rem;

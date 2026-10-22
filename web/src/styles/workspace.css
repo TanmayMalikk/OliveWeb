@@ -125,6 +125,21 @@
   font-size: clamp(2.4rem, 4vw, 4rem);
   margin-top: 0.8rem;
 }
+.safety-plan-web {
+  display: grid;
+  gap: 1rem;
+}
+.safety-plan-summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.safety-plan-summary > div {
+  flex: 1;
+}
+.safety-plan-group textarea {
+  min-height: 8rem;
+}
 .today {
   font-size: 0.65rem;
   color: var(--muted);

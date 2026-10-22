@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safety_primary">الخطة الأساسية</string>
+    <string name="safety_backup">الخطة البديلة</string>
+    <string name="safety_consult">استشارة الموظفين</string>
+    <string name="safety_consult_description">يشارك الخطتين مع الموظف التالي المتاح لتعديلهما. ستتوفر المحادثة مع الموظفين قريبًا.</string>
+    <string name="safety_request">طلب استشارة</string>
+    <string name="safety_stop">إيقاف المشاركة</string>
+    <string name="safety_shared">تمت المشاركة مع %1$s</string>
+    <string name="safety_waiting">في انتظار الموظف التالي المتاح.</string>
+    <string name="safety_share_queued">تم حفظ الطلب.</string>
+    <string name="safety_saving">جارٍ الحفظ على هذا الجهاز…</string>
+    <string name="safety_saved">تم الحفظ.</string>
+    <string name="safety_sync_error">تعذر تحديث تفاصيل الاستشارة. يرجى المحاولة مجددًا.</string>
+    <string name="safety_storage_error">تعذّر الحفظ على هذا الجهاز. أبقِ هذه الصفحة مفتوحة وأعد المحاولة.</string>
+    <string name="safety_access_revoked">لم تعد هذه الخطة مشتركة معك. تم حذف النسخة المخزنة مؤقتًا.</string>
+    <string name="safety_account_required">تتطلب الاستشارة تسجيل الدخول إلى حساب. تبقى خططك متاحة دون اتصال.</string>
+    <string name="safety_conflict">تغيّر هذا القسم على جهاز آخر. تم الاحتفاظ بتعديلك. اختر النسخة التي تريد الاحتفاظ بها.</string>
+    <string name="safety_synced_version">النسخة المتزامنة: %1$s</string>
+    <string name="safety_keep_mine">الاحتفاظ بتعديلي</string>
+    <string name="safety_use_synced">استخدام النسخة المتزامنة</string>
+    <string name="safety_destination">وجهة آمنة</string>
+    <string name="safety_travel">وسيلة النقل</string>
+    <string name="safety_contacts">شخص موثوق / مكان آمن للإقامة</string>
+    <string name="safety_essentials">الأغراض والوثائق الأساسية</string>
+    <string name="safety_dependants">الأطفال والمعالون والحيوانات الأليفة</string>
+    <string name="safety_aftercare">بعد المغادرة</string>
+<string name="safety_inbox">استشارات خطط الأمان</string>
+    <string name="safety_inbox_empty">لا توجد خطط أمان مشتركة معك حاليًا.</string>
+    <string name="safety_available">متاح للاستشارات الجديدة</string>
+    <string name="safety_staff_intro">اعرض الخطط المشتركة معك وعدّلها.</string>
+    <string name="safety_retry_save">إعادة محاولة الحفظ</string>
+    <string name="safety_back">رجوع</string>
+    <string name="safety_open_plan">فتح خطة %1$s</string>
+    <string name="safety_source">إرشادات التخطيط: وكالة الصحة العامة الكندية. عدّل هذه الإرشادات مع شخص تثق به.</string>
+    <string name="safety_upload_document">رفع الوثيقة</string>
+    <string name="safety_upload_for">رفع الوثيقة: %1$s. قريبًا.</string>
+<string name="safety_storage_photos">الصور</string>
+    <string name="safety_storage_videos">مقاطع الفيديو</string>
+    <string name="safety_storage_documents">صور الوثائق</string>
+    <string name="safety_document_upload_hint">سيتوفر الرفع قريبًا. ستظهر الملفات المرفوعة أيضًا في الوثائق.</string>
+</resources>
