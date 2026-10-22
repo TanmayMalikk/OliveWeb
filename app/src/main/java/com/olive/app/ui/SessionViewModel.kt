@@ -7,13 +7,22 @@ import com.olive.app.data.*
 import com.olive.app.ui.session.SessionRuntime
 import com.olive.app.ui.documents.SafetyDocumentsController
 import com.olive.app.ui.location.LocationMapController
+import com.olive.app.ui.media.MediaTransferController
 import com.olive.app.security.SafeEntryMethod
 import com.olive.app.security.allowsAppPin
 
-// Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
+/**
+ * Android lifecycle adapter and composition root for session-scoped feature controllers.
+ *
+ * `SessionViewModel` owns [MediaTransferController], which is shared with [SafetyDocumentsController].
+ * The media controller is not a standalone ViewModel: this avoids a second session lifecycle while
+ * durable transfers remain independent through WorkManager and `MediaTransferStore`.
+ * Screens observe state and dispatch actions; feature controllers own the workflows.
+ */
 class SessionViewModel(application:Application):AndroidViewModel(application) {
     private val runtime=SessionRuntime(application,viewModelScope)
-    internal val documents=SafetyDocumentsController(application,viewModelScope,runtime.safetyDocumentRepository)
+    internal val media=if(runtime.localMode) null else MediaTransferController(application,viewModelScope)
+    internal val documents=SafetyDocumentsController(application,viewModelScope,runtime.safetyDocumentRepository,media)
     internal val locationMap=LocationMapController(application,viewModelScope,runtime.locationSharingRepository)
     val screen get()=runtime.state.screen
     val pinChallengeVersion get()=runtime.state.pinChallengeVersion
