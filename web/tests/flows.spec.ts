@@ -36,7 +36,7 @@ async function onboard(page: Page, cover = "Olive") {
 async function unlock(page: Page, link: string) {
   await page.goto(link);
   await expect(page.getByLabel("Browser PIN", { exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/\/entry$/);
+  await expect(page).toHaveURL(/\/$/);
   await page.getByLabel("Browser PIN", { exact: true }).fill("123456");
   await page.getByRole("button", { name: "Unlock", exact: true }).click();
   await expect(
@@ -93,11 +93,11 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
 }) => {
   const link = await onboard(page);
   await page.getByRole("button", { name: "Continue to my cover" }).click();
-  await expect(page).toHaveURL(/\/olive$/);
+  await expect(page).toHaveURL(/\/$/);
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "A little less rush. A little more play.",
+      name: "Good food. Better together.",
     }),
   ).toBeVisible();
   await unlock(page, link);
@@ -143,7 +143,7 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await page.getByRole("button", { name: "Save preferences" }).click();
   await expect(page.getByRole("status")).toContainText("Changes saved.");
   await page.getByRole("button", { name: "Quick Exit", exact: true }).click();
-  await expect(page).toHaveURL(/\/daily-digest$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText("Private fixture note")).toHaveCount(0);
   await unlock(page, link);
   await page.getByRole("button", { name: "Notes", exact: true }).click();
@@ -167,15 +167,14 @@ test("invalid personal links cannot open an account even with valid account cred
 }) => {
   await onboard(page);
   await page.goto(`/entry#${"a".repeat(43)}`);
-  await page.getByLabel("Username", { exact: true }).fill("website_tester");
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("link is invalid");
+  await page.getByLabel("Browser PIN", { exact: true }).fill("123456");
+  await page.getByRole("button", { name: "Unlock", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("current personal link");
   await expect(
     page.getByRole("button", { name: "Notes", exact: true }),
   ).toHaveCount(0);
 });
-test("returning account automatically routes to its saved cover without opening private content", async ({
+test("returning account opens the PIN gate at the root URL without revealing private content", async ({
   page,
 }) => {
   await onboard(page, "Daily Digest");
@@ -184,7 +183,8 @@ test("returning account automatically routes to its saved cover without opening 
   await page.getByLabel("Username", { exact: true }).fill("website_tester");
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page).toHaveURL(/\/daily-digest$/);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByLabel("Browser PIN", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Notes", exact: true }),
   ).toHaveCount(0);
@@ -217,10 +217,9 @@ test("personal links can be rotated and wrong PINs do not reveal private data", 
   expect(replacement).not.toBe(original);
   await page.getByRole("button", { name: "Quick Exit", exact: true }).click();
   await page.goto(original);
-  await page.getByLabel("Username", { exact: true }).fill("website_tester");
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("link is invalid");
+  await page.getByLabel("Browser PIN", { exact: true }).fill("123456");
+  await page.getByRole("button", { name: "Unlock", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("current personal link");
   await unlock(page, replacement);
 });
 test("food menu customizations, favourites, cart quantities and payment data stay inside their intended flows", async ({
@@ -267,7 +266,7 @@ test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus do
     .getByRole("button", { name: "Unlock", exact: true })
     .click({ noWaitAfter: true });
   await page.getByRole("button", { name: "Quick Exit", exact: true }).click();
-  await expect(page).toHaveURL(/\/olive$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(
     page.getByRole("heading", { name: "Welcome, Test." }),
   ).toHaveCount(0);
@@ -278,7 +277,7 @@ test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus do
     page.getByRole("dialog", { name: "Would you like a little more time?" }),
   ).toBeVisible();
   await page.clock.fastForward(15_000);
-  await expect(page).toHaveURL(/\/olive$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(
     page.getByRole("button", { name: "Notes", exact: true }),
   ).toHaveCount(0);
@@ -361,7 +360,7 @@ test("PWA manifests use cover-specific identities and download page does not fab
     await request.get("/cover/olive/manifest.webmanifest")
   ).json();
   expect(manifest.name).toBe("Olive");
-  expect(manifest.start_url).toBe("/olive");
+  expect(manifest.start_url).toBe("/");
   expect(manifest.icons[0].src).toContain("olive-192");
   await page.goto("/download");
   await expect(
@@ -402,7 +401,7 @@ for (const size of [
       "/cover/calculator",
     ]) {
       await page.goto(path);
-      await expect(page.locator("h1").first()).toBeVisible();
+      await expect(page.locator("h1:visible,h2:visible").first()).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > innerWidth + 1,

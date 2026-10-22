@@ -24,7 +24,7 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
     const manifest = await (
       await request.get(`/${slug}/manifest.webmanifest`)
     ).json();
-    expect(manifest.start_url).toBe(`/${slug}`);
+    expect(manifest.start_url).toBe("/");
     expect(manifest.icons[0].src).toBe(`/icons/${slug}-192.png`);
     const legacy = await (
       await request.get(`/cover/${slug}/manifest.webmanifest`)
@@ -38,9 +38,14 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
   await expect(
     page.locator('a[href$="/account"],a[href$="/download"]'),
   ).toHaveCount(0);
+  await page.locator(".grove-brand").click({ clickCount: 5, delay: 120 });
+  await expect(
+    page.getByRole("button", { name: "Sign in", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/$/);
   await page.goto("/account");
   await expect(
-    page.getByRole("button", { name: "Get started", exact: true }),
+    page.getByRole("button", { name: "Sign in", exact: true }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });

@@ -79,7 +79,7 @@ export function createServerApp({ development = false } = {}) {
         ? siteConfig.covers.find((site) => site.slug === req.params.slug)
         : hostSite;
       if (req.params.slug && !site) return res.status(404).end();
-      const start = site ? (hostSite?.id === site.id ? "/" : site.path) : "/";
+      const start = "/";
       const icon = site?.slug ?? "game";
       res.type("application/manifest+json").json({
         id: start,
