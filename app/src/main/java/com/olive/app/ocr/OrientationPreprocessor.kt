@@ -15,7 +15,7 @@ import java.nio.FloatBuffer
    OrientationPreprocessor: Runs an isolated ultra-lightweight ONNX model (224x224)
    to detect document rotation and automatically stand the byte stream upright.
  */
-class OrientationPreprocessor(private val context: Context) {
+class OrientationPreprocessor(context: Context) {
 
     private val ortEnv = OrtEnvironment.getEnvironment()
     private val ortSession: OrtSession
@@ -91,12 +91,12 @@ class OrientationPreprocessor(private val context: Context) {
 
             // 6. Re-compress the upright canvas back into a clean JPEG byte stream for Paddle
             val outputStream = ByteArrayOutputStream()
-            uprightBitmap!!.compress(Bitmap.CompressFormat.JPEG, 95, outputStream) // 95 keeps lines razor sharp
+            uprightBitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream) // 95 keeps lines razor sharp
             val processedBytes = outputStream.toByteArray()
 
             // Clean up large remaining canvases to avoid Out-Of-Memory (OOM) heap overflows
             currentBitmap.recycle()
-            uprightBitmap!!.recycle()
+            uprightBitmap.recycle()
 
             processedBytes
 
