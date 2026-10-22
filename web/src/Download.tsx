@@ -18,8 +18,21 @@ interface Distribution {
   phoneReady: boolean;
   androidLabel?: string | null;
 }
+
+function configuredAndroidUrl() {
+  const configured = import.meta.env.VITE_ANDROID_DOWNLOAD_URL?.trim();
+  if (!configured) return null;
+  try {
+    const url = new URL(configured);
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function DownloadPage() {
   const { go } = useSession();
+  const publishedAndroidUrl = configuredAndroidUrl();
   const [info, setInfo] = useState<Distribution | null>(null);
   const [qr, setQr] = useState("");
   const [error, setError] = useState("");
@@ -32,19 +45,34 @@ export default function DownloadPage() {
       })
       .then((value: Distribution) => {
         setInfo(value);
-        if (value.androidAvailable && value.phoneReady && value.androidUrl)
-          return QRCode.toDataURL(value.androidUrl, {
-            width: 280,
-            margin: 2,
-            color: { dark: "#30432b", light: "#ffffff" },
-          }).then(setQr);
       })
       .catch((e) => {
-        if (e.name !== "AbortError")
+        if (e.name !== "AbortError" && !publishedAndroidUrl)
           setError("Download information is unavailable. Try again shortly.");
       });
     return () => controller.abort();
-  }, []);
+  }, [publishedAndroidUrl]);
+  const androidUrl = publishedAndroidUrl ?? info?.androidUrl ?? null;
+  const androidAvailable = Boolean(
+    publishedAndroidUrl || (info?.androidAvailable && info.androidUrl),
+  );
+  useEffect(() => {
+    if (!androidUrl) {
+      setQr("");
+      return;
+    }
+    let active = true;
+    void QRCode.toDataURL(androidUrl, {
+      width: 280,
+      margin: 2,
+      color: { dark: "#30432b", light: "#ffffff" },
+    }).then((value) => {
+      if (active) setQr(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, [androidUrl]);
   return (
     <div className="page-width download-page">
       <header className="site-header">
@@ -85,8 +113,9 @@ export default function DownloadPage() {
               <p className="help-note">{info.androidLabel}</p>
             )}
             <p>
-              Download the Android APK and open it to install. Android may ask
-              you to allow installation from your browser.
+              Scan the code with your Android camera to download the newest
+              signed app, then open the APK to install it. Android may ask you
+              to allow installation from your browser.
             </p>
             <div className="qr-area">
               {qr ? (
@@ -103,26 +132,28 @@ export default function DownloadPage() {
                 <div className="qr-placeholder">
                   <Smartphone size={40} />
                   <span>
-                    {info?.androidAvailable
+                    {androidAvailable
                       ? "A phone-accessible QR link is not configured yet."
                       : "The Android download is not available in this local preview yet."}
                   </span>
                 </div>
               )}
             </div>
-            {info?.androidAvailable ? (
-              <a className="button" href="/download/android">
+            {androidAvailable && androidUrl ? (
+              <a className="button" href={androidUrl}>
                 <Download size={17} /> Download Android APK
               </a>
             ) : (
               <Button disabled>Android download unavailable</Button>
             )}
-            {info?.androidAvailable && !info.phoneReady && (
-              <p className="help-note">
-                You can download on this computer. A phone cannot use this
-                computer’s localhost address.
-              </p>
-            )}
+            {!publishedAndroidUrl &&
+              info?.androidAvailable &&
+              !info.phoneReady && (
+                <p className="help-note">
+                  You can download on this computer. A phone cannot use this
+                  computer’s localhost address.
+                </p>
+              )}
           </section>
           <section className="install-card">
             <div className="install-icon">
@@ -130,15 +161,18 @@ export default function DownloadPage() {
             </div>
             <span className="eyebrow">FOR IPHONE & IPAD</span>
             <h2>A place on your Home Screen.</h2>
-            <p>Use the web app with Safari. No App Store download is needed.</p>
+            <p>
+              Install the web app from Safari. It opens from your Home Screen
+              like an app, and no App Store download is needed.
+            </p>
             <ol className="install-steps">
               <li>
                 <span>1</span>
                 <div>
                   <h3>Open your chosen cover in Safari</h3>
                   <p>
-                    Finish account setup first, then open the cover linked to
-                    your account.
+                    Finish account setup first, then open your cover link in
+                    Safari. These installation steps are for Safari on iOS.
                   </p>
                 </div>
               </li>

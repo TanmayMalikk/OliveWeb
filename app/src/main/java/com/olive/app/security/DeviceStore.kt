@@ -5,15 +5,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-data class DeviceEnrollment(val uid: String, val triggerHash: String, val role: AccountRole = AccountRole.USER)
-data class DeviceSession(val enrollment:DeviceEnrollment,val profile:UserProfile)
-sealed interface PinResult {
-    data object Accepted : PinResult
-    data class Rejected(val failures: Int) : PinResult
-}
-
 // This is the private locker on the phone: PIN verifier, cached profile, and failed-attempt history all stay encrypted.
-class DeviceStore(private val vault: EncryptedVault, private val activityVault: EncryptedVault) {
+class DeviceStore(private val vault: EncryptedVault, activityVault: EncryptedVault, private val phoneSecure: () -> Boolean = { true }) {
+    private val histories=DeviceActivityStore(activityVault)
     // Startup needs the enrollment and profile together; decrypt the vault once instead of once per value.
     fun currentSession():DeviceSession? {
         val root=vault.read()
@@ -21,7 +15,7 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
         val entry=root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return null
         val savedProfile=root.optJSONObject("profiles")?.optJSONObject(uid) ?: return null
         return DeviceSession(
-            DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role"))),
+            enrollment(uid,entry),
             UserProfile.fromJson(savedProfile),
         )
     }
@@ -30,7 +24,7 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
         val root = vault.read()
         val uid = root.optString("activeUid")
         val entry = root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return null
-        return DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role")))
+        return enrollment(uid,entry)
     }
     // A package update can leave Firebase signed in while the local active pointer is missing; relink only a saved enrollment.
     fun restoreActive(uid: String): DeviceEnrollment? {
@@ -39,7 +33,7 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
             val entry=root.optJSONObject("enrollments")?.optJSONObject(uid) ?: return@update
             if(root.optJSONObject("profiles")?.optJSONObject(uid)==null) return@update
             root.put("activeUid",uid)
-            restored=DeviceEnrollment(uid,entry.optString("triggerHash"),AccountRole.fromStored(entry.optString("role")))
+            restored=enrollment(uid,entry)
         }
         return restored
     }
@@ -68,6 +62,45 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
             }))
         return DeviceEnrollment(identity.uid,profile.triggerHash,profile.role)
     }
+    private fun enrollment(uid: String, entry: JSONObject) = DeviceEnrollment(uid,entry.optString("triggerHash"),
+        AccountRole.fromStored(entry.optString("role")),SafeEntryMethod.fromStored(entry.optString("entryMethod")),entry.has("pinVerifier"))
+
+    internal fun deviceLockGrant(uid: String): JSONObject {
+        val entry=vault.read().getJSONObject("enrollments").getJSONObject(uid)
+        check(SafeEntryMethod.fromStored(entry.optString("entryMethod"))==SafeEntryMethod.DEVICE_LOCK)
+        return entry.getJSONObject("deviceLockGrant")
+    }
+
+    internal fun enrollDeviceLock(identity: AccountIdentity, profile: UserProfile, grant: JSONObject): DeviceEnrollment {
+        require(profile.role==AccountRole.USER)
+        vault.update { root ->
+            root.child("enrollments").put(identity.uid,JSONObject()
+                .put("triggerHash",profile.triggerHash).put("role",profile.role.name)
+                .put("entryMethod",SafeEntryMethod.DEVICE_LOCK.name).put("deviceLockGrant",grant).put("failures",0))
+            root.child("profiles").put(identity.uid,profile.toJson())
+            root.put("activeUid",identity.uid)
+        }
+        return DeviceEnrollment(identity.uid,profile.triggerHash,profile.role,SafeEntryMethod.DEVICE_LOCK,false)
+    }
+    // Preserve the other configured method when changing the preference or replacing a PIN.
+    internal fun updateSafeEntry(expected:DeviceEnrollment,method:SafeEntryMethod?,pin:String?,grant:JSONObject?):DeviceEnrollment {
+        require(pin==null || InputPolicy.validPin(pin))
+        val verifier=pin?.let(SecretVerifier::createPin)
+        var updated:DeviceEnrollment?=null
+        vault.update { root ->
+            check(root.optString("activeUid")==expected.uid)
+            val entry=root.getJSONObject("enrollments").getJSONObject(expected.uid)
+            check(enrollment(expected.uid,entry)==expected && expected.role==AccountRole.USER)
+            verifier?.let { entry.put("pinVerifier",it) }
+            grant?.let { entry.put("deviceLockGrant",it) }
+            val chosen=method ?: expected.entryMethod
+            check(if(chosen==SafeEntryMethod.APP_PIN) entry.has("pinVerifier") else entry.has("deviceLockGrant"))
+            entry.put("entryMethod",chosen.name).put("failures",0)
+            updated=enrollment(expected.uid,entry)
+        }
+        return checkNotNull(updated)
+    }
+
     // Safe contacts, staff, and admins use account login only, so their local session never stores a device PIN.
     fun enrollWithoutPin(identity: AccountIdentity, profile: UserProfile): DeviceEnrollment {
         require(profile.role!=AccountRole.USER)
@@ -77,18 +110,22 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
             root.child("profiles").put(identity.uid,profile.toJson())
             root.put("activeUid",identity.uid)
         }
-        return DeviceEnrollment(identity.uid,"",profile.role)
+        return DeviceEnrollment(identity.uid,"",profile.role,hasAppPin=false)
     }
     fun removePin(uid: String) {
         vault.update { root -> root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
             remove("pinVerifier");remove("lockedUntil");put("failures",0)
         } }
     }
-    // PIN attempt counting lives here; change the screen response in SessionViewModel.submitPin too.
+    // Verify only the active User enrollment and count failures here; SessionAccess handles routing after the result.
     fun verify(uid: String, pin: String, now: Long = System.currentTimeMillis()): PinResult {
+        require(InputPolicy.validPin(pin))
         var result: PinResult = PinResult.Rejected(0)
         vault.update { root ->
+            require(root.optString("activeUid")==uid) { "PIN account is no longer active" }
             val saved=root.getJSONObject("enrollments").getJSONObject(uid)
+            require(AccountRole.fromStored(saved.optString("role"))==AccountRole.USER) { "This account does not use a PIN" }
+            check(enrollment(uid,saved).allowsAppPin(phoneSecure()))
             val verifier=saved.getString("pinVerifier")
             val accepted=SecretVerifier.matches(pin,verifier)
             val next=if(accepted) GateState() else GateState(saved.optInt("failures")).failed()
@@ -148,132 +185,19 @@ class DeviceStore(private val vault: EncryptedVault, private val activityVault: 
             FailedAttempt(entry.getString("id"),entry.getLong("timestamp"))
         }.asReversed()
     }
-    // These histories stay encrypted on this device under the current account ID.
-    fun recordSettings(uid: String, event: SettingsEvent) { activityVault.update { append(it,uid,"settingsHistory",event.toJson()) } }
-    fun settingsHistory(uid: String): List<SettingsEvent> = rows(uid,"settingsHistory").map(SettingsEvent::fromJson)
-    fun recordTrigger(uid: String, event: TriggerEvent) { activityVault.update { append(it,uid,"triggerHistory",event.toJson()) } }
-    fun triggerHistory(uid: String): List<TriggerEvent> = rows(uid,"triggerHistory").map(TriggerEvent::fromJson).map { event ->
-        // Hide old first-try Accepted rows too; the trigger itself still stays in history.
-        if(event.lastResult=="Accepted" && event.pinAttempts==1) event.copy(pinAttempts=0,lastResult="No PIN attempt") else event
-    }
-    fun recordTriggerAttempt(uid: String, id: String, accepted: Boolean) {
-        activityVault.update { root ->
-            val events=root.optJSONObject("triggerHistory")?.optJSONArray(uid) ?: return@update
-            for(index in 0 until events.length()) {
-                val item=events.getJSONObject(index)
-                if(item.optString("id")==id) {
-                    // A clean first-try unlock is routine; only show Accepted after this trigger already had a wrong PIN.
-                    if(accepted && item.optInt("pinAttempts")==0) break
-                    item.put("pinAttempts",item.optInt("pinAttempts")+1)
-                    item.put("lastResult",if(accepted) "Accepted" else "Incorrect PIN")
-                    root.child("historySynced").child(uid).put("triggers/$id",false)
-                    break
-                }
-            }
-        }
-    }
-    fun recordCheckout(uid: String, event: CheckoutEvent) { activityVault.update { append(it,uid,"checkoutHistory",event.toJson()) } }
-    fun checkoutHistory(uid: String): List<CheckoutEvent> = rows(uid,"checkoutHistory").map(CheckoutEvent::fromJson)
-    fun savePrivateEntry(uid: String, entry: PrivateEntry) {
-        activityVault.update { root ->
-            val byAccount=root.child("privateEntries")
-            val entries=byAccount.optJSONArray(uid) ?: JSONArray().also { byAccount.put(uid,it) }
-            val index=(0 until entries.length()).firstOrNull { entries.getJSONObject(it).optString("id")==entry.id }
-            if(index==null) entries.put(entry.toJson()) else entries.put(index,entry.toJson())
-            root.child("historySynced").child(uid).put("private_entries/${entry.id}",false)
-        }
-    }
-    fun privateEntries(uid: String): List<PrivateEntry> = rows(uid,"privateEntries").map(PrivateEntry::fromJson)
-        .filter { it.purgedAt==null }
-    // After the configured retention period, erase private content but keep a tiny sync tombstone so another device cannot resurrect it.
-    fun purgeExpiredPrivateEntries(uid: String, now: Long = System.currentTimeMillis()): Boolean {
-        var changed=false
-        activityVault.update { root ->
-            val entries=root.optJSONObject("privateEntries")?.optJSONArray(uid) ?: return@update
-            for(index in 0 until entries.length()) {
-                val entry=PrivateEntry.fromJson(entries.getJSONObject(index))
-                if(entry.purgedAt==null && entry.trashExpired(now)) {
-                    val tombstone=entry.copy(updatedAt=now,kind=null,title="",body="",pinned=false,edits=emptyList(),purgedAt=now)
-                    entries.put(index,tombstone.toJson())
-                    root.child("historySynced").child(uid).put("private_entries/${entry.id}",false)
-                    changed=true
-                }
-            }
-        }
-        return changed
-    }
-    fun pendingHistory(uid: String): List<HistoryRecord> {
-        val root=activityVault.read()
-        val synced=root.optJSONObject("historySynced")?.optJSONObject(uid)
-        return listOf("settings" to "settingsHistory","triggers" to "triggerHistory","checkouts" to "checkoutHistory","private_entries" to "privateEntries")
-            .flatMap { (category,section) ->
-                val rows=root.optJSONObject(section)?.optJSONArray(uid) ?: JSONArray()
-                (0 until rows.length()).map { rows.getJSONObject(it) }.filter { synced?.optBoolean("$category/${it.getString("id")}") != true }
-                    .map { HistoryRecord(category,it.getString("id"),it.toString()) }
-            }
-    }
-    fun markHistorySynced(uid: String, record: HistoryRecord) {
-        activityVault.update { root ->
-            val section=when(record.category) {
-                "settings" -> "settingsHistory"; "triggers" -> "triggerHistory"
-                "checkouts" -> "checkoutHistory"; "private_entries" -> "privateEntries"
-                else -> return@update
-            }
-            val rows=root.optJSONObject(section)?.optJSONArray(uid) ?: return@update
-            val current=(0 until rows.length()).map { rows.getJSONObject(it) }.firstOrNull { it.optString("id")==record.id }
-            if(current?.toString()==record.json)
-                root.child("historySynced").child(uid).put("${record.category}/${record.id}",true)
-        }
-    }
-    fun mergeHistory(uid: String, records: List<HistoryRecord>) {
-        activityVault.update { root ->
-            val sections=mapOf("settings" to "settingsHistory","triggers" to "triggerHistory","checkouts" to "checkoutHistory","private_entries" to "privateEntries")
-            records.forEach { record ->
-                val section=sections[record.category] ?: return@forEach
-                val byAccount=root.child(section)
-                val rows=byAccount.optJSONArray(uid) ?: JSONArray().also { byAccount.put(uid,it) }
-                val incoming=JSONObject(record.json)
-                val existing=(0 until rows.length()).firstOrNull { rows.getJSONObject(it).optString("id")==record.id }
-                val localIsNewer=record.category=="triggers" && existing!=null &&
-                    rows.getJSONObject(existing).optInt("pinAttempts")>incoming.optInt("pinAttempts")
-                var privateNeedsUpload=false
-                if(existing==null) rows.put(incoming)
-                else if(record.category=="triggers" && !localIsNewer) rows.put(existing,incoming)
-                else if(record.category=="private_entries") {
-                    // A purge tombstone wins by timestamp and never pulls old note text or edit history back in.
-                    val local=PrivateEntry.fromJson(rows.getJSONObject(existing))
-                    val cloud=PrivateEntry.fromJson(incoming)
-                    val newest=when {
-                        local.purgedAt!=null -> local
-                        cloud.purgedAt!=null -> cloud
-                        local.updatedAt>cloud.updatedAt -> local
-                        else -> cloud
-                    }
-                    val edits=if(newest.purgedAt!=null) emptyList() else
-                        (local.edits+cloud.edits).distinctBy { it.id }.sortedBy { it.timestamp }
-                    val merged=newest.copy(edits=edits)
-                    rows.put(existing,merged.toJson())
-                    privateNeedsUpload=(local.purgedAt!=null && cloud.purgedAt==null) || local.updatedAt>cloud.updatedAt ||
-                        (newest.purgedAt==null && edits.any { localEdit -> cloud.edits.none { it.id==localEdit.id } })
-                }
-                if(!localIsNewer && !privateNeedsUpload) root.child("historySynced").child(uid).put("${record.category}/${record.id}",true)
-            }
-        }
-    }
-    private fun append(root: JSONObject, uid: String, section: String, value: JSONObject) {
-        val byAccount=root.child(section)
-        val entries=byAccount.optJSONArray(uid) ?: JSONArray().also { byAccount.put(uid,it) }
-        entries.put(value)
-        val category=when(section) {
-            "settingsHistory" -> "settings"; "triggerHistory" -> "triggers"
-            "checkoutHistory" -> "checkouts"; "privateEntries" -> "private_entries"
-            else -> error("Unknown private storage section")
-        }
-        root.child("historySynced").child(uid).put("$category/${value.getString("id")}",false)
-    }
-    private fun rows(uid: String, section: String): List<JSONObject> {
-        val entries=activityVault.read().optJSONObject(section)?.optJSONArray(uid) ?: JSONArray()
-        return (0 until entries.length()).map { entries.getJSONObject(it) }.asReversed()
-    }
+    // Delegate activity storage so PIN/account state remains isolated from history merging.
+    fun recordSettings(uid: String, event: SettingsEvent) = histories.recordSettings(uid,event)
+    fun settingsHistory(uid: String) = histories.settingsHistory(uid)
+    fun recordTrigger(uid: String, event: TriggerEvent) = histories.recordTrigger(uid,event)
+    fun triggerHistory(uid: String) = histories.triggerHistory(uid)
+    fun recordTriggerAttempt(uid: String, id: String, accepted: Boolean) = histories.recordTriggerAttempt(uid,id,accepted)
+    fun recordCheckout(uid: String, event: CheckoutEvent) = histories.recordCheckout(uid,event)
+    fun checkoutHistory(uid: String) = histories.checkoutHistory(uid)
+    fun savePrivateEntry(uid: String, entry: PrivateEntry) = histories.savePrivateEntry(uid,entry)
+    fun privateEntries(uid: String) = histories.privateEntries(uid)
+    fun purgeExpiredPrivateEntries(uid: String, now: Long = System.currentTimeMillis()) = histories.purgeExpiredPrivateEntries(uid,now)
+    fun pendingHistory(uid: String) = histories.pendingHistory(uid)
+    fun markHistorySynced(uid: String, record: HistoryRecord) = histories.markHistorySynced(uid,record)
+    fun mergeHistory(uid: String, records: List<HistoryRecord>) = histories.mergeHistory(uid,records)
     fun forgetDevice() { vault.update { it.remove("activeUid") } }
 }

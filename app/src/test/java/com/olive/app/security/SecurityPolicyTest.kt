@@ -4,13 +4,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SecurityPolicyTest {
-    @Test fun frenchTranslationsIncludeErrorsAndDynamicCounters() {
-        assertEquals("Paramètres", com.olive.app.ui.translate("Settings","French"))
-        assertEquals("NIP incorrect. 3 tentatives restantes.",com.olive.app.ui.translate("Incorrect PIN. 3 attempts remaining.","French"))
-        assertEquals("Paiement refusé",com.olive.app.ui.translate("Payment declined","French"))
-        assertEquals("Settings",com.olive.app.ui.translate("Settings","English"))
+    @Test fun newUsernamesNeedALetterAndPasswordsCannotContainTheirUsername() {
+        assertFalse(InputPolicy.validUsername("12345678"))
+        assertFalse(InputPolicy.validUsername("________"))
+        assertTrue(InputPolicy.validUsername("letters_only"))
+        assertTrue(InputPolicy.validUsername("1234567a"))
+        // Existing numeric usernames remain able to sign in.
+        assertTrue(InputPolicy.validExistingUsername("12345678"))
+        assertFalse(InputPolicy.validAccountPassword("Test_user123!","test_user"))
+        assertFalse(InputPolicy.validAccountPassword("!123Test_user"," TEST_USER "))
+        assertFalse(InputPolicy.validAccountPassword("testuser","testuser"))
+        assertTrue(InputPolicy.validAccountPassword("Unrelated123!","test_user"))
     }
-
     @Test fun pinVerifierUsesRandomSaltAndRejectsWrongPin() {
         val first=SecretVerifier.create("123456")
         val second=SecretVerifier.create("123456")
@@ -33,6 +38,14 @@ class SecurityPolicyTest {
         assertEquals(15,IdlePolicy.countdown(60_000))
         assertEquals(1,IdlePolicy.countdown(74_999))
         assertEquals(0,IdlePolicy.countdown(75_000))
+    }
+    @Test fun accessibilityCanExtendTheWarningButCannotShortenThePrivacyDefault() {
+        assertNull(IdlePolicy.countdown(59_999,60_000))
+        assertEquals(60,IdlePolicy.countdown(60_000,60_000))
+        assertEquals(45,IdlePolicy.countdown(75_000,60_000))
+        assertEquals(0,IdlePolicy.countdown(120_000,60_000))
+        assertEquals(15,IdlePolicy.countdown(60_000,0))
+        assertEquals(0,IdlePolicy.countdown(75_000,0))
     }
     @Test fun triggerRequiresExactNormalizedMatch() {
         assertEquals(InputPolicy.triggerHash("  MY WORD  "),InputPolicy.triggerHash("my word"))
@@ -71,5 +84,3 @@ class SecurityPolicyTest {
         assertTrue(InputPolicy.validDob("2000-02-29"))
     }
 }
-
-

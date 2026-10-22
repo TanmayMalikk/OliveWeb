@@ -16,6 +16,7 @@ export interface Branch {
   gapY: number;
   gap: number;
   passed: boolean;
+  seed?: number;
 }
 export interface FlightWorld {
   y: number;
@@ -25,7 +26,7 @@ export interface FlightWorld {
   over: boolean;
 }
 export function flightSpeedMultiplier(score: number) {
-  return Math.min(7.5, 1 + Math.floor(score / 5) / 10);
+  return Math.min(7.5, 1 + Math.floor(score / 2) / 10);
 }
 export function flightGap(score: number) {
   // The rounded branch tips extend half a stroke into each end of the gap.
@@ -33,7 +34,10 @@ export function flightGap(score: number) {
   const minimumGap = FLIGHT.radiusY * 4 + FLIGHT.branchStroke;
   return Math.max(minimumGap, FLIGHT.gap - Math.floor(score / 10) * 8);
 }
-export function newFlight(width: number = FLIGHT.width): FlightWorld {
+export function newFlight(
+  width: number = FLIGHT.width,
+  random: () => number = () => 0.5,
+): FlightWorld {
   return {
     y: 230,
     velocity: 0,
@@ -45,6 +49,7 @@ export function newFlight(width: number = FLIGHT.width): FlightWorld {
         gapY: index % 2 ? 195 : 238,
         gap: flightGap(0),
         passed: false,
+        seed: random(),
       }),
     ),
     over: false,
@@ -192,6 +197,7 @@ export function advanceFlight(
       gapY: 155 + random() * 165,
       gap: flightGap(score),
       passed: false,
+      seed: random(),
     });
   const angle = (oliveAngle(velocity) * Math.PI) / 180;
   const verticalRadius = Math.hypot(13 * Math.sin(angle), 17 * Math.cos(angle));

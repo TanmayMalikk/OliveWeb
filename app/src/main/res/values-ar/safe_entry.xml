@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entry_setup_title">احمِ مساحتك الآمنة</string>
+    <string name="entry_setup_description">اختر طريقة فتح التطبيق الآمن على هذا الجهاز.</string>
+    <string name="entry_safety_question">هل يعرف الشخص الذي يؤذيك رمز هاتفك أو نمطه أو كلمة مروره، أو يمكنه الوصول إليها؟</string>
+    <string name="entry_yes">نعم</string>
+    <string name="entry_no">لا</string>
+    <string name="entry_choose_method">اختر طريقة الدخول</string>
+    <string name="entry_new_pin">رمز PIN جديد</string>
+    <string name="entry_device_lock">قفل الجهاز</string>
+    <string name="entry_recommended">%1$s · موصى به</string>
+    <string name="entry_recommend_pin">استخدم رمزًا منفصلًا لا يعرفه هذا الشخص. يقبل قفل الجهاز أيضًا رمز الهاتف أو نمطه أو كلمة مروره.</string>
+    <string name="entry_recommend_device">يوصى بقفل الجهاز إذا كان هذا الشخص لا يستطيع فتح هاتفك.</string>
+    <string name="entry_new_pin_description">أنشئ رمزًا منفصلًا للتطبيق من 4 إلى 6 أرقام. تجنب استخدام رمز هاتفك.</string>
+    <string name="entry_device_description">استخدم بصمة الإصبع أو التعرف المدعوم على الوجه أو رمز هاتف Android أو نمطه أو كلمة مروره. لا يلزم رمز منفصل للتطبيق.</string>
+    <string name="entry_device_unavailable">أعدّ قفل الشاشة في إعدادات Android لاستخدام قفل الجهاز، أو اختر رمز PIN جديدًا.</string>
+    <string name="entry_confirm_setup">أكد هويتك لإعداد الدخول الآمن.</string>
+    <string name="entry_unlock_description">أكد هويتك باستخدام Android لفتح المساحة الآمنة.</string>
+    <string name="entry_unlock">فتح باستخدام قفل الجهاز</string>
+    <string name="entry_use_phone_lock">استخدام قفل شاشة الهاتف</string>
+    <string name="entry_auth_failed">تعذر التحقق من مصادقة Android. يظل الدخول مقفلًا. حاول مجددًا أو سجل الدخول لإعداد الدخول الآمن من جديد.</string>
+    <string name="entry_auth_cancelled">ألغيت المصادقة أو إنها غير متاحة. يظل الدخول مقفلًا.</string>
+<string name="entry_verify_trigger">أكد هويتك بقفل الجهاز لتغيير كلمة الدخول.</string>
+    <string name="entry_invalid_trigger">اختر كلمة أو عبارة من 3 إلى 64 حرفًا.</string>
+    <string name="entry_calculator_help">للدخول الآمن، أدخل رمز التطبيق (أو أي 4 إلى 6 أرقام عند استخدام قفل الجهاز)، ثم اضغط يساوي مرتين. يظل قفل الجهاز يتطلب مصادقة Android.</string>
+</resources>

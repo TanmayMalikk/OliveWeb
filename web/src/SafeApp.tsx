@@ -43,10 +43,12 @@ import {
 import { accounts, triggerHash } from "./services/accounts";
 import { issueEntryLink, savedEntryLink } from "./services/entry-links";
 const Messages = lazy(() => import("./Messages"));
+const SafetyPlan = lazy(() => import("./SafetyPlan"));
 const nav: { page: Page; icon: typeof House }[] = [
   { page: "Home", icon: House },
   { page: "Notes", icon: NotebookPen },
   { page: "Messages", icon: MessageCircle },
+  { page: "SafetyPlan", icon: ShieldCheck },
   { page: "Contacts", icon: Users },
   { page: "Profile", icon: UserRound },
   { page: "Settings", icon: Settings },
@@ -115,11 +117,13 @@ export default function SafeApp() {
                       ? "People in your corner."
                       : s.page === "Messages"
                         ? "Stay connected."
-                        : s.page === "Settings"
-                          ? "Your space. Your settings."
-                          : s.page === "Activity"
-                            ? "Your account, in perspective."
-                            : "Your story, your words."}
+                        : s.page === "SafetyPlan"
+                          ? "A plan shaped around you."
+                          : s.page === "Settings"
+                            ? "Your space. Your settings."
+                            : s.page === "Activity"
+                              ? "Your account, in perspective."
+                              : "Your story, your words."}
               </h1>
             </div>
             <small className="today">
@@ -150,6 +154,10 @@ export default function SafeApp() {
             <SettingsPage />
           ) : s.page === "Activity" ? (
             <Activity />
+          ) : s.page === "SafetyPlan" ? (
+            <Suspense fallback={<p role="status">Opening safety plan…</p>}>
+              <SafetyPlan />
+            </Suspense>
           ) : (
             <Suspense fallback={<p role="status">Opening conversations…</p>}>
               <Messages />

@@ -18,10 +18,13 @@ class ResponsivenessPolicyTest {
 
     @Test fun messagingDirectoryRegistrationIsDeduplicatedPerIdentity() {
         val identity=AccountIdentity("uid-1","Olive_User")
-        assertEquals("uid-1:olive_user",messagingIdentityMarker(identity))
-        assertTrue(shouldRegisterMessagingIdentity(null,identity))
-        assertFalse(shouldRegisterMessagingIdentity("uid-1:olive_user",identity))
-        assertTrue(shouldRegisterMessagingIdentity("uid-2:olive_user",identity))
+        val publicKey=byteArrayOf(1,2,3,4)
+        val marker=messagingIdentityMarker(identity,publicKey)
+        assertTrue(marker.startsWith("secure-v2:uid-1:olive_user:"))
+        assertTrue(shouldRegisterMessagingIdentity(null,identity,publicKey))
+        assertFalse(shouldRegisterMessagingIdentity(marker,identity,publicKey))
+        assertTrue(shouldRegisterMessagingIdentity(marker,identity,byteArrayOf(4,3,2,1)))
+        assertTrue(shouldRegisterMessagingIdentity("secure-v1:uid-1:olive_user",identity,publicKey))
     }
 
     @Test fun calculatorHistoryCanArriveAfterTheInputIsAlreadyInteractive() {

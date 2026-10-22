@@ -16,40 +16,83 @@ function LeafyBranch({
   x,
   end,
   down,
+  seed,
 }: {
   x: number;
   end: number;
   down: boolean;
+  seed: number;
 }) {
   const height = down ? end : FLIGHT.height - end;
+  const variation = seed + (down ? 0.173 : 0.719);
+  const random = (index: number, salt = 0) => {
+    const value =
+      Math.sin(variation * 8191 + index * 127.1 + salt * 311.7) * 43758.5453;
+    return value - Math.floor(value);
+  };
+  const sway = (random(0, 1) - 0.5) * 9;
+  const branchShape = `M27 0 Q${10 + sway} ${height * 0.36} ${23 + sway * 0.25} ${height} L${35 + sway * 0.25} ${height} Q${24 + sway} ${height * 0.36} 27 0Z`;
+  const leafCount = Math.max(1, Math.floor((height - 10) / 32));
   return (
     <g transform={`translate(${x},${end}) scale(1,${down ? -1 : 1})`}>
       <path
-        d={branchPath(height)}
-        stroke="#746444"
-        strokeWidth={FLIGHT.branchStroke}
-        strokeLinecap="round"
-        fill="none"
+        d={branchShape}
+        fill="#6f5b39"
+        stroke="#4f4029"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
       />
       <path
-        d={`M25 0 Q20 ${height * 0.36} 29 ${height}`}
+        d={branchPath(height)}
         stroke="#aa9871"
-        strokeWidth="3"
+        strokeWidth="2.5"
         strokeLinecap="round"
         fill="none"
       />
-      {Array.from({ length: Math.floor(height / 33) }, (_, index) => {
-        const y = 20 + index * 33;
+      {Array.from({ length: leafCount }, (_, index) => {
+        const y = Math.min(
+          height - 12,
+          24 + index * 32 + (random(index, 2) - 0.5) * 8,
+        );
+        const leftScale = 0.78 + random(index, 3) * 0.34;
+        const rightScale = 0.78 + random(index, 4) * 0.34;
+        const leftRotation = -18 + random(index, 5) * 25;
+        const rightRotation = -7 + random(index, 6) * 25;
+        const twigSide = random(index, 7) > 0.5 ? 1 : -1;
+        const twigLength = 10 + random(index, 8) * 10;
+        const leftColor = random(index, 9) > 0.5 ? "#91a36d" : "#738a55";
+        const rightColor = random(index, 10) > 0.5 ? "#a7b584" : "#667d4b";
         return (
-          <g key={index} transform={`translate(26,${y})`}>
-            <path d={leafPaths[0]} fill={index % 2 ? "#7e9260" : "#9ba978"} />
-            <path d={leafPaths[1]} fill={index % 2 ? "#a8b58a" : "#728655"} />
+          <g key={index}>
             <path
-              d="M0 3 L-19 23 M0 9 L19 28"
-              stroke="#526640"
-              strokeWidth="1"
-              fill="none"
+              d={`M27 ${y - 2} L${27 + twigSide * twigLength} ${y + 10 + random(index, 11) * 7} L${27 + twigSide * 3} ${y + 9}Z`}
+              fill="#5f4d31"
+              stroke="#493b27"
+              strokeWidth="0.8"
+              strokeLinejoin="round"
             />
+            <g transform={`translate(27,${y})`}>
+              <path
+                d={`M0 5 L${-17 * leftScale} ${21 * leftScale} M0 8 L${18 * rightScale} ${24 * rightScale}`}
+                stroke="#526640"
+                strokeWidth="1.2"
+                fill="none"
+              />
+              <path
+                d={leafPaths[0]}
+                fill={leftColor}
+                stroke="#586c43"
+                strokeWidth="0.7"
+                transform={`rotate(${leftRotation}) scale(${leftScale})`}
+              />
+              <path
+                d={leafPaths[1]}
+                fill={rightColor}
+                stroke="#526640"
+                strokeWidth="0.7"
+                transform={`rotate(${rightRotation}) scale(${rightScale})`}
+              />
+            </g>
           </g>
         );
       })}
@@ -58,7 +101,9 @@ function LeafyBranch({
 }
 
 export default function OliveFlight() {
-  const [world, setWorld] = useState(() => newFlight());
+  const [world, setWorld] = useState(() =>
+    newFlight(FLIGHT.width, Math.random),
+  );
   const [phase, setPhase] = useState<"ready" | "playing" | "paused">("ready");
   const [best, setBest] = useState<number | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -77,7 +122,7 @@ export default function OliveFlight() {
       if (Math.abs(widthRef.current - width) < 0.1) return;
       widthRef.current = width;
       setViewWidth(width);
-      if (phaseRef.current === "ready") setWorld(newFlight(width));
+      if (phaseRef.current === "ready") setWorld(newFlight(width, Math.random));
     });
     observer.observe(element);
     return () => observer.disconnect();
@@ -130,7 +175,10 @@ export default function OliveFlight() {
   }, [world.over, world.score, best, loaded]);
   function flap() {
     if (world.over || phase === "ready") {
-      setWorld({ ...newFlight(widthRef.current), velocity: FLIGHT.lift });
+      setWorld({
+        ...newFlight(widthRef.current, Math.random),
+        velocity: FLIGHT.lift,
+      });
       setPhase("playing");
     } else {
       setWorld((current) => ({ ...current, velocity: FLIGHT.lift }));
@@ -210,11 +258,13 @@ export default function OliveFlight() {
                   x={branch.x}
                   end={branch.gapY - branch.gap / 2}
                   down
+                  seed={branch.seed ?? index * 0.271}
                 />
                 <LeafyBranch
                   x={branch.x}
                   end={branch.gapY + branch.gap / 2}
                   down={false}
+                  seed={branch.seed ?? index * 0.271}
                 />
               </g>
             ))}
@@ -296,7 +346,7 @@ export default function OliveFlight() {
           <Button
             variant="quiet"
             onClick={() => {
-              setWorld(newFlight(widthRef.current));
+              setWorld(newFlight(widthRef.current, Math.random));
               setPhase("ready");
               stage.current?.focus();
             }}

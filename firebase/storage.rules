@@ -6,7 +6,14 @@ service firebase.storage {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // Change this path with AccountRepository.profileObject; keep every profile locked to its owner.
+    // GitHub Actions replaces this signed APK after each successful main build.
+    // Public clients may download it, but only the deployment service account can upload it.
+    match /public/android/olive-branch.apk {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Keep this path aligned with FirebaseAccountRepository.profileObject and its tests; each profile belongs to its owner.
     match /accounts/{uid}/profile.json {
       allow read: if owner(uid);
       allow create, update: if owner(uid)
@@ -30,8 +37,10 @@ service firebase.storage {
     // Media stays in its owner's folder; the Firestore metadata controls any later sharing.
     match /users/{userId}/media/{fileId} {
       allow create, update: if owner(userId) && request.resource.size <= 250 * 1024 * 1024;
-      allow read: if request.auth != null
-        && request.auth.uid in firestore.get(/databases/(default)/documents/files/$(fileId)).data.allowed_users;
+      allow read: if owner(userId)
+        || (request.auth != null && resource.metadata['access_' + request.auth.uid] == 'true')
+        || (request.auth != null
+          && request.auth.uid in firestore.get(/databases/(default)/documents/files/$(fileId)).data.allowed_users);
       allow delete: if owner(userId);
     }
 

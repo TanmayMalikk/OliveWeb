@@ -9,9 +9,9 @@ import {
 } from "./olive-flight";
 
 describe("Olive Flight physics", () => {
-  it("caps speed at 7.5x starting at 325 points", () => {
-    expect(flightSpeedMultiplier(324)).toBe(7.4);
-    for (const score of [325, 330, 10000]) {
+  it("caps speed at 7.5x starting at 130 points", () => {
+    expect(flightSpeedMultiplier(129)).toBe(7.4);
+    for (const score of [130, 132, 10000]) {
       expect(flightSpeedMultiplier(score)).toBe(7.5);
       const world = { ...newFlight(), score };
       const next = advanceFlight(world, 0.01);
@@ -62,15 +62,15 @@ describe("Olive Flight physics", () => {
       ).over,
     ).toBe(true);
   });
-  it("increases horizontal speed by 0.1x at each five-point milestone", () => {
+  it("increases horizontal speed by 0.1x at each two-point milestone", () => {
     for (const [score, multiplier] of [
       [0, 1],
-      [4, 1],
-      [5, 1.1],
-      [9, 1.1],
-      [10, 1.2],
-      [15, 1.3],
-      [50, 2],
+      [1, 1],
+      [2, 1.1],
+      [3, 1.1],
+      [4, 1.2],
+      [6, 1.3],
+      [20, 2],
     ]) {
       expect(flightSpeedMultiplier(score)).toBeCloseTo(multiplier);
       const world = { ...newFlight(), score };
@@ -85,7 +85,7 @@ describe("Olive Flight physics", () => {
     const milestone = advanceFlight(
       {
         ...newFlight(),
-        score: 4,
+        score: 1,
         branches: [
           { x: 20, gapY: 230, gap: FLIGHT.gap, passed: false },
           { x: 350, gapY: 238, gap: FLIGHT.gap, passed: false },
@@ -93,7 +93,7 @@ describe("Olive Flight physics", () => {
       },
       0.01,
     );
-    expect(milestone.score).toBe(5);
+    expect(milestone.score).toBe(2);
     const next = advanceFlight(milestone, 0.01);
     expect(milestone.branches[1].x - next.branches[1].x).toBeCloseTo(
       FLIGHT.speed * 1.1 * 0.01,

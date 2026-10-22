@@ -4,7 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CatalogTest {
-    private val dishes = DemoCatalogRepository().dishes()
+    private val dishes = DemoCatalogRepository(com.olive.app.ui.testResourceText()::invoke).dishes()
     @Test fun homemadeMenuHasTwentyItemsAndAllDietChoices() {
         assertTrue(dishes.size>=20)
         assertEquals(setOf("Vegetarian","Vegan","Meat"),dishes.map { it.diet }.toSet())
