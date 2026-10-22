@@ -41,11 +41,11 @@ class OrientationPreprocessor(private val context: Context) {
             rawBitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, decodeOptions)
                 ?: return imageBytes // Fallback to original bytes if decoding completely fails
 
-            val currentBitmap = rawBitmap!!
+            val currentBitmap = rawBitmap
 
             // 2. Downscale a separate small copy to match the ONNX model input constraint (224x224)
             scaledBitmap = Bitmap.createScaledBitmap(currentBitmap, 224, 224, true)
-            val floatBuffer = bitmapToFloatBuffer(scaledBitmap!!)
+            val floatBuffer = bitmapToFloatBuffer(scaledBitmap)
 
             // 3. Fire ONNX Runtime inference pass
             val inputShape = longArrayOf(1, 3, 224, 224)
@@ -54,8 +54,8 @@ class OrientationPreprocessor(private val context: Context) {
         // Execute session and auto-close the result block safely to prevent memory leaks
             val outputs: OrtSession.Result = ortSession.run(mapOf("x" to inputTensor))
 
-        // FIX: Access the first output node dynamically and cast its value
-            val outputTensor = outputs.get(0) as OnnxTensor
+        // Access the first output node dynamically and cast its value
+            val outputTensor = outputs[0] as OnnxTensor
             @Suppress("UNCHECKED_CAST")
             val logits = outputTensor.value as Array<FloatArray>
 
@@ -66,11 +66,11 @@ class OrientationPreprocessor(private val context: Context) {
             val predictedClass = logits[0].indices.maxByOrNull { logits[0][it] } ?: 0
 
 
-            // Map layout classes to hardware rotation degrees
+            // Map layout classes to correction angles needed to stand upright
             val rotationDegrees = when (predictedClass) {
-                1 -> 90f   // Sideways Clockwise
-                2 -> 180f  // Completely Inverted
-                3 -> 270f  // Sideways Counter-Clockwise
+                1 -> 270f  // Correct 90° rotation
+                2 -> 180f  // Correct 180° inversion
+                3 -> 90f   // Correct 270° (90° CCW) rotation
                 else -> 0f // Already Upright (0°)
             }
 
