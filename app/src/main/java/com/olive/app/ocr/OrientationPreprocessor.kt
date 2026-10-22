@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.util.Log
+import androidx.core.graphics.scale
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.OnnxTensor
@@ -44,7 +45,7 @@ class OrientationPreprocessor(context: Context) {
             val currentBitmap = rawBitmap
 
             // 2. Downscale a separate small copy to match the ONNX model input constraint (224x224)
-            scaledBitmap = Bitmap.createScaledBitmap(currentBitmap, 224, 224, true)
+            scaledBitmap = currentBitmap.scale(224, 224, true)
             val floatBuffer = bitmapToFloatBuffer(scaledBitmap)
 
             // 3. Fire ONNX Runtime inference pass
