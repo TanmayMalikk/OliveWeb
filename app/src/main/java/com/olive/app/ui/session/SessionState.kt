@@ -36,6 +36,7 @@ internal class SessionState(private val canEnterSafe:()->Boolean) {
     var chatMessages by mutableStateOf(emptyList<ChatMessage>())
     var messagingBusy by mutableStateOf(false)
     var messagingNeedsReconnect by mutableStateOf(false)
+    var conversationLoadFailed by mutableStateOf(false)
     var pendingSync by mutableStateOf(false)
     var deliveryAddress by mutableStateOf(DeliveryAddress())
     var addressPrompt by mutableStateOf(false)

@@ -1,6 +1,7 @@
 package com.olive.app.ui
 
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
@@ -22,6 +23,8 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material.icons.outlined.NorthEast
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,14 +33,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.olive.app.data.SafetyDocument
+import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
@@ -47,6 +55,7 @@ import java.util.Locale
     val active=session.activeConversation ?: return
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
+    var openedMedia by remember { mutableStateOf<Pair<SafetyDocument,File>?>(null) }
     val listState=rememberLazyListState()
     val imeBottom=WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible=imeBottom>0
@@ -58,6 +67,10 @@ import java.util.Locale
             delay(120.milliseconds)
             listState.animateScrollToItem(session.chatMessages.lastIndex)
         }
+    }
+    openedMedia?.let { (document,file) ->
+        SafetyDocumentViewer(document,file) { file.delete();openedMedia=null }
+        return
     }
     Box(modifier) {
     Column(Modifier.fillMaxSize().padding(start=20.dp,end=20.dp,top=12.dp)) {
@@ -89,7 +102,7 @@ import java.util.Locale
                             Column(Modifier.weight(1f)) {
                                 Text(if(mine) session.coverUsername else chat.senderUsername,style=MaterialTheme.typography.labelSmall,
                                     color=if(mine) Color.White.copy(alpha=.78f) else Muted)
-                                ChatMessageBody(chat,session,mine)
+                                ChatMessageBody(chat,session,mine) { document,file -> openedMedia=document to file }
                                 if(chat.sentAt>0) Text(DateTimeFormatter.ofPattern(uiText(R.string.ui_mmm_d_hh_mm)).withZone(ZoneId.systemDefault()).format(Instant.ofEpochMilli(chat.sentAt)),
                                     style=MaterialTheme.typography.labelSmall,color=if(mine) Color.White.copy(alpha=.7f) else Muted)
                             }
@@ -118,22 +131,29 @@ import java.util.Locale
         }
     }
     if(exit!=null && session.chatQuickExitHintVisible && session.screen==SessionScreen.Safe && !session.privacyBlackout) {
-        androidx.compose.ui.window.Dialog(onDismissRequest=session::dismissChatQuickExitHint) {
+        val density=LocalDensity.current
+        Popup(alignment=Alignment.TopEnd,
+            offset=IntOffset(with(density) { (-14).dp.roundToPx() },with(density) { 82.dp.roundToPx() }),
+            onDismissRequest=session::dismissChatQuickExitHint,
+            properties=PopupProperties(focusable=true,dismissOnBackPress=true,dismissOnClickOutside=true)) {
             Surface(shape=MaterialTheme.shapes.large,color=OliveGreen,contentColor=Color.White,
                 shadowElevation=14.dp,border=BorderStroke(2.dp,Color.White.copy(alpha=.9f)),
-                modifier=Modifier.fillMaxWidth().widthIn(max=360.dp).testTag("chat_quick_exit_hint")) {
+                modifier=Modifier.widthIn(min=280.dp,max=340.dp).testTag("chat_quick_exit_hint").semantics {
+                    paneTitle=uiText(R.string.ui_quick_exit_moved_here)
+                }) {
                 Column(Modifier.padding(horizontal=22.dp,vertical=18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Text(uiText(R.string.ui_quick_exit_moved_here),fontSize=20.sp,lineHeight=25.sp,
-                        fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,color=Color.White)
+                    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                        Text(uiText(R.string.ui_quick_exit_moved_here),fontSize=20.sp,lineHeight=25.sp,
+                            fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,color=Color.White,
+                            modifier=Modifier.weight(1f))
+                        Icon(Icons.Outlined.NorthEast,null,tint=Color.White,modifier=Modifier.size(30.dp))
+                    }
                     Text(uiText(R.string.ui_while_you_are_in_a_chat_use_exit_in_the_top_right_corner),
                         fontSize=16.sp,lineHeight=22.sp,color=Color.White)
                     Button(onClick=session::dismissChatQuickExitHint,
                         colors=ButtonDefaults.buttonColors(containerColor=Color.White,contentColor=OliveGreen),
                         modifier=Modifier.align(Alignment.End).heightIn(min=46.dp).testTag("dismiss_chat_quick_exit_hint")) {
                         Text(uiText(R.string.ui_okay),fontSize=16.sp)
-                    }
-                    TextButton(onClick=exit,modifier=Modifier.align(Alignment.End).testTag("chat_hint_quick_exit")) {
-                        Text(stringResource(R.string.quick_exit),color=Color.White)
                     }
                 }
             }
@@ -143,8 +163,25 @@ import java.util.Locale
     }
 }
 
-@Composable private fun ChatMessageBody(chat:com.olive.app.data.ChatMessage,session:SessionViewModel,mine:Boolean) {
+@Composable private fun ChatMessageBody(chat:com.olive.app.data.ChatMessage,session:SessionViewModel,mine:Boolean,
+    onOpenMedia:(SafetyDocument,File)->Unit) {
     val parts=chat.body.split(":",limit=3)
+    if(!chat.unsent && parts.firstOrNull()=="SHARED_MEDIA" && parts.size>=2) {
+        SharedMediaMessage(parts[1],parts.getOrNull(2).orEmpty(),session,mine,onOpenMedia)
+        return
+    }
+    if(!chat.unsent && parts.firstOrNull()=="SHARED_LOCATION") {
+        Surface(onClick={session.navigate(SafePage.Location)},shape=MaterialTheme.shapes.medium,
+            color=if(mine) Color.White.copy(alpha=.2f) else Color.Black.copy(alpha=.05f),
+            modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).testTag("shared_live_location")) {
+            Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Outlined.LocationOn,stringResource(R.string.shared_live_location))
+                Column { Text(stringResource(R.string.shared_live_location),style=MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.open_location_map),fontWeight=androidx.compose.ui.text.font.FontWeight.Bold) }
+            }
+        }
+        return
+    }
     val shared=parts.firstOrNull() in setOf("SHARED_NOTE","SHARED_INCIDENT") && parts.size>=2
     if(chat.unsent || !shared) {
         Text(when { chat.unsent -> stringResource(R.string.message_unsent)
@@ -166,6 +203,30 @@ import java.util.Locale
                     style=MaterialTheme.typography.labelSmall)
                 Text(title,style=MaterialTheme.typography.bodyMedium,
                     fontWeight=androidx.compose.ui.text.font.FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable private fun SharedMediaMessage(id:String,name:String,session:SessionViewModel,mine:Boolean,
+    onOpen:(SafetyDocument,File)->Unit) {
+    var opening by remember(id) { mutableStateOf(false) }
+    Surface(onClick={
+        val uid=session.coverAccountId ?: return@Surface
+        if(opening) return@Surface
+        opening=true
+        session.documents.openShared(uid,id,{ document,local -> onOpen(document,local) },{ opening=false })
+    },enabled=!opening,shape=MaterialTheme.shapes.medium,
+        color=if(mine) Color.White.copy(alpha=.2f) else Color.Black.copy(alpha=.05f),
+        modifier=Modifier.fillMaxWidth().padding(vertical=4.dp).testTag("shared_media_$id")) {
+        Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically,
+            horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            if(opening) CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp)
+            else Icon(Icons.Outlined.AttachFile,stringResource(R.string.shared_secure_file))
+            Column {
+                Text(stringResource(R.string.shared_secure_file),style=MaterialTheme.typography.labelSmall)
+                Text(name.ifBlank { stringResource(R.string.encrypted_document) },style=MaterialTheme.typography.bodyMedium,
+                    fontWeight=androidx.compose.ui.text.font.FontWeight.Bold,maxLines=2)
             }
         }
     }

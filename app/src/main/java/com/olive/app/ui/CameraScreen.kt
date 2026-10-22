@@ -2,282 +2,167 @@ package com.olive.app.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
+import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Cameraswitch
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.olive.app.R
+import com.olive.app.data.AccountIdentity
+import java.io.File
+import java.util.UUID
 
-/**
- * ============================================================================
- * CameraScreen Composable
- * ============================================================================
- * Purpose: Provides a secure in-app camera interface for taking photos into memory
- * without saving them to the device's public gallery.
- * 
- * Key Features:
- * 1. Runtime Permission Check & Request: Prompts the user for camera permission if not already granted.
- * 2. Realistic Camera UI: Live preview with a circular white shutter button in the bottom center.
- * 3. Corrected Orientation: Automatically corrects the 90-degree portrait orientation rotation on review.
- * 4. Photo Review Mode: Once captured, the camera closes/hides and the photo is presented on screen 
- *    with options to "Take Again" or "Done".
- * 5. Localized Strings: Uses R.string resource strings for all user-facing text.
- * ============================================================================
- */
-@Composable
-fun CameraScreen(
-    session: SessionViewModel,
-    viewModel: CameraViewModel = viewModel(),
-) {
-    // 1. Context: Needed for accessing system resources and checking permissions.
-    val context = LocalContext.current
+private enum class CameraMode { Photo, Video }
+private data class CapturedMedia(val file:File,val mimeType:String,val name:String)
 
-    // 2. LifecycleOwner: Required by CameraX to tie camera lifecycle to the current UI component.
-    val lifecycleOwner = LocalLifecycleOwner.current
+/** Embedded camera whose temporary media stays inside the app cache until it reaches safe storage. */
+@Composable internal fun CameraScreen(session:SessionViewModel,viewModel:CameraViewModel=viewModel()) {
+    val context=LocalContext.current
+    val lifecycleOwner=LocalLifecycleOwner.current
+    val uid=session.coverAccountId ?: return
+    val controller=session.documents
+    val uploadError=stringResource(R.string.documents_upload_failed)
+    var permissionGranted by remember { mutableStateOf(ContextCompat.checkSelfPermission(context,Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED) }
+    val audioGranted=ContextCompat.checkSelfPermission(context,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED
+    var mode by rememberSaveable { mutableStateOf(CameraMode.Photo) }
+    var captured by remember { mutableStateOf<CapturedMedia?>(null) }
+    var pendingFile by remember { mutableStateOf<File?>(null) }
+    val busy by viewModel.busy.collectAsState()
+    val recording by viewModel.recording.collectAsState()
+    val ready by viewModel.ready.collectAsState()
+    val cameraError by viewModel.error.collectAsState()
+    val preview=remember { PreviewView(context).apply { scaleType=PreviewView.ScaleType.FILL_CENTER } }
+    val permissionLauncher=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { permissionGranted=it }
+    val captureFolder=remember { File(context.cacheDir,"captured-media").apply { mkdirs() } }
 
-    // 3. Processing State: Observes whether the camera manager is currently capturing/processing.
-    val isProcessing by viewModel.isProcessing.collectAsState()
-
-    // 4. Camera Permission State: Tracks whether CAMERA permission is granted.
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
-        )
+    fun newCapture(extension:String)=File(captureFolder,"${UUID.randomUUID()}.$extension")
+    fun accept(file:File,mime:String,name:String) {
+        pendingFile=null;viewModel.leaveCamera();captured=CapturedMedia(file,mime,name)
+    }
+    fun discardCapture() {
+        captured?.file?.delete();pendingFile?.delete();captured=null;pendingFile=null;viewModel.clearError()
     }
 
-    // 5. Permission Launcher: Handles the system permission request dialog callback.
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { isGranted ->
-        hasCameraPermission = isGranted
-    }
-
-    // Request camera permission automatically when the screen opens if not yet granted.
     LaunchedEffect(Unit) {
-        if (!hasCameraPermission) {
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-        }
+        captureFolder.listFiles()?.forEach(File::delete)
+        controller.prepare(uid)
+    }
+    LaunchedEffect(permissionGranted,captured) {
+        if(permissionGranted && captured==null) viewModel.bind(lifecycleOwner,preview)
+    }
+    DisposableEffect(Unit) {
+        onDispose { viewModel.leaveCamera();captured?.file?.delete();pendingFile?.delete() }
     }
 
-    // 6. Captured Photo State: Holds raw image bytes in memory.
-    // - If null: We show the live camera preview.
-    // - If not null: The camera is closed and we show the Photo Review screen.
-    var capturedImageBytes by remember { mutableStateOf<ByteArray?>(null) }
-
-    // 7. PreviewView: Remembers a single instance of CameraX PreviewView across UI recompositions.
-    val previewView = remember { PreviewView(context) }
-
-    // 8. Bind Camera: Binds camera when permission is granted AND we are in live preview mode (capturedImageBytes == null).
-    LaunchedEffect(hasCameraPermission, capturedImageBytes) {
-        if (hasCameraPermission && (capturedImageBytes == null)) {
-            viewModel.cameraManager.bindCamera(lifecycleOwner, previewView)
+    Box(Modifier.fillMaxSize().background(Color.Black).testTag("camera_screen")) {
+        when {
+            !permissionGranted -> CameraPermissionPrompt({permissionLauncher.launch(Manifest.permission.CAMERA)},session::back)
+            captured!=null -> CameraReview(captured!!,controllerLoading=controller.state.loading,
+                uploadError=controller.state.error,onRetake=::discardCapture,onSave={ media ->
+                controller.uploadCaptured(media.file,media.name,media.mimeType,AccountIdentity(uid,session.coverUsername),uploadError) {
+                    captured=null;session.back()
+                }
+            })
+            else -> {
+                AndroidView(factory={preview},modifier=Modifier.fillMaxSize())
+                Row(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom=150.dp)
+                    .background(Color.Black.copy(alpha=.5f),RoundedCornerShape(24.dp)).padding(horizontal=8.dp),
+                    horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected=mode==CameraMode.Photo,onClick={if(!recording) mode=CameraMode.Photo},
+                        label={Text(stringResource(R.string.camera_photo))},leadingIcon={Icon(Icons.Outlined.PhotoCamera,null)})
+                    FilterChip(selected=mode==CameraMode.Video,onClick={if(!recording) mode=CameraMode.Video},modifier=Modifier.testTag("camera_mode_video"),
+                        label={Text(stringResource(R.string.camera_video))},leadingIcon={Icon(Icons.Outlined.Videocam,null)})
+                }
+                IconButton(onClick=session::back,Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp)
+                    .background(Color.Black.copy(alpha=.55f),CircleShape).testTag("camera_back")) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack,stringResource(R.string.back),tint=Color.White)
+                }
+                IconButton(onClick={viewModel.flip(lifecycleOwner,preview)},enabled=ready && !busy && !recording,
+                    modifier=Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)
+                        .background(Color.Black.copy(alpha=.55f),CircleShape).testTag("camera_flip")) {
+                    Icon(Icons.Outlined.Cameraswitch,stringResource(R.string.camera_flip),tint=Color.White)
+                }
+                cameraError?.let { Text(it,Modifier.align(Alignment.Center).padding(24.dp).background(Color.Black.copy(alpha=.75f)).padding(12.dp),color=Color.White) }
+                if(ready) Spacer(Modifier.size(1.dp).align(Alignment.Center).testTag("camera_ready"))
+                else if(cameraError==null) CircularProgressIndicator(Modifier.align(Alignment.Center),color=Color.White)
+                CameraShutter(mode,recording,busy,ready,Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom=52.dp)) {
+                    if(mode==CameraMode.Photo) {
+                        val file=newCapture("jpg");pendingFile=file
+                        viewModel.capturePhoto(file) { accept(it,"image/jpeg","Olive photo.jpg") }
+                    } else if(recording) viewModel.stopVideo()
+                    else {
+                        val file=newCapture("mp4");pendingFile=file
+                        viewModel.startVideo(file,audioGranted) { accept(it,"video/mp4","Olive video.mp4") }
+                    }
+                }
+                if(recording) Text(stringResource(R.string.camera_recording),Modifier.align(Alignment.BottomCenter)
+                    .navigationBarsPadding().padding(bottom=132.dp).background(Color.Black.copy(alpha=.55f),RoundedCornerShape(16.dp))
+                    .padding(horizontal=12.dp,vertical=6.dp).testTag("camera_recording_active"),color=Color.White)
+            }
         }
     }
+}
 
-    // Outer container filling the entire screen with a black background.
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        // ========================================================================
-        // SCENARIO A: CAMERA PERMISSION NOT GRANTED
-        // ========================================================================
-        if (!hasCameraPermission) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = stringResource(R.string.camera_permission_required),
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        permissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                ) {
-                    Text(stringResource(R.string.grant_camera_permission))
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { session.navigate(SafePage.Home) },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
-        } 
-        // ========================================================================
-        // SCENARIO B: LIVE CAMERA PREVIEW & SHUTTER BUTTON (capturedImageBytes == null)
-        // ========================================================================
-        else if (capturedImageBytes == null) {
-            // AndroidView embeds the traditional CameraX PreviewView inside Jetpack Compose.
-            AndroidView(
-                factory = { previewView },
-                modifier = Modifier.fillMaxSize()
-            )
+@Composable private fun CameraPermissionPrompt(request:()->Unit,back:()->Unit) {
+    Column(Modifier.fillMaxSize().padding(32.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
+        Text(stringResource(R.string.camera_permission_required),color=Color.White)
+        Spacer(Modifier.height(16.dp));Button(onClick=request) { Text(stringResource(R.string.grant_camera_permission)) }
+        TextButton(onClick=back) { Text(stringResource(R.string.cancel),color=Color.White) }
+    }
+}
 
-            // Top-left back button to return to Safe Home screen.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                contentAlignment = Alignment.TopStart
-            ) {
-                IconButton(
-                    onClick = { session.navigate(SafePage.Home) },
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.5f), shape = CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.back),
-                        tint = Color.White
-                    )
-                }
-            }
+@Composable private fun CameraShutter(mode:CameraMode,recording:Boolean,busy:Boolean,ready:Boolean,modifier:Modifier,onClick:()->Unit) {
+    FilledIconButton(onClick=onClick,enabled=ready && (!busy || recording),modifier=modifier.size(84.dp).testTag("camera_shutter"),
+        shape=CircleShape,colors=IconButtonDefaults.filledIconButtonColors(containerColor=if(recording) Color.Red else Color.White)) {
+        Icon(if(mode==CameraMode.Photo) Icons.Outlined.PhotoCamera else Icons.Outlined.Videocam,
+            stringResource(if(recording) R.string.camera_stop_recording else if(mode==CameraMode.Photo) R.string.camera_take_photo else R.string.camera_start_recording),
+            tint=if(recording) Color.White else Color.Black,modifier=Modifier.size(38.dp))
+    }
+}
 
-            // Bottom control layout reflecting real phone cameras: circular white shutter button.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 48.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                // Circular White Shutter Button
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .background(Color.White, shape = CircleShape)
-                        .clickable(enabled = !isProcessing) {
-                            // Trigger photo capture into RAM as ByteArray.
-                            viewModel.capturePhotoForProcessing { imageBytes ->
-                                // Once captured, update state. This closes/hides the camera 
-                                // and transitions to the Photo Review screen below.
-                                capturedImageBytes = imageBytes
-                            }
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isProcessing) {
-                        // Show loading indicator inside shutter button while capturing
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(40.dp),
-                            color = Color.Black,
-                            strokeWidth = 3.dp
-                        )
-                    } else {
-                        // Inner circle styling for realistic camera shutter appearance
-                        Box(
-                            modifier = Modifier
-                                .size(68.dp)
-                                .background(Color.White, shape = CircleShape)
-                                .padding(4.dp)
-                                .background(Color.LightGray.copy(alpha = 0.3f), shape = CircleShape)
-                        )
-                    }
-                }
-            }
-        } 
-        // ========================================================================
-        // SCENARIO C: PHOTO REVIEW SCREEN (Camera closed, photo presented)
-        // ========================================================================
-        else {
-            // Decode the captured raw ByteArray into an Android Bitmap and correct portrait orientation (90 deg rotation).
-            val bitmap = remember(capturedImageBytes) {
-                capturedImageBytes?.let { bytes ->
-                    val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    val matrix = android.graphics.Matrix().apply {
-                        postRotate(90f)
-                    }
-                    android.graphics.Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
-                }
-            }
-
-            // Convert Android Bitmap into Compose ImageBitmap for rendering.
-            val imageBitmap = remember(bitmap) {
-                bitmap?.asImageBitmap()
-            }
-
-            if (imageBitmap != null) {
-                // Display the captured photo filling the screen.
-                Image(
-                    bitmap = imageBitmap,
-                    contentDescription = stringResource(R.string.captured_photo_review),
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // Fallback message if decoding fails.
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(stringResource(R.string.error_loading_photo_preview), color = Color.White)
-                }
-            }
-
-            // Bottom action bar for reviewing the photo with "Take Again" or "Done" options.
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Option 1: Take Again -> Clears captured photo and re-opens live camera preview.
-                    Button(
-                        onClick = {
-                            capturedImageBytes = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                    ) {
-                        Text(stringResource(R.string.take_again), color = Color.White)
-                    }
-
-                    // Option 2: Done -> Needs no functionality right now (left intentionally empty).
-                    Button(
-                        onClick = {
-                            // As requested: "done needs no functionality right now"
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Text(stringResource(R.string.done))
-                    }
+@Composable private fun CameraReview(media:CapturedMedia,controllerLoading:Boolean,uploadError:String?,onRetake:()->Unit,onSave:(CapturedMedia)->Unit) {
+    Box(Modifier.fillMaxSize()) {
+        if(media.mimeType.startsWith("image/")) AsyncImage(model=media.file,contentDescription=stringResource(R.string.captured_photo_review),
+            contentScale=ContentScale.Fit,modifier=Modifier.fillMaxSize())
+        else AndroidView(factory={ context -> VideoView(context).apply {
+            setVideoPath(media.file.absolutePath);setOnPreparedListener { player -> player.isLooping=true;start() }
+        } },modifier=Modifier.fillMaxSize(),onRelease={it.stopPlayback()})
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
+            .padding(start=24.dp,end=24.dp,bottom=104.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            if(controllerLoading) Text(stringResource(R.string.camera_saving),color=Color.White,
+                modifier=Modifier.align(Alignment.CenterHorizontally).testTag("camera_saving"))
+            uploadError?.let { AccessibleMessage(it,color=MaterialTheme.colorScheme.error,
+                modifier=Modifier.background(Color.Black.copy(alpha=.72f),MaterialTheme.shapes.small).padding(10.dp).testTag("camera_upload_error")) }
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick=onRetake,enabled=!controllerLoading,modifier=Modifier.weight(1f).testTag("camera_retake"),
+                    colors=ButtonDefaults.outlinedButtonColors(contentColor=Color.White)) { Text(stringResource(R.string.take_again)) }
+                Button(onClick={onSave(media)},enabled=!controllerLoading,modifier=Modifier.weight(1f).testTag("camera_save")) {
+                    if(controllerLoading) CircularProgressIndicator(Modifier.size(18.dp),strokeWidth=2.dp)
+                    else Text(stringResource(R.string.camera_save))
                 }
             }
         }

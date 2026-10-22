@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.HealthAndSafety
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,19 +35,25 @@ import com.olive.app.data.*
     val uiText=rememberResourceText()
     FormColumn {
             Box(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(end=56.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                Column(Modifier.padding(end=104.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                     Text(stringResource(R.string.olive_branch),fontFamily=FontFamily.Serif,fontSize=30.sp,color=OliveGreen)
                     Text(if(profile.role==AccountRole.SAFE_CONTACT) uiText(R.string.safe_contact_space) else uiText(R.string.your_safe_space),style=MaterialTheme.typography.headlineMedium,modifier=Modifier.semantics { heading() })
                     Text(if(profile.role==AccountRole.SAFE_CONTACT) uiText(R.string.ui_use_quick_exit_from_any_page_to_lock_olive_branch) else uiText(R.string.use_quick_exit_from_any_page_to_lock_this_area_and_return_to_your_cover_app),color=Muted)
                 }
-                IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.align(Alignment.TopEnd).testTag("safe_settings")) {
-                    Icon(Icons.Outlined.Settings,uiText(R.string.settings))
+                Row(Modifier.align(Alignment.TopEnd)) {
+                    IconButton(onClick={session.navigate(SafePage.Camera)},enabled=!session.localMode,
+                        modifier=Modifier.testTag("safe_camera")) {
+                        Icon(Icons.Outlined.PhotoCamera,stringResource(R.string.camera_title))
+                    }
+                    IconButton(onClick={session.navigate(SafePage.Settings)},modifier=Modifier.testTag("safe_settings")) {
+                        Icon(Icons.Outlined.Settings,uiText(R.string.settings))
+                    }
                 }
             }
             ModeNotice(session)
             Button(onClick={session.navigate(SafePage.Profile)},modifier=Modifier.fillMaxWidth().testTag("safe_profile")) { Text(stringResource(R.string.my_profile)) }
             Button(onClick={session.navigate(SafePage.Activity)},modifier=Modifier.fillMaxWidth().testTag("safe_activity")) { Text(stringResource(R.string.account_activity)) }
-            OutlinedButton(onClick={session.navigate(SafePage.OcrTest)},modifier=Modifier.fillMaxWidth().testTag("safe_ocr_test")) { Text("Test PaddleOCR Document Checking") }
+            OutlinedButton(onClick={session.navigate(SafePage.OcrTest)},modifier=Modifier.fillMaxWidth().testTag("safe_ocr_test")) { Text(stringResource(R.string.ocr_test_entry)) }
             Text(stringResource(R.string.private_features),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
             // UI sizing/color: feature tiles are two-wide, at least 112dp tall, use 30–32dp icons, and 17–18sp centered labels.
             // Change the two container colors here if these tiles need different shades from the shared theme.

@@ -31,12 +31,12 @@ object AppLocaleManager {
     fun resolveSystemDefaultLanguageTag(): String {
         val systemLocale = Locale.getDefault()
         val lang = systemLocale.language.lowercase()
-        return when {
-            lang == "fr" -> "fr"
-            lang == "es" -> "es"
-            lang == "ar" -> "ar"
-            lang == "zh" -> "zh-rCN"
-            lang == "en" -> "en"
+        return when (lang) {
+            "fr" -> "fr"
+            "es" -> "es"
+            "ar" -> "ar"
+            "zh" -> "zh-rCN"
+            "en" -> "en"
             else -> "en"
         }
     }

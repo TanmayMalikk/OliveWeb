@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
@@ -21,14 +22,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import com.olive.app.R
 import com.olive.app.data.*
-import com.olive.app.ocr.PaddleOcrManager
-import com.olive.app.ocr.OcrResult
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
@@ -50,6 +45,7 @@ import kotlin.time.Duration.Companion.seconds
     var backup by rememberSaveable(ownerUid) { mutableStateOf(false) }
     val plan=controller.plan
     val staff=session.accountRole==AccountRole.STAFF
+    val safeContact=session.accountRole==AccountRole.SAFE_CONTACT
     val state=rememberLazyListState()
     val scope=rememberCoroutineScope()
     val expandedDescription=stringResource(R.string.support_expanded)
@@ -71,14 +67,14 @@ import kotlin.time.Duration.Companion.seconds
                     SafetyBackButton(onClick={leaveEditor();onBack()},tag="safety_back")
                     Text(stringResource(R.string.support_safety_plan),style=MaterialTheme.typography.headlineSmall,
                         modifier=Modifier.weight(1f).semantics { heading() })
-                    if(!staff) IconButton(onClick={leaveEditor();scope.launch {
+                    if(!staff && !safeContact) IconButton(onClick={leaveEditor();scope.launch {
                         val consultationIndex=1+SAFETY_CHECKLIST_SECTIONS.size+(if(older.isNotEmpty()) 1 else 0)+(if(olderOpen) older.size else 0)
                         state.animateScrollToItem(consultationIndex)
                     }},enabled=plan!=null,modifier=Modifier.testTag("safety_jump_consultation")) {
                         Icon(Icons.Outlined.SupportAgent,stringResource(R.string.safety_consult))
                     }
                 }
-                if(staff) Text(ownerName,style=MaterialTheme.typography.labelLarge)
+                if(staff || safeContact) Text(ownerName,style=MaterialTheme.typography.labelLarge)
                 Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected=!backup,onClick={leaveEditor();backup=false},label={Text(stringResource(R.string.safety_primary))},modifier=Modifier.weight(1f).testTag("safety_primary"))
                     FilterChip(selected=backup,onClick={leaveEditor();backup=true},label={Text(stringResource(R.string.safety_backup))},modifier=Modifier.weight(1f).testTag("safety_backup"))
@@ -113,11 +109,12 @@ import kotlin.time.Duration.Companion.seconds
                     if(plan!=null) {
                         SAFETY_CHECKLIST_SECTIONS.forEach { section -> item(key="${prefix}_$section") {
                             SafetyChecklistSection(plan,"${prefix}_$section",
-                                onEdit={key,value -> if(controller.plan?.ownerUid==ownerUid) controller.edit(key,value)},
-                                onResolve={key,keepMine -> if(controller.plan?.ownerUid==ownerUid) controller.resolve(key,keepMine)},
-                                contacts=if(!staff && section=="contacts") session.profile?.contacts.orEmpty() else emptyList(),
-                                contactsEditable=!staff && section=="contacts",
-                                onContactsChange=if(!staff && section=="contacts") session::saveContacts else null)
+                                onEdit={key,value -> if(!safeContact && controller.plan?.ownerUid==ownerUid) controller.edit(key,value)},
+                                onResolve={key,keepMine -> if(!safeContact && controller.plan?.ownerUid==ownerUid) controller.resolve(key,keepMine)},
+                                contacts=if(!staff && !safeContact && section=="contacts") session.profile?.contacts.orEmpty() else emptyList(),
+                                contactsEditable=!staff && !safeContact && section=="contacts",
+                                onContactsChange=if(!staff && !safeContact && section=="contacts") session::saveContacts else null,
+                                editable=!safeContact)
                             HorizontalDivider(Modifier.padding(horizontal=16.dp),color=LightSage)
                         } }
                         if(older.isNotEmpty()) item {
@@ -129,9 +126,10 @@ import kotlin.time.Duration.Companion.seconds
                         if(olderOpen) older.keys.forEach { key -> item(key=key) {
                             SafetyChecklistSection(plan,key,
                                 onEdit={key,value -> if(controller.plan?.ownerUid==ownerUid) controller.edit(key,value)},
-                                onResolve={key,keepMine -> if(controller.plan?.ownerUid==ownerUid) controller.resolve(key,keepMine)})
+                                onResolve={key,keepMine -> if(controller.plan?.ownerUid==ownerUid) controller.resolve(key,keepMine)},editable=!safeContact)
                         } }
-                        if(!staff) item { Box(Modifier.padding(16.dp)) { SafetyConsultationControls(session,plan) } }
+                        if(!staff && !safeContact) item { Box(Modifier.padding(16.dp)) { SafetyConsultationControls(session,plan) } }
+                        if(!staff && !safeContact) item { Box(Modifier.padding(horizontal=16.dp)) { SafetyContactSharingControls(session,plan) } }
                     }
                     item {
                         Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -141,6 +139,63 @@ import kotlin.time.Duration.Companion.seconds
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable internal fun SafeContactSafetyPlansScreen(session:SessionViewModel) {
+    val controller=session.safetyPlans
+    var selected by rememberSaveable { mutableStateOf<SharedSafetyPlan?>(null) }
+    LaunchedEffect(Unit) { controller.refreshSharedPlans() }
+    if(selected!=null) SafetyPlanScreen(session,checkNotNull(selected).ownerUid,checkNotNull(selected).ownerName,onBack={
+        controller.close();selected=null;controller.refreshSharedPlans()
+    }) else FormColumn {
+        SafetyBackButton(onClick=session::back,tag="safe_contact_safety_back")
+        Heading(stringResource(R.string.support_safety_plan),stringResource(R.string.safe_contact_shared_plans_intro))
+        if(session.localMode) Text(stringResource(R.string.safety_account_required),color=Muted)
+        if(controller.sharedPlans.isEmpty()) Surface(Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.large,color=LightSage) {
+            Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.safe_contact_no_shared_plans),style=MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.safe_contact_no_shared_plans_help),style=MaterialTheme.typography.bodySmall,color=Muted)
+            }
+        }
+        controller.sharedPlans.forEach { shared ->
+            OutlinedCard(onClick={selected=shared},modifier=Modifier.fillMaxWidth().testTag("shared_plan_${shared.ownerUid}")) {
+                Row(Modifier.padding(16.dp),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.HealthAndSafety,null,tint=OliveGreen)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(shared.ownerName.ifBlank { stringResource(R.string.safe_contact_shared_user) },style=MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.safe_contact_view_shared_plan),style=MaterialTheme.typography.bodySmall,color=Muted)
+                    }
+                }
+            }
+        }
+        controller.error?.let { AccessibleMessage(stringResource(it)) }
+    }
+}
+
+@Composable private fun SafetyContactSharingControls(session:SessionViewModel,plan:SafetyPlan) {
+    var selected by remember(plan.safeContactUids) { mutableStateOf(plan.safeContactUids.toSet()) }
+    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(R.string.safety_share_safe_contacts),style=MaterialTheme.typography.titleMedium,
+            modifier=Modifier.semantics { heading() })
+        Text(stringResource(R.string.safety_share_safe_contacts_help),style=MaterialTheme.typography.bodySmall,color=Muted)
+        if(session.friends.isEmpty()) Text(stringResource(R.string.location_no_friends),color=Muted)
+        session.friends.forEach { friend ->
+            val trusted=session.profile?.contacts?.firstOrNull { it.linkedUid==friend.uid }
+            Row(Modifier.fillMaxWidth(),verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                Checkbox(friend.uid in selected,{ checked -> selected=if(checked) selected+friend.uid else selected-friend.uid },
+                    enabled=friend.uid in selected || selected.size<10)
+                Column(Modifier.weight(1f)) {
+                    Text(trusted?.name ?: friend.username)
+                    if(trusted!=null) Text("@${friend.username}",style=MaterialTheme.typography.bodySmall,color=Muted)
+                }
+            }
+        }
+        Button(onClick={session.safetyPlans.shareWithContacts(session.friends.filter { it.uid in selected })},
+            enabled=!session.localMode && selected!=plan.safeContactUids.toSet(),modifier=Modifier.fillMaxWidth().testTag("share_safety_plan")) {
+            Text(stringResource(R.string.safety_save_sharing))
         }
     }
 }
@@ -165,103 +220,6 @@ import kotlin.time.Duration.Companion.seconds
             Text(stringResource(R.string.safety_stop))
         }
         Text(stringResource(R.string.safety_consult_description),style=MaterialTheme.typography.bodySmall,color=Muted)
-    }
-}
-
-@Composable internal fun SafetyDocumentsScreen(session:SessionViewModel) {
-    val context = LocalContext.current
-    var activeCameraCategory by remember { mutableStateOf<String?>(null) }
-    var uploadChoiceCategory by remember { mutableStateOf<String?>(null) }
-    var ocrResultDialog by remember { mutableStateOf<OcrResult?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-    val ocrManager = remember { PaddleOcrManager(context) }
-
-    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            coroutineScope.launch(Dispatchers.IO) {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                if (bytes != null) {
-                    val result = ocrManager.recognizeDocument(bytes)
-                    withContext(Dispatchers.Main) {
-                        ocrResultDialog = result
-                    }
-                }
-            }
-        }
-    }
-
-    if (activeCameraCategory != null) {
-        Box(Modifier.fillMaxSize()) {
-            CameraScreen(session)
-        }
-        return
-    }
-
-    FormColumn {
-        SafetyBackButton(onClick=session::back,tag="safe_home")
-        Heading(stringResource(R.string.support_documents), "Upload or capture documents for PaddleOCR validity checking.")
-        listOf("photos" to R.string.safety_storage_photos,"videos" to R.string.safety_storage_videos,
-            "documents" to R.string.safety_storage_documents).forEach { (category,label) ->
-            OutlinedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(label),style=MaterialTheme.typography.titleMedium,modifier=Modifier.semantics { heading() })
-                    Text("Ready for PaddleOCR document validity check",style=MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick={ uploadChoiceCategory = category },enabled=true,modifier=Modifier.testTag("safety_upload_$category")) {
-                        Text(stringResource(R.string.safety_upload))
-                    }
-                }
-            }
-        }
-    }
-
-    if (uploadChoiceCategory != null) {
-        AlertDialog(
-            onDismissRequest = { uploadChoiceCategory = null },
-            title = { Text("Upload Document") },
-            text = { Text("Choose how you would like to provide the document for PaddleOCR validity checking.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    val cat = uploadChoiceCategory
-                    uploadChoiceCategory = null
-                    activeCameraCategory = cat
-                }) {
-                    Text("Take Picture")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    uploadChoiceCategory = null
-                    galleryLauncher.launch("image/*")
-                }) {
-                    Text("Upload Image")
-                }
-            }
-        )
-    }
-
-    if (ocrResultDialog != null) {
-        val res = ocrResultDialog!!
-        AlertDialog(
-            onDismissRequest = { ocrResultDialog = null },
-            title = { Text("PaddleOCR Document Check") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Status: ${if (res.success) "Valid ✓" else "Failed"}")
-                    Text("Extracted Text:\n${res.extractedText}", style = MaterialTheme.typography.bodySmall)
-                    if (res.detectedFields.isNotEmpty()) {
-                        Text("Detected Fields:", style = MaterialTheme.typography.labelMedium)
-                        res.detectedFields.forEach { (k, v) ->
-                            Text("• $k: $v", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { ocrResultDialog = null }) {
-                    Text("Done")
-                }
-            }
-        )
     }
 }
 

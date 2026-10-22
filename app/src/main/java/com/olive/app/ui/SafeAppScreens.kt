@@ -25,6 +25,8 @@ import androidx.compose.runtime.*
         SafePage.SafetyPlan -> SafetyPlanScreen(session)
         SafePage.Documents -> SafetyDocumentsScreen(session)
         SafePage.OcrTest -> OcrTestScreen(session)
+        SafePage.Camera -> CameraScreen(session)
+        SafePage.Location -> LocationMapScreen(session)
     } }
     if(session.viewedSharedEntry!=null) SharedEntryViewer(session)
 }

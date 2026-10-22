@@ -3,7 +3,6 @@ package com.olive.app.ui
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
-import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.olive.app.data.*

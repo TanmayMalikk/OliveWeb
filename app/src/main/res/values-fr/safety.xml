@@ -25,9 +25,7 @@
     <string name="safety_essentials">Objets et documents essentiels</string>
     <string name="safety_dependants">Enfants, personnes à charge et animaux</string>
     <string name="safety_aftercare">Après le départ</string>
-    <string name="safety_documents_intro">Conservez ici photos, vidéos et images de documents. Le stockage et le téléversement arrivent bientôt ; aucun fichier n’est encore recueilli.</string>
-    <string name="safety_upload">Téléverser des fichiers</string>
-    <string name="safety_inbox">Consultations sur les plans de sécurité</string>
+<string name="safety_inbox">Consultations sur les plans de sécurité</string>
     <string name="safety_inbox_empty">Aucun plan de sécurité ne vous est actuellement partagé.</string>
     <string name="safety_available">Disponible pour de nouvelles consultations</string>
     <string name="safety_staff_intro">Consultez et modifiez les plans partagés avec vous.</string>
@@ -37,8 +35,7 @@
     <string name="safety_source">Conseils : Agence de la santé publique du Canada. Adaptez ces pistes avec une personne de confiance.</string>
     <string name="safety_upload_document">Téléverser le document</string>
     <string name="safety_upload_for">Téléverser le document : %1$s. Bientôt disponible.</string>
-    <string name="safety_upload_soon">Bientôt disponible. Les documents téléversés depuis votre plan apparaîtront aussi ici.</string>
-    <string name="safety_storage_photos">Photos</string>
+<string name="safety_storage_photos">Photos</string>
     <string name="safety_storage_videos">Vidéos</string>
     <string name="safety_storage_documents">Images de documents</string>
     <string name="safety_document_upload_hint">Le téléversement arrive bientôt. Les fichiers apparaîtront aussi dans Documents.</string>

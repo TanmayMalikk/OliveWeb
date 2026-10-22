@@ -16,7 +16,7 @@ import com.olive.app.data.PrivateEntryKind
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
-enum class AttachmentCategory { Notes, Incidents, Media }
+enum class AttachmentCategory { Notes, Incidents, Media, Location }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,8 +25,15 @@ fun AttachmentPicker(
     // mediaViewModel: MediaViewModel
     onDismiss: () -> Unit
 ) {
-    // This state controls the "Drill Down" UI
     var selectedCategory by remember { mutableStateOf<AttachmentCategory?>(null) }
+    val uid=session.coverAccountId
+    val documentState=session.documents.state
+    val requestLocationPermission=LocalLocationPermissionRequest.current
+    var locationDuration by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedCategory,uid) {
+        if(selectedCategory!=AttachmentCategory.Media || uid==null || session.localMode) return@LaunchedEffect
+        session.documents.load(uid,false)
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
@@ -39,9 +46,12 @@ fun AttachmentPicker(
                 Text(
                     text = if (selectedCategory == null) stringResource(R.string.share_attachment)
                         else stringResource(R.string.select_attachment_category,
-                            stringResource(if(selectedCategory==AttachmentCategory.Notes) R.string.private_notes
-                                else if(selectedCategory==AttachmentCategory.Incidents) R.string.incident_reports
-                                else R.string.saved_media)),
+                            stringResource(when(selectedCategory) {
+                                AttachmentCategory.Notes -> R.string.private_notes
+                                AttachmentCategory.Incidents -> R.string.incident_reports
+                                AttachmentCategory.Media -> R.string.saved_media
+                                else -> R.string.share_live_location_with
+                            })),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -64,6 +74,12 @@ fun AttachmentPicker(
                     headlineContent = { Text(stringResource(R.string.saved_media)) },
                     leadingContent = { Icon(Icons.Outlined.PhotoCamera, null) },
                     modifier = Modifier.clickable { selectedCategory = AttachmentCategory.Media }
+                )
+                if(session.accountRole==com.olive.app.data.AccountRole.USER) ListItem(
+                    headlineContent={Text(stringResource(R.string.start_sharing_location))},
+                    supportingContent={Text(stringResource(R.string.location_share_in_chat_help))},
+                    leadingContent={Icon(Icons.Outlined.LocationOn,null)},
+                    modifier=Modifier.clickable { locationDuration=true }
                 )
             }
             // STEP 2: Show Specific Items based on the selection
@@ -97,14 +113,39 @@ fun AttachmentPicker(
                             }
                         }
                         AttachmentCategory.Media -> {
-                            //ToDO change after implementing media uploads
-                            item { Text(stringResource(R.string.media_uploads_not_configured), Modifier.padding(16.dp)) }
-                            // In Phase 2, this will iterate through mediaViewModel.savedMedia
+                            val media=documentState.files.filter { it.ownerUid==uid }
+                            if(documentState.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                            if(documentState.error!=null) item { Text(stringResource(R.string.documents_load_failed),Modifier.padding(16.dp),color=MaterialTheme.colorScheme.error) }
+                            if(!documentState.loading && documentState.error==null && media.isEmpty()) item {
+                                Text(stringResource(if(session.localMode) R.string.documents_account_required else R.string.documents_empty),
+                                    Modifier.padding(16.dp))
+                            }
+                            items(media,key={it.id}) { document ->
+                                ListItem(
+                                    headlineContent={Text(document.name,maxLines=2)},
+                                    supportingContent={Text(document.mimeType)},
+                                    leadingContent={Icon(when {
+                                        document.mimeType.startsWith("image/")->Icons.Outlined.Image
+                                        document.mimeType.startsWith("video/")->Icons.Outlined.Videocam
+                                        else->Icons.Outlined.Description
+                                    },null)},
+                                    modifier=Modifier.clickable {
+                                        session.shareSafetyDocumentInChat(document)
+                                        onDismiss()
+                                    }
+                                )
+                            }
                         }
+                        AttachmentCategory.Location -> Unit
                         null -> {}
                     }
                 }
             }
         }
+    }
+    if(locationDuration) ShareDurationDialog(onDismiss={locationDuration=false}) { duration ->
+        locationDuration=false
+        session.shareLiveLocationInChat(duration,requestLocationPermission)
+        onDismiss()
     }
 }

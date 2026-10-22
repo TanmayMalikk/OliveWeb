@@ -60,8 +60,7 @@
     <string name="ui_birthday_required">Birthday required</string>
     <string name="ui_email_required">Email (required)</string>
     <string name="ui_invalid_email">Invalid email</string>
-    <string name="ui_create_your_device_pin">Create your device PIN.</string>
-    <string name="ui_invalid_pin">Invalid PIN</string>
+<string name="ui_invalid_pin">Invalid PIN</string>
     <string name="ui_4_6_digits">4–6 digits</string>
     <string name="ui_pins_differ">PINs differ</string>
     <string name="ui_pins_match">PINs match</string>
@@ -84,12 +83,7 @@
     <string name="ui_contact_name_optional">Contact name (optional)</string>
     <string name="ui_complete_both_fields">Complete both fields</string>
     <string name="ui_phone_or_email_optional">Phone or email (optional)</string>
-    <string name="ui_stay_connected_with_people_who_trust_you_for_support">Stay connected with people who trust you for support.</string>
-    <string name="ui_notes_and_incidents">Notes and incidents</string>
-    <string name="ui_future_feature">Future feature</string>
-    <string name="ui_future_feature_value">Future feature %1$s</string>
-    <string name="ui_your_safe_contact_account_information">Your Safe Contact account information.</string>
-    <string name="ui_use_quick_exit_from_any_page_to_lock_olive_branch">Use Quick exit from any page to lock Olive Branch.</string>
+<string name="ui_use_quick_exit_from_any_page_to_lock_olive_branch">Use Quick exit from any page to lock Olive Branch.</string>
     <string name="ui_leaving_the_app_locks_olive_branch">Leaving the app locks Olive Branch.</string>
     <string name="ui_notes">Notes</string>
     <string name="ui_profile">Profile</string>
@@ -154,7 +148,10 @@
     <string name="ui_value_account_created">%1$s account created.</string>
     <string name="ui_unable_to_delete_this_account">Unable to delete this account.</string>
     <string name="ui_value_was_deleted">%1$s was deleted.</string>
-    <string name="ui_incorrect_pin_value_attempts_remaining">Incorrect PIN. %1$d attempts remaining.</string>
+    <plurals name="ui_incorrect_pin_value_attempts_remaining">
+        <item quantity="one">Incorrect PIN. %1$d attempt remaining.</item>
+        <item quantity="other">Incorrect PIN. %1$d attempts remaining.</item>
+    </plurals>
     <string name="ui_staff_and_admin_accounts_are_created_by_an_administrator">Staff and Admin accounts are created by an administrator.</string>
     <string name="ui_invalid_username_10e538">Invalid username.</string>
     <string name="ui_invalid_password_a2df22">Invalid password.</string>

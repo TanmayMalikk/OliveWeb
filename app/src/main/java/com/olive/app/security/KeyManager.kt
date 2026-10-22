@@ -70,7 +70,7 @@ object KeyManager {
     fun wrapKey(secretKey: SecretKey, publicKey: PublicKey): String {
         val cipher = Cipher.getInstance(RSA_MODE)
         val spec = javax.crypto.spec.OAEPParameterSpec(
-            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA1, javax.crypto.spec.PSource.PSpecified.DEFAULT
+            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA256, javax.crypto.spec.PSource.PSpecified.DEFAULT
         )
         // Bypass WRAP_MODE entirely
         cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
@@ -96,7 +96,7 @@ object KeyManager {
         val cipher = Cipher.getInstance(RSA_MODE)
         val privateKey = getPrivateKey() ?: throw Exception("Private key missing")
         val spec = javax.crypto.spec.OAEPParameterSpec(
-            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA1, javax.crypto.spec.PSource.PSpecified.DEFAULT
+            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA256, javax.crypto.spec.PSource.PSpecified.DEFAULT
         )
         // Bypass UNWRAP_MODE entirely and manually rebuild the AES key
         cipher.init(Cipher.DECRYPT_MODE, privateKey, spec)
