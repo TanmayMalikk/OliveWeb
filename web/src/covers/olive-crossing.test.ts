@@ -6,6 +6,7 @@ import {
   createCrossingLane,
   moveCrossing,
   newCrossing,
+  railSignal,
   type CrossingWorld,
 } from "./olive-crossing";
 
@@ -13,9 +14,19 @@ describe("Olive Crossing", () => {
   it("starts the olive on a safe lane", () => {
     const world = newCrossing(() => 0);
     expect(world.lanes[world.playerRow].type).toBe("grass");
-    expect(world.lanes.map((lane) => lane.type)).toContain("water");
-    expect(world.lanes.map((lane) => lane.type)).toContain("rail");
     expect(world.score).toBe(0);
+  });
+
+  it("chooses road, grass, water, and rail lanes with 6:4:3:2 weights", () => {
+    const laneType = (roll: number) => createCrossingLane(12, () => roll).type;
+    expect(laneType(0)).toBe("road");
+    expect(laneType(0.399)).toBe("road");
+    expect(laneType(0.4)).toBe("grass");
+    expect(laneType(0.665)).toBe("grass");
+    expect(laneType(0.67)).toBe("water");
+    expect(laneType(0.865)).toBe("water");
+    expect(laneType(0.87)).toBe("rail");
+    expect(laneType(0.999)).toBe("rail");
   });
 
   it("keeps side-to-side movement within the grove", () => {
@@ -51,7 +62,7 @@ describe("Olive Crossing", () => {
 
   it("moves farm traffic and detects a collision", () => {
     const base = newCrossing(() => 0);
-    const road = createCrossingLane(30, () => 0.9);
+    const road = createCrossingLane(30, () => 0.9, false, "road");
     const world: CrossingWorld = {
       ...base,
       lanes: base.lanes.map((lane, row) =>
@@ -109,7 +120,12 @@ describe("Olive Crossing", () => {
       0.7, 0.1,
     ];
     let call = 0;
-    const lane = createCrossingLane(40, () => values[call++ % values.length]);
+    const lane = createCrossingLane(
+      40,
+      () => values[call++ % values.length],
+      false,
+      "road",
+    );
     expect(lane.type).toBe("road");
     expect(
       new Set(lane.vehicles.map((vehicle) => vehicle.speed)).size,
@@ -130,7 +146,7 @@ describe("Olive Crossing", () => {
   it("spawns new carts individually after each lane's wait", () => {
     const base = newCrossing(() => 0);
     const road = {
-      ...createCrossingLane(50, () => 0.9),
+      ...createCrossingLane(50, () => 0.9, false, "road"),
       vehicles: [],
       spawnIn: 0,
       spawnCount: 4,
@@ -148,7 +164,7 @@ describe("Olive Crossing", () => {
   it("keeps the olive safe only when it lands on a lily pad", () => {
     const base = newCrossing(() => 0);
     const water = {
-      ...createCrossingLane(60, () => 0.3),
+      ...createCrossingLane(60, () => 0.3, false, "water"),
       pads: [base.playerColumn],
     };
     const world: CrossingWorld = {
@@ -161,10 +177,21 @@ describe("Olive Crossing", () => {
     expect(moveCrossing(world, "right").over).toBe(true);
   });
 
+  it("keeps two aligned lily-pad routes through every water lane", () => {
+    const leftRoute = Math.floor(CROSSING.columns / 3);
+    const rightRoute = Math.floor((CROSSING.columns * 2) / 3);
+    for (const roll of [0, 0.2, 0.5, 0.8, 0.999]) {
+      const water = createCrossingLane(65, () => roll, false, "water");
+      expect(water.pads).toContain(leftRoute);
+      expect(water.pads).toContain(rightRoute);
+      expect(water.pads.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
   it("releases fast trains onto railway lanes", () => {
     const base = newCrossing(() => 0);
     const rail = {
-      ...createCrossingLane(70, () => 0.45),
+      ...createCrossingLane(70, () => 0.45, false, "rail"),
       spawnIn: 0,
     };
     const world: CrossingWorld = {
@@ -174,8 +201,22 @@ describe("Olive Crossing", () => {
     const next = advanceCrossing(world, 0.01, () => 0.5);
     expect(next.lanes[0].vehicles).toHaveLength(1);
     expect(next.lanes[0].vehicles[0].kind).toBe("train");
-    expect(next.lanes[0].vehicles[0].speed).toBeGreaterThan(2);
+    expect(next.lanes[0].vehicles[0].speed).toBeGreaterThan(11);
     expect(next.lanes[0].spawnIn).toBeGreaterThan(2);
+  });
+
+  it("changes rail signals from green to yellow to red before a train", () => {
+    const rail = createCrossingLane(75, () => 0.5, false, "rail");
+    expect(railSignal({ ...rail, spawnIn: 3 })).toBe("green");
+    expect(railSignal({ ...rail, spawnIn: 1.4 })).toBe("yellow");
+    expect(railSignal({ ...rail, spawnIn: 0.5 })).toBe("red");
+    expect(
+      railSignal({
+        ...rail,
+        spawnIn: 4,
+        vehicles: [{ id: 1, x: 1, width: 4, speed: 3, kind: "train" }],
+      }),
+    ).toBe("red");
   });
 
   it("freezes the world after the round ends", () => {

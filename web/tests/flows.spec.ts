@@ -286,6 +286,7 @@ test("advanced matrix tools and statistical plots are usable through the calcula
   page,
 }) => {
   await page.goto("/cover/calculator");
+  await page.getByRole("tab", { name: "Calculator", exact: true }).click();
   await page.getByRole("button", { name: "Math tools", exact: true }).click();
   await page
     .getByRole("combobox", { name: "Calculation", exact: true })
@@ -309,10 +310,6 @@ test("calculator worker, graph navigation, table and quadratic solver work", asy
   page,
 }) => {
   await page.goto("/cover/calculator");
-  await page.getByLabel("Expression", { exact: true }).fill("12+30");
-  await page.getByRole("button", { name: "Equals", exact: true }).click();
-  await expect(page.locator("output")).toHaveText("42");
-  await page.getByRole("button", { name: "Graph", exact: true }).click();
   await expect(page.getByRole("img", { name: /Graph of x\^2/ })).toBeVisible();
   await page.getByRole("button", { name: "Zoom in", exact: true }).click();
   await expect(
@@ -321,13 +318,19 @@ test("calculator worker, graph navigation, table and quadratic solver work", asy
   await page.getByRole("button", { name: "Table & analysis" }).click();
   await expect(page.getByRole("table")).toBeVisible();
   await page.getByRole("button", { name: "Close dialog" }).click();
+  await page.getByRole("tab", { name: "Calculator", exact: true }).click();
+  await page.getByLabel("Expression", { exact: true }).fill("12+30");
+  await page.getByRole("button", { name: "Equals", exact: true }).click();
+  await expect(page.locator("output")).toHaveText("42");
   await page.getByRole("button", { name: "Equations", exact: true }).click();
   await page.getByLabel("Coefficients a, b, c").fill("1,-5,6");
   await page
     .getByRole("button", { name: "Calculate", exact: true })
     .last()
     .click();
-  await expect(page.getByRole("status")).toContainText("x = 3, 2");
+  await expect(page.getByRole("dialog").getByRole("status")).toContainText(
+    "x = 3, 2",
+  );
 });
 test("news reader sanitizes publisher HTML and bookmarks stay available", async ({
   page,

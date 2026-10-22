@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Calculator as CalculatorIcon,
-  Delete,
-  History,
   Plus,
   Minus,
   ArrowLeft,
@@ -24,7 +22,10 @@ export default function Calculator() {
   const [error, setError] = useState("");
   const [scientific, setScientific] = useState(false);
   const [degrees, setDegrees] = useState(false);
-  const [tab, setTab] = useState("Calculate");
+  const [tab, setTab] = useState<"Graphing" | "Calculator">("Graphing");
+  const [calculatorView, setCalculatorView] = useState<"Keypad" | "History">(
+    "Keypad",
+  );
   const [history, setHistory] = useState<
     { expression: string; result: string }[]
   >([]);
@@ -138,7 +139,7 @@ export default function Calculator() {
     }
   }
   useEffect(() => {
-    if (tab === "Graph") void draw();
+    if (tab === "Graphing") void draw();
   }, [zoom, centreX, degrees, tab]);
   const labels: Record<string, string> = {
     AC: "Clear all",
@@ -171,289 +172,402 @@ export default function Calculator() {
           <h1>Better Calculator</h1>
         </div>
       </header>
-      <nav className="cover-tabs" aria-label="Calculator tools">
-        {["Calculate", "Graph", "History"].map((t) => (
+      <nav className="calculator-mode-tabs" aria-label="Calculator mode">
+        {(["Graphing", "Calculator"] as const).map((mode) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            aria-current={t === tab ? "page" : undefined}
+            key={mode}
+            type="button"
+            role="tab"
+            aria-selected={tab === mode}
+            onClick={() => setTab(mode)}
           >
-            {t}
+            {mode}
           </button>
         ))}
-        <button onClick={() => setSolver("quadratic")}>Equations</button>
-        <button onClick={() => setSolver("stats")}>Statistics</button>
-        <button onClick={() => setSolver("advanced")}>Math tools</button>
-        <button onClick={() => setPlots(true)}>Stat plots</button>
       </nav>
-      <div className="calculator-layout">
-        <section className="calculator-body panel">
-          {tab === "Calculate" ? (
-            <>
-              <div className="calculator-display">
-                <label htmlFor="expression" className="sr-only">
-                  Expression
-                </label>
-                <input
-                  id="expression"
-                  value={expression}
-                  onChange={(e) => setExpression(e.target.value.slice(0, 180))}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void equals();
-                  }}
-                  placeholder="0"
-                  autoComplete="off"
-                />
-                <output aria-live="polite">{result}</output>
+
+      {tab === "Graphing" ? (
+        <section
+          className="graphing-workspace"
+          aria-label="Graphing calculator"
+        >
+          <aside className="graph-expression-panel">
+            <div className="graph-expression-heading">
+              <div>
+                <span className="eyebrow">EXPRESSIONS</span>
+                <h2>Graph</h2>
               </div>
-              <div className="calculator-options">
-                <Button
-                  variant="quiet"
-                  onClick={() => setScientific(!scientific)}
-                  aria-pressed={scientific}
+              <button
+                type="button"
+                className="angle-mode"
+                onClick={() => setDegrees(!degrees)}
+                aria-label={`Use ${degrees ? "radians" : "degrees"}`}
+              >
+                {degrees ? "DEG" : "RAD"}
+              </button>
+            </div>
+            <form
+              className="graph-expression-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void draw();
+              }}
+            >
+              <span className="graph-expression-number">1</span>
+              <span className="graph-expression-colour" aria-hidden="true" />
+              <label htmlFor="graph-expression" className="sr-only">
+                Graph expression
+              </label>
+              <span className="graph-y-label" aria-hidden="true">
+                y =
+              </span>
+              <input
+                id="graph-expression"
+                value={graphInput}
+                onChange={(event) =>
+                  setGraphInput(event.target.value.slice(0, 180))
+                }
+                autoComplete="off"
+                spellCheck={false}
+                aria-describedby="graph-expression-help"
+              />
+              <button type="submit">Plot</button>
+            </form>
+            <div className="graph-expression-details">
+              <p id="graph-expression-help">
+                Try x^2, sin(x), sqrt(x), or a combination.
+              </p>
+              <p>
+                <span>Derivative</span>
+                <strong>{graph?.derivative ?? "—"}</strong>
+              </p>
+            </div>
+            <button
+              type="button"
+              className="graph-table-button"
+              onClick={() => setTable(true)}
+            >
+              Table &amp; analysis
+            </button>
+          </aside>
+
+          <div className="graph-stage">
+            <svg
+              className="graph"
+              viewBox="0 0 900 600"
+              preserveAspectRatio="none"
+              role="img"
+              aria-label={`Graph of ${graphInput}. Zoom ${Math.round(zoom * 100)} percent. Center X ${centreX}, Y ${centreY}.`}
+            >
+              <defs>
+                <pattern
+                  id="minor-grid"
+                  width="45"
+                  height="30"
+                  patternUnits="userSpaceOnUse"
                 >
-                  <SlidersHorizontal size={16} /> Scientific
-                </Button>
-                <Button variant="quiet" onClick={() => setDegrees(!degrees)}>
-                  {degrees ? "DEG" : "RAD"}
-                </Button>
-              </div>
-              {scientific && (
-                <div className="scientific-keys">
+                  <path
+                    d="M45 0H0V30"
+                    fill="none"
+                    stroke="#e4e7df"
+                    strokeWidth="1"
+                  />
+                </pattern>
+                <pattern
+                  id="major-grid"
+                  width="90"
+                  height="60"
+                  patternUnits="userSpaceOnUse"
+                >
+                  <rect width="90" height="60" fill="url(#minor-grid)" />
+                  <path
+                    d="M90 0H0V60"
+                    fill="none"
+                    stroke="#cfd5ca"
+                    strokeWidth="1.2"
+                  />
+                </pattern>
+              </defs>
+              <rect width="900" height="600" fill="url(#major-grid)" />
+              <path
+                d={`M0 ${300 + (centreY / width) * 300}H900M${450 - (centreX / width) * 450} 0V600`}
+                stroke="#697367"
+                strokeWidth="1.4"
+              />
+              {points.map((point, index) => {
+                const previous = points[index - 1];
+                if (
+                  !previous ||
+                  Math.abs(point[1] - previous[1]) > width ||
+                  point[0] - previous[0] > width / 50
+                )
+                  return null;
+                return (
+                  <line
+                    key={index}
+                    x1={450 + ((previous[0] - centreX) / width) * 450}
+                    y1={300 - ((previous[1] - centreY) / width) * 300}
+                    x2={450 + ((point[0] - centreX) / width) * 450}
+                    y2={300 - ((point[1] - centreY) / width) * 300}
+                    stroke="#3f6b43"
+                    strokeWidth="3"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                );
+              })}
+            </svg>
+            <div
+              className="graph-zoom-controls"
+              aria-label="Graph zoom controls"
+            >
+              <button
+                type="button"
+                onClick={() => setZoom((z) => Math.min(5, z * 1.25))}
+                aria-label="Zoom in"
+              >
+                <Plus size={20} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom((z) => Math.max(0.2, z / 1.25))}
+                aria-label="Zoom out"
+              >
+                <Minus size={20} />
+              </button>
+            </div>
+            <div className="graph-pan-controls" aria-label="Graph pan controls">
+              <button
+                type="button"
+                onClick={() => setCentreY((y) => y + width / 4)}
+                aria-label="Pan up"
+              >
+                <ArrowUp size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCentreX((x) => x - width / 4)}
+                aria-label="Pan left"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setZoom(1);
+                  setCentreX(0);
+                  setCentreY(0);
+                }}
+                aria-label="Reset graph view"
+              >
+                0
+              </button>
+              <button
+                type="button"
+                onClick={() => setCentreX((x) => x + width / 4)}
+                aria-label="Pan right"
+              >
+                <ArrowRight size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCentreY((y) => y - width / 4)}
+                aria-label="Pan down"
+              >
+                <ArrowDown size={18} />
+              </button>
+            </div>
+            {error && (
+              <p className="graph-error form-error" role="alert">
+                {error}
+              </p>
+            )}
+          </div>
+        </section>
+      ) : (
+        <div className="calculator-layout">
+          <section className="calculator-body panel">
+            <nav className="calculator-tool-tabs" aria-label="Calculator tools">
+              {(["Keypad", "History"] as const).map((view) => (
+                <button
+                  type="button"
+                  key={view}
+                  aria-current={calculatorView === view ? "page" : undefined}
+                  onClick={() => setCalculatorView(view)}
+                >
+                  {view}
+                </button>
+              ))}
+              <button type="button" onClick={() => setSolver("quadratic")}>
+                Equations
+              </button>
+              <button type="button" onClick={() => setSolver("stats")}>
+                Statistics
+              </button>
+              <button type="button" onClick={() => setSolver("advanced")}>
+                Math tools
+              </button>
+              <button type="button" onClick={() => setPlots(true)}>
+                Stat plots
+              </button>
+            </nav>
+            {calculatorView === "Keypad" ? (
+              <>
+                <div className="calculator-display">
+                  <label htmlFor="expression" className="sr-only">
+                    Expression
+                  </label>
+                  <input
+                    id="expression"
+                    value={expression}
+                    onChange={(e) =>
+                      setExpression(e.target.value.slice(0, 180))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void equals();
+                    }}
+                    placeholder="0"
+                    autoComplete="off"
+                  />
+                  <output aria-live="polite">{result}</output>
+                </div>
+                <div className="calculator-options">
+                  <Button
+                    variant="quiet"
+                    onClick={() => setScientific(!scientific)}
+                    aria-pressed={scientific}
+                  >
+                    <SlidersHorizontal size={16} /> Scientific
+                  </Button>
+                  <Button variant="quiet" onClick={() => setDegrees(!degrees)}>
+                    {degrees ? "DEG" : "RAD"}
+                  </Button>
+                </div>
+                {scientific && (
+                  <div className="scientific-keys">
+                    {[
+                      "sin(",
+                      "cos(",
+                      "tan(",
+                      "asin(",
+                      "acos(",
+                      "atan(",
+                      "sqrt(",
+                      "log(",
+                      "log10(",
+                      "exp(",
+                      "π",
+                      "^",
+                    ].map((key) => (
+                      <button
+                        key={key}
+                        onClick={() =>
+                          setExpression((v) => (v + key).slice(0, 180))
+                        }
+                        aria-label={labels[key] ?? key.replace("(", "")}
+                      >
+                        {key}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="calculator-keys">
                   {[
-                    "sin(",
-                    "cos(",
-                    "tan(",
-                    "asin(",
-                    "acos(",
-                    "atan(",
-                    "sqrt(",
-                    "log(",
-                    "log10(",
-                    "exp(",
-                    "π",
-                    "^",
+                    "AC",
+                    "(",
+                    ")",
+                    "⌫",
+                    "7",
+                    "8",
+                    "9",
+                    "÷",
+                    "4",
+                    "5",
+                    "6",
+                    "×",
+                    "1",
+                    "2",
+                    "3",
+                    "−",
+                    "0",
+                    ".",
+                    "+",
+                    "=",
                   ].map((key) => (
                     <button
                       key={key}
-                      onClick={() =>
-                        setExpression((v) => (v + key).slice(0, 180))
+                      className={
+                        key === "="
+                          ? "equals"
+                          : ["÷", "×", "−"].includes(key)
+                            ? "operator"
+                            : ""
                       }
-                      aria-label={labels[key] ?? key.replace("(", "")}
+                      aria-label={labels[key] ?? key}
+                      onClick={() => {
+                        if (key === "AC") {
+                          setExpression("");
+                          setResult("0");
+                          setError("");
+                        } else if (key === "⌫")
+                          setExpression((v) => v.slice(0, -1));
+                        else if (key === "=") void equals();
+                        else setExpression((v) => (v + key).slice(0, 180));
+                      }}
                     >
                       {key}
                     </button>
                   ))}
                 </div>
-              )}
-              <div className="calculator-keys">
-                {[
-                  "AC",
-                  "(",
-                  ")",
-                  "⌫",
-                  "7",
-                  "8",
-                  "9",
-                  "÷",
-                  "4",
-                  "5",
-                  "6",
-                  "×",
-                  "1",
-                  "2",
-                  "3",
-                  "−",
-                  "0",
-                  ".",
-                  "+",
-                  "=",
-                ].map((key) => (
-                  <button
-                    key={key}
-                    className={
-                      key === "="
-                        ? "equals"
-                        : ["÷", "×", "−"].includes(key)
-                          ? "operator"
-                          : ""
-                    }
-                    aria-label={labels[key] ?? key}
-                    onClick={() => {
-                      if (key === "AC") {
-                        setExpression("");
-                        setResult("0");
-                        setError("");
-                      } else if (key === "⌫")
-                        setExpression((v) => v.slice(0, -1));
-                      else if (key === "=") void equals();
-                      else setExpression((v) => (v + key).slice(0, 180));
-                    }}
-                  >
-                    {key}
-                  </button>
-                ))}
+              </>
+            ) : (
+              <div className="calculation-history">
+                <h2>Your calculations</h2>
+                {history.length ? (
+                  history.map((row, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setExpression(row.expression);
+                        setResult(row.result);
+                        setCalculatorView("Keypad");
+                      }}
+                    >
+                      <span>{row.expression}</span>
+                      <strong>{row.result}</strong>
+                    </button>
+                  ))
+                ) : (
+                  <p>Calculations from this session appear here.</p>
+                )}
               </div>
-            </>
-          ) : tab === "History" ? (
-            <div className="calculation-history">
-              <h2>Your calculations</h2>
-              {history.length ? (
-                history.map((row, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setExpression(row.expression);
-                      setResult(row.result);
-                      setTab("Calculate");
-                    }}
-                  >
-                    <span>{row.expression}</span>
-                    <strong>{row.result}</strong>
-                  </button>
-                ))
-              ) : (
-                <p>Calculations from this session appear here.</p>
-              )}
-            </div>
-          ) : (
-            <>
-              <Form onSubmit={draw}>
-                <Field
-                  label="y ="
-                  value={graphInput}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setGraphInput(e.target.value)
-                  }
-                  maxLength={180}
-                />
-                <Button type="submit">Plot graph</Button>
-              </Form>
-              <svg
-                className="graph"
-                viewBox="0 0 600 400"
-                role="img"
-                aria-label={`Graph of ${graphInput}. Zoom ${Math.round(zoom * 100)} percent. Center X ${centreX}, Y ${centreY}.`}
-              >
-                <defs>
-                  <pattern
-                    id="grid"
-                    width="30"
-                    height="20"
-                    patternUnits="userSpaceOnUse"
-                  >
-                    <path
-                      d="M30 0H0V20"
-                      fill="none"
-                      stroke="#d8ddce"
-                      strokeWidth=".6"
-                    />
-                  </pattern>
-                </defs>
-                <rect width="600" height="400" fill="url(#grid)" />
-                <path
-                  d={`M0 ${200 + (centreY / width) * 200}H600M${300 - (centreX / width) * 300} 0V400`}
-                  stroke="#68795e"
-                />
-                {points.map((point, index) => {
-                  const previous = points[index - 1];
-                  if (
-                    !previous ||
-                    Math.abs(point[1] - previous[1]) > width ||
-                    point[0] - previous[0] > width / 50
-                  )
-                    return null;
-                  return (
-                    <line
-                      key={index}
-                      x1={300 + ((previous[0] - centreX) / width) * 300}
-                      y1={200 - ((previous[1] - centreY) / width) * 200}
-                      x2={300 + ((point[0] - centreX) / width) * 300}
-                      y2={200 - ((point[1] - centreY) / width) * 200}
-                      stroke="#405b35"
-                      strokeWidth="2.5"
-                    />
-                  );
-                })}
-              </svg>
-              <div className="graph-controls">
-                <Button
-                  variant="outline"
-                  onClick={() => setZoom((z) => Math.min(5, z * 1.25))}
-                  aria-label="Zoom in"
-                >
-                  <Plus size={17} />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setZoom((z) => Math.max(0.2, z / 1.25))}
-                  aria-label="Zoom out"
-                >
-                  <Minus size={17} />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setCentreX((x) => x - width / 4)}
-                  aria-label="Pan left"
-                >
-                  <ArrowLeft size={17} />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setCentreX((x) => x + width / 4)}
-                  aria-label="Pan right"
-                >
-                  <ArrowRight size={17} />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setCentreY((y) => y + width / 4)}
-                  aria-label="Pan up"
-                >
-                  <ArrowUp size={17} />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setCentreY((y) => y - width / 4)}
-                  aria-label="Pan down"
-                >
-                  <ArrowDown size={17} />
-                </Button>
-                <Button variant="quiet" onClick={() => setTable(true)}>
-                  Table & analysis
-                </Button>
-              </div>
-              <p className="help-note">
-                Derivative: {graph?.derivative ?? "—"}
+            )}
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
               </p>
-            </>
-          )}
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
+            )}
+          </section>
+          <aside className="calculator-note">
+            <span className="eyebrow">EVERYDAY &amp; ADVANCED</span>
+            <h2>
+              Every tool,
+              <br />
+              one quiet
+              <br />
+              <em>workspace.</em>
+            </h2>
+            <p>
+              Use the keypad for quick arithmetic, then open equations,
+              statistics, plots, or specialized math tools when you need them.
             </p>
-          )}
-        </section>
-        <aside className="calculator-note">
-          <span className="eyebrow">A LITTLE PERSPECTIVE</span>
-          <h2>
-            Not everything
-            <br />
-            needs to be
-            <br />
-            <em>complicated.</em>
-          </h2>
-          <p>
-            Everyday calculations, a clearer view of a curve, or a fresh look at
-            the numbers.
-          </p>
-          <div className="calculator-note-line" />
-          <p>
-            Trigonometry uses {degrees ? "degrees" : "radians"}. Calculations
-            stay on this device.
-          </p>
-        </aside>
-      </div>
+            <div className="calculator-note-line" />
+            <p>
+              Trigonometry uses {degrees ? "degrees" : "radians"}. Calculations
+              stay on this device.
+            </p>
+          </aside>
+        </div>
+      )}
       {table && (
         <Modal title="Graph table & analysis" onClose={() => setTable(false)}>
           <p>y = {graphInput}</p>

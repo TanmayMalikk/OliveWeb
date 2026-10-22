@@ -15,6 +15,7 @@ import {
   advanceCrossing,
   moveCrossing,
   newCrossing,
+  railSignal,
   type CrossingDirection,
 } from "./olive-crossing";
 
@@ -218,6 +219,7 @@ export default function OliveCrossing() {
           >
             {world.lanes.map((lane, row) => {
               const y = laneY(row);
+              const signal = lane.type === "rail" ? railSignal(lane) : null;
               return (
                 <g key={lane.id} className="crossing-lane">
                   <rect
@@ -269,6 +271,35 @@ export default function OliveCrossing() {
                             stroke="#d1c5aa"
                             strokeWidth="4"
                           />
+                          <g
+                            className={`crossing-rail-signal crossing-rail-signal-${signal}`}
+                            transform={`translate(${camera.x + 9} ${y + 3})`}
+                          >
+                            <rect
+                              width="18"
+                              height="44"
+                              rx="6"
+                              fill="#30352f"
+                              stroke="#ebe6ce"
+                              strokeWidth="2"
+                            />
+                            {(
+                              [
+                                ["red", 9, "#e65245"],
+                                ["yellow", 22, "#e4b947"],
+                                ["green", 35, "#5fa45e"],
+                              ] as const
+                            ).map(([colour, cy, fill]) => (
+                              <circle
+                                key={colour}
+                                className={`crossing-signal-light crossing-signal-light-${colour}`}
+                                cx="9"
+                                cy={cy}
+                                r="5"
+                                fill={fill}
+                              />
+                            ))}
+                          </g>
                         </>
                       )}
                       {lane.vehicles.map((vehicle) => (
@@ -535,7 +566,7 @@ export default function OliveCrossing() {
       </div>
       <p className="flight-instructions">
         Use arrow keys, WASD, or the direction buttons. Grass and lily pads are
-        safe; watch for carts and trains.
+        safe. Railway lights warn when a train is approaching.
       </p>
     </section>
   );

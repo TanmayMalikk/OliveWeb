@@ -43,20 +43,20 @@ export function createCrossingLane(
   id: number,
   random: () => number = Math.random,
   forceGrass = false,
-  forcedType?: "water" | "rail",
+  forcedType?: CrossingLane["type"],
 ): CrossingLane {
   const roll = random();
   const type: CrossingLane["type"] = forceGrass
     ? "grass"
     : forcedType
       ? forcedType
-      : roll < 0.24
-        ? "grass"
-        : roll < 0.4
-          ? "water"
-          : roll < 0.54
-            ? "rail"
-            : "road";
+      : roll < 6 / 15
+        ? "road"
+        : roll < 10 / 15
+          ? "grass"
+          : roll < 13 / 15
+            ? "water"
+            : "rail";
   const direction: 1 | -1 = random() < 0.5 ? 1 : -1;
   if (type === "grass")
     return {
@@ -69,12 +69,16 @@ export function createCrossingLane(
       spawnCount: 0,
     };
   if (type === "water") {
-    const pads: number[] = [];
+    const padColumns = new Set([
+      Math.floor(CROSSING.columns / 3),
+      Math.floor((CROSSING.columns * 2) / 3),
+    ]);
     let column = Math.floor(random() * 2);
     while (column < CROSSING.columns) {
-      pads.push(column);
+      padColumns.add(column);
       column += 2 + Math.floor(random() * 2);
     }
+    const pads = [...padColumns].sort((a, b) => a - b);
     return {
       id,
       type,
@@ -92,7 +96,7 @@ export function createCrossingLane(
       direction,
       vehicles: [],
       pads: [],
-      spawnIn: 0.7 + random() * 2.5,
+      spawnIn: 2.4 + random() * 2.4,
       spawnCount: 0,
     };
   const vehicleCount = 2 + Math.floor(random() * 3);
@@ -121,15 +125,10 @@ export function createCrossingLane(
   };
 }
 
-function scheduledLaneType(id: number) {
-  const place = id % 9;
-  return place === 3 ? "water" : place === 5 ? "rail" : undefined;
-}
-
 export function newCrossing(random: () => number = Math.random): CrossingWorld {
   const lanes = Array.from({ length: CROSSING.rows }, (_, row) => {
     const id = CROSSING.rows - 1 - row;
-    return createCrossingLane(id, random, id < 3, scheduledLaneType(id));
+    return createCrossingLane(id, random, id < 3);
   });
   return {
     lanes,
@@ -145,14 +144,26 @@ export function newCrossing(random: () => number = Math.random): CrossingWorld {
 export function crossingCollision(world: CrossingWorld) {
   const lane = world.lanes[world.playerRow];
   if (!lane || lane.type === "grass") return false;
-  if (lane.type === "water") return !lane.pads.includes(world.playerColumn);
   const playerLeft = world.playerColumn + 0.5 - CROSSING.playerHalfWidth;
   const playerRight = world.playerColumn + 0.5 + CROSSING.playerHalfWidth;
+  if (lane.type === "water") {
+    const onPad = lane.pads.some(
+      (column) => Math.abs(world.playerColumn - column) <= 0.52,
+    );
+    return !onPad;
+  }
   return lane.vehicles.some((vehicle) => {
     const vehicleLeft = vehicle.x + CROSSING.vehicleInset;
     const vehicleRight = vehicle.x + vehicle.width - CROSSING.vehicleInset;
     return playerRight > vehicleLeft && playerLeft < vehicleRight;
   });
+}
+
+export function railSignal(lane: CrossingLane): "green" | "yellow" | "red" {
+  if (lane.type !== "rail") return "green";
+  if (lane.vehicles.length || lane.spawnIn <= 0.85) return "red";
+  if (lane.spawnIn <= 1.8) return "yellow";
+  return "green";
 }
 
 export function moveCrossing(
@@ -174,15 +185,7 @@ export function moveCrossing(
     playerRow = Math.max(0, playerRow - 1);
     position += 1;
     if (playerRow <= 2) {
-      lanes = [
-        createCrossingLane(
-          nextLaneId,
-          random,
-          false,
-          scheduledLaneType(nextLaneId),
-        ),
-        ...lanes.slice(0, -1),
-      ];
+      lanes = [createCrossingLane(nextLaneId, random), ...lanes.slice(0, -1)];
       nextLaneId += 1;
       playerRow += 1;
     }
@@ -244,12 +247,12 @@ export function advanceCrossing(
             width,
             kind,
             speed:
-              kind === "train" ? 2.2 + random() * 1.8 : 0.65 + random() * 1.25,
+              kind === "train" ? 12 + random() * 8 : 0.65 + random() * 1.25,
           },
         ];
         spawnCount += 1;
         spawnIn =
-          lane.type === "rail" ? 2.2 + random() * 3.8 : 0.85 + random() * 2.8;
+          lane.type === "rail" ? 3 + random() * 4 : 0.85 + random() * 2.8;
       } else spawnIn = 0.2 + random() * 0.25;
     }
     return { ...lane, vehicles, spawnIn, spawnCount };
