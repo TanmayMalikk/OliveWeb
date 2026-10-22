@@ -54,7 +54,7 @@ class OrientationPreprocessorTest {
             val rotatedBitmap = Bitmap.createBitmap(
                 originalBitmap, 0, 0, 
                 originalBitmap.width, originalBitmap.height, 
-                matrix, true
+                matrix, true,
             )
 
             val outputStream = ByteArrayOutputStream()

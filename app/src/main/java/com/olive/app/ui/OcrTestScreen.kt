@@ -31,11 +31,11 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
     val ocrManager = remember { PaddleOcrManager(context) }
     val orientationPreprocessor = remember { OrientationPreprocessor(context) }
 
-    var isRunning by remember { mutableStateOf(false) }
-    var ocrResult by remember { mutableStateOf<OcrResult?>(null) }
-    var statusMessage by remember { mutableStateOf("Ready to test orientation preprocessor and PaddleOCR on test_doc.png.") }
-    var rawPreviewBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var processedPreviewBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var isRunning by remember { mutableStateOf(value = false) }
+    var ocrResult by remember { mutableStateOf<OcrResult?>(value = null) }
+    var statusMessage by remember { mutableStateOf(value = "Ready to test orientation preprocessor and PaddleOCR on test_doc.png.") }
+    var rawPreviewBitmap by remember { mutableStateOf<Bitmap?>(value = null) }
+    var processedPreviewBitmap by remember { mutableStateOf<Bitmap?>(value = null) }
 
     fun runOcrPipeline() {
         isRunning = true
@@ -115,32 +115,43 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
             Text(statusMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
 
             // Visual Feedback Section for Raw vs Processed (Reoriented) Images
-            if (rawPreviewBitmap != null || processedPreviewBitmap != null) {
+            val rawBmp = rawPreviewBitmap
+            val processedBmp = processedPreviewBitmap
+            if ((rawBmp != null) || (processedBmp != null)) {
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         Text("🖼️ Visual Orientation Feedback", style = MaterialTheme.typography.titleMedium)
 
-                        if (rawPreviewBitmap != null) {
+                        if (rawBmp != null) {
                             Text("1. Original Raw Image (Loaded from Assets):", style = MaterialTheme.typography.labelMedium)
                             Card(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
                                     Image(
-                                        bitmap = rawPreviewBitmap!!.asImageBitmap(),
+                                        bitmap = rawBmp.asImageBitmap(),
                                         contentDescription = "Raw test document",
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier.fillMaxSize(),
                                     )
                                 }
                             }
                         }
 
-                        if (processedPreviewBitmap != null) {
+                        if (processedBmp != null) {
                             Text("2. Processed & Straightened Image (Fed to Detector):", style = MaterialTheme.typography.labelMedium)
                             Card(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
                                     Image(
-                                        bitmap = processedPreviewBitmap!!.asImageBitmap(),
+                                        bitmap = processedBmp.asImageBitmap(),
                                         contentDescription = "Processed upright document",
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier.fillMaxSize(),
                                     )
                                 }
                             }
