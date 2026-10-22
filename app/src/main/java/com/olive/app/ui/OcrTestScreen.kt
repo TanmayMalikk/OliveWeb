@@ -1,5 +1,8 @@
 package com.olive.app.ui
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -7,37 +10,79 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.olive.app.ocr.PaddleOcrManager
+import com.olive.app.ocr.OrientationPreprocessor
 import com.olive.app.ocr.OcrResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /*
-   OcrTestScreen: A dedicated, isolated testing screen for PaddleOCR document checking.
-   Displays the raw extracted text from the document for debugging and inspection.
+   OcrTestScreen: A dedicated, isolated testing screen for PaddleOCR document checking
+   and visual orientation preprocessing feedback.
  */
 @Composable
 fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val ocrManager = remember { PaddleOcrManager(context) }
+    val orientationPreprocessor = remember { OrientationPreprocessor(context) }
 
     var isRunning by remember { mutableStateOf(false) }
     var ocrResult by remember { mutableStateOf<OcrResult?>(null) }
-    var statusMessage by remember { mutableStateOf("Ready to test PaddleOCR on your actual document.") }
+    var statusMessage by remember { mutableStateOf("Ready to test orientation preprocessor and PaddleOCR on test_doc.png.") }
+    var rawPreviewBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var processedPreviewBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-    fun runOcrOnBytes(bytes: ByteArray) {
+    fun runOcrPipeline() {
         isRunning = true
-        statusMessage = "Analyzing document with PaddleOCR..."
+        statusMessage = "Loading test document..."
         coroutineScope.launch(Dispatchers.IO) {
-            val result = ocrManager.recognizeDocument(bytes)
+            val sampleBytes = runCatching {
+                context.assets.open("models/test_doc.png").use { it.readBytes() }
+            }.getOrNull() ?: runCatching {
+                context.assets.open("test_doc.png").use { it.readBytes() }
+            }.getOrNull() ?: runCatching {
+                context.assets.open("models/test_doc.jpg").use { it.readBytes() }
+            }.getOrNull() ?: runCatching {
+                context.assets.open("test_doc.jpg").use { it.readBytes() }
+            }.getOrNull()
+
+            if (sampleBytes == null) {
+                withContext(Dispatchers.Main) {
+                    statusMessage = "Error: No test image found in assets."
+                    isRunning = false
+                }
+                return@launch
+            }
+
+            // Decode raw bitmap for preview
+            val rawBmp = BitmapFactory.decodeByteArray(sampleBytes, 0, sampleBytes.size)
+
+            withContext(Dispatchers.Main) {
+                rawPreviewBitmap = rawBmp
+                statusMessage = "Preprocessing orientation (detecting & straightening rotation)..."
+            }
+
+            // Run orientation preprocessor
+            val processedBytes = orientationPreprocessor.process(sampleBytes)
+            val processedBmp = BitmapFactory.decodeByteArray(processedBytes, 0, processedBytes.size)
+
+            withContext(Dispatchers.Main) {
+                processedPreviewBitmap = processedBmp
+                statusMessage = "Running PaddleOCR on reoriented image..."
+            }
+
+            // Run OCR
+            val result = ocrManager.recognizeDocument(processedBytes)
+
             withContext(Dispatchers.Main) {
                 ocrResult = result
                 isRunning = false
-                statusMessage = if (result.success) "OCR Test Successful!" else "OCR Test Failed."
+                statusMessage = if (result.success) "OCR & Orientation Pipeline Successful!" else "OCR Failed."
             }
         }
     }
@@ -51,33 +96,58 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("PaddleOCR Testing", style = MaterialTheme.typography.headlineMedium)
+                Text("OCR & Orientation Test", style = MaterialTheme.typography.headlineMedium)
                 TextButton(onClick = onBack) {
                     Text("Back")
                 }
             }
 
-            Text("Place your actual document image (test_doc.png) into your project's assets/ folder, then click below to test.", style = MaterialTheme.typography.bodyMedium)
+            Text("Preview how OrientationPreprocessor straightens test_doc.png before feeding it to PaddleOCR.", style = MaterialTheme.typography.bodyMedium)
 
             Button(
-                onClick = {
-                    val sampleBytes = runCatching {
-                        context.assets.open("models/test_doc.png").use { it.readBytes() }
-                    }.getOrNull()
-
-                    if (sampleBytes != null) {
-                        runOcrOnBytes(sampleBytes)
-                    } else {
-                        statusMessage = "Error: No test image found. Please add test_doc.png to your assets/ folder."
-                    }
-                },
+                onClick = ::runOcrPipeline,
                 enabled = !isRunning,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (isRunning) "Running OCR..." else "Run OCR on Actual Test Document")
+                Text(if (isRunning) "Processing Pipeline..." else "Run Preprocessor & PaddleOCR")
             }
 
             Text(statusMessage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+
+            // Visual Feedback Section for Raw vs Processed (Reoriented) Images
+            if (rawPreviewBitmap != null || processedPreviewBitmap != null) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text("🖼️ Visual Orientation Feedback", style = MaterialTheme.typography.titleMedium)
+
+                        if (rawPreviewBitmap != null) {
+                            Text("1. Original Raw Image (Loaded from Assets):", style = MaterialTheme.typography.labelMedium)
+                            Card(modifier = Modifier.fillMaxWidth().height(220.dp)) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Image(
+                                        bitmap = rawPreviewBitmap!!.asImageBitmap(),
+                                        contentDescription = "Raw test document",
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+                        }
+
+                        if (processedPreviewBitmap != null) {
+                            Text("2. Processed & Straightened Image (Fed to Detector):", style = MaterialTheme.typography.labelMedium)
+                            Card(modifier = Modifier.fillMaxWidth().height(220.dp)) {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Image(
+                                        bitmap = processedPreviewBitmap!!.asImageBitmap(),
+                                        contentDescription = "Processed upright document",
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             if (ocrResult != null) {
                 val res = ocrResult!!
