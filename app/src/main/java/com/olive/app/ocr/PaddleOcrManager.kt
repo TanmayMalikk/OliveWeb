@@ -1,8 +1,6 @@
 package com.olive.app.ocr
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.util.Log
 import com.paddle.ocr.PaddleOCR
 import com.paddle.ocr.PaddleOCRConfig
@@ -28,6 +26,7 @@ Class PaddleOcrManager
 class PaddleOcrManager(private val context: Context) {
 
     private var paddleOcr: PaddleOCR? = null
+    private val straightener = OrientationPreprocessor(context)
 
     private suspend fun ensureInitialized(): PaddleOCR {
         if (paddleOcr == null) {
@@ -77,38 +76,13 @@ class PaddleOcrManager(private val context: Context) {
     suspend fun recognizeDocument(imageBytes: ByteArray): OcrResult = withContext(Dispatchers.IO) {
         try {
             val ocr = ensureInitialized()
-            val runResult = ocr.recognize(imageBytes)
+            // PPOCRv6 Android API does not include orientation detection, we do that here instead
+            val uprightBytes = straightener.process(imageBytes)
+            val runResult = ocr.recognize(uprightBytes)
 
             // Return pure raw text lines without confidence annotations
             val extractedText = runResult.results.joinToString("\n") { it.text }
                 .ifBlank { "No text recognized from document." }
-
-            val avgConfidence = if (runResult.results.isNotEmpty()) {
-                runResult.results.map { it.confidence }.average().toFloat()
-            } else {
-                0.95f
-            }
-
-            OcrResult(
-                success = true,
-                extractedText = extractedText,
-                confidence = avgConfidence,
-                rawResults = runResult.results,
-                detectedFields = mapOf("line_count" to runResult.lineCount.toString())
-            )
-        } catch (e: Exception) {
-            Log.e("PaddleOcrManager", "PaddleOCR SDK recognition failed", e)
-            OcrResult(false, "OCR Error: ${e.localizedMessage ?: "Unknown exception"}", 0f)
-        }
-    }
-
-    suspend fun recognizeBitmap(bitmap: Bitmap): OcrResult = withContext(Dispatchers.Default) {
-        try {
-            val ocr = ensureInitialized()
-            val runResult = ocr.recognize(bitmap)
-
-            val extractedText = runResult.results.joinToString("\n") { it.text }
-                .ifBlank { "No text recognized from bitmap." }
 
             val avgConfidence = if (runResult.results.isNotEmpty()) {
                 runResult.results.map { it.confidence }.average().toFloat()
