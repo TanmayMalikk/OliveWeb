@@ -63,16 +63,7 @@ class PaddleOcrManager(private val context: Context) {
         }
         return paddleOcr!!
     }
-
-    suspend fun release() {
-        try {
-            paddleOcr?.release()
-        } catch (e: Exception) {
-            Log.e("PaddleOcrManager", "Error releasing SDK", e)
-        }
-        paddleOcr = null
-    }
-
+    
     suspend fun recognizeDocument(imageBytes: ByteArray): OcrResult = withContext(Dispatchers.IO) {
         try {
             val ocr = ensureInitialized()
