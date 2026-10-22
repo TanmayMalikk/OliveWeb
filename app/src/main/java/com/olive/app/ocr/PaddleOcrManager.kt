@@ -2,13 +2,17 @@ package com.olive.app.ocr
 
 import android.content.Context
 import android.util.Log
+import com.olive.app.R
 import com.paddle.ocr.PaddleOCR
 import com.paddle.ocr.PaddleOCRConfig
 import com.paddle.ocr.EngineConfig
 import com.paddle.ocr.model.OCRResult
 import com.paddle.ocr.util.OpenCVUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class OcrResult(
     val success: Boolean,
@@ -26,12 +30,16 @@ Class PaddleOcrManager
 class PaddleOcrManager(private val context: Context) {
 
     private var paddleOcr: PaddleOCR? = null
-    private val straightener = OrientationPreprocessor(context)
+    private var straightener:OrientationPreprocessor?=null
+    private val mutex=Mutex()
+    private var released=false
 
     private suspend fun ensureInitialized(): PaddleOCR {
+        check(!released) { "OCR engine has been released" }
         if (paddleOcr == null) {
             try {
                 OpenCVUtils.init(context.applicationContext)
+                straightener=OrientationPreprocessor(context.applicationContext)
                 paddleOcr = PaddleOCR.create(
                     context = context,
                     config = PaddleOCRConfig(
@@ -57,6 +65,8 @@ class PaddleOcrManager(private val context: Context) {
                     recConfigAssetPath = "models/rec/inference.yml"
                 )
             } catch (e: Exception) {
+                runCatching { straightener?.close() }
+                straightener=null
                 Log.e("PaddleOcrManager", "Failed to initialize PaddleOCR instance", e)
                 throw e
             }
@@ -64,33 +74,47 @@ class PaddleOcrManager(private val context: Context) {
         return paddleOcr!!
     }
 
-    suspend fun recognizeDocument(imageBytes: ByteArray): OcrResult = withContext(Dispatchers.IO) {
-        try {
-            val ocr = ensureInitialized()
-            // PPOCRv6 Android API does not include orientation detection, we do that here instead
-            val uprightBytes = straightener.process(imageBytes)
-            val runResult = ocr.recognize(uprightBytes)
+    suspend fun recognizeDocument(imageBytes:ByteArray):OcrResult = recognizeDocumentWithPreview(imageBytes).second
+
+    suspend fun recognizeDocumentWithPreview(imageBytes:ByteArray):Pair<ByteArray,OcrResult> = withContext(Dispatchers.IO) {
+        mutex.withLock { try {
+            val ocr=ensureInitialized()
+            val uprightBytes=checkNotNull(straightener).process(imageBytes)
+            val runResult=ocr.recognize(uprightBytes)
 
             // Return pure raw text lines without confidence annotations
             val extractedText = runResult.results.joinToString("\n") { it.text }
-                .ifBlank { "No text recognized from document." }
+                .ifBlank { context.getString(R.string.ocr_no_text) }
 
             val avgConfidence = if (runResult.results.isNotEmpty()) {
                 runResult.results.map { it.confidence }.average().toFloat()
             } else {
-                0.95f
+                0f
             }
 
-            OcrResult(
+            uprightBytes to OcrResult(
                 success = true,
                 extractedText = extractedText,
                 confidence = avgConfidence,
                 rawResults = runResult.results,
                 detectedFields = mapOf("line_count" to runResult.lineCount.toString())
             )
+        } catch(cancelled:CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e("PaddleOcrManager", "PaddleOCR SDK recognition failed", e)
-            OcrResult(false, "OCR Error: ${e.localizedMessage ?: "Unknown exception"}", 0f)
+            imageBytes to OcrResult(false,context.getString(R.string.ocr_error_detail,e.localizedMessage ?: e.javaClass.simpleName),0f)
+        } }
+    }
+
+    suspend fun release()=withContext(Dispatchers.IO) {
+        mutex.withLock {
+            if(released) return@withLock
+            released=true
+            runCatching { paddleOcr?.release() }
+            paddleOcr=null
+            runCatching { straightener?.close() }
+            straightener=null
         }
     }
 }

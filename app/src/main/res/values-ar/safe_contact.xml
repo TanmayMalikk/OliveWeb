@@ -22,6 +22,15 @@
     <string name="camera_title">الكاميرا الخاصة</string>
     <string name="camera_photo">صورة</string>
     <string name="camera_video">فيديو</string>
+    <string name="camera_document">مستند</string>
+    <string name="camera_scan_document">مسح المستند</string>
+    <string name="camera_scanning_document">جارٍ مسح المستند…</string>
+    <string name="camera_ocr_complete">اكتمل مسح المستند</string>
+    <string name="camera_ocr_failed">تعذر مسح المستند</string>
+    <string name="camera_ocr_confidence">دقة النص: %1$d%%</string>
+    <string name="camera_ocr_low_confidence">قد يكون بعض النص غير دقيق. أعد التقاط المستند أو احفظه على أي حال.</string>
+    <string name="camera_save_anyway">الحفظ على أي حال</string>
+    <string name="camera_document_capture_failed">تعذر التقاط المستند.</string>
     <string name="camera_take_photo">التقاط صورة</string>
     <string name="camera_start_recording">بدء التسجيل</string>
     <string name="camera_stop_recording">إيقاف التسجيل</string>
@@ -53,7 +62,7 @@
     <string name="documents_preview_unavailable">المعاينة غير متاحة</string>
     <string name="documents_preview_supported">تُفتح الصور ومقاطع الفيديو وملفات PDF والملفات النصية ومستندات Word بصيغة .docx بشكل خاص داخل Olive Branch.</string>
     <string name="documents_choose_source">اختر ما تريد رفعه</string>
-    <string name="documents_choose_source_help">اختر وسائط أو مستندًا. تُبقي Olive Branch هذه الشاشة مفتوحة بينما يمنح Android وصولًا خاصًا إلى اختيارك.</string>
+    <string name="documents_choose_source_help">افتح الكاميرا الخاصة لالتقاط صورة أو تسجيل فيديو أو مسح مستند، أو اختر ملفًا موجودًا من جهازك.</string>
     <string name="documents_choose_media">صورة أو فيديو</string>
     <string name="documents_choose_document">مستند PDF أو نص أو Word</string>
     <string name="camera_flip">التبديل بين الكاميرا الأمامية والخلفية</string>

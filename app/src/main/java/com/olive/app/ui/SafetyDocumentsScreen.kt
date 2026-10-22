@@ -116,7 +116,11 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
             Text(stringResource(R.string.documents_choose_source),style=MaterialTheme.typography.headlineSmall,
                 modifier=Modifier.semantics { heading() })
             Text(stringResource(R.string.documents_choose_source_help),style=MaterialTheme.typography.bodyMedium,color=Muted)
-            Button(onClick={launchProtectedPicker {
+            Button(onClick={choosingUpload=false;session.navigate(SafePage.Camera)},
+                modifier=Modifier.fillMaxWidth().testTag("documents_choose_camera")) {
+                Icon(Icons.Outlined.PhotoCamera,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.documents_camera))
+            }
+            OutlinedButton(onClick={launchProtectedPicker {
                 mediaPicker.launch(androidx.activity.result.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
             }},modifier=Modifier.fillMaxWidth().testTag("documents_choose_media")) {
                 Icon(Icons.Outlined.PermMedia,null);Spacer(Modifier.width(8.dp));Text(stringResource(R.string.documents_choose_media))
@@ -147,7 +151,15 @@ private enum class DocumentFilter { All, Photos, Videos, Documents }
                     Text(if(own) stringResource(R.string.documents_yours) else stringResource(R.string.documents_shared_by,
                         owner ?: stringResource(R.string.safe_contact_shared_user)),
                         style=MaterialTheme.typography.bodySmall,color=Muted)
+                    file.ocrConfidence?.let { confidence ->
+                        Text(stringResource(R.string.camera_ocr_confidence,(confidence*100).toInt()),
+                            style=MaterialTheme.typography.bodySmall,color=Muted)
+                    }
                 }
+            }
+            file.ocrText?.takeIf { it.isNotBlank() }?.let { text ->
+                Text(text,style=MaterialTheme.typography.bodySmall,maxLines=3,
+                    modifier=Modifier.testTag("document_ocr_${file.id}"))
             }
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 Button(onClick=onOpen,modifier=Modifier.weight(1f)) { Icon(Icons.Outlined.Visibility,null);Spacer(Modifier.width(6.dp));Text(stringResource(R.string.open)) }

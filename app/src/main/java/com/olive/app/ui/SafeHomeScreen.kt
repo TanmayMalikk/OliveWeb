@@ -53,7 +53,6 @@ import com.olive.app.data.*
             ModeNotice(session)
             Button(onClick={session.navigate(SafePage.Profile)},modifier=Modifier.fillMaxWidth().testTag("safe_profile")) { Text(stringResource(R.string.my_profile)) }
             Button(onClick={session.navigate(SafePage.Activity)},modifier=Modifier.fillMaxWidth().testTag("safe_activity")) { Text(stringResource(R.string.account_activity)) }
-            OutlinedButton(onClick={session.navigate(SafePage.OcrTest)},modifier=Modifier.fillMaxWidth().testTag("safe_ocr_test")) { Text(stringResource(R.string.ocr_test_entry)) }
             Text(stringResource(R.string.private_features),style=MaterialTheme.typography.titleLarge,modifier=Modifier.semantics { heading() })
             // UI sizing/color: feature tiles are two-wide, at least 112dp tall, use 30–32dp icons, and 17–18sp centered labels.
             // Change the two container colors here if these tiles need different shades from the shared theme.

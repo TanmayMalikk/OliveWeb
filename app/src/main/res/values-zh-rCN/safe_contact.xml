@@ -22,6 +22,15 @@
     <string name="camera_title">私人相机</string>
     <string name="camera_photo">照片</string>
     <string name="camera_video">视频</string>
+    <string name="camera_document">文档</string>
+    <string name="camera_scan_document">扫描文档</string>
+    <string name="camera_scanning_document">正在扫描文档…</string>
+    <string name="camera_ocr_complete">文档扫描完成</string>
+    <string name="camera_ocr_failed">无法扫描文档</string>
+    <string name="camera_ocr_confidence">文本置信度：%1$d%%</string>
+    <string name="camera_ocr_low_confidence">部分文字可能不准确。请重新拍摄文档或仍然保存。</string>
+    <string name="camera_save_anyway">仍然保存</string>
+    <string name="camera_document_capture_failed">无法拍摄文档。</string>
     <string name="camera_take_photo">拍照</string>
     <string name="camera_start_recording">开始录像</string>
     <string name="camera_stop_recording">停止录像</string>
@@ -53,7 +62,7 @@
     <string name="documents_preview_unavailable">无法预览</string>
     <string name="documents_preview_supported">图片、视频、PDF、文本文件和 Word .docx 文件会在 Olive Branch 内私密打开。</string>
     <string name="documents_choose_source">选择要上传的内容</string>
-    <string name="documents_choose_source_help">选择媒体或文档。Android 授予所选内容的私密访问权限时，Olive Branch 会保持此页面打开。</string>
+    <string name="documents_choose_source_help">打开私人相机拍照、录制视频或扫描文档，或者从设备中选择现有文件。</string>
     <string name="documents_choose_media">照片或视频</string>
     <string name="documents_choose_document">PDF、文本或 Word 文档</string>
     <string name="camera_flip">切换前置或后置摄像头</string>

@@ -106,6 +106,10 @@ test('file metadata is owned, shareable for reads, and cannot be reshaped', asyn
   await assertFails(setDoc(doc(alice,'files/wrong-path'),metadata));
   await assertFails(updateDoc(doc(bob,'files/file-metadata-1'),{allowed_users:['file-alice','file-bob','file-charlie']}));
   await assertFails(updateDoc(target,{unexpected:'not allowed'}));
+  await assertSucceeds(updateDoc(target,{ocr_text:'Recognized document text',ocr_confidence:0.82,ocr_successful:true}));
+  await assertFails(updateDoc(target,{ocr_confidence:1.2}));
+  await assertFails(setDoc(doc(alice,'files/file-metadata-2'),{...metadata,
+    storage_path:'users/file-alice/media/file-metadata-2',ocr_text:'Incomplete OCR metadata'}));
   await assertSucceeds(updateDoc(target,{allowed_users:['file-alice','file-charlie']}));
   await assertSucceeds(getDoc(doc(charlie,'files/file-metadata-1')));
   await assertFails(deleteDoc(doc(bob,'files/file-metadata-1')));

@@ -16,7 +16,7 @@ import java.nio.FloatBuffer
    OrientationPreprocessor: Runs an isolated ultra-lightweight ONNX model (224x224)
    to detect document rotation and automatically stand the byte stream upright.
  */
-class OrientationPreprocessor(context: Context) {
+class OrientationPreprocessor(context: Context):AutoCloseable {
 
     private val ortEnv = OrtEnvironment.getEnvironment()
     private val ortSession: OrtSession
@@ -37,8 +37,13 @@ class OrientationPreprocessor(context: Context) {
         var uprightBitmap: Bitmap? = null
 
         return try {
-            // 1. Decode raw compressed bytes into an in-memory working Bitmap canvas
-            val decodeOptions = BitmapFactory.Options().apply { inMutable = true }
+            // Bound the working bitmap before decoding it. Camera-native images can otherwise require
+            // hundreds of MB while the original and rotated canvases coexist.
+            val bounds=BitmapFactory.Options().apply { inJustDecodeBounds=true }
+            BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.size,bounds)
+            var sample=1
+            while(maxOf(bounds.outWidth,bounds.outHeight)/sample>MAX_WORKING_DIMENSION) sample*=2
+            val decodeOptions = BitmapFactory.Options().apply { inMutable=true;inSampleSize=sample }
             rawBitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, decodeOptions)
                 ?: return imageBytes // Fallback to original bytes if decoding completely fails
 
@@ -50,21 +55,13 @@ class OrientationPreprocessor(context: Context) {
 
             // 3. Fire ONNX Runtime inference pass
             val inputShape = longArrayOf(1, 3, 224, 224)
-            val inputTensor = OnnxTensor.createTensor(ortEnv, floatBuffer, inputShape)
-
-        // Execute session and auto-close the result block safely to prevent memory leaks
-            val outputs: OrtSession.Result = ortSession.run(mapOf("x" to inputTensor))
-
-        // Access the first output node dynamically and cast its value
-            val outputTensor = outputs[0] as OnnxTensor
-            @Suppress("UNCHECKED_CAST")
-            val logits = outputTensor.value as Array<FloatArray>
-
-        // Always close individual tensor resources when done reading them
-            outputTensor.close()
-            outputs.close()
-
-            val predictedClass = logits[0].indices.maxByOrNull { logits[0][it] } ?: 0
+            val predictedClass=OnnxTensor.createTensor(ortEnv,floatBuffer,inputShape).use { inputTensor ->
+                ortSession.run(mapOf("x" to inputTensor)).use { outputs ->
+                    @Suppress("UNCHECKED_CAST")
+                    val logits=(outputs[0] as OnnxTensor).value as Array<FloatArray>
+                    logits[0].indices.maxByOrNull { logits[0][it] } ?: 0
+                }
+            }
 
 
             // Map layout classes to correction angles needed to stand upright
@@ -77,41 +74,30 @@ class OrientationPreprocessor(context: Context) {
 
             Log.d("OrientationPrep", "Detected layout class: $predictedClass -> Rotating: $rotationDegrees°")
 
-            // Clean up the small tensor thumbnail allocation right away
-            scaledBitmap.recycle()
-
-            // 4. If the page is already perfectly upright, return original untouched bytes
-            if (rotationDegrees == 0f) {
-                currentBitmap.recycle()
-                return imageBytes
+            // Preserve untouched bytes only when they already fit the OCR memory bound.
+            if(rotationDegrees==0f && sample==1) return imageBytes
+            uprightBitmap=if(rotationDegrees==0f) currentBitmap else {
+                val matrix=Matrix().apply { postRotate(rotationDegrees) }
+                Bitmap.createBitmap(currentBitmap,0,0,currentBitmap.width,currentBitmap.height,matrix,true)
             }
-
-            // 5. Spin the massive original resolution canvas using a hardware Matrix
-            val matrix = Matrix().apply { postRotate(rotationDegrees) }
-            uprightBitmap = Bitmap.createBitmap(currentBitmap, 0, 0, currentBitmap.width, currentBitmap.height, matrix, true)
 
             // 6. Re-compress the upright canvas back into a clean JPEG byte stream for Paddle
             val outputStream = ByteArrayOutputStream()
             uprightBitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream) // 95 keeps lines razor sharp
             val processedBytes = outputStream.toByteArray()
 
-            // Clean up large remaining canvases to avoid Out-Of-Memory (OOM) heap overflows
-            currentBitmap.recycle()
-            uprightBitmap.recycle()
-
             processedBytes
 
         } catch (e: Exception) {
             Log.e("OrientationPrep", "Failed to preprocess orientation, skipping layer: ${e.message}", e)
 
-            // Safe cleanup fallback if an error spikes mid-flight
-            rawBitmap?.recycle()
-            scaledBitmap?.recycle()
-            uprightBitmap?.recycle()
-
             imageBytes
+        } finally {
+            listOfNotNull(rawBitmap,scaledBitmap,uprightBitmap).distinct().forEach { if(!it.isRecycled) it.recycle() }
         }
     }
+
+    override fun close() { ortSession.close() }
 
     /**
      * Packs standard 32-bit pixel integers into normalized floating point math streams
@@ -144,4 +130,6 @@ class OrientationPreprocessor(context: Context) {
         buffer.rewind()
         return buffer
     }
+
+    private companion object { const val MAX_WORKING_DIMENSION=2048 }
 }
