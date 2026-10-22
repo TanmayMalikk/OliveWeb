@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   Leaf,
   RotateCcw,
@@ -11,10 +11,13 @@ import {
 } from "lucide-react";
 import { Button } from "../components";
 import { readCover, writeCover } from "../services/cover-storage";
+import { useSession } from "../session";
 import OliveFlight from "./OliveFlight";
 import { createMemoryBoard } from "./memory-board";
 const symbols = [Leaf, Flower2, Sun, Cloud, Moon, TreePine];
 export default function Game({ landing = false }: { landing?: boolean }) {
+  const session = useSession();
+  const entryTaps = useRef<number[]>([]);
   const Content = landing ? "main" : "div";
   const [game, setGame] = useState<"pairs" | "flight">("pairs");
   const [size, setSize] = useState(5);
@@ -81,15 +84,25 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     setMatched([]);
     setMoves(0);
   }
+  function tapBrand() {
+    const now = Date.now();
+    entryTaps.current = [
+      ...entryTaps.current.filter((tap) => now - tap < 2500),
+      now,
+    ];
+    if (entryTaps.current.length < 5) return;
+    entryTaps.current = [];
+    void session.perform(session.beginEntry);
+  }
   return (
     <div className={`grove ${landing ? "grove-landing" : ""}`}>
       <header className="grove-header">
-        <a href="/" className="grove-brand">
+        <button type="button" className="grove-brand" onClick={tapBrand}>
           <Sprout strokeWidth={1.4} />
           <span>
             little grove<small>A SMALL DAILY PAUSE</small>
           </span>
-        </a>
+        </button>
       </header>
       <Content id={landing ? "main" : undefined} className="grove-main">
         <div className="grove-intro">

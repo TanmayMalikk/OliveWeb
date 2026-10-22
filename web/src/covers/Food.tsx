@@ -116,10 +116,7 @@ export default function Food() {
         <div className="food-wordmark">
           olive<span>FROM OUR KITCHEN, WITH LOVE.</span>
         </div>
-        <button
-          className="delivery-location text-link"
-          onClick={() => setTab("Account")}
-        >
+        <div className="delivery-location">
           <MapPin size={18} />
           <span>
             DELIVERING A LITTLE GOOD
@@ -130,14 +127,14 @@ export default function Food() {
                 : "Choose your neighbourhood"}
             </strong>
           </span>
-        </button>
+        </div>
         <Button variant="outline" onClick={() => setTab("Cart")}>
           <ShoppingBag size={18} /> Your bag{" "}
           <span className="badge">{count}</span>
         </Button>
       </div>
       <nav className="cover-tabs" aria-label="Olive sections">
-        {["Discover", "Saved", "Cart", "Account"].map((t) => (
+        {["Discover", "Saved", "Cart"].map((t) => (
           <button
             key={t}
             aria-current={tab === t ? "page" : undefined}
@@ -156,19 +153,7 @@ export default function Food() {
           {storageError}
         </p>
       )}
-      {tab === "Account" ? (
-        <section className="cover-account panel">
-          <span className="eyebrow">WELCOME TO OLIVE</span>
-          <h1>A table with your name on it.</h1>
-          <p>Your account connects your favourite everyday app.</p>
-          <Button onClick={() => session.go("/account/sign-in")}>
-            <Forward>Manage your account</Forward>
-          </Button>
-          <Button variant="quiet" onClick={() => session.go("/account/create")}>
-            Create an account
-          </Button>
-        </section>
-      ) : tab === "Cart" ? (
+      {tab === "Cart" ? (
         <section className="cart-layout">
           <div>
             <span className="eyebrow">A LITTLE GOOD, TO GO</span>

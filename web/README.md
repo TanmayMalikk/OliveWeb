@@ -29,53 +29,42 @@ npm start           # Production preview at http://127.0.0.1:4173
 The browser tests use an installed Chrome and isolated, fictional browser stores.
 Firebase rule checks remain in `../firebase` (`npm test` there starts demo emulators).
 
-## Routes
+## Production structure
 
-| Planned address | Local route | Behavior |
-| --- | --- | --- |
-| `yourolivebranch.ca` | `/` | Little Grove, a playable nature-pairs memory game. Never restores the private workspace. |
-| `yourolivebranch.ca/download` | `/download` | Android download/QR when configured; iPhone/iPad Safari installation walkthrough; onboarding link. |
-| `yourolivebranch.ca/account` | `/account` | Account introduction, registration, sign-in, and installation links. |
-| Account onboarding | `/account/create` | Credentials → cover selection → profile → browser PIN → personal-link handoff. |
-| Returning account | `/account/sign-in` | Reads the saved profile and routes to its linked cover. No private workspace is opened. |
-| Replace a lost link | `/account/link` | Password-authenticated link replacement. The previous link stops working. |
-| Personal entry | `/entry#<random-token>` | Valid owner link + enrolled-browser PIN; on another device, account sign-in and browser enrollment first. |
-| Olive | `/olive` | Menu, search/filter, ingredient choices, favourites, cart, demo checkout. |
-| Daily Digest | `/daily-digest` | Live Google News feed, search, location/world scope, bookmarks, reader where available. |
-| Better Calculator | `/calculator` | Arithmetic/scientific expressions, graph, zoom/pan, table, derivative, quadratic roots, 30 mobile math tools, statistical plots. |
-| Game | `/game` | Little Grove memory game and Olive Flight. |
+| Address                    | Build command            | Behavior                                                                                                                                                                                                           |
+| -------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `yourolivebranch.ca`       | `npm run build:user`     | A pathless user SPA. `/` shows the cover saved for this browser: Game, News, Food, or Calculator. Game is the default. Login, onboarding, PIN entry, and Safe App are in-memory screens and the address stays `/`. |
+| `get.yourolivebranch.ca`   | `npm run build:download` | Download and installation instructions at `/`.                                                                                                                                                                     |
+| `admin.yourolivebranch.ca` | `npm run build:admin`    | Staff and administrator sign-in and workspace at `/`. Personal and safe-contact roles are rejected here.                                                                                                           |
 
-Cover domains are intentionally not hardcoded. Local paths use one origin so local
-accounts and enrollment remain available across covers. Independent production
-domains have separate browser stores and Firebase sessions; this implementation
-uses fresh sign-in/enrollment rather than an automatic authentication handoff. Never pass
-passwords, ID tokens, or refresh tokens in cover redirect URLs.
+The production setup uses three Vercel projects from this same `web` directory,
+one build command and domain per row. All three use the same Firebase project and
+the same web environment variables. Each deployment needs SPA fallback to
+`index.html`; API, manifest, news proxy, and APK endpoints still need the Express
+server or equivalent serverless functions.
+
+The four user covers are states of the first SPA, rather than pages or subdomains.
+The chosen cover is saved in the browser enrollment/profile. Two people can open
+the same `https://yourolivebranch.ca/` address and see different covers. The Game
+cover exposes no login or download links. Five quick taps on its Little Grove
+brand starts private entry. Food, News, and Calculator retain their configured
+trigger input. Quick Exit returns to the saved cover at `/`.
+
+Legacy local routes such as `/olive`, `/daily-digest`, `/calculator`, `/game`, and
+`/account/sign-in` are accepted as migration/development inputs, then immediately
+removed from the address bar. Personal entry links arrive as
+`https://yourolivebranch.ca/entry#<random-token>`; both the path and fragment are
+replaced with `/` as soon as the app reads them.
 
 ### Shared code, multiple website addresses
 
-`site.config.json` is the address map shared by the React router, account cover
-redirects, Quick Exit, and the server's PWA manifests. All `origin` fields are
-blank for local development. Old `/cover/<name>` URLs continue to work; navigation
-uses the short canonical URLs above. `/` stays the game disguise and `/account`
-stays the onboarding site. No account or download links appear on the game.
-
-When production domains are chosen, set `publicOrigin` to the main HTTPS origin
-and each cover's `origin` to its HTTPS origin, for example
-`https://news.example.com` (no path). Deploy this same code/build behind all those
-domains with SPA fallback and `/api`, manifest, and download server routes. A
-configured cover domain's `/` displays that cover. Rebuild and restart after
-changing the configuration. Multiple Vercel domains may target the same project;
-the current Express server endpoints must also be deployed using a compatible
-server/service setup rather than publishing only `dist` as static files.
-
-Public account/download links and newly generated personal links target
-`publicOrigin`; cover navigation targets the selected cover's origin. Navigation
-across origins clears active browser vault keys. Cloud account profiles remain in
-the same Firebase project. **There is no automatic cross-domain sign-in handoff**:
-sign in/enroll again where required. Configure Firebase authorized domains, Storage
-CORS, and hosting before enabling those domains. Local browser-only accounts and
-saved games stay with the origin that created them. Existing personal bookmarks
-must be replaced or supported by the old domain when domains change.
+`site.config.json` is the address map shared by the three builds, Quick Exit,
+personal links, and PWA manifests. `VITE_SITE_MODE` is committed through
+`.env.user`, `.env.download`, and `.env.admin`; Vercel may also set it explicitly.
+Configure all three domains as Firebase authorized domains and configure Storage
+CORS before enabling them. Browser storage stays origin-specific, so account
+enrollment lives on the main domain while the public download and admin sites keep
+their own sessions/storage.
 
 The Android UI remains Kotlin in `app`; shared web UI is React in `web/src`.
 There are no duplicated React applications or separate cover repositories.

@@ -22,10 +22,14 @@ import {
 import { useSession } from "./session";
 import { accounts, triggerHash } from "./services/accounts";
 import { CoverPreview } from "./Landing";
-export function AuthPage() {
+export function AuthPage({
+  organizationOnly = false,
+}: {
+  organizationOnly?: boolean;
+}) {
   const session = useSession();
-  const create = session.path === "/account/create";
-  const [role, setRole] = useState<Role>("USER");
+  const create = !organizationOnly && session.path === "/account/create";
+  const [role, setRole] = useState<Role>(organizationOnly ? "STAFF" : "USER");
   return (
     <div className="account-layout">
       <aside className="account-aside">
@@ -46,9 +50,11 @@ export function AuthPage() {
         <span className="aside-bottom">A little more room to be you.</span>
       </aside>
       <main className="account-main" id="main">
-        <button className="text-link" onClick={() => session.go("/")}>
-          <ArrowLeft size={17} /> Back to home
-        </button>
+        {!organizationOnly && (
+          <button className="text-link" onClick={() => session.go("/")}>
+            <ArrowLeft size={17} /> Back to home
+          </button>
+        )}
         <div className="account-form">
           <span className="eyebrow">
             {create ? "A SIMPLE START" : "MAKE YOURSELF AT HOME"}
@@ -84,12 +90,15 @@ export function AuthPage() {
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
               >
-                <option value="USER">Personal account</option>
-                <option value="SAFE_CONTACT">Safe contact</option>
-                {!create && (
+                {organizationOnly ? (
                   <>
                     <option value="STAFF">Organization staff</option>
                     <option value="ADMIN">Organization administrator</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="USER">Personal account</option>
+                    <option value="SAFE_CONTACT">Safe contact</option>
                   </>
                 )}
               </select>
@@ -148,35 +157,39 @@ export function AuthPage() {
               </Forward>
             </Button>
           </Form>
-          <p className="auth-switch">
-            {create ? "Already have an account?" : "New around here?"}{" "}
-            <button
-              className="text-link"
-              onClick={() => {
-                session.clearMessage();
-                session.go(create ? "/account/sign-in" : "/account/create");
-              }}
-            >
-              {create ? "Sign in" : "Create an account"}{" "}
-              <ArrowRight size={15} />
-            </button>
-          </p>
-          <div className="account-utility-links">
-            <a className="text-link" href={siteHref("/download")}>
-              Download & installation <ArrowRight size={15} />
-            </a>
-            {!create && (
+          {!organizationOnly && (
+            <p className="auth-switch">
+              {create ? "Already have an account?" : "New around here?"}{" "}
               <button
                 className="text-link"
                 onClick={() => {
                   session.clearMessage();
-                  session.go("/account/link");
+                  session.go(create ? "/account/sign-in" : "/account/create");
                 }}
               >
-                Replace a lost personal link <ArrowRight size={15} />
+                {create ? "Sign in" : "Create an account"}{" "}
+                <ArrowRight size={15} />
               </button>
-            )}
-          </div>
+            </p>
+          )}
+          {!organizationOnly && (
+            <div className="account-utility-links">
+              <a className="text-link" href={siteHref("/download")}>
+                Download & installation <ArrowRight size={15} />
+              </a>
+              {!create && (
+                <button
+                  className="text-link"
+                  onClick={() => {
+                    session.clearMessage();
+                    session.go("/account/link");
+                  }}
+                >
+                  Replace a lost personal link <ArrowRight size={15} />
+                </button>
+              )}
+            </div>
+          )}
           <div className="storage-note">
             <Leaf size={18} />
             <span>
