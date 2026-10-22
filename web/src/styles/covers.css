@@ -662,6 +662,207 @@
   font-size: clamp(2rem, 4vw, 3.2rem);
   margin-top: 0.4rem;
 }
+.calculator-mode-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.32rem;
+  margin-bottom: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: #eef1e7;
+}
+.calculator-mode-tabs > button {
+  min-width: 8.5rem;
+  min-height: 2.8rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.62rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+.calculator-mode-tabs > button[aria-selected="true"] {
+  background: var(--paper);
+  color: var(--olive);
+  box-shadow: 0 1px 5px rgb(48 62 41 / 12%);
+}
+.graphing-workspace {
+  display: grid;
+  grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+  min-height: 38rem;
+  border: 1px solid var(--line);
+  border-radius: 1.1rem;
+  background: var(--paper);
+  overflow: hidden;
+  box-shadow: 0 16px 42px rgb(52 66 43 / 8%);
+}
+.graph-expression-panel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  background: #fafbf6;
+}
+.graph-expression-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.15rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.graph-expression-heading h2 {
+  margin-top: 0.2rem;
+  font-size: 1.75rem;
+}
+.angle-mode {
+  min-width: 3.4rem;
+  min-height: 2.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--paper);
+  color: var(--olive);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.graph-expression-row {
+  display: grid;
+  grid-template-columns: 1.25rem 0.35rem auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 1.2rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.graph-expression-number {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.graph-expression-colour {
+  width: 0.35rem;
+  height: 2.7rem;
+  border-radius: 999px;
+  background: #3f6b43;
+}
+.graph-y-label {
+  font: 1.25rem var(--serif);
+  color: var(--olive);
+}
+.graph-expression-row input {
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.4rem 0.25rem;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font:
+    1.15rem ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+.graph-expression-row input:focus {
+  outline: none;
+  border-bottom-color: var(--olive);
+}
+.graph-expression-row button,
+.graph-table-button {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.5rem;
+  background: var(--olive);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+.graph-expression-details {
+  padding: 1rem 1.15rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.graph-expression-details > p:last-child {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.graph-expression-details strong {
+  color: var(--ink);
+  font:
+    1rem ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.graph-table-button {
+  margin: auto 1.15rem 1.15rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--olive);
+}
+.graph-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 38rem;
+  overflow: hidden;
+  background: #fbfcf8;
+}
+.graph-stage .graph {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 38rem;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.graph-zoom-controls,
+.graph-pan-controls {
+  position: absolute;
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #cdd4c7;
+  border-radius: 0.65rem;
+  background: #cdd4c7;
+  box-shadow: 0 4px 14px rgb(44 56 38 / 12%);
+}
+.graph-zoom-controls {
+  top: 1rem;
+  right: 1rem;
+}
+.graph-pan-controls {
+  right: 1rem;
+  bottom: 1rem;
+  grid-template-columns: repeat(5, 2.55rem);
+}
+.graph-zoom-controls > button,
+.graph-pan-controls > button {
+  display: grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  background: rgb(255 255 252 / 94%);
+  color: var(--olive);
+}
+.graph-zoom-controls > button:hover,
+.graph-pan-controls > button:hover {
+  background: #edf2e7;
+}
+.graph-error {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 5rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.6rem;
+  background: rgb(255 250 246 / 94%);
+}
 .calculator-layout {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
@@ -671,6 +872,28 @@
 }
 .calculator-body {
   padding: clamp(1rem, 3vw, 2rem);
+}
+.calculator-tool-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: calc(-1 * clamp(1rem, 3vw, 2rem)) calc(-1 * clamp(1rem, 3vw, 2rem))
+    1.25rem;
+  padding: 0.65rem;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.calculator-tool-tabs > button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+.calculator-tool-tabs > button:hover,
+.calculator-tool-tabs > button[aria-current] {
+  background: #e9ede2;
+  color: var(--olive);
 }
 .calculator-display {
   padding: 1.5rem 0.5rem;
@@ -976,6 +1199,9 @@
     grid-template-columns: 1.4fr 1fr;
     gap: 2rem;
   }
+  .graphing-workspace {
+    grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
+  }
   .grove-main {
     gap: 3rem;
   }
@@ -1062,6 +1288,41 @@
   }
   .calculator-layout {
     grid-template-columns: 1fr;
+  }
+  .calculator-heading {
+    padding-block: 1.5rem;
+  }
+  .calculator-mode-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .calculator-mode-tabs > button {
+    min-width: 0;
+  }
+  .graphing-workspace {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .graph-expression-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .graph-expression-details {
+    display: none;
+  }
+  .graph-table-button {
+    align-self: flex-start;
+    margin-top: 0.85rem;
+  }
+  .graph-stage,
+  .graph-stage .graph {
+    min-height: 30rem;
+  }
+  .graph-pan-controls {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
   }
   .calculator-note {
     display: none;
@@ -1223,6 +1484,22 @@
   transform-origin: center;
   animation: crossing-lily-bob 1.6s ease-in-out infinite alternate;
 }
+.crossing-rail-signal {
+  filter: drop-shadow(0 2px 2px rgb(42 45 38 / 28%));
+}
+.crossing-signal-light {
+  opacity: 0.18;
+  transition: opacity 0.15s ease;
+}
+.crossing-rail-signal-red .crossing-signal-light-red,
+.crossing-rail-signal-yellow .crossing-signal-light-yellow,
+.crossing-rail-signal-green .crossing-signal-light-green {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+.crossing-rail-signal-red .crossing-signal-light-red {
+  animation: crossing-signal-warning 0.46s ease-in-out infinite alternate;
+}
 .crossing-train {
   animation: crossing-train-rumble 0.12s ease-in-out infinite alternate;
 }
@@ -1274,6 +1551,11 @@
     transform: translateY(1.5px) rotate(1.5deg);
   }
 }
+@keyframes crossing-signal-warning {
+  to {
+    opacity: 0.48;
+  }
+}
 @keyframes crossing-train-rumble {
   to {
     transform: translateY(-1px);
@@ -1306,6 +1588,7 @@
   .crossing-tree circle,
   .crossing-wave,
   .crossing-lilypad > *,
+  .crossing-signal-light,
   .crossing-train,
   .crossing-player-hop,
   .crossing-crashed {
