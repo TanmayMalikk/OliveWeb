@@ -15,15 +15,17 @@ import java.util.UUID
 
 data class SafetyDocument(
     val id:String,val ownerUid:String,val storagePath:String,val name:String,val mimeType:String,
-    val allowedUsers:List<String>,val createdAt:Long=0,
+    val allowedUsers:List<String>,val createdAt:Long=0,val ocrText:String?=null,
+    val ocrConfidence:Float?=null,val ocrSuccessful:Boolean?=null,
 )
+data class DocumentOcrMetadata(val text:String,val confidence:Float,val successful:Boolean)
 
 interface SafetyDocumentDataSource {
     suspend fun listFor(uid:String):List<SafetyDocument>
     fun observeFor(uid:String,onUpdate:(List<SafetyDocument>)->Unit,onError:(String)->Unit):ChatSubscription
     suspend fun getFor(uid:String,id:String):SafetyDocument
     suspend fun upload(context:Context,uri:Uri,owner:AccountIdentity):SafetyDocument
-    suspend fun uploadFile(file:File,name:String,mimeType:String,owner:AccountIdentity):SafetyDocument
+    suspend fun uploadFile(file:File,name:String,mimeType:String,owner:AccountIdentity,ocr:DocumentOcrMetadata?=null):SafetyDocument
     suspend fun share(document:SafetyDocument,ownerUid:String,recipientUids:List<String>)
     suspend fun delete(document:SafetyDocument,ownerUid:String)
     suspend fun download(context:Context,document:SafetyDocument):File
@@ -62,15 +64,16 @@ class SafetyDocumentRepository(
         val name=resolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use { cursor ->
             if(cursor.moveToFirst()) cursor.getString(0) else null
         }?.trim()?.take(160).orEmpty().ifBlank { "Document" }
-        return upload(name,mime,size,owner) { resolver.openInputStream(uri) ?: error("Unable to read the selected file") }
+        return upload(name,mime,size,owner,{ resolver.openInputStream(uri) ?: error("Unable to read the selected file") })
     }
 
-    override suspend fun uploadFile(file:File,name:String,mimeType:String,owner:AccountIdentity):SafetyDocument {
+    override suspend fun uploadFile(file:File,name:String,mimeType:String,owner:AccountIdentity,ocr:DocumentOcrMetadata?):SafetyDocument {
         require(file.isFile && file.length()>0) { "Captured media is empty" }
-        return upload(name.trim().take(160),mimeType.take(120),file.length(),owner,file::inputStream)
+        return upload(name.trim().take(160),mimeType.take(120),file.length(),owner,file::inputStream,ocr)
     }
 
-    private suspend fun upload(name:String,mime:String,size:Long?,owner:AccountIdentity,open:()->InputStream):SafetyDocument {
+    private suspend fun upload(name:String,mime:String,size:Long?,owner:AccountIdentity,open:()->InputStream,
+        ocr:DocumentOcrMetadata?=null):SafetyDocument {
         require(mime.startsWith("image/") || mime.startsWith("video/") || mime in DOCUMENT_TYPES) { "Unsupported file type" }
         require(size==null || size in 1..MAX_BYTES) { "File must be smaller than 250 MB" }
         val safeName=name.ifBlank { "Document" }
@@ -80,15 +83,22 @@ class SafetyDocumentRepository(
             .setCustomMetadata(accessKey(owner.uid),"true").build()
         try {
             open().use { reference.putStream(it,storageMetadata).await() }
-            firestore.collection("files").document(id).set(mapOf(
+            val record=mutableMapOf<String,Any>(
                 "owner_id" to owner.uid,"storage_path" to path,"file_name" to safeName,"file_type" to mime,
                 "allowed_users" to listOf(owner.uid),"created_at" to FieldValue.serverTimestamp(),
-            )).await()
+            )
+            ocr?.let {
+                record["ocr_text"]=it.text.take(MAX_OCR_TEXT)
+                record["ocr_confidence"]=it.confidence.coerceIn(0f,1f).toDouble()
+                record["ocr_successful"]=it.successful
+            }
+            firestore.collection("files").document(id).set(record).await()
         } catch(failure:Exception) {
             runCatching { reference.delete().await() }
             throw failure
         }
-        return SafetyDocument(id,owner.uid,path,safeName,mime,listOf(owner.uid),System.currentTimeMillis())
+        return SafetyDocument(id,owner.uid,path,safeName,mime,listOf(owner.uid),System.currentTimeMillis(),
+            ocr?.text?.take(MAX_OCR_TEXT),ocr?.confidence?.coerceIn(0f,1f),ocr?.successful)
     }
 
     override suspend fun share(document:SafetyDocument,ownerUid:String,recipientUids:List<String>) {
@@ -155,12 +165,14 @@ class SafetyDocumentRepository(
         val owner=row.getString("owner_id") ?: return null
         return SafetyDocument(row.id,owner,row.getString("storage_path").orEmpty(),row.getString("file_name").orEmpty(),
             row.getString("file_type").orEmpty(),(row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty(),
-            row.getTimestamp("created_at")?.toDate()?.time ?: 0)
+            row.getTimestamp("created_at")?.toDate()?.time ?: 0,row.getString("ocr_text"),
+            row.getDouble("ocr_confidence")?.toFloat(),row.getBoolean("ocr_successful"))
     }
 
     private companion object {
         const val MAX_BYTES=250L*1024L*1024L
         const val CACHE_LIFETIME=60L*60L*1000L
+        const val MAX_OCR_TEXT=50_000
         fun accessKey(uid:String)="access_$uid"
         val DOCUMENT_TYPES=setOf("application/pdf","text/plain","application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document")

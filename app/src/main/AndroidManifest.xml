@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
@@ -19,6 +20,9 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/ic_app_info_blank" android:roundIcon="@drawable/ic_app_info_blank"
         android:supportsRtl="true" android:theme="@style/Theme.Olive">
+        <!-- OCR runs locally. Disable ONNX's optional telemetry provider, which eagerly loads
+             native code and calls telemetry JNI methods absent from the Android artifact. -->
+        <provider android:name="ai.onnxruntime.TelemetryInitializer" tools:node="remove" />
         <service android:name=".location.LiveLocationService" android:exported="false"
             android:foregroundServiceType="location" android:stopWithTask="false" />
         <provider android:name="androidx.core.content.FileProvider"

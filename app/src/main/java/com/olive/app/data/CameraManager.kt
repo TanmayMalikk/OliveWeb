@@ -6,6 +6,8 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
 import androidx.camera.video.FileOutputOptions
@@ -19,6 +21,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.io.File
+import android.util.Size
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
@@ -37,7 +40,10 @@ class CameraManager(private val context:Context) {
         val cameraProvider=ProcessCameraProvider.awaitInstance(context)
         val rotation=previewView.display?.rotation
         val previewBuilder=Preview.Builder()
+        val imageResolution=ResolutionSelector.Builder().setResolutionStrategy(ResolutionStrategy(Size(1920,1080),
+            ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER)).build()
         val imageBuilder=ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .setResolutionSelector(imageResolution)
         val recorderBuilder=Recorder.Builder().setQualitySelector(QualitySelector.from(Quality.HD))
         if(rotation!=null) { previewBuilder.setTargetRotation(rotation);imageBuilder.setTargetRotation(rotation) }
         val preview=previewBuilder.build().also { it.surfaceProvider=previewView.surfaceProvider }

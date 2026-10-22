@@ -16,9 +16,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.ocr.PaddleOcrManager
-import com.olive.app.ocr.OrientationPreprocessor
 import com.olive.app.ocr.OcrResult
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -31,7 +32,7 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val ocrManager = remember { PaddleOcrManager(context) }
-    val orientationPreprocessor = remember { OrientationPreprocessor(context) }
+    val cleanupScope=remember { CoroutineScope(SupervisorJob()+Dispatchers.IO) }
 
     var isRunning by remember { mutableStateOf(value = false) }
     var ocrResult by remember { mutableStateOf<OcrResult?>(value = null) }
@@ -69,8 +70,8 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                 statusMessage = "Preprocessing orientation (detecting & straightening rotation)..."
             }
 
-            // Run orientation preprocessor
-            val processedBytes = orientationPreprocessor.process(sampleBytes)
+            // One pipeline pass provides both the corrected preview and OCR result.
+            val (processedBytes,result)=ocrManager.recognizeDocumentWithPreview(sampleBytes)
             val processedBmp = BitmapFactory.decodeByteArray(processedBytes, 0, processedBytes.size)
 
             withContext(Dispatchers.Main) {
@@ -78,14 +79,18 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                 statusMessage = "Running PaddleOCR on reoriented image..."
             }
 
-            // Run OCR
-            val result = ocrManager.recognizeDocument(processedBytes)
-
             withContext(Dispatchers.Main) {
                 ocrResult = result
                 isRunning = false
                 statusMessage = if (result.success) "OCR & Orientation Pipeline Successful!" else "OCR Failed."
             }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            rawPreviewBitmap?.recycle();processedPreviewBitmap?.recycle()
+            cleanupScope.launch { ocrManager.release() }
         }
     }
 

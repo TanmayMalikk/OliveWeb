@@ -22,6 +22,15 @@
     <string name="camera_title">Private camera</string>
     <string name="camera_photo">Photo</string>
     <string name="camera_video">Video</string>
+    <string name="camera_document">Document</string>
+    <string name="camera_scan_document">Scan document</string>
+    <string name="camera_scanning_document">Scanning document…</string>
+    <string name="camera_ocr_complete">Document scan complete</string>
+    <string name="camera_ocr_failed">The document could not be scanned</string>
+    <string name="camera_ocr_confidence">Text confidence: %1$d%%</string>
+    <string name="camera_ocr_low_confidence">Some text may be inaccurate. Retake the document or save it anyway.</string>
+    <string name="camera_save_anyway">Save anyway</string>
+    <string name="camera_document_capture_failed">The document could not be captured.</string>
     <string name="camera_take_photo">Take photo</string>
     <string name="camera_start_recording">Start recording</string>
     <string name="camera_stop_recording">Stop recording</string>
@@ -53,7 +62,7 @@
     <string name="documents_preview_unavailable">Preview unavailable</string>
     <string name="documents_preview_supported">Images, videos, PDFs, text files and Word .docx files open privately inside Olive Branch.</string>
     <string name="documents_choose_source">Choose what to upload</string>
-    <string name="documents_choose_source_help">Select media or a document. Olive Branch keeps this screen open while Android grants private access to your selection.</string>
+    <string name="documents_choose_source_help">Open the private camera to take a photo, record a video or scan a document, or select an existing file from your device.</string>
     <string name="documents_choose_media">Photo or video</string>
     <string name="documents_choose_document">PDF, text or Word document</string>
     <string name="camera_flip">Switch front or back camera</string>

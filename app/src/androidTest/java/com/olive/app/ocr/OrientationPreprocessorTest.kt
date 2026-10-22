@@ -8,6 +8,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
@@ -28,6 +29,8 @@ class OrientationPreprocessorTest {
         testDocBytes = context.assets.open("test_doc.png").readBytes()
         assertTrue("test_doc.png should not be empty", testDocBytes.isNotEmpty())
     }
+
+    @After fun tearDown() { preprocessor.close() }
 
     @Test
     fun testProcessUprightDocument() {
@@ -70,10 +73,27 @@ class OrientationPreprocessorTest {
             // Verify corrected output is a valid decodable image
             val correctedBitmap = BitmapFactory.decodeByteArray(correctedBytes, 0, correctedBytes.size)
             assertNotNull("Corrected bitmap for rotation $rotation should be valid", correctedBitmap)
-            assertTrue(correctedBitmap.width > 0)
-            assertTrue(correctedBitmap.height > 0)
+            assertEquals("Corrected width for rotation $rotation",originalBitmap.width,correctedBitmap.width)
+            assertEquals("Corrected height for rotation $rotation",originalBitmap.height,correctedBitmap.height)
+            assertTrue("Corrected pixels for rotation $rotation should match the upright source",
+                meanPixelDifference(originalBitmap,correctedBitmap)<35.0)
             correctedBitmap.recycle()
         }
         originalBitmap.recycle()
+    }
+
+    private fun meanPixelDifference(first:Bitmap,second:Bitmap):Double {
+        val width=64;val height=64
+        val a=Bitmap.createScaledBitmap(first,width,height,true)
+        val b=Bitmap.createScaledBitmap(second,width,height,true)
+        val ap=IntArray(width*height);val bp=IntArray(width*height)
+        a.getPixels(ap,0,width,0,0,width,height);b.getPixels(bp,0,width,0,0,width,height)
+        a.recycle();b.recycle()
+        return ap.indices.sumOf { index ->
+            val x=ap[index];val y=bp[index]
+            (kotlin.math.abs((x shr 16 and 255)-(y shr 16 and 255))+
+                kotlin.math.abs((x shr 8 and 255)-(y shr 8 and 255))+
+                kotlin.math.abs((x and 255)-(y and 255))).toDouble()/3
+        }/ap.size
     }
 }

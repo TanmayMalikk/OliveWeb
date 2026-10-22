@@ -6,13 +6,21 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.olive.app.data.CameraManager
+import com.olive.app.ocr.OcrResult
+import com.olive.app.ocr.PaddleOcrManager
 import java.io.File
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class CameraViewModel(application:Application):AndroidViewModel(application) {
     private val camera=CameraManager(application)
+    private val ocr=PaddleOcrManager(application)
     private val _busy=MutableStateFlow(false)
     val busy=_busy.asStateFlow()
     private val _recording=MutableStateFlow(false)
@@ -22,6 +30,9 @@ class CameraViewModel(application:Application):AndroidViewModel(application) {
     private val _error=MutableStateFlow<String?>(null)
     val error=_error.asStateFlow()
     private val _frontFacing=MutableStateFlow(false)
+    private var documentJob:Job?=null
+    private var pendingDocumentFile:File?=null
+    private var documentGeneration=0
 
     fun bind(owner:LifecycleOwner,preview:PreviewView) {
         viewModelScope.launch {
@@ -55,6 +66,35 @@ class CameraViewModel(application:Application):AndroidViewModel(application) {
         }
     }
 
+    fun captureDocument(file:File,onCaptured:(File,OcrResult)->Unit) {
+        if(documentJob?.isActive==true) return
+        val generation=++documentGeneration
+        pendingDocumentFile=file
+        documentJob=viewModelScope.launch {
+            _busy.value=true;_error.value=null
+            try {
+                val captured=camera.capturePhoto(file)
+                val result=ocr.recognizeDocument(captured.readBytes())
+                if(generation!=documentGeneration) { captured.delete();return@launch }
+                pendingDocumentFile=null
+                documentJob=null
+                onCaptured(captured,result)
+            } catch(cancelled:CancellationException) {
+                file.delete()
+                throw cancelled
+            } catch(failure:Exception) {
+                file.delete()
+                _error.value=failure.localizedMessage ?: getApplication<Application>().getString(com.olive.app.R.string.camera_document_capture_failed)
+            } finally {
+                if(generation==documentGeneration) {
+                    pendingDocumentFile=null
+                    documentJob=null
+                    _busy.value=false
+                }
+            }
+        }
+    }
+
     fun startVideo(file:File,includeAudio:Boolean,onCaptured:(File)->Unit) {
         _error.value=null
         runCatching {
@@ -68,6 +108,14 @@ class CameraViewModel(application:Application):AndroidViewModel(application) {
 
     fun stopVideo()=camera.stopVideo()
     fun clearError() { _error.value=null }
-    fun leaveCamera() { camera.unbind();_ready.value=false;_recording.value=false;_busy.value=false }
-    override fun onCleared() { camera.release() }
+    fun leaveCamera() {
+        documentGeneration++
+        documentJob?.cancel();documentJob=null
+        pendingDocumentFile?.delete();pendingDocumentFile=null
+        camera.unbind();_ready.value=false;_recording.value=false;_busy.value=false
+    }
+    override fun onCleared() {
+        leaveCamera();camera.release()
+        CoroutineScope(NonCancellable+Dispatchers.IO).launch { ocr.release() }
+    }
 }

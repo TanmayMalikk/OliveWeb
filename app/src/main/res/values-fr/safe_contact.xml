@@ -22,6 +22,15 @@
     <string name="camera_title">Appareil photo privé</string>
     <string name="camera_photo">Photo</string>
     <string name="camera_video">Vidéo</string>
+    <string name="camera_document">Document</string>
+    <string name="camera_scan_document">Numériser le document</string>
+    <string name="camera_scanning_document">Numérisation du document…</string>
+    <string name="camera_ocr_complete">Numérisation terminée</string>
+    <string name="camera_ocr_failed">Le document n’a pas pu être numérisé</string>
+    <string name="camera_ocr_confidence">Fiabilité du texte : %1$d%%</string>
+    <string name="camera_ocr_low_confidence">Certains textes peuvent être inexacts. Reprenez le document ou enregistrez-le quand même.</string>
+    <string name="camera_save_anyway">Enregistrer quand même</string>
+    <string name="camera_document_capture_failed">Le document n’a pas pu être capturé.</string>
     <string name="camera_take_photo">Prendre une photo</string>
     <string name="camera_start_recording">Commencer l’enregistrement</string>
     <string name="camera_stop_recording">Arrêter l’enregistrement</string>
@@ -53,7 +62,7 @@
     <string name="documents_preview_unavailable">Aperçu indisponible</string>
     <string name="documents_preview_supported">Les images, vidéos, PDF, fichiers texte et documents Word .docx s’ouvrent en privé dans Olive Branch.</string>
     <string name="documents_choose_source">Choisir le type de fichier</string>
-    <string name="documents_choose_source_help">Sélectionnez un média ou un document. Olive Branch garde cet écran ouvert pendant qu’Android autorise l’accès privé à votre sélection.</string>
+    <string name="documents_choose_source_help">Ouvrez l’appareil photo privé pour prendre une photo, enregistrer une vidéo ou numériser un document, ou sélectionnez un fichier existant sur votre appareil.</string>
     <string name="documents_choose_media">Photo ou vidéo</string>
     <string name="documents_choose_document">Document PDF, texte ou Word</string>
     <string name="camera_flip">Changer de caméra avant ou arrière</string>
