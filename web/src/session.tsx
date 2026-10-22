@@ -16,11 +16,17 @@ import {
 import { database } from "./services/local";
 import {
   issueEntryLink,
+  savedEntryLink,
   verifyEntryLink,
   validEntryToken,
 } from "./services/entry-links";
 import { readCover, writeCover } from "./services/cover-storage";
-import { canonicalPath, coverForRoute, siteDestination } from "./sites";
+import {
+  canonicalPath,
+  coverForRoute,
+  siteDestination,
+  type SiteMode,
+} from "./sites";
 import {
   coverPath,
   covers,
@@ -60,6 +66,7 @@ type SessionValue = {
     create: boolean,
   ) => Promise<void>;
   completeSetup: (p: Profile, pin: string) => Promise<void>;
+  beginEntry: () => Promise<void>;
   quickExit: () => void;
   searchTrigger: (value: string) => Promise<boolean>;
   unlock: (pin: string) => Promise<void>;
@@ -74,19 +81,34 @@ type SessionValue = {
   onboardingProfile: Profile | null;
 };
 const initialEntryToken =
-  location.pathname === "/entry" && validEntryToken(location.hash.slice(1))
+  (location.pathname === "/" || location.pathname === "/entry") &&
+  validEntryToken(location.hash.slice(1))
     ? location.hash.slice(1)
     : null;
-if (location.pathname === "/entry" && location.hash)
-  window.history.replaceState({}, "", "/entry");
+if (location.hash || location.pathname === "/entry")
+  window.history.replaceState({}, "", "/");
 const Context = createContext<SessionValue | null>(null);
 export const useSession = () => {
   const value = useContext(Context);
   if (!value) throw new Error("Missing session");
   return value;
 };
-export function SessionProvider({ children }: { children: ReactNode }) {
-  const [path, setPath] = useState(() => canonicalPath(location.pathname));
+export function SessionProvider({
+  children,
+  mode = "user",
+}: {
+  children: ReactNode;
+  mode?: SiteMode;
+}) {
+  const [path, setPath] = useState(() =>
+    mode === "admin"
+      ? "/account/sign-in"
+      : mode === "download"
+        ? "/download"
+        : initialEntryToken
+          ? "/account/sign-in"
+          : canonicalPath(location.pathname),
+  );
   const [phase, setPhase] = useState<SessionValue["phase"]>("public");
   const [personalLink, setPersonalLink] = useState("");
   const [entryAttempt, setEntryAttempt] = useState(0);
@@ -109,21 +131,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   phaseRef.current = phase;
   const routeCover = coverForRoute(path, location.origin)?.id as
     Cover | undefined;
-  const cover = routeCover ?? enrollment?.cover ?? profile?.coverType ?? "FOOD";
-  const go = useCallback((to: string) => {
-    pendingEntry.current = null;
-    entryOwner.current = null;
-    const destination = new URL(siteDestination(to, location.origin));
-    if (destination.origin !== location.origin) {
-      accounts.lock();
-      window.location.assign(destination.href);
-      return;
-    }
-    const localPath =
-      destination.pathname + destination.search + destination.hash;
-    window.history.pushState({}, "", localPath);
-    setPath(destination.pathname);
-    window.scrollTo({ top: 0 });
+  const cover = routeCover ?? enrollment?.cover ?? profile?.coverType ?? "GAME";
+  const go = useCallback(
+    (to: string) => {
+      pendingEntry.current = null;
+      entryOwner.current = null;
+      const destination = new URL(siteDestination(to, location.origin));
+      const internalAdmin = mode === "admin" && to !== "/download";
+      const internalDownload = mode === "download" && to === "/download";
+      if (
+        !internalAdmin &&
+        !internalDownload &&
+        destination.origin !== location.origin
+      ) {
+        accounts.lock();
+        window.location.assign(destination.href);
+        return;
+      }
+      window.history.replaceState({}, "", "/");
+      setPath(canonicalPath(to));
+      window.scrollTo({ top: 0 });
+    },
+    [mode],
+  );
+  useEffect(() => {
+    if (location.pathname !== "/" || location.search || location.hash)
+      window.history.replaceState({}, "", "/");
   }, []);
   useEffect(() => {
     let live = true;
@@ -143,7 +176,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           if (
             entryToken &&
             authenticated &&
-            (await verifyEntryLink(value.uid, entryToken, !cloudMode)) &&
             live &&
             pendingEntry.current === entryToken
           ) {
@@ -162,9 +194,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [entryAttempt]);
   const quickExit = useCallback(() => {
-    const destination = new URL(
-      siteDestination(coverPath(profile?.coverType ?? cover), location.origin),
-    );
     epoch.current++;
     entryOwner.current = null;
     pendingEntry.current = null;
@@ -179,14 +208,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setBusy(false);
     setPhase("public");
     phaseRef.current = "public";
-    if (destination.origin !== location.origin) {
-      window.location.replace(destination.href);
-      return;
-    }
-    window.history.replaceState({}, "", destination.pathname);
-    setPath(destination.pathname);
+    window.history.replaceState({}, "", "/");
+    setPath(
+      mode === "admin"
+        ? "/account/sign-in"
+        : mode === "download"
+          ? "/download"
+          : coverPath(profile?.coverType ?? cover),
+    );
     window.scrollTo({ top: 0 });
-  }, [cover, profile?.coverType]);
+  }, [cover, mode, profile?.coverType]);
   useEffect(() => {
     const onPop = () => {
       epoch.current++;
@@ -200,19 +231,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setIdleSeconds(null);
       setBusy(false);
       setPhase("public");
-      setPath(canonicalPath(location.pathname));
+      setPath(
+        mode === "admin"
+          ? "/account/sign-in"
+          : mode === "download"
+            ? "/download"
+            : coverPath(enrollment?.cover ?? "GAME"),
+      );
+      window.history.replaceState({}, "", "/");
       setMessage("");
     };
     addEventListener("popstate", onPop);
     const onHash = () => {
-      if (location.pathname !== "/entry") return;
       const candidate = location.hash.slice(1);
+      if (!validEntryToken(candidate)) return;
       epoch.current++;
       accounts.lock();
       entryOwner.current = null;
       pendingEntry.current = validEntryToken(candidate) ? candidate : null;
-      window.history.replaceState({}, "", "/entry");
-      setPath("/entry");
+      window.history.replaceState({}, "", "/");
+      setPath("/account/sign-in");
       setProfile(null);
       setHistory(emptyHistory());
       setPersonalLink("");
@@ -220,14 +258,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMessage("");
       setBusy(false);
       setPhase("public");
-      setEntryAttempt((n) => n + 1);
+      if (enrollment) {
+        entryOwner.current = enrollment.uid;
+        setPhase("pin");
+      } else setEntryAttempt((n) => n + 1);
     };
     addEventListener("hashchange", onHash);
     return () => {
       removeEventListener("popstate", onPop);
       removeEventListener("hashchange", onHash);
     };
-  }, []);
+  }, [enrollment?.cover, mode]);
   useEffect(() => {
     const onHidden = () => {
       if (document.hidden && phaseRef.current !== "public") quickExit();
@@ -284,14 +325,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [phase, noteInteraction, quickExit]);
   useEffect(() => {
     document.title =
-      phase === "safe" || phase === "pin"
-        ? covers.find((c) => c.id === cover)!.name
-        : coverForRoute(path, location.origin)
-          ? covers.find((c) => c.id === cover)!.name
-          : path.startsWith("/account") || path === "/download"
-            ? "Olive Branch"
-            : "Little Grove";
-  }, [path, cover, phase]);
+      mode === "admin"
+        ? "Olive Branch Workspace"
+        : mode === "download"
+          ? "Olive Branch"
+          : covers.find((c) => c.id === cover)!.name;
+  }, [cover, mode]);
   async function perform(work: () => Promise<void>) {
     if (working.current) return;
     working.current = true;
@@ -315,6 +354,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     role: Role,
     create: boolean,
   ) {
+    if ((role === "STAFF" || role === "ADMIN") !== (mode === "admin"))
+      throw new Error(
+        mode === "admin"
+          ? "Use a Staff or Administrator account in this workspace."
+          : "Organization accounts sign in at admin.yourolivebranch.ca.",
+      );
     const token = epoch.current;
     const loaded = await accounts.authenticate(
       username,
@@ -384,15 +429,39 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         triggerHash: p.triggerHash,
       });
       accounts.lock();
-      if (entryOwner.current === current.uid) setPhase("pin");
-      else {
-        go(coverPath(p.coverType));
+      const saved = await savedEntryLink(current.uid);
+      const token = saved ? new URL(saved).hash.slice(1) : "";
+      if (validEntryToken(token)) {
+        pendingEntry.current = token;
+        entryOwner.current = current.uid;
+        setPhase("pin");
+      } else {
+        setPath("/account/link");
         setPhase("public");
       }
     } else {
       setOnboardingProfile(p);
       setPhase("setup");
     }
+  }
+  async function beginEntry() {
+    setMessage("");
+    if (!enrollment) {
+      setPath("/account/sign-in");
+      window.history.replaceState({}, "", "/");
+      return;
+    }
+    const saved = await savedEntryLink(enrollment.uid);
+    const token = saved ? new URL(saved).hash.slice(1) : "";
+    if (!validEntryToken(token)) {
+      setPath("/account/sign-in");
+      window.history.replaceState({}, "", "/");
+      return;
+    }
+    pendingEntry.current = token;
+    entryOwner.current = enrollment.uid;
+    setPhase("pin");
+    window.history.replaceState({}, "", "/");
   }
   async function completeSetup(p: Profile, pin: string) {
     const token = epoch.current;
@@ -422,14 +491,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPhase("link");
   }
   async function searchTrigger(value: string) {
-    if (
-      !enrollment ||
-      enrollment.cover !== cover ||
-      enrollment.role !== "USER" ||
-      entryOwner.current !== enrollment.uid
-    )
+    if (!enrollment || enrollment.cover !== cover || enrollment.role !== "USER")
       return false;
     if ((await triggerHash(value)) !== enrollment.triggerHash) return false;
+    if (entryOwner.current !== enrollment.uid) {
+      const saved = await savedEntryLink(enrollment.uid);
+      const token = saved ? new URL(saved).hash.slice(1) : "";
+      if (!validEntryToken(token)) return false;
+      pendingEntry.current = token;
+      entryOwner.current = enrollment.uid;
+    }
     setMessage("");
     setPhase("pin");
     return true;
@@ -517,7 +588,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setEnrollment(null);
     await (await database).delete("device", "current");
     setPhase("public");
-    go("/");
+    go(mode === "admin" ? "/account/sign-in" : "/");
   }
   return (
     <Context.Provider
@@ -539,6 +610,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         perform,
         authenticate,
         completeSetup,
+        beginEntry,
         quickExit,
         searchTrigger,
         unlock,

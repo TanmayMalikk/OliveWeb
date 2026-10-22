@@ -13,8 +13,7 @@ import { SessionProvider, useSession } from "./session";
 import { AuthPage, Setup } from "./Account";
 import { Button, Field, Form } from "./components";
 import Game from "./covers/Game";
-import Landing from "./Landing";
-import { coverForRoute, siteHref } from "./sites";
+import { coverSite, siteMode, type SiteMode } from "./sites";
 import "./styles.css";
 const Download = lazy(() => import("./Download"));
 const EntryLink = lazy(() => import("./EntryLink"));
@@ -138,24 +137,37 @@ function PinGate() {
     </main>
   );
 }
-function Routes() {
+function Cover() {
+  const s = useSession();
+  return (
+    <main
+      id="main"
+      className={`cover-container${s.cover === "GAME" ? " game-cover" : ""}`}
+    >
+      {s.cover === "FOOD" ? (
+        <Food />
+      ) : s.cover === "NEWS" ? (
+        <News />
+      ) : s.cover === "CALCULATOR" ? (
+        <Calculator />
+      ) : (
+        <Game />
+      )}
+    </main>
+  );
+}
+function Routes({ mode }: { mode: SiteMode }) {
   const s = useSession();
   useEffect(() => {
-    const cover = coverForRoute(s.path, location.origin)?.slug;
+    const cover = coverSite(s.cover).slug;
     let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     if (!link) {
       link = document.createElement("link");
       link.rel = "manifest";
       document.head.append(link);
     }
-    link.href = cover
-      ? `/${cover}/manifest.webmanifest`
-      : "/manifest.webmanifest";
-    const icon = ["olive", "daily-digest", "calculator", "game"].includes(
-      cover ?? "",
-    )
-      ? cover
-      : "game";
+    link.href = `/${cover}/manifest.webmanifest`;
+    const icon = cover;
     const apple = document.querySelector<HTMLLinkElement>(
       'link[rel="apple-touch-icon"]',
     );
@@ -174,46 +186,20 @@ function Routes() {
             : icon === "calculator"
               ? "Better Calculator"
               : "Little Grove";
-  }, [s.path]);
+  }, [s.cover]);
   let content: ReactNode;
-  if (s.phase === "safe" && s.profile) content = <SafeApp />;
-  else if (s.phase === "portal" && s.profile) content = <Portal />;
+  if (mode === "download") content = <Download />;
+  else if (mode === "admin") {
+    if (s.phase === "portal" && s.profile) content = <Portal />;
+    else if (s.phase === "setup") content = <Setup />;
+    else content = <AuthPage organizationOnly />;
+  } else if (s.phase === "safe" && s.profile) content = <SafeApp />;
   else if (s.phase === "setup") content = <Setup />;
   else if (s.phase === "link") content = <EntryLink />;
   else if (s.phase === "pin") content = <PinGate />;
   else if (s.path === "/download") content = <Download />;
-  else if (s.path === "/account") content = <Landing />;
-  else if (
-    s.path.startsWith("/account/") ||
-    (s.path === "/entry" && s.hasEntryToken)
-  )
-    content = <AuthPage />;
-  else if (coverForRoute(s.path, location.origin))
-    content = (
-      <>
-        {s.cover !== "GAME" && (
-          <div className="cover-public-bar">
-            <a href={siteHref("/account")}>Account</a>
-            <a href={siteHref("/download")}>Get the app</a>
-          </div>
-        )}
-        <main
-          id="main"
-          className={`cover-container${s.cover === "GAME" ? " game-cover" : ""}`}
-        >
-          {s.cover === "FOOD" ? (
-            <Food />
-          ) : s.cover === "NEWS" ? (
-            <News />
-          ) : s.cover === "CALCULATOR" ? (
-            <Calculator />
-          ) : (
-            <Game />
-          )}
-        </main>
-      </>
-    );
-  else content = <Game landing />;
+  else if (s.path.startsWith("/account")) content = <AuthPage />;
+  else content = <Cover />;
   return (
     <>
       <a className="skip-link" href="#main">
@@ -257,6 +243,7 @@ class ErrorBoundary extends Component<
     );
   }
 }
+const mode = siteMode();
 if (!crypto.subtle) {
   createRoot(document.getElementById("root")!).render(
     <main className="error-page">
@@ -270,8 +257,8 @@ if (!crypto.subtle) {
 } else
   createRoot(document.getElementById("root")!).render(
     <ErrorBoundary>
-      <SessionProvider>
-        <Routes />
+      <SessionProvider mode={mode}>
+        <Routes mode={mode} />
       </SessionProvider>
     </ErrorBoundary>,
   );

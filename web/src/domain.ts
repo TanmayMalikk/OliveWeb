@@ -191,7 +191,7 @@ export const emptyProfile = (
     postalCode: "",
     country: "Canada",
   },
-  coverType: "FOOD",
+  coverType: "GAME",
   email: "",
   phone: "",
 });
