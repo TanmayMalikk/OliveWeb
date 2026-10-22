@@ -107,6 +107,8 @@ dependencies {
     implementation("org.jsoup:jsoup:1.23.2")
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
+    // Media transfers use OkHttp directly; do not rely on Coil's transitive dependency.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     testImplementation("junit:junit:4.13.2")
