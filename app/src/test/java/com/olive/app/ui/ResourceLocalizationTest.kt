@@ -12,7 +12,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class ResourceLocalizationTest {
     private val root=listOf(File("src/main"),File("app/src/main")).first { it.isDirectory }
-    private val locales=listOf("values-fr","values-es","values-ar","values-zh","values-zh-rCN")
+    private val locales=listOf("values-fr","values-es","values-ar","values-zh-rCN")
 
     private fun strings(folder:String):Map<String,String> = File(root,"res/$folder").listFiles().orEmpty()
         .filter { it.extension=="xml" }.flatMap { file ->

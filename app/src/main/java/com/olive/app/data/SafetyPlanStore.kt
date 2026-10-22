@@ -22,10 +22,15 @@ internal class SafetyPlanStore(context:Context,localMode:Boolean) {
         vault.update { root ->
             val actor=root.child(actorUid)
             val old=actor.optJSONObject(ownerUid) ?: error("Plan has not been loaded")
-            updated=change(SafetyPlan.fromJson(old))
-            actor.put(ownerUid,checkNotNull(updated).toJson())
+            val next=change(SafetyPlan.fromJson(old))
+            updated=next
+            actor.put(ownerUid,next.toJson())
         }
         return checkNotNull(updated)
+    }
+    fun write(actorUid:String,ownerUid:String,value:SafetyPlan) {
+        require(value.ownerUid==ownerUid)
+        vault.update { root -> root.child(actorUid).put(ownerUid,value.toJson()) }
     }
     fun all(actorUid:String):List<SafetyPlan> {
         val actor=vault.read().optJSONObject(actorUid) ?: return emptyList()

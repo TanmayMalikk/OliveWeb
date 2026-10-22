@@ -9,7 +9,7 @@ internal val SAFETY_FIELD_KEYS=listOf("primary","backup").flatMap { plan -> SAFE
 
 internal data class SafetyField(val value:String,val revision:Long=0,val mutationId:String?=null,
     val conflictValue:String?=null,val conflictRevision:Long?=null) {
-    fun toJson()=JSONObject().put("value",value).put("revision",revision).put("mutationId",mutationId)
+    fun toJson():JSONObject=JSONObject().put("value",value).put("revision",revision).put("mutationId",mutationId)
         .put("conflictValue",conflictValue).put("conflictRevision",conflictRevision)
     companion object {
         fun fromJson(json:JSONObject)=SafetyField(json.getString("value"),json.optLong("revision"),
@@ -18,19 +18,23 @@ internal data class SafetyField(val value:String,val revision:Long=0,val mutatio
     }
 }
 internal data class SafetyPlan(val ownerUid:String,val ownerName:String,val fields:Map<String,SafetyField>,
-    val staffUid:String="",val staffName:String="",val consultationRequested:Boolean=false,val shareAction:String="") {
+    val staffUid:String="",val staffName:String="",val consultationRequested:Boolean=false,val shareAction:String="",
+    val safeContactUids:List<String> = emptyList(),val safeContactNames:Map<String,String> = emptyMap()) {
     val hasEdits get()=fields.values.any { it.mutationId!=null }
     val hasConflicts get()=fields.values.any { it.conflictRevision!=null }
     val pending get()=hasEdits || shareAction.isNotEmpty()
-    fun toJson()=JSONObject().put("ownerUid",ownerUid).put("ownerName",ownerName)
+    fun toJson():JSONObject=JSONObject().put("ownerUid",ownerUid).put("ownerName",ownerName)
         .put("fields",JSONObject().also { json -> fields.forEach { (key,field) -> json.put(key,field.toJson()) } })
         .put("staffUid",staffUid).put("staffName",staffName).put("consultationRequested",consultationRequested).put("shareAction",shareAction)
+        .put("safeContactUids",org.json.JSONArray(safeContactUids)).put("safeContactNames",JSONObject(safeContactNames))
     companion object {
         fun fromJson(json:JSONObject):SafetyPlan {
             val fields=json.getJSONObject("fields")
             return SafetyPlan(json.getString("ownerUid"),json.optString("ownerName"),SAFETY_FIELD_KEYS.mapNotNull { key ->
                 fields.optJSONObject(key)?.let { key to SafetyField.fromJson(it) }
-            }.toMap(),json.optString("staffUid"),json.optString("staffName"),json.optBoolean("consultationRequested"),json.optString("shareAction"))
+            }.toMap(),json.optString("staffUid"),json.optString("staffName"),json.optBoolean("consultationRequested"),json.optString("shareAction"),
+                json.optJSONArray("safeContactUids")?.let { array -> (0 until array.length()).map(array::getString) }.orEmpty(),
+                json.optJSONObject("safeContactNames")?.let { names -> names.keys().asSequence().associateWith(names::getString) }.orEmpty())
         }
     }
 }
@@ -49,7 +53,8 @@ internal fun mergeSafetyPlan(current:SafetyPlan,sent:SafetyPlan,remote:SafetyPla
             else -> local
         }
     }
-    return current.copy(fields=fields,staffUid=remote.staffUid,staffName=remote.staffName,consultationRequested=remote.consultationRequested)
+    return current.copy(fields=fields,staffUid=remote.staffUid,staffName=remote.staffName,consultationRequested=remote.consultationRequested,
+        safeContactUids=remote.safeContactUids,safeContactNames=remote.safeContactNames)
 }
 internal fun SafetyField.edit(value:String)=copy(value=value,mutationId=UUID.randomUUID().toString())
 // Upgrade only untouched local placeholders. User-cleared checklists, drafts and remote revisions remain intact.
@@ -64,3 +69,4 @@ internal fun safetyFieldsWithDefaults(existing:Map<String,SafetyField>,defaults:
     }
 }
 internal data class SafetyConsultation(val ownerUid:String,val ownerName:String)
+internal data class SharedSafetyPlan(val ownerUid:String,val ownerName:String,val updatedAt:Long=0)

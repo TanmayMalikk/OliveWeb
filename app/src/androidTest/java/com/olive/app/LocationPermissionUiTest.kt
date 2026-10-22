@@ -30,11 +30,13 @@ class LocationPermissionUiTest:OliveUiTestBase() {
     private fun shell(command:String) {
         ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
     }
-    @Test fun onboardingRequestsLocationAndHotlineCanRetryWithApproximatePermission() {
+    @Test fun onboardingRequestsAllFeaturePermissionsAndHotlineCanRetryWithApproximatePermission() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         automation.serviceInfo=automation.serviceInfo.apply { flags=flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS }
         // Run this regression after revoking location permission from the disposable emulator, before instrumentation starts.
         org.junit.Assume.assumeTrue(context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)
+        automation.revokeRuntimePermission(context.packageName,Manifest.permission.CAMERA)
+        automation.revokeRuntimePermission(context.packageName,Manifest.permission.RECORD_AUDIO)
         context.getSharedPreferences("olive_permissions",android.content.Context.MODE_PRIVATE).edit().clear().commit()
         waitFor("new_user")
         val session=ViewModelProvider(compose.activity)[SessionViewModel::class.java]
@@ -44,6 +46,9 @@ class LocationPermissionUiTest:OliveUiTestBase() {
             "English","","Edmonton",InputPolicy.triggerHash("moon garden"),address=DeliveryAddress(city="Edmonton"))) }
         chooseAppPin();fill("new_pin","123456");fill("confirm_pin","123456");click("pin_setup_submit")
         // Local test mode intentionally skips notifications; location follows the completed onboarding step directly.
+        permissionButton("/permission_deny_button")
+        // Camera and microphone follow immediately; denying either must still finish onboarding normally.
+        permissionButton("/permission_deny_button")
         permissionButton("/permission_deny_button")
         waitCover();assertTrue(session.configured)
         unlock();compose.runOnIdle { session.navigate(SafePage.Hotlines) };waitFor("hotline_use_device_location")

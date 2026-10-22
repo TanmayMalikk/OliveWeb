@@ -5,8 +5,9 @@ import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
 // Callable Functions verify current Auth roles and sharing on every read and write; no plaintext Firestore disk cache.
-internal class SafetyPlanRepository {
-    private val functions=FirebaseFunctions.getInstance("northamerica-northeast1")
+internal class SafetyPlanRepository(
+    private val functions:FirebaseFunctions=FirebaseFunctions.getInstance("northamerica-northeast1"),
+) {
     private suspend fun call(name:String,data:Map<String,Any> = emptyMap()):JSONObject {
         val result=functions.getHttpsCallable(name).call(data).await().data as? Map<*,*> ?: error("Invalid response")
         return JSONObject(result)
@@ -19,6 +20,14 @@ internal class SafetyPlanRepository {
         return SafetyPlan.fromJson(result.getJSONObject("plan"))
     }
     suspend fun consult(action:String)=SafetyPlan.fromJson(call("safetyPlanConsult",mapOf("action" to action)).getJSONObject("plan"))
+    suspend fun shareContacts(friends:List<Friend>)=SafetyPlan.fromJson(call("safetyPlanShareContacts",mapOf("contacts" to friends.map {
+        mapOf("uid" to it.uid,"friendshipId" to it.friendshipId,"name" to it.username)
+    })).getJSONObject("plan"))
+    suspend fun sharedWithMe():List<SharedSafetyPlan> {
+        val plans=call("safetyPlansSharedWithMe").getJSONArray("plans")
+        return (0 until plans.length()).map { index -> val row=plans.getJSONObject(index)
+            SharedSafetyPlan(row.getString("ownerUid"),row.optString("ownerName"),row.optLong("updatedAt")) }
+    }
     suspend fun consultations():Pair<Boolean,List<SafetyConsultation>> {
         val result=call("safetyPlanConsultations")
         val plans=result.getJSONArray("plans")

@@ -19,23 +19,17 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
             java.util.Base64.getEncoder().encodeToString(key.encoded)
         }
         val ref=firestore.collection("conversations").document(conversation.id)
-        val currentWrapped=ref.get().await().wrappedKey(currentUid)
-        if(currentWrapped!=null) return KeyManager.unwrapKey(currentWrapped)
         val selected=firestore.runTransaction { transaction ->
             val snapshot=transaction.get(ref)
-            snapshot.wrappedKey(currentUid) ?: run {
+            val savedKeys=snapshot.participantPublicKeys()
+            if(savedKeys==encodedPublicKeys) snapshot.wrappedKey(currentUid) ?: error("Secure conversation key unavailable.")
+            else {
                 transaction.update(ref,mapOf("roomKeys" to wrapped,"participantPublicKeys" to encodedPublicKeys,
                     "updatedAt" to FieldValue.serverTimestamp()))
                 wrapped.getValue(currentUid)
             }
         }.await()
-        return if(selected==wrapped[currentUid]) generated else KeyManager.unwrapKey(selected)
-    }
-
-    suspend fun loadRoomKey(conversationId:String,currentUid:String):SecretKey {
-        val snapshot=firestore.collection("conversations").document(conversationId).get().await()
-        val wrapped=snapshot.wrappedKey(currentUid) ?: error("Secure conversation key unavailable.")
-        return KeyManager.unwrapKey(wrapped)
+        return KeyManager.unwrapKey(selected)
     }
 
     suspend fun send(conversationId:String,sender:AccountIdentity,text:String,roomKey:SecretKey) {
@@ -66,7 +60,7 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
                         row.getString("ciphertext")!=null -> runCatching {
                             EncryptionUtils.decryptText(row.getString("ciphertext").orEmpty(),roomKey)
                         }.getOrDefault("")
-                        else -> row.getString("body").orEmpty()
+                        else -> ""
                     }
                     ChatMessage(row.id,sender,row.getString("senderUsername").orEmpty(),body,
                         row.getTimestamp("sentAt")?.toDate()?.time ?: row.getLong("clientSentAt") ?: 0L,deleted)
@@ -83,7 +77,7 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
             val savedMessage=transaction.get(messageRef)
             val savedConversation=transaction.get(conversation)
             check(savedMessage.getString("senderUid")==currentUid && savedMessage.getBoolean("deleted")!=true)
-            val updates=mutableMapOf<String,Any>("deleted" to true,"deletedAt" to FieldValue.serverTimestamp())
+            val updates=mutableMapOf("deleted" to true,"deletedAt" to FieldValue.serverTimestamp())
             if(savedMessage.contains("ciphertext")) updates["ciphertext"]="Message unsent" else updates["body"]="Message unsent"
             transaction.update(messageRef,updates)
             if(savedConversation.getString("lastMessageId")==message.id) transaction.update(conversation,mapOf(
@@ -94,4 +88,8 @@ class SecureChatRepository(private val firestore:FirebaseFirestore=FirebaseFires
     @Suppress("UNCHECKED_CAST")
     private fun com.google.firebase.firestore.DocumentSnapshot.wrappedKey(uid:String)=
         (get("roomKeys") as? Map<String,String>)?.get(uid)
+
+    @Suppress("UNCHECKED_CAST")
+    private fun com.google.firebase.firestore.DocumentSnapshot.participantPublicKeys()=
+        get("participantPublicKeys") as? Map<String,String>
 }

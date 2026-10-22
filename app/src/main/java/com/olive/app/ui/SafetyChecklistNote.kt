@@ -23,7 +23,7 @@ import java.util.UUID
 // Sections share one continuous note surface. Each heading and checkbox remains separately navigable with TalkBack.
 @Composable internal fun SafetyChecklistSection(plan:SafetyPlan,fieldKey:String,onEdit:(String,String)->Unit,
     onResolve:(String,Boolean)->Unit,contacts:List<SafeContact> = emptyList(),contactsEditable:Boolean=false,
-    onContactsChange:((List<SafeContact>)->Unit)?=null) {
+    onContactsChange:((List<SafeContact>)->Unit)?=null,editable:Boolean=true) {
     val field=plan.fields[fieldKey] ?: return
     val items=remember(field.value) { readSafetyChecklist(field.value) }
     val section=fieldKey.substringAfter('_')
@@ -46,12 +46,12 @@ import java.util.UUID
             Text(stringResource(R.string.safety_document_upload_hint),style=MaterialTheme.typography.bodySmall,color=Muted)
         }
         if(section!="contacts") items.forEachIndexed { index,item -> key(item.id) {
-            ChecklistRow(item,title,fieldKey,index,
+            ChecklistRow(item,title,fieldKey,index,editable,
                 onChecked={ checked -> update(items.map { if(it.id==item.id) it.copy(checked=checked) else it }) },
                 onText={ value -> update(items.map { if(it.id==item.id) it.copy(text=value) else it }) },
                 onRemove={update(items.filterNot { it.id==item.id })})
         } }
-        if(section!="contacts") {
+        if(section!="contacts" && editable) {
             val addDescription=stringResource(R.string.safety_add_to_section,title)
             TextButton(onClick={update(items+SafetyChecklistItem(UUID.randomUUID().toString(),""))},
                 modifier=Modifier.testTag("safety_add_$fieldKey").semantics { contentDescription=addDescription }) {
@@ -59,7 +59,7 @@ import java.util.UUID
             }
         }
         if(full) AccessibleMessage(stringResource(R.string.safety_checklist_full))
-        if(field.conflictRevision!=null) {
+        if(field.conflictRevision!=null && editable) {
             AccessibleMessage(stringResource(R.string.safety_conflict),modifier=Modifier.testTag("safety_conflict_$fieldKey"))
             Text(stringResource(R.string.safety_synced_version,safetyChecklistPreview(field.conflictValue.orEmpty())))
             FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -70,22 +70,22 @@ import java.util.UUID
     }
 }
 
-@Composable private fun ChecklistRow(item:SafetyChecklistItem,heading:String,sectionKey:String,index:Int,
+@Composable private fun ChecklistRow(item:SafetyChecklistItem,heading:String,sectionKey:String,index:Int,editable:Boolean,
     onChecked:(Boolean)->Unit,onText:(String)->Unit,onRemove:()->Unit) {
     val empty=stringResource(R.string.safety_empty_item)
     val name=item.text.ifBlank { empty }
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.Top) {
-        Checkbox(checked=item.checked,onCheckedChange=onChecked,
+        Checkbox(checked=item.checked,onCheckedChange=if(editable) onChecked else null,
             modifier=Modifier.testTag("safety_check_${sectionKey}_$index").semantics { contentDescription=name })
         Column(Modifier.weight(1f)) {
-            BasicTextField(value=item.text,onValueChange=onText,textStyle=MaterialTheme.typography.bodyLarge.copy(
+            BasicTextField(value=item.text,onValueChange=onText,readOnly=!editable,textStyle=MaterialTheme.typography.bodyLarge.copy(
                 color=if(item.checked) Muted else Ink,textDecoration=if(item.checked) TextDecoration.LineThrough else null),
                 cursorBrush=SolidColor(OliveGreen),keyboardOptions=KeyboardOptions(autoCorrectEnabled=false),
                 modifier=Modifier.fillMaxWidth().heightIn(min=48.dp).padding(vertical=12.dp)
                     .testTag(if(index==0) "safety_$sectionKey" else "safety_${sectionKey}_${item.id}")
                     .semantics { contentDescription=heading }.keepVisibleWhileTyping(),
                 decorationBox={ input -> Box { if(item.text.isEmpty()) Text(empty,color=Muted);input() } })
-            if(sectionKey.substringAfter('_')=="documents") {
+            if(sectionKey.substringAfter('_')=="documents" && editable) {
                 val uploadDescription=stringResource(R.string.safety_upload_for,name)
                 OutlinedButton(onClick={},enabled=false,contentPadding=PaddingValues(horizontal=12.dp,vertical=4.dp),
                     modifier=Modifier.testTag("safety_upload_${sectionKey}_$index").semantics { contentDescription=uploadDescription }) {
@@ -93,9 +93,11 @@ import java.util.UUID
                 }
             }
         }
-        val removeLabel=stringResource(R.string.safety_remove_item,name)
-        IconButton(onClick=onRemove,modifier=Modifier.testTag("safety_remove_${sectionKey}_$index")) {
-            Icon(Icons.Outlined.Close,removeLabel,Modifier.size(18.dp))
+        if(editable) {
+            val removeLabel=stringResource(R.string.safety_remove_item,name)
+            IconButton(onClick=onRemove,modifier=Modifier.testTag("safety_remove_${sectionKey}_$index")) {
+                Icon(Icons.Outlined.Close,removeLabel,Modifier.size(18.dp))
+            }
         }
     }
 }

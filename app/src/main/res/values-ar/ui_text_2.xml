@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="ui_quinoa">الكينوا</string>
     <string name="ui_cucumber">خيار</string>
     <string name="ui_tomato">طماطم</string>
@@ -136,7 +136,7 @@
     <string name="ui_fraction_decimal">الكسر / العشري</string>
     <string name="ui_1_25_or_7_4">1.25 أو 7/4</string>
     <string name="ui_mixed_improper_fraction">جزء مختلط / غير لائق</string>
-    <string name="ui_2_1_3_or_7_3">2 1/3 أو 7/3</string>
+    <string name="ui_2_1_3_or_7_3" tools:ignore="TypographyFractions">2 1/3 أو 7/3</string>
     <string name="ui_scientific_notation">التدوين العلمي</string>
     <string name="ui_1_2e5_or_1_2_10_5">1.2E5 أو 1.2×10^5</string>
     <string name="ui_numerical_derivative">مشتق عددي</string>

@@ -28,8 +28,12 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     val messagingRepository = if(localMode) null else MessagingRepository()
     val secureChatRepository = if(localMode) null else SecureChatRepository()
     val secureDocumentRepository = if(localMode) null else SecureDocumentRepository()
-    val messageReadState=application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
-    val cloudState=application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
+    val safetyDocumentRepository = if(localMode) null else SafetyDocumentRepository()
+    val locationSharingRepository = if(localMode) null else LocationSharingRepository(application)
+    val messageReadState:android.content.SharedPreferences=
+        application.getSharedPreferences("olive_message_read_state",android.content.Context.MODE_PRIVATE)
+    val cloudState:android.content.SharedPreferences=
+        application.getSharedPreferences("olive_cloud_state",android.content.Context.MODE_PRIVATE)
     var enrollment by mutableStateOf<DeviceEnrollment?>(null)
     var pendingIdentity: AccountIdentity? = null
     var pendingProfile: UserProfile? = null
@@ -41,6 +45,8 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     var conversationSubscription: ChatSubscription? = null
     var messageSubscription: ChatSubscription? = null
     var observedFriendshipIds=emptySet<String>()
+    var chatQuickExitHintShown=false
+    var verifiedMessagingIdentityMarker:String?=null
     var lastTouchAt=0L
     val historySyncMutex=Mutex()
     var activeTriggerId: String? = null
@@ -85,7 +91,7 @@ internal class SessionRuntime(val application:Application,val scope:CoroutineSco
     }
     val pendingMessageActionCount get()=state.incomingFriendRequests.size+unreadMessageCount
 
-    // User access requires verified app-PIN or Android authentication for this enrollment and epoch.
+    // User access requires a verified app PIN or Android authentication for this enrollment and epoch.
     private fun canEnterSafe():Boolean {
         val device=enrollment
         val requiresPin=device?.role==AccountRole.USER || state.accountRole==AccountRole.USER
