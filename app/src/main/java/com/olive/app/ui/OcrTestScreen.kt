@@ -57,7 +57,7 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                 }
             }
 
-            Text("Place your actual document image (e.g. test_doc.png or test_doc.jpg) into your project's assets/ folder, then click below to test.", style = MaterialTheme.typography.bodyMedium)
+            Text("Place your actual document image (test_doc.png) into your project's assets/ folder, then click below to test.", style = MaterialTheme.typography.bodyMedium)
 
             Button(
                 onClick = {
@@ -68,7 +68,7 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                     if (sampleBytes != null) {
                         runOcrOnBytes(sampleBytes)
                     } else {
-                        statusMessage = "Error: No test image found. Please add test_doc.png or test_doc.jpg to your assets/ folder."
+                        statusMessage = "Error: No test image found. Please add test_doc.png to your assets/ folder."
                     }
                 },
                 enabled = !isRunning,

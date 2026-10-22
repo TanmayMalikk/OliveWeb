@@ -63,7 +63,7 @@ class PaddleOcrManager(private val context: Context) {
         }
         return paddleOcr!!
     }
-    
+
     suspend fun recognizeDocument(imageBytes: ByteArray): OcrResult = withContext(Dispatchers.IO) {
         try {
             val ocr = ensureInitialized()
