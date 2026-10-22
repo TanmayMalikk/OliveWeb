@@ -57,24 +57,18 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                 }
             }
 
-            Text("Place your actual document image (e.g. test_doc.png or test_doc.jpg) into your project's assets/ or assets/models/ folder, then click below to test.", style = MaterialTheme.typography.bodyMedium)
+            Text("Place your actual document image (e.g. test_doc.png or test_doc.jpg) into your project's assets/ folder, then click below to test.", style = MaterialTheme.typography.bodyMedium)
 
             Button(
                 onClick = {
                     val sampleBytes = runCatching {
                         context.assets.open("models/test_doc.png").use { it.readBytes() }
-                    }.getOrNull() ?: runCatching {
-                        context.assets.open("test_doc.png").use { it.readBytes() }
-                    }.getOrNull() ?: runCatching {
-                        context.assets.open("models/test_doc.jpg").use { it.readBytes() }
-                    }.getOrNull() ?: runCatching {
-                        context.assets.open("test_doc.jpg").use { it.readBytes() }
                     }.getOrNull()
 
                     if (sampleBytes != null) {
                         runOcrOnBytes(sampleBytes)
                     } else {
-                        statusMessage = "Error: No test image found. Please add test_doc.png or test_doc.jpg to your assets/ or assets/models/ folder."
+                        statusMessage = "Error: No test image found. Please add test_doc.png or test_doc.jpg to your assets/ folder."
                     }
                 },
                 enabled = !isRunning,
