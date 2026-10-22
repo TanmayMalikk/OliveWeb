@@ -8,11 +8,14 @@ const require = createRequire(new URL("../functions/package.json", import.meta.u
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId:"demo-olive-rules",storageBucket:"demo-olive-rules.appspot.com"});
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8180";
 const {auth, db, bucket} = require("./src/firebase");
-const {safetyPlanSync, safetyPlanConsultations, safetyPlanAvailability} = require("./src/safetyPlans");
+const {safetyPlanSync, safetyPlanConsultations, safetyPlanAvailability, safetyPlanShareContacts,
+  safetyPlansSharedWithMe} = require("./src/safetyPlans");
 const {safetyPlanConsult} = require("./src/safetyConsultations");
 const users = new Map([
   ["plan-owner",{uid:"plan-owner",email:"owner@users.olive.invalid",displayName:"Owner"}],
+  ["plan-share-owner",{uid:"plan-share-owner",email:"share-owner@users.olive.invalid",displayName:"Sharing owner"}],
   ["plan-other",{uid:"plan-other",email:"other@users.olive.invalid"}],
+  ["plan-contact",{uid:"plan-contact",email:"contact@safe.olive.invalid",displayName:"Safe contact"}],
   ["plan-staff",{uid:"plan-staff",customClaims:{role:"STAFF"},displayName:"Staff"}],
   ["plan-staff2",{uid:"plan-staff2",customClaims:{role:"STAFF"},displayName:"Staff two"}],
   ["plan-forged",{uid:"plan-forged",email:"forged@users.olive.invalid",displayName:"Forged"}],
@@ -62,4 +65,18 @@ test("no available staff leaves a durable waiting request and repeated requests 
   await Promise.all([call(safetyPlanConsult,"plan-owner",{action:"request"}),call(safetyPlanConsult,"plan-owner",{action:"request"})]);
   assert.equal((await db.collection("safetyStaff").doc("plan-staff2").get()).data().activeCount,1);
   await call(safetyPlanConsult,"plan-owner",{action:"stop"});
+});
+test("owners can share a read-only plan with an accepted safe contact and revoke it", async () => {
+  const owner="plan-share-owner",contact="plan-contact",friendship="owner-contact-friendship";
+  await call(safetyPlanSync,owner,{ownerUid:owner,defaults:{primary_destination:"Safe place"},changes:[]});
+  await db.collection("friendLists").doc(owner).collection("friends").doc(friendship).set({friendUid:contact,friendUsername:"safe_contact"});
+  await call(safetyPlanShareContacts,owner,{contacts:[{uid:contact,friendshipId:friendship,name:"Safe contact"}]});
+  assert.equal((await call(safetyPlansSharedWithMe,contact)).plans[0].ownerUid,owner);
+  const shared=await call(safetyPlanSync,contact,{ownerUid:owner,changes:[]});
+  assert.equal(shared.plan.fields.primary_destination.value,"Safe place");
+  await assert.rejects(call(safetyPlanSync,contact,{ownerUid:owner,changes:[{
+    key:"primary_destination",value:"Unauthorized edit",revision:0,mutationId:"bad-edit"}]}));
+  await call(safetyPlanShareContacts,owner,{contacts:[]});
+  await assert.rejects(call(safetyPlanSync,contact,{ownerUid:owner,changes:[]}));
+  assert.equal((await call(safetyPlansSharedWithMe,contact)).plans.length,0);
 });

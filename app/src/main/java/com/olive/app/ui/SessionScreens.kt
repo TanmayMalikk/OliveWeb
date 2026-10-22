@@ -81,8 +81,10 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
     }
     CompositionLocalProvider(LocalAccessibilityFocusCoordinator provides accessibilityFocus) {
     val coverTitle=session.coverType.localizedTitle(uiText)
-    val showSupport=session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER
-    val showQuickExit=(showSupport && !(session.page==SafePage.Messages && session.activeConversation!=null)) ||
+    val inActiveChat=session.page==SafePage.Messages && session.activeConversation!=null
+    val safeUser=session.screen==SessionScreen.Safe && session.accountRole==AccountRole.USER
+    val showSupport=safeUser && !inActiveChat && session.page!=SafePage.Camera
+    val showQuickExit=(safeUser && !inActiveChat && session.page!=SafePage.Camera) ||
         (session.screen==SessionScreen.Pin && session.usesCover)
     var supportExpanded by remember(session.screen,session.page,session.coverAccountId) { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().then(if(isCover) Modifier else Modifier.imePadding())) {
@@ -117,6 +119,8 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                 Box(Modifier.fillMaxSize()) {
                 Scaffold(modifier=if(supportExpanded) Modifier.clearAndSetSemantics {} else Modifier,
                     bottomBar={ if(showQuickExit || showSupport) Spacer(Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp)) },
+                    contentWindowInsets=if(session.screen==SessionScreen.Safe && session.page==SafePage.Camera)
+                        WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets,
                 ) { padding ->
                     Box(Modifier.fillMaxSize().padding(padding)) {
                         AnimatedContent(targetState=session.screen,label="session screen",
@@ -132,7 +136,8 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
                                 SessionScreen.Safe -> when(session.page) {
                                     SafePage.Home -> uiText(R.string.home);SafePage.Notes -> uiText(R.string.ui_notes);SafePage.Messages -> uiText(R.string.messages)
                                     SafePage.Profile -> uiText(R.string.ui_profile);SafePage.Contacts -> uiText(R.string.ui_contacts);SafePage.Settings -> uiText(R.string.settings);SafePage.Activity -> uiText(R.string.ui_activity);SafePage.Hotlines -> uiText(R.string.support_hotlines);SafePage.SafetyPlan -> uiText(R.string.support_safety_plan);SafePage.Documents -> uiText(R.string.support_documents)
-                                    SafePage.OcrTest -> "PaddleOCR Test"
+                                    SafePage.OcrTest -> uiText(R.string.ocr_test_title)
+                                    SafePage.Camera -> uiText(R.string.camera_title);SafePage.Location -> uiText(R.string.location_map)
                                 }
                                 SessionScreen.Loading -> uiText(R.string.ui_loading)
                                 SessionScreen.Welcome -> uiText(R.string.welcome)
@@ -230,9 +235,8 @@ internal fun shouldComposeCover(configured:Boolean,usesCover:Boolean)=configured
         tag.contains("trigger",ignoreCase=true) -> uiText(R.string.a11y_trigger_word)
         else -> uiText(R.string.a11y_password)
     }
-    val accessibleError=error
     OutlinedTextField(value=value,onValueChange=onChange,label={Text(label)},
-        modifier=Modifier.fillMaxWidth().testTag(tag).semantics { if(accessibleError!=null) error(accessibleError) }.onFocusChanged { if(it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
+        modifier=Modifier.fillMaxWidth().testTag(tag).semantics { error?.let { error(it) } }.onFocusChanged { if(it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
         enabled=enabled,singleLine=!multiline,minLines=if(multiline) 3 else 1,isError=error!=null,
         supportingText=error?.let { message -> { AccessibleMessage(message,modifier=Modifier.testTag("${tag}_error"),color=MaterialTheme.colorScheme.error) } },
         visualTransformation=if(secret && !secretVisible) PasswordVisualTransformation() else VisualTransformation.None,

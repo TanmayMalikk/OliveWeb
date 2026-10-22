@@ -3,7 +3,7 @@ const {db} = require("./firebase");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");
-exports.safetyPlanConsult = onCall(async (request) => {
+exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   if (caller.role !== "USER" || !["request", "stop"].includes(request.data?.action)) throw new HttpsError("permission-denied", "Owner only.");
   const reference = planReference(caller.uid);

@@ -17,7 +17,8 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
                 if(uid !in conversation.participantIds) return
                 messageSubscription?.close();chatMessages=emptyList();activeConversation=conversation;message=null
                 conversationActions.markConversationRead(conversation)
-                chatQuickExitHintVisible=accountRole==AccountRole.USER
+                chatQuickExitHintVisible=accountRole==AccountRole.USER && !chatQuickExitHintShown
+                if(chatQuickExitHintVisible) chatQuickExitHintShown=true
                 val token=epoch
                 messagingBusy=true
                 scope.launch {
@@ -61,7 +62,7 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
                         if(epoch==token && activeConversation?.id==conversation.id) onSent()
                     }
                     catch(error: CancellationException) { throw error }
-                    catch(error: Exception) { if(epoch==token) message=runtime.application.getString(R.string.ui_unable_to_send_the_message) }
+                    catch(_: Exception) { if(epoch==token) message=runtime.application.getString(R.string.ui_unable_to_send_the_message) }
                     finally { if(epoch==token) messagingBusy=false }
                 }
             }
@@ -72,10 +73,10 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
         with(runtime) {
             with(state) {
                 val conversation=activeConversation ?: return
-                messaging.runMessagingAction("Unable to unsend this message.") { repository,device,_ ->
+                messaging.runMessagingAction("Unable to unsend this message.") { _,device,_ ->
                     secureSharing.revokeIfShared(chat,conversation,device.uid)
-                    secureChatRepository?.unsend(conversation.id,chat,device.uid)
-                        ?: repository.unsend(conversation.id,chat,device.uid)
+                    checkNotNull(secureChatRepository) { "Secure messaging unavailable" }
+                        .unsend(conversation.id,chat,device.uid)
                 }
             }
         }
@@ -89,13 +90,7 @@ internal class SessionConversations(private val runtime:SessionRuntime) {
         }
     }
 
-    fun readMessageKey(uid:String,conversationId:String): String {
-        with(runtime) {
-            with(state) {
-                return "read_message_${uid}_$conversationId"
-            }
-        }
-    }
+    fun readMessageKey(uid:String,conversationId:String)="read_message_${uid}_$conversationId"
 
     fun markConversationRead(conversation:ChatConversation) {
         with(runtime) {

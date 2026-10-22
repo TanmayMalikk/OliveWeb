@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="location_last_known">آخر موقع معروف</string>
+    <string name="powered_by_geoapify">بدعم من Geoapify</string>
+    <string name="location_map">خريطة الموقع</string>
+    <string name="location_map_user_help">اعرض موقعك الحالي والمواقع المحفوظة التي شاركها جهات اتصال الأمان. لا تبدأ المشاركة المباشرة إلا بعد اختيار جهات الاتصال أدناه.</string>
+    <string name="location_map_contact_help">اعرض المواقع المباشرة التي شاركها أصدقاؤك معك. تستخدم علامتك الموقع المحفوظ عند إنشاء الحساب.</string>
+    <string name="location_map_accessibility">خريطة تفاعلية. اسحب للتحريك، وقرّب بإصبعين للتكبير، أو اختر علامة لمعرفة اسمها.</string>
+    <string name="location_map_unavailable">تعذر تحميل الخريطة. تحقق من اتصالك وحاول مرة أخرى.</string>
+    <string name="location_zoom_in">تكبير</string>
+    <string name="location_zoom_out">تصغير</string>
+    <string name="recenter_map">إعادة توسيط الخريطة</string>
+    <string name="location_follow_user">إبقاء المستخدم في المنتصف</string>
+    <string name="location_stop_following">إيقاف متابعة المستخدم</string>
+    <string name="you">أنت</string>
+    <string name="your_saved_location">موقعك المحفوظ</string>
+    <string name="share_live_location_with">مشاركة الموقع المباشر مع</string>
+    <string name="location_contacts_selected">تم اختيار %1$d من 10 جهات اتصال</string>
+    <string name="location_no_friends">أضف صديقًا واقبل طلبه قبل مشاركة الموقع.</string>
+    <string name="start_sharing_location">بدء مشاركة الموقع المباشر</string>
+    <string name="stop_sharing_location">إيقاف المشاركة</string>
+    <string name="location_permission_required">يلزم إذن الموقع لعرض موقعك المباشر ومشاركته.</string>
+    <string name="location_start_failed">تعذر بدء مشاركة الموقع المباشر.</string>
+    <string name="location_firebase_required">تتوفر المشاركة المباشرة عند تسجيل الدخول إلى مشروع Firebase المُعد.</string>
+    <string name="share_saved_location">مشاركة الموقع المحفوظ</string>
+    <string name="share_saved_location_help">شارك الموقع المحفوظ عند إنشاء الحساب مع أصدقائك المقبولين. لا يتم تتبع جهازك باستمرار.</string>
+    <string name="location_saved_address_unavailable">تعذر وضع الموقع المحفوظ على الخريطة. اختر اقتراح عنوان في إعدادات الحساب وحاول مرة أخرى.</string>
+<string name="location_notification_channel">تحديثات التطبيق</string>
+    <string name="location_notification_title">جارٍ تحديث التطبيق…</string>
+    <string name="location_notification_text">يتم إبقاء التطبيق محدثًا.</string>
+    <string name="location_choose_duration">ما المدة التي تريد مشاركة موقعك خلالها؟</string>
+    <string name="location_one_hour">ساعة واحدة</string>
+    <plurals name="location_hours">
+        <item quantity="zero">%1$d ساعة</item>
+        <item quantity="one">%1$d ساعة</item>
+        <item quantity="two">%1$d ساعتان</item>
+        <item quantity="few">%1$d ساعات</item>
+        <item quantity="many">%1$d ساعة</item>
+        <item quantity="other">%1$d ساعة</item>
+    </plurals>
+    <string name="location_custom_hours">عدد ساعات مخصص</string>
+    <string name="location_custom_range">أدخل من ساعة واحدة إلى 72 ساعة.</string>
+    <string name="location_share_for_custom">مشاركة</string>
+    <string name="location_sharing_until">تتم المشاركة حتى %1$s</string>
+    <string name="location_ten_seconds_testing">10 ثوانٍ (للاختبار)</string>
+</resources>

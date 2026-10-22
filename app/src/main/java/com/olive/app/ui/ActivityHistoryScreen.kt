@@ -44,7 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
             Icon(Icons.Outlined.CalendarMonth,null);Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f),horizontalAlignment=Alignment.Start) {
                 Text(label,style=MaterialTheme.typography.labelMedium)
-                Text(display ?: uiText(R.string.not_selected),color=if(value==null) Muted else MaterialTheme.colorScheme.onSurface)
+                Text(display ?: uiText(R.string.olive_not_selected),color=if(value==null) Muted else MaterialTheme.colorScheme.onSurface)
             }
             Icon(Icons.Outlined.AccessTime,null)
         }
@@ -124,7 +124,7 @@ import androidx.compose.ui.text.font.FontWeight
             if(triggers.isEmpty()) item { Text(stringResource(R.string.no_trigger_activity_yet)) }
             items(visible(ActivityCategory.Triggers,triggers),key={it.id}) { event ->
                 Card(Modifier.fillMaxWidth().testTag("trigger_history_row")) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
-                    Text(event.source,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)
+                    Text(event.source,fontWeight=FontWeight.SemiBold)
                     Text(formatter.format(Instant.ofEpochMilli(event.timestamp)),style=MaterialTheme.typography.bodySmall,color=Muted)
                     if(event.pinAttempts>0) Text("${stringResource(R.string.pin_attempts)}: ${event.pinAttempts} · ${when(event.lastResult) { "Accepted" -> uiText(R.string.accepted); "Incorrect PIN" -> uiText(R.string.incorrect_pin); "No PIN attempt" -> uiText(R.string.no_pin_attempt); else -> event.lastResult }}")
                 } }

@@ -12,7 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.olive.app.R
 import com.olive.app.ocr.PaddleOcrManager
 import com.olive.app.ocr.OrientationPreprocessor
 import com.olive.app.ocr.OcrResult
@@ -96,13 +98,13 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("OCR & Orientation Test", style = MaterialTheme.typography.headlineMedium)
+                Text(stringResource(R.string.ocr_test_title), style = MaterialTheme.typography.headlineMedium)
                 TextButton(onClick = onBack) {
-                    Text("Back")
+                    Text(stringResource(R.string.back))
                 }
             }
 
-            Text("Preview how OrientationPreprocessor straightens test_doc.png before feeding it to PaddleOCR.", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.ocr_test_description), style = MaterialTheme.typography.bodyMedium)
 
             Button(
                 onClick = ::runOcrPipeline,
@@ -164,7 +166,7 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                 val res = ocrResult!!
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Raw OCR Text Output", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.ocr_raw_output), style = MaterialTheme.typography.titleMedium)
 
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -177,12 +179,12 @@ fun OcrTestScreen(session: SessionViewModel, onBack: () -> Unit = session::back)
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("Success: ${res.success}")
-                        Text("Confidence: ${(res.confidence * 100).toInt()}%")
+                        Text(stringResource(R.string.ocr_success,res.success))
+                        Text(stringResource(R.string.ocr_confidence,(res.confidence * 100).toInt()))
                         
                         if (res.detectedFields.isNotEmpty()) {
                             HorizontalDivider()
-                            Text("Parsed Fields:", style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.ocr_parsed_fields), style = MaterialTheme.typography.labelMedium)
                             res.detectedFields.forEach { (k, v) ->
                                 Text("• $k: $v", style = MaterialTheme.typography.bodySmall)
                             }

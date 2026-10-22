@@ -53,6 +53,9 @@ import com.olive.app.R
             // Closing options immediately leave the accessibility tree even while their visual exit finishes.
             Column(Modifier.then(if(expanded) Modifier else Modifier.clearAndSetSemantics {})
                 .verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                SupportAction(R.string.location_map,Icons.Outlined.LocationOn,"support_location",true,150) {
+                    if(expanded) { onExpanded(false);session.navigate(SafePage.Location) }
+                }
                 SupportAction(R.string.support_walkthrough,Icons.AutoMirrored.Outlined.MenuBook,"support_walkthrough",false,120) {}
                 SupportAction(R.string.support_staff_help,Icons.Outlined.SupportAgent,"support_staff_help",false,90) {}
                 SupportAction(R.string.support_emergency,Icons.Outlined.WarningAmber,"support_emergency",false,60) {}

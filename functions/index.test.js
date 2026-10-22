@@ -7,7 +7,8 @@ test("deployment keeps the existing callable endpoint names", () => {
   const endpoints = require("./index");
   const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount",
     "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
-    "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult"];
+    "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
+    "safetyPlanShareContacts", "safetyPlansSharedWithMe"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
 });

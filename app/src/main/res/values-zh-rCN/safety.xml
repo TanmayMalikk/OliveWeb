@@ -25,9 +25,7 @@
     <string name="safety_essentials">必需品和重要文件</string>
     <string name="safety_dependants">儿童、受抚养者和宠物</string>
     <string name="safety_aftercare">离开之后</string>
-    <string name="safety_documents_intro">在此保存照片、视频和文件图片。存储和上传功能即将推出；目前不会收集任何文件。</string>
-    <string name="safety_upload">上传文件</string>
-    <string name="safety_inbox">安全计划咨询</string>
+<string name="safety_inbox">安全计划咨询</string>
     <string name="safety_inbox_empty">目前没有与你共享的安全计划。</string>
     <string name="safety_available">可接受新的咨询</string>
     <string name="safety_staff_intro">查看和编辑与您共享的计划。</string>
@@ -37,8 +35,7 @@
     <string name="safety_source">规划参考：加拿大公共卫生局。请与可信的人一起调整这些提示。</string>
     <string name="safety_upload_document">上传文件</string>
     <string name="safety_upload_for">上传文件：%1$s。即将推出。</string>
-    <string name="safety_upload_soon">即将推出。从安全计划上传的文件也会显示在这里。</string>
-    <string name="safety_storage_photos">照片</string>
+<string name="safety_storage_photos">照片</string>
     <string name="safety_storage_videos">视频</string>
     <string name="safety_storage_documents">文件图片</string>
     <string name="safety_document_upload_hint">上传功能即将推出。上传的文件也会显示在“文件”中。</string>

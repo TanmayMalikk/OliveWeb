@@ -36,6 +36,7 @@ import java.util.UUID
     var editing by remember { mutableStateOf<String?>(null) }
     var name by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
+    var linkedUid by remember { mutableStateOf("") }
     FormColumn {
         IconButton(onClick=session::back,modifier=Modifier.testTag("trusted_contacts_back")) {
             Icon(Icons.AutoMirrored.Outlined.ArrowBack,stringResource(R.string.ui_previous_safe_page))
@@ -66,9 +67,15 @@ import java.util.UUID
                             .semantics { contentDescription=safeStayDescription })
                     }
                     Text(stringResource(R.string.safe_to_stay_description),style=MaterialTheme.typography.bodySmall,color=Muted)
+                    TrustedContactLinkPicker(session.friends,contact.linkedUid,
+                        profile.contacts.filterNot { it.id==contact.id }.mapNotNull { it.linkedUid.takeIf(String::isNotBlank) }.toSet(),
+                        !session.busy,"trusted_link_${contact.id}") { selectedUid ->
+                        session.saveContacts(profile.contacts.map { if(it.id==contact.id) it.copy(linkedUid=selectedUid) else it })
+                        if(editing==contact.id) linkedUid=selectedUid
+                    }
                     Row {
-                        TextButton(onClick={session.recordSettingsInteraction("Olive Branch","Opened contact editor");editing=contact.id; name=contact.name; details=contact.details},enabled=!session.busy) { Text(stringResource(R.string.edit)) }
-                        TextButton(onClick={session.recordSettingsInteraction("Olive Branch","Selected remove contact");session.saveContacts(profile.contacts.filterNot { it.id==contact.id }); if(editing==contact.id) {editing=null; name=""; details=""}},enabled=!session.busy) { Text(stringResource(R.string.remove)) }
+                        TextButton(onClick={session.recordSettingsInteraction("Olive Branch","Opened contact editor");editing=contact.id; name=contact.name; details=contact.details;linkedUid=contact.linkedUid},enabled=!session.busy) { Text(stringResource(R.string.edit)) }
+                        TextButton(onClick={session.recordSettingsInteraction("Olive Branch","Selected remove contact");session.saveContacts(profile.contacts.filterNot { it.id==contact.id }); if(editing==contact.id) {editing=null; name=""; details="";linkedUid=""}},enabled=!session.busy) { Text(stringResource(R.string.remove)) }
                     }
                 }
             }
@@ -77,18 +84,21 @@ import java.util.UUID
         Text(if(editing==null) uiText(R.string.add_a_contact) else uiText(R.string.edit_contact),style=MaterialTheme.typography.titleMedium)
         Field(uiText(R.string.contact_name),name,"contact_name",enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused contact name")}) { name=it.take(120) }
         Field(uiText(R.string.phone_or_email),details,"contact_details",enabled=!session.busy,onFocus={session.recordSettingsInteraction("Olive Branch","Focused contact details")}) { details=it.take(200) }
+        TrustedContactLinkPicker(session.friends,linkedUid,
+            profile.contacts.filterNot { it.id==editing }.mapNotNull { it.linkedUid.takeIf(String::isNotBlank) }.toSet(),
+            !session.busy,"contact_link_account") { linkedUid=it }
         Status(session)
         Button(onClick={
             if(name.isBlank() || details.isBlank()) session.error(uiText(R.string.enter_a_name_and_a_phone_number_or_email))
             else if(editing==null && profile.contacts.size>=25) session.error(uiText(R.string.you_can_save_up_to_25_contacts))
             else {
                 val contact=SafeContact(editing ?: UUID.randomUUID().toString(),name.trim(),details.trim(),
-                    profile.contacts.firstOrNull { it.id==editing }?.safeToStay ?: false)
+                    profile.contacts.firstOrNull { it.id==editing }?.safeToStay ?: false,linkedUid)
                 session.saveContacts(if(editing==null) profile.contacts+contact else profile.contacts.map { if(it.id==editing) contact else it })
-                editing=null; name=""; details=""
+                editing=null; name=""; details="";linkedUid=""
             }
         },enabled=!session.busy,modifier=Modifier.fillMaxWidth().testTag("save_contact")) { Text(stringResource(R.string.save_contact)) }
-        if(editing!=null) TextButton(onClick={editing=null; name=""; details=""}) { Text(stringResource(R.string.cancel_edit)) }
+        if(editing!=null) TextButton(onClick={editing=null; name=""; details="";linkedUid=""}) { Text(stringResource(R.string.cancel_edit)) }
     }
 }
 
@@ -142,6 +152,12 @@ import java.util.UUID
             Field(uiText(R.string.new_trigger_word_or_phrase),trigger,"settings_trigger",secret=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused trigger word")}) { trigger=it.take(64) }
             if(!session.usesDeviceLock) Field(uiText(R.string.current_pin),pin,"settings_pin",secret=true,numeric=true,onFocus={session.recordSettingsInteraction("Olive Branch","Focused trigger-change PIN")}) { pin=it.filter { c -> c in '0'..'9' }.take(6) }
             Button(onClick={if(session.usesDeviceLock) session.changeDeviceLockTrigger(trigger) else session.changeTrigger(trigger,pin);pin="";trigger=""},enabled=!session.busy,modifier=Modifier.testTag("change_trigger")) { Text(stringResource(R.string.change_trigger_word)) }
+        } else {
+            HorizontalDivider()
+            OutlinedButton(onClick=session::signOut,enabled=!session.busy,
+                modifier=Modifier.fillMaxWidth().testTag("sign_out")) {
+                Text(stringResource(R.string.sign_out_on_this_device))
+            }
         }
         Status(session)
     }
