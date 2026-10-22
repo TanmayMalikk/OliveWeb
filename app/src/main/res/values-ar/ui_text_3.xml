@@ -108,4 +108,6 @@
     <string name="ocr_success">Success: %1$b</string>
     <string name="ocr_confidence">Confidence: %1$d%%</string>
     <string name="ocr_parsed_fields">Parsed Fields:</string>
-    <string name="ocr_test_entry">Test PaddleOCR Document Checking</string></resources>
+    <string name="ocr_no_text">لم يتم التعرف على نص في المستند.</string>
+    <string name="ocr_error_detail">خطأ OCR: %1$s</string>
+</resources>

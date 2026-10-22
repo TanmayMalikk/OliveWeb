@@ -9,6 +9,7 @@ import com.olive.app.data.AccountIdentity
 import com.olive.app.data.SafetyDocument
 import com.olive.app.data.SafetyDocumentDataSource
 import com.olive.app.data.ChatSubscription
+import com.olive.app.data.DocumentOcrMetadata
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -60,11 +61,12 @@ internal class SafetyDocumentsController(
         checkNotNull(repository).upload(applicationContext,uri,identity)
     }
 
-    fun uploadCaptured(file:File,name:String,mimeType:String,identity:AccountIdentity,fallbackError:String,onComplete:()->Unit) =
+    fun uploadCaptured(file:File,name:String,mimeType:String,identity:AccountIdentity,fallbackError:String,
+        ocr:DocumentOcrMetadata?=null,onComplete:()->Unit) =
         run(refreshAfter=true,fallbackError=fallbackError,onComplete={ file.delete();onComplete() }) {
             val timeout=if(mimeType.startsWith("image/")) PHOTO_UPLOAD_TIMEOUT else VIDEO_UPLOAD_TIMEOUT
             checkNotNull(withTimeoutOrNull(timeout.milliseconds) {
-                checkNotNull(repository).uploadFile(file,name,mimeType,identity)
+                checkNotNull(repository).uploadFile(file,name,mimeType,identity,ocr)
             }) { fallbackError }
         }
 

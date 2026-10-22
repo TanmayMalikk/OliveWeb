@@ -22,6 +22,15 @@
     <string name="camera_title">Cámara privada</string>
     <string name="camera_photo">Foto</string>
     <string name="camera_video">Video</string>
+    <string name="camera_document">Documento</string>
+    <string name="camera_scan_document">Escanear documento</string>
+    <string name="camera_scanning_document">Escaneando documento…</string>
+    <string name="camera_ocr_complete">Escaneo completado</string>
+    <string name="camera_ocr_failed">No se pudo escanear el documento</string>
+    <string name="camera_ocr_confidence">Confianza del texto: %1$d%%</string>
+    <string name="camera_ocr_low_confidence">Parte del texto puede ser inexacto. Vuelve a tomar el documento o guárdalo de todos modos.</string>
+    <string name="camera_save_anyway">Guardar de todos modos</string>
+    <string name="camera_document_capture_failed">No se pudo capturar el documento.</string>
     <string name="camera_take_photo">Tomar foto</string>
     <string name="camera_start_recording">Iniciar grabación</string>
     <string name="camera_stop_recording">Detener grabación</string>
@@ -53,7 +62,7 @@
     <string name="documents_preview_unavailable">Vista previa no disponible</string>
     <string name="documents_preview_supported">Las imágenes, videos, PDF, archivos de texto y documentos Word .docx se abren de forma privada dentro de Olive Branch.</string>
     <string name="documents_choose_source">Elige qué subir</string>
-    <string name="documents_choose_source_help">Selecciona contenido multimedia o un documento. Olive Branch mantiene esta pantalla abierta mientras Android concede acceso privado a tu selección.</string>
+    <string name="documents_choose_source_help">Abre la cámara privada para tomar una foto, grabar un video o escanear un documento, o selecciona un archivo existente de tu dispositivo.</string>
     <string name="documents_choose_media">Foto o video</string>
     <string name="documents_choose_document">Documento PDF, de texto o Word</string>
     <string name="camera_flip">Cambiar entre cámara frontal y trasera</string>
