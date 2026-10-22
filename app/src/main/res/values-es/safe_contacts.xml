@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safe_to_stay">Lugar seguro para quedarse</string>
+    <string name="safe_to_stay_for">Lugar seguro para quedarse con %1$s</string>
+    <string name="safe_to_stay_description">Activa esta opción si esta persona de confianza aceptó que te quedes con ella.</string>
+    <string name="safety_selected_contacts">Seleccionados para este plan: %1$d</string>
+    <string name="safety_contact_picker_help">Elige entre tus contactos de confianza o agrega una persona nueva aquí.</string>
+    <string name="safety_include_contact">Incluir a %1$s en este plan de seguridad</string>
+    <string name="safety_save_and_select_contact">Guardar y seleccionar contacto</string>
+    <string name="safety_no_contacts_selected">No hay contactos de confianza seleccionados para este plan.</string>
+</resources>

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-test("both games and controls fit the available laptop and desktop viewport", async ({
+test("all games and controls fit the available laptop and desktop viewport", async ({
   page,
 }) => {
   for (const [width, height] of [
@@ -14,26 +14,34 @@ test("both games and controls fit the available laptop and desktop viewport", as
   ]) {
     await page.setViewportSize({ width, height });
     await page.goto("/");
-    for (const name of ["Nature Pairs", "Olive Flight"]) {
+    for (const name of ["Nature Pairs", "Olive Flight", "Olive Crossing"]) {
       await page.getByRole("button", { name, exact: true }).click();
       const layout = await page.evaluate(() => {
         const game = document
           .querySelector(".grove-game")!
           .getBoundingClientRect();
         const play = document
-          .querySelector(".flight-stage, .memory-grid")!
+          .querySelector(".flight-stage, .memory-grid, .crossing-stage")!
           .getBoundingClientRect();
         const controls = document
           .querySelector(".game-bottom")!
           .getBoundingClientRect();
         return {
-          fullWidth:
-            !document.querySelector(".flight-stage") ||
-            Math.abs(
-              play.width -
-                document.querySelector(".flight-arena")!.getBoundingClientRect()
-                  .width,
-            ) < 2,
+          fullWidth: document.querySelector(".flight-stage")
+            ? Math.abs(
+                play.width -
+                  document
+                    .querySelector(".flight-arena")!
+                    .getBoundingClientRect().width,
+              ) < 2
+            : document.querySelector(".crossing-stage")
+              ? Math.abs(
+                  play.width -
+                    document
+                      .querySelector(".crossing-arena")!
+                      .getBoundingClientRect().width,
+                ) < 2
+              : true,
           scrollHeight: document.documentElement.scrollHeight,
           scrollWidth: document.documentElement.scrollWidth,
           height: innerHeight,
@@ -65,6 +73,7 @@ test("both games and controls fit the available laptop and desktop viewport", as
       });
   }
   // Resize the current game without reloading or losing the selected game.
+  await page.getByRole("button", { name: "Olive Flight", exact: true }).click();
   await page.setViewportSize({ width: 1440, height: 640 });
   await expect(
     page.getByRole("button", { name: "Start Olive Flight" }),

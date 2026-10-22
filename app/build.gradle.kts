@@ -4,6 +4,11 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+tasks.named("check") {
+    dependsOn(rootProject.tasks.named("checkSourceSize"))
+    dependsOn(rootProject.tasks.named("checkArchitecture"))
+}
 val firebaseConfigured = file("google-services.json").exists() && providers.gradleProperty("oliveLocalTest").orNull != "true"
 if (firebaseConfigured) pluginManager.apply("com.google.gms.google-services")
 // Optional separate output directory for checks while Android Studio indexes the default build.
@@ -12,14 +17,18 @@ val localProperties = Properties().apply {
     val source = rootProject.file("local.properties")
     if (source.exists()) source.inputStream().use { load(it) }
 }
-val placesApiKey = localProperties.getProperty("PLACES_API_KEY").orEmpty()
-require(placesApiKey.matches(Regex("[A-Za-z0-9_-]*"))) { "PLACES_API_KEY contains unsupported characters" }
+val geoapifyApiKey = localProperties.getProperty("GEOAPIFY_API_KEY").orEmpty()
+require(geoapifyApiKey.matches(Regex("[A-Za-z0-9_-]*"))) { "GEOAPIFY_API_KEY contains unsupported characters" }
+val realtimeDatabaseUrl = localProperties.getProperty("REALTIME_DATABASE_URL").orEmpty()
+require(realtimeDatabaseUrl.isBlank() || realtimeDatabaseUrl.startsWith("https://")) { "REALTIME_DATABASE_URL must use HTTPS" }
 val releaseProperties = Properties().apply {
     val source = rootProject.file("keystore.properties")
     if (source.exists()) source.inputStream().use { load(it) }
 }
 val releaseKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
 val releaseSigningReady = releaseKeys.all { !releaseProperties.getProperty(it).isNullOrBlank() }
+val automatedVersionCode = providers.environmentVariable("OLIVE_VERSION_CODE").orNull?.toIntOrNull()
+val automatedVersionName = providers.environmentVariable("OLIVE_VERSION_NAME").orNull
 
 android {
     lint {
@@ -27,9 +36,9 @@ android {
         disable += "TypographyEllipsis" // Three periods are an intentional visual text choice.
         disable += "LockedOrientationActivity" // Olive intentionally uses a phone-first portrait layout.
     }
-    @Suppress("UnstableApiUsage") // Hide the experimental API warning; this setting includes all languages so users can switch languages in the app.
+    @Suppress("UnstableApiUsage") // AGP marks the language-split API as experimental; disabling splits keeps all translations installed.
     bundle {
-        // Every supported locale ships with the base APK because users can change language inside Olive.
+        // Include every bundled locale in the base APK so translations do not require a separate language download.
         language { enableSplit = false }
     }
     signingConfigs {
@@ -52,10 +61,11 @@ android {
         applicationId = "com.olive.app"
         minSdk = 28
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = automatedVersionCode ?: 2
+        versionName = automatedVersionName ?: "0.2.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
-        buildConfigField("String", "PLACES_API_KEY", "\"$placesApiKey\"")
+        buildConfigField("String", "GEOAPIFY_API_KEY", "\"$geoapifyApiKey\"")
+        buildConfigField("String", "REALTIME_DATABASE_URL", "\"$realtimeDatabaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -64,32 +74,46 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+val cameraxVersion = "1.6.2"
+
 dependencies {
+    implementation("androidx.camera:camera-core:${cameraxVersion}")
+    implementation("androidx.camera:camera-camera2:${cameraxVersion}")
+    implementation("androidx.camera:camera-lifecycle:${cameraxVersion}")
+    implementation("androidx.camera:camera-view:${cameraxVersion}")
+    implementation("androidx.camera:camera-video:${cameraxVersion}")
+    implementation("androidx.camera:camera-extensions:${cameraxVersion}")
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     // App and instrumented tests both need the same Compose version constraints.
     listOf("implementation", "androidTestImplementation").forEach { configuration ->
         add(configuration, platform("androidx.compose:compose-bom:2026.09.00"))
     }
     implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
-    implementation(platform("com.google.firebase:firebase-bom:35.0.0"))
+    implementation(platform("com.google.firebase:firebase-bom:35.0.2"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-functions")
-    implementation("com.google.android.libraries.places:places:6.0.2")
+    implementation("com.google.firebase:firebase-database")
+    implementation("com.google.firebase:firebase-appcheck-playintegrity")
+    implementation("com.google.android.gms:play-services-location:21.4.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
     implementation("org.apache.commons:commons-math3:3.6.1")
     implementation("org.jsoup:jsoup:1.23.2")
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
+    testImplementation("org.robolectric:robolectric:4.17")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")

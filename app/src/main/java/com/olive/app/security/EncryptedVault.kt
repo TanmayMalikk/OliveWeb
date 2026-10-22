@@ -15,6 +15,8 @@ import javax.crypto.spec.GCMParameterSpec
 // The phone's private stash: one atomic AES-encrypted file backed by Android Keystore.
 class EncryptedVault(context: Context, mode: String) {
     private val file = AtomicFile(File(context.noBackupFilesDir, "olive-$mode.vault"))
+    // Foreground editors and background workers use separate instances of the same file.
+    private val fileLock=locks.computeIfAbsent(file.baseFile.absolutePath) { Any() }
     private val alias = "olive.vault.$mode.v1"
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
@@ -26,7 +28,8 @@ class EncryptedVault(context: Context, mode: String) {
             generateKey()
         }
     }
-    @Synchronized fun read(): JSONObject {
+    fun read():JSONObject = synchronized(fileLock) { readUnlocked() }
+    private fun readUnlocked(): JSONObject {
         if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) return JSONObject()
         val bytes = file.openRead().use { it.readBytes() }
         require(bytes.size > 29 && bytes[0] == 1.toByte()) { "Unsupported encrypted store" }
@@ -35,8 +38,8 @@ class EncryptedVault(context: Context, mode: String) {
         val plain = cipher.doFinal(bytes.copyOfRange(13,bytes.size))
         return try { JSONObject(String(plain, Charsets.UTF_8)) } finally { plain.fill(0) }
     }
-    @Synchronized fun update(change: (JSONObject) -> Unit) {
-        val root = read()
+    fun update(change: (JSONObject) -> Unit) = synchronized(fileLock) {
+        val root = readUnlocked()
         change(root)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key())
@@ -46,6 +49,7 @@ class EncryptedVault(context: Context, mode: String) {
         try { stream.write(bytes); file.finishWrite(stream) }
         catch (e: Exception) { file.failWrite(stream); throw e }
     }
+    private companion object { val locks=java.util.concurrent.ConcurrentHashMap<String,Any>() }
 }
 
 fun JSONObject.child(name: String): JSONObject = optJSONObject(name) ?: JSONObject().also { put(name,it) }

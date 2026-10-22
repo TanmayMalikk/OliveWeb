@@ -1,13 +1,12 @@
 package com.olive.app
 
 import android.view.View
-import android.view.InputDevice
+import androidx.activity.compose.setContent
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,11 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.action.GeneralClickAction
-import androidx.test.espresso.action.Press
-import androidx.test.espresso.action.Tap
-import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import com.olive.app.data.NewsArticle
 import com.olive.app.ui.OliveTheme
 import com.olive.app.ui.covers.news.NewsArticleReader
@@ -31,7 +25,6 @@ import com.olive.app.data.NewsMetadataRepository
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import android.util.Base64
-import androidx.compose.ui.semantics.SemanticsProperties
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -62,6 +55,14 @@ class NewsReaderUiTest:OliveUiTestBase() {
             }
         }
         waitFor("news_article_card")
+        // Story details form one navigation target; the bookmark keeps its own action.
+        compose.onNodeWithTag("news_article_card")
+            .assertTextContains(article.title).assertTextContains(article.summary)
+            .assertTextContains("Test Gazette").assertTextContains("Environment").assertHasClickAction()
+        compose.onNodeWithContentDescription("Save article").performClick()
+        assertTrue(saved.value)
+        assertTrue(!opened.value)
+        compose.onNodeWithContentDescription("Remove bookmark").performClick()
         compose.onNodeWithTag("news_article_topic",useUnmergedTree=true).onChildren().assertAny(hasText("Environment"))
         compose.onNodeWithTag("news_article_paywall",useUnmergedTree=true).assertDoesNotExist()
         if(InstrumentationRegistry.getArguments().getString("captureNewsCard")=="true") {
@@ -121,11 +122,10 @@ class NewsReaderUiTest:OliveUiTestBase() {
         compose.waitUntil(5_000) { linkPosition.get().contains('|') }
         val position=linkPosition.get().trim('"').split('|').map(String::toFloat)
         // A real tap creates a history entry; script-only redirects can be skipped by Chromium.
-        onView(isAssignableFrom(WebView::class.java)).perform(GeneralClickAction(Tap.SINGLE,{ view ->
-            val location=IntArray(2);view.getLocationOnScreen(location)
-            val density=view.resources.displayMetrics.density
-            floatArrayOf(location[0]+position[0]*density,location[1]+position[1]*density)
-        },Press.FINGER,InputDevice.SOURCE_TOUCHSCREEN,0))
+        val location=IntArray(2)
+        instrumentation.runOnMainSync { browser.getLocationOnScreen(location) }
+        val density=browser.resources.displayMetrics.density
+        tapOnScreen(location[0]+position[0]*density,location[1]+position[1]*density)
         waitForBody("Related story final paragraph","/next")
         compose.waitForIdle()
         compose.onNodeWithTag("news_reader_host").assertTextEquals("publisher.example")
@@ -179,9 +179,7 @@ class NewsReaderUiTest:OliveUiTestBase() {
                 }
             }
             compose.waitUntil(30_000) {
-                compose.onAllNodesWithTag("news_article_image",useUnmergedTree=true).fetchSemanticsNodes().any {
-                    it.config.getOrElse(SemanticsProperties.StateDescription) { "" }=="Article photo loaded"
-                }
+                compose.onAllNodesWithTag("news_article_image",useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()
             }
             val preview=File(instrumentation.targetContext.getExternalFilesDir("reader-preview"),"live-news-card.png")
             val bitmap=compose.onNodeWithTag("news_article_card").captureToImage().asAndroidBitmap()
@@ -202,6 +200,7 @@ class NewsReaderUiTest:OliveUiTestBase() {
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("news_article_paywall",useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("news_article_topic",useUnmergedTree=true).onChildren().assertAny(hasText("Politics"))
         compose.onNodeWithTag("news_article_paywall",useUnmergedTree=true).onChildren().assertAny(hasText("Paywall"))
+        compose.onNodeWithTag("news_article_card").assertTextContains("Politics").assertTextContains("Paywall")
     }
 
     private fun findBrowser(view:View):WebView? {

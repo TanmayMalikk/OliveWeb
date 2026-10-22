@@ -13,13 +13,14 @@ import { Button } from "../components";
 import { readCover, writeCover } from "../services/cover-storage";
 import { useSession } from "../session";
 import OliveFlight from "./OliveFlight";
+import OliveCrossing from "./OliveCrossing";
 import { createMemoryBoard } from "./memory-board";
 const symbols = [Leaf, Flower2, Sun, Cloud, Moon, TreePine];
 export default function Game({ landing = false }: { landing?: boolean }) {
   const session = useSession();
   const entryTaps = useRef<number[]>([]);
   const Content = landing ? "main" : "div";
-  const [game, setGame] = useState<"pairs" | "flight">("pairs");
+  const [game, setGame] = useState<"pairs" | "flight" | "crossing">("pairs");
   const [size, setSize] = useState(5);
   const pairCount = Math.floor((size * size) / 2);
   const [cards, setCards] = useState(() => createMemoryBoard(5));
@@ -109,7 +110,9 @@ export default function Game({ landing = false }: { landing?: boolean }) {
           <span className="eyebrow">
             {game === "pairs"
               ? "TAKE A BREATH. FIND A PAIR."
-              : "SPREAD YOUR LEAVES. TAKE FLIGHT."}
+              : game === "flight"
+                ? "SPREAD YOUR LEAVES. TAKE FLIGHT."
+                : "ONE BRAVE OLIVE. ONE BUSY ROAD."}
           </span>
           <h1>
             A little less rush.
@@ -123,11 +126,17 @@ export default function Game({ landing = false }: { landing?: boolean }) {
                 <br />
                 Turn over two cards and find what belongs together.
               </>
-            ) : (
+            ) : game === "flight" ? (
               <>
                 One little olive. A whole grove to explore.
                 <br />
                 Find your rhythm and flutter between the branches.
+              </>
+            ) : (
+              <>
+                Help a little olive cross the busy grove paths.
+                <br />
+                Keep moving, watch the carts, and see how far you get.
               </>
             )}
           </p>
@@ -143,6 +152,12 @@ export default function Game({ landing = false }: { landing?: boolean }) {
               onClick={() => setGame("flight")}
             >
               Olive Flight
+            </button>
+            <button
+              aria-pressed={game === "crossing"}
+              onClick={() => setGame("crossing")}
+            >
+              Olive Crossing
             </button>
           </div>
           {game === "pairs" && (
@@ -172,6 +187,8 @@ export default function Game({ landing = false }: { landing?: boolean }) {
         </div>
         {game === "flight" ? (
           <OliveFlight />
+        ) : game === "crossing" ? (
+          <OliveCrossing />
         ) : (
           <section className="grove-game" aria-label="Nature pairs memory game">
             <div className="game-score">

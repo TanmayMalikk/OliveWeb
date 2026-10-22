@@ -5,6 +5,7 @@ export type Page =
   | "Home"
   | "Notes"
   | "Messages"
+  | "SafetyPlan"
   | "Contacts"
   | "Profile"
   | "Settings"

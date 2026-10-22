@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="entry_restore_lock">This phone has no screen lock and no backup app PIN is configured. Restore the phone screen lock to use device authentication.</string>
+    <string name="entry_set_pin_first">Set up an app PIN below before choosing it as your entry method.</string>
+    <string name="entry_settings_saved">Safe entry settings saved.</string>
+    <string name="entry_current_method">Preferred method: %1$s</string>
+    <string name="entry_backup_description">You can keep both methods configured. When device lock is selected, the app PIN is available only if the phone screen lock is removed. Cancelling or failing Android authentication does not enable PIN fallback.</string>
+    <string name="entry_use_device">Set up and use device lock</string>
+    <string name="entry_use_pin">Use saved app PIN</string>
+    <string name="entry_pin_setup">Set up or update app PIN</string>
+    <string name="entry_save_backup">Save backup PIN</string>
+    <string name="entry_save_use_pin">Save and use app PIN</string>
+    <string name="entry_confirm_settings">Confirm your identity with Android to change your safe entry settings.</string>
+    <string name="entry_settings_cancelled">Authentication cancelled. Your safe entry settings were not changed.</string>
+    <string name="entry_settings_failed">Unable to complete this change. Check the selected entry method and try again.</string>
+</resources>

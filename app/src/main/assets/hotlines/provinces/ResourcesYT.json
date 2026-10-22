@@ -1,0 +1,23 @@
+{
+  "Whitehorse": {
+    "Hotlines": {
+      "Yukon Women's Transition Home Crisis Line": {
+        "Desc": "Confidential 24/7 crisis line and safe emergency shelter for women and children fleeing domestic violence in Yukon.",
+        "Phone": "1-800-661-0408",
+        "url": "https://ywth.ca/"
+      },
+      "Yukon Distress and Crisis Line": {
+        "Desc": "24/7 crisis support line for individuals in distress across Yukon territory.",
+        "Phone": "1-844-533-3030",
+        "url": "https://yukondistressline.ca/"
+      }
+    },
+    "Shelters": {
+      "Yukon Women's Transition Home": {
+        "Desc": "Emergency transition home offering safe shelter, basic needs, and crisis intervention.",
+        "Phone": "1-800-661-0408",
+        "url": "https://ywth.ca/"
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="safe_to_stay">Safe to stay</string>
+    <string name="safe_to_stay_for">Safe to stay with %1$s</string>
+    <string name="safe_to_stay_description">Turn this on if this trusted person has agreed that you can stay with them.</string>
+    <string name="safety_selected_contacts">Selected for this plan: %1$d</string>
+    <string name="safety_contact_picker_help">Choose from your trusted contacts. You can also add someone new here.</string>
+    <string name="safety_include_contact">Include %1$s in this safety plan</string>
+    <string name="safety_save_and_select_contact">Save and select contact</string>
+    <string name="safety_no_contacts_selected">No trusted contacts are selected for this plan.</string>
+</resources>

@@ -83,7 +83,11 @@ The web adapter preserves mobile contracts:
 - Profiles: Storage `accounts/{uid}/profile.json`, with the same profile fields.
 - History: Storage `accounts/{uid}/history/{settings,triggers,checkouts,private_entries}/{id}.json`.
 - Messages/friends: existing Firestore directory, request, friendship, friend-list,
-  conversation, and message collections. Firestore disk persistence is disabled.
+  conversation, and message collections. Message bodies use the same RSA-wrapped
+  AES-GCM room-key format as Android; Firestore disk persistence is disabled.
+- Safety plans: the user, safe-contact, and staff web views call the same
+  `safetyPlan*` callable Functions as Android, including field revisions,
+  consultation assignment, shared read access, and staff availability.
 - Organization actions: existing callable Functions in `northamerica-northeast1`;
   admin authorization stays on the server.
 - Web-only entry registry: Firestore `webEntryLinks/{uid}` stores a SHA-256 token
@@ -103,8 +107,20 @@ The existing rule-test emulator uses Firestore 8180 separately.
 
 ## Android APK / QR
 
-A QR is shown only when a real APK exists **and** a phone-reachable origin is set.
-An unavailable download is displayed honestly; no fake QR or placeholder APK is served.
+The production download build reads `VITE_ANDROID_DOWNLOAD_URL` from
+`.env.download`. It points to the stable Firebase Storage object
+`public/android/olive-branch.apk`, so the QR and download button always resolve
+to the currently published APK.
+
+`.github/workflows/publish-android-main.yml` runs after every push to `main`. It
+builds a signed APK with an increasing version code, deploys the Storage rule,
+and replaces that object. The QR value can remain stable while its download is
+updated automatically. Configure the repository secrets listed in
+`docs/DISTRIBUTION.md` before enabling the workflow.
+
+Local development still supports an APK from disk. A QR is shown only when a
+real APK exists **and** a phone-reachable origin is set; unavailable local
+downloads never receive a fake QR.
 
 ```powershell
 $env:ANDROID_APK_PATH = 'C:\absolute\path\to\signed-release.apk'
@@ -118,13 +134,13 @@ parameters cannot select local files. This checkout's ignored `.env.local` uses
 the existing `app/build/outputs/apk/debug/app-debug.apk`, explicitly approved for
 local university testing, and labels it as a development build. Both server entry
 points read `.env.local`; existing process environment variables take precedence.
-Use a properly signed release APK before public distribution. There is no release
-keystore configured in this checkout.
+Use a properly signed release APK before public distribution. Release credentials
+are supplied to CI through GitHub secrets and are never committed.
 Phone downloads cannot use the computer's localhost address. LAN HTTP can deliver
 an APK, but the web account/PWA needs trusted HTTPS on a phone for Web Crypto.
-The current QR points to `http://10.60.110.161:5173/download/android`; both devices must
-be on the same reachable network. Update `PUBLIC_ORIGIN` if the computer's address
-changes. Windows firewall settings have not been changed.
+For a LAN preview, both devices must be on the same reachable network. Update
+`PUBLIC_ORIGIN` if the computer's address changes. Windows firewall settings are
+not changed by the app.
 
 ## PWA and responsive UI
 

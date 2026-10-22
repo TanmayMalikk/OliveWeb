@@ -14,10 +14,12 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { firebase } from "./accounts";
+import { database } from "./local";
 import type { Identity } from "../domain";
 export interface DirectoryUser {
   uid: string;
   username: string;
+  publicKey: string;
 }
 export interface Friend {
   friendshipId: string;
@@ -37,17 +39,83 @@ export interface Message {
   senderUid: string;
   senderUsername: string;
   body: string;
+  ciphertext?: string;
   deleted: boolean;
   clientSentAt: number;
 }
 export const pairId = (a: string, b: string) => [a, b].sort().join("--");
+const bytesToBase64 = (value: ArrayBuffer | Uint8Array) => {
+  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+  let binary = "";
+  bytes.forEach((byte) => (binary += String.fromCharCode(byte)));
+  return btoa(binary);
+};
+const base64ToBytes = (value: string) =>
+  Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+async function messagingKeys(uid: string): Promise<CryptoKeyPair> {
+  const db = await database;
+  const id = `message-keys:${uid}`;
+  const saved = await db.get("device", id);
+  if (saved?.publicKey && saved?.privateKey) return saved as CryptoKeyPair;
+  const pair = (await crypto.subtle.generateKey(
+    {
+      name: "RSA-OAEP",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    false,
+    ["encrypt", "decrypt"],
+  )) as CryptoKeyPair;
+  await db.put("device", pair, id);
+  return pair;
+}
+async function encodedPublicKey(uid: string) {
+  const pair = await messagingKeys(uid);
+  return bytesToBase64(await crypto.subtle.exportKey("spki", pair.publicKey));
+}
+async function importPublicKey(value: string) {
+  return crypto.subtle.importKey(
+    "spki",
+    base64ToBytes(value),
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["encrypt"],
+  );
+}
+async function wrapRoomKey(raw: Uint8Array, publicKey: string) {
+  return bytesToBase64(
+    await crypto.subtle.encrypt(
+      { name: "RSA-OAEP" },
+      await importPublicKey(publicKey),
+      raw.buffer.slice(
+        raw.byteOffset,
+        raw.byteOffset + raw.byteLength,
+      ) as ArrayBuffer,
+    ),
+  );
+}
+async function unwrapRoomKey(uid: string, value: string) {
+  const pair = await messagingKeys(uid);
+  const raw = await crypto.subtle.decrypt(
+    { name: "RSA-OAEP" },
+    pair.privateKey,
+    base64ToBytes(value),
+  );
+  return crypto.subtle.importKey("raw", raw, "AES-GCM", false, [
+    "encrypt",
+    "decrypt",
+  ]);
+}
 export async function register(identity: Identity) {
   const { db } = await firebase();
+  const publicKey = await encodedPublicKey(identity.uid);
   await setDoc(
     doc(db, "messageDirectory", identity.username.toLowerCase()),
     {
       uid: identity.uid,
       username: identity.username.toLowerCase(),
+      publicKey,
       updatedAt: serverTimestamp(),
     },
     { merge: true },
@@ -162,6 +230,7 @@ export async function dismissRequest(request: Request) {
 }
 export async function subscribeMessages(
   id: string,
+  roomKey: CryptoKey,
   callback: (messages: Message[]) => void,
   onError: (error: Error) => void,
 ) {
@@ -172,28 +241,114 @@ export async function subscribeMessages(
       orderBy("sentAt"),
       limitToLast(250),
     ),
-    (s) => callback(s.docs.map((d) => ({ ...d.data(), id: d.id }) as Message)),
+    async (snapshot) => {
+      const messages = await Promise.all(
+        snapshot.docs.map(async (row) => {
+          const value = row.data() as Omit<Message, "id" | "body">;
+          let body = "";
+          if (!value.deleted && value.ciphertext) {
+            try {
+              const combined = base64ToBytes(value.ciphertext);
+              const plain = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: combined.slice(0, 12) },
+                roomKey,
+                combined.slice(12),
+              );
+              body = new TextDecoder().decode(plain);
+            } catch {
+              body = "Unable to decrypt this message on this device.";
+            }
+          }
+          return { ...value, id: row.id, body } as Message;
+        }),
+      );
+      callback(messages);
+    },
     onError,
   );
 }
-export async function sendMessage(id: string, current: Identity, text: string) {
+export async function roomKey(id: string, current: Identity, peer: Friend) {
+  const { db } = await firebase();
+  const [own, other] = await Promise.all([
+    getDoc(doc(db, "messageDirectory", current.username.toLowerCase())),
+    getDoc(doc(db, "messageDirectory", peer.friendUsername.toLowerCase())),
+  ]);
+  const publicKeys: Record<string, string> = {
+    [current.uid]: String(own.data()?.publicKey ?? ""),
+    [peer.friendUid]: String(other.data()?.publicKey ?? ""),
+  };
+  if (Object.values(publicKeys).some((key) => !key))
+    throw new Error(
+      "Both people must open the updated app before secure messages can be sent.",
+    );
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  const wrapped = Object.fromEntries(
+    await Promise.all(
+      Object.entries(publicKeys).map(async ([uid, key]) => [
+        uid,
+        await wrapRoomKey(raw, key),
+      ]),
+    ),
+  );
+  const conversation = doc(db, "conversations", id);
+  const selected = await runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(conversation);
+    if (!snapshot.exists())
+      throw new Error("This conversation is no longer available.");
+    const savedKeys = snapshot.data().participantPublicKeys as
+      Record<string, string> | undefined;
+    const roomKeys = snapshot.data().roomKeys as
+      Record<string, string> | undefined;
+    if (
+      savedKeys &&
+      roomKeys?.[current.uid] &&
+      Object.entries(publicKeys).every(([uid, key]) => savedKeys[uid] === key)
+    )
+      return roomKeys[current.uid];
+    transaction.update(conversation, {
+      roomKeys: wrapped,
+      participantPublicKeys: publicKeys,
+      updatedAt: serverTimestamp(),
+    });
+    return wrapped[current.uid];
+  });
+  raw.fill(0);
+  return unwrapRoomKey(current.uid, selected);
+}
+export async function sendMessage(
+  id: string,
+  current: Identity,
+  text: string,
+  key: CryptoKey,
+) {
   const body = text.trim().replace(/\r\n/g, "\n");
   if (!body || body.length > 2000)
     throw new Error("Messages must contain 1–2,000 characters.");
   const { db } = await firebase();
   const conversation = doc(db, "conversations", id);
   const message = doc(collection(conversation, "messages"));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      key,
+      new TextEncoder().encode(body),
+    ),
+  );
+  const combined = new Uint8Array(iv.length + encrypted.length);
+  combined.set(iv);
+  combined.set(encrypted, iv.length);
   const batch = writeBatch(db);
   batch.set(message, {
     senderUid: current.uid,
     senderUsername: current.username.toLowerCase(),
-    body,
+    ciphertext: bytesToBase64(combined),
     deleted: false,
     sentAt: serverTimestamp(),
     clientSentAt: Date.now(),
   });
   batch.update(conversation, {
-    lastMessage: body.slice(0, 160),
+    lastMessage: "Secure message",
     lastMessageId: message.id,
     lastSenderUid: current.uid,
     updatedAt: serverTimestamp(),
@@ -216,13 +371,15 @@ export async function unsendMessage(
     if (original.data()?.senderUid !== current.uid || original.data()?.deleted)
       throw new Error("This message cannot be unsent.");
     tx.update(messageRef, {
-      body: "Message unsent",
+      ...(original.data()?.ciphertext
+        ? { ciphertext: "Message unsent" }
+        : { body: "Message unsent" }),
       deleted: true,
       deletedAt: serverTimestamp(),
     });
     if (chat.data()?.lastMessageId === message.id)
       tx.update(conversation, {
-        lastMessage: "Message unsent",
+        lastMessage: "Secure message",
         updatedAt: serverTimestamp(),
       });
   });

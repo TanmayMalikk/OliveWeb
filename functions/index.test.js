@@ -3,6 +3,16 @@ const assert = require("node:assert/strict");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId: "olive-test", storageBucket: "olive-test.appspot.com"});
 const { _test } = require("./index");
 
+test("deployment keeps the existing callable endpoint names", () => {
+  const endpoints = require("./index");
+  const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount",
+    "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
+    "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
+    "safetyPlanShareContacts", "safetyPlansSharedWithMe"];
+  assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
+  names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
 test("role aliases and real organization emails are deterministic", () => {
   assert.equal(_test.signInEmail("alex_1", "USER"), "alex_1@users.olive.invalid");
   assert.equal(_test.signInEmail("alex_1", "SAFE_CONTACT"), "alex_1@safe.olive.invalid");
@@ -23,8 +33,14 @@ test("new usernames require at least eight allowed characters", () => {
   assert.throws(() => _test.normalizedUsername("short_1"));
   assert.equal(_test.normalizedExistingUsername("old_1"), "old_1");
   assert.throws(() => _test.normalizedUsername("invalid-name"));
+  assert.throws(() => _test.normalizedUsername("12345678"));
+  assert.throws(() => _test.normalizedUsername("________"));
+  assert.equal(_test.normalizedUsername("lettersonly"), "lettersonly");
+  assert.equal(_test.normalizedExistingUsername("12345678"), "12345678");
   assert.equal(_test.validPassword("Abcd123!"), true);
   assert.equal(_test.validPassword("Abcd1234"), false);
   assert.equal(_test.validPassword("1234567!"), false);
   assert.equal(_test.validPassword("abcdefgh!"), false);
+  assert.equal(_test.validPassword("Valid_12123!", "valid_12"), false);
+  assert.equal(_test.validPassword("Other123!", "valid_12"), true);
 });

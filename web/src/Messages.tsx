@@ -22,6 +22,7 @@ export default function Messages() {
   const [found, setFound] = useState<DirectoryUser | null>(null);
   const [feedback, setFeedback] = useState("");
   const [draft, setDraft] = useState("");
+  const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
   const identity = accounts.identity;
   useEffect(() => {
     if (!cloudMode || !identity) return;
@@ -58,22 +59,38 @@ export default function Messages() {
   useEffect(() => {
     setRows([]);
     setDraft("");
+    setRoomKey(null);
     if (!peer) return;
     let active = true;
     let stop: (() => void) | undefined;
     void messaging
-      .subscribeMessages(
-        peer.friendshipId,
-        (value) => {
-          if (active) setRows(value);
-        },
-        (error) => {
-          if (active) setFeedback(error.message);
-        },
-      )
+      .roomKey(peer.friendshipId, identity!, peer)
+      .then((key) => {
+        if (!active) return undefined;
+        setRoomKey(key);
+        return messaging.subscribeMessages(
+          peer.friendshipId,
+          key,
+          (value) => {
+            if (active) setRows(value);
+          },
+          (error) => {
+            if (active) setFeedback(error.message);
+          },
+        );
+      })
       .then((cleanup) => {
+        if (!cleanup) return;
         if (!active) cleanup();
         else stop = cleanup;
+      })
+      .catch((error) => {
+        if (active)
+          setFeedback(
+            error instanceof Error
+              ? error.message
+              : "Unable to open secure messages.",
+          );
       });
     return () => {
       active = false;
@@ -264,6 +281,7 @@ export default function Messages() {
                     peer.friendshipId,
                     identity,
                     draft,
+                    roomKey!,
                   );
                   setDraft("");
                 });
@@ -280,7 +298,10 @@ export default function Messages() {
                 placeholder="A message, at your pace…"
                 required
               />
-              <Button type="submit" disabled={session.busy || !draft.trim()}>
+              <Button
+                type="submit"
+                disabled={session.busy || !draft.trim() || !roomKey}
+              >
                 <Send size={18} />
                 <span className="sr-only">Send message</span>
               </Button>
