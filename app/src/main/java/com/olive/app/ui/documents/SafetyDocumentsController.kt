@@ -56,11 +56,19 @@ internal class SafetyDocumentsController(
             generation++;state=SafetyDocumentsState(ownerUid=ownerUid)
         }
         if(localMode || repository==null) return
+        // Pending encrypted jobs are restored independently of Firestore. This keeps queued/offline
+        // work visible before the trusted callable publishes its finalized `files` record.
+        media?.observeUploads(ownerUid)
         if(subscription!=null) return
         val token=generation
         state=state.copy(loading=true,error=null)
         subscription=repository.observeFor(ownerUid,{ files ->
-            if(token==generation && state.ownerUid==ownerUid) state=state.copy(files=files,loading=false,error=null)
+            if(token==generation && state.ownerUid==ownerUid) {
+                state=state.copy(files=files,loading=false,error=null)
+                // Retire a completed pending card only after its Firestore-backed document is ready
+                // to replace it, preventing an empty-state flash at the finalization boundary.
+                media?.acknowledgePublished(files.mapTo(mutableSetOf()) { it.id })
+            }
         },{ error ->
             if(token==generation && state.ownerUid==ownerUid) {
                 // Firestore stops a listener after terminal failures such as PERMISSION_DENIED. Keeping

@@ -14,8 +14,10 @@ import com.olive.app.data.MediaPreprocessor
 import com.olive.app.data.MediaRepository
 import com.olive.app.data.MediaTicketDataSource
 import com.olive.app.data.MediaTransferState
+import com.olive.app.data.MediaTransferStatus
 import com.olive.app.data.MediaTransferStore
 import com.olive.app.data.MediaUploadJob
+import com.olive.app.data.MediaUploadPresentation
 import com.olive.app.data.MediaUploadWorker
 import com.olive.app.data.OcrReview
 import com.olive.app.data.PassThroughMediaPreprocessor
@@ -29,6 +31,7 @@ import java.security.MessageDigest
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,8 +74,54 @@ internal class MediaTransferController(
     private val preprocessor:MediaPreprocessor=PassThroughMediaPreprocessor,
 ) {
     private val applicationContext=context.applicationContext
+    private var observedOwnerUid:String?=null
+    private var publishedMediaIds:Set<String> = emptySet()
+    private val observationJobs=mutableMapOf<String,Job>()
+    private val workProgress=mutableMapOf<String,Pair<Long,Long>>()
     var state by mutableStateOf<MediaTransferState>(MediaTransferState.Idle)
         private set
+    var uploads by mutableStateOf<List<MediaUploadPresentation>>(emptyList())
+        private set
+
+    /**
+     * Restores and observes every durable upload belonging to the visible account.
+     *
+     * WorkManager owns execution, while this controller owns only the device-local presentation.
+     * Re-entering the screen after process death reconstructs pending cards from the encrypted
+     * [MediaTransferStore] and reconnects to the already scheduled unique work chains.
+     */
+    fun observeUploads(ownerUid:String) {
+        if(observedOwnerUid!=ownerUid) {
+            observationJobs.values.forEach(Job::cancel);observationJobs.clear();workProgress.clear()
+            observedOwnerUid=ownerUid;publishedMediaIds=emptySet();uploads=emptyList()
+        }
+        scope.launch { refreshUploads(ownerUid)
+            .filterNot { it.status in setOf(MediaTransferStatus.COMPLETE,MediaTransferStatus.FAILED,MediaTransferStatus.CANCELLED) }
+            .forEach { observe(it.jobId) } }
+    }
+
+    /** Retries a durable job without repeating OCR, compression, or encryption. */
+    fun retryUpload(jobId:String) {
+        retry(jobId)
+        observedOwnerUid?.let { owner -> scope.launch { refreshUploads(owner) } }
+    }
+
+    /**
+     * Removes completed local bookkeeping only after Firestore publishes the matching media record.
+     * This prevents a blank gap: the pending card remains until the finalized document can replace it.
+     */
+    fun acknowledgePublished(mediaIds:Set<String>) {
+        val owner=observedOwnerUid ?: return
+        publishedMediaIds=mediaIds
+        scope.launch {
+            val completed=withContext(Dispatchers.IO) { store.all().filter {
+                it.ownerUid==owner && it.status==MediaTransferStatus.COMPLETE && it.mediaId in mediaIds
+            } }
+            withContext(Dispatchers.IO) { completed.forEach { store.remove(it.id) } }
+            completed.forEach { observationJobs.remove(it.id)?.cancel();workProgress.remove(it.id) }
+            refreshUploads(owner)
+        }
+    }
 
     /**
      * Entry point for picker-selected safety documents. The caller supplies the OCR recommendation.
@@ -94,6 +143,7 @@ internal class MediaTransferController(
                 .onSuccess { job ->
                     store.write(job);MediaUploadWorker.enqueue(applicationContext,job.id)
                     observe(job.id)
+                    refreshUploads(owner.uid)
                     state=MediaTransferState.Queued(job.id);onQueued(job.id)
                 }.onFailure { failure ->
                     val message=failure.localizedMessage ?: "Unable to prepare encrypted media"
@@ -120,6 +170,7 @@ internal class MediaTransferController(
             } }.onSuccess { job ->
                 store.write(job);MediaUploadWorker.enqueue(applicationContext,job.id)
                 observe(job.id)
+                refreshUploads(owner.uid)
                 state=MediaTransferState.Queued(job.id);onQueued(job.id)
             }.onFailure { failure ->
                 val message=failure.localizedMessage ?: "Unable to prepare encrypted media"
@@ -131,7 +182,7 @@ internal class MediaTransferController(
     /** Re-enqueues an existing durable job without repeating OCR, compression, or encryption. */
     fun retry(jobId:String) {
         val job=store.get(jobId) ?: return
-        store.write(job.copy(status=com.olive.app.data.MediaTransferStatus.QUEUED,error=null))
+        store.write(job.copy(status=MediaTransferStatus.QUEUED,error=null))
         MediaUploadWorker.enqueue(applicationContext,jobId);observe(jobId);state=MediaTransferState.Queued(jobId)
     }
 
@@ -149,20 +200,27 @@ internal class MediaTransferController(
         }
     }
 
-    fun clearState() { state=MediaTransferState.Idle }
+    fun clearState() {
+        observationJobs.values.forEach(Job::cancel);observationJobs.clear();workProgress.clear()
+        observedOwnerUid=null;publishedMediaIds=emptySet();uploads=emptyList();state=MediaTransferState.Idle
+    }
 
     /** Projects durable WorkManager progress into Compose-observable session state. */
     private fun observe(jobId:String) {
-        scope.launch {
+        if(observationJobs.containsKey(jobId)) return
+        observationJobs[jobId]=scope.launch {
             WorkManager.getInstance(applicationContext)
                 .getWorkInfosForUniqueWorkFlow(MediaUploadWorker.workName(jobId))
                 .collectLatest { work ->
                     val info=work.firstOrNull { !it.state.isFinished } ?: work.maxByOrNull { it.runAttemptCount }
                         ?: return@collectLatest
                     state=when(info.state) {
-                        WorkInfo.State.RUNNING -> MediaTransferState.Uploading(jobId,
-                            info.progress.getLong(MediaUploadWorker.BYTES_SENT,0),
-                            info.progress.getLong(MediaUploadWorker.TOTAL_BYTES,0))
+                        WorkInfo.State.RUNNING -> {
+                            val sent=info.progress.getLong(MediaUploadWorker.BYTES_SENT,0)
+                            val total=info.progress.getLong(MediaUploadWorker.TOTAL_BYTES,0)
+                            workProgress[jobId]=sent to total
+                            MediaTransferState.Uploading(jobId,sent,total)
+                        }
                         WorkInfo.State.SUCCEEDED -> MediaTransferState.Completed(jobId,
                             info.outputData.getString(MediaUploadWorker.MEDIA_ID).orEmpty())
                         WorkInfo.State.FAILED -> MediaTransferState.Failed(jobId,
@@ -170,8 +228,44 @@ internal class MediaTransferController(
                         WorkInfo.State.CANCELLED -> MediaTransferState.Failed(jobId,"Media upload was cancelled",true)
                         else -> MediaTransferState.Queued(jobId)
                     }
+                    observedOwnerUid?.let { refreshUploads(it) }
                 }
         }
+    }
+
+    /** Reads encrypted durable jobs off the main thread and publishes a key-free UI projection. */
+    private suspend fun refreshUploads(ownerUid:String):List<MediaUploadPresentation> {
+        val progressSnapshot=workProgress.toMap()
+        val publishedSnapshot=publishedMediaIds
+        val jobs=withContext(Dispatchers.IO) {
+            val owned=store.all().filter { it.ownerUid==ownerUid }
+            val retired=owned.filter { it.status==MediaTransferStatus.COMPLETE && it.mediaId in publishedSnapshot }
+            retired.forEach { store.remove(it.id) }
+            owned.filterNot { it in retired }.sortedByDescending { it.createdAt }.map { job ->
+                val metadata=runCatching {
+                    val wrapped=job.source.wrappedKeys[ownerUid] ?: error("Encryption key is unavailable")
+                    JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,KeyManager.unwrapKey(wrapped)))
+                }.getOrNull()
+                val progress=progressSnapshot[job.id]
+                MediaUploadPresentation(job.id,job.ownerUid,
+                    metadata?.optString("name")?.takeIf(String::isNotBlank) ?: "Encrypted document",
+                    metadata?.optString("mimeType")?.takeIf(String::isNotBlank) ?: "application/octet-stream",
+                    job.status,progress?.first ?: completedBytes(job),progress?.second ?: job.source.ciphertextSize,
+                    job.mediaId,job.error,job.createdAt)
+            }
+        }
+        if(observedOwnerUid==ownerUid) uploads=jobs
+        return jobs
+    }
+
+    /** Reconstructs multipart progress from persisted ETags when live WorkInfo is unavailable. */
+    private fun completedBytes(job:MediaUploadJob):Long {
+        if(job.status==MediaTransferStatus.COMPLETE) return job.source.ciphertextSize
+        if(job.partSize<=0 || job.completedParts.isEmpty()) return 0
+        return job.completedParts.keys.sumOf { part ->
+            val offset=(part-1)*job.partSize
+            minOf(job.partSize,(job.source.ciphertextSize-offset).coerceAtLeast(0))
+        }.coerceAtMost(job.source.ciphertextSize)
     }
 
     /** Resolves picker metadata, then hands the stream to the shared preparation pipeline. */
