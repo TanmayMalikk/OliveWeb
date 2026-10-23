@@ -151,3 +151,29 @@ sealed interface MediaTransferState {
     data class Completed(val jobId:String,val mediaId:String):MediaTransferState
     data class Failed(val jobId:String?,val message:String,val retryable:Boolean):MediaTransferState
 }
+
+/**
+ * Decrypted, device-local projection of one durable upload for presentation in Compose.
+ *
+ * The persisted [MediaUploadJob] remains the source of truth. This projection deliberately contains
+ * no AES/RSA key material and is never sent to Firebase, WorkManager input data, or Cloudflare. Its
+ * display name and MIME type are recovered on-device from `encryptedMetadata`, which lets an upload
+ * remain understandable after process death without persisting plaintext metadata separately.
+ */
+data class MediaUploadPresentation(
+    val jobId:String,
+    val ownerUid:String,
+    val name:String,
+    val mimeType:String,
+    val status:MediaTransferStatus,
+    val bytesTransferred:Long,
+    val totalBytes:Long,
+    val mediaId:String,
+    val error:String?,
+    val createdAt:Long,
+) {
+    /** A bounded fraction suitable for a determinate progress indicator. */
+    val progress:Float? get()=totalBytes.takeIf { it>0 }?.let {
+        (bytesTransferred.toDouble()/it.toDouble()).coerceIn(0.0,1.0).toFloat()
+    }
+}
