@@ -62,7 +62,15 @@ internal class SafetyDocumentsController(
         subscription=repository.observeFor(ownerUid,{ files ->
             if(token==generation && state.ownerUid==ownerUid) state=state.copy(files=files,loading=false,error=null)
         },{ error ->
-            if(token==generation && state.ownerUid==ownerUid) state=state.copy(loading=false,error=error)
+            if(token==generation && state.ownerUid==ownerUid) {
+                // Firestore stops a listener after terminal failures such as PERMISSION_DENIED. Keeping
+                // the old handle made later load() calls believe observation was still active, so the
+                // Documents screen could remain permanently empty even after rules/connectivity were
+                // corrected. Remove the dead registration before exposing the error so re-entering the
+                // screen—or queueing an upload below—can establish a fresh listener.
+                subscription?.close();subscription=null
+                state=state.copy(loading=false,error=error.ifBlank { "Unable to load documents" })
+            }
         })
     }
 
@@ -70,7 +78,13 @@ internal class SafetyDocumentsController(
     fun upload(uri:Uri,identity:AccountIdentity,fallbackError:String,ocrReview:OcrReview=OcrReview.NOT_RUN) {
         val transfers=media ?: return reportError(fallbackError)
         state=state.copy(loading=true,error=null)
-        transfers.queueDocument(uri,identity,ocrReview,onQueued={ state=state.copy(loading=false,error=null) },
+        transfers.queueDocument(uri,identity,ocrReview,onQueued={
+            state=state.copy(loading=false,error=null)
+            // Upload execution is durable and may finish after the picker/activity transition. Ensure a
+            // listener that previously failed is reattached now; the server-published `files` record will
+            // then flow into state without polling or coupling the UI to the WorkManager implementation.
+            if(subscription==null) load(identity.uid,false)
+        },
             onFailure={ state=state.copy(loading=false,error=it.ifBlank { fallbackError }) })
     }
 
