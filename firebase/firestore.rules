@@ -163,8 +163,17 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.owner_id == request.auth.uid
         && validFileMetadata(request.resource.data, fileId);
-      allow read: if signedIn() && request.auth.uid in resource.data.allowed_users
+      // A direct document read can validate both authorization and the complete stored shape because
+      // Firestore evaluates the rule against one concrete resource.
+      allow get: if signedIn() && request.auth.uid in resource.data.allowed_users
         && (validFileMetadata(resource.data, fileId) || validEncryptedMedia(resource.data, fileId));
+      // Collection rules are evaluated against every *possible* query result, not only the records
+      // currently stored. The Android client constrains this listener with
+      // `whereArrayContains("allowed_users", request.auth.uid)`, which proves this membership check.
+      // Requiring the full schema validator here makes that safe query unprovable and Firestore rejects
+      // it with PERMISSION_DENIED. Schema validation remains mandatory for direct reads and all client
+      // writes; callable-created encrypted records are validated before the Admin SDK publishes them.
+      allow list: if signedIn() && request.auth.uid in resource.data.allowed_users;
       allow update: if signedIn() && resource.data.owner_id == request.auth.uid
         && request.resource.data.owner_id == resource.data.owner_id
         && request.resource.data.storage_path == resource.data.storage_path
