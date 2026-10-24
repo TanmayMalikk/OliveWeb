@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="game_cover_title">Olive Tap</string>
+    <string name="game_cover_instructions">Touchez l’olive et augmentez votre score.</string>
+    <string name="game_player_name">Nom du joueur</string>
+    <string name="game_tap_olive">Toucher l’olive</string>
+    <string name="game_score">Score : %1$d</string>
+    <string name="game_cover_app_olive_tap">Application de jeu · Olive Tap</string>
+</resources>

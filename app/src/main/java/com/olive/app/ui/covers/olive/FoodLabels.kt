@@ -1,37 +1,152 @@
+// Contains the food labels code for this part of Olive.
 package com.olive.app.ui.covers.olive
+
+import com.olive.app.ui.shared.*
 
 import com.olive.app.R
 import com.olive.app.data.Dish
-import com.olive.app.ui.ResourceText
+import com.olive.app.ui.shared.ResourceText
 
-private data class DishLabels(val name:Int,val description:Int,val category:Int,val restaurant:Int)
-private val dishLabels=mapOf(
-    "bowl" to DishLabels(R.string.ui_garden_harvest_bowl, R.string.ui_quinoa_roasted_vegetables_and_lemon_tahini, R.string.bowls_1, R.string.ui_olive_kitchen),
-    "bowl2" to DishLabels(R.string.ui_maple_sweet_potato_bowl, R.string.ui_warm_grains_maple_sweet_potato_and_crunchy_greens, R.string.bowls_1, R.string.ui_olive_kitchen),
-    "bowl3" to DishLabels(R.string.ui_mediterranean_feta_bowl, R.string.ui_fresh_vegetables_herbed_rice_and_feta, R.string.bowls_1, R.string.ui_olive_kitchen),
-    "bowl4" to DishLabels(R.string.ui_chicken_power_bowl, R.string.ui_grilled_chicken_grains_and_crisp_vegetables, R.string.bowls_1, R.string.ui_olive_kitchen),
-    "pizza" to DishLabels(R.string.classic_margherita, R.string.ui_tomato_mozzarella_and_basil_on_house_made_dough, R.string.pizza, R.string.ui_olive_kitchen),
-    "pizza2" to DishLabels(R.string.ui_roasted_vegetable_pizza, R.string.ui_peppers_mushrooms_and_red_onion_with_mozzarella, R.string.pizza, R.string.ui_olive_kitchen),
-    "pizza3" to DishLabels(R.string.ui_vegan_garden_pizza, R.string.ui_garden_vegetables_and_dairy_free_cheese, R.string.pizza, R.string.ui_olive_kitchen),
-    "pizza4" to DishLabels(R.string.ui_chicken_pesto_pizza, R.string.ui_chicken_pesto_tomato_and_mozzarella, R.string.pizza, R.string.ui_olive_kitchen),
-    "burger" to DishLabels(R.string.ui_olive_house_burger, R.string.ui_beef_cheddar_and_house_sauce_on_a_toasted_bun, R.string.burgers_1, R.string.ui_olive_kitchen),
-    "burger2" to DishLabels(R.string.ui_crispy_chicken_burger, R.string.ui_crispy_chicken_with_slaw_and_pickles, R.string.burgers_1, R.string.ui_olive_kitchen),
-    "burger3" to DishLabels(R.string.ui_black_bean_burger, R.string.ui_house_made_black_bean_patty_with_fresh_toppings, R.string.burgers_1, R.string.ui_olive_kitchen),
-    "wrap1" to DishLabels(R.string.ui_falafel_crunch_wrap, R.string.ui_falafel_vegetables_and_tahini_in_a_warm_wrap, R.string.ui_wraps, R.string.ui_olive_kitchen),
-    "wrap2" to DishLabels(R.string.ui_grilled_chicken_wrap, R.string.ui_seasoned_chicken_and_garden_vegetables, R.string.ui_wraps, R.string.ui_olive_kitchen),
-    "pasta1" to DishLabels(R.string.ui_creamy_mushroom_pasta, R.string.ui_mushrooms_and_spinach_in_a_creamy_parmesan_sauce, R.string.ui_pasta, R.string.ui_olive_kitchen),
-    "pasta2" to DishLabels(R.string.ui_tomato_basil_pasta, R.string.ui_slow_cooked_tomato_sauce_with_basil, R.string.ui_pasta, R.string.ui_olive_kitchen),
-    "pasta3" to DishLabels(R.string.ui_chicken_parmesan_pasta, R.string.ui_breaded_chicken_tomato_sauce_and_melted_cheese, R.string.ui_pasta, R.string.ui_olive_kitchen),
-    "salad1" to DishLabels(R.string.ui_apple_walnut_salad, R.string.ui_greens_apple_walnuts_and_maple_vinaigrette, R.string.ui_salads, R.string.ui_olive_kitchen),
-    "salad2" to DishLabels(R.string.ui_greek_village_salad, R.string.ui_cucumber_tomato_olives_and_feta, R.string.ui_salads, R.string.ui_olive_kitchen),
-    "soup1" to DishLabels(R.string.ui_tomato_herb_soup, R.string.ui_a_smooth_tomato_soup_with_basil_and_garlic, R.string.ui_soups, R.string.ui_olive_kitchen),
-    "plate1" to DishLabels(R.string.ui_homestyle_chicken_plate, R.string.ui_roasted_chicken_potatoes_and_seasonal_vegetables, R.string.ui_plates, R.string.ui_olive_kitchen),
-    "plate2" to DishLabels(R.string.ui_stuffed_pepper_plate, R.string.ui_rice_and_lentil_stuffed_pepper_with_tomato_sauce, R.string.ui_plates, R.string.ui_olive_kitchen),
+// Groups the data and actions for dish labels.
+private data class DishLabels(
+    val name: Int,
+    val description: Int,
+    val category: Int,
+    val restaurant: Int
+)
+
+private val dishLabels = mapOf(
+    "bowl" to DishLabels(
+        R.string.ui_garden_harvest_bowl,
+        R.string.ui_quinoa_roasted_vegetables_and_lemon_tahini,
+        R.string.bowls_1,
+        R.string.ui_olive_kitchen
+    ),
+    "bowl2" to DishLabels(
+        R.string.ui_maple_sweet_potato_bowl,
+        R.string.ui_warm_grains_maple_sweet_potato_and_crunchy_greens,
+        R.string.bowls_1,
+        R.string.ui_olive_kitchen
+    ),
+    "bowl3" to DishLabels(
+        R.string.ui_mediterranean_feta_bowl,
+        R.string.ui_fresh_vegetables_herbed_rice_and_feta,
+        R.string.bowls_1,
+        R.string.ui_olive_kitchen
+    ),
+    "bowl4" to DishLabels(
+        R.string.ui_chicken_power_bowl,
+        R.string.ui_grilled_chicken_grains_and_crisp_vegetables,
+        R.string.bowls_1,
+        R.string.ui_olive_kitchen
+    ),
+    "pizza" to DishLabels(
+        R.string.classic_margherita,
+        R.string.ui_tomato_mozzarella_and_basil_on_house_made_dough,
+        R.string.pizza,
+        R.string.ui_olive_kitchen
+    ),
+    "pizza2" to DishLabels(
+        R.string.ui_roasted_vegetable_pizza,
+        R.string.ui_peppers_mushrooms_and_red_onion_with_mozzarella,
+        R.string.pizza,
+        R.string.ui_olive_kitchen
+    ),
+    "pizza3" to DishLabels(
+        R.string.ui_vegan_garden_pizza,
+        R.string.ui_garden_vegetables_and_dairy_free_cheese,
+        R.string.pizza,
+        R.string.ui_olive_kitchen
+    ),
+    "pizza4" to DishLabels(
+        R.string.ui_chicken_pesto_pizza,
+        R.string.ui_chicken_pesto_tomato_and_mozzarella,
+        R.string.pizza,
+        R.string.ui_olive_kitchen
+    ),
+    "burger" to DishLabels(
+        R.string.ui_olive_house_burger,
+        R.string.ui_beef_cheddar_and_house_sauce_on_a_toasted_bun,
+        R.string.burgers_1,
+        R.string.ui_olive_kitchen
+    ),
+    "burger2" to DishLabels(
+        R.string.ui_crispy_chicken_burger,
+        R.string.ui_crispy_chicken_with_slaw_and_pickles,
+        R.string.burgers_1,
+        R.string.ui_olive_kitchen
+    ),
+    "burger3" to DishLabels(
+        R.string.ui_black_bean_burger,
+        R.string.ui_house_made_black_bean_patty_with_fresh_toppings,
+        R.string.burgers_1,
+        R.string.ui_olive_kitchen
+    ),
+    "wrap1" to DishLabels(
+        R.string.ui_falafel_crunch_wrap,
+        R.string.ui_falafel_vegetables_and_tahini_in_a_warm_wrap,
+        R.string.ui_wraps,
+        R.string.ui_olive_kitchen
+    ),
+    "wrap2" to DishLabels(
+        R.string.ui_grilled_chicken_wrap,
+        R.string.ui_seasoned_chicken_and_garden_vegetables,
+        R.string.ui_wraps,
+        R.string.ui_olive_kitchen
+    ),
+    "pasta1" to DishLabels(
+        R.string.ui_creamy_mushroom_pasta,
+        R.string.ui_mushrooms_and_spinach_in_a_creamy_parmesan_sauce,
+        R.string.ui_pasta,
+        R.string.ui_olive_kitchen
+    ),
+    "pasta2" to DishLabels(
+        R.string.ui_tomato_basil_pasta,
+        R.string.ui_slow_cooked_tomato_sauce_with_basil,
+        R.string.ui_pasta,
+        R.string.ui_olive_kitchen
+    ),
+    "pasta3" to DishLabels(
+        R.string.ui_chicken_parmesan_pasta,
+        R.string.ui_breaded_chicken_tomato_sauce_and_melted_cheese,
+        R.string.ui_pasta,
+        R.string.ui_olive_kitchen
+    ),
+    "salad1" to DishLabels(
+        R.string.ui_apple_walnut_salad,
+        R.string.ui_greens_apple_walnuts_and_maple_vinaigrette,
+        R.string.ui_salads,
+        R.string.ui_olive_kitchen
+    ),
+    "salad2" to DishLabels(
+        R.string.ui_greek_village_salad,
+        R.string.ui_cucumber_tomato_olives_and_feta,
+        R.string.ui_salads,
+        R.string.ui_olive_kitchen
+    ),
+    "soup1" to DishLabels(
+        R.string.ui_tomato_herb_soup,
+        R.string.ui_a_smooth_tomato_soup_with_basil_and_garlic,
+        R.string.ui_soups,
+        R.string.ui_olive_kitchen
+    ),
+    "plate1" to DishLabels(
+        R.string.ui_homestyle_chicken_plate,
+        R.string.ui_roasted_chicken_potatoes_and_seasonal_vegetables,
+        R.string.ui_plates,
+        R.string.ui_olive_kitchen
+    ),
+    "plate2" to DishLabels(
+        R.string.ui_stuffed_pepper_plate,
+        R.string.ui_rice_and_lentil_stuffed_pepper_with_tomato_sauce,
+        R.string.ui_plates,
+        R.string.ui_olive_kitchen
+    ),
 )
 
 // Persisted ingredient/diet values remain stable across languages and existing installations.
 // Only their displayed labels change; toggling a translation still updates the original ingredient key.
-private val ingredientLabels=mapOf(
+private val ingredientLabels = mapOf(
     "Quinoa" to R.string.ui_quinoa,
     "Cucumber" to R.string.ui_cucumber,
     "Tomato" to R.string.ui_tomato,
@@ -92,12 +207,22 @@ private val ingredientLabels=mapOf(
     "Herbs" to R.string.ui_herbs,
 )
 
-internal fun ResourceText.dishName(dish:Dish)=dishLabels[dish.id]?.let { this(it.name) } ?: dish.name
-internal fun ResourceText.dishDescription(dish:Dish)=dishLabels[dish.id]?.let { this(it.description) } ?: dish.description
-internal fun ResourceText.dishCategory(dish:Dish)=dishLabels[dish.id]?.let { this(it.category) } ?: dish.category
-internal fun ResourceText.dishRestaurant(dish:Dish)=dishLabels[dish.id]?.let { this(it.restaurant) } ?: dish.restaurant
-internal fun ResourceText.ingredient(value:String)=ingredientLabels[value]?.let { this(it) } ?: value
-internal fun ResourceText.foodFilter(value:String)=when(value) {
+internal fun ResourceText.dishName(dish: Dish) =
+    dishLabels[dish.id]?.let { this(it.name) } ?: dish.name
+
+internal fun ResourceText.dishDescription(dish: Dish) =
+    dishLabels[dish.id]?.let { this(it.description) } ?: dish.description
+
+internal fun ResourceText.dishCategory(dish: Dish) =
+    dishLabels[dish.id]?.let { this(it.category) } ?: dish.category
+
+internal fun ResourceText.dishRestaurant(dish: Dish) =
+    dishLabels[dish.id]?.let { this(it.restaurant) } ?: dish.restaurant
+
+internal fun ResourceText.ingredient(value: String) =
+    ingredientLabels[value]?.let { this(it) } ?: value
+
+internal fun ResourceText.foodFilter(value: String) = when (value) {
     "All" -> this(R.string.all)
     "Vegetarian" -> this(R.string.vegetarian)
     "Vegan" -> this(R.string.vegan)

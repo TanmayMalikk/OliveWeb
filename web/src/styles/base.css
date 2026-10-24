@@ -1,0 +1,163 @@
+/* Styles the base part of the web app. */
+:root {
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  color: #263523;
+  background: #f7f7ef;
+  font-synthesis: none;
+  --paper: #f7f7ef;
+  --white: #fdfdf8;
+  --ink: #263523;
+  --olive: #435d35;
+  --muted: #626d59;
+  --line: #dfe3d5;
+  --soft: #e9eddf;
+  --serif: Georgia, "Times New Roman", serif;
+  --radius: 1.25rem;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 1rem;
+}
+body {
+  margin: 0;
+  min-width: 20rem;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+a {
+  color: inherit;
+}
+button {
+  color: inherit;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #7e995b;
+  outline-offset: 4px;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+button svg,
+a svg {
+  flex-shrink: 0;
+}
+button {
+  border: 0;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1,
+h2,
+h3 {
+  font-weight: 400;
+}
+h1,
+h2 {
+  font-family: var(--serif);
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+}
+h1 {
+  font-size: clamp(2.8rem, 5.5vw, 5.8rem);
+}
+h2 {
+  font-size: clamp(2rem, 3.4vw, 3.4rem);
+}
+h3 {
+  font-size: 1.12rem;
+  line-height: 1.4;
+}
+p {
+  line-height: 1.75;
+  color: var(--muted);
+}
+em {
+  font-weight: 400;
+  color: #6c7d52;
+}
+img,
+svg {
+  max-width: 100%;
+}
+img {
+  display: block;
+}
+button {
+  background: none;
+}
+input,
+select,
+textarea {
+  min-width: 0;
+  width: 100%;
+  background: var(--white);
+  border: 1px solid #d2d8c8;
+  border-radius: 0.65rem;
+  color: var(--ink);
+  padding: 0.85rem 1rem;
+  line-height: 1.5;
+}
+input,
+select {
+  min-height: 3rem;
+}
+textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+small {
+  line-height: 1.5;
+}
+a {
+  text-decoration: none;
+}
+svg {
+  vertical-align: middle;
+}
+main {
+  min-width: 0;
+}
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+dialog::backdrop {
+  background: #17251599;
+  backdrop-filter: blur(4px);
+}
+dialog {
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--paper);
+}

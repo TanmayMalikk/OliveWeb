@@ -1,16 +1,21 @@
+// Contains the session navigation code for this part of Olive.
 package com.olive.app.ui.session
 
+import com.olive.app.ui.shared.*
+
+import com.olive.app.ui.users.shared.navigation.*
+
 import com.olive.app.data.*
-import com.olive.app.ui.*
 
 // Owns navigation history and background locking; quick exit clears PIN authorization and invalidates pending operations.
-internal class SessionNavigation(private val runtime:SessionRuntime) {
+internal class SessionNavigation(private val runtime: SessionRuntime) {
+    // Opens screen.
     fun openScreen(value: SessionScreen) {
         with(runtime) {
             with(state) {
-                if(value==screen) return
+                if (value == screen) return
                 screenHistory += screen
-                screen=value
+                screen = value
             }
         }
     }
@@ -19,35 +24,67 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
     fun quickExit() {
         with(runtime) {
             with(state) {
-                enrollment?.let { accountRole=it.role }
-                if(accountRole==AccountRole.USER && screen in setOf(SessionScreen.Safe,SessionScreen.Pin)) accessibilityExitVersion++
+                enrollment?.let { accountRole = it.role }
+                if (accountRole == AccountRole.USER && screen in setOf(
+                        SessionScreen.Safe,
+                        SessionScreen.Pin
+                    )
+                ) accessibilityExitVersion++
                 safety.close()
                 epoch++
-                pinAuthorizedUid=null;pinAuthorizedEpoch=-1L
-                deviceLockRequest?.complete(null);deviceLockRequest=null
-                operationJob?.cancel();operationJob=null
-                idleJob?.cancel();idleJob=null;idleCountdownSeconds=null
-                busy=false;checkoutActive=false;coverReset++;addressPrompt=false
-                viewedSharedEntry=null
-                profile?.coverType?.let { coverType=it }
-                if(accountRole==AccountRole.SAFE_CONTACT) {
-                    page=SafePage.Home;activityCategory=null;screenHistory.clear();safePageHistory.clear()
-                    message=null;messaging.stopMessaging();activeTriggerId=null;triggerJob=null;screen=SessionScreen.Safe
+                pinAuthorizedUid = null
+                pinAuthorizedEpoch = -1L
+                deviceLockRequest?.complete(null)
+                deviceLockRequest = null
+                operationJob?.cancel()
+                operationJob = null
+                idleJob?.cancel()
+                idleJob = null
+                idleCountdownSeconds = null
+                busy = false
+                checkoutActive = false
+                coverReset++
+                addressPrompt = false
+                viewedSharedEntry = null
+                profile?.coverType?.let { coverType = it }
+                if (accountRole == AccountRole.SAFE_CONTACT) {
+                    page = SafePage.Home
+                    activityCategory =
+                        null
+                    screenHistory.clear()
+                    safePageHistory.clear()
+                    message = null
+                    messaging.stopMessaging()
+                    activeTriggerId = null
+                    triggerJob =
+                        null
+                    screen = SessionScreen.Safe
                     return
                 }
-                screen=when(accountRole) {
+                screen = when (accountRole) {
                     AccountRole.USER -> SessionScreen.Cover
                     AccountRole.SAFE_CONTACT -> SessionScreen.Safe
-                    AccountRole.STAFF,AccountRole.ADMIN -> SessionScreen.Portal
+                    AccountRole.STAFF, AccountRole.ADMIN -> SessionScreen.Portal
                 }
-                page=SafePage.Home;activityCategory=null
-                screenHistory.clear();safePageHistory.clear()
-                profile=null; attempts=emptyList(); message=null; pendingSync=false
-                settingsHistory=emptyList();privacyHistory=emptyList();triggerHistory=emptyList();privateEntries=emptyList()
+                page = SafePage.Home
+                activityCategory = null
+                screenHistory.clear()
+                safePageHistory.clear()
+                profile = null
+                attempts = emptyList()
+                message = null
+                pendingSync = false
+                settingsHistory = emptyList()
+                privacyHistory = emptyList()
+                triggerHistory =
+                    emptyList()
+                privateEntries = emptyList()
                 messaging.stopMessaging()
-                if(accountRole==AccountRole.USER && !localMode) messaging.syncLocalNotificationHandler()
-                activeTriggerId=null;triggerJob=null
-                pendingIdentity=null; pendingProfile=null
+                if (accountRole == AccountRole.USER && !localMode) messaging.syncLocalNotificationHandler()
+                activeTriggerId = null
+                triggerJob = null
+                pendingIdentity = null
+                pendingProfile = null
             }
         }
     }
@@ -56,11 +93,19 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
         with(runtime) {
             with(state) {
                 // Also discard partially entered onboarding fields when leaving the app.
-                if(screen == SessionScreen.Loading || screen == SessionScreen.StorageError) return
-                if(enrollment==null) {
-                    epoch++;operationJob?.cancel();operationJob=null;busy=false;pendingIdentity=null;pendingProfile=null
-                    screenHistory.clear();screen=SessionScreen.Welcome;message=null
-                } else if(accountRole==AccountRole.USER) quickExit()
+                if (screen == SessionScreen.Loading || screen == SessionScreen.StorageError) return
+                if (enrollment == null) {
+                    epoch++
+                    operationJob?.cancel()
+                    operationJob = null
+                    busy =
+                        false
+                    pendingIdentity = null
+                    pendingProfile = null
+                    screenHistory.clear()
+                    screen = SessionScreen.Welcome
+                    message = null
+                } else if (accountRole == AccountRole.USER) quickExit()
             }
         }
     }
@@ -68,14 +113,21 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
     fun back() {
         with(runtime) {
             with(state) {
-                if(screen == SessionScreen.Safe && page==SafePage.Messages && activeConversation!=null) conversationActions.closeConversation()
-                else if(screen == SessionScreen.Safe && page==SafePage.Activity && activityCategory!=null) { activityCategory=null;message=null }
-                else if(screen == SessionScreen.Safe && safePageHistory.isNotEmpty()) {
-                    page=safePageHistory.removeAt(safePageHistory.lastIndex);message=null
+                if (screen == SessionScreen.Safe && page == SafePage.Messages && activeConversation != null) conversationActions.closeConversation()
+                else if (screen == SessionScreen.Safe && page == SafePage.Activity && activityCategory != null) {
+                    activityCategory = null
+                    message = null
+                } else if (screen == SessionScreen.Safe && safePageHistory.isNotEmpty()) {
+                    page = safePageHistory.removeAt(safePageHistory.lastIndex)
+                    message = null
+                } else if (screen == SessionScreen.Safe && page != SafePage.Home) {
+                    page = SafePage.Home
+                    message = null
+                } else if ((screen == SessionScreen.Safe && accountRole == AccountRole.USER) || screen == SessionScreen.Pin) quickExit()
+                else if (screenHistory.isNotEmpty()) {
+                    screen = screenHistory.removeAt(screenHistory.lastIndex)
+                    message = null
                 }
-                else if(screen == SessionScreen.Safe && page != SafePage.Home) { page=SafePage.Home;message=null }
-                else if((screen == SessionScreen.Safe && accountRole==AccountRole.USER) || screen == SessionScreen.Pin) quickExit()
-                else if(screenHistory.isNotEmpty()) { screen=screenHistory.removeAt(screenHistory.lastIndex);message=null }
                 // Root cover/welcome/loading screens deliberately consume Back so Android does not open the phone home screen.
             }
         }
@@ -84,16 +136,24 @@ internal class SessionNavigation(private val runtime:SessionRuntime) {
     fun navigate(value: SafePage) {
         with(runtime) {
             with(state) {
-                if(screen == SessionScreen.Safe) {
-                    if(value!=page) safePageHistory += page
-                    page=value; message=null
-                    if(value==SafePage.Activity) activityCategory=null
-                    val uid=enrollment?.uid
-                    if(uid!=null) {
-                        if(value==SafePage.Settings || value==SafePage.Profile || value==SafePage.Contacts)
-                            history.recordSettingsInteraction("Olive Branch", "Opened ${value.name.lowercase()} page")
-                        if(value==SafePage.Activity || value==SafePage.Notes) history.refreshHistory(uid)
-                        if(value==SafePage.Messages) messaging.ensureMessagingObservation(showFeedback=true)
+                if (screen == SessionScreen.Safe) {
+                    if (value != page) safePageHistory += page
+                    page = value
+                    message = null
+                    if (value == SafePage.Activity) activityCategory = null
+                    val uid = enrollment?.uid
+                    if (uid != null) {
+                        if (value == SafePage.Settings || value == SafePage.Profile || value == SafePage.Contacts)
+                            history.recordSettingsInteraction(
+                                "Olive Branch",
+                                "Opened ${value.name.lowercase()} page"
+                            )
+                        if (value == SafePage.Activity || value == SafePage.Notes) history.refreshHistory(
+                            uid
+                        )
+                        if (value == SafePage.Messages) messaging.ensureMessagingObservation(
+                            showFeedback = true
+                        )
                     }
                 }
             }

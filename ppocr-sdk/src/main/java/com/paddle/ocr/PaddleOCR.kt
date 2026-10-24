@@ -23,6 +23,7 @@ import com.paddle.ocr.model.OCRError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+// Groups the data and actions for paddle ocr.
 class PaddleOCR private constructor(
     private val engine: OCREngine,
 ) {

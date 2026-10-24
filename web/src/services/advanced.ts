@@ -1,3 +1,4 @@
+// Contains the advanced code for this part of Olive.
 import * as math from "mathjs";
 const allowed = new Set([
   "sin",
@@ -208,6 +209,7 @@ function regression(x: number[], y: number[], degree = 1) {
   const residual = y.reduce((sum, v, i) => sum + (v - prediction[i]) ** 2, 0);
   return { coefficients, rSquared: ss ? 1 - residual / ss : 1 };
 }
+// Calculates tool.
 export function calculateTool(
   tool: string,
   input: string,

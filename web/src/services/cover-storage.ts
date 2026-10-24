@@ -1,3 +1,4 @@
+// Contains the cover-storage code for this part of Olive.
 import { database } from "./local";
 import { encrypt, decrypt } from "./crypto";
 import type { Envelope, Event } from "../domain";
@@ -17,6 +18,7 @@ async function deviceKey() {
   })();
   return keyPromise;
 }
+// Reads cover.
 export async function readCover<T>(id: string, fallback: T): Promise<T> {
   const box: Envelope | undefined = await (
     await database

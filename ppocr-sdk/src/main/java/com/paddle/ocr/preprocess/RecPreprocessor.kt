@@ -21,11 +21,13 @@ import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import kotlin.math.ceil
 
+// Groups the data and actions for rec preprocess result.
 data class RecPreprocessResult(
     val tensorData: FloatArray,
     val shape: LongArray,
 )
 
+// Groups the data and actions for rec preprocessor.
 object RecPreprocessor {
     private const val FIXED_HEIGHT = 48
     private const val MAX_IMG_W = 3200

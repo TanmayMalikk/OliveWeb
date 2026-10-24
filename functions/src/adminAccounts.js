@@ -1,3 +1,4 @@
+// Contains the admin accounts code for this part of Olive.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebase");
 const {text, normalizedUsername, normalizedRole, validPassword, signInEmail, roleFromUser, isTemporaryEmail, profileComplete, defaultProfile, PROTECTED_USERNAME} = require("./accountPolicy");

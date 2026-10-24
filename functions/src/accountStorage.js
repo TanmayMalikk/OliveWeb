@@ -1,3 +1,4 @@
+// Contains the account storage code for this part of Olive.
 const {HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebase");
 const {isTemporaryEmail, organizationEmailKey, signInEmail, roleFromUser} = require("./accountPolicy");

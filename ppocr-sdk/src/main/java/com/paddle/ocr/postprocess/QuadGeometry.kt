@@ -16,6 +16,7 @@ package com.paddle.ocr.postprocess
 
 import org.opencv.core.Point
 
+// Groups the data and actions for quad geometry.
 internal object QuadGeometry {
     fun orderMinAreaRectPoints(points: Array<Point>): List<Point> {
         val sorted = points.sortedBy { it.x }

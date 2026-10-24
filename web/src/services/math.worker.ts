@@ -1,3 +1,4 @@
+// Contains the worker code for this part of Olive.
 import { derivative, mean, median, std, format } from "mathjs";
 import { safeExpression, calculateTool } from "./advanced";
 self.onmessage = (

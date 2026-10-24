@@ -388,7 +388,6 @@
     <string name="y_one_function_per_line">Y =（每行一个函数）</string>
     <string name="camera_permission_required">在橄榄枝拍照需获得相机许可。</string>
     <string name="grant_camera_permission">授予相机权限</string>
-    <string name="error_loading_photo_preview">加载照片预览时出错</string>
-    <string name="captured_photo_review">拍摄的照片评论</string>
+<string name="captured_photo_review">拍摄的照片评论</string>
     <string name="take_again">再看一遍</string>
 </resources>

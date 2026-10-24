@@ -16,6 +16,7 @@ package com.paddle.ocr.engine
 
 import com.paddle.ocr.model.OCRResult
 
+// Groups the data and actions for ocrengine result.
 data class OCREngineResult(
     val results: List<OCRResult>,
     val detectionTimeMs: Long,

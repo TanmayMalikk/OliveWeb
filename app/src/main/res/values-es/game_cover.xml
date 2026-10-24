@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="game_cover_title">Olive Tap</string>
+    <string name="game_cover_instructions">Toca la aceituna y aumenta tu puntuación.</string>
+    <string name="game_player_name">Nombre del jugador</string>
+    <string name="game_tap_olive">Tocar aceituna</string>
+    <string name="game_score">Puntuación: %1$d</string>
+    <string name="game_cover_app_olive_tap">Aplicación de juego · Olive Tap</string>
+</resources>

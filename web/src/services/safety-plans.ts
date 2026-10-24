@@ -1,3 +1,4 @@
+// Contains the safety-plans code for this part of Olive.
 import { firebase } from "./accounts";
 
 export const safetySections = [
@@ -10,11 +11,13 @@ export const safetySections = [
   "documents",
   "grab",
 ] as const;
+// Groups the data and actions for safety field.
 export type SafetyField = {
   value: string;
   revision: number;
   mutationId?: string;
 };
+// Groups the data and actions for safety plan.
 export type SafetyPlan = {
   ownerUid: string;
   ownerName: string;
@@ -31,6 +34,7 @@ async function call<T>(name: string, data: unknown = {}): Promise<T> {
   const { httpsCallable } = await import("firebase/functions");
   return (await httpsCallable(functions, name)(data)).data as T;
 }
+// Loads plan.
 export async function loadPlan(ownerUid: string) {
   const defaults = Object.fromEntries(
     ["primary", "backup"].flatMap((plan) =>
@@ -45,6 +49,7 @@ export async function loadPlan(ownerUid: string) {
     })
   ).plan;
 }
+// Saves field.
 export async function saveField(plan: SafetyPlan, key: string, value: string) {
   const current = plan.fields[key] ?? { value: "", revision: 0 };
   return (
@@ -79,6 +84,7 @@ export async function staffConsultations() {
     plans: { ownerUid: string; ownerName: string; updatedAt: number }[];
   }>("safetyPlanConsultations");
 }
+// Sets staff availability.
 export async function setStaffAvailability(available: boolean) {
   return call<{ available: boolean }>("safetyPlanAvailability", { available });
 }

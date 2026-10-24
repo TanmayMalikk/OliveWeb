@@ -16,6 +16,7 @@ package com.paddle.ocr.model
 
 import android.graphics.PointF
 
+// Groups the data and actions for ocrbox.
 data class OCRBox(
     val points: List<PointF>,
 ) {

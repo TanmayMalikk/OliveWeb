@@ -10,11 +10,10 @@ Open Android Studio's **Terminal** tab at the project root and run:
 
 This automatically runs:
 
-1. Android/Kotlin JVM unit tests.
-2. A debug APK build.
-3. Cloud Functions unit tests.
-4. A production-dependency security audit for Cloud Functions.
-5. Firestore and Firebase Storage rules tests in local emulators.
+1. Android/Kotlin JVM unit tests, debug and UI-test APK builds, lint, source-size checks, and architecture checks.
+2. Web unit tests, a production build, Playwright user flows, responsive checks, and axe accessibility checks.
+3. Cloud Functions unit tests and a production-dependency security audit.
+4. Firestore and Firebase Storage rules tests in local emulators.
 
 The script stops at the first failure and returns a nonzero exit code. A successful run ends with `All requested Olive tests passed.` It uses Android Studio's bundled Java runtime when that runtime is installed in the standard location.
 
@@ -25,6 +24,8 @@ Start a Pixel emulator or connect an Android device with USB debugging enabled. 
 ```powershell
 .\test-all.bat -WithDeviceTests
 ```
+
+The disposable emulator must be unlocked and use PIN `246810` so the device-credential tests can exercise the real Android prompt. Device tests run one method per instrumentation process to prevent Android 17 activity state from leaking between unrelated workflows. Assertion failures stop immediately; only a confirmed Android framework process crash is retried once.
 
 ## Faster runs while editing
 

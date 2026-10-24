@@ -1,3 +1,4 @@
+// Contains the local code for this part of Olive.
 import { openDB } from "idb";
 import { decrypt, encrypt, importKey, unwrapKey, wrapKey } from "./crypto";
 import {
@@ -17,15 +18,18 @@ export const database = openDB("olive-branch-web", 1, {
     db.createObjectStore("device");
   },
 });
+// Groups the data and actions for local account.
 interface LocalAccount {
   id: string;
   identity: Identity;
   passwordKey: WrappedKey;
 }
+// Groups the data and actions for local vault.
 export interface LocalVault {
   profile: Profile | null;
   history: History;
 }
+// Creates local.
 export async function createLocal(
   username: string,
   password: string,
@@ -76,6 +80,7 @@ export async function loginLocal(
     );
   }
 }
+// Reads local.
 export async function readLocal(
   uid: string,
   raw: Uint8Array,

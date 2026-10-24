@@ -1,3 +1,4 @@
+// Contains the organization accounts code for this part of Olive.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db} = require("./firebase");
 const {text, normalizedExistingUsername, normalizedRole, signInEmail, organizationEmailKey, roleFromUser, isTemporaryEmail, defaultProfile} = require("./accountPolicy");

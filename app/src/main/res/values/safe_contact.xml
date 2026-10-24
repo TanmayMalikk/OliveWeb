@@ -39,8 +39,7 @@
     <string name="camera_saving">Saving privately…</string>
     <string name="documents_upload_failed">The file could not be uploaded.</string>
     <string name="documents_load_failed">Your saved files could not be loaded.</string>
-    <string name="documents_open_failed">This secure file could not be opened.</string>
-    <string name="documents_share_failed">This secure file could not be shared.</string>
+<string name="documents_share_failed">This secure file could not be shared.</string>
     <string name="documents_shared_in_chat">Secure file shared.</string>
     <string name="shared_secure_file">Shared secure file</string>
     <string name="trusted_link_title">Chat account</string>
@@ -56,8 +55,7 @@
     <string name="documents_empty_help">Upload your own file or ask a connected user to share one with you.</string>
     <string name="documents_yours">Your file</string>
     <string name="documents_shared_by">Shared by %1$s</string>
-    <string name="documents_no_viewer">No app on this device can open this file type.</string>
-    <string name="documents_private_viewer">Private in-app viewer</string>
+<string name="documents_private_viewer">Private in-app viewer</string>
     <string name="documents_pdf_page">Page %1$d of %2$d</string>
     <string name="documents_preview_unavailable">Preview unavailable</string>
     <string name="documents_preview_supported">Images, videos, PDFs, text files and Word .docx files open privately inside Olive Branch.</string>

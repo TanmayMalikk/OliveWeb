@@ -23,6 +23,7 @@ import org.opencv.core.Mat
 import org.opencv.core.Scalar
 import org.opencv.imgproc.Imgproc
 
+// Groups the data and actions for det preprocess result.
 data class DetPreprocessResult(
     val tensorData: FloatArray,
     val shape: LongArray,
@@ -30,6 +31,7 @@ data class DetPreprocessResult(
     val originalW: Int,
 )
 
+// Groups the data and actions for det preprocessor.
 object DetPreprocessor {
     private val mean = doubleArrayOf(0.485, 0.456, 0.406)
     private val std = doubleArrayOf(0.229, 0.224, 0.225)

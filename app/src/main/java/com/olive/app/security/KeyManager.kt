@@ -1,3 +1,4 @@
+// Contains the key manager code for this part of Olive.
 package com.olive.app.security
 
 import android.security.keystore.KeyGenParameterSpec
@@ -14,6 +15,7 @@ import javax.crypto.spec.SecretKeySpec
 import java.security.KeyFactory
 import java.security.spec.X509EncodedKeySpec
 
+// Groups the data and actions for key manager.
 object KeyManager {
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     private const val RSA_MODE = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding"
@@ -36,7 +38,11 @@ object KeyManager {
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
         )
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
-            .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512, KeyProperties.DIGEST_SHA1)
+            .setDigests(
+                KeyProperties.DIGEST_SHA256,
+                KeyProperties.DIGEST_SHA512,
+                KeyProperties.DIGEST_SHA1
+            )
             .setKeySize(2048)
             .build()
 
@@ -53,6 +59,7 @@ object KeyManager {
         return certificate?.publicKey
     }
 
+    // Gets or create public key.
     fun getOrCreatePublicKey(): PublicKey = getPublicKey() ?: generateUserKeyPair().public
 
     /**
@@ -70,7 +77,10 @@ object KeyManager {
     fun wrapKey(secretKey: SecretKey, publicKey: PublicKey): String {
         val cipher = Cipher.getInstance(RSA_MODE)
         val spec = javax.crypto.spec.OAEPParameterSpec(
-            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA256, javax.crypto.spec.PSource.PSpecified.DEFAULT
+            "SHA-256",
+            "MGF1",
+            java.security.spec.MGF1ParameterSpec.SHA256,
+            javax.crypto.spec.PSource.PSpecified.DEFAULT
         )
         // Bypass WRAP_MODE entirely
         cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
@@ -96,7 +106,10 @@ object KeyManager {
         val cipher = Cipher.getInstance(RSA_MODE)
         val privateKey = getPrivateKey() ?: throw Exception("Private key missing")
         val spec = javax.crypto.spec.OAEPParameterSpec(
-            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA256, javax.crypto.spec.PSource.PSpecified.DEFAULT
+            "SHA-256",
+            "MGF1",
+            java.security.spec.MGF1ParameterSpec.SHA256,
+            javax.crypto.spec.PSource.PSpecified.DEFAULT
         )
         // Bypass UNWRAP_MODE entirely and manually rebuild the AES key
         cipher.init(Cipher.DECRYPT_MODE, privateKey, spec)

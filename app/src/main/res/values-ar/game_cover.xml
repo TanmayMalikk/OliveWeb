@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="game_cover_title">لمسة الزيتون</string>
+    <string name="game_cover_instructions">اضغط على الزيتونة وارفع نتيجتك.</string>
+    <string name="game_player_name">اسم اللاعب</string>
+    <string name="game_tap_olive">اضغط على الزيتونة</string>
+    <string name="game_score">النتيجة: %1$d</string>
+    <string name="game_cover_app_olive_tap">تطبيق ألعاب · لمسة الزيتون</string>
+</resources>

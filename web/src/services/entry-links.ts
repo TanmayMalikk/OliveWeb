@@ -1,3 +1,4 @@
+// Contains the entry-links code for this part of Olive.
 import { cloudMode, firebase } from "./accounts";
 import { database } from "./local";
 import { readCover, writeCover } from "./cover-storage";
@@ -33,6 +34,7 @@ export async function tokenDigest(token: string) {
     (b) => b.toString(16).padStart(2, "0"),
   ).join("");
 }
+// Checks that entry link is valid.
 export async function verifyEntryLink(
   uid: string,
   token: string,
@@ -51,6 +53,7 @@ export async function verifyEntryLink(
   }
   return (await (await database).get("device", `entry-hash:${uid}`)) === hash;
 }
+// Saves d entry link.
 export async function savedEntryLink(uid: string) {
   const token = await readCover<string | null>(`${uid}:personal-link`, null);
   if (!token) return null;

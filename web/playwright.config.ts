@@ -1,3 +1,4 @@
+// Contains the playwright.config code for this part of Olive.
 import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",

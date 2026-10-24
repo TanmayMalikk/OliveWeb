@@ -1,8 +1,12 @@
+// Tests the news repository test behavior.
 package com.olive.app.data
+
+import com.olive.app.ui.shared.*
 
 import org.junit.Assert.*
 import org.junit.Test
 
+// Groups the data and actions for news repository test.
 class NewsRepositoryTest {
 
     private val repository = GoogleNewsRepository()
@@ -11,11 +15,20 @@ class NewsRepositoryTest {
     fun rssLocaleQueryGeneratesCorrectGoogleNewsParametersForEachLanguage() {
         // Chinese (Simplified) must specify zh-CN and zh-Hans
         val zhQuery = repository.rssLocaleQuery("Chinese")
-        assertTrue("Chinese query should contain zh-CN, got: $zhQuery", zhQuery.contains("hl=zh-CN"))
-        assertTrue("Chinese query should contain zh-Hans ceid, got: $zhQuery", zhQuery.contains("ceid=CN:zh-Hans"))
+        assertTrue(
+            "Chinese query should contain zh-CN, got: $zhQuery",
+            zhQuery.contains("hl=zh-CN")
+        )
+        assertTrue(
+            "Chinese query should contain zh-Hans ceid, got: $zhQuery",
+            zhQuery.contains("ceid=CN:zh-Hans")
+        )
 
         val zhCodeQuery = repository.rssLocaleQuery("zh")
-        assertTrue("zh query should contain zh-CN, got: $zhCodeQuery", zhCodeQuery.contains("hl=zh-CN"))
+        assertTrue(
+            "zh query should contain zh-CN, got: $zhCodeQuery",
+            zhCodeQuery.contains("hl=zh-CN")
+        )
 
         // French
         val frQuery = repository.rssLocaleQuery("French")
@@ -23,7 +36,10 @@ class NewsRepositoryTest {
 
         // Spanish
         val esQuery = repository.rssLocaleQuery("Spanish")
-        assertTrue("Spanish query should contain es-419, got: $esQuery", esQuery.contains("hl=es-419"))
+        assertTrue(
+            "Spanish query should contain es-419, got: $esQuery",
+            esQuery.contains("hl=es-419")
+        )
 
         // Arabic
         val arQuery = repository.rssLocaleQuery("Arabic")
@@ -31,10 +47,16 @@ class NewsRepositoryTest {
 
         // English (default)
         val enQuery = repository.rssLocaleQuery("English")
-        assertTrue("English query should contain en-CA, got: $enQuery", enQuery.contains("hl=en-CA"))
+        assertTrue(
+            "English query should contain en-CA, got: $enQuery",
+            enQuery.contains("hl=en-CA")
+        )
 
         // Unsupported language (e.g. Japanese) defaults to English
         val jaQuery = repository.rssLocaleQuery("Japanese")
-        assertTrue("Unsupported language query should default to en-CA, got: $jaQuery", jaQuery.contains("hl=en-CA"))
+        assertTrue(
+            "Unsupported language query should default to en-CA, got: $jaQuery",
+            jaQuery.contains("hl=en-CA")
+        )
     }
 }
