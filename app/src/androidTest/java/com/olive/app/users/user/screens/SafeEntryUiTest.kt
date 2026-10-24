@@ -53,6 +53,20 @@ class SafeEntryUiTest : OliveUiTestBase() {
     }
 
     @Test
+    fun correctPinRunsOliveAnimationBeforeSafeAreaBecomesInteractive() {
+        register()
+        trigger()
+        enterPin("123456")
+        waitFor("pin_safe_animation")
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        compose.runOnIdle { assertEquals(SessionScreen.Safe, session.screen) }
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("pin_safe_animation").fetchSemanticsNodes().isEmpty()
+        }
+        compose.onNodeWithTag("safe_settings").assertIsDisplayed()
+    }
+
+    @Test
     fun safetyAnswerChangesRecommendationAndSeparatePinStillUnlocks() {
         entrySetup()
         compose.onNodeWithTag("entry_choose_pin").assertDoesNotExist()
