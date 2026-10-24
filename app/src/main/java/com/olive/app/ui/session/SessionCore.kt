@@ -1,0 +1,227 @@
+// Contains the session core code for this part of Olive.
+package com.olive.app.ui.session
+
+import com.olive.app.ui.shared.*
+
+import com.olive.app.ui.users.shared.navigation.*
+
+import android.app.Application
+import androidx.compose.runtime.*
+import com.olive.app.BuildConfig
+import com.olive.app.data.*
+import com.olive.app.R
+import com.olive.app.security.*
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
+
+// Shares dependencies, account identity, jobs and cancellation epoch across feature controllers.
+internal class SessionRuntime(val application: Application, val scope: CoroutineScope) {
+    val state: SessionState = SessionState { canEnterSafe() }
+    val localMode = !BuildConfig.FIREBASE_CONFIGURED
+    val vault = EncryptedVault(application, if (localMode) "demo" else "firebase")
+    val activityVault =
+        EncryptedVault(application, if (localMode) "demo-activity" else "firebase-activity")
+
+    // Checks whether the phone has a screen lock.
+    fun phoneSecure() =
+        application.getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure
+
+    var deviceSecure by mutableStateOf(phoneSecure())
+    val store = DeviceStore(vault, activityVault, ::phoneSecure)
+    val coverStore = CoverStateStore(EncryptedVault(application, "cover"))
+    val coverSaveMutex = Mutex()
+    val foodRevisions = mutableMapOf<String, Long>()
+    val newsRevisions = mutableMapOf<String, Long>()
+    val accounts: AccountRepository =
+        if (localMode) LocalAccountRepository(vault) else FirebaseAccountRepository()
+    val adminRepository = if (localMode) null else AdminRepository()
+    val messagingRepository = if (localMode) null else MessagingRepository()
+    val secureChatRepository = if (localMode) null else SecureChatRepository()
+    val secureDocumentRepository = if (localMode) null else SecureDocumentRepository()
+    val safetyDocumentRepository = if (localMode) null else SafetyDocumentRepository()
+    val locationSharingRepository = if (localMode) null else LocationSharingRepository(application)
+    val messageReadState: android.content.SharedPreferences =
+        application.getSharedPreferences(
+            "olive_message_read_state",
+            android.content.Context.MODE_PRIVATE
+        )
+    val cloudState: android.content.SharedPreferences =
+        application.getSharedPreferences("olive_cloud_state", android.content.Context.MODE_PRIVATE)
+    var enrollment by mutableStateOf<DeviceEnrollment?>(null)
+    var pendingIdentity: AccountIdentity? = null
+    var pendingProfile: UserProfile? = null
+    var operationJob: Job? = null
+    var triggerJob: Job? = null
+    var historySyncJob: Job? = null
+    var idleJob: Job? = null
+    var socialSubscription: ChatSubscription? = null
+    var conversationSubscription: ChatSubscription? = null
+    var messageSubscription: ChatSubscription? = null
+    var observedFriendshipIds = emptySet<String>()
+    var chatQuickExitHintShown = false
+    var verifiedMessagingIdentityMarker: String? = null
+    var lastTouchAt = 0L
+    val historySyncMutex = Mutex()
+    var activeTriggerId: String? = null
+    var epoch = 0L
+    var pinAuthorizedUid: String? = null
+    var pinAuthorizedEpoch = -1L
+    val screenHistory = mutableListOf<SessionScreen>()
+    val safePageHistory = mutableListOf<SafePage>()
+
+    val auth = SessionAuthentication(this)
+    val access = SessionAccess(this)
+    val entrySettings = SessionEntrySettings(this)
+    val deviceAccess = SessionDeviceAccess(this)
+    val navigation = SessionNavigation(this)
+    val organization = OrganizationAccounts(this)
+    val messaging = SessionMessaging(this)
+    val friendActions = FriendActions(this)
+    val conversationActions = SessionConversations(this)
+    val secureSharing = SessionSecureSharing(this)
+    val privacy = SessionPrivacy(this)
+    val covers = SessionCoverState(this)
+    val history = SessionHistory(this)
+    val notes = SessionNotes(this)
+    val safety = SessionSafetyPlans(this)
+    val settings = SessionSettings(this)
+    val operations = SessionOperations(this)
+
+    val configured get() = enrollment != null
+    val coverAccountId get() = enrollment?.uid
+    val sensitive get() = state.screen != SessionScreen.Cover || state.checkoutActive
+    val setupUsername get() = pendingIdentity?.username.orEmpty()
+    val setupProfile get() = pendingProfile
+    val usesCover get() = state.accountRole == AccountRole.USER
+    val unreadMessageCount: Int
+        get() {
+            state.readMessageVersion
+            val uid = enrollment?.uid ?: return 0
+            return state.conversations.count { conversation ->
+                conversation.lastMessageId.isNotBlank() && conversation.lastSenderUid.isNotBlank() &&
+                        conversation.lastSenderUid != uid &&
+                        messageReadState.getString(
+                            conversationActions.readMessageKey(
+                                uid,
+                                conversation.id
+                            ), null
+                        ) != conversation.lastMessageId
+            }
+        }
+    val pendingMessageActionCount get() = state.incomingFriendRequests.size + unreadMessageCount
+
+    // User access requires a verified app PIN or Android authentication for this enrollment and epoch.
+    private fun canEnterSafe(): Boolean {
+        val device = enrollment
+        val requiresPin = device?.role == AccountRole.USER || state.accountRole == AccountRole.USER
+        return !requiresPin || (device != null && pinAuthorizedUid == device.uid && pinAuthorizedEpoch == epoch)
+    }
+
+}
+
+// Uses a 25-second timeout by default; Android authentication gets longer. Epoch/job checks reject canceled work.
+internal class SessionOperations(private val runtime: SessionRuntime) {
+    // Runs operation.
+    fun runOperation(failure: String, timeoutMillis: Long = 25_000, block: suspend (Long) -> Unit) {
+        with(runtime) {
+            with(state) {
+                val token = epoch
+                busy = true
+                message = null
+                operationJob = scope.launch {
+                    val runningJob = coroutineContext.job
+                    var finalFailure: String? = null
+                    try {
+                        withTimeout(timeoutMillis.milliseconds) { block(token) }
+                    } catch (_: TimeoutCancellationException) {
+                        if (epoch == token) finalFailure =
+                            application.getString(R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        if (epoch == token) finalFailure = failure
+                    } finally {
+                        if (operationJob === runningJob) {
+                            operationJob = null
+                            busy = false
+                            finalFailure?.let { message = it }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Observable screen state exposed through SessionViewModel; the screen setter enforces the verified User entry gate.
+internal class SessionState(private val canEnterSafe: () -> Boolean) {
+    private var screenState by mutableStateOf(SessionScreen.Loading)
+    var screen: SessionScreen
+        get() = screenState
+        set(value) {
+            screenState =
+                if (value == SessionScreen.Safe && !canEnterSafe()) SessionScreen.Cover else value
+        }
+    // Counts changes to PIN challenge.
+    var pinChallengeVersion by mutableIntStateOf(0)
+    // Counts changes to accessibility exit.
+    var accessibilityExitVersion by mutableIntStateOf(0)
+    var page by mutableStateOf(SafePage.Home)
+    var activityCategory by mutableStateOf<ActivityCategory?>(null)
+    var busy by mutableStateOf(false)
+    var deviceLockRequest by mutableStateOf<DeviceLockRequest?>(null)
+    var message by mutableStateOf<String?>(null)
+    var profile by mutableStateOf<UserProfile?>(null)
+    var attempts by mutableStateOf(emptyList<FailedAttempt>())
+    var settingsHistory by mutableStateOf(emptyList<SettingsEvent>())
+    var privacyHistory by mutableStateOf(emptyList<SettingsEvent>())
+    var triggerHistory by mutableStateOf(emptyList<TriggerEvent>())
+    var checkoutHistory by mutableStateOf(emptyList<CheckoutEvent>())
+    var privateEntries by mutableStateOf(emptyList<PrivateEntry>())
+    var viewedSharedEntry by mutableStateOf<PrivateEntry?>(null)
+    var userSearchResults by mutableStateOf(emptyList<DirectoryUser>())
+    var friends by mutableStateOf(emptyList<Friend>())
+    var incomingFriendRequests by mutableStateOf(emptyList<FriendRequest>())
+    var outgoingFriendRequests by mutableStateOf(emptyList<FriendRequest>())
+    var conversations by mutableStateOf(emptyList<ChatConversation>())
+    // Counts changes to read message.
+    var readMessageVersion by mutableIntStateOf(0)
+    var activeConversation by mutableStateOf<ChatConversation?>(null)
+    var chatQuickExitHintVisible by mutableStateOf(false)
+    var chatMessages by mutableStateOf(emptyList<ChatMessage>())
+    var messagingBusy by mutableStateOf(false)
+    var messagingNeedsReconnect by mutableStateOf(false)
+    var conversationLoadFailed by mutableStateOf(false)
+    var pendingSync by mutableStateOf(false)
+    var deliveryAddress by mutableStateOf(DeliveryAddress())
+    var addressPrompt by mutableStateOf(false)
+    // Counts changes to address save.
+    var addressSaveVersion by mutableIntStateOf(0)
+    var language by mutableStateOf(AppLocaleManager.resolveSystemDefaultLanguageName())
+    var coverDob by mutableStateOf("")
+    var coverFullName by mutableStateOf("")
+    var coverUsername by mutableStateOf("")
+    var coverType by mutableStateOf(CoverType.FOOD)
+    var accountRole by mutableStateOf(AccountRole.USER)
+    var adminCounts by mutableStateOf(AccountCounts())
+    var adminAccounts by mutableStateOf(emptyList<AdminAccountSummary>())
+    var foodCart by mutableStateOf<Map<String, Int>>(emptyMap())
+    var foodFavorites by mutableStateOf<Set<String>>(emptySet())
+    var foodCustomizations by mutableStateOf<Map<String, Set<String>>>(emptyMap())
+    var savedNews by mutableStateOf<List<NewsArticle>>(emptyList())
+    // Counts changes to cover data.
+    var coverDataVersion by mutableIntStateOf(0)
+    var checkoutActive by mutableStateOf(false)
+    var idleCountdownSeconds by mutableStateOf<Int?>(null)
+    var privacyBlackout by mutableStateOf(false)
+    var credentialFieldError by mutableStateOf<CredentialFieldError?>(null)
+    var creatingAccount by mutableStateOf(false)
+    var coverReset by mutableIntStateOf(0)
+}

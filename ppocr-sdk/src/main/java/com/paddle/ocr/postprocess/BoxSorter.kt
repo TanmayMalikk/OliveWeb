@@ -16,6 +16,7 @@ package com.paddle.ocr.postprocess
 
 import com.paddle.ocr.model.OCRBox
 
+// Groups the data and actions for box sorter.
 object BoxSorter {
     private const val ROW_THRESHOLD_Y = 10f
 

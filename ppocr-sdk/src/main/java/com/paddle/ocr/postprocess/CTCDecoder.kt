@@ -14,6 +14,7 @@
 
 package com.paddle.ocr.postprocess
 
+// Groups the data and actions for ctcdecoder.
 object CTCDecoder {
     private const val BLANK_IDX = 0
 

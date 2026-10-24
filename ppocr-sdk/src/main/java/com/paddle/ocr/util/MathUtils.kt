@@ -16,6 +16,7 @@ package com.paddle.ocr.util
 
 import kotlin.math.floor
 
+// Groups the data and actions for math utils.
 object MathUtils {
 
     fun roundHalfToEven(value: Double): Int {

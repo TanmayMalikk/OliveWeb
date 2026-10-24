@@ -1,3 +1,4 @@
+// Contains the firebase code for this part of Olive.
 import { initializeApp } from "firebase/app";
 import {
   getAuth,

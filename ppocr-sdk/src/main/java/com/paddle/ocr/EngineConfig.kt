@@ -14,6 +14,7 @@
 
 package com.paddle.ocr
 
+// Groups the data and actions for engine config.
 data class EngineConfig(
     val numThreads: Int = 4,
 )

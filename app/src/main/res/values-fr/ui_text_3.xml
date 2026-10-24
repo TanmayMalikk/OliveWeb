@@ -102,12 +102,6 @@
     <string name="ui_update_your_profile_details">Mettez à jour les informations de votre profil.</string>
     <string name="ui_profile_required_fields">Le nom complet, une date de naissance valide et la ville sont obligatoires.</string>
     <string name="password_excludes_username">Le mot de passe ne doit pas contenir votre nom d’utilisateur.</string>
-    <string name="ocr_test_title">OCR &amp; Orientation Test</string>
-    <string name="ocr_test_description">Preview how the orientation preprocessor straightens the test document before feeding it to PaddleOCR.</string>
-    <string name="ocr_raw_output">Raw OCR Text Output</string>
-    <string name="ocr_success">Success: %1$b</string>
-    <string name="ocr_confidence">Confidence: %1$d%%</string>
-    <string name="ocr_parsed_fields">Parsed Fields:</string>
-    <string name="ocr_no_text">Aucun texte reconnu dans le document.</string>
+<string name="ocr_no_text">Aucun texte reconnu dans le document.</string>
     <string name="ocr_error_detail">Erreur OCR : %1$s</string>
 </resources>

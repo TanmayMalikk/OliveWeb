@@ -1,3 +1,4 @@
+// Contains the build.gradle code for this part of Olive.
 plugins {
     id("com.android.library")
 }

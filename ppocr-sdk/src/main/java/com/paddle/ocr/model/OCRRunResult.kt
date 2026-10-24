@@ -14,6 +14,7 @@
 
 package com.paddle.ocr.model
 
+// Groups the data and actions for ocrrun result.
 data class OCRRunResult(
     val results: List<OCRResult>,
     val detectionTimeMs: Long,

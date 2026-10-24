@@ -25,6 +25,7 @@ import com.paddle.ocr.postprocess.BoxSorter
 import com.paddle.ocr.postprocess.QuadTextCrop
 import com.paddle.ocr.util.BitmapUtils
 
+// Groups the data and actions for ocrengine.
 class OCREngine(
     context: Context,
     private val config: PaddleOCRConfig,

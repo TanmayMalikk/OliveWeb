@@ -1,3 +1,4 @@
+// Contains the main code for this part of Olive.
 import {
   Component,
   lazy,
@@ -10,18 +11,19 @@ import {
 import { createRoot } from "react-dom/client";
 import { LogOut, Delete, ArrowLeft, Leaf } from "lucide-react";
 import { SessionProvider, useSession } from "./session";
-import { AuthPage, Setup } from "./Account";
+import { AuthPage, Setup } from "./users/shared/auth/Account";
 import { Button, Field, Form } from "./components";
-import Game from "./covers/Game";
+import Game from "./public/covers/Game";
 import { coverSite, siteMode, type SiteMode } from "./sites";
 import "./styles.css";
-const Download = lazy(() => import("./Download"));
-const EntryLink = lazy(() => import("./EntryLink"));
-const SafeApp = lazy(() => import("./SafeApp"));
-const Food = lazy(() => import("./covers/Food"));
-const News = lazy(() => import("./covers/News"));
-const Calculator = lazy(() => import("./covers/Calculator"));
-const Portal = lazy(() => import("./Portal"));
+const Download = lazy(() => import("./public/Download"));
+const EntryLink = lazy(() => import("./users/shared/auth/EntryLink"));
+const SafeApp = lazy(() => import("./users/shared/safe_app/SafeApp"));
+const Food = lazy(() => import("./public/covers/Food"));
+const News = lazy(() => import("./public/covers/News"));
+const Calculator = lazy(() => import("./public/covers/Calculator"));
+const AdminPortal = lazy(() => import("./users/admin/AdminPortal"));
+const StaffPortal = lazy(() => import("./users/staff/StaffPortal"));
 function PinGate() {
   const s = useSession();
   const [pin, setPin] = useState("");
@@ -190,7 +192,8 @@ function Routes({ mode }: { mode: SiteMode }) {
   let content: ReactNode;
   if (mode === "download") content = <Download />;
   else if (mode === "admin") {
-    if (s.phase === "portal" && s.profile) content = <Portal />;
+    if (s.phase === "portal" && s.profile)
+      content = s.profile.role === "ADMIN" ? <AdminPortal /> : <StaffPortal />;
     else if (s.phase === "setup") content = <Setup />;
     else content = <AuthPage organizationOnly />;
   } else if (s.phase === "safe" && s.profile) content = <SafeApp />;
@@ -218,6 +221,7 @@ function Routes({ mode }: { mode: SiteMode }) {
     </>
   );
 }
+// Groups the data and actions for error boundary.
 class ErrorBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }

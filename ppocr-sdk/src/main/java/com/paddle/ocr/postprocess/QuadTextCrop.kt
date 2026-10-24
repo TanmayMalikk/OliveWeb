@@ -25,6 +25,7 @@ import org.opencv.imgproc.Imgproc
 import kotlin.math.hypot
 import kotlin.math.max
 
+// Groups the data and actions for quad text crop.
 object QuadTextCrop {
     private const val VERTICAL_CROP_RATIO = 1.5
 

@@ -14,6 +14,7 @@
 
 package com.paddle.ocr.util
 
+// Groups the data and actions for yaml utils.
 object YamlUtils {
 
     fun leadingSpaces(line: String): Int {

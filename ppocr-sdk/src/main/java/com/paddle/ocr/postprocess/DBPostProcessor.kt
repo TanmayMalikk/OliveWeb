@@ -26,6 +26,7 @@ import org.opencv.core.Point
 import org.opencv.core.Scalar
 import org.opencv.imgproc.Imgproc
 
+// Groups the data and actions for dbpost processor.
 object DBPostProcessor {
     private const val MIN_SIZE_BEFORE_UNCLIP = 3f
     private const val MIN_SIZE_AFTER_UNCLIP = 5f

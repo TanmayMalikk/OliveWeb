@@ -1,3 +1,4 @@
+// Contains the paddle OCR manager code for this part of Olive.
 package com.olive.app.ocr
 
 import android.content.Context
@@ -14,6 +15,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+// Groups the data and actions for OCR result.
 data class OcrResult(
     val success: Boolean,
     val extractedText: String,
@@ -30,16 +32,17 @@ Class PaddleOcrManager
 class PaddleOcrManager(private val context: Context) {
 
     private var paddleOcr: PaddleOCR? = null
-    private var straightener:OrientationPreprocessor?=null
-    private val mutex=Mutex()
-    private var released=false
+    private var straightener: OrientationPreprocessor? = null
+    private val mutex = Mutex()
+    private var released = false
 
+    // Makes sure initialized is ready.
     private suspend fun ensureInitialized(): PaddleOCR {
         check(!released) { "OCR engine has been released" }
         if (paddleOcr == null) {
             try {
                 OpenCVUtils.init(context.applicationContext)
-                straightener=OrientationPreprocessor(context.applicationContext)
+                straightener = OrientationPreprocessor(context.applicationContext)
                 paddleOcr = PaddleOCR.create(
                     context = context,
                     config = PaddleOCRConfig(
@@ -66,7 +69,7 @@ class PaddleOcrManager(private val context: Context) {
                 )
             } catch (e: Exception) {
                 runCatching { straightener?.close() }
-                straightener=null
+                straightener = null
                 Log.e("PaddleOcrManager", "Failed to initialize PaddleOCR instance", e)
                 throw e
             }
@@ -74,47 +77,58 @@ class PaddleOcrManager(private val context: Context) {
         return paddleOcr!!
     }
 
-    suspend fun recognizeDocument(imageBytes:ByteArray):OcrResult = recognizeDocumentWithPreview(imageBytes).second
+    suspend fun recognizeDocument(imageBytes: ByteArray): OcrResult =
+        recognizeDocumentWithPreview(imageBytes).second
 
-    suspend fun recognizeDocumentWithPreview(imageBytes:ByteArray):Pair<ByteArray,OcrResult> = withContext(Dispatchers.IO) {
-        mutex.withLock { try {
-            val ocr=ensureInitialized()
-            val uprightBytes=checkNotNull(straightener).process(imageBytes)
-            val runResult=ocr.recognize(uprightBytes)
+    suspend fun recognizeDocumentWithPreview(imageBytes: ByteArray): Pair<ByteArray, OcrResult> =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                try {
+                    val ocr = ensureInitialized()
+                    val uprightBytes = checkNotNull(straightener).process(imageBytes)
+                    val runResult = ocr.recognize(uprightBytes)
 
-            // Return pure raw text lines without confidence annotations
-            val extractedText = runResult.results.joinToString("\n") { it.text }
-                .ifBlank { context.getString(R.string.ocr_no_text) }
+                    // Return pure raw text lines without confidence annotations
+                    val extractedText = runResult.results.joinToString("\n") { it.text }
+                        .ifBlank { context.getString(R.string.ocr_no_text) }
 
-            val avgConfidence = if (runResult.results.isNotEmpty()) {
-                runResult.results.map { it.confidence }.average().toFloat()
-            } else {
-                0f
+                    val avgConfidence = if (runResult.results.isNotEmpty()) {
+                        runResult.results.map { it.confidence }.average().toFloat()
+                    } else {
+                        0f
+                    }
+
+                    uprightBytes to OcrResult(
+                        success = true,
+                        extractedText = extractedText,
+                        confidence = avgConfidence,
+                        rawResults = runResult.results,
+                        detectedFields = mapOf("line_count" to runResult.lineCount.toString())
+                    )
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Exception) {
+                    Log.e("PaddleOcrManager", "PaddleOCR SDK recognition failed", e)
+                    imageBytes to OcrResult(
+                        false,
+                        context.getString(
+                            R.string.ocr_error_detail,
+                            e.localizedMessage ?: e.javaClass.simpleName
+                        ),
+                        0f
+                    )
+                }
             }
+        }
 
-            uprightBytes to OcrResult(
-                success = true,
-                extractedText = extractedText,
-                confidence = avgConfidence,
-                rawResults = runResult.results,
-                detectedFields = mapOf("line_count" to runResult.lineCount.toString())
-            )
-        } catch(cancelled:CancellationException) {
-            throw cancelled
-        } catch (e: Exception) {
-            Log.e("PaddleOcrManager", "PaddleOCR SDK recognition failed", e)
-            imageBytes to OcrResult(false,context.getString(R.string.ocr_error_detail,e.localizedMessage ?: e.javaClass.simpleName),0f)
-        } }
-    }
-
-    suspend fun release()=withContext(Dispatchers.IO) {
+    suspend fun release() = withContext(Dispatchers.IO) {
         mutex.withLock {
-            if(released) return@withLock
-            released=true
+            if (released) return@withLock
+            released = true
             runCatching { paddleOcr?.release() }
-            paddleOcr=null
+            paddleOcr = null
             runCatching { straightener?.close() }
-            straightener=null
+            straightener = null
         }
     }
 }

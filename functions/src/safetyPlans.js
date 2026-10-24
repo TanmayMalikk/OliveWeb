@@ -1,3 +1,4 @@
+// Contains the safety plans code for this part of Olive.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {db} = require("./firebase");
 const {mergeFields} = require("./safetyPlanPolicy");

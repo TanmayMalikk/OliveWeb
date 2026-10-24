@@ -18,6 +18,7 @@ import android.content.Context
 import android.util.Log
 import org.opencv.android.OpenCVLoader
 
+// Groups the data and actions for open cvutils.
 object OpenCVUtils {
 
     private var initialized = false

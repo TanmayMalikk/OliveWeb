@@ -388,7 +388,6 @@ Buen humor.</string>
     <string name="y_one_function_per_line">Y = (una función por línea)</string>
     <string name="camera_permission_required">Se requiere permiso de la cámara para tomar fotografías en Olive Branch.</string>
     <string name="grant_camera_permission">Conceder permiso a la cámara</string>
-    <string name="error_loading_photo_preview">Error al cargar la vista previa de la foto</string>
-    <string name="captured_photo_review">Revisión de fotos capturadas</string>
+<string name="captured_photo_review">Revisión de fotos capturadas</string>
     <string name="take_again">Tomar de nuevo</string>
 </resources>

@@ -1,3 +1,4 @@
+// Contains the accounts code for this part of Olive.
 import {
   createLocal,
   loginLocal,
@@ -27,6 +28,7 @@ export const cloudMode = Boolean(
   import.meta.env.VITE_FIREBASE_STORAGE_BUCKET &&
   import.meta.env.VITE_FIREBASE_APP_ID,
 );
+// Groups the data and actions for cloud.
 type Cloud = typeof import("./firebase");
 let cloud: Cloud | null = null;
 export async function firebase() {
@@ -34,6 +36,7 @@ export async function firebase() {
   await cloud.authReady;
   return cloud;
 }
+// Groups the data and actions for accounts.
 export class Accounts {
   identity: Identity | null = null;
   private raw: Uint8Array | null = null;

@@ -39,8 +39,7 @@
     <string name="camera_saving">正在私密保存…</string>
     <string name="documents_upload_failed">无法上传文件。</string>
     <string name="documents_load_failed">无法加载已保存的文件。</string>
-    <string name="documents_open_failed">无法打开此安全文件。</string>
-    <string name="documents_share_failed">无法分享此安全文件。</string>
+<string name="documents_share_failed">无法分享此安全文件。</string>
     <string name="documents_shared_in_chat">已分享安全文件。</string>
     <string name="shared_secure_file">共享的安全文件</string>
     <string name="trusted_link_title">聊天账户</string>
@@ -56,8 +55,7 @@
     <string name="documents_empty_help">上传自己的文件，或请连接的用户与您分享文件。</string>
     <string name="documents_yours">您的文件</string>
     <string name="documents_shared_by">由 %1$s 分享</string>
-    <string name="documents_no_viewer">此设备上没有可打开该文件类型的应用。</string>
-    <string name="documents_private_viewer">应用内私密查看器</string>
+<string name="documents_private_viewer">应用内私密查看器</string>
     <string name="documents_pdf_page">第 %1$d 页，共 %2$d 页</string>
     <string name="documents_preview_unavailable">无法预览</string>
     <string name="documents_preview_supported">图片、视频、PDF、文本文件和 Word .docx 文件会在 Olive Branch 内私密打开。</string>

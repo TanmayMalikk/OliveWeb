@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="game_cover_title">橄榄点击</string>
+    <string name="game_cover_instructions">点击橄榄来提高分数。</string>
+    <string name="game_player_name">玩家名称</string>
+    <string name="game_tap_olive">点击橄榄</string>
+    <string name="game_score">分数：%1$d</string>
+    <string name="game_cover_app_olive_tap">游戏应用 · 橄榄点击</string>
+</resources>
