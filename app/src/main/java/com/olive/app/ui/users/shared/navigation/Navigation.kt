@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.error
@@ -112,6 +113,16 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
         session.page,
         session.coverAccountId
     ) { mutableStateOf(false) }
+    var observedScreen by remember { mutableStateOf(session.screen) }
+    var pinAnimationRunning by remember { mutableStateOf(false) }
+    val correctPinJustUnlocked =
+        observedScreen == SessionScreen.Pin && session.screen == SessionScreen.Safe
+    val showPinAnimation = correctPinJustUnlocked || pinAnimationRunning
+    SideEffect {
+        if (correctPinJustUnlocked) pinAnimationRunning = true
+        observedScreen = session.screen
+        if (session.screen != SessionScreen.Safe) pinAnimationRunning = false
+    }
     Box(Modifier.fillMaxSize().then(if (isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(
@@ -171,7 +182,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(Modifier.fillMaxSize()) {
                     Scaffold(
-                        modifier = if (supportExpanded) Modifier.clearAndSetSemantics {} else Modifier,
+                        modifier = if (supportExpanded || showPinAnimation) Modifier.clearAndSetSemantics {} else Modifier,
                         bottomBar = {
                             if (showQuickExit || showSupport) Spacer(
                                 Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp)
@@ -304,6 +315,17 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                             }
                         }
                     }
+                    if (showPinAnimation) PinSafeOliveTransition(
+                        backgroundColor = MaterialTheme.colorScheme.background,
+                        modifier = Modifier.fillMaxSize().testTag("pin_safe_animation")
+                            .clearAndSetSemantics {}
+                            .pointerInput(Unit) {
+                                awaitPointerEventScope {
+                                    while (true) awaitPointerEvent().changes.forEach { it.consume() }
+                                }
+                            },
+                        onAnimationEnd = { pinAnimationRunning = false },
+                    )
                     SafeSupportControls(
                         session,
                         exit,
