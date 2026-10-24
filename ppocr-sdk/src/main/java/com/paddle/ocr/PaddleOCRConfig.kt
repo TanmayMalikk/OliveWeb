@@ -14,6 +14,7 @@
 
 package com.paddle.ocr
 
+// Groups the data and actions for paddle ocrconfig.
 data class PaddleOCRConfig(
     val detImgMode: String = "BGR",
     val detLimitSideLen: Int = 64,

@@ -1,3 +1,4 @@
+// Contains the safety plan access code for this part of Olive.
 const {HttpsError} = require("firebase-functions/v2/https");
 const {auth, db} = require("./firebase");
 const {text, roleFromUser} = require("./accountPolicy");

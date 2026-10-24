@@ -36,6 +36,7 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 @RunWith(AndroidJUnit4::class)
+// Groups the data and actions for ocrbenchmark test.
 class OCRBenchmarkTest {
 
     companion object {
@@ -314,6 +315,7 @@ class OCRBenchmarkTest {
         return context.resources.openRawResource(resId).use { it.readBytes() }
     }
 
+    // Groups the data and actions for timing summary.
     data class TimingSummary(val mean: Double, val stdev: Double, val p90: Double) {
         fun toJson() = JSONObject().apply {
             put("mean", mean)

@@ -18,6 +18,7 @@ import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 
+// Groups the data and actions for image utils.
 object ImageUtils {
 
     fun resizeToMultipleOf32(

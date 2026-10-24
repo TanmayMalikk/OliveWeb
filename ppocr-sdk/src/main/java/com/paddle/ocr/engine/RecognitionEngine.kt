@@ -18,10 +18,12 @@ import com.paddle.ocr.postprocess.CTCDecoder
 import com.paddle.ocr.preprocess.RecPreprocessor
 import org.opencv.core.Mat
 
+// Groups the data and actions for recognition engine.
 class RecognitionEngine(
     private val ortManager: ORTSessionManager,
     private val characterList: List<String>,
 ) {
+    // Groups the data and actions for recognition result.
     data class RecognitionResult(
         val texts: List<Pair<String, Float>>,
         val preprocessMs: Long,

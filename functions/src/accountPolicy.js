@@ -1,3 +1,4 @@
+// Contains the account policy code for this part of Olive.
 const {HttpsError} = require("firebase-functions/v2/https");
 const {createHash} = require("node:crypto");
 

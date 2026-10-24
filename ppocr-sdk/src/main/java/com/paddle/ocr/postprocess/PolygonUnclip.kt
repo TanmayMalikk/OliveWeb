@@ -24,6 +24,7 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 
+// Groups the data and actions for polygon unclip.
 internal object PolygonUnclip {
     private const val EPS = 1e-6
     private const val ARC_TOLERANCE = 0.25

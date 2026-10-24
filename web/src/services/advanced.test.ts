@@ -1,3 +1,4 @@
+// Tests the test behavior.
 import { describe, it, expect } from "vitest";
 import { calculateTool, safeExpression } from "./advanced";
 import tools from "../data/tools.json";

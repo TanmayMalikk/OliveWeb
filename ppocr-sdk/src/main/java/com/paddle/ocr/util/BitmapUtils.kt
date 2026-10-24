@@ -22,6 +22,7 @@ import org.opencv.core.MatOfByte
 import org.opencv.imgcodecs.Imgcodecs
 import org.opencv.imgproc.Imgproc
 
+// Groups the data and actions for bitmap utils.
 object BitmapUtils {
 
     fun imdecodeBGR(imageBytes: ByteArray): Mat {

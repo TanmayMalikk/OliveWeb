@@ -372,9 +372,8 @@
     <string name="secure_message">Secure message</string><string name="encrypted_message_unavailable">Encrypted message unavailable</string>
 <string name="news_near_location">News near %1$s</string>
 <string name="accounts">Accounts</string><string name="add_another_contact">Add another contact</string><string name="calculation">Calculation</string><string name="change_local_news_location">Change local news location</string><string name="city_or_region">City or region</string><string name="create">Create</string><string name="deg">DEG</string><string name="data_values">Data values</string><string name="delete_account">Delete account</string><string name="generate_table">Generate table</string><string name="graph_table_analysis">Graph table &amp; analysis</string><string name="input">Input</string><string name="plot">Plot</string><string name="rad">RAD</string><string name="reconnect">Reconnect</string><string name="refresh">Refresh</string><string name="save">Save</string><string name="save_profile">Save profile</string><string name="stat_plots">Stat plots</string><string name="statistical_plots">Statistical plots</string><string name="table_analysis">Table &amp; analysis</string><string name="use_device_location">Use device location</string><string name="x_values">X values</string><string name="y_values">Y values</string><string name="delete_managed_account_warning">This permanently removes the %1$s account from Firebase Authentication and deletes its account data.</string><string name="y_one_function_per_line">Y = (one function per line)</string>
-    <string name="camera_permission_required" translatable="false">Camera permission is required to take photos in Olive Branch.</string>
-    <string name="grant_camera_permission" translatable="false">Grant Camera Permission</string>
-    <string name="error_loading_photo_preview" translatable="false">Error loading photo preview</string>
-    <string name="captured_photo_review" translatable="false">Captured photo review</string>
-    <string name="take_again" translatable="false">Take Again</string>
+    <string name="camera_permission_required">Camera permission is required to take photos in Olive Branch.</string>
+    <string name="grant_camera_permission">Grant Camera Permission</string>
+<string name="captured_photo_review">Captured photo review</string>
+    <string name="take_again">Take Again</string>
 </resources>

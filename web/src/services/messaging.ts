@@ -1,3 +1,4 @@
+// Contains the messaging code for this part of Olive.
 import {
   collection,
   doc,
@@ -16,16 +17,19 @@ import {
 import { firebase } from "./accounts";
 import { database } from "./local";
 import type { Identity } from "../domain";
+// Groups the data and actions for directory user.
 export interface DirectoryUser {
   uid: string;
   username: string;
   publicKey: string;
 }
+// Groups the data and actions for friend.
 export interface Friend {
   friendshipId: string;
   friendUid: string;
   friendUsername: string;
 }
+// Groups the data and actions for request.
 export interface Request {
   id: string;
   senderUid: string;
@@ -34,6 +38,7 @@ export interface Request {
   recipientUsername: string;
   friendshipId: string;
 }
+// Groups the data and actions for message.
 export interface Message {
   id: string;
   senderUid: string;
@@ -170,6 +175,7 @@ export async function subscribeSocial(
   ];
   return () => cleanups.forEach((stop) => stop());
 }
+// Sends request.
 export async function sendRequest(current: Identity, peer: DirectoryUser) {
   const { db } = await firebase();
   const id = `${current.uid}--${peer.uid}`;
@@ -315,6 +321,7 @@ export async function roomKey(id: string, current: Identity, peer: Friend) {
   raw.fill(0);
   return unwrapRoomKey(current.uid, selected);
 }
+// Sends message.
 export async function sendMessage(
   id: string,
   current: Identity,

@@ -22,10 +22,12 @@ import com.paddle.ocr.preprocess.DetPreprocessResult
 import com.paddle.ocr.preprocess.DetPreprocessor
 import org.opencv.core.Mat
 
+// Groups the data and actions for detection engine.
 class DetectionEngine(
     private val ortManager: ORTSessionManager,
     private val config: PaddleOCRConfig,
 ) {
+    // Groups the data and actions for detection result.
     data class DetectionResult(
         val boxes: List<OCRBox>,
         val preprocessMs: Long,

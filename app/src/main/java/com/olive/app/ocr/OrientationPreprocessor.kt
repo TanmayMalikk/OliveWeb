@@ -1,3 +1,4 @@
+// Contains the orientation preprocessor code for this part of Olive.
 package com.olive.app.ocr
 
 import android.content.Context
@@ -16,7 +17,7 @@ import java.nio.FloatBuffer
    OrientationPreprocessor: Runs an isolated ultra-lightweight ONNX model (224x224)
    to detect document rotation and automatically stand the byte stream upright.
  */
-class OrientationPreprocessor(context: Context):AutoCloseable {
+class OrientationPreprocessor(context: Context) : AutoCloseable {
 
     private val ortEnv = OrtEnvironment.getEnvironment()
     private val ortSession: OrtSession
@@ -39,11 +40,19 @@ class OrientationPreprocessor(context: Context):AutoCloseable {
         return try {
             // Bound the working bitmap before decoding it. Camera-native images can otherwise require
             // hundreds of MB while the original and rotated canvases coexist.
-            val bounds=BitmapFactory.Options().apply { inJustDecodeBounds=true }
-            BitmapFactory.decodeByteArray(imageBytes,0,imageBytes.size,bounds)
-            var sample=1
-            while(maxOf(bounds.outWidth,bounds.outHeight)/sample>MAX_WORKING_DIMENSION) sample*=2
-            val decodeOptions = BitmapFactory.Options().apply { inMutable=true;inSampleSize=sample }
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
+            var sample = 1
+            while (maxOf(
+                    bounds.outWidth,
+                    bounds.outHeight
+                ) / sample > MAX_WORKING_DIMENSION
+            ) sample *= 2
+            val decodeOptions =
+                BitmapFactory.Options().apply {
+                    inMutable = true
+                    inSampleSize = sample
+                }
             rawBitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, decodeOptions)
                 ?: return imageBytes // Fallback to original bytes if decoding completely fails
 
@@ -55,13 +64,14 @@ class OrientationPreprocessor(context: Context):AutoCloseable {
 
             // 3. Fire ONNX Runtime inference pass
             val inputShape = longArrayOf(1, 3, 224, 224)
-            val predictedClass=OnnxTensor.createTensor(ortEnv,floatBuffer,inputShape).use { inputTensor ->
-                ortSession.run(mapOf("x" to inputTensor)).use { outputs ->
-                    @Suppress("UNCHECKED_CAST")
-                    val logits=(outputs[0] as OnnxTensor).value as Array<FloatArray>
-                    logits[0].indices.maxByOrNull { logits[0][it] } ?: 0
+            val predictedClass =
+                OnnxTensor.createTensor(ortEnv, floatBuffer, inputShape).use { inputTensor ->
+                    ortSession.run(mapOf("x" to inputTensor)).use { outputs ->
+                        @Suppress("UNCHECKED_CAST")
+                        val logits = (outputs[0] as OnnxTensor).value as Array<FloatArray>
+                        logits[0].indices.maxByOrNull { logits[0][it] } ?: 0
+                    }
                 }
-            }
 
 
             // Map layout classes to correction angles needed to stand upright
@@ -72,32 +82,54 @@ class OrientationPreprocessor(context: Context):AutoCloseable {
                 else -> 0f // Already Upright (0°)
             }
 
-            Log.d("OrientationPrep", "Detected layout class: $predictedClass -> Rotating: $rotationDegrees°")
+            Log.d(
+                "OrientationPrep",
+                "Detected layout class: $predictedClass -> Rotating: $rotationDegrees°"
+            )
 
             // Preserve untouched bytes only when they already fit the OCR memory bound.
-            if(rotationDegrees==0f && sample==1) return imageBytes
-            uprightBitmap=if(rotationDegrees==0f) currentBitmap else {
-                val matrix=Matrix().apply { postRotate(rotationDegrees) }
-                Bitmap.createBitmap(currentBitmap,0,0,currentBitmap.width,currentBitmap.height,matrix,true)
+            if (rotationDegrees == 0f && sample == 1) return imageBytes
+            uprightBitmap = if (rotationDegrees == 0f) currentBitmap else {
+                val matrix = Matrix().apply { postRotate(rotationDegrees) }
+                Bitmap.createBitmap(
+                    currentBitmap,
+                    0,
+                    0,
+                    currentBitmap.width,
+                    currentBitmap.height,
+                    matrix,
+                    true
+                )
             }
 
             // 6. Re-compress the upright canvas back into a clean JPEG byte stream for Paddle
             val outputStream = ByteArrayOutputStream()
-            uprightBitmap.compress(Bitmap.CompressFormat.JPEG, 95, outputStream) // 95 keeps lines razor sharp
+            uprightBitmap.compress(
+                Bitmap.CompressFormat.JPEG,
+                95,
+                outputStream
+            ) // 95 keeps lines razor sharp
             val processedBytes = outputStream.toByteArray()
 
             processedBytes
 
         } catch (e: Exception) {
-            Log.e("OrientationPrep", "Failed to preprocess orientation, skipping layer: ${e.message}", e)
+            Log.e(
+                "OrientationPrep",
+                "Failed to preprocess orientation, skipping layer: ${e.message}",
+                e
+            )
 
             imageBytes
         } finally {
-            listOfNotNull(rawBitmap,scaledBitmap,uprightBitmap).distinct().forEach { if(!it.isRecycled) it.recycle() }
+            listOfNotNull(rawBitmap, scaledBitmap, uprightBitmap).distinct()
+                .forEach { if (!it.isRecycled) it.recycle() }
         }
     }
 
-    override fun close() { ortSession.close() }
+    override fun close() {
+        ortSession.close()
+    }
 
     /**
      * Packs standard 32-bit pixel integers into normalized floating point math streams
@@ -131,5 +163,7 @@ class OrientationPreprocessor(context: Context):AutoCloseable {
         return buffer
     }
 
-    private companion object { const val MAX_WORKING_DIMENSION=2048 }
+    private companion object {
+        const val MAX_WORKING_DIMENSION = 2048
+    }
 }

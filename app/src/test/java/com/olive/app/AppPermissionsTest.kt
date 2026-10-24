@@ -1,23 +1,59 @@
+// Tests the app permissions test behavior.
 package com.olive.app
+
+import com.olive.app.ui.shared.*
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
+// Groups the data and actions for app permissions test.
 class AppPermissionsTest {
-    @Test fun notificationsAlwaysPrecedeTheLocationPrompt() {
-        assertEquals(OnboardingPermission.Notifications,nextOnboardingPermission(true,false,false,false,false,false,false,false))
+    @Test
+    fun notificationsAlwaysPrecedeTheLocationPrompt() {
+        assertEquals(
+            OnboardingPermission.Notifications,
+            nextOnboardingPermission(true, false, false, false, false, false, false, false)
+        )
         // Either accepting or denying notifications counts as answering its prompt.
-        assertEquals(OnboardingPermission.Location,nextOnboardingPermission(true,true,false,false,false,false,false,false))
-        assertEquals(OnboardingPermission.Location,nextOnboardingPermission(false,true,false,false,false,false,false,false))
+        assertEquals(
+            OnboardingPermission.Location,
+            nextOnboardingPermission(true, true, false, false, false, false, false, false)
+        )
+        assertEquals(
+            OnboardingPermission.Location,
+            nextOnboardingPermission(false, true, false, false, false, false, false, false)
+        )
     }
-    @Test fun locationIsFollowedByCameraAndMicrophone() {
-        assertEquals(OnboardingPermission.Location,nextOnboardingPermission(false,false,false,false,false,false,false,false))
-        assertEquals(OnboardingPermission.Camera,nextOnboardingPermission(false,false,true,false,false,false,false,false))
-        assertEquals(OnboardingPermission.Microphone,nextOnboardingPermission(false,false,true,false,true,false,false,false))
-        assertEquals(OnboardingPermission.Done,nextOnboardingPermission(false,false,true,false,true,false,true,false))
+
+    @Test
+    fun locationIsFollowedByCameraAndMicrophone() {
+        assertEquals(
+            OnboardingPermission.Location,
+            nextOnboardingPermission(false, false, false, false, false, false, false, false)
+        )
+        assertEquals(
+            OnboardingPermission.Camera,
+            nextOnboardingPermission(false, false, true, false, false, false, false, false)
+        )
+        assertEquals(
+            OnboardingPermission.Microphone,
+            nextOnboardingPermission(false, false, true, false, true, false, false, false)
+        )
+        assertEquals(
+            OnboardingPermission.Done,
+            nextOnboardingPermission(false, false, true, false, true, false, true, false)
+        )
     }
-    @Test fun answeredPromptsDoNotRepeatWhenTheCoverChangesOrAppRestarts() {
-        assertEquals(OnboardingPermission.Done,nextOnboardingPermission(true,true,false,true,false,true,false,true))
-        assertEquals(OnboardingPermission.Notifications,nextOnboardingPermission(true,false,true,true,true,true,true,true))
+
+    @Test
+    fun answeredPromptsDoNotRepeatWhenTheCoverChangesOrAppRestarts() {
+        assertEquals(
+            OnboardingPermission.Done,
+            nextOnboardingPermission(true, true, false, true, false, true, false, true)
+        )
+        assertEquals(
+            OnboardingPermission.Notifications,
+            nextOnboardingPermission(true, false, true, true, true, true, true, true)
+        )
     }
 }

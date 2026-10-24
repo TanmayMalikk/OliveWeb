@@ -14,6 +14,7 @@
 
 package com.paddle.ocr.benchmark
 
+// Groups the data and actions for benchmark fixtures.
 object BenchmarkFixtures {
     const val defaultReferenceImageName = "android_ocr_benchmark_reference.jpg"
 }

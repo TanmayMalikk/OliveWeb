@@ -38,7 +38,7 @@ function Invoke-Checked {
 
 Set-Location -LiteralPath $projectRoot
 Invoke-Checked "Android unit tests, debug APK, UI-test APK, and lint" {
-    & ".\gradlew.bat" testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug
+    & ".\gradlew.bat" testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug checkSourceSize checkArchitecture
 }
 @(
     "$projectRoot\app\build\outputs\apk\debug\app-debug.apk",
@@ -46,6 +46,14 @@ Invoke-Checked "Android unit tests, debug APK, UI-test APK, and lint" {
     "$projectRoot\app\build\reports\lint-results-debug.html"
 ).ForEach({ if (-not (Test-Path -LiteralPath $_)) { throw "Required test artifact was not created: $_" } })
 $completedChecks.Add("Required Android artifacts created")
+
+Push-Location -LiteralPath "$projectRoot\web"
+try {
+    if (-not (Test-Path -LiteralPath "node_modules")) { Invoke-Checked "Install web dependencies" { & npm.cmd ci } }
+    Invoke-Checked "Web unit tests" { & npm.cmd test }
+    Invoke-Checked "Web production build" { & npm.cmd run build }
+    Invoke-Checked "Web browser and accessibility tests" { & npm.cmd run test:e2e }
+} finally { Pop-Location }
 
 Push-Location -LiteralPath "$projectRoot\functions"
 try {
@@ -90,19 +98,67 @@ if ($WithDeviceTests) {
     }
     Write-Host "Using Android device: $selectedDevice" -ForegroundColor Cyan
     Invoke-Checked "Build Android UI tests" { & ".\gradlew.bat" -PoliveLocalTest=true assembleDebug assembleDebugAndroidTest }
+    # Remove saved Android tasks as well as app data. Otherwise a previous isolated Compose
+    # test can be restored as the starting activity for the next instrumentation run.
+    & $adb -s $selectedDevice uninstall com.olive.app.test 2>&1 | Out-Null
+    & $adb -s $selectedDevice uninstall com.olive.app 2>&1 | Out-Null
     Invoke-Checked "Install Olive test build" { & $adb -s $selectedDevice install -r "$projectRoot\app\build\outputs\apk\debug\app-debug.apk" }
     Invoke-Checked "Install Olive UI tests" { & $adb -s $selectedDevice install -r -t "$projectRoot\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk" }
     & $adb -s $selectedDevice shell input keyevent KEYCODE_WAKEUP | Out-Null
     & $adb -s $selectedDevice shell wm dismiss-keyguard | Out-Null
-    Write-Host "`n== Android device UI tests ==" -ForegroundColor Green
-    $instrumentationOutput = & $adb -s $selectedDevice shell am instrument -w -r -e clearPackageData true com.olive.app.test/androidx.test.runner.AndroidJUnitRunner 2>&1
-    $instrumentationOutput | ForEach-Object { Write-Host $_ }
-    $deviceResult = $instrumentationOutput -join "`n"
-    # The suite keeps growing, so accept any successful non-empty test run instead of a hardcoded count.
-    if ($LASTEXITCODE -ne 0 -or $deviceResult -notmatch 'OK \(([1-9][0-9]*) tests?\)' -or $deviceResult -match 'FAILURES!!!') {
-        throw "Android device UI tests failed on $selectedDevice."
+    $userState = (& $adb -s $selectedDevice shell dumpsys user 2>&1) -join "`n"
+    if ($userState -notmatch 'State: RUNNING_UNLOCKED') {
+        throw "The Android test user is locked. Unlock the emulator once with PIN 246810, then rerun the command."
     }
-    $deviceTestCount=[regex]::Match($deviceResult,'OK \(([1-9][0-9]*) tests?\)').Groups[1].Value
+    function Assert-DeviceTestPin {
+        $verification = (& $adb -s $selectedDevice shell locksettings verify --old 246810 2>&1) -join "`n"
+        if ($verification -match 'user has no password') {
+            $setResult = (& $adb -s $selectedDevice shell locksettings set-pin 246810 2>&1) -join "`n"
+            if ($setResult -notmatch "Pin set to '246810'") { throw "Could not configure the disposable emulator PIN: $setResult" }
+        } elseif ($verification -notmatch 'Lock credential verified successfully') {
+            throw "The Android device must use the disposable test PIN 246810: $verification"
+        }
+    }
+    Write-Host "`n== Android device UI tests ==" -ForegroundColor Green
+    # Android 17 can crash its activity transaction handler after several Compose activity
+    # replacements in one instrumentation process. Isolating methods removes shared activity
+    # state and tells developers exactly which workflow needs attention.
+    $deviceTestCases = Get-ChildItem -LiteralPath "$projectRoot\app\src\androidTest\java" -Recurse -Filter "*Test.kt" |
+        ForEach-Object {
+            $source = Get-Content -LiteralPath $_.FullName -Raw
+            $packageMatch = [regex]::Match($source, '(?m)^package\s+([\w.]+)')
+            $classMatch = [regex]::Match($source, '(?m)^class\s+(\w+Test)\b')
+            if ($packageMatch.Success -and $classMatch.Success) {
+                [regex]::Matches($source, '@Test\s+fun\s+(\w+)\s*\(') | ForEach-Object {
+                    "$($packageMatch.Groups[1].Value).$($classMatch.Groups[1].Value)#$($_.Groups[1].Value)"
+                }
+            }
+        } | Sort-Object
+    if ($deviceTestCases.Count -eq 0) { throw "No Android device test methods were found." }
+    $deviceTestCount = 0
+    foreach ($testCase in $deviceTestCases) {
+        Write-Host "  RUN   $testCase" -ForegroundColor Cyan
+        $attempt = 0
+        do {
+            $attempt++
+            & $adb -s $selectedDevice shell am force-stop com.olive.app | Out-Null
+            & $adb -s $selectedDevice shell am force-stop com.olive.app.test | Out-Null
+            Assert-DeviceTestPin
+            $instrumentationOutput = & $adb -s $selectedDevice shell am instrument -w -r -e clearPackageData true -e class $testCase com.olive.app.test/androidx.test.runner.AndroidJUnitRunner 2>&1
+            $instrumentationOutput | ForEach-Object { Write-Host $_ }
+            $deviceResult = $instrumentationOutput -join "`n"
+            $countMatch = [regex]::Match($deviceResult, 'OK \(([1-9][0-9]*) tests?\)')
+            $passed = $LASTEXITCODE -eq 0 -and $countMatch.Success -and $deviceResult -notmatch 'FAILURES!!!'
+            $frameworkCrash = $deviceResult -match 'shortMsg=Process crashed|Activity client record must not be null'
+            if (-not $passed -and $attempt -eq 1 -and $frameworkCrash) {
+                Write-Warning "Android framework crashed during $testCase; retrying once in a clean process."
+            }
+        } while (-not $passed -and $attempt -lt 2 -and $frameworkCrash)
+        if (-not $passed) {
+            throw "Android device UI test $testCase failed on $selectedDevice."
+        }
+        $deviceTestCount += [int]$countMatch.Groups[1].Value
+    }
     $completedChecks.Add("Android device UI tests on $selectedDevice ($deviceTestCount tests)")
 }
 

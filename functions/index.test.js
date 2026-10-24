@@ -1,3 +1,4 @@
+// Contains the index.test code for this part of Olive.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId: "olive-test", storageBucket: "olive-test.appspot.com"});

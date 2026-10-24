@@ -1,3 +1,4 @@
+// Contains the account deletion code for this part of Olive.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebase");
 const {text, roleFromUser, PROTECTED_USERNAME} = require("./accountPolicy");

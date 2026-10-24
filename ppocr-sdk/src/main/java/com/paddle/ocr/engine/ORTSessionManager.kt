@@ -22,6 +22,7 @@ import com.paddle.ocr.EngineConfig
 import com.paddle.ocr.model.OCRError
 import java.nio.FloatBuffer
 
+// Groups the data and actions for ortsession manager.
 class ORTSessionManager(
     private val context: Context,
     private val config: EngineConfig,

@@ -17,6 +17,7 @@ package com.paddle.ocr.model
 import android.content.Context
 import com.paddle.ocr.util.YamlUtils
 
+// Groups the data and actions for model config.
 data class ModelConfig(
     val characterList: List<String>,
 ) {

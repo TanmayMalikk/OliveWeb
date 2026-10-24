@@ -50,6 +50,7 @@ QUALIFIER_TO_LANG = {
     "values-fr-rCA": "fr",
 }
 
+# Runs the parse strings xml steps.
 def parse_strings_xml(file_path):
     """Parses a strings.xml file into a dictionary of key -> text."""
     if not os.path.exists(file_path):
@@ -67,10 +68,12 @@ def parse_strings_xml(file_path):
         print(f"Error parsing {file_path}: {e}", file=sys.stderr)
         return {}
 
+# Runs the protect placeholders steps.
 def protect_placeholders(text):
     """Masks formatting placeholders (%1$s, %1$d, \\n, HTML tags) prior to translation."""
     placeholders = []
     
+    # Runs the mask match steps.
     def mask_match(m):
         placeholders.append(m.group(0))
         return f"__PARAM_{len(placeholders) - 1}__"
@@ -79,6 +82,7 @@ def protect_placeholders(text):
     masked_text = pattern.sub(mask_match, text)
     return masked_text, placeholders
 
+# Runs the restore placeholders steps.
 def restore_placeholders(text, placeholders):
     """Restores masked placeholders after translation."""
     result = text
@@ -88,6 +92,7 @@ def restore_placeholders(text, placeholders):
         result = result.replace(token, ph)
     return result
 
+# Runs the translate batch gtx steps.
 def translate_batch_gtx(masked_texts, target_lang, max_retries=3):
     """Translates a batch of texts in a single HTTP request."""
     delimiter = "\n\n"
@@ -119,6 +124,7 @@ def translate_batch_gtx(masked_texts, target_lang, max_retries=3):
             
     return None, "Rate limit retries exhausted."
 
+# Runs the escape xml steps.
 def escape_xml(val):
     """Escapes special characters for Android strings.xml."""
     val = val.replace("&", "&amp;")
@@ -128,6 +134,7 @@ def escape_xml(val):
     val = val.replace("'", "\\'")
     return val
 
+# Runs the save strings xml steps.
 def save_strings_xml(file_path, strings_dict):
     """Saves dictionary into strings.xml with clean Android formatting."""
     lines = ['<?xml version="1.0" encoding="utf-8"?>', '<resources>']
@@ -140,11 +147,13 @@ def save_strings_xml(file_path, strings_dict):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
+# Runs the get target lang steps.
 def get_target_lang(folder_name):
     if not folder_name.startswith("values-"):
         folder_name = f"values-{folder_name}"
     return QUALIFIER_TO_LANG.get(folder_name, folder_name.replace("values-", ""))
 
+# Runs the process locale steps.
 def process_locale(folder_name, default_strings, delay=2.0, batch_size=20, dry_run=False, overwrite=False, verbose=False):
     lang_code = get_target_lang(folder_name)
     target_dir = os.path.join(RES_DIR, folder_name if folder_name.startswith("values-") else f"values-{folder_name}")
@@ -219,6 +228,7 @@ def process_locale(folder_name, default_strings, delay=2.0, batch_size=20, dry_r
     elif dry_run:
         print(f"  [Dry Run] No changes written to '{xml_path}'.")
 
+# Runs the main steps.
 def main():
     parser = argparse.ArgumentParser(description="Auto-translate missing Android strings.xml entries in batches.")
     parser.add_argument("--target-locale", "-l", help="Target specific locale (e.g., 'es', 'ar', 'zh', 'fr')")

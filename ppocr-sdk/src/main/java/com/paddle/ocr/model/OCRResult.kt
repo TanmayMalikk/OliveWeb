@@ -14,6 +14,7 @@
 
 package com.paddle.ocr.model
 
+// Groups the data and actions for ocrresult.
 data class OCRResult(
     val box: OCRBox,
     val text: String,

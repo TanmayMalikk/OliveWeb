@@ -387,7 +387,6 @@
     <string name="y_one_function_per_line">Y = (une fonction par ligne)</string>
     <string name="camera_permission_required">L\'autorisation de l\'appareil photo est requise pour prendre des photos à Olive Branch.</string>
     <string name="grant_camera_permission">Accorder l\'autorisation à la caméra</string>
-    <string name="error_loading_photo_preview">Erreur lors du chargement de l\'aperçu de la photo</string>
-    <string name="captured_photo_review">Examen des photos capturées</string>
+<string name="captured_photo_review">Examen des photos capturées</string>
     <string name="take_again">Reprendre</string>
 </resources>

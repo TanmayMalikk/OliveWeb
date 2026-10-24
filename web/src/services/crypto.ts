@@ -1,3 +1,4 @@
+// Contains the crypto code for this part of Olive.
 import type { Envelope, WrappedKey } from "../domain";
 const encoder = new TextEncoder();
 export const toBase64 = (value: Uint8Array) =>

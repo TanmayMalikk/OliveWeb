@@ -14,11 +14,18 @@
 
 package com.paddle.ocr.model
 
+// Groups the data and actions for ocrerror.
 sealed class OCRError(message: String, cause: Throwable? = null) : Exception(message, cause) {
+    // Groups the data and actions for model not found.
     class ModelNotFound(modelPath: String, cause: Throwable? = null) : OCRError("Model not found: $modelPath", cause)
+    // Groups the data and actions for model load failed.
     class ModelLoadFailed(modelName: String, cause: Throwable) : OCRError("Failed to load $modelName model", cause)
+    // Groups the data and actions for config parse failed.
     class ConfigParseFailed(path: String, cause: Throwable? = null) : OCRError("Failed to parse config: $path", cause)
+    // Groups the data and actions for invalid image.
     class InvalidImage : OCRError("Input image is empty or invalid")
+    // Groups the data and actions for inference failed.
     class InferenceFailed(stage: String, cause: Throwable) : OCRError("Inference failed at stage '$stage'", cause)
+    // Groups the data and actions for decode error.
     class DecodeError(message: String, cause: Throwable? = null) : OCRError(message, cause)
 }

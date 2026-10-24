@@ -30,14 +30,14 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/document_paths" />
         </provider>
-        <activity android:name=".MainActivity" android:exported="false"
+        <activity android:name=".OliveActivity" android:exported="false"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
         <!-- Android Studio can always use this entry point, even after the user changes covers. -->
         <activity android:name=".OliveLauncher" android:exported="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
-        <activity-alias android:name=".FoodLauncher" android:targetActivity=".MainActivity"
+        <activity-alias android:name=".FoodLauncher" android:targetActivity=".OliveActivity"
             android:exported="true" android:enabled="true" android:label="Olive"
             android:icon="@mipmap/ic_launcher_food" android:roundIcon="@mipmap/ic_launcher_food">
             <intent-filter>
@@ -45,7 +45,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
-        <activity-alias android:name=".NewsLauncher" android:targetActivity=".MainActivity"
+        <activity-alias android:name=".NewsLauncher" android:targetActivity=".OliveActivity"
             android:exported="true" android:enabled="false" android:label="Daily Digest"
             android:icon="@mipmap/ic_launcher_news" android:roundIcon="@mipmap/ic_launcher_news">
             <intent-filter>
@@ -53,7 +53,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
-        <activity-alias android:name=".CalculatorLauncher" android:targetActivity=".MainActivity"
+        <activity-alias android:name=".CalculatorLauncher" android:targetActivity=".OliveActivity"
             android:exported="true" android:enabled="false" android:label="Better Calculator"
             android:icon="@mipmap/ic_launcher_calculator" android:roundIcon="@mipmap/ic_launcher_calculator">
             <intent-filter>
@@ -61,7 +61,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
-        <activity-alias android:name=".BranchLauncher" android:targetActivity=".MainActivity"
+        <activity-alias android:name=".BranchLauncher" android:targetActivity=".OliveActivity"
             android:exported="true" android:enabled="false" android:label="Olive Branch"
             android:icon="@mipmap/ic_launcher_branch" android:roundIcon="@mipmap/ic_launcher_branch">
             <intent-filter>
@@ -69,7 +69,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
-        <activity-alias android:name=".TreeLauncher" android:targetActivity=".MainActivity"
+        <activity-alias android:name=".TreeLauncher" android:targetActivity=".OliveActivity"
             android:exported="true" android:enabled="false" android:label="Olive Tree"
             android:icon="@mipmap/ic_launcher_tree" android:roundIcon="@mipmap/ic_launcher_tree">
             <intent-filter>
