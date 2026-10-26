@@ -29,6 +29,15 @@
     <string name="camera_save">Guardar de forma privada</string>
     <string name="camera_saving">Guardando de forma privada…</string>
     <string name="documents_upload_failed">No se pudo subir el archivo.</string>
+    <string name="documents_preparing_upload">Preparando la carga cifrada</string>
+    <string name="documents_preparing_upload_help">El archivo seleccionado se está procesando y cifrando en este dispositivo.</string>
+    <string name="documents_upload_queued">Esperando una conexión</string>
+    <string name="documents_upload_waiting_retry">Esperando para volver a intentar</string>
+    <string name="documents_upload_starting">Iniciando la carga segura</string>
+    <string name="documents_upload_progress">Subiendo %1$d%%</string>
+    <string name="documents_upload_finalizing">Finalizando la carga segura</string>
+    <string name="documents_upload_complete">Carga completada</string>
+    <string name="documents_upload_cancelled">Carga cancelada</string>
     <string name="documents_load_failed">No se pudieron cargar los archivos guardados.</string>
     <string name="documents_open_failed">No se pudo abrir este archivo seguro.</string>
     <string name="documents_share_failed">No se pudo compartir este archivo seguro.</string>

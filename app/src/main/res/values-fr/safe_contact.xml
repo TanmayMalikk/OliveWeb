@@ -29,6 +29,15 @@
     <string name="camera_save">Enregistrer en privé</string>
     <string name="camera_saving">Enregistrement privé…</string>
     <string name="documents_upload_failed">Le fichier n’a pas pu être téléversé.</string>
+    <string name="documents_preparing_upload">Préparation du téléversement chiffré</string>
+    <string name="documents_preparing_upload_help">Le fichier sélectionné est traité et chiffré sur cet appareil.</string>
+    <string name="documents_upload_queued">En attente d’une connexion</string>
+    <string name="documents_upload_waiting_retry">En attente d’une nouvelle tentative</string>
+    <string name="documents_upload_starting">Démarrage du téléversement sécurisé</string>
+    <string name="documents_upload_progress">Téléversement : %1$d%%</string>
+    <string name="documents_upload_finalizing">Finalisation du téléversement sécurisé</string>
+    <string name="documents_upload_complete">Téléversement terminé</string>
+    <string name="documents_upload_cancelled">Téléversement annulé</string>
     <string name="documents_load_failed">Impossible de charger vos fichiers enregistrés.</string>
     <string name="documents_open_failed">Impossible d’ouvrir ce fichier sécurisé.</string>
     <string name="documents_share_failed">Impossible de partager ce fichier sécurisé.</string>
