@@ -16,11 +16,12 @@ import com.olive.app.data.SafetyDocument
 import com.olive.app.data.SafetyDocumentDataSource
 import com.olive.app.data.ChatSubscription
 import com.olive.app.data.DocumentOcrMetadata
+import com.olive.app.data.MediaKind
+import com.olive.app.data.OcrReview
+import com.olive.app.ui.media.MediaTransferController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
-import kotlin.time.Duration.Companion.milliseconds
 
 // Groups the data and actions for safety documents state.
 internal data class SafetyDocumentsState(
@@ -35,6 +36,7 @@ internal class SafetyDocumentsController(
     context: Context,
     private val scope: CoroutineScope,
     private val repository: SafetyDocumentDataSource?,
+    private val media: MediaTransferController?,
 ) {
     private val applicationContext = context.applicationContext
     private var generation = 0
@@ -57,22 +59,32 @@ internal class SafetyDocumentsController(
             state = SafetyDocumentsState(ownerUid = ownerUid)
         }
         if (localMode || repository == null) return
+        media?.observeUploads(ownerUid)
         if (subscription != null) return
         val token = generation
         state = state.copy(loading = true, error = null)
         subscription = repository.observeFor(ownerUid, { files ->
-            if (token == generation && state.ownerUid == ownerUid) state =
-                state.copy(files = files, loading = false, error = null)
+            if (token == generation && state.ownerUid == ownerUid) {
+                state = state.copy(files = files, loading = false, error = null)
+                media?.acknowledgePublished(files.mapTo(mutableSetOf()) { it.id })
+            }
         }, { error ->
-            if (token == generation && state.ownerUid == ownerUid) state =
-                state.copy(loading = false, error = error)
+            if (token == generation && state.ownerUid == ownerUid) {
+                subscription?.close()
+                subscription = null
+                state = state.copy(loading = false, error = error.ifBlank { "Unable to load documents" })
+            }
         })
     }
 
-    fun upload(uri: Uri, identity: AccountIdentity, fallbackError: String) =
-        run(refreshAfter = true, fallbackError = fallbackError) {
-            checkNotNull(repository).upload(applicationContext, uri, identity)
-        }
+    fun upload(uri: Uri, identity: AccountIdentity, fallbackError: String, ocrReview: OcrReview = OcrReview.NOT_RUN) {
+        val transfers = media ?: return reportError(fallbackError)
+        state = state.copy(loading = true, error = null)
+        transfers.queueDocument(uri, identity, ocrReview, onQueued = {
+            state = state.copy(loading = false, error = null)
+            if (subscription == null) load(identity.uid, false)
+        }, onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
+    }
 
     fun uploadCaptured(
         file: File,
@@ -82,23 +94,37 @@ internal class SafetyDocumentsController(
         fallbackError: String,
         ocr: DocumentOcrMetadata? = null,
         onComplete: () -> Unit
-    ) =
-        run(
-            refreshAfter = true,
-            fallbackError = fallbackError,
-            onComplete = {
-                file.delete()
-                onComplete()
-            }) {
-            val timeout =
-                if (mimeType.startsWith("image/")) PHOTO_UPLOAD_TIMEOUT else VIDEO_UPLOAD_TIMEOUT
-            checkNotNull(withTimeoutOrNull(timeout.milliseconds) {
-                checkNotNull(repository).uploadFile(file, name, mimeType, identity, ocr)
-            }) { fallbackError }
+    ) {
+        val transfers = media ?: return reportError(fallbackError)
+        state = state.copy(loading = true, error = null)
+        val kind = if (mimeType.startsWith("video/")) MediaKind.VIDEO else MediaKind.DOCUMENT
+        val review = when {
+            kind != MediaKind.DOCUMENT -> OcrReview.NOT_APPLICABLE
+            ocr == null -> OcrReview.NOT_RUN
+            ocr.successful -> OcrReview.PASSED
+            else -> OcrReview.RETAKE_DECLINED
         }
+        transfers.queueFile(file, name, mimeType, identity, kind, review, ocr,
+            onQueued = {
+                file.delete()
+                state = state.copy(loading = false, error = null)
+                if (subscription == null) load(identity.uid, false)
+                onComplete()
+            },
+            onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
+    }
 
-    fun download(document: SafetyDocument, onReady: (File) -> Unit) = run {
-        onReady(checkNotNull(repository).download(applicationContext, document))
+    fun download(document: SafetyDocument, onReady: (File) -> Unit) {
+        if (document.objectKey.isNotBlank()) {
+            val uid = state.ownerUid ?: return
+            state = state.copy(loading = true, error = null)
+            media?.download(document, uid,
+                { state = state.copy(loading = false, error = null); onReady(it) },
+                { state = state.copy(loading = false, error = it) })
+                ?: reportError("Encrypted media is unavailable")
+            return
+        }
+        run { onReady(checkNotNull(repository).download(applicationContext, document)) }
     }
 
     // Opens shared.
@@ -149,6 +175,7 @@ internal class SafetyDocumentsController(
         subscription?.close()
         subscription = null
         generation++
+        media?.clearState()
         state = SafetyDocumentsState()
     }
 
@@ -180,8 +207,4 @@ internal class SafetyDocumentsController(
         if (state.ownerUid == ownerUid) state = state.copy(files = files, error = null)
     }
 
-    private companion object {
-        const val PHOTO_UPLOAD_TIMEOUT = 45_000L
-        const val VIDEO_UPLOAD_TIMEOUT = 5L * 60L * 1000L
-    }
 }
