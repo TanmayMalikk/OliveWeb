@@ -29,6 +29,15 @@
     <string name="camera_save">Save privately</string>
     <string name="camera_saving">Saving privately…</string>
     <string name="documents_upload_failed">The file could not be uploaded.</string>
+    <string name="documents_preparing_upload">Preparing encrypted upload</string>
+    <string name="documents_preparing_upload_help">The selected file is being processed and encrypted on this device.</string>
+    <string name="documents_upload_queued">Waiting for a connection</string>
+    <string name="documents_upload_waiting_retry">Waiting to retry</string>
+    <string name="documents_upload_starting">Starting secure upload</string>
+    <string name="documents_upload_progress">Uploading %1$d%%</string>
+    <string name="documents_upload_finalizing">Finishing secure upload</string>
+    <string name="documents_upload_complete">Upload complete</string>
+    <string name="documents_upload_cancelled">Upload cancelled</string>
     <string name="documents_load_failed">Your saved files could not be loaded.</string>
     <string name="documents_open_failed">This secure file could not be opened.</string>
     <string name="documents_share_failed">This secure file could not be shared.</string>
