@@ -9,7 +9,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.safecontact.SharedEntryViewer
 import com.olive.app.ui.users.shared.camera.CameraScreen
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
-import com.olive.app.ui.users.shared.safetyplan.SafetyPlanScreen
+import com.olive.app.ui.users.shared.safetyplan.*
 import com.olive.app.ui.users.user.account.*
 import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
 import com.olive.app.ui.users.user.location.LocationMapScreen
@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.semantics.heading
@@ -83,12 +85,72 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
             SafePage.Activity -> ActivityHistory(session)
             SafePage.Hotlines -> SafeResourcesScreen(session, profile)
             SafePage.SafetyPlan -> SafetyPlanScreen(session)
+            SafePage.StaffHelp -> StaffHelpScreen(session)
             SafePage.Documents -> SafetyDocumentsScreen(session)
             SafePage.Camera -> CameraScreen(session)
             SafePage.Location -> LocationMapScreen(session)
         }
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
+}
+
+// Requests a staff assignment, keeps the user informed, then opens the assigned support chat.
+@Composable
+private fun StaffHelpScreen(session: SessionViewModel) {
+    val controller = session.safetyPlans
+    val context = LocalContext.current
+    val lease = remember { Any() }
+    DisposableEffect(lease) { onDispose { controller.close(lease) } }
+    LaunchedEffect(lease) {
+        session.ensureMessagingObservation()
+        controller.open(
+            session.coverAccountId.orEmpty(), session.coverUsername,
+            safetyDefaults(context), lease
+        )
+        val plan = controller.plan
+        if (plan != null && plan.staffUid.isBlank() && plan.shareAction != "request") {
+            controller.consult()
+        }
+    }
+    val plan = controller.plan
+    LaunchedEffect(plan?.staffUid, session.conversations) {
+        if (plan?.staffUid.isNullOrBlank()) return@LaunchedEffect
+        val chat = session.conversations.firstOrNull {
+            it.type == "SUPPORT" && it.ownerUid == session.coverAccountId
+        } ?: return@LaunchedEffect
+        session.back()
+        session.navigate(SafePage.Messages)
+        session.openConversation(chat)
+    }
+    BackHandler { session.back() }
+    FormColumn {
+        IconButton(onClick = session::back, modifier = Modifier.testTag("staff_help_back")) {
+            Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.ui_previous_safe_page))
+        }
+        Heading(
+            stringResource(R.string.support_staff_help),
+            stringResource(R.string.support_staff_search_help)
+        )
+        CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+        Text(
+            if (plan?.staffUid.isNullOrBlank()) stringResource(R.string.support_looking_for_staff)
+            else stringResource(R.string.support_staff_found, plan.staffName),
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            style = MaterialTheme.typography.titleMedium,
+            textAlign = TextAlign.Center
+        )
+        controller.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+        if (plan?.consultationRequested == true || plan?.shareAction == "request") {
+            OutlinedButton(
+                onClick = {
+                    controller.consult(stop = true)
+                    session.back()
+                },
+                enabled = controller.saving == 0,
+                modifier = Modifier.fillMaxWidth().testTag("cancel_staff_help")
+            ) { Text(stringResource(R.string.support_cancel_staff_request)) }
+        }
+    }
 }
 
 // The overlay owns both corners so an expanded menu never blocks the real Quick exit control.
@@ -162,9 +224,14 @@ internal fun SafeSupportControls(
                     R.string.support_staff_help,
                     Icons.Outlined.SupportAgent,
                     "support_staff_help",
-                    false,
+                    true,
                     90
-                ) {}
+                ) {
+                    if (expanded) {
+                        onExpanded(false)
+                        session.navigate(SafePage.StaffHelp)
+                    }
+                }
                 SupportAction(
                     R.string.support_emergency,
                     Icons.Outlined.WarningAmber,

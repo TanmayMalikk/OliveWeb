@@ -87,14 +87,12 @@ class SafeSupportUiTest : OliveUiTestBase() {
     }
 
     @Test
-    fun placeholdersDoNothingAndQuickExitWorksWithTheMenuOpen() {
+    fun availableSupportActionsAndQuickExitWorkWithTheMenuOpen() {
         setup()
         toggle()
-        listOf(
-            "support_walkthrough",
-            "support_staff_help",
-            "support_emergency"
-        ).forEach { compose.onNodeWithTag(it).assertIsNotEnabled() }
+        listOf("support_walkthrough", "support_emergency")
+            .forEach { compose.onNodeWithTag(it).assertIsNotEnabled() }
+        compose.onNodeWithTag("support_staff_help").assertIsEnabled()
         compose.onNodeWithTag("support_hotlines").assertIsEnabled()
         compose.onNodeWithTag("support_contacts").assertIsEnabled()
         compose.onNodeWithTag("safe_settings").assertDoesNotExist()

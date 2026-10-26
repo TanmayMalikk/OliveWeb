@@ -7,6 +7,10 @@
     <string name="support_collapsed">مطوية</string>
     <string name="support_walkthrough">دليل إرشادي</string>
     <string name="support_staff_help">طلب المساعدة من الموظفين</string>
+    <string name="support_looking_for_staff">جارٍ البحث عن موظفين…</string>
+    <string name="support_staff_found">تم تعيين %1$s. جارٍ فتح محادثة الدعم…</string>
+    <string name="support_staff_search_help">سيربطك Olive Branch بأحد الموظفين المتاحين بشكل آمن.</string>
+    <string name="support_cancel_staff_request">إلغاء الطلب</string>
     <string name="support_emergency">طوارئ</string>
     <string name="support_hotlines">خطوط المساعدة</string>
     <string name="support_coming_soon">%1$s · قريبًا</string>

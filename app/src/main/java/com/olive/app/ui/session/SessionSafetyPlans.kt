@@ -42,7 +42,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             ((runtime.state.accountRole in setOf(
                 AccountRole.USER,
                 AccountRole.SAFE_CONTACT
-            ) && runtime.state.screen == SessionScreen.Safe && runtime.state.page == SafePage.SafetyPlan) ||
+            ) && runtime.state.screen == SessionScreen.Safe && runtime.state.page in setOf(SafePage.SafetyPlan, SafePage.StaffHelp)) ||
                     (runtime.state.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
                             runtime.state.screen == SessionScreen.Portal))
 
@@ -139,8 +139,44 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val old = plan ?: return
         if (runtime.state.accountRole != AccountRole.USER || (!stop && old.hasConflicts)) return
         val action = if (stop) "stop" else "request"
-        plan = old.copy(shareAction = action)
-        persist { it.copy(shareAction = action) }
+        val actor = runtime.coverAccountId ?: return
+        val token = generation
+        val staged = old.copy(shareAction = action)
+        plan = staged
+        saving++
+        error = null
+        runtime.scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    writes.withLock {
+                        store.update(actor, actor) { it.copy(shareAction = action) }
+                    }
+                }
+                if (!hasSafetyConnection(runtime.application)) {
+                    SafetyPlanSyncWorker.enqueue(runtime.application, actor, actor)
+                    return@launch
+                }
+                sync.withLock {
+                    withTimeout(35.seconds) {
+                        withContext(Dispatchers.IO) {
+                            syncSafetyPlan(store, repository, actor, actor)
+                        }
+                    }
+                }
+                val updated = withContext(Dispatchers.IO) { store.read(actor, actor) }
+                if (current(actor, actor, token) && updated != null) {
+                    plan = updated
+                    error = null
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                SafetyPlanSyncWorker.enqueue(runtime.application, actor, actor)
+                if (current(actor, actor, token)) error = R.string.safety_sync_error
+            } finally {
+                if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
     }
 
     // Runs the share with contacts code.

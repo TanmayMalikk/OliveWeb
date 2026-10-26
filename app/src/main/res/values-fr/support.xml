@@ -7,6 +7,10 @@
     <string name="support_collapsed">Réduit</string>
     <string name="support_walkthrough">Guide</string>
     <string name="support_staff_help">Demander de l’aide au personnel</string>
+    <string name="support_looking_for_staff">Recherche de membres du personnel…</string>
+    <string name="support_staff_found">%1$s a été affecté. Ouverture de votre clavardage de soutien…</string>
+    <string name="support_staff_search_help">Olive Branch vous mettra en contact de façon sécurisée avec un membre du personnel disponible.</string>
+    <string name="support_cancel_staff_request">Annuler la demande</string>
     <string name="support_emergency">Urgence</string>
     <string name="support_hotlines">Lignes d’aide</string>
     <string name="support_coming_soon">%1$s · Bientôt disponible</string>

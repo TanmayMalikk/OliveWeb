@@ -46,7 +46,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
-            MessagingSidebar(session, currentUid, exit, Modifier.width(340.dp).fillMaxHeight())
+            MessagingSidebar(session, currentUid, portalExit(session, exit), Modifier.width(340.dp).fillMaxHeight())
             VerticalDivider()
             if (active == null) Box(
                 Modifier.weight(1f).fillMaxHeight(),
@@ -57,13 +57,16 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
                     color = Muted
                 )
             } else ChatPane(session, currentUid, false, exit, Modifier.weight(1f).fillMaxHeight())
-        } else if (active == null) MessagingSidebar(session, currentUid, exit, Modifier.fillMaxSize())
+        } else if (active == null) MessagingSidebar(session, currentUid, portalExit(session, exit), Modifier.fillMaxSize())
         else {
             BackHandler { session.closeConversation() }
             ChatPane(session, currentUid, true, exit, Modifier.fillMaxSize())
         }
     }
 }
+
+private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
+    if (session.screen == SessionScreen.Portal) exit else null
 
 // UI sizing/color: the sidebar uses 20dp side padding, 10dp list gaps, soft status-card colors, and Material title styles.
 @Composable

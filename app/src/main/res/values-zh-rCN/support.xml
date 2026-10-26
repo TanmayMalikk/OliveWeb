@@ -7,6 +7,10 @@
     <string name="support_collapsed">已收起</string>
     <string name="support_walkthrough">使用指南</string>
     <string name="support_staff_help">向工作人员求助</string>
+    <string name="support_looking_for_staff">正在寻找工作人员…</string>
+    <string name="support_staff_found">已分配 %1$s。正在打开支持聊天…</string>
+    <string name="support_staff_search_help">Olive Branch 会安全地为您联系一名有空的工作人员。</string>
+    <string name="support_cancel_staff_request">取消请求</string>
     <string name="support_emergency">紧急情况</string>
     <string name="support_hotlines">求助热线</string>
     <string name="support_coming_soon">%1$s · 即将推出</string>
