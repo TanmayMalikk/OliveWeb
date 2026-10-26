@@ -1,0 +1,17 @@
+{
+  "name": "voip-library",
+  "version": "1.0.0",
+  "description": "Authenticated HTTP API for managing Mumble voice calls over ICE",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/start.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@zeroc/ice": "^3.7.0"
+  },
+  "license": "UNLICENSED"
+}
