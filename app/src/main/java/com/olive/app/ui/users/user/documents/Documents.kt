@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
@@ -38,6 +40,10 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     val uid = session.coverAccountId ?: return
     val controller = session.documents
     val state = controller.state
+    val mediaController = session.media
+    val uploads = mediaController?.uploads.orEmpty()
+    val preparation = mediaController?.state as? MediaTransferState.Preparing
+    val preparing = preparation != null && preparation.stage != "downloading"
     var filter by rememberSaveable { mutableStateOf(DocumentFilter.All) }
     var sharing by remember { mutableStateOf<SafetyDocument?>(null) }
     var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
@@ -105,7 +111,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
         }
         Button(
             onClick = { choosingUpload = true },
-            enabled = !state.loading && !session.localMode,
+            enabled = !preparing && !session.localMode,
             modifier = Modifier.fillMaxWidth().testTag("documents_upload")
         ) {
             Icon(
@@ -157,7 +163,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 )
             }
         }
-        if (!state.loading && shown.isEmpty()) Surface(
+        if (!state.loading && !preparing && uploads.isEmpty() && shown.isEmpty()) Surface(
             Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
             color = LightSage
@@ -182,6 +188,10 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (preparing) item(key = "preparing_upload") { PreparingUploadCard() }
+            items(uploads, key = { "upload_${it.jobId}" }) { upload ->
+                PendingUploadCard(upload) { mediaController?.retryUpload(upload.jobId) }
+            }
             items(shown, key = { it.id }) { file ->
                 SafetyDocumentCard(file, uid, session.friends, onOpen = {
                     controller.download(file) { local ->
@@ -263,6 +273,81 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 onClick = { choosingUpload = false },
                 modifier = Modifier.align(Alignment.End)
             ) { Text(stringResource(R.string.cancel)) }
+        }
+    }
+}
+
+@Composable
+private fun PreparingUploadCard() {
+    OutlinedCard(Modifier.fillMaxWidth().testTag("document_upload_preparing")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.documents_preparing_upload), style = MaterialTheme.typography.titleMedium)
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+            Text(
+                stringResource(R.string.documents_preparing_upload_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted
+            )
+        }
+    }
+}
+
+@Composable
+private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
+    val failed = upload.status == MediaTransferStatus.FAILED
+    val status = when (upload.status) {
+        MediaTransferStatus.QUEUED -> stringResource(
+            if (upload.error == null) R.string.documents_upload_queued
+            else R.string.documents_upload_waiting_retry
+        )
+        MediaTransferStatus.CREATING_SESSION -> stringResource(R.string.documents_upload_starting)
+        MediaTransferStatus.UPLOADING -> stringResource(
+            R.string.documents_upload_progress,
+            upload.progress?.times(100)?.toInt() ?: 0
+        )
+        MediaTransferStatus.FINALIZING -> stringResource(R.string.documents_upload_finalizing)
+        MediaTransferStatus.COMPLETE -> stringResource(R.string.documents_upload_complete)
+        MediaTransferStatus.FAILED -> stringResource(R.string.documents_upload_failed)
+        MediaTransferStatus.CANCELLED -> stringResource(R.string.documents_upload_cancelled)
+    }
+    OutlinedCard(Modifier.fillMaxWidth().testTag("document_upload_${upload.jobId}")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    Icons.Outlined.CloudUpload,
+                    null,
+                    tint = if (failed) MaterialTheme.colorScheme.error else OliveGreen
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(upload.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
+                    Text(
+                        status,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        color = if (failed) MaterialTheme.colorScheme.error else Muted
+                    )
+                }
+            }
+            if (!failed && upload.status != MediaTransferStatus.CANCELLED) {
+                val progress = upload.progress
+                if (progress != null && upload.status == MediaTransferStatus.UPLOADING) {
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
+            upload.error?.takeIf { failed }?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
+            if (failed) OutlinedButton(onClick = onRetry, modifier = Modifier.align(Alignment.End)) {
+                Icon(Icons.Outlined.Refresh, null)
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(R.string.retry))
+            }
         }
     }
 }
