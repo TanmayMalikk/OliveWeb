@@ -112,6 +112,36 @@ test('file metadata is owned, shareable for reads, and cannot be reshaped', asyn
   await assertSucceeds(deleteDoc(target));
 });
 
+test('authorized users can query encrypted media without exposing other file records', async () => {
+  const alice=env.authenticatedContext('media-alice').firestore();
+  const bob=env.authenticatedContext('media-bob').firestore();
+  const charlie=env.authenticatedContext('media-charlie').firestore();
+  const anonymous=env.unauthenticatedContext().firestore();
+  const mediaId='encrypted-media-1';
+  const encrypted={owner_id:'media-alice',object_key:`users/media-alice/media/${mediaId}`,
+    encrypted_metadata:'encrypted-display-metadata',wrapped_keys:{'media-alice':'wrapped-owner-key','media-bob':'wrapped-recipient-key'},
+    allowed_users:['media-alice','media-bob'],ciphertext_size:4096,
+    ciphertext_sha256:'a'.repeat(64),encryption_version:1,created_at:serverTimestamp()};
+
+  // Cloud Functions writes encrypted records with the Admin SDK, which bypasses client rules.
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(),`files/${mediaId}`),encrypted);
+    await setDoc(doc(context.firestore(),'files/malformed-encrypted-media'),{
+      ...encrypted,object_key:'users/media-alice/media/malformed-encrypted-media',unexpected:'forbidden'});
+  });
+
+  const visibleToAlice=query(collection(alice,'files'),where('allowed_users','array-contains','media-alice'));
+  const visibleToBob=query(collection(bob,'files'),where('allowed_users','array-contains','media-bob'));
+  await assertSucceeds(getDocs(visibleToAlice));
+  await assertSucceeds(getDocs(visibleToBob));
+  // A caller cannot satisfy the rule by querying another user's membership value.
+  await assertFails(getDocs(query(collection(charlie,'files'),where('allowed_users','array-contains','media-alice'))));
+  await assertFails(getDocs(collection(alice,'files')));
+  await assertFails(getDocs(query(collection(anonymous,'files'),where('allowed_users','array-contains','media-alice'))));
+  // Direct reads retain full schema validation even for a UID present in allowed_users.
+  await assertFails(getDoc(doc(alice,'files/malformed-encrypted-media')));
+});
+
 test('users and safe contacts get encrypted private DMs and only the sender can unsend', async () => {
   const alice=env.authenticatedContext('social-a',{email:'social_alice@users.olive.invalid'}).firestore();
   const bob=env.authenticatedContext('social-b',{email:'social_bob@safe.olive.invalid'}).firestore();

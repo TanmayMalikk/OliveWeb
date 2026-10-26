@@ -141,16 +141,50 @@ service cloud.firestore {
           && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25
           && data.allowed_users.hasAny([data.owner_id]);
       }
+      function validEncryptedMedia(data, id) {
+        return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','allowed_users',
+            'ciphertext_size','ciphertext_sha256','encryption_version','created_at'])
+          && data.owner_id is string
+          && data.object_key == 'users/' + data.owner_id + '/media/' + id
+          && data.encrypted_metadata is string && data.encrypted_metadata.size() > 0
+          && data.encrypted_metadata.size() <= 65536
+          && data.wrapped_keys is map
+          && data.allowed_users is list
+          && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25
+          && data.allowed_users.hasAny([data.owner_id])
+          && data.wrapped_keys.keys().hasAll(data.allowed_users)
+          && data.wrapped_keys.keys().hasOnly(data.allowed_users)
+          && data.ciphertext_size is int && data.ciphertext_size > 0
+          && data.ciphertext_size <= 250 * 1024 * 1024
+          && data.ciphertext_sha256 is string
+          && data.ciphertext_sha256.matches('^[0-9a-f]{64}$')
+          && data.encryption_version is int && data.encryption_version >= 1;
+      }
       allow create: if signedIn()
         && request.resource.data.owner_id == request.auth.uid
         && validFileMetadata(request.resource.data, fileId);
-      allow read: if signedIn() && request.auth.uid in resource.data.allowed_users;
+      // A direct document read can validate both authorization and the complete stored shape because
+      // Firestore evaluates the rule against one concrete resource.
+      allow get: if signedIn() && request.auth.uid in resource.data.allowed_users
+        && (validFileMetadata(resource.data, fileId) || validEncryptedMedia(resource.data, fileId));
+      // Collection rules are evaluated against every *possible* query result, not only the records
+      // currently stored. The Android client constrains this listener with
+      // `whereArrayContains("allowed_users", request.auth.uid)`, which proves this membership check.
+      // Requiring the full schema validator here makes that safe query unprovable and Firestore rejects
+      // it with PERMISSION_DENIED. Schema validation remains mandatory for direct reads and all client
+      // writes; callable-created encrypted records are validated before the Admin SDK publishes them.
+      allow list: if signedIn() && request.auth.uid in resource.data.allowed_users;
       allow update: if signedIn() && resource.data.owner_id == request.auth.uid
         && request.resource.data.owner_id == resource.data.owner_id
         && request.resource.data.storage_path == resource.data.storage_path
         && validFileMetadata(request.resource.data, fileId);
-      allow delete: if signedIn() && resource.data.owner_id == request.auth.uid;
+      // Encrypted R2 objects must be deleted through the callable so metadata cannot be orphaned.
+      allow delete: if signedIn() && resource.data.owner_id == request.auth.uid
+        && resource.data.keys().hasAll(['storage_path']);
     }
+
+    // Upload sessions contain internal R2 identifiers and are callable-only.
+    match /mediaUploads/{jobId} { allow read, write: if false; }
 
     match /privateEntries/{entryId} {
       function validPrivateEntry(data) {
