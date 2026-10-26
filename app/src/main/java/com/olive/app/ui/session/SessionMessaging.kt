@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 // Connects account messaging and manages live subscriptions.
 internal class SessionMessaging(private val runtime: SessionRuntime) {
     private fun messagingScreenActive() = with(runtime.state) {
-        (screen == SessionScreen.Safe && page == SafePage.Messages) ||
+        screen == SessionScreen.Safe ||
                 (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN))
     }
     // Makes sure messaging observation is ready.
@@ -82,6 +82,8 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                                     )
                             }
                         })
+                        // The live listeners are attached; their first rows can populate after loading ends.
+                        if (epoch == token && messagingScreenActive()) messagingBusy = false
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {

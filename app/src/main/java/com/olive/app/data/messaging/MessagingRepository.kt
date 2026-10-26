@@ -137,7 +137,6 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         val senderFriendRef =
             firestore.collection("friendLists").document(request.senderUid).collection("friends")
                 .document(friendshipId)
-        val conversationRef = firestore.collection("conversations").document(friendshipId)
         val participantIds = listOf(current.uid, request.senderUid).sorted()
         val participantNames = mapOf(
             current.uid to current.username.lowercase(),
@@ -164,18 +163,6 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 "friendUid" to current.uid,
                 "friendUsername" to current.username.lowercase(),
                 "createdAt" to FieldValue.serverTimestamp()
-            )
-        )
-        batch.set(
-            conversationRef, mapOf(
-                "friendshipId" to friendshipId,
-                "participantIds" to participantIds,
-                "participantUsernames" to participantNames,
-                "createdAt" to FieldValue.serverTimestamp(),
-                "updatedAt" to FieldValue.serverTimestamp(),
-                "lastMessage" to "",
-                "lastMessageId" to "",
-                "lastSenderUid" to ""
             )
         )
         batch.delete(requestRef)
@@ -237,6 +224,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                         return@addSnapshotListener
                     }
                     onUpdate(snapshot?.documents.orEmpty().mapNotNull(::conversationFrom)
+                        .filter { it.type == "SUPPORT" || it.lastMessageId.isNotBlank() }
                         .sortedByDescending { it.updatedAt })
                 }
         return listener.asSubscription()

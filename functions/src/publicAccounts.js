@@ -35,8 +35,10 @@ exports.createPublicAccount = onCall(async (request) => {
       role,
       createdAt: FieldValue.serverTimestamp(),
     });
-    const token = await auth.createCustomToken(created.uid);
-    return {uid: created.uid, username, token};
+    // The Android app can sign in with the email alias and password it just
+    // supplied. This avoids requiring the function runtime to sign a second,
+    // short-lived custom token after the account has already been created.
+    return {uid: created.uid, username};
   } catch (error) {
     if (created?.uid) await auth.deleteUser(created.uid).catch(() => {});
     const directoryOwner = await directory.get().catch(() => null);

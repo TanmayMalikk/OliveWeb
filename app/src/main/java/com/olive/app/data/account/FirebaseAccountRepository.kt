@@ -38,9 +38,11 @@ class FirebaseAccountRepository : AccountRepository {
         val result = functions.getHttpsCallable("createPublicAccount").call(
             mapOf("username" to normalized, "password" to password, "role" to role.name)
         ).await().data as? Map<*, *> ?: error("Missing account")
-        val token = result["token"]?.toString().orEmpty()
-        check(token.isNotBlank()) { "Missing account token" }
-        val user = auth.signInWithCustomToken(token).await().user ?: error("Missing account")
+        check(result["uid"]?.toString()?.isNotBlank() == true) { "Missing account" }
+        val user = auth.signInWithEmailAndPassword(
+            AccountPolicy.signInEmail(normalized, role),
+            password
+        ).await().user ?: error("Missing account")
         return AccountIdentity(user.uid, normalized)
     }
 

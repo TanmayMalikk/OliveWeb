@@ -7,6 +7,10 @@
     <string name="support_collapsed">Contraído</string>
     <string name="support_walkthrough">Guía</string>
     <string name="support_staff_help">Pedir ayuda al personal</string>
+    <string name="support_looking_for_staff">Buscando personal disponible…</string>
+    <string name="support_staff_found">Se asignó a %1$s. Abriendo el chat de apoyo…</string>
+    <string name="support_staff_search_help">Olive Branch te conectará de forma segura con un miembro del personal disponible.</string>
+    <string name="support_cancel_staff_request">Cancelar solicitud</string>
     <string name="support_emergency">Emergencia</string>
     <string name="support_hotlines">Líneas de ayuda</string>
     <string name="support_coming_soon">%1$s · Próximamente</string>
