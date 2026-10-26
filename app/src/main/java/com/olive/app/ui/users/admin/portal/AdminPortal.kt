@@ -7,6 +7,9 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 
 import com.olive.app.ui.users.shared.organization.OrganizationSettings
+import com.olive.app.ui.users.shared.organization.OrganizationMap
+import com.olive.app.ui.users.shared.organization.OrganizationDashboardCard
+import com.olive.app.ui.users.staff.portal.SafetyConsultations
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -14,6 +17,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.HealthAndSafety
+import androidx.compose.material.icons.outlined.ManageAccounts
+import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +35,7 @@ import com.olive.app.data.AdminAccountSummary
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 // Groups the data and actions for admin page.
-private enum class AdminPage { Dashboard, Accounts, Settings }
+private enum class AdminPage { Dashboard, Accounts, Settings, Map, SafetyPlans }
 
 @Composable
 internal fun AdminPortal(session: SessionViewModel) {
@@ -43,6 +49,8 @@ internal fun AdminPortal(session: SessionViewModel) {
             session,
             onAccounts = { page = AdminPage.Accounts },
             onSettings = { page = AdminPage.Settings },
+            onMap = { page = AdminPage.Map },
+            onSafetyPlans = { page = AdminPage.SafetyPlans },
         )
         AdminPage.Accounts -> AdminAccounts(
             session,
@@ -54,6 +62,8 @@ internal fun AdminPortal(session: SessionViewModel) {
             session,
             onBack = { page = AdminPage.Dashboard },
         )
+        AdminPage.Map -> OrganizationMap(onBack = { page = AdminPage.Dashboard })
+        AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
     }
     if (createOpen) CreateAccountDialog(session, onDismiss = { createOpen = false })
     deleteTarget?.let { account ->
@@ -84,6 +94,8 @@ private fun AdminDashboard(
     session: SessionViewModel,
     onAccounts: () -> Unit,
     onSettings: () -> Unit,
+    onMap: () -> Unit,
+    onSafetyPlans: () -> Unit,
 ) {
     val uiText = rememberResourceText()
     Column(
@@ -111,18 +123,24 @@ private fun AdminDashboard(
             }
         }
         AccountCountGrid(session.adminCounts)
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(
-                    uiText(R.string.ui_active_chats_with_staff_and_users),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(stringResource(R.string.in_development), color = Muted)
-            }
-        }
-        Button(onClick = onAccounts, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.accounts))
-        }
+        OrganizationDashboardCard(
+            Icons.Outlined.HealthAndSafety,
+            stringResource(R.string.safety_inbox),
+            stringResource(R.string.admin_safety_plans_description),
+            onSafetyPlans,
+        )
+        OrganizationDashboardCard(
+            Icons.Outlined.ManageAccounts,
+            stringResource(R.string.accounts),
+            stringResource(R.string.admin_accounts_description),
+            onAccounts,
+        )
+        OrganizationDashboardCard(
+            Icons.Outlined.LocationOn,
+            stringResource(R.string.organization_live_map),
+            stringResource(R.string.organization_location_feed_not_enabled),
+            onMap,
+        )
         Status(session)
         OutlinedButton(
             onClick = session::signOut,

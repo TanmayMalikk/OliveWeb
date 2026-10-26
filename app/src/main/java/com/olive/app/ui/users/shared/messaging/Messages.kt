@@ -17,6 +17,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,7 +46,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
-            MessagingSidebar(session, currentUid, Modifier.width(340.dp).fillMaxHeight())
+            MessagingSidebar(session, currentUid, exit, Modifier.width(340.dp).fillMaxHeight())
             VerticalDivider()
             if (active == null) Box(
                 Modifier.weight(1f).fillMaxHeight(),
@@ -56,7 +57,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
                     color = Muted
                 )
             } else ChatPane(session, currentUid, false, exit, Modifier.weight(1f).fillMaxHeight())
-        } else if (active == null) MessagingSidebar(session, currentUid, Modifier.fillMaxSize())
+        } else if (active == null) MessagingSidebar(session, currentUid, exit, Modifier.fillMaxSize())
         else {
             BackHandler { session.closeConversation() }
             ChatPane(session, currentUid, true, exit, Modifier.fillMaxSize())
@@ -69,9 +70,20 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
 private fun MessagingSidebar(
     session: SessionViewModel,
     currentUid: String,
+    exit: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val uiText = rememberResourceText()
+    val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+    val roleConversations = if (organizationAccount) session.conversations.filter { it.type == "SUPPORT" }
+    else session.conversations
+    var showingArchived by rememberSaveable { mutableStateOf(false) }
+    val shownConversations = roleConversations.filter {
+        (it.id in session.archivedConversationIds) == showingArchived
+    }
+    val archivedCount = roleConversations.count { it.id in session.archivedConversationIds }
+    var conversationActions by remember { mutableStateOf<ChatConversation?>(null) }
+    var noteTargets by remember { mutableStateOf<List<DirectoryUser>?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var reconnectPassword by rememberSaveable { mutableStateOf("") }
     var friendsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -86,14 +98,14 @@ private fun MessagingSidebar(
     ) {
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = session::back, modifier = Modifier.testTag("safe_home")) {
+                IconButton(onClick = exit ?: session::back, modifier = Modifier.testTag("safe_home")) {
                     Icon(
                         Icons.AutoMirrored.Outlined.ArrowBack,
                         uiText(R.string.ui_previous_safe_page)
                     )
                 }
                 Text(
-                    stringResource(R.string.friends_messages),
+                    stringResource(if (organizationAccount) R.string.support_conversations else R.string.friends_messages),
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.semantics { heading() })
             }
@@ -139,7 +151,20 @@ private fun MessagingSidebar(
                 }
             }
         }
-        item {
+        if (organizationAccount) item {
+            Surface(
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    stringResource(R.string.staff_conversations_assigned_help),
+                    modifier = Modifier.padding(14.dp),
+                    color = OliveGreen,
+                )
+            }
+        }
+        if (!organizationAccount) item {
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -162,7 +187,7 @@ private fun MessagingSidebar(
         }
         if (session.messagingBusy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
         item { Status(session) }
-        if (session.userSearchResults.isNotEmpty()) {
+        if (!organizationAccount && session.userSearchResults.isNotEmpty()) {
             item {
                 Text(
                     stringResource(R.string.search_results),
@@ -186,6 +211,9 @@ private fun MessagingSidebar(
                             Modifier.weight(1f),
                             style = MaterialTheme.typography.titleMedium
                         )
+                        TextButton(onClick = { noteTargets = listOf(user) }) {
+                            Text(stringResource(R.string.private_note))
+                        }
                         when (relationship) {
                             FriendRelationship.AddFriend -> Button(
                                 onClick = {
@@ -215,7 +243,7 @@ private fun MessagingSidebar(
                 }
             }
         }
-        if (session.incomingFriendRequests.isNotEmpty()) {
+        if (!organizationAccount && session.incomingFriendRequests.isNotEmpty()) {
             item {
                 Row(Modifier.fillMaxWidth().clickable { pendingExpanded = !pendingExpanded }
                     .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -259,7 +287,7 @@ private fun MessagingSidebar(
                 }
             }
         }
-        item {
+        if (!organizationAccount) item {
             Row(Modifier.fillMaxWidth().clickable { outgoingExpanded = !outgoingExpanded }
                 .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -272,7 +300,7 @@ private fun MessagingSidebar(
                 )
             }
         }
-        if (outgoingExpanded) {
+        if (!organizationAccount && outgoingExpanded) {
             if (session.outgoingFriendRequests.isEmpty()) item {
                 Text(
                     stringResource(R.string.no_outgoing_requests),
@@ -304,7 +332,7 @@ private fun MessagingSidebar(
                 }
             }
         }
-        item {
+        if (!organizationAccount) item {
             Row(Modifier.fillMaxWidth().clickable { friendsExpanded = !friendsExpanded }
                 .padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -325,7 +353,7 @@ private fun MessagingSidebar(
                 }
             }
         }
-        if (friendsExpanded) {
+        if (!organizationAccount && friendsExpanded) {
             if (session.friends.isEmpty()) item {
                 Text(
                     stringResource(R.string.no_friends_yet),
@@ -333,41 +361,54 @@ private fun MessagingSidebar(
                 )
             }
             items(session.friends, key = { "friend-${it.friendshipId}" }) { friend ->
-                OutlinedButton(
-                    onClick = { session.startConversation(friend) },
-                    enabled = !session.messagingBusy,
-                    modifier = Modifier.animateItem().fillMaxWidth().testTag("friend_" + friend.uid)
+                Row(
+                    Modifier.animateItem().fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(
-                        friend.username,
-                        Modifier.weight(1f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Start
-                    )
-                    Text(stringResource(R.string.message))
+                    OutlinedButton(
+                        onClick = { session.startConversation(friend) },
+                        enabled = !session.messagingBusy,
+                        modifier = Modifier.weight(1f).testTag("friend_" + friend.uid)
+                    ) {
+                        Text(
+                            friend.username,
+                            Modifier.weight(1f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Start
+                        )
+                        Text(stringResource(R.string.message))
+                    }
+                    TextButton(onClick = {
+                        noteTargets = listOf(DirectoryUser(friend.uid, friend.username))
+                    }) { Text(stringResource(R.string.private_note)) }
                 }
             }
         }
         item {
             Text(
-                stringResource(R.string.direct_messages),
+                if (showingArchived) stringResource(R.string.archived_chats)
+                else stringResource(if (organizationAccount) R.string.support_conversations else R.string.direct_messages),
                 style = MaterialTheme.typography.titleMedium
             )
         }
-        if (session.conversations.isEmpty()) item {
+        if (shownConversations.isEmpty()) item {
             Text(
-                stringResource(R.string.no_conversations_yet),
+                if (showingArchived) stringResource(R.string.no_archived_chats)
+                else stringResource(if (organizationAccount) R.string.no_assigned_support_conversations else R.string.no_conversations_yet),
                 color = Muted
             )
         }
-        items(session.conversations, key = { "conversation-${it.id}" }) { conversation ->
-            OutlinedButton(
-                onClick = { session.openConversation(conversation) },
+        items(shownConversations, key = { "conversation-${it.id}" }) { conversation ->
+            OutlinedCard(
                 modifier = Modifier.animateItem().fillMaxWidth()
                     .testTag("conversation_" + conversation.id)
+                    .combinedClickable(
+                        onClick = { session.openConversation(conversation) },
+                        onLongClick = { conversationActions = conversation },
+                    ),
             ) {
-                Column(Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
                     Text(
-                        conversation.peerUsername(currentUid),
+                        conversation.displayName(currentUid),
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
@@ -380,5 +421,39 @@ private fun MessagingSidebar(
                 }
             }
         }
+        item {
+            OutlinedButton(
+                onClick = { showingArchived = !showingArchived },
+                modifier = Modifier.fillMaxWidth().testTag("archived_chats"),
+            ) {
+                Text(
+                    if (showingArchived) stringResource(R.string.back_to_messages)
+                    else stringResource(R.string.archived_chats_count, archivedCount)
+                )
+            }
+        }
+    }
+    conversationActions?.let { conversation ->
+        ConversationActionsDialog(
+            conversation = conversation,
+            archived = conversation.id in session.archivedConversationIds,
+            currentUid = currentUid,
+            role = session.accountRole,
+            onArchive = {
+                session.setConversationArchived(
+                    conversation,
+                    conversation.id !in session.archivedConversationIds,
+                )
+                conversationActions = null
+            },
+            onNotes = {
+                conversationActions = null
+                noteTargets = it
+            },
+            onDismiss = { conversationActions = null },
+        )
+    }
+    noteTargets?.let { targets ->
+        PrivateContactNoteDialog(session, targets, onDismiss = { noteTargets = null })
     }
 }

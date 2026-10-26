@@ -11,6 +11,7 @@ import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.functions.FirebaseFunctionsException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -95,6 +96,8 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 if (!busy && enrollment == null && screen == SessionScreen.Cover) {
+                    accountRole = AccountRole.USER
+                    coverType = CoverType.FOOD
                     creatingAccount = false
                     message =
                         null
@@ -171,6 +174,8 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
                         val details = error.message.orEmpty()
                         val usernameUnavailable =
                             create && (error is FirebaseAuthUserCollisionException ||
+                                    (error is FirebaseFunctionsException &&
+                                            error.code == FirebaseFunctionsException.Code.ALREADY_EXISTS) ||
                                     details.contains("unavailable", ignoreCase = true))
                         val incorrectLogin =
                             !create && (error is FirebaseAuthInvalidCredentialsException ||
@@ -231,6 +236,8 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
                                 )
                             }
                             enrollment = saved
+                            archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+                            privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
                             profile = existing
                             coverUsername =
                                 existing.username
@@ -289,6 +296,8 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
                             withContext(Dispatchers.IO) { store.enrollWithoutPin(identity, value) }
                         if (epoch == token) {
                             enrollment = saved
+                            archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+                            privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
                             profile = value
                             coverUsername =
                                 value.username
@@ -354,6 +363,8 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
             coverUsername = value.username
             coverType = value.coverType
             accountRole = value.role
+            archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+            privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
             covers.restoreCoverData(saved.uid)
             navigation.quickExit()
             if (!localMode) history.loadCloudHistory(saved.uid, value.username)
@@ -443,8 +454,10 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
                         foodCustomizations =
                             emptyMap()
                         savedNews = emptyList()
+                        archivedConversationIds = emptySet()
+                        privateContactNotes = emptyMap()
                         coverDataVersion++
-                        screen = SessionScreen.Welcome
+                        screen = SessionScreen.Cover
                     } catch (_: Exception) { /* Fail closed: the interface remains locked. */
                     } finally {
                         busy = false
@@ -483,6 +496,8 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
                 checkoutHistory = withContext(Dispatchers.IO) { store.checkoutHistory(device.uid) }
                 if (!localMode) history.loadCloudHistory(device.uid, saved.username)
                 if (saved.role != AccountRole.USER) profile = saved
+                archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(device.uid) }
+                privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(device.uid) }
                 if (saved.role == AccountRole.SAFE_CONTACT) withContext(Dispatchers.IO) {
                     store.removePin(
                         device.uid
@@ -496,7 +511,7 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 screen = when (enrollment?.role) {
-                    null -> SessionScreen.Welcome
+                    null -> SessionScreen.Cover
                     AccountRole.USER -> SessionScreen.Cover
                     AccountRole.SAFE_CONTACT -> SessionScreen.Safe
                     AccountRole.STAFF, AccountRole.ADMIN -> SessionScreen.Portal

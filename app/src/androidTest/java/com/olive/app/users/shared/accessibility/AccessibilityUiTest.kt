@@ -101,7 +101,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
 
     @Test
     fun nativeAccessibilityEventsReachTheInteractionObserver() {
-        waitFor("new_user")
+        openOnboarding()
         val observed = AtomicInteger(0)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         instrumentation.runOnMainSync {

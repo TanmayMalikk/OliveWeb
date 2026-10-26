@@ -62,7 +62,10 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
                 state.message = application.getString(R.string.entry_device_unavailable)
                 return
             }
-            val verifyPin = device.allowsAppPin(secure)
+            // Keep Android authentication as proof while device lock is preferred.
+            // The backup PIN becomes proof only when it is preferred or the phone lock is gone.
+            val verifyPin = device.hasAppPin &&
+                    (device.entryMethod == SafeEntryMethod.APP_PIN || !secure)
             if (verifyPin && !InputPolicy.validPin(currentPin)) {
                 state.message = application.getString(R.string.enter_your_4_6_digit_pin)
                 return

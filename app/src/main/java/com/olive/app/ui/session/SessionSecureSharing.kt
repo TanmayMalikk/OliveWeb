@@ -26,19 +26,20 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             val device = enrollment ?: error("No active account")
             val repository = messagingRepository ?: error("Messaging unavailable")
             val secure = secureChatRepository ?: error("Secure messaging unavailable")
-            val peerUid = conversation.participantIds.first { it != device.uid }
-            val peerName = conversation.participantUsernames[peerUid]
-                ?: error("Conversation participant unavailable")
-            val peer = repository.searchUsers(peerName, device.uid).firstOrNull()
-                ?: error("The other user needs to open the updated app before secure messages can be sent.")
-            require(peer.publicKey.isNotBlank()) {
-                "The other user needs to open the updated app before secure messages can be sent."
+            val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
+                val username = conversation.participantUsernames[uid]
+                    ?: error("Conversation participant unavailable")
+                repository.searchUsers(username, device.uid).firstOrNull()
+                    ?: error("Every participant needs to open the updated app before secure messages can be sent.")
+            }
+            require(peers.all { it.publicKey.isNotBlank() }) {
+                "Every participant needs to open the updated app before secure messages can be sent."
             }
             val keys: Map<String, PublicKey> = withContext(Dispatchers.Default) {
-                mapOf(
-                    device.uid to KeyManager.getOrCreatePublicKey(),
-                    peerUid to KeyManager.decodePublicKey(peer.publicKey)
-                )
+                buildMap {
+                    put(device.uid, KeyManager.getOrCreatePublicKey())
+                    peers.forEach { put(it.uid, KeyManager.decodePublicKey(it.publicKey)) }
+                }
             }
             return secure.ensureRoomKey(conversation, device.uid, keys)
         }
@@ -58,17 +59,18 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 message = null
                 scope.launch {
                     try {
-                        val peerUid = conversation.participantIds.first { it != device.uid }
-                        val peerName = conversation.participantUsernames[peerUid]
-                            ?: error("Participant unavailable")
-                        val peer = repository.searchUsers(peerName, device.uid).firstOrNull()
-                            ?: error("Recipient unavailable")
-                        require(peer.publicKey.isNotBlank())
+                        val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
+                            val name = conversation.participantUsernames[uid]
+                                ?: error("Participant unavailable")
+                            repository.searchUsers(name, device.uid).firstOrNull()
+                                ?: error("Recipient unavailable")
+                        }
+                        require(peers.all { it.publicKey.isNotBlank() })
                         val recipients = withContext(Dispatchers.Default) {
-                            mapOf(
-                                device.uid to KeyManager.getOrCreatePublicKey(),
-                                peerUid to KeyManager.decodePublicKey(peer.publicKey)
-                            )
+                            buildMap {
+                                put(device.uid, KeyManager.getOrCreatePublicKey())
+                                peers.forEach { put(it.uid, KeyManager.decodePublicKey(it.publicKey)) }
+                            }
                         }
                         documents.saveMultiRecipientEntry(
                             entry.id,
@@ -117,11 +119,12 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 messagingBusy = true
                 message = null
                 scope.launch {
-                    var newlyGrantedRecipient: String? = null
+                    val newlyGrantedRecipients = mutableListOf<String>()
                     try {
-                        val recipient = conversation.participantIds.first { it != device.uid }
-                        if (recipient !in document.allowedUsers) newlyGrantedRecipient = recipient
-                        documents.grantAccess(document, device.uid, recipient)
+                        conversation.participantIds.filter { it != device.uid }.forEach { recipient ->
+                            if (recipient !in document.allowedUsers) newlyGrantedRecipients += recipient
+                            documents.grantAccess(document, device.uid, recipient)
+                        }
                         chat.send(
                             conversation.id, AccountIdentity(device.uid, coverUsername),
                             "SHARED_MEDIA:${document.id}:${document.name}", roomKey(conversation)
@@ -129,20 +132,52 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         if (epoch == token) message =
                             runtime.application.getString(R.string.documents_shared_in_chat)
                     } catch (error: CancellationException) {
-                        newlyGrantedRecipient?.let { recipient ->
+                        newlyGrantedRecipients.forEach { recipient ->
                             runCatching {
                                 documents.revokeAccess(document.id, device.uid, recipient)
                             }
                         }
                         throw error
                     } catch (_: Exception) {
-                        newlyGrantedRecipient?.let { recipient ->
+                        newlyGrantedRecipients.forEach { recipient ->
                             runCatching {
                                 documents.revokeAccess(document.id, device.uid, recipient)
                             }
                         }
                         if (epoch == token) message =
                             runtime.application.getString(R.string.documents_share_failed)
+                    } finally {
+                        if (epoch == token) messagingBusy = false
+                    }
+                }
+            }
+        }
+    }
+
+    fun shareSafetyPlan() {
+        with(runtime) {
+            with(state) {
+                val conversation = activeConversation ?: return
+                val device = enrollment ?: return
+                val chat = secureChatRepository ?: return
+                if (accountRole != com.olive.app.data.AccountRole.USER || messagingBusy ||
+                    conversation.type != "SUPPORT") return
+                val token = epoch
+                messagingBusy = true
+                message = null
+                scope.launch {
+                    try {
+                        chat.send(
+                            conversation.id,
+                            AccountIdentity(device.uid, coverUsername),
+                            "SHARED_SAFETY_PLAN:${device.uid}:Safety plan",
+                            roomKey(conversation),
+                        )
+                        if (epoch == token) message = runtime.application.getString(R.string.safety_plan_shared_in_chat)
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Exception) {
+                        if (epoch == token) message = runtime.application.getString(R.string.safety_sync_error)
                     } finally {
                         if (epoch == token) messagingBusy = false
                     }
@@ -219,14 +254,16 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         val parts = message.body.split(":", limit = 3)
         if (parts.firstOrNull() == "SHARED_MEDIA") {
             val entryId = parts.getOrNull(1) ?: return
-            val recipient = conversation.participantIds.firstOrNull { it != currentUid } ?: return
-            runtime.safetyDocumentRepository?.revokeAccess(entryId, currentUid, recipient)
+            conversation.participantIds.filter { it != currentUid }.forEach { recipient ->
+                runtime.safetyDocumentRepository?.revokeAccess(entryId, currentUid, recipient)
+            }
             return
         }
         if (parts.firstOrNull() !in setOf("SHARED_NOTE", "SHARED_INCIDENT")) return
         val entryId = parts.getOrNull(1) ?: return
-        val recipient = conversation.participantIds.firstOrNull { it != currentUid } ?: return
-        runtime.secureDocumentRepository?.revokeAccessToEntry(entryId, recipient)
+        conversation.participantIds.filter { it != currentUid }.forEach { recipient ->
+            runtime.secureDocumentRepository?.revokeAccessToEntry(entryId, recipient)
+        }
     }
 
     fun close() {

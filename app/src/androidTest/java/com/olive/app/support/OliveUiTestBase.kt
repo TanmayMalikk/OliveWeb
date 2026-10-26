@@ -144,6 +144,15 @@ abstract class OliveUiTestBase {
         visibleNode(tag).performClick()
     }
 
+    // A clean install stays inside the cover until the discreet olive is double-tapped.
+    protected fun openOnboarding() {
+        waitCover()
+        click("cover_tab_account")
+        waitFor("discreet_cover_olive")
+        visibleNode("discreet_cover_olive").performTouchInput { doubleClick() }
+        waitFor("new_user")
+    }
+
     protected fun nextOnboarding() {
         click("onboarding_next")
     }
@@ -158,7 +167,7 @@ abstract class OliveUiTestBase {
     }
 
     protected fun register(pin: String = "123456", username: String = "olive_tester") {
-        waitFor("new_user")
+        openOnboarding()
         click("new_user")
         fill("username", username)
         fill("password", "test-password-123")

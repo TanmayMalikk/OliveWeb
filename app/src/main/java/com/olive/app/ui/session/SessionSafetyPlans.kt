@@ -43,7 +43,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 AccountRole.USER,
                 AccountRole.SAFE_CONTACT
             ) && runtime.state.screen == SessionScreen.Safe && runtime.state.page == SafePage.SafetyPlan) ||
-                    (runtime.state.accountRole == AccountRole.STAFF && runtime.state.screen == SessionScreen.Portal))
+                    (runtime.state.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+                            runtime.state.screen == SessionScreen.Portal))
 
     // Runs the current code.
     // Rejects old background results after the account, plan owner, or screen session changes.
@@ -170,6 +171,33 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
+    // Adds one already-approved safe contact to the user's staff support conversation.
+    fun setSupportContact(uid: String) {
+        if (!authorized() || runtime.state.accountRole != AccountRole.USER || runtime.localMode) return
+        val old = plan ?: return
+        if (old.staffUid.isBlank() || (uid.isNotBlank() && uid !in old.safeContactUids)) return
+        val actor = runtime.coverAccountId ?: return
+        val token = generation
+        saving++
+        error = null
+        runtime.scope.launch {
+            try {
+                repository.setSupportContact(uid)
+                if (current(actor, actor, token)) {
+                    val updated = old.copy(supportSafeContactUid = uid)
+                    plan = updated
+                    withContext(Dispatchers.IO) { store.write(actor, actor, updated) }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current(actor, actor, token)) error = R.string.safety_sync_error
+            } finally {
+                if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
     // Loads the plans that other users currently share with this safe contact.
     fun refreshSharedPlans() {
         if (!authorized() || runtime.state.accountRole != AccountRole.SAFE_CONTACT || runtime.localMode) return
@@ -284,7 +312,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
 
     // Loads assigned consultations and the staff member's availability from local and cloud storage.
     suspend fun refreshConsultations() {
-        if (!authorized() || runtime.state.accountRole != AccountRole.STAFF || runtime.localMode) return
+        if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return
         val actor = runtime.coverAccountId ?: return
         try {
             val cached = withContext(Dispatchers.IO) { store.all(actor) }

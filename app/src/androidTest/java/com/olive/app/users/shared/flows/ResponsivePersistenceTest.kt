@@ -61,6 +61,29 @@ class ResponsivePersistenceTest {
     }
 
     @Test
+    fun archivedChatsAndPrivateContactNotesStaySeparateForEachAccount() {
+        val suffix = UUID.randomUUID().toString()
+        val store = DeviceStore(
+            EncryptedVault(context, "responsive-private-social-$suffix"),
+            EncryptedVault(context, "responsive-private-social-activity-$suffix")
+        )
+        store.setConversationArchived("viewer-a", "chat-1", true)
+        store.appendPrivateContactNote("viewer-a", "person-1", "Taylor", "First detail")
+        store.appendPrivateContactNote("viewer-a", "person-1", "Taylor", "Second detail")
+
+        assertEquals(setOf("chat-1"), store.archivedConversationIds("viewer-a"))
+        assertEquals(
+            "First detail\nSecond detail",
+            store.privateContactNotes("viewer-a")["person-1"]?.body
+        )
+        assertEquals(emptySet<String>(), store.archivedConversationIds("viewer-b"))
+        assertEquals(emptyMap<String, com.olive.app.data.PrivateContactNote>(), store.privateContactNotes("viewer-b"))
+
+        store.setConversationArchived("viewer-a", "chat-1", false)
+        assertEquals(emptySet<String>(), store.archivedConversationIds("viewer-a"))
+    }
+
+    @Test
     fun allCoverStateRestoresFromOneSnapshot() {
         val store =
             CoverStateStore(EncryptedVault(context, "responsive-cover-${UUID.randomUUID()}"))

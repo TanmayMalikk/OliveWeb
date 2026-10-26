@@ -68,7 +68,7 @@ import java.util.Base64
 
 // Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
 // UI sizing/color: this root fills the window; the 12dp quick-exit inset and OliveGreen button styling live in its Scaffold.
-internal fun shouldComposeCover(configured: Boolean, usesCover: Boolean) = configured && usesCover
+internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
 @Composable
 internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int = 0) {
@@ -130,7 +130,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                 .semantics { paneTitle = coverTitle } else Modifier.fillMaxSize()
                 .clearAndSetSemantics { }) {
             Box(Modifier.fillMaxSize()) {
-                if (shouldComposeCover(session.configured, session.usesCover)) {
+                if (shouldComposeCover(session.usesCover)) {
                     when (session.coverType) {
                         CoverType.FOOD -> OliveCover(
                             cover,
@@ -154,7 +154,11 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                         )
 
                         CoverType.CALCULATOR -> CalculatorCover(session, isCover)
-                        CoverType.GAME -> GameCover(isCover, session::interceptSearch)
+                        CoverType.GAME -> GameCover(
+                            sessionViewModel = session,
+                            interactive = isCover,
+                            onEntryAttempt = session::interceptSearch,
+                        )
                     }
                 }
             }

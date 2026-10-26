@@ -21,7 +21,11 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
             val verifier = SecretVerifier.create(password)
             vault.update { root ->
                 val accounts = root.child("accounts")
-                check(!accounts.has(key(username, role))) { "Account unavailable" }
+                val normalized = InputPolicy.username(username)
+                val usernameTaken = accounts.has(normalized) || AccountRole.entries.any {
+                    accounts.has(key(normalized, it))
+                }
+                check(!usernameTaken) { "Account unavailable" }
                 accounts.put(
                     key(username, role),
                     JSONObject().put("uid", identity.uid).put("passwordVerifier", verifier)

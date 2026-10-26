@@ -31,14 +31,17 @@ class FirebaseAccountRepository : AccountRepository {
     ): AccountIdentity {
         require(InputPolicy.validUsername(username)) { "Invalid username" }
         require(InputPolicy.validAccountPassword(password, username)) { "Invalid password" }
-        val user =
-            auth.createUserWithEmailAndPassword(AccountPolicy.signInEmail(username, role), password)
-                .await().user ?: error("Missing account")
-        user.updateProfile(
-            com.google.firebase.auth.UserProfileChangeRequest.Builder()
-                .setDisplayName(InputPolicy.username(username)).build()
-        ).await()
-        return AccountIdentity(user.uid, InputPolicy.username(username))
+        require(role == AccountRole.USER || role == AccountRole.SAFE_CONTACT) {
+            "Staff and Admin accounts must be created by an administrator"
+        }
+        val normalized = InputPolicy.username(username)
+        val result = functions.getHttpsCallable("createPublicAccount").call(
+            mapOf("username" to normalized, "password" to password, "role" to role.name)
+        ).await().data as? Map<*, *> ?: error("Missing account")
+        val token = result["token"]?.toString().orEmpty()
+        check(token.isNotBlank()) { "Missing account token" }
+        val user = auth.signInWithCustomToken(token).await().user ?: error("Missing account")
+        return AccountIdentity(user.uid, normalized)
     }
 
     override suspend fun authenticate(

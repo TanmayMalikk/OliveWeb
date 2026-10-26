@@ -34,7 +34,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val hasAppPin get() = runtime.enrollment?.hasAppPin == true
     val phoneHasLock get() = runtime.deviceSecure
     val usesDeviceLock get() = preferredEntryMethod == SafeEntryMethod.DEVICE_LOCK && phoneHasLock
-    val canUseAppPin get() = runtime.enrollment?.allowsAppPin(phoneHasLock) == true
+    val canUseAppPin get() = runtime.enrollment?.allowsAppPin() == true
     // Refreshes device security.
     fun refreshDeviceSecurity() {
         runtime.deviceSecure = runtime.phoneSecure()
@@ -65,6 +65,8 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val incomingFriendRequests get() = runtime.state.incomingFriendRequests
     val outgoingFriendRequests get() = runtime.state.outgoingFriendRequests
     val conversations get() = runtime.state.conversations
+    val archivedConversationIds get() = runtime.state.archivedConversationIds
+    val privateContactNotes get() = runtime.state.privateContactNotes
     val activeConversation get() = runtime.state.activeConversation
     val chatQuickExitHintVisible get() = runtime.state.chatQuickExitHintVisible
     val chatMessages get() = runtime.state.chatMessages
@@ -136,6 +138,8 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         runtime.auth.createDevicePin(pin, confirmation)
 
     fun interceptSearch(value: String): Boolean = runtime.access.interceptSearch(value)
+    // Opens the PIN challenge from the discreet olive shown on every cover.
+    fun beginDiscreetEntry() = runtime.access.beginDiscreetEntry()
     // Submits PIN.
     fun submitPin(pin: String, challenge: Int = pinChallengeVersion) =
         runtime.access.submitPin(pin, challenge)
@@ -205,6 +209,11 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
 
     // Closes conversation.
     fun closeConversation() = runtime.conversationActions.closeConversation()
+    fun setConversationArchived(conversation: ChatConversation, archived: Boolean) =
+        runtime.conversationActions.setArchived(conversation, archived)
+
+    fun appendPrivateContactNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) =
+        runtime.conversationActions.appendPrivateNote(target, text, onSaved)
     // Sends message.
     fun sendMessage(text: String, onSent: () -> Unit = {}) =
         runtime.conversationActions.sendMessage(text, onSent)
@@ -212,6 +221,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
     fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
     fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
+    fun shareSafetyPlanInChat() = runtime.secureSharing.shareSafetyPlan()
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 

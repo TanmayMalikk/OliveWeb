@@ -22,5 +22,5 @@
     <string name="entry_auth_cancelled">Authentification annulée ou indisponible. L’accès reste verrouillé.</string>
 <string name="entry_verify_trigger">Confirmez avec le verrouillage de l’appareil pour modifier le mot déclencheur.</string>
     <string name="entry_invalid_trigger">Choisissez un mot ou une phrase de 3 à 64 caractères.</string>
-    <string name="entry_calculator_help">Pour accéder à l’espace sécurisé, saisissez votre code PIN (ou 4 à 6 chiffres quelconques avec le verrouillage de l’appareil), puis appuyez deux fois sur égal. Le verrouillage exige toujours l’authentification Android.</string>
+    <string name="entry_calculator_help">La calculatrice exige un code PIN de secours. Saisissez-le et appuyez deux fois sur égal pour accéder à l’espace sécurisé. Le verrouillage de l’appareil peut rester votre méthode préférée.</string>
 </resources>

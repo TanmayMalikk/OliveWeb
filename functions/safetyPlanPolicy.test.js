@@ -21,11 +21,12 @@ test("malformed and oversized edits cannot enter the store", () => {
     assert.throws(() => mergeFields({}, {}, [patch]));
   }
 });
-test("only the owner and assigned staff can edit; revoked staff and safe contacts cannot", () => {
+test("owners, assigned staff, and admins can edit; safe contacts cannot", () => {
   const plan = {staffUid:"staff",consultationRequested:true};
   assert.equal(canEdit({uid:"owner",role:"USER"},plan,"owner"),true);
   assert.equal(canEdit({uid:"staff",role:"STAFF"},plan,"owner"),true);
-  for (const actor of [{uid:"other",role:"USER"},{uid:"staff",role:"USER"},{uid:"staff",role:"SAFE_CONTACT"},{uid:"admin",role:"ADMIN"}]) assert.equal(canEdit(actor,plan,"owner"),false);
+  assert.equal(canEdit({uid:"admin",role:"ADMIN"},plan,"owner"),true);
+  for (const actor of [{uid:"other",role:"USER"},{uid:"staff",role:"USER"},{uid:"staff",role:"SAFE_CONTACT"}]) assert.equal(canEdit(actor,plan,"owner"),false);
   assert.equal(canEdit({uid:"staff",role:"STAFF"},{...plan,staffUid:""},"owner"),false);
 });
 test("automatic assignment excludes disabled/unverified staff and balances available staff", () => {
@@ -37,6 +38,16 @@ test("automatic assignment excludes disabled/unverified staff and balances avail
   assert.equal(staffEligible(user,{}),false);
   assert.equal(chooseStaff([{uid:"a",available:false,activeCount:0},{uid:"b",activeCount:2},{uid:"c",activeCount:1}]).uid,"c");
   assert.equal(chooseStaff([{uid:"a",available:false}]),undefined);
+});
+
+test("staff assignment randomizes only between equally least-loaded staff", () => {
+  const candidates = [
+    {uid:"busy",activeCount:4},
+    {uid:"first",activeCount:1},
+    {uid:"second",activeCount:1},
+  ];
+  assert.equal(chooseStaff(candidates, () => 0).uid, "first");
+  assert.equal(chooseStaff(candidates, () => 0.999).uid, "second");
 });
 
 test("document and quick-grab sections can be added without replacing legacy notes", () => {

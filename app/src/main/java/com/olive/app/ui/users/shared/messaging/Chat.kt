@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.NorthEast
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -107,7 +108,7 @@ internal fun ChatPane(
                         color = Muted
                     )
                     Text(
-                        active.peerUsername(currentUid).lowercase(Locale.ROOT),
+                        active.displayName(currentUid).lowercase(Locale.ROOT),
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.semantics { heading() })
                 }
@@ -332,6 +333,23 @@ private fun ChatMessageBody(
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                     )
                 }
+            }
+        }
+        return
+    }
+    if (!chat.unsent && parts.firstOrNull() == "SHARED_SAFETY_PLAN") {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        ) {
+            Row(
+                Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(Icons.Outlined.HealthAndSafety, stringResource(R.string.shared_safety_plan))
+                Text(stringResource(R.string.shared_safety_plan), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
             }
         }
         return

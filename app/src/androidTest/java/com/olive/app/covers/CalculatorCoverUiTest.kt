@@ -95,6 +95,13 @@ class CalculatorCoverUiTest {
     }
 
     @Test
+    fun fitnessButtonOpensTheFitnessCalculator() {
+        compose.onNodeWithTag("calculator_fitness").performClick()
+        compose.onNodeWithTag("fitness_tracker").assertIsDisplayed()
+        compose.onNodeWithText("Steps today").assertIsDisplayed()
+    }
+
+    @Test
     fun graphTableUsesRangeInputsAndCreatesScrollableRows() {
         compose.onNodeWithTag("graph_editor").performClick()
         compose.onNodeWithTag("graph_table_analysis").performClick()

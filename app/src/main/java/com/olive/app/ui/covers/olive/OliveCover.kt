@@ -106,6 +106,7 @@ internal fun OliveCover(
                     ),
                 ).forEach { (tab, icon, label) ->
                     NavigationBarItem(
+                        modifier = Modifier.testTag("cover_tab_${tab.name.lowercase()}"),
                         selected = vm.tab == tab, onClick = { vm.navigate(tab) },
                         icon = {
                             BadgedBox(badge = {

@@ -10,6 +10,8 @@ import com.olive.app.R
 import androidx.core.content.edit
 import com.olive.app.data.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 
 // Owns conversation selection, messages and read markers.
@@ -18,7 +20,8 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     fun openConversation(conversation: ChatConversation) {
         with(runtime) {
             with(state) {
-                if (screen != SessionScreen.Safe || page != SafePage.Messages) return
+                if (!((screen == SessionScreen.Safe && page == SafePage.Messages) ||
+                            (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)))) return
                 val uid = enrollment?.uid ?: return
                 if (uid !in conversation.participantIds) return
                 messageSubscription?.close()
@@ -122,6 +125,51 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 chatQuickExitHintVisible = false
+            }
+        }
+    }
+
+    fun setArchived(conversation: ChatConversation, archived: Boolean) {
+        with(runtime) {
+            val uid = enrollment?.uid ?: return
+            if (uid !in conversation.participantIds) return
+            val previous = state.archivedConversationIds
+            state.archivedConversationIds = if (archived) {
+                previous + conversation.id
+            } else {
+                previous - conversation.id
+            }
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        store.setConversationArchived(uid, conversation.id, archived)
+                    }
+                } catch (_: Exception) {
+                    state.archivedConversationIds = previous
+                    state.message = runtime.application.getString(R.string.unable_to_update_archived_chat)
+                }
+            }
+        }
+    }
+
+    fun appendPrivateNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) {
+        with(runtime) {
+            val uid = enrollment?.uid ?: return
+            if (target.uid == uid || text.isBlank() || text.length > 2_000) return
+            state.messagingBusy = true
+            scope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        store.appendPrivateContactNote(uid, target.uid, target.username, text)
+                        store.privateContactNotes(uid)
+                    }.also { state.privateContactNotes = it }
+                    onSaved()
+                } catch (error: Exception) {
+                    state.message = error.localizedMessage
+                        ?: runtime.application.getString(R.string.unable_to_save_private_contact_note)
+                } finally {
+                    state.messagingBusy = false
+                }
             }
         }
     }

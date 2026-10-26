@@ -12,7 +12,7 @@ import org.junit.Test
 class CredentialRulesUiTest : OliveUiTestBase() {
     @Test
     fun newAccountsRejectNumericUsernamesAndPasswordsContainingUsername() {
-        waitFor("new_user")
+        openOnboarding()
         click("new_user")
         fill("username", "12345678")
         fill("password", "Unrelated123!")

@@ -35,7 +35,7 @@ import org.junit.Test
 class SafeSupportUiTest : OliveUiTestBase() {
     // Sets up.
     private fun setup(): SessionViewModel {
-        waitFor("new_user")
+        openOnboarding()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         compose.runOnIdle {

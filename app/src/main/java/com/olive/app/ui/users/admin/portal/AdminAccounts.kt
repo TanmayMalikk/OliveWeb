@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.data.*
+import com.olive.app.ui.users.shared.messaging.PrivateContactNoteDialog
 
 
 @Composable
@@ -38,6 +39,7 @@ internal fun AdminAccounts(
     onDelete: (AdminAccountSummary) -> Unit
 ) {
     val uiText = rememberResourceText()
+    var noteTarget by remember { mutableStateOf<DirectoryUser?>(null) }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 18.dp),
@@ -72,13 +74,19 @@ internal fun AdminAccounts(
             color = Muted
         )
         session.adminAccounts.forEach { account ->
-            AccountRow(account, !session.busy) {
-                onDelete(
-                    account
-                )
-            }
+            AccountRow(
+                account,
+                !session.busy,
+                onNote = if (account.role == AccountRole.USER) {
+                    { noteTarget = DirectoryUser(account.uid, account.username) }
+                } else null,
+                onDelete = { onDelete(account) },
+            )
         }
         Status(session)
+    }
+    noteTarget?.let { target ->
+        PrivateContactNoteDialog(session, listOf(target), onDismiss = { noteTarget = null })
     }
 }
 
@@ -114,7 +122,12 @@ internal fun AccountCountGrid(counts: AccountCounts) {
 }
 
 @Composable
-private fun AccountRow(account: AdminAccountSummary, enabled: Boolean, onDelete: () -> Unit) {
+private fun AccountRow(
+    account: AdminAccountSummary,
+    enabled: Boolean,
+    onNote: (() -> Unit)?,
+    onDelete: () -> Unit,
+) {
     val uiText = rememberResourceText()
     OutlinedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -127,12 +140,21 @@ private fun AccountRow(account: AdminAccountSummary, enabled: Boolean, onDelete:
                         ), color = Muted
                     )
                     if (account.fullName.isNotBlank()) Text(account.fullName)
+                    if (account.role == com.olive.app.data.AccountRole.STAFF) Text(
+                        uiText(R.string.assigned_users_count, account.assignedUsers),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
                     if (account.email.isNotBlank()) Text(
                         account.email,
                         style = MaterialTheme.typography.bodySmall,
                         color = Muted
                     )
                 }
+                if (onNote != null) TextButton(
+                    onClick = onNote,
+                    enabled = enabled,
+                ) { Text(stringResource(R.string.private_note)) }
                 TextButton(
                     onClick = onDelete,
                     enabled = enabled && !account.protected

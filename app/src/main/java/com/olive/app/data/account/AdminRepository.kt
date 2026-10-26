@@ -23,6 +23,7 @@ data class AdminAccountSummary(
     val phone: String,
     val profileComplete: Boolean,
     val protected: Boolean,
+    val assignedUsers: Int = 0,
 )
 
 // Groups the data and actions for admin account draft.
@@ -65,7 +66,8 @@ class AdminRepository {
                             value.string("email"),
                             value.string("phone"),
                             value["profileComplete"] == true,
-                            value["protected"] == true
+                            value["protected"] == true,
+                            (value["assignedUsers"] as? Number)?.toInt() ?: 0,
                         )
                     }
                 }

@@ -1,7 +1,7 @@
 // Contains the account deletion code for this part of Olive.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebase");
-const {text, roleFromUser, PROTECTED_USERNAME} = require("./accountPolicy");
+const {text, roleFromUser, protectedAccount} = require("./accountPolicy");
 const {readProfile, deleteOrganizationLogin, requireAdmin, listEveryUser} = require("./accountStorage");
 
 async function deleteQuery(query) {
@@ -28,7 +28,7 @@ exports.adminDeleteAccount = onCall(async (request) => {
   const profile = await readProfile(uid);
   const role = roleFromUser(target, profile);
   const username = text(profile?.username || target.displayName || target.email?.split("@")[0], 24).toLowerCase();
-  if (username === PROTECTED_USERNAME || target.customClaims?.owner === true) throw new HttpsError("permission-denied", "The owner account cannot be deleted.");
+  if (protectedAccount(target, username)) throw new HttpsError("permission-denied", "This protected account cannot be deleted.");
   if (role === "ADMIN") {
     const users = await listEveryUser();
     let adminCount = 0;

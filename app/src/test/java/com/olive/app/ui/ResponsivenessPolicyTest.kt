@@ -19,10 +19,9 @@ import org.junit.Test
 // Groups the data and actions for responsiveness policy test.
 class ResponsivenessPolicyTest {
     @Test
-    fun coverIsOnlyConstructedAfterAUserSessionIsConfigured() {
-        assertFalse(shouldComposeCover(configured = false, usesCover = true))
-        assertFalse(shouldComposeCover(configured = true, usesCover = false))
-        assertTrue(shouldComposeCover(configured = true, usesCover = true))
+    fun coverIsConstructedForTheDefaultAndConfiguredUserRoutes() {
+        assertFalse(shouldComposeCover(usesCover = false))
+        assertTrue(shouldComposeCover(usesCover = true))
     }
 
     @Test

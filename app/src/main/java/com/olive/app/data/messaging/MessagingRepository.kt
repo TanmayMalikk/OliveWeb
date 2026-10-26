@@ -224,15 +224,9 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     // Watches conversations for changes.
     fun observeConversations(
         currentUid: String,
-        friendshipIds: List<String>,
         onUpdate: (List<ChatConversation>) -> Unit,
         onError: (String) -> Unit
     ): ChatSubscription {
-        if (friendshipIds.isEmpty()) {
-            onUpdate(emptyList())
-            return ChatSubscription {}
-        }
-        val allowedIds = friendshipIds.toSet()
         val listener =
             firestore.collection("conversations").whereArrayContains("participantIds", currentUid)
                 .addSnapshotListener { snapshot, error ->
@@ -242,8 +236,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                         )
                         return@addSnapshotListener
                     }
-                    onUpdate(snapshot?.documents.orEmpty().filter { it.id in allowedIds }
-                        .mapNotNull(::conversationFrom).sortedByDescending { it.updatedAt })
+                    onUpdate(snapshot?.documents.orEmpty().mapNotNull(::conversationFrom)
+                        .sortedByDescending { it.updatedAt })
                 }
         return listener.asSubscription()
     }
@@ -283,7 +277,9 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             row.getString("lastMessage").orEmpty(),
             row.getTimestamp("updatedAt")?.toDate()?.time ?: 0L,
             row.getString("lastMessageId").orEmpty(),
-            row.getString("lastSenderUid").orEmpty()
+            row.getString("lastSenderUid").orEmpty(),
+            row.getString("type") ?: "DIRECT",
+            row.getString("ownerUid").orEmpty(),
         )
     }
 

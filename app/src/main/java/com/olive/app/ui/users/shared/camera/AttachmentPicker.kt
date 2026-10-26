@@ -26,7 +26,7 @@ import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
 // Groups the data and actions for attachment category.
-private enum class AttachmentCategory { Notes, Incidents, Media, Location }
+private enum class AttachmentCategory { Notes, Incidents, Media, SafetyPlan, Location }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +68,7 @@ internal fun AttachmentPicker(
                                 AttachmentCategory.Notes -> R.string.private_notes
                                 AttachmentCategory.Incidents -> R.string.incident_reports
                                 AttachmentCategory.Media -> R.string.saved_media
+                                AttachmentCategory.SafetyPlan -> R.string.shared_safety_plan
                                 else -> R.string.share_live_location_with
                             }
                         )
@@ -96,6 +97,16 @@ internal fun AttachmentPicker(
                     headlineContent = { Text(stringResource(R.string.saved_media)) },
                     leadingContent = { Icon(Icons.Outlined.PhotoCamera, null) },
                     modifier = Modifier.clickable { selectedCategory = AttachmentCategory.Media }
+                )
+                if (session.accountRole == com.olive.app.data.AccountRole.USER &&
+                    session.activeConversation?.type == "SUPPORT") ListItem(
+                    headlineContent = { Text(stringResource(R.string.shared_safety_plan)) },
+                    supportingContent = { Text(stringResource(R.string.share_safety_plan_support_chat)) },
+                    leadingContent = { Icon(Icons.Outlined.HealthAndSafety, null) },
+                    modifier = Modifier.clickable {
+                        session.shareSafetyPlanInChat()
+                        onDismiss()
+                    },
                 )
                 if (session.accountRole == com.olive.app.data.AccountRole.USER) ListItem(
                     headlineContent = { Text(stringResource(R.string.start_sharing_location)) },
@@ -186,6 +197,7 @@ internal fun AttachmentPicker(
                         }
 
                         AttachmentCategory.Location -> Unit
+                        AttachmentCategory.SafetyPlan -> Unit
                         null -> {}
                     }
                 }

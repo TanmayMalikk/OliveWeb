@@ -149,7 +149,10 @@ internal fun SafeEntrySetup(session: SessionViewModel) {
 }
 
 @Composable
-internal fun DeviceLockPrompt(session: SessionViewModel) {
+internal fun DeviceLockPrompt(
+    session: SessionViewModel,
+    onUseBackupPin: (() -> Unit)? = null,
+) {
     LaunchedEffect(Unit) { session.authenticateDeviceLock() }
     FormColumn {
         Heading(
@@ -163,6 +166,15 @@ internal fun DeviceLockPrompt(session: SessionViewModel) {
             modifier = Modifier.fillMaxWidth().testTag("device_lock_unlock")
         ) {
             Text(stringResource(R.string.entry_unlock))
+        }
+        if (onUseBackupPin != null) {
+            OutlinedButton(
+                onClick = onUseBackupPin,
+                enabled = !session.busy,
+                modifier = Modifier.fillMaxWidth().testTag("use_backup_pin"),
+            ) {
+                Text(stringResource(R.string.entry_use_backup_pin))
+            }
         }
     }
 }
