@@ -3,6 +3,7 @@ package com.olive.app.security
 
 import com.olive.app.ui.shared.*
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
@@ -29,5 +30,65 @@ class EncryptionUtilsTest {
         assertNotEquals(ciphertext, EncryptionUtils.encryptText(originalText, secretKey))
         val tampered = ciphertext.dropLast(2) + "AA"
         assertThrows(Exception::class.java) { EncryptionUtils.decryptText(tampered, secretKey) }
+    }
+
+    @Test
+    fun `test binary encryption and decryption`() {
+        val originalBytes = byteArrayOf(
+            0x00,
+            0x01,
+            0x7F,
+            0x80.toByte(),
+            0xFF.toByte(),
+        )
+        val secretKey = EncryptionUtils.generateSymmetricKey()
+
+        val encryptedBytes = EncryptionUtils.encryptBytes(originalBytes, secretKey)
+        val decryptedBytes = EncryptionUtils.decryptBytes(encryptedBytes, secretKey)
+
+        assertArrayEquals(originalBytes, decryptedBytes)
+    }
+
+    @Test
+    fun `test binary encryption uses a unique IV`() {
+        val originalBytes = "private media".toByteArray()
+        val secretKey = EncryptionUtils.generateSymmetricKey()
+
+        val firstPayload = EncryptionUtils.encryptBytes(originalBytes, secretKey)
+        val secondPayload = EncryptionUtils.encryptBytes(originalBytes, secretKey)
+
+        assertNotEquals(firstPayload.toList(), secondPayload.toList())
+    }
+
+    @Test
+    fun `test tampered binary payload fails authentication`() {
+        val secretKey = EncryptionUtils.generateSymmetricKey()
+        val encryptedBytes = EncryptionUtils.encryptBytes(byteArrayOf(1, 2, 3), secretKey)
+        encryptedBytes[encryptedBytes.lastIndex] =
+            (encryptedBytes.last().toInt() xor 0x01).toByte()
+
+        assertThrows(Exception::class.java) {
+            EncryptionUtils.decryptBytes(encryptedBytes, secretKey)
+        }
+    }
+
+    @Test
+    fun `test truncated binary payload is rejected`() {
+        val secretKey = EncryptionUtils.generateSymmetricKey()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            EncryptionUtils.decryptBytes(ByteArray(27), secretKey)
+        }
+    }
+
+    @Test
+    fun `test empty binary payload round trip`() {
+        val secretKey = EncryptionUtils.generateSymmetricKey()
+        val encryptedBytes = EncryptionUtils.encryptBytes(ByteArray(0), secretKey)
+
+        assertArrayEquals(
+            ByteArray(0),
+            EncryptionUtils.decryptBytes(encryptedBytes, secretKey),
+        )
     }
 }
