@@ -43,18 +43,20 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
         TextButton(onClick = onBack) { Text(stringResource(R.string.safety_back)) }
         Heading(
             stringResource(R.string.safety_inbox),
-            stringResource(R.string.safety_staff_intro),
+            stringResource(if (session.accountRole == com.olive.app.data.AccountRole.ADMIN) R.string.safety_admin_intro else R.string.safety_staff_intro),
             stringResource(R.string.olive_tree),
         )
-        val availabilityLabel = stringResource(R.string.safety_available)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(availabilityLabel, Modifier.weight(1f))
-            Switch(
-                checked = controller.available,
-                onCheckedChange = controller::changeAvailability,
-                modifier = Modifier.testTag("safety_staff_available")
-                    .semantics { contentDescription = availabilityLabel },
-            )
+        if (session.accountRole == com.olive.app.data.AccountRole.STAFF) {
+            val availabilityLabel = stringResource(R.string.safety_available)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(availabilityLabel, Modifier.weight(1f))
+                Switch(
+                    checked = controller.available,
+                    onCheckedChange = controller::changeAvailability,
+                    modifier = Modifier.testTag("safety_staff_available")
+                        .semantics { contentDescription = availabilityLabel },
+                )
+            }
         }
         controller.error?.let { AccessibleMessage(stringResource(it)) }
         if (controller.consultations.isEmpty()) Text(stringResource(R.string.safety_inbox_empty))

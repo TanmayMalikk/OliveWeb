@@ -4,7 +4,7 @@
     <string name="entry_set_pin_first">Set up an app PIN below before choosing it as your entry method.</string>
     <string name="entry_settings_saved">Safe entry settings saved.</string>
     <string name="entry_current_method">Preferred method: %1$s</string>
-    <string name="entry_backup_description">You can keep both methods configured. When device lock is selected, the app PIN is available only if the phone screen lock is removed. Cancelling or failing Android authentication does not enable PIN fallback.</string>
+    <string name="entry_backup_description">You can keep both methods configured. Device lock stays preferred, and the backup app PIN gives you another way to enter.</string>
     <string name="entry_use_device">Set up and use device lock</string>
     <string name="entry_use_pin">Use saved app PIN</string>
     <string name="entry_pin_setup">Set up or update app PIN</string>
@@ -13,4 +13,9 @@
     <string name="entry_confirm_settings">Confirm your identity with Android to change your safe entry settings.</string>
     <string name="entry_settings_cancelled">Authentication cancelled. Your safe entry settings were not changed.</string>
     <string name="entry_settings_failed">Unable to complete this change. Check the selected entry method and try again.</string>
+    <string name="calculator_pin_required_title">Create an app PIN first</string>
+    <string name="calculator_pin_required_description">Calculator needs a 4–6 digit backup app PIN so ordinary calculations do not open Android authentication. Device lock will remain your preferred entry method.</string>
+    <string name="calculator_create_pin">Create backup PIN and select Calculator</string>
+    <string name="entry_use_backup_pin">Use backup app PIN instead</string>
+    <string name="entry_missing_backup_pin">Your phone’s screen lock appears to be disabled and no backup app PIN was added. Restore the phone’s screen lock, unlock the safe area, then add a backup PIN in Settings.</string>
 </resources>

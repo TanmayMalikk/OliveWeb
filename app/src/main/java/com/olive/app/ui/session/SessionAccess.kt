@@ -43,6 +43,30 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
         }
     }
 
+    // Starts the same locked PIN flow when the user double-taps the discreet olive on a cover.
+    fun beginDiscreetEntry() {
+        with(runtime) {
+            with(state) {
+                if (accountRole != AccountRole.USER || screen != SessionScreen.Cover || busy || privacyBlackout) return
+                val device = enrollment
+                if (device == null) {
+                    auth.setup()
+                    return
+                }
+                if (device.role != AccountRole.USER) return
+                val event = TriggerEvent(source = "Cover olive")
+                activeTriggerId = event.id
+                triggerJob = scope.launch(Dispatchers.IO) {
+                    store.recordTrigger(device.uid, event)
+                    history.queueHistorySync()
+                }
+                pinChallengeVersion++
+                message = null
+                screen = SessionScreen.Pin
+            }
+        }
+    }
+
     // Reject queued clicks from an old PIN screen or while verification/blackout is active.
     fun submitPin(pin: String, challenge: Int) {
         with(runtime) {
@@ -50,7 +74,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 if (busy || privacyBlackout || screen != SessionScreen.Pin || accountRole != AccountRole.USER || challenge != pinChallengeVersion) return
                 val device = enrollment ?: return
                 if (device.role != AccountRole.USER || activeTriggerId == null) return
-                if (!device.allowsAppPin(phoneSecure())) return
+                if (!device.allowsAppPin()) return
                 if (!InputPolicy.validPin(pin)) {
                     message =
                         runtime.application.getString(R.string.enter_your_4_6_digit_pin)
@@ -103,7 +127,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 ) return
                 val device = enrollment ?: return
                 if (device.role != AccountRole.USER) return
-                if (!device.allowsAppPin(phoneSecure())) {
+                if (!device.allowsAppPin()) {
                     // Calculator digits open a fresh challenge; Android must still authenticate the account.
                     val event = TriggerEvent(source = "Better Calculator")
                     activeTriggerId = event.id
@@ -163,11 +187,11 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
     ) {
         with(runtime) {
             with(state) {
-                if (usingAppPin && !device.allowsAppPin(phoneSecure())) return
+                if (usingAppPin && !device.allowsAppPin()) return
                 val saved = withContext(Dispatchers.IO) { store.unlockSnapshot(device.uid) }
                 if (epoch != token || screen != expectedScreen || enrollment != device || privacyBlackout ||
                     (challenge != null && challenge != pinChallengeVersion) ||
-                    (usingAppPin && !device.allowsAppPin(phoneSecure()))
+                    (usingAppPin && !device.allowsAppPin())
                 ) return
                 pinAuthorizedUid = device.uid
                 pinAuthorizedEpoch = token

@@ -113,8 +113,15 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
 // UI sizing/color: this screen owns the compact breakpoint, keypad dimensions, PIN-dot size, OliveGreen accents, and responsive text sizes.
 @Composable
 internal fun PinPrompt(session: SessionViewModel) {
-    if (session.usesDeviceLock) {
-        DeviceLockPrompt(session)
+    val challenge = session.pinChallengeVersion
+    var useBackupPin by remember(challenge) { mutableStateOf(false) }
+    if (session.usesDeviceLock && !useBackupPin) {
+        DeviceLockPrompt(
+            session = session,
+            onUseBackupPin = if (session.hasAppPin) {
+                { useBackupPin = true }
+            } else null,
+        )
         return
     }
     if (!session.canUseAppPin) {
@@ -123,12 +130,16 @@ internal fun PinPrompt(session: SessionViewModel) {
                 stringResource(R.string.entry_device_lock),
                 stringResource(R.string.entry_restore_lock)
             )
+            Text(
+                stringResource(R.string.entry_missing_backup_pin),
+                color = Muted,
+                modifier = Modifier.testTag("missing_backup_pin"),
+            )
             Status(session)
         }
         return
     }
     val uiText = rememberResourceText()
-    val challenge = session.pinChallengeVersion
     var pin by remember(challenge) { mutableStateOf("") }
     val headingScrollState = rememberScrollState()
     val pinLabel = uiText(R.string.a11y_pin)

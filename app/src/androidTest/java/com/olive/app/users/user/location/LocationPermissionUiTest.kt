@@ -59,7 +59,7 @@ class LocationPermissionUiTest : OliveUiTestBase() {
         automation.revokeRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
         context.getSharedPreferences("olive_permissions", android.content.Context.MODE_PRIVATE)
             .edit().clear().commit()
-        waitFor("new_user")
+        openOnboarding()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         compose.runOnIdle {
             session.chooseNew()

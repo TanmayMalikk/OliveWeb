@@ -19,6 +19,10 @@ import kotlinx.coroutines.withContext
 
 // Connects account messaging and manages live subscriptions.
 internal class SessionMessaging(private val runtime: SessionRuntime) {
+    private fun messagingScreenActive() = with(runtime.state) {
+        (screen == SessionScreen.Safe && page == SafePage.Messages) ||
+                (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN))
+    }
     // Makes sure messaging observation is ready.
     fun ensureMessagingObservation(showFeedback: Boolean = false) {
         with(runtime) {
@@ -59,9 +63,9 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 scope.launch {
                     try {
                         registerMessagingIdentity(identity)
-                        if (epoch != token || screen != SessionScreen.Safe) return@launch
+                        if (epoch != token || !messagingScreenActive()) return@launch
                         socialSubscription = repository.observeSocial(device.uid, { social ->
-                            if (epoch == token && screen == SessionScreen.Safe) {
+                            if (epoch == token && messagingScreenActive()) {
                                 friends = social.friends
                                 incomingFriendRequests = social.incoming
                                 outgoingFriendRequests = social.outgoing
@@ -102,7 +106,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         with(runtime) {
             with(state) {
                 val device = enrollment ?: return
-                if (localMode || messagingBusy || password.isBlank() || screen != SessionScreen.Safe || page != SafePage.Messages) return
+                if (localMode || messagingBusy || password.isBlank() || !messagingScreenActive()) return
                 val token = epoch
                 messagingBusy = true
                 message = null
@@ -124,7 +128,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                     } finally {
                         if (epoch == token) messagingBusy = false
                     }
-                    if (connected && epoch == token && screen == SessionScreen.Safe && page == SafePage.Messages) {
+                    if (connected && epoch == token && messagingScreenActive()) {
                         onConnected()
                         startMessaging(showFeedback = true)
                     }
@@ -137,20 +141,28 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
     fun observeFriendConversations(currentFriends: List<Friend>, token: Long) {
         with(runtime) {
             with(state) {
-                val ids = currentFriends.map { it.friendshipId }.toSet()
+                // The marker keeps support conversations observable even when this account has no friends.
+                val ids = currentFriends.map { it.friendshipId }.toSet() + "__support__"
                 if (ids == observedFriendshipIds) return
                 observedFriendshipIds = ids
                 conversationSubscription?.close()
                 conversationSubscription =
-                    messagingRepository?.observeConversations(deviceUid(), ids.toList(), { rows ->
-                        if (epoch == token && screen == SessionScreen.Safe) {
+                    messagingRepository?.observeConversations(deviceUid(), { rows ->
+                        if (epoch == token && messagingScreenActive()) {
                             if (conversationLoadFailed) message = null
                             conversationLoadFailed = false
                             conversations = rows
                             activeConversation?.let { active ->
                                 rows.firstOrNull { it.id == active.id }?.let { updated ->
-                                    activeConversation = updated
-                                    conversationActions.markConversationRead(updated)
+                                    if (active.participantIds != updated.participantIds) {
+                                        messageSubscription?.close()
+                                        messageSubscription = null
+                                        activeConversation = null
+                                        conversationActions.openConversation(updated)
+                                    } else {
+                                        activeConversation = updated
+                                        conversationActions.markConversationRead(updated)
+                                    }
                                 }
                             }
                         }
@@ -180,7 +192,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                     return
                 }
                 val device = enrollment ?: return
-                if (messagingBusy || messagingNeedsReconnect || screen != SessionScreen.Safe || page != SafePage.Messages) return
+                if (messagingBusy || messagingNeedsReconnect || !messagingScreenActive()) return
                 val token = epoch
                 messagingBusy = true
                 message = null

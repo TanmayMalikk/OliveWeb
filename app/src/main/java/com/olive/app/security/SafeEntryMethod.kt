@@ -15,6 +15,5 @@ enum class SafeEntryMethod {
     }
 }
 
-// A configured backup is never an alternative to an available, selected device lock.
-internal fun DeviceEnrollment.allowsAppPin(phoneSecure: Boolean): Boolean =
-    hasAppPin && (entryMethod == SafeEntryMethod.APP_PIN || !phoneSecure)
+// A saved app PIN is an optional second route even when device lock stays preferred.
+internal fun DeviceEnrollment.allowsAppPin(): Boolean = hasAppPin

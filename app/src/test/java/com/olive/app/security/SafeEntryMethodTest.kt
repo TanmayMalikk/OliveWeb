@@ -22,19 +22,16 @@ class SafeEntryMethodTest {
     }
 
     @Test
-    fun backupPinIsAllowedOnlyAfterPhoneLockIsRemoved() {
+    fun backupPinIsAlwaysAnOptionalSecondEntryRoute() {
         val device = DeviceEnrollment(
             "uid",
             "trigger",
             entryMethod = SafeEntryMethod.DEVICE_LOCK,
             hasAppPin = true
         )
-        assertFalse(device.allowsAppPin(true))
-        assertTrue(device.allowsAppPin(false))
-        assertFalse(device.copy(hasAppPin = false).allowsAppPin(false))
-        assertFalse(device.copy(hasAppPin = false).allowsAppPin(true))
+        assertTrue(device.allowsAppPin())
+        assertFalse(device.copy(hasAppPin = false).allowsAppPin())
         val selectedPin = device.copy(entryMethod = SafeEntryMethod.APP_PIN)
-        assertTrue(selectedPin.allowsAppPin(true))
-        assertTrue(selectedPin.allowsAppPin(false))
+        assertTrue(selectedPin.allowsAppPin())
     }
 }

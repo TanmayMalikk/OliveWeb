@@ -34,7 +34,7 @@ internal class SessionRuntime(val application: Application, val scope: Coroutine
         application.getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure
 
     var deviceSecure by mutableStateOf(phoneSecure())
-    val store = DeviceStore(vault, activityVault, ::phoneSecure)
+    val store = DeviceStore(vault, activityVault)
     val coverStore = CoverStateStore(EncryptedVault(application, "cover"))
     val coverSaveMutex = Mutex()
     val foodRevisions = mutableMapOf<String, Long>()
@@ -191,6 +191,8 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var incomingFriendRequests by mutableStateOf(emptyList<FriendRequest>())
     var outgoingFriendRequests by mutableStateOf(emptyList<FriendRequest>())
     var conversations by mutableStateOf(emptyList<ChatConversation>())
+    var archivedConversationIds by mutableStateOf(emptySet<String>())
+    var privateContactNotes by mutableStateOf(emptyMap<String, PrivateContactNote>())
     // Counts changes to read message.
     var readMessageVersion by mutableIntStateOf(0)
     var activeConversation by mutableStateOf<ChatConversation?>(null)

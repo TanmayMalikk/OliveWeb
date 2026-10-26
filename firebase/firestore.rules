@@ -27,7 +27,15 @@ service cloud.firestore {
 
     function validMessagingEmail(username) {
       return request.auth.token.email == username + '@users.olive.invalid'
-        || request.auth.token.email == username + '@safe.olive.invalid';
+        || request.auth.token.email == username + '@safe.olive.invalid'
+        || request.auth.token.email == username + '@staff.olive.invalid'
+        || request.auth.token.email == username + '@admin.olive.invalid';
+    }
+
+    function personalMessagingAccount() {
+      return request.auth != null &&
+        (request.auth.token.email.matches('.*@users[.]olive[.]invalid') ||
+          request.auth.token.email.matches('.*@safe[.]olive[.]invalid'));
     }
 
     function contactAt(c, i) {
@@ -194,15 +202,20 @@ service cloud.firestore {
 
     // Username lookup is exact and case-normalized by the app; listing the directory is never allowed.
     match /messageDirectory/{username} {
+      function validDirectoryEntry() {
+        return request.resource.data.keys().hasOnly(['uid','username','publicKey','updatedAt'])
+          && request.resource.data.username == username
+          && request.resource.data.publicKey is string && request.resource.data.publicKey.size() > 0
+          && request.resource.data.publicKey.size() <= 1000
+          && validMessageUsername(username)
+          && validMessagingEmail(username);
+      }
       allow get: if signedIn();
       allow list: if false;
-      allow create, update: if owner(request.resource.data.uid)
-        && request.resource.data.keys().hasOnly(['uid','username','publicKey','updatedAt'])
-        && request.resource.data.username == username
-        && request.resource.data.publicKey is string && request.resource.data.publicKey.size() > 0
-        && request.resource.data.publicKey.size() <= 1000
-        && validMessageUsername(username)
-        && validMessagingEmail(username);
+      allow create: if owner(request.resource.data.uid) && validDirectoryEntry();
+      allow update: if owner(resource.data.uid)
+        && request.resource.data.uid == resource.data.uid
+        && validDirectoryEntry();
       allow delete: if owner(resource.data.uid);
     }
 
@@ -226,7 +239,8 @@ service cloud.firestore {
 
     match /friendRequests/{requestId} {
       allow read: if signedIn() && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
-      allow create: if signedIn() && request.resource.data.senderUid == request.auth.uid
+      allow create: if signedIn() && personalMessagingAccount()
+        && request.resource.data.senderUid == request.auth.uid
         && requestId == request.resource.data.senderUid + '--' + request.resource.data.recipientUid
         && validFriendRequest(request.resource.data)
         && !exists(/databases/$(database)/documents/friendRequests/$(request.resource.data.recipientUid + '--' + request.resource.data.senderUid))
@@ -255,7 +269,8 @@ service cloud.firestore {
     match /friendships/{friendshipId} {
       allow get: if signedIn() && request.auth.uid in resource.data.participantIds;
       allow list: if false;
-      allow create: if signedIn() && validFriendship(request.resource.data,friendshipId)
+      allow create: if signedIn() && personalMessagingAccount()
+        && validFriendship(request.resource.data,friendshipId)
         && acceptedRequest(request.resource.data).recipientUid == request.auth.uid
         && acceptedRequest(request.resource.data).friendshipId == friendshipId
         && acceptedRequest(request.resource.data).senderUid in request.resource.data.participantIds
@@ -329,15 +344,21 @@ service cloud.firestore {
     }
 
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys'])
+      return data.keys().hasOnly(['type','ownerUid','staffUid','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys'])
         && data.friendshipId == conversationId
         && data.lastMessage is string && data.lastMessage.size() <= 160
         && data.lastMessageId is string && data.lastMessageId.size() <= 128
         && (!data.keys().hasAny(['lastSenderUid'])
           || (data.lastSenderUid is string && data.lastSenderUid.size() <= 128))
-        && existsAfter(/databases/$(database)/documents/friendships/$(data.friendshipId))
-        && data.participantIds == friendshipForConversation(data).participantIds
-        && data.participantUsernames == friendshipForConversation(data).participantUsernames;
+        && ((!(data.keys().hasAny(['type']))
+              && existsAfter(/databases/$(database)/documents/friendships/$(data.friendshipId))
+              && data.participantIds == friendshipForConversation(data).participantIds
+              && data.participantUsernames == friendshipForConversation(data).participantUsernames)
+          || (data.type == 'SUPPORT' && data.ownerUid is string && data.staffUid is string
+              && conversationId == 'support-' + data.ownerUid
+              && data.participantIds is list && data.participantIds.size() >= 2
+              && data.participantIds.size() <= 3 && data.ownerUid in data.participantIds
+              && data.staffUid in data.participantIds));
     }
 
     function validConversationKeys(data) {
@@ -348,7 +369,10 @@ service cloud.firestore {
         && data.roomKeys[data.participantIds[0]] is string && data.roomKeys[data.participantIds[0]].size() <= 1000
         && data.roomKeys[data.participantIds[1]] is string && data.roomKeys[data.participantIds[1]].size() <= 1000
         && data.participantPublicKeys[data.participantIds[0]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[0]])).data.publicKey
-        && data.participantPublicKeys[data.participantIds[1]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[1]])).data.publicKey;
+        && data.participantPublicKeys[data.participantIds[1]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[1]])).data.publicKey
+        && (data.participantIds.size() == 2 ||
+          (data.roomKeys[data.participantIds[2]] is string && data.roomKeys[data.participantIds[2]].size() <= 1000
+            && data.participantPublicKeys[data.participantIds[2]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[2]])).data.publicKey));
     }
 
     match /conversations/{conversationId} {
@@ -357,7 +381,9 @@ service cloud.firestore {
       allow get: if conversationParticipant(resource.data);
       allow list: if signedIn()
         && request.auth.uid in resource.data.participantIds;
-      allow create: if conversationParticipant(request.resource.data) && validConversation(request.resource.data,conversationId);
+      allow create: if conversationParticipant(request.resource.data)
+        && !request.resource.data.keys().hasAny(['type'])
+        && validConversation(request.resource.data,conversationId);
       allow update: if conversationParticipant(resource.data)
         && validConversation(request.resource.data,conversationId)
         && (

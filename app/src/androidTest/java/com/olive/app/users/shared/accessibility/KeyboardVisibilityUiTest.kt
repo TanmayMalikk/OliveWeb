@@ -103,7 +103,7 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
 
     @Test
     fun credentialsStayAboveKeyboardWhenSwitchingFieldsAndReopeningIt() {
-        waitFor("new_user")
+        openOnboarding()
         click("new_user")
         focus("password")
         compose.onNodeWithTag("password").performTextInput("example")

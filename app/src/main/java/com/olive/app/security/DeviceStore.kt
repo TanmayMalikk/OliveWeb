@@ -10,7 +10,6 @@ import java.util.UUID
 class DeviceStore(
     private val vault: EncryptedVault,
     activityVault: EncryptedVault,
-    private val phoneSecure: () -> Boolean = { true }
 ) {
     private val histories = DeviceActivityStore(activityVault)
 
@@ -172,7 +171,7 @@ class DeviceStore(
             require(root.optString("activeUid") == uid) { "PIN account is no longer active" }
             val saved = root.getJSONObject("enrollments").getJSONObject(uid)
             require(AccountRole.fromStored(saved.optString("role")) == AccountRole.USER) { "This account does not use a PIN" }
-            check(enrollment(uid, saved).allowsAppPin(phoneSecure()))
+            check(enrollment(uid, saved).allowsAppPin())
             val verifier = saved.getString("pinVerifier")
             val accepted = SecretVerifier.matches(pin, verifier)
             val next = if (accepted) GateState() else GateState(saved.optInt("failures")).failed()
@@ -237,6 +236,53 @@ class DeviceStore(
 
     fun pendingSync(uid: String) =
         vault.read().optJSONObject("pendingSync")?.optBoolean(uid) ?: false
+
+    fun archivedConversationIds(uid: String): Set<String> {
+        val rows = vault.read().optJSONObject("archivedConversations")?.optJSONArray(uid)
+            ?: return emptySet()
+        return (0 until rows.length()).mapNotNull { rows.optString(it).takeIf(String::isNotBlank) }
+            .toSet()
+    }
+
+    fun setConversationArchived(uid: String, conversationId: String, archived: Boolean) {
+        require(conversationId.isNotBlank() && conversationId.length <= 160)
+        vault.update { root ->
+            val all = root.child("archivedConversations")
+            val current = all.optJSONArray(uid) ?: JSONArray()
+            val values = (0 until current.length()).mapNotNull {
+                current.optString(it).takeIf(String::isNotBlank)
+            }.toMutableSet()
+            if (archived) values += conversationId else values -= conversationId
+            all.put(uid, JSONArray(values.sorted()))
+        }
+    }
+
+    fun privateContactNotes(uid: String): Map<String, PrivateContactNote> {
+        val rows = vault.read().optJSONObject("privateContactNotes")?.optJSONObject(uid)
+            ?: return emptyMap()
+        return rows.keys().asSequence().mapNotNull { targetUid ->
+            val row = rows.optJSONObject(targetUid) ?: return@mapNotNull null
+            val body = row.optString("body").takeIf(String::isNotBlank) ?: return@mapNotNull null
+            targetUid to PrivateContactNote(targetUid, row.optString("username"), body)
+        }.toMap()
+    }
+
+    fun appendPrivateContactNote(uid: String, targetUid: String, username: String, text: String) {
+        val addition = text.trim()
+        require(targetUid.isNotBlank() && targetUid != uid && targetUid.length <= 160)
+        require(username.isNotBlank() && username.length <= 60)
+        require(addition.isNotBlank() && addition.length <= 2_000)
+        vault.update { root ->
+            val notes = root.child("privateContactNotes").child(uid)
+            val previous = notes.optJSONObject(targetUid)?.optString("body").orEmpty()
+            val combined = if (previous.isBlank()) addition else "$previous\n$addition"
+            require(combined.length <= 20_000) { "This private note is full." }
+            notes.put(
+                targetUid,
+                JSONObject().put("username", username).put("body", combined)
+            )
+        }
+    }
 
     fun markSynced(uid: String) {
         vault.update { it.child("pendingSync").put(uid, false) }

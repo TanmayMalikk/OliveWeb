@@ -4,6 +4,7 @@ const {db} = require("./firebase");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");
+const {saveSupportConversation} = require("./supportGroups");
 exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   if (caller.role !== "USER" || !["request", "stop"].includes(request.data?.action)) throw new HttpsError("permission-denied", "Owner only.");
@@ -16,7 +17,7 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
       if (staffEligible(user, profile)) candidates.push({uid: user.uid, name: profile.fullName});
     }
   }
-  return db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) throw new HttpsError("failed-precondition", "Sync the plan before sharing.");
     const plan = snapshot.data();
@@ -35,4 +36,6 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
     transaction.set(reference, updated);
     return {plan: updated};
   });
+  if (result.plan.staffUid) await saveSupportConversation(result.plan, result.plan.supportSafeContactUid || "");
+  return result;
 });

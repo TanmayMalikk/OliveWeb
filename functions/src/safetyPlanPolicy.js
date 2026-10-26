@@ -33,8 +33,11 @@ function mergeFields(existing, defaults, changes) {
 function staffEligible(user, profile) {
   return !user.disabled && user.customClaims?.role === "STAFF" && Boolean(profile?.fullName && profile?.email && profile?.dob);
 }
-function chooseStaff(candidates) {
-  return candidates.filter((staff) => staff.available !== false)
-      .sort((a, b) => (a.activeCount || 0) - (b.activeCount || 0) || a.uid.localeCompare(b.uid))[0];
+function chooseStaff(candidates, random = Math.random) {
+  const available = candidates.filter((staff) => staff.available !== false);
+  if (!available.length) return undefined;
+  const leastAssignments = Math.min(...available.map((staff) => staff.activeCount || 0));
+  const tied = available.filter((staff) => (staff.activeCount || 0) === leastAssignments);
+  return tied[Math.floor(random() * tied.length)];
 }
 module.exports = {FIELD_KEYS, mergeFields, validFields, staffEligible, chooseStaff};

@@ -16,8 +16,23 @@ import java.io.File
 // Groups the data and actions for onboarding flow test.
 class OnboardingFlowTest : OliveUiTestBase() {
     @Test
-    fun credentialsUseLiveRequirementsAndInlineErrors() {
+    fun cleanInstallOpensOnboardingOnlyAfterTheOliveIsDoubleTapped() {
+        waitCover()
+        compose.onNodeWithTag("new_user").assertDoesNotExist()
+        click("cover_tab_account")
+        waitFor("discreet_cover_olive")
+        compose.onNodeWithTag("new_user").assertDoesNotExist()
+        compose.onNodeWithText("Set up account").assertDoesNotExist()
+
+        compose.onNodeWithTag("discreet_cover_olive").performTouchInput { doubleClick() }
+
         waitFor("new_user")
+        compose.onNodeWithTag("new_user").assertIsDisplayed()
+    }
+
+    @Test
+    fun credentialsUseLiveRequirementsAndInlineErrors() {
+        openOnboarding()
         click("new_user")
         fill("username", "abc")
         fill("password", "short")
@@ -32,7 +47,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
 
     @Test
     fun safeContactGetsShorterOnboardingAndNoCover() {
-        waitFor("account_role")
+        openOnboarding()
         click("account_role")
         click("role_safe_contact")
         click("new_user")
@@ -79,7 +94,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
     @Test
     // Runs when boarding needs city but not afull delivery address happens.
     fun onboardingNeedsCityButNotAFullDeliveryAddress() {
-        waitFor("new_user")
+        openOnboarding()
         click("new_user")
         fill("username", "city_only")
         fill(
@@ -98,6 +113,10 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("address_city", "Edmonton")
         nextOnboarding()
         fill("trigger", "moon garden")
+        compose.onNodeWithTag("cover_choice_food").assertIsSelected()
+        compose.onNodeWithTag("cover_choice_news").assertIsNotSelected().performClick()
+            .assertIsSelected()
+        compose.onNodeWithTag("cover_choice_food").assertIsNotSelected()
         waitFor(
             "profile_submit"
         )

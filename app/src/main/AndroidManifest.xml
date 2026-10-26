@@ -14,6 +14,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application android:name=".OliveApplication" android:allowBackup="false" android:label="@string/app_name"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -24,6 +25,8 @@
              native code and calls telemetry JNI methods absent from the Android artifact. -->
         <provider android:name="ai.onnxruntime.TelemetryInitializer" tools:node="remove" />
         <service android:name=".location.LiveLocationService" android:exported="false"
+            android:foregroundServiceType="location" android:stopWithTask="false" />
+        <service android:name=".ui.covers.calculator.FitnessWalkService" android:exported="false"
             android:foregroundServiceType="location" android:stopWithTask="false" />
         <provider android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.documents" android:exported="false"
