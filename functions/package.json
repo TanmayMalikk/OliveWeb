@@ -8,6 +8,8 @@
     "provision-demo-accounts": "node scripts/provision-demo-accounts.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@aws-sdk/s3-request-presigner": "^3.922.0",
     "firebase-admin": "^14.5.0",
     "firebase-functions": "^7.4.0"
   },
