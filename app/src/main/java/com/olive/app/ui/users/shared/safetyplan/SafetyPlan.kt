@@ -448,14 +448,14 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
         if (plan.staffUid.isBlank() && plan.shareAction != "request" && !plan.consultationRequested) {
             OutlinedButton(
                 onClick = { controller.consult() },
-                enabled = !plan.hasConflicts,
+                enabled = !plan.hasConflicts && controller.saving == 0,
                 modifier = Modifier.testTag("safety_request_consultation")
             ) {
                 Text(stringResource(R.string.safety_request))
             }
         } else OutlinedButton(
             onClick = { controller.consult(stop = true) },
-            enabled = plan.shareAction != "stop",
+            enabled = plan.shareAction != "stop" && controller.saving == 0,
             modifier = Modifier.testTag("safety_stop_sharing")
         ) {
             Text(stringResource(R.string.safety_stop))

@@ -38,6 +38,7 @@ private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages, Map }
 
 @Composable
 internal fun StaffPortal(session: SessionViewModel) {
+    LaunchedEffect(session.coverAccountId) { session.ensureMessagingObservation() }
     var page by remember { mutableStateOf(StaffPage.Dashboard) }
     BackHandler(enabled = page != StaffPage.Dashboard) { page = StaffPage.Dashboard }
     when (page) {

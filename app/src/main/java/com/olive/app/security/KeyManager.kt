@@ -21,7 +21,7 @@ object KeyManager {
     private const val RSA_MODE = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding"
 
     // The alias used to locate the user's RSA keys securely inside the Android hardware
-    private const val USER_KEY_ALIAS = "olive.user.rsa.v1"
+    private const val USER_KEY_ALIAS = "olive.user.rsa.v2"
 
     /**
      * Generates a persistent RSA Public/Private KeyPair in the Android Keystore.
@@ -79,7 +79,7 @@ object KeyManager {
         val spec = javax.crypto.spec.OAEPParameterSpec(
             "SHA-256",
             "MGF1",
-            java.security.spec.MGF1ParameterSpec.SHA256,
+            java.security.spec.MGF1ParameterSpec.SHA1,
             javax.crypto.spec.PSource.PSpecified.DEFAULT
         )
         // Bypass WRAP_MODE entirely
@@ -108,7 +108,7 @@ object KeyManager {
         val spec = javax.crypto.spec.OAEPParameterSpec(
             "SHA-256",
             "MGF1",
-            java.security.spec.MGF1ParameterSpec.SHA256,
+            java.security.spec.MGF1ParameterSpec.SHA1,
             javax.crypto.spec.PSource.PSpecified.DEFAULT
         )
         // Bypass UNWRAP_MODE entirely and manually rebuild the AES key

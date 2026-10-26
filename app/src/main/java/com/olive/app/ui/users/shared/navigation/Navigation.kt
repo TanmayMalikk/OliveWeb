@@ -238,6 +238,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                                         SafePage.SafetyPlan -> uiText(
                                             R.string.support_safety_plan
                                         )
+                                        SafePage.StaffHelp -> uiText(R.string.support_staff_help)
 
                                         SafePage.Documents -> uiText(R.string.support_documents)
                                         SafePage.Camera -> uiText(R.string.camera_title)
@@ -511,7 +512,7 @@ internal fun Field(
 // Groups the data and actions for session screen.
 internal enum class SessionScreen { Loading, Welcome, NewCredentials, ReturningCredentials, ProfileSetup, TriggerSetup, OrganizationProfileSetup, DevicePin, Cover, Pin, Safe, Portal, StorageError }
 // Groups the data and actions for safe page.
-internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, Documents, Camera, Location }
+internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Settings, Activity, Hotlines, SafetyPlan, StaffHelp, Documents, Camera, Location }
 // Groups the data and actions for activity category.
 internal enum class ActivityCategory { Settings, Triggers, PinAttempts, Checkouts, Privacy }
 // Groups the data and actions for credential field error.

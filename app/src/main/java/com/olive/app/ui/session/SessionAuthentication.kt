@@ -183,14 +183,16 @@ internal class SessionAuthentication(private val runtime: SessionRuntime) {
                                 "sign-in failed",
                                 ignoreCase = true
                             ))
-                        if (!usernameUnavailable && !incorrectLogin) throw error
+                        if (!usernameUnavailable && !incorrectLogin && !(create && error is FirebaseFunctionsException)) throw error
                         if (epoch == token) {
                             credentialFieldError =
                                 if (usernameUnavailable) CredentialFieldError.UsernameTaken else CredentialFieldError.IncorrectPassword
                             message =
-                                if (usernameUnavailable) runtime.application.getString(R.string.ui_username_taken_c04650) else runtime.application.getString(
-                                    R.string.ui_incorrect_password_b68db3
-                                )
+                                when {
+                                    usernameUnavailable -> runtime.application.getString(R.string.ui_username_taken_c04650)
+                                    incorrectLogin -> runtime.application.getString(R.string.ui_incorrect_password_b68db3)
+                                    else -> error.message?.takeIf { it.isNotBlank() } ?: runtime.application.getString(R.string.unable_to_sign_in_check_your_credentials_and_connection_then_try_again)
+                                }
                         }
                         return@runOperation
                     }
