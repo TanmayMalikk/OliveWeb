@@ -17,6 +17,9 @@ data class FriendRequest(
 // Groups the data and actions for friend.
 data class Friend(val friendshipId: String, val uid: String, val username: String)
 
+// A private note belongs only to the signed-in account on this device.
+data class PrivateContactNote(val uid: String, val username: String, val body: String)
+
 // Groups the data and actions for social snapshot.
 data class SocialSnapshot(
     val friends: List<Friend> = emptyList(),
@@ -37,9 +40,13 @@ data class ChatConversation(
     val updatedAt: Long = 0L,
     val lastMessageId: String = "",
     val lastSenderUid: String = "",
+    val type: String = "DIRECT",
+    val ownerUid: String = "",
 ) {
-    fun peerUsername(currentUid: String) = participantUsernames.entries
-        .firstOrNull { it.key != currentUid }?.value ?: "Conversation"
+    fun displayName(currentUid: String) = if (type == "SUPPORT") {
+        participantUsernames.filterKeys { it != currentUid }.values.joinToString(" • ")
+            .ifBlank { "Support chat" }
+    } else participantUsernames.entries.firstOrNull { it.key != currentUid }?.value ?: "Conversation"
 }
 
 // Groups the data and actions for chat message.

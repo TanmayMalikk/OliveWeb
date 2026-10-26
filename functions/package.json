@@ -4,7 +4,8 @@
   "main": "index.js",
   "engines": { "node": "22" },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "provision-demo-accounts": "node scripts/provision-demo-accounts.js"
   },
   "dependencies": {
     "firebase-admin": "^14.5.0",

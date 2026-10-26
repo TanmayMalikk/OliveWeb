@@ -50,7 +50,8 @@ internal data class SafetyPlan(
     val consultationRequested: Boolean = false,
     val shareAction: String = "",
     val safeContactUids: List<String> = emptyList(),
-    val safeContactNames: Map<String, String> = emptyMap()
+    val safeContactNames: Map<String, String> = emptyMap(),
+    val supportSafeContactUid: String = ""
 ) {
     val hasEdits get() = fields.values.any { it.mutationId != null }
     val hasConflicts get() = fields.values.any { it.conflictRevision != null }
@@ -70,6 +71,7 @@ internal data class SafetyPlan(
         .put("consultationRequested", consultationRequested).put("shareAction", shareAction)
         .put("safeContactUids", org.json.JSONArray(safeContactUids))
         .put("safeContactNames", JSONObject(safeContactNames))
+        .put("supportSafeContactUid", supportSafeContactUid)
 
     companion object {
         fun fromJson(json: JSONObject): SafetyPlan {
@@ -88,7 +90,8 @@ internal data class SafetyPlan(
                     ?.let { array -> (0 until array.length()).map(array::getString) }.orEmpty(),
                 json.optJSONObject("safeContactNames")
                     ?.let { names -> names.keys().asSequence().associateWith(names::getString) }
-                    .orEmpty()
+                    .orEmpty(),
+                json.optString("supportSafeContactUid")
             )
         }
     }
@@ -123,7 +126,8 @@ internal fun mergeSafetyPlan(
         staffName = remote.staffName,
         consultationRequested = remote.consultationRequested,
         safeContactUids = remote.safeContactUids,
-        safeContactNames = remote.safeContactNames
+        safeContactNames = remote.safeContactNames,
+        supportSafeContactUid = remote.supportSafeContactUid
     )
 }
 

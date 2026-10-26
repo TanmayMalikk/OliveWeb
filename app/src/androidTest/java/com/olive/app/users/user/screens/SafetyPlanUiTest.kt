@@ -20,7 +20,7 @@ import org.junit.Test
 class SafetyPlanUiTest : OliveUiTestBase() {
     // Sets up.
     private fun setup(): SessionViewModel {
-        waitFor("new_user")
+        openOnboarding()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         compose.runOnIdle {
             session.chooseNew()

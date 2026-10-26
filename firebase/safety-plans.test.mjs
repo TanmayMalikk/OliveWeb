@@ -18,6 +18,7 @@ const users = new Map([
   ["plan-contact",{uid:"plan-contact",email:"contact@safe.olive.invalid",displayName:"Safe contact"}],
   ["plan-staff",{uid:"plan-staff",customClaims:{role:"STAFF"},displayName:"Staff"}],
   ["plan-staff2",{uid:"plan-staff2",customClaims:{role:"STAFF"},displayName:"Staff two"}],
+  ["plan-admin",{uid:"plan-admin",customClaims:{role:"ADMIN"},displayName:"Admin"}],
   ["plan-forged",{uid:"plan-forged",email:"forged@users.olive.invalid",displayName:"Forged"}],
 ]);
 let env;
@@ -31,14 +32,15 @@ before(async () => {
 after(async () => { auth.getUser=originalGetUser;auth.listUsers=originalListUsers;bucket.file=originalFile;await env.cleanup();await db.terminate(); });
 const call=(endpoint,uid,data={}) => endpoint.run({auth:{uid},data});
 test("full consultation workflow enforces owner consent, assigned-staff edits, conflicts and revocation", async () => {
-  const owner="plan-owner",staff="plan-staff";
+  const owner="plan-owner";
   let response=await call(safetyPlanSync,owner,{ownerUid:owner,defaults:{primary_destination:"Initial",backup_destination:"Backup"},changes:[]});
   assert.equal(response.plan.fields.primary_destination.value,"Initial");
-  await assert.rejects(call(safetyPlanSync,staff,{ownerUid:owner}));
+  await assert.rejects(call(safetyPlanSync,"plan-staff",{ownerUid:owner}));
   await assert.rejects(call(safetyPlanSync,"plan-other",{ownerUid:owner}));
   await assert.rejects(call(safetyPlanAvailability,"plan-forged",{available:true}));
   response=await call(safetyPlanConsult,owner,{action:"request"});
-  assert.equal(response.plan.staffUid,staff);
+  const staff=response.plan.staffUid;
+  assert.ok(["plan-staff","plan-staff2"].includes(staff));
   assert.equal((await call(safetyPlanConsultations,staff)).plans[0].ownerUid,owner);
   await call(safetyPlanSync,staff,{ownerUid:owner,changes:[{key:"primary_destination",value:"Staff edit",revision:1,mutationId:"staff-1"}]});
   response=await call(safetyPlanSync,owner,{ownerUid:owner,changes:[{key:"primary_destination",value:"Offline owner edit",revision:1,mutationId:"owner-1"}]});
@@ -46,6 +48,9 @@ test("full consultation workflow enforces owner consent, assigned-staff edits, c
   assert.equal(response.plan.fields.primary_destination.value,"Staff edit");
   response=await call(safetyPlanSync,owner,{ownerUid:owner,changes:[{key:"primary_destination",value:"Resolved owner edit",revision:2,mutationId:"owner-2"}]});
   assert.equal(response.plan.fields.primary_destination.value,"Resolved owner edit");
+  response=await call(safetyPlanSync,"plan-admin",{ownerUid:owner,changes:[{key:"primary_destination",value:"Admin edit",revision:3,mutationId:"admin-1"}]});
+  assert.equal(response.plan.fields.primary_destination.value,"Admin edit");
+  assert.ok((await call(safetyPlanConsultations,"plan-admin")).plans.some((plan) => plan.ownerUid===owner));
   await call(safetyPlanConsult,owner,{action:"stop"});
   await assert.rejects(call(safetyPlanSync,staff,{ownerUid:owner}));
   assert.equal((await call(safetyPlanConsultations,staff)).plans.length,0);

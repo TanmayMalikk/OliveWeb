@@ -102,6 +102,7 @@ internal fun NewsFeed(
                         }
                         item {
                             Card(
+                                modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = Paper),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                 shape = RoundedCornerShape(20.dp)

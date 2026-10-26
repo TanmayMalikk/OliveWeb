@@ -1,8 +1,8 @@
 // Contains the admin accounts code for this part of Olive.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebase");
-const {text, normalizedUsername, normalizedRole, validPassword, signInEmail, roleFromUser, isTemporaryEmail, profileComplete, defaultProfile, PROTECTED_USERNAME} = require("./accountPolicy");
-const {readProfile, writeProfile, saveOrganizationLogin, requireAdmin, listEveryUser} = require("./accountStorage");
+const {text, normalizedUsername, normalizedRole, validPassword, signInEmail, roleFromUser, isTemporaryEmail, profileComplete, defaultProfile, protectedAccount} = require("./accountPolicy");
+const {readProfile, writeProfile, saveOrganizationLogin, requireAdmin, listEveryUser, usernameExistsGlobally} = require("./accountStorage");
 
 exports.adminListAccounts = onCall(async (request) => {
   await requireAdmin(request);
@@ -11,10 +11,12 @@ exports.adminListAccounts = onCall(async (request) => {
     const profile = await readProfile(user.uid);
     const role = roleFromUser(user, profile);
     const username = text(profile?.username || user.displayName || user.email?.split("@")[0], 24).toLowerCase();
+    const staffSettings = role === "STAFF" ? (await db.collection("safetyStaff").doc(user.uid).get()).data() : null;
     return {
       uid: user.uid, username, role, fullName: text(profile?.fullName, 120), email: user.email || "",
       phone: text(profile?.phone || user.phoneNumber, 40), profileComplete: profileComplete(role, profile),
-      protected: user.uid === request.auth.uid || username === PROTECTED_USERNAME || user.customClaims?.owner === true,
+      protected: user.uid === request.auth.uid || protectedAccount(user, username),
+      assignedUsers: role === "STAFF" ? (staffSettings?.activeCount || 0) : 0,
     };
   }));
   const counts = {USER: 0, SAFE_CONTACT: 0, STAFF: 0, ADMIN: 0};
@@ -34,14 +36,7 @@ exports.adminCreateAccount = onCall(async (request) => {
   const authEmail = signInEmail(username, role);
   const profileEmail = (role === "STAFF" || role === "ADMIN") && text(input.email, 254) ? signInEmail(username, role, input.email) : authEmail;
   const directory = db.collection("accountDirectory").doc(username);
-  if ((await directory.get()).exists) throw new HttpsError("already-exists", "That username is already in use.");
-  if ((await listEveryUser()).some((user) => text(user.displayName, 24).toLowerCase() === username)) {
-    throw new HttpsError("already-exists", "That username is already in use.");
-  }
-  for (const domain of ["users", "safe", "staff", "admin"]) {
-    try { await auth.getUserByEmail(`${username}@${domain}.olive.invalid`); throw new HttpsError("already-exists", "That username is already in use."); }
-    catch (error) { if (error instanceof HttpsError) throw error; if (error.code !== "auth/user-not-found") throw error; }
-  }
+  if (await usernameExistsGlobally(username)) throw new HttpsError("already-exists", "That username is already in use.");
   let created;
   try {
     created = await auth.createUser({email: authEmail, password, displayName: username, emailVerified: isTemporaryEmail(authEmail)});
@@ -52,10 +47,13 @@ exports.adminCreateAccount = onCall(async (request) => {
     await saveOrganizationLogin(created.uid, username, role, profile.email);
     return {uid: created.uid, username, role, email: authEmail, profileComplete: profileComplete(role, profile)};
   } catch (error) {
-    await directory.delete().catch(() => {});
+    const directoryOwner = await directory.get().catch(() => null);
+    if (directoryOwner?.data()?.uid === created?.uid) await directory.delete().catch(() => {});
     if (created?.uid) await bucket.deleteFiles({prefix: `accounts/${created.uid}/`}).catch(() => {});
     if (created?.uid) await auth.deleteUser(created.uid).catch(() => {});
-    if (error.code === "auth/email-already-exists") throw new HttpsError("already-exists", "That email is already in use.");
+    if (error.code === "auth/email-already-exists" || error.code === 6 || error.code === "already-exists") {
+      throw new HttpsError("already-exists", "That username is already in use.");
+    }
     throw error;
   }
 });

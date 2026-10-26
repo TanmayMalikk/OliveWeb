@@ -18,7 +18,7 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
     const changed = !old || Object.keys(fields).length !== Object.keys(old.fields || {}).length ||
       Object.entries(fields).some(([key, field]) => field !== old.fields?.[key]);
     const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", consultationRequested: false,
-      safeContactUids: [], safeContactNames: {}}), fields, updatedAt: Date.now()} : old;
+      safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}), fields, updatedAt: Date.now()} : old;
     if (changed) transaction.set(reference, plan);
     return {plan, conflicts};
   });
@@ -61,10 +61,12 @@ exports.safetyPlansSharedWithMe = onCall({invoker: "public"}, async (request) =>
 });
 exports.safetyPlanConsultations = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
-  if (caller.role !== "STAFF") throw new HttpsError("permission-denied", "Staff only.");
-  const snapshot = await db.collection("safetyPlans").where("staffUid", "==", caller.uid).get();
-  const settings = await db.collection("safetyStaff").doc(caller.uid).get();
-  return {available: settings.data()?.available !== false, plans: snapshot.docs.map((document) => ({ownerUid: document.id, ownerName: document.data().ownerName || "", updatedAt: document.data().updatedAt}))};
+  if (!["STAFF", "ADMIN"].includes(caller.role)) throw new HttpsError("permission-denied", "Organization access only.");
+  const snapshot = caller.role === "ADMIN" ? await db.collection("safetyPlans").get() :
+    await db.collection("safetyPlans").where("staffUid", "==", caller.uid).get();
+  const settings = caller.role === "STAFF" ? await db.collection("safetyStaff").doc(caller.uid).get() : null;
+  return {available: caller.role === "STAFF" ? settings.data()?.available !== false : true,
+    plans: snapshot.docs.map((document) => ({ownerUid: document.id, ownerName: document.data().ownerName || "", updatedAt: document.data().updatedAt}))};
 });
 exports.safetyPlanAvailability = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);

@@ -102,8 +102,10 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                         false
                     pendingIdentity = null
                     pendingProfile = null
+                    accountRole = AccountRole.USER
+                    coverType = CoverType.FOOD
                     screenHistory.clear()
-                    screen = SessionScreen.Welcome
+                    screen = SessionScreen.Cover
                     message = null
                 } else if (accountRole == AccountRole.USER) quickExit()
             }
@@ -125,7 +127,12 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     message = null
                 } else if ((screen == SessionScreen.Safe && accountRole == AccountRole.USER) || screen == SessionScreen.Pin) quickExit()
                 else if (screenHistory.isNotEmpty()) {
-                    screen = screenHistory.removeAt(screenHistory.lastIndex)
+                    val previousScreen = screenHistory.removeAt(screenHistory.lastIndex)
+                    if (enrollment == null && previousScreen == SessionScreen.Cover) {
+                        accountRole = AccountRole.USER
+                        coverType = CoverType.FOOD
+                    }
+                    screen = previousScreen
                     message = null
                 }
                 // Root cover/welcome/loading screens deliberately consume Back so Android does not open the phone home screen.

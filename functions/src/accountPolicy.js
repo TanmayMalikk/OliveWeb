@@ -6,7 +6,12 @@ const ROLES = new Set(["USER", "SAFE_CONTACT", "STAFF", "ADMIN"]);
 const USERNAME = /^(?=.*[a-z])[a-z0-9_]{8,24}$/;
 const EXISTING_USERNAME = /^[a-z0-9_]{4,24}$/;
 const PASSWORD = /^(?=.*\p{L})(?=.*\p{N})(?=.*[^\p{L}\p{N}\s]).{8,24}$/u;
-const PROTECTED_USERNAME = "olive_admin";
+const PROTECTED_USERNAMES = new Set(["olive_admin", "oliveadmin", "olivestaff"]);
+
+function protectedAccount(user, username) {
+  return PROTECTED_USERNAMES.has(text(username, 24).toLowerCase()) ||
+    user?.customClaims?.owner === true || user?.customClaims?.protected === true;
+}
 
 
 function validPassword(value, username) {
@@ -94,4 +99,4 @@ function defaultProfile(username, role, input, email) {
   };
 }
 
-module.exports = {validPassword, text, normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail, organizationEmailKey, roleFromUser, isTemporaryEmail, profileComplete, defaultProfile, PROTECTED_USERNAME};
+module.exports = {validPassword, text, normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail, organizationEmailKey, roleFromUser, isTemporaryEmail, profileComplete, defaultProfile, protectedAccount, PROTECTED_USERNAMES};

@@ -9,13 +9,28 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.AccountRole
 import com.olive.app.data.CoverType
@@ -23,6 +38,80 @@ import com.olive.app.R
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
 import com.olive.app.ui.covers.olive.AddressFields
+
+// A tiny olive gives every cover the same private-entry shortcut without looking like a normal button.
+// Sighted users double-tap it. TalkBack users activate it with TalkBack's normal double-tap gesture.
+@Composable
+internal fun DiscreetCoverEntry(
+    enabled: Boolean,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val oliveLabel = stringResource(R.string.olive_icon)
+    val openLabel = stringResource(R.string.ui_set_your_private_entry)
+    Canvas(
+        modifier.size(48.dp)
+            .testTag("discreet_cover_olive")
+            .semantics {
+                contentDescription = oliveLabel
+                if (enabled) onClick(openLabel) {
+                    onOpen()
+                    true
+                }
+            }
+            .pointerInput(enabled) {
+                if (enabled) detectTapGestures(onDoubleTap = { onOpen() })
+            }
+    ) {
+        val oliveWidth = 11.dp.toPx()
+        val oliveHeight = 15.dp.toPx()
+        val center = Offset(size.width * .58f, size.height * .58f)
+        rotate(-18f, center) {
+            drawOval(
+                color = OliveGreen.copy(alpha = .50f),
+                topLeft = Offset(center.x - oliveWidth / 2f, center.y - oliveHeight / 2f),
+                size = Size(oliveWidth, oliveHeight),
+            )
+        }
+        rotate(-35f, Offset(center.x - 3.dp.toPx(), center.y - 8.dp.toPx())) {
+            drawOval(
+                color = SageGreen.copy(alpha = .45f),
+                topLeft = Offset(center.x - 6.dp.toPx(), center.y - 11.dp.toPx()),
+                size = Size(8.dp.toPx(), 4.dp.toPx()),
+            )
+        }
+    }
+}
+
+// Calculator and Game use this page for cover-account settings and the discreet entry olive.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
+    val scrollState = rememberScrollState()
+    BackHandler(onBack = onBack)
+    Scaffold(
+        containerColor = Cream,
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.settings)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Cream),
+            )
+        },
+    ) { padding ->
+        Column(
+            Modifier.fillMaxSize().padding(padding).oliveScrollbar(scrollState)
+                .verticalScroll(scrollState).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            CoverAccountPanel(session)
+        }
+    }
+}
 
 @Composable
 internal fun CoverAccountPanel(session: SessionViewModel) {
@@ -55,6 +144,12 @@ internal fun CoverAccountPanel(session: SessionViewModel) {
             Text(stringResource(R.string.save_account_settings))
         }
         session.message?.let { AccessibleMessage(it) }
+        HorizontalDivider(Modifier.padding(top = 8.dp))
+        DiscreetCoverEntry(
+            enabled = !session.busy,
+            onOpen = session::beginDiscreetEntry,
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(vertical = 16.dp),
+        )
     }
 }
 

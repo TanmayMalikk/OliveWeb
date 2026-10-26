@@ -78,7 +78,7 @@ internal fun SafetyPlanScreen(
     }
     var backup by rememberSaveable(ownerUid) { mutableStateOf(false) }
     val plan = controller.plan
-    val staff = session.accountRole == AccountRole.STAFF
+    val organizationEditor = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     val safeContact = session.accountRole == AccountRole.SAFE_CONTACT
     val state = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -110,7 +110,7 @@ internal fun SafetyPlanScreen(
                         stringResource(R.string.support_safety_plan),
                         style = MaterialTheme.typography.headlineSmall,
                         modifier = Modifier.weight(1f).semantics { heading() })
-                    if (!staff && !safeContact) IconButton(
+                    if (!organizationEditor && !safeContact) IconButton(
                         onClick = {
                             leaveEditor()
                             scope.launch {
@@ -125,7 +125,7 @@ internal fun SafetyPlanScreen(
                         Icon(Icons.Outlined.SupportAgent, stringResource(R.string.safety_consult))
                     }
                 }
-                if (staff || safeContact) Text(
+                if (organizationEditor || safeContact) Text(
                     ownerName,
                     style = MaterialTheme.typography.labelLarge
                 )
@@ -233,9 +233,9 @@ internal fun SafetyPlanScreen(
                                             keepMine
                                         )
                                     },
-                                    contacts = if (!staff && !safeContact && section == "contacts") session.profile?.contacts.orEmpty() else emptyList(),
-                                    contactsEditable = !staff && !safeContact && section == "contacts",
-                                    onContactsChange = if (!staff && !safeContact && section == "contacts") session::saveContacts else null,
+                                    contacts = if (!organizationEditor && !safeContact && section == "contacts") session.profile?.contacts.orEmpty() else emptyList(),
+                                    contactsEditable = !organizationEditor && !safeContact && section == "contacts",
+                                    onContactsChange = if (!organizationEditor && !safeContact && section == "contacts") session::saveContacts else null,
                                     editable = !safeContact
                                 )
                                 HorizontalDivider(
@@ -274,7 +274,7 @@ internal fun SafetyPlanScreen(
                                 )
                             }
                         }
-                        if (!staff && !safeContact) item {
+                        if (!organizationEditor && !safeContact) item {
                             Box(Modifier.padding(16.dp)) {
                                 SafetyConsultationControls(
                                     session,
@@ -282,7 +282,7 @@ internal fun SafetyPlanScreen(
                                 )
                             }
                         }
-                        if (!staff && !safeContact) item {
+                        if (!organizationEditor && !safeContact) item {
                             Box(Modifier.padding(horizontal = 16.dp)) {
                                 SafetyContactSharingControls(
                                     session,
@@ -298,7 +298,7 @@ internal fun SafetyPlanScreen(
                         ) {
                             OutlinedButton(
                                 onClick = { session.navigate(SafePage.Documents) },
-                                enabled = !staff,
+                                enabled = !organizationEditor,
                                 modifier = Modifier.fillMaxWidth().testTag("safety_documents")
                             ) { Text(stringResource(R.string.support_documents)) }
                             Text(
@@ -459,6 +459,26 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
             modifier = Modifier.testTag("safety_stop_sharing")
         ) {
             Text(stringResource(R.string.safety_stop))
+        }
+        if (plan.staffUid.isNotBlank() && plan.safeContactUids.isNotEmpty()) {
+            Text(
+                stringResource(R.string.support_chat_contact),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            plan.safeContactUids.forEach { uid ->
+                val selected = plan.supportSafeContactUid == uid
+                FilterChip(
+                    selected = selected,
+                    onClick = { controller.setSupportContact(if (selected) "" else uid) },
+                    label = { Text(plan.safeContactNames[uid] ?: stringResource(R.string.safe_contact)) },
+                    enabled = controller.saving == 0,
+                )
+            }
+            Text(
+                stringResource(R.string.support_chat_contact_help),
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+            )
         }
         Text(
             stringResource(R.string.safety_consult_description),

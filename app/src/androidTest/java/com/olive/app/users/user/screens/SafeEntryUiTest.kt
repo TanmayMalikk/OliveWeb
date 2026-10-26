@@ -21,7 +21,7 @@ import com.olive.app.data.DeliveryAddress
 // Groups the data and actions for safe entry UI test.
 class SafeEntryUiTest : OliveUiTestBase() {
     private fun entrySetup() {
-        waitFor("new_user")
+        openOnboarding()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         // Exercise real account/profile persistence while keeping these tests focused on the entry-method screens.
         compose.runOnIdle {

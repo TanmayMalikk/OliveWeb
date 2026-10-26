@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SportsEsports
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,15 +28,23 @@ import com.olive.app.R
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.covers.shared.CoverSettingsPage
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
 /** A small, usable game cover. The nickname field also accepts the configured safe-entry phrase. */
 @Composable
 internal fun GameCover(
+    sessionViewModel: SessionViewModel? = null,
     interactive: Boolean = true,
     onEntryAttempt: (String) -> Boolean = { false },
 ) {
     var nickname by remember { mutableStateOf("") }
     var score by remember { mutableIntStateOf(0) }
+    var settingsOpen by remember { mutableStateOf(false) }
+    if (settingsOpen && sessionViewModel != null) {
+        CoverSettingsPage(sessionViewModel) { settingsOpen = false }
+        return
+    }
     BackHandler(interactive) { }
     Column(
         Modifier.fillMaxSize().background(Cream).safeDrawingPadding().padding(24.dp)
@@ -64,6 +73,13 @@ internal fun GameCover(
                 fontWeight = FontWeight.SemiBold,
                 color = OliveGreen,
             )
+            if (sessionViewModel != null) IconButton(
+                onClick = { settingsOpen = true },
+                enabled = interactive,
+                modifier = Modifier.testTag("game_settings"),
+            ) {
+                Icon(Icons.Outlined.Settings, stringResource(R.string.settings))
+            }
         }
         Spacer(Modifier.height(12.dp))
         Text(stringResource(R.string.game_cover_instructions), color = Muted)

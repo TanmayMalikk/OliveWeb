@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.olive.app.data.DeliveryAddress
 import com.olive.app.data.OrderLine
 import com.olive.app.R
+import com.olive.app.ui.covers.shared.DiscreetCoverEntry
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.shared.rememberResourceText
 import java.time.format.DateTimeFormatter
@@ -140,10 +141,11 @@ internal fun FoodAccountScreen(
                 )
             }
             item {
-                Button(
-                    onClick = onSetup,
-                    modifier = Modifier.padding(horizontal = 24.dp).fillMaxWidth()
-                ) { Text(stringResource(R.string.set_up_account)) }
+                DiscreetCoverEntry(
+                    enabled = true,
+                    onOpen = onSetup,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                )
             }
         } else {
             item {

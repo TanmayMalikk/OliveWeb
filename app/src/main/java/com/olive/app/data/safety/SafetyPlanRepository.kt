@@ -49,6 +49,10 @@ internal class SafetyPlanRepository(
             mapOf("uid" to it.uid, "friendshipId" to it.friendshipId, "name" to it.username)
         })).getJSONObject("plan"))
 
+    suspend fun setSupportContact(uid: String) {
+        call("safetySupportContact", mapOf("safeContactUid" to uid))
+    }
+
     suspend fun sharedWithMe(): List<SharedSafetyPlan> {
         val plans = call("safetyPlansSharedWithMe").getJSONArray("plans")
         return (0 until plans.length()).map { index ->

@@ -42,6 +42,8 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                         withContext(Dispatchers.IO) { store.enrollWithoutPin(identity, updated) }
                     if (epoch == token) {
                         enrollment = saved
+                        archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+                        privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
                         profile = updated
                         pendingProfile =
                             updated

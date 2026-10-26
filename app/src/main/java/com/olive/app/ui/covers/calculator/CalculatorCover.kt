@@ -22,6 +22,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.olive.app.ui.covers.shared.CoverSettingsPage
 
 // Keep the calculator looking like a calculator, with no account controls on the cover.
 // This shell owns responsive keypad layout; CalculatorDisplay renders history/results and ScientificKeypad dispatches keys.
@@ -62,7 +65,17 @@ internal fun CalculatorCover(session: SessionViewModel, interactive: Boolean = t
     var angleMode by remember { mutableStateOf(CalculatorAngleMode.RADIANS) }
     var inverseTrig by remember { mutableStateOf(false) }
     var scientificExpanded by remember { mutableStateOf(false) }
+    var settingsOpen by remember { mutableStateOf(false) }
+    var fitnessOpen by remember { mutableStateOf(false) }
     LaunchedEffect(session.coverReset) { input.reset() }
+    if (fitnessOpen) {
+        FitnessTrackerScreen(session.coverAccountId ?: "guest") { fitnessOpen = false }
+        return
+    }
+    if (settingsOpen) {
+        CoverSettingsPage(session) { settingsOpen = false }
+        return
+    }
     if (graphing) {
         GraphingCalculator(interactive, angleMode, { angleMode = it }) { graphing = false }
         return
@@ -98,6 +111,20 @@ internal fun CalculatorCover(session: SessionViewModel, interactive: Boolean = t
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
                 )
+                IconButton(
+                    onClick = { fitnessOpen = true },
+                    enabled = interactive,
+                    modifier = Modifier.testTag("calculator_fitness"),
+                ) {
+                    Icon(Icons.AutoMirrored.Outlined.DirectionsWalk, stringResource(R.string.fitness_calculator))
+                }
+                IconButton(
+                    onClick = { settingsOpen = true },
+                    enabled = interactive,
+                    modifier = Modifier.testTag("calculator_settings"),
+                ) {
+                    Icon(Icons.Outlined.Settings, stringResource(R.string.settings))
+                }
             }
             Spacer(Modifier.height(if (compact) 6.dp else 10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
