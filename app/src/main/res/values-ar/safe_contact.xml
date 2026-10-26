@@ -38,6 +38,15 @@
     <string name="camera_save">حفظ بشكل خاص</string>
     <string name="camera_saving">جارٍ الحفظ بشكل خاص…</string>
     <string name="documents_upload_failed">تعذر رفع الملف.</string>
+    <string name="documents_preparing_upload">جارٍ تحضير الرفع المشفر</string>
+    <string name="documents_preparing_upload_help">تتم معالجة الملف المحدد وتشفيره على هذا الجهاز.</string>
+    <string name="documents_upload_queued">في انتظار الاتصال</string>
+    <string name="documents_upload_waiting_retry">في انتظار إعادة المحاولة</string>
+    <string name="documents_upload_starting">جارٍ بدء الرفع الآمن</string>
+    <string name="documents_upload_progress">جارٍ الرفع %1$d%%</string>
+    <string name="documents_upload_finalizing">جارٍ إنهاء الرفع الآمن</string>
+    <string name="documents_upload_complete">اكتمل الرفع</string>
+    <string name="documents_upload_cancelled">تم إلغاء الرفع</string>
     <string name="documents_load_failed">تعذر تحميل ملفاتك المحفوظة.</string>
 <string name="documents_share_failed">تعذرت مشاركة هذا الملف الآمن.</string>
     <string name="documents_shared_in_chat">تمت مشاركة الملف الآمن.</string>

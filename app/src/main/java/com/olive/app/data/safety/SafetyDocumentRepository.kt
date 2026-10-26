@@ -2,17 +2,16 @@
 package com.olive.app.data
 
 import android.content.Context
-import android.net.Uri
-import android.provider.OpenableColumns
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.olive.app.security.EncryptionUtils
+import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
 import java.io.File
-import java.io.InputStream
-import java.util.UUID
 
 // Groups the data and actions for safety document.
 data class SafetyDocument(
@@ -26,6 +25,12 @@ data class SafetyDocument(
     val ocrText: String? = null,
     val ocrConfidence: Float? = null,
     val ocrSuccessful: Boolean? = null,
+    val objectKey: String = "",
+    val encryptedMetadata: String = "",
+    val wrappedKeys: Map<String, String> = emptyMap(),
+    val ciphertextSize: Long = 0,
+    val ciphertextSha256: String = "",
+    val encryptionVersion: Int = 0,
 )
 
 // Groups the data and actions for document OCR metadata.
@@ -43,15 +48,6 @@ interface SafetyDocumentDataSource {
 
     // Gets for.
     suspend fun getFor(uid: String, id: String): SafetyDocument
-    suspend fun upload(context: Context, uri: Uri, owner: AccountIdentity): SafetyDocument
-    suspend fun uploadFile(
-        file: File,
-        name: String,
-        mimeType: String,
-        owner: AccountIdentity,
-        ocr: DocumentOcrMetadata? = null
-    ): SafetyDocument
-
     suspend fun share(document: SafetyDocument, ownerUid: String, recipientUids: List<String>)
     suspend fun delete(document: SafetyDocument, ownerUid: String)
     suspend fun download(context: Context, document: SafetyDocument): File
@@ -61,9 +57,10 @@ interface SafetyDocumentDataSource {
 class SafetyDocumentRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
+    private val media: MediaTicketDataSource = MediaRepository(),
 ) : SafetyDocumentDataSource {
     override suspend fun listFor(uid: String): List<SafetyDocument> = firestore.collection("files")
-        .whereArrayContains("allowed_users", uid).get().await().documents.mapNotNull(::documentFrom)
+        .whereArrayContains("allowed_users", uid).get().await().documents.mapNotNull { documentFrom(it, uid) }
         .sortedByDescending { it.createdAt }
 
     // Watches for for changes.
@@ -79,7 +76,7 @@ class SafetyDocumentRepository(
                     return@addSnapshotListener
                 }
                 onUpdate(
-                    snapshot?.documents.orEmpty().mapNotNull(::documentFrom)
+                    snapshot?.documents.orEmpty().mapNotNull { documentFrom(it, uid) }
                         .sortedByDescending { it.createdAt })
             }
         return ChatSubscription { listener.remove() }
@@ -87,89 +84,10 @@ class SafetyDocumentRepository(
 
     // Gets for.
     override suspend fun getFor(uid: String, id: String): SafetyDocument {
-        val document = documentFrom(firestore.collection("files").document(id).get().await())
+        val document = documentFrom(firestore.collection("files").document(id).get().await(), uid)
             ?: error("File is no longer available")
         require(uid in document.allowedUsers) { "You no longer have access to this file" }
         return document
-    }
-
-    override suspend fun upload(
-        context: Context,
-        uri: Uri,
-        owner: AccountIdentity
-    ): SafetyDocument {
-        val resolver = context.contentResolver
-        val mime = resolver.getType(uri)?.take(120)?.ifBlank { null } ?: "application/octet-stream"
-        val size =
-            resolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0) else null
-            }
-        val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getString(0) else null
-            }?.trim()?.take(160).orEmpty().ifBlank { "Document" }
-        return upload(
-            name,
-            mime,
-            size,
-            owner,
-            { resolver.openInputStream(uri) ?: error("Unable to read the selected file") })
-    }
-
-    override suspend fun uploadFile(
-        file: File,
-        name: String,
-        mimeType: String,
-        owner: AccountIdentity,
-        ocr: DocumentOcrMetadata?
-    ): SafetyDocument {
-        require(file.isFile && file.length() > 0) { "Captured media is empty" }
-        return upload(
-            name.trim().take(160),
-            mimeType.take(120),
-            file.length(),
-            owner,
-            file::inputStream,
-            ocr
-        )
-    }
-
-    private suspend fun upload(
-        name: String, mime: String, size: Long?, owner: AccountIdentity, open: () -> InputStream,
-        ocr: DocumentOcrMetadata? = null
-    ): SafetyDocument {
-        require(mime.startsWith("image/") || mime.startsWith("video/") || mime in DOCUMENT_TYPES) { "Unsupported file type" }
-        require(size == null || size in 1..MAX_BYTES) { "File must be smaller than 250 MB" }
-        val safeName = name.ifBlank { "Document" }
-        val id = UUID.randomUUID().toString()
-        val path = "users/${owner.uid}/media/$id"
-        val reference = storage.reference.child(path)
-        val storageMetadata = StorageMetadata.Builder().setContentType(mime)
-            .setCustomMetadata(accessKey(owner.uid), "true").build()
-        try {
-            open().use { reference.putStream(it, storageMetadata).await() }
-            val record = mutableMapOf<String, Any>(
-                "owner_id" to owner.uid,
-                "storage_path" to path,
-                "file_name" to safeName,
-                "file_type" to mime,
-                "allowed_users" to listOf(owner.uid),
-                "created_at" to FieldValue.serverTimestamp(),
-            )
-            ocr?.let {
-                record["ocr_text"] = it.text.take(MAX_OCR_TEXT)
-                record["ocr_confidence"] = it.confidence.coerceIn(0f, 1f).toDouble()
-                record["ocr_successful"] = it.successful
-            }
-            firestore.collection("files").document(id).set(record).await()
-        } catch (failure: Exception) {
-            runCatching { reference.delete().await() }
-            throw failure
-        }
-        return SafetyDocument(
-            id, owner.uid, path, safeName, mime, listOf(owner.uid), System.currentTimeMillis(),
-            ocr?.text?.take(MAX_OCR_TEXT), ocr?.confidence?.coerceIn(0f, 1f), ocr?.successful
-        )
     }
 
     override suspend fun share(
@@ -178,6 +96,7 @@ class SafetyDocumentRepository(
         recipientUids: List<String>
     ) {
         require(document.ownerUid == ownerUid && recipientUids.distinct().size <= 10)
+        require(document.objectKey.isBlank()) { "Encrypted media sharing will be enabled with chat attachment migration" }
         val current = getFor(ownerUid, document.id)
         val updated = (listOf(ownerUid) + recipientUids.distinct()).distinct()
         updateStorageAccess(current, current.allowedUsers.toSet(), updated.toSet())
@@ -198,6 +117,7 @@ class SafetyDocumentRepository(
 
     suspend fun grantAccess(document: SafetyDocument, ownerUid: String, recipientUid: String) {
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
+        require(document.objectKey.isBlank()) { "Encrypted media sharing will be enabled with chat attachment migration" }
         val current = getFor(ownerUid, document.id)
         val updated = current.allowedUsers.toSet() + recipientUid
         updateStorageAccess(current, current.allowedUsers.toSet(), updated)
@@ -213,6 +133,7 @@ class SafetyDocumentRepository(
     suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) {
         val document = getFor(ownerUid, documentId)
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
+        require(document.objectKey.isBlank()) { "Encrypted media sharing will be enabled with chat attachment migration" }
         val updated = document.allowedUsers.toSet() - recipientUid
         updateStorageAccess(document, document.allowedUsers.toSet(), updated)
         try {
@@ -226,11 +147,16 @@ class SafetyDocumentRepository(
 
     override suspend fun delete(document: SafetyDocument, ownerUid: String) {
         require(document.ownerUid == ownerUid)
+        if (document.objectKey.isNotBlank()) {
+            media.deleteMedia(document.id)
+            return
+        }
         storage.reference.child(document.storagePath).delete().await()
         firestore.collection("files").document(document.id).delete().await()
     }
 
     override suspend fun download(context: Context, document: SafetyDocument): File {
+        require(document.objectKey.isBlank()) { "Encrypted media downloads use MediaTransferController" }
         val folder = File(context.cacheDir, "opened-documents").apply { mkdirs() }
         folder.listFiles()
             ?.filter { System.currentTimeMillis() - it.lastModified() > CACHE_LIFETIME }
@@ -255,30 +181,42 @@ class SafetyDocumentRepository(
         storage.reference.child(document.storagePath).updateMetadata(metadata).await()
     }
 
-    private fun documentFrom(row: DocumentSnapshot): SafetyDocument? {
+    private fun documentFrom(row: DocumentSnapshot, viewerUid: String): SafetyDocument? {
         val owner = row.getString("owner_id") ?: return null
+        val encryptedMetadata = row.getString("encrypted_metadata").orEmpty()
+        @Suppress("UNCHECKED_CAST")
+        val wrapped = (row.get("wrapped_keys") as? Map<String, String>).orEmpty()
+        val metadata = if (encryptedMetadata.isBlank()) null else runCatching {
+            val key = wrapped[viewerUid]?.let(KeyManager::unwrapKey)
+                ?: error("Encryption key is unavailable")
+            JSONObject(EncryptionUtils.decryptText(encryptedMetadata, key))
+        }.getOrNull()
         return SafetyDocument(
-            row.id,
-            owner,
-            row.getString("storage_path").orEmpty(),
-            row.getString("file_name").orEmpty(),
-            row.getString("file_type").orEmpty(),
-            (row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty(),
-            row.getTimestamp("created_at")?.toDate()?.time ?: 0,
-            row.getString("ocr_text"),
-            row.getDouble("ocr_confidence")?.toFloat(),
-            row.getBoolean("ocr_successful")
+            id = row.id,
+            ownerUid = owner,
+            storagePath = row.getString("storage_path").orEmpty(),
+            name = metadata?.optString("name")?.takeIf(String::isNotBlank)
+                ?: row.getString("file_name").orEmpty().ifBlank { "Encrypted document" },
+            mimeType = metadata?.optString("mimeType")?.takeIf(String::isNotBlank)
+                ?: row.getString("file_type").orEmpty().ifBlank { "application/octet-stream" },
+            allowedUsers = (row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty(),
+            createdAt = row.getTimestamp("created_at")?.toDate()?.time ?: 0,
+            ocrText = metadata?.optString("ocrText")?.takeIf(String::isNotBlank) ?: row.getString("ocr_text"),
+            ocrConfidence = metadata?.takeIf { it.has("ocrConfidence") }?.optDouble("ocrConfidence")?.toFloat()
+                ?: row.getDouble("ocr_confidence")?.toFloat(),
+            ocrSuccessful = metadata?.takeIf { it.has("ocrSuccessful") }?.optBoolean("ocrSuccessful")
+                ?: row.getBoolean("ocr_successful"),
+            objectKey = row.getString("object_key").orEmpty(),
+            encryptedMetadata = encryptedMetadata,
+            wrappedKeys = wrapped,
+            ciphertextSize = row.getLong("ciphertext_size") ?: 0,
+            ciphertextSha256 = row.getString("ciphertext_sha256").orEmpty(),
+            encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0,
         )
     }
 
     private companion object {
-        const val MAX_BYTES = 250L * 1024L * 1024L
         const val CACHE_LIFETIME = 60L * 60L * 1000L
-        const val MAX_OCR_TEXT = 50_000
         fun accessKey(uid: String) = "access_$uid"
-        val DOCUMENT_TYPES = setOf(
-            "application/pdf", "text/plain", "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
     }
 }
