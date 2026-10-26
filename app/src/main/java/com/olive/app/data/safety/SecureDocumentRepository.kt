@@ -163,4 +163,26 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
     suspend fun deleteEntry(entryId: String) {
         firestore.collection("privateEntries").document(entryId).delete().await()
     }
+
+    /**
+     * Retrieves all Private Entries that this user has access to.
+     */
+    suspend fun fetchMyEntries(currentUid: String): List<PrivateEntry> {
+        val snapshot = firestore.collection("privateEntries")
+            .whereArrayContains("allowedUsers", currentUid)
+            .get()
+            .await()
+
+        val entries = mutableListOf<PrivateEntry>()
+        for (doc in snapshot.documents) {
+            try {
+                // We reuse loadAndDecryptEntry but pass the already fetched snapshot ID
+                val decryptedEntry = loadAndDecryptEntry(doc.id, currentUid)
+                entries.add(decryptedEntry)
+            } catch (@Suppress("unused") ignored: Exception) {
+                // If one document fails to decrypt (e.g., bad key), skip it and continue loading the rest
+            }
+        }
+        return entries
+    }
 }
