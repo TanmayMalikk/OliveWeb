@@ -212,7 +212,7 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var addressPrompt by mutableStateOf(false)
     // Counts changes to address save.
     var addressSaveVersion by mutableIntStateOf(0)
-    var language by mutableStateOf(AppLocaleManager.resolveSystemDefaultLanguageName())
+    var language by mutableStateOf("English")
     var coverDob by mutableStateOf("")
     var coverFullName by mutableStateOf("")
     var coverUsername by mutableStateOf("")

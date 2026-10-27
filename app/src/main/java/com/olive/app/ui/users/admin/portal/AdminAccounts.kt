@@ -177,7 +177,6 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
     var dob by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
-    val language = AppLocaleManager.resolveSystemDefaultLanguageName()
     var city by remember { mutableStateOf("") }
     var affected by remember { mutableStateOf("") }
     var abuser by remember { mutableStateOf("") }
@@ -288,7 +287,6 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
                         dob,
                         email,
                         phone,
-                        language,
                         city,
                         affected,
                         abuser,
