@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/start.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:integration": "MUMBLE_INTEGRATION=1 node --test test/mumble.integration.test.js"
   },
   "engines": {
     "node": ">=18"
