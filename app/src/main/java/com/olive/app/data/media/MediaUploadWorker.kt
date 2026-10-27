@@ -58,7 +58,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         if(job.status in setOf(MediaTransferStatus.COMPLETE,MediaTransferStatus.CANCELLED)) return Result.success()
 
         // Never continue another signed-in user's queued transfer after an account switch.
-        if(FirebaseAuth.getInstance().currentUser?.uid!=job.ownerUid) return Result.retry()
+        if(FirebaseAuth.getInstance().currentUser?.uid!=job.ownerUid) {
+            store.write(job.copy(status=MediaTransferStatus.QUEUED,
+                error="Waiting for the account that queued this upload"))
+            return Result.retry()
+        }
         val file=File(job.source.filePath)
         if(!file.isFile || file.length()!=job.source.ciphertextSize) return permanent(job,"Encrypted upload staging file is missing")
         return try {
@@ -83,6 +87,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         } catch(cancelled:CancellationException) { throw cancelled }
         catch(error:FirebaseFunctionsException) {
             if(error.code in setOf(FirebaseFunctionsException.Code.INVALID_ARGUMENT,FirebaseFunctionsException.Code.PERMISSION_DENIED,
+                    FirebaseFunctionsException.Code.UNAUTHENTICATED,
                     FirebaseFunctionsException.Code.NOT_FOUND, FirebaseFunctionsException.Code.FAILED_PRECONDITION))
                 permanent(job,error.localizedMessage ?: "Media upload was rejected")
             else retry(job,error)
