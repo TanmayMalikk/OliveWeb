@@ -11,7 +11,7 @@ const {auth, db, bucket} = require("./src/firebase");
 const {safetyPlanSync, safetyPlanConsultations, safetyPlanAvailability, safetyPlanShareContacts,
   safetyPlansSharedWithMe} = require("./src/safetyPlans");
 const {safetyPlanConsult} = require("./src/safetyConsultations");
-const {safetySupportAdmin} = require("./src/supportGroups");
+const {safetySupportAdmin, staffSupportClose} = require("./src/supportGroups");
 const {staffSupportRequest} = require("./src/supportTickets");
 const users = new Map([
   ["plan-owner",{uid:"plan-owner",email:"owner@users.olive.invalid",displayName:"Owner"}],
@@ -45,14 +45,25 @@ test("full consultation workflow enforces owner consent, assigned-staff edits, c
   const staff=response.plan.staffUid;
   assert.ok(["plan-staff","plan-staff2"].includes(staff));
   const consultationId=`plan-consult-${owner}`;
+  const originalRoomKeys={[owner]:"owner-wrap",[staff]:"staff-wrap"};
+  await db.collection("conversations").doc(consultationId).update({
+    roomKeys:originalRoomKeys,participantPublicKeys:{[owner]:"owner-key",[staff]:"staff-key"},
+  });
   const escalation=await call(safetySupportAdmin,staff,{conversationId:consultationId});
   assert.equal(escalation.adminUid,"plan-admin");
   const otherStaff=staff==="plan-staff" ? "plan-staff2" : "plan-staff";
   await assert.rejects(call(safetySupportAdmin,otherStaff,{conversationId:consultationId}));
   const supportConversation=await db.collection("conversations").doc(consultationId).get();
   assert.deepEqual(new Set(supportConversation.data().participantIds),new Set([owner,staff,"plan-admin"]));
+  assert.deepEqual(supportConversation.data().roomKeys,originalRoomKeys);
   assert.equal(supportConversation.data().supportOrigin,"PLAN_CONSULT");
   assert.equal(supportConversation.data().supportTag,"NEEDS_ADMIN");
+  await assert.rejects(call(staffSupportClose,owner,{conversationId:consultationId}));
+  await assert.rejects(call(staffSupportClose,otherStaff,{conversationId:consultationId}));
+  await call(staffSupportClose,staff,{conversationId:consultationId});
+  assert.ok((await db.collection("conversations").doc(consultationId).get()).get("closedAt"));
+  await call(safetyPlanConsult,owner,{action:"request"});
+  assert.equal((await db.collection("conversations").doc(consultationId).get()).get("closedAt"),undefined);
   assert.equal((await call(safetyPlanConsultations,staff)).plans[0].ownerUid,owner);
   await call(safetyPlanSync,staff,{ownerUid:owner,changes:[{key:"primary_destination",value:"Staff edit",revision:1,mutationId:"staff-1"}]});
   response=await call(safetyPlanSync,owner,{ownerUid:owner,changes:[{key:"primary_destination",value:"Offline owner edit",revision:1,mutationId:"owner-1"}]});
@@ -95,6 +106,10 @@ test("support tickets create an anonymous chat without sharing the safety plan",
   assert.equal(supportConversation.exists,true);
   assert.equal(supportConversation.data().supportOrigin,"SUPPORT");
   assert.equal(supportConversation.data().supportTag,"SUPPORT");
+  await call(staffSupportClose,response.ticket.staffUid,{conversationId:`support-${owner}`});
+  assert.ok((await db.collection("conversations").doc(`support-${owner}`).get()).get("closedAt"));
+  await call(staffSupportRequest,owner,{action:"request"});
+  assert.equal((await db.collection("conversations").doc(`support-${owner}`).get()).get("closedAt"),undefined);
   assert.equal((await call(safetyPlanConsultations,response.ticket.staffUid)).plans.some((plan) => plan.ownerUid===owner),false);
   await call(staffSupportRequest,owner,{action:"stop"});
   assert.equal((await db.collection("conversations").doc(`support-${owner}`).get()).exists,false);

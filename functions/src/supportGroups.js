@@ -17,7 +17,7 @@ async function participantNames(participantIds) {
   return Object.fromEntries(participantIds.map((uid, index) => [uid, profiles[index]?.username || uid]));
 }
 
-async function saveSupportConversation(plan, safeContactUid = "") {
+async function saveSupportConversation(plan, safeContactUid = "", reopen = false) {
   if (!plan?.ownerUid || !plan?.staffUid) return;
   const origin = plan.supportOrigin === PLAN_CONSULT ? PLAN_CONSULT : SUPPORT;
   const conversationId = plan.conversationId || supportConversationId(plan.ownerUid, origin);
@@ -28,8 +28,8 @@ async function saveSupportConversation(plan, safeContactUid = "") {
   const participantUsernames = await participantNames(participantIds);
   const reference = db.collection("conversations").doc(conversationId);
   const current = await reference.get();
-  const membershipChanged = current.exists &&
-    JSON.stringify(current.data()?.participantIds || []) !== JSON.stringify(participantIds);
+  const previousParticipants = current.data()?.participantIds || [];
+  const participantRemoved = previousParticipants.some(uid => !participantIds.includes(uid));
   const value = {
     type: "SUPPORT", ownerUid: plan.ownerUid, staffUid: plan.staffUid, adminUid: plan.adminUid || "",
     supportOrigin: origin, supportTag: plan.adminUid ? NEEDS_ADMIN : origin,
@@ -38,7 +38,11 @@ async function saveSupportConversation(plan, safeContactUid = "") {
     lastMessageId: current.data()?.lastMessageId || "", lastSenderUid: current.data()?.lastSenderUid || "",
   };
   if (!current.exists) value.createdAt = FieldValue.serverTimestamp();
-  if (membershipChanged) {
+  // A new request reopens a conversation that staff previously closed.
+  if (reopen && current.get("closedAt")) value.closedAt = FieldValue.delete();
+  // Adding someone preserves the old room key so prior messages stay readable.
+  // Removing someone clears it so they cannot read messages sent afterward.
+  if (participantRemoved) {
     value.roomKeys = FieldValue.delete();
     value.participantPublicKeys = FieldValue.delete();
   }
@@ -104,6 +108,25 @@ exports.safetySupportAdmin = onCall({invoker: "public"}, async (request) => {
     conversationId, supportOrigin: origin,
   }, safeContactUid);
   return {conversationId, adminUid: selected.uid, adminName: selected.name};
+});
+
+/** Archives a support conversation for every participant when its assigned staff member closes it. */
+exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
+  const caller = await safetyCaller(request);
+  if (caller.role !== "STAFF") throw new HttpsError("permission-denied", "Assigned staff only.");
+  const conversationId = typeof request.data?.conversationId === "string" ? request.data.conversationId : "";
+  if (!/^(plan-consult|support)-[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
+    throw new HttpsError("invalid-argument", "Invalid support conversation.");
+  }
+  const reference = db.collection("conversations").doc(conversationId);
+  await db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists || snapshot.get("type") !== "SUPPORT" || snapshot.get("staffUid") !== caller.uid) {
+      throw new HttpsError("permission-denied", "Only the assigned staff member can close this chat.");
+    }
+    if (!snapshot.get("closedAt")) transaction.update(reference, {closedAt: FieldValue.serverTimestamp()});
+  });
+  return {conversationId};
 });
 
 module.exports.saveSupportConversation = saveSupportConversation;

@@ -11,6 +11,7 @@ Object.assign(exports, require("./src/supportTickets"));
 const supportGroups = require("./src/supportGroups");
 exports.safetySupportContact = supportGroups.safetySupportContact;
 exports.safetySupportAdmin = supportGroups.safetySupportAdmin;
+exports.staffSupportClose = supportGroups.staffSupportClose;
 Object.assign(exports, require("./src/mediaTickets"));
 
 const {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,

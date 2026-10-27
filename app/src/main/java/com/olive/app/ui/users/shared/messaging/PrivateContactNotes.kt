@@ -36,6 +36,7 @@ internal fun ChatConversation.privateNoteTargets(
 internal fun ConversationActionsDialog(
     conversation: ChatConversation,
     archived: Boolean,
+    closed: Boolean = false,
     currentUid: String,
     role: AccountRole,
     friendUids: Set<String>,
@@ -46,10 +47,24 @@ internal fun ConversationActionsDialog(
     val targets = conversation.privateNoteTargets(currentUid, role, friendUids)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(conversation.displayName(currentUid, stringResource(R.string.support_chat_name))) },
+        title = {
+            Text(
+                conversation.displayName(
+                    currentUid,
+                    role,
+                    conversation.anonymousStaffDisplayName(
+                        stringResource(R.string.support_chat_name),
+                        stringResource(R.string.support_ticket_consultation),
+                        stringResource(R.string.support_ticket_support),
+                        stringResource(R.string.support_ticket_escalation),
+                    ),
+                )
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {
+                if (closed) Text(stringResource(R.string.support_chat_closed))
+                else Button(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(if (archived) R.string.unarchive_chat else R.string.archive_chat))
                 }
                 if (targets.isNotEmpty()) OutlinedButton(

@@ -29,6 +29,8 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -89,9 +91,11 @@ private fun MessagingSidebar(
     } else session.conversations
     var showingArchived by rememberSaveable { mutableStateOf(false) }
     val shownConversations = roleConversations.filter {
-        (it.id in session.archivedConversationIds) == showingArchived
+        (it.closedAt > 0L || it.id in session.archivedConversationIds) == showingArchived
     }
-    val archivedCount = roleConversations.count { it.id in session.archivedConversationIds }
+    val supportConversations = shownConversations.filter { it.type == "SUPPORT" }
+    val directConversations = shownConversations.filter { it.type != "SUPPORT" }
+    val archivedCount = roleConversations.count { it.closedAt > 0L || it.id in session.archivedConversationIds }
     var conversationActions by remember { mutableStateOf<ChatConversation?>(null) }
     var noteTargets by remember { mutableStateOf<List<DirectoryUser>?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -414,56 +418,45 @@ private fun MessagingSidebar(
                 }
             }
         }
+        if (showingArchived) item {
+            Text(stringResource(R.string.archived_chats), style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() })
+        }
         item {
-            Text(
-                if (showingArchived) stringResource(R.string.archived_chats)
-                else stringResource(if (organizationAccount) R.string.support_conversations else R.string.direct_messages),
-                style = MaterialTheme.typography.titleMedium
+            Text(stringResource(R.string.support_conversations), style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.semantics { heading() })
+        }
+        if (supportConversations.isEmpty()) item {
+            Text(stringResource(when {
+                showingArchived -> R.string.no_archived_chats
+                organizationAccount -> R.string.no_assigned_support_conversations
+                else -> R.string.support_no_conversations
+            }), color = Muted)
+        }
+        items(supportConversations, key = { "conversation-${it.id}" }) { conversation ->
+            ConversationRow(
+                conversation, currentUid, session.accountRole,
+                Modifier.animateItem().fillMaxWidth().testTag("conversation_${conversation.id}"),
+                onOpen = { session.openConversation(conversation) },
+                onActions = { conversationActions = conversation },
             )
         }
-        if (shownConversations.isEmpty()) item {
-            Text(
-                if (showingArchived) stringResource(R.string.no_archived_chats)
-                else stringResource(if (organizationAccount) R.string.no_assigned_support_conversations else R.string.no_conversations_yet),
-                color = Muted
-            )
-        }
-        items(shownConversations, key = { "conversation-${it.id}" }) { conversation ->
-            val highlightedSupport = conversation.highlightedFor(session.accountRole)
-            val conversationColor = if (highlightedSupport) OliveGreen else MaterialTheme.colorScheme.surface
-            val conversationContentColor = if (highlightedSupport) MaterialTheme.colorScheme.onPrimary
-            else MaterialTheme.colorScheme.onSurface
-            OutlinedCard(
-                modifier = Modifier.animateItem().fillMaxWidth()
-                    .testTag("conversation_" + conversation.id)
-                    .combinedClickable(
-                        onClick = { session.openConversation(conversation) },
-                        onLongClick = { conversationActions = conversation },
-                    ),
-                colors = CardDefaults.outlinedCardColors(
-                    containerColor = conversationColor,
-                    contentColor = conversationContentColor,
-                ),
-            ) {
-                Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
-                    if (organizationAccount) Text(
-                        supportTagLabel(conversation.supportTag),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = OliveGreen,
-                    )
-                    Text(
-                        conversation.displayName(currentUid, uiText(R.string.support_chat_name)),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        when {
-                            conversation.lastMessage == "Message unsent" -> uiText(R.string.message_unsent)
-                            conversation.lastMessageId.isNotBlank() -> uiText(R.string.secure_message)
-                            else -> uiText(R.string.new_conversation)
-                        }, maxLines = 1,
-                        color = if (highlightedSupport) conversationContentColor.copy(alpha = .82f) else Muted
-                    )
-                }
+        if (!organizationAccount) {
+            item {
+                Text(stringResource(R.string.direct_messages), style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { heading() })
+            }
+            if (directConversations.isEmpty()) item {
+                Text(stringResource(if (showingArchived) R.string.no_archived_chats
+                    else R.string.no_conversations_yet), color = Muted)
+            }
+            items(directConversations, key = { "conversation-${it.id}" }) { conversation ->
+                ConversationRow(
+                    conversation, currentUid, session.accountRole,
+                    Modifier.animateItem().fillMaxWidth().testTag("conversation_${conversation.id}"),
+                    onOpen = { session.openConversation(conversation) },
+                    onActions = { conversationActions = conversation },
+                )
             }
         }
         item {
@@ -481,14 +474,15 @@ private fun MessagingSidebar(
     conversationActions?.let { conversation ->
         ConversationActionsDialog(
             conversation = conversation,
-            archived = conversation.id in session.archivedConversationIds,
+            archived = conversation.closedAt > 0L || conversation.id in session.archivedConversationIds,
+            closed = conversation.closedAt > 0L,
             currentUid = currentUid,
             role = session.accountRole,
             friendUids = session.friends.mapTo(mutableSetOf()) { it.uid },
             onArchive = {
                 session.setConversationArchived(
                     conversation,
-                    conversation.id !in session.archivedConversationIds,
+                    conversation.closedAt == 0L && conversation.id !in session.archivedConversationIds,
                 )
                 conversationActions = null
             },
@@ -501,6 +495,62 @@ private fun MessagingSidebar(
     }
     noteTargets?.let { targets ->
         PrivateContactNoteDialog(session, targets, onDismiss = { noteTargets = null })
+    }
+}
+
+@Composable
+private fun ConversationRow(
+    conversation: ChatConversation,
+    currentUid: String,
+    viewerRole: AccountRole,
+    modifier: Modifier,
+    onOpen: () -> Unit,
+    onActions: () -> Unit,
+) {
+    val uiText = rememberResourceText()
+    val organizationAccount = viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+    OutlinedCard(modifier.combinedClickable(onClick = onOpen, onLongClick = onActions)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                if (conversation.type == "SUPPORT") Icons.Outlined.SupportAgent
+                else Icons.Outlined.PersonOutline,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+            )
+            Column {
+                if (organizationAccount) Text(
+                    supportTagLabel(conversation.supportTag),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = OliveGreen,
+                )
+                Text(
+                    conversation.displayName(
+                        currentUid,
+                        viewerRole,
+                        conversation.anonymousStaffDisplayName(
+                            uiText(R.string.support_chat_name),
+                            uiText(R.string.support_ticket_consultation),
+                            uiText(R.string.support_ticket_support),
+                            uiText(R.string.support_ticket_escalation),
+                        ),
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    when {
+                        conversation.lastMessage == "Message unsent" -> uiText(R.string.message_unsent)
+                        conversation.lastMessageId.isNotBlank() -> uiText(R.string.secure_message)
+                        else -> uiText(R.string.new_conversation)
+                    },
+                    maxLines = 1,
+                    color = Muted,
+                )
+            }
+        }
     }
 }
 

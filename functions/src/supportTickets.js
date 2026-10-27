@@ -64,6 +64,6 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
     transaction.set(reference, created);
     return created;
   });
-  if (ticket.staffUid) await saveSupportConversation(ticket);
+  if (ticket.staffUid) await saveSupportConversation(ticket, "", true);
   return {ticket};
 });

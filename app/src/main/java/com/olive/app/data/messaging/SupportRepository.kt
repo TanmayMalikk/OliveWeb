@@ -26,6 +26,10 @@ internal class SupportRepository(
     suspend fun requestAdmin(conversationId: String) {
         call("safetySupportAdmin", mapOf("conversationId" to conversationId))
     }
+
+    suspend fun close(conversationId: String) {
+        call("staffSupportClose", mapOf("conversationId" to conversationId))
+    }
 }
 
 internal data class StaffSupportTicket(

@@ -46,10 +46,32 @@ data class ChatConversation(
     val adminUid: String = "",
     val supportOrigin: String = "",
     val supportTag: String = "",
+    val closedAt: Long = 0L,
 ) {
-    fun displayName(currentUid: String, supportName: String = "Your Olive Branch") = if (type == "SUPPORT") {
-        supportName
+    fun displayName(
+        currentUid: String,
+        viewerRole: AccountRole,
+        anonymousStaffName: String = "Your Olive Branch",
+    ) = if (type == "SUPPORT") {
+        if (viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
+            participantUsernames[ownerUid].orEmpty().ifBlank { "User" }
+        } else anonymousStaffName
     } else participantUsernames.entries.firstOrNull { it.key != currentUid }?.value ?: "Conversation"
+
+    // Personal accounts see why the anonymous Olive Staff conversation was opened.
+    fun anonymousStaffDisplayName(
+        staffName: String,
+        consultationName: String,
+        supportName: String,
+        escalationName: String,
+    ): String {
+        val ticketName = when {
+            supportTag == SUPPORT_TAG_NEEDS_ADMIN -> escalationName
+            supportOrigin == SUPPORT_TAG_PLAN_CONSULT || supportTag == SUPPORT_TAG_PLAN_CONSULT -> consultationName
+            else -> supportName
+        }
+        return "$staffName • $ticketName"
+    }
 
     // Personal accounts see a role label instead of an organization member's account name.
     fun senderDisplayName(
@@ -63,8 +85,6 @@ data class ChatConversation(
         senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() }
     ) anonymousStaffName else senderUsername
 
-    fun highlightedFor(viewerRole: AccountRole) =
-        type == "SUPPORT" && viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN)
 }
 
 internal const val SUPPORT_TAG_PLAN_CONSULT = "PLAN_CONSULT"
