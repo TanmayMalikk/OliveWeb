@@ -106,8 +106,17 @@ test('file metadata is owned, shareable for reads, and cannot be reshaped', asyn
   await assertFails(setDoc(doc(alice,'files/wrong-path'),metadata));
   await assertFails(updateDoc(doc(bob,'files/file-metadata-1'),{allowed_users:['file-alice','file-bob','file-charlie']}));
   await assertFails(updateDoc(target,{unexpected:'not allowed'}));
-  await assertSucceeds(updateDoc(target,{ocr_text:'Recognized document text',ocr_confidence:0.82,ocr_successful:true}));
+  await assertFails(updateDoc(target,{ocr_text:'Recognized document text',ocr_confidence:0.82,ocr_successful:true}));
   await assertFails(updateDoc(target,{ocr_confidence:1.2}));
+  await assertFails(updateDoc(target,{ocr_text:'x'.repeat(50001)}));
+  await assertFails(setDoc(doc(alice,'files/file-metadata-plaintext-ocr'),{...metadata,
+    storage_path:'users/file-alice/media/file-metadata-plaintext-ocr',
+    ocr_text:'Server-readable OCR must never be accepted',ocr_confidence:0.82,ocr_successful:true}));
+  await assertFails(setDoc(doc(alice,'files/client-injected-encrypted-metadata'),{
+    owner_id:'file-alice',object_key:'users/file-alice/media/client-injected-encrypted-metadata',
+    encrypted_metadata:'untrusted-client-ciphertext',wrapped_keys:{'file-alice':'wrapped-key'},
+    allowed_users:['file-alice'],ciphertext_size:1024,ciphertext_sha256:'a'.repeat(64),
+    encryption_version:1,created_at:serverTimestamp()}));
   await assertFails(setDoc(doc(alice,'files/file-metadata-2'),{...metadata,
     storage_path:'users/file-alice/media/file-metadata-2',ocr_text:'Incomplete OCR metadata'}));
   await assertSucceeds(updateDoc(target,{allowed_users:['file-alice','file-charlie']}));
