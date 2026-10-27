@@ -29,6 +29,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.*
+import com.olive.app.data.media.MediaTransferState
+import com.olive.app.data.media.MediaTransferStatus
+import com.olive.app.data.media.MediaUploadPresentation
 import java.io.File
 
 // Groups the data and actions for document filter.

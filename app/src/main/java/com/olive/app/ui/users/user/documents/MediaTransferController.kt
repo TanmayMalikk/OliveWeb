@@ -1,4 +1,4 @@
-package com.olive.app.ui.media
+package com.olive.app.ui.users.user.documents
 
 import android.content.Context
 import android.net.Uri
@@ -10,19 +10,19 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
-import com.olive.app.data.MediaKind
-import com.olive.app.data.MediaPreprocessor
-import com.olive.app.data.MediaRepository
-import com.olive.app.data.MediaTicketDataSource
-import com.olive.app.data.MediaTransferState
-import com.olive.app.data.MediaTransferStatus
-import com.olive.app.data.MediaTransferStore
-import com.olive.app.data.MediaUploadJob
-import com.olive.app.data.MediaUploadPresentation
-import com.olive.app.data.MediaUploadWorker
-import com.olive.app.data.OcrReview
-import com.olive.app.data.PassThroughMediaPreprocessor
-import com.olive.app.data.PreparedEncryptedMedia
+import com.olive.app.data.SafetyDocument
+import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.MediaPreprocessor
+import com.olive.app.data.media.MediaTicketDataSource
+import com.olive.app.data.media.MediaTransferState
+import com.olive.app.data.media.MediaTransferStatus
+import com.olive.app.data.media.MediaTransferStore
+import com.olive.app.data.media.MediaUploadJob
+import com.olive.app.data.media.MediaUploadPresentation
+import com.olive.app.data.media.MediaUploadWorker
+import com.olive.app.data.media.OcrReview
+import com.olive.app.data.media.PassThroughMediaPreprocessor
+import com.olive.app.data.media.PreparedEncryptedMedia
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import com.olive.app.security.MediaCipher
@@ -41,7 +41,22 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import kotlin.coroutines.coroutineContext
-import com.olive.app.data.SafetyDocument
+
+internal interface MediaTransferOperations {
+    fun observeUploads(ownerUid:String)
+    fun acknowledgePublished(mediaIds:Set<String>)
+    fun queueDocument(
+        uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
+        onQueued:(String)->Unit,onFailure:(String)->Unit,
+    )
+    fun queueFile(
+        file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
+        ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
+        onQueued:(String)->Unit,onFailure:(String)->Unit,
+    )
+    suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File
+    fun clearState()
+}
 
 /**
  * Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
@@ -69,11 +84,11 @@ import com.olive.app.data.SafetyDocument
 internal class MediaTransferController(
     context:Context,
     private val scope:CoroutineScope,
+    private val repository:MediaTicketDataSource,
     private val store:MediaTransferStore=MediaTransferStore(context),
-    private val repository:MediaTicketDataSource=MediaRepository(),
     private val client:OkHttpClient=OkHttpClient(),
     private val preprocessor:MediaPreprocessor=PassThroughMediaPreprocessor,
-) {
+):MediaTransferOperations {
     private val applicationContext=context.applicationContext
     private var observedOwnerUid:String?=null
     private var publishedMediaIds:Set<String> = emptySet()
@@ -91,7 +106,7 @@ internal class MediaTransferController(
      * Re-entering the screen after process death reconstructs pending cards from the encrypted
      * [MediaTransferStore] and reconnects to the already scheduled unique work chains.
      */
-    fun observeUploads(ownerUid:String) {
+    override fun observeUploads(ownerUid:String) {
         if(observedOwnerUid!=ownerUid) {
             observationJobs.values.forEach(Job::cancel);observationJobs.clear();workProgress.clear()
             observedOwnerUid=ownerUid;publishedMediaIds=emptySet();uploads=emptyList()
@@ -111,7 +126,7 @@ internal class MediaTransferController(
      * Removes completed local bookkeeping only after Firestore publishes the matching media record.
      * This prevents a blank gap: the pending card remains until the finalized document can replace it.
      */
-    fun acknowledgePublished(mediaIds:Set<String>) {
+    override fun acknowledgePublished(mediaIds:Set<String>) {
         val owner=observedOwnerUid ?: return
         publishedMediaIds=mediaIds
         scope.launch {
@@ -129,9 +144,9 @@ internal class MediaTransferController(
      * [OcrReview.RETAKE_RECOMMENDED] pauses before any plaintext processing; declining is represented
      * by calling again with [OcrReview.RETAKE_DECLINED].
      */
-    fun queueDocument(
-        uri:Uri,owner:AccountIdentity,ocrReview:OcrReview=OcrReview.NOT_RUN,
-        onQueued:(String)->Unit={},onFailure:(String)->Unit={},
+    override fun queueDocument(
+        uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
+        onQueued:(String)->Unit,onFailure:(String)->Unit,
     ) {
         if(ocrReview==OcrReview.RETAKE_RECOMMENDED) {
             // OCR is advisory: pause for a user decision instead of silently rejecting the document.
@@ -154,11 +169,10 @@ internal class MediaTransferController(
     }
 
     /** Queues a camera/capture file through the same preprocessing and encryption pipeline. */
-    fun queueFile(
+    override fun queueFile(
         file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
-        ocrReview:OcrReview=if(kind==MediaKind.DOCUMENT) OcrReview.NOT_RUN else OcrReview.NOT_APPLICABLE,
-        ocr:DocumentOcrMetadata?=null,
-        onQueued:(String)->Unit={},onFailure:(String)->Unit={},
+        ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
+        onQueued:(String)->Unit,onFailure:(String)->Unit,
     ) {
         if(ocrReview==OcrReview.RETAKE_RECOMMENDED) {
             val message="Document quality review recommends another capture"
@@ -188,21 +202,21 @@ internal class MediaTransferController(
         MediaUploadWorker.enqueue(applicationContext,jobId);observe(jobId);state=MediaTransferState.Queued(jobId)
     }
 
-    /** Downloads and decrypts a new R2-backed document; legacy Firebase Storage uses its repository. */
-    fun download(document:SafetyDocument,viewerUid:String,onReady:(File)->Unit,onFailure:(String)->Unit={}) {
+    /** Downloads and decrypts an R2-backed document for the authenticated viewer. */
+    override suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File {
         require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
-        scope.launch {
-            state=MediaTransferState.Preparing("downloading")
-            runCatching { withContext(Dispatchers.IO) { downloadEncrypted(document,viewerUid) } }
-                .onSuccess { file -> state=MediaTransferState.Idle;onReady(file) }
-                .onFailure { failure ->
-                    val message=failure.localizedMessage ?: "Unable to download encrypted media"
-                    state=MediaTransferState.Failed(null,message,true);onFailure(message)
-                }
+        state=MediaTransferState.Preparing("downloading")
+        return try {
+            withContext(Dispatchers.IO) { downloadEncrypted(document,viewerUid) }
+                .also { state=MediaTransferState.Idle }
+        } catch(failure:Exception) {
+            val message=failure.localizedMessage ?: "Unable to download encrypted media"
+            state=MediaTransferState.Failed(null,message,true)
+            throw failure
         }
     }
 
-    fun clearState() {
+    override fun clearState() {
         observationJobs.values.forEach(Job::cancel);observationJobs.clear();workProgress.clear()
         observedOwnerUid=null;publishedMediaIds=emptySet();uploads=emptyList();state=MediaTransferState.Idle
     }
