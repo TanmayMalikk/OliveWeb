@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+            name="description"
+            content="A starter template for clear, searchable developer documentation."
+    />
+    <title>DevGuide — Project documentation</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script defer src="./app.js"></script>
+</head>
+<body>
+<header class="topbar">
+    <button
+            class="menu-toggle"
+            type="button"
+            aria-label="Open documentation navigation"
+            aria-expanded="false"
+            aria-controls="sidebar"
+    >
+        <span></span><span></span><span></span>
+    </button>
+    <a class="brand" href="#/overview" aria-label="DevGuide home">
+        <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
+        <span>DevGuide</span>
+    </a>
+    <span class="topbar-caption">Project documentation</span>
+    <a class="topbar-link" href="https://github.com/macewanCS/F26_D1">View source <span aria-hidden="true">↗</span></a>
+</header>
+
+<div class="page-layout">
+    <aside class="sidebar" id="sidebar" aria-label="Documentation navigation">
+        <div class="sidebar-inner">
+            <p class="sidebar-label">DOCUMENTATION</p>
+            <nav id="primary-nav"></nav>
+            <div class="sidebar-footer">
+                <span class="status-dot" aria-hidden="true"></span>
+                <span>Documentation starter</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="content-inner">
+            <div class="breadcrumbs" id="breadcrumbs" aria-label="Breadcrumb"></div>
+            <article id="article" class="markdown-body" aria-live="polite">
+                <p class="loading-message">Loading documentation…</p>
+            </article>
+            <nav class="page-pagination" id="page-pagination" aria-label="Page navigation"></nav>
+        </div>
+    </main>
+
+    <aside class="toc-sidebar" aria-label="On this page">
+        <div class="toc-inner">
+            <p class="toc-title">ON THIS PAGE</p>
+            <nav id="table-of-contents"></nav>
+        </div>
+    </aside>
+</div>
+<div class="sidebar-backdrop" aria-hidden="true"></div>
+</body>
+</html>
