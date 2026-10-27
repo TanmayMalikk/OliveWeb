@@ -9,9 +9,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.olive.app.data.*
 import com.olive.app.ui.session.SessionRuntime
+import com.olive.app.ui.users.user.documents.MediaTransferController
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.location.LocationMapController
-import com.olive.app.ui.users.user.documents.MediaTransferController
 import com.olive.app.security.SafeEntryMethod
 import com.olive.app.security.allowsAppPin
 import okhttp3.OkHttpClient
@@ -19,14 +19,9 @@ import okhttp3.OkHttpClient
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 internal class SessionViewModel(application: Application) : AndroidViewModel(application) {
     private val runtime = SessionRuntime(application, viewModelScope)
-    internal val media = if (runtime.localMode) null else MediaTransferController(
-        application,
-        viewModelScope,
-        MediaTransferStore(application),
-        MediaRepository(),
-        OkHttpClient(),
-        PassThroughMediaPreprocessor,
-    )
+    internal val media = runtime.mediaRepository?.let {
+        MediaTransferController(application, viewModelScope, it)
+    }
     internal val documents =
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)
     internal val locationMap =

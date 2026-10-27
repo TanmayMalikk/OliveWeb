@@ -44,7 +44,7 @@ import coil3.compose.AsyncImage
 import com.olive.app.R
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
-import com.olive.app.data.MediaKind
+import com.olive.app.data.media.MediaKind
 import com.olive.app.ocr.OcrResult
 import java.io.File
 import java.util.UUID
