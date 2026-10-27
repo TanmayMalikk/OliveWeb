@@ -9,6 +9,11 @@
     <string name="support_staff_help">向工作人员求助</string>
     <string name="support_looking_for_staff">正在寻找工作人员…</string>
     <string name="support_staff_found">已分配 %1$s。正在打开支持聊天…</string>
+    <string name="support_staff_ready">已分配一名工作人员。正在打开 Olive Staff…</string>
+    <string name="support_chat_name">Olive Staff</string>
+    <string name="support_filter_plan_consults">计划咨询</string>
+    <string name="support_filter_support">支持</string>
+    <string name="support_filter_needs_admin">需要管理员</string>
     <string name="support_staff_search_help">Olive Branch 会安全地为您联系一名有空的工作人员。</string>
     <string name="support_cancel_staff_request">取消请求</string>
     <string name="support_emergency">紧急情况</string>

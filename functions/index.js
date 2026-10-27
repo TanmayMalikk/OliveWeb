@@ -7,6 +7,7 @@ Object.assign(exports, require("./src/organizationAccounts"));
 Object.assign(exports, require("./src/accountDeletion"));
 Object.assign(exports, require("./src/safetyPlans"));
 Object.assign(exports, require("./src/safetyConsultations"));
+Object.assign(exports, require("./src/supportTickets"));
 const supportGroups = require("./src/supportGroups");
 exports.safetySupportContact = supportGroups.safetySupportContact;
 exports.safetySupportAdmin = supportGroups.safetySupportAdmin;

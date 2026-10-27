@@ -46,7 +46,7 @@ internal fun ConversationActionsDialog(
     val targets = conversation.privateNoteTargets(currentUid, role, friendUids)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(conversation.displayName(currentUid)) },
+        title = { Text(conversation.displayName(currentUid, stringResource(R.string.support_chat_name))) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {

@@ -55,6 +55,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.olive.app.data.SafetyDocument
+import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
+import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
 import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -108,9 +110,24 @@ internal fun ChatPane(
                         color = Muted
                     )
                     Text(
-                        active.displayName(currentUid).lowercase(Locale.ROOT),
+                        active.displayName(currentUid, uiText(R.string.support_chat_name)),
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.semantics { heading() })
+                    if (active.type == "SUPPORT" && session.accountRole in setOf(
+                            com.olive.app.data.AccountRole.STAFF,
+                            com.olive.app.data.AccountRole.ADMIN,
+                        )
+                    ) Text(
+                        stringResource(
+                            when (active.supportTag) {
+                                SUPPORT_TAG_PLAN_CONSULT -> R.string.support_filter_plan_consults
+                                SUPPORT_TAG_NEEDS_ADMIN -> R.string.support_filter_needs_admin
+                                else -> R.string.support_filter_support
+                            }
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = OliveGreen,
+                    )
                 }
                 if (exit != null) Button(
                     onClick = exit,
@@ -122,12 +139,12 @@ internal fun ChatPane(
             if (session.accountRole == com.olive.app.data.AccountRole.STAFF &&
                 active.type == "SUPPORT" && active.adminUid.isBlank()) {
                 OutlinedButton(
-                    onClick = { session.requestAdminHelp(active.ownerUid) },
-                    enabled = session.safetyPlans.saving == 0,
+                    onClick = { session.requestAdminHelp(active.id) },
+                    enabled = session.support.saving == 0,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                         .testTag("request_admin_help"),
                 ) { Text(stringResource(R.string.request_admin_help)) }
-                session.safetyPlans.error?.let { message ->
+                session.support.error?.let { message ->
                     Text(stringResource(message), color = MaterialTheme.colorScheme.error)
                 }
             }
@@ -170,7 +187,12 @@ internal fun ChatPane(
                                 ) {
                                     Column(Modifier.weight(1f)) {
                                         Text(
-                                            if (mine) session.coverUsername else chat.senderUsername,
+                                            if (mine) session.coverUsername else active.senderDisplayName(
+                                                chat.senderUid,
+                                                chat.senderUsername,
+                                                session.accountRole,
+                                                uiText(R.string.support_chat_name),
+                                            ),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = if (mine) Color.White.copy(alpha = .78f) else Muted
                                         )

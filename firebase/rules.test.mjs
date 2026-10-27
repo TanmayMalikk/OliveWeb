@@ -284,6 +284,7 @@ test('support conversations allow one user, safe contact, staff member, and admi
   }));
   const conversationId='support-support-owner';
   const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',adminUid:'support-admin',
+    supportOrigin:'SUPPORT',supportTag:'NEEDS_ADMIN',
     friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-admin'],
     participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact','support-admin':'support_admin'},
     createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:''};
