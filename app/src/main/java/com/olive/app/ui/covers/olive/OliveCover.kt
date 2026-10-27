@@ -67,7 +67,8 @@ internal fun OliveCover(
     }
     var checkoutNotice by remember { mutableStateOf(false) }
     var areaDialog by remember { mutableStateOf(false) }
-    val savedAddress = session?.deliveryAddress ?: DeliveryAddress()
+    var guestAddress by remember { mutableStateOf(DeliveryAddress()) }
+    val savedAddress = if (configured) session?.deliveryAddress ?: DeliveryAddress() else guestAddress
     LaunchedEffect(savedAddress) { vm.updateLocation(savedAddress) }
     LaunchedEffect(session?.coverReset) {
         checkoutNotice = false
@@ -129,7 +130,7 @@ internal fun OliveCover(
                     CoverTab.Discover -> FoodDiscoverScreen(
                         vm,
                         onSearch
-                    ) { if (configured) areaDialog = true else onAccountSetup() }
+                    ) { areaDialog = true }
 
                     CoverTab.Saved -> SavedDishesScreen(vm)
                     CoverTab.Cart -> FoodCartScreen(vm) {
@@ -147,9 +148,15 @@ internal fun OliveCover(
     }
     if (areaDialog && interactive) AddressDialog(
         savedAddress,
-        session?.busy == true,
-        session?.message,
-        onSave = { session?.saveAddress(it) },
+        configured && session?.busy == true,
+        session?.message.takeIf { configured },
+        onSave = { address ->
+            if (configured) session?.saveAddress(address)
+            else {
+                guestAddress = address
+                areaDialog = false
+            }
+        },
         onClose = {
             areaDialog = false
             session?.dismissAddressPrompt()

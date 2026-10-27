@@ -26,6 +26,10 @@ class SettingsFlowTest : OliveUiTestBase() {
         val originalLanguage = session.profile!!.language
         compose.onNodeWithTag("language").assertDoesNotExist()
         fill("settings_situation", "Updated test situation")
+        fill("address_line1", "123 Test Street")
+        fill("address_province", "Alberta")
+        fill("address_postal", "T5J 0N3")
+        fill("address_country", "Canada")
         click("save_settings")
         compose.waitUntil(30_000) { !session.busy && session.profile?.situation == "Updated test situation" }
         fill("settings_trigger", "new secret")

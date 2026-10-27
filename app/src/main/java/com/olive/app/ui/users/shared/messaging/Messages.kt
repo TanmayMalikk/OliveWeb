@@ -214,8 +214,10 @@ private fun MessagingSidebar(
                             Modifier.weight(1f),
                             style = MaterialTheme.typography.titleMedium
                         )
-                        TextButton(onClick = { noteTargets = listOf(user) }) {
-                            Text(stringResource(R.string.private_note))
+                        if (relationship == FriendRelationship.Friends) {
+                            TextButton(onClick = { noteTargets = listOf(user) }) {
+                                Text(stringResource(R.string.private_note))
+                            }
                         }
                         when (relationship) {
                             FriendRelationship.AddFriend -> Button(
@@ -442,6 +444,7 @@ private fun MessagingSidebar(
             archived = conversation.id in session.archivedConversationIds,
             currentUid = currentUid,
             role = session.accountRole,
+            friendUids = session.friends.mapTo(mutableSetOf()) { it.uid },
             onArchive = {
                 session.setConversationArchived(
                     conversation,

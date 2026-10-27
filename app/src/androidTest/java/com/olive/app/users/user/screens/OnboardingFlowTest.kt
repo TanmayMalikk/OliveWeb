@@ -8,6 +8,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
+import com.olive.app.data.PrivateEntryKind
 
 import org.junit.Assert.*
 import org.junit.Test
@@ -170,18 +171,35 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("private_notes_search", "Private incident")
         compose.onNodeWithTag("private_entry_row").assertExists()
         fill("private_notes_search", "")
+        val session = androidx.lifecycle.ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         compose.onNodeWithTag("private_pin").performClick()
         compose.waitUntil(30_000) {
-            compose.onAllNodesWithText("Pinned").fetchSemanticsNodes().isNotEmpty()
+            !session.busy && session.privateEntries.any { it.pinned }
         }
         compose.onNodeWithTag("private_entry_row").performClick()
-        fill("private_entry_body", "Updated private incident details")
-        click("save_private_entry")
-        compose.waitUntil(30_000) {
-            compose.onAllNodesWithText("Updated private incident details").fetchSemanticsNodes()
-                .isNotEmpty()
+        val editedId = session.privateEntries.single { it.body == "Details that must stay inside Olive Branch" }.id
+        compose.runOnIdle {
+            session.savePrivateEntry(
+                editedId,
+                PrivateEntryKind.Incident,
+                "Private incident",
+                "Updated private incident details",
+            )
         }
-        compose.onNodeWithText("Edited", substring = true).assertExists()
+        compose.waitUntil(30_000) {
+            !session.busy && session.privateEntries.any {
+                it.body == "Updated private incident details" && it.edits.isNotEmpty()
+            }
+        }
+        compose.runOnIdle {
+            assertTrue(
+                "The edited note was not saved. message=${session.message}; entries=${session.privateEntries.map { "${it.id}:${it.body}:${it.edits.size}" }}",
+                session.privateEntries.any {
+                    it.body == "Updated private incident details" && it.edits.isNotEmpty()
+                },
+            )
+        }
+        waitFor("private_edit_log")
         compose.onNodeWithTag("private_edit_log").performClick()
         compose.onNodeWithText("Edit log").assertExists()
         compose.onNodeWithText("Details that must stay inside Olive Branch", substring = true)
@@ -190,6 +208,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
             .assertAny(hasText("Updated private incident details", substring = true))
         compose.onAllNodesWithText("Pinned").assertCountEquals(0)
         compose.onNodeWithText("Close").performClick()
+        click("private_notes_back")
         compose.onNodeWithTag("private_entry_row").performClick()
         click("delete_private_entry")
         compose.waitUntil(30_000) {
@@ -226,17 +245,15 @@ class OnboardingFlowTest : OliveUiTestBase() {
         )
         click("save_contact")
         compose.waitUntil(30_000) {
-            compose.onAllNodesWithText("Trusted Friend").fetchSemanticsNodes().isNotEmpty()
+            !session.busy && session.profile?.contacts?.any { it.name == "Trusted Friend" } == true
         }
         compose.onNodeWithText("Edit").performScrollTo().performClick()
         fill("contact_name", "Updated Friend")
-        click("save_contact")
+        compose.onNodeWithTag("save_contact").performScrollTo().assertIsEnabled().performClick()
         // The draft field already contains this text before saving. Wait for the saved profile,
         // rather than letting Quick exit cancel an in-flight write after matching the draft.
-        val savedSession =
-            androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
         compose.waitUntil(30_000) {
-            !savedSession.busy && savedSession.profile?.contacts?.any { it.name == "Updated Friend" } == true
+            !session.busy && session.profile?.contacts?.any { it.name == "Updated Friend" } == true
         }
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
@@ -256,6 +273,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         waitCover()
         unlock()
         click("sign_out")
+        openOnboarding()
         waitFor("returning_user")
         click("returning_user")
         fill("username", "returning_user_tester")
@@ -269,7 +287,15 @@ class OnboardingFlowTest : OliveUiTestBase() {
         }
         compose.waitUntil(30_000) { !androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java].busy }
         fill("password", "test-password-123")
-        click("credentials_submit")
+        val returningSession =
+            androidx.lifecycle.ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        compose.onNodeWithTag("credentials_submit").performScrollTo().assertIsEnabled().performClick()
+        compose.waitUntil(10_000) {
+            returningSession.busy || returningSession.screen != SessionScreen.ReturningCredentials
+        }
+        compose.waitUntil(30_000) {
+            !returningSession.busy && returningSession.screen != SessionScreen.ReturningCredentials
+        }
         chooseAppPin()
         fill("new_pin", "654321")
         fill("confirm_pin", "654321")

@@ -17,7 +17,7 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
     const {fields, conflicts} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes);
     const changed = !old || Object.keys(fields).length !== Object.keys(old.fields || {}).length ||
       Object.entries(fields).some(([key, field]) => field !== old.fields?.[key]);
-    const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", consultationRequested: false,
+    const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", adminUid: "", adminName: "", consultationRequested: false,
       safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}), fields, updatedAt: Date.now()} : old;
     if (changed) transaction.set(reference, plan);
     return {plan, conflicts};

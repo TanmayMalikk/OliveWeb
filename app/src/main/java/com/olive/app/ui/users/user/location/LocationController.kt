@@ -43,6 +43,11 @@ internal data class LocationMapState(
     val staticSharing: Boolean = false,
     val working: Boolean = false,
     val error: String? = null,
+    val navigationTargetUid: String? = null,
+    val route: LocationRoute? = null,
+    val navigating: Boolean = false,
+    val routeWorking: Boolean = false,
+    val routeError: String? = null,
 ) {
     fun displayedOwn(role: AccountRole) =
         if (role == AccountRole.USER) livePoint ?: ownPoint else ownPoint
@@ -56,6 +61,7 @@ internal class LocationMapController(
 ) {
     private val applicationContext = context.applicationContext
     private var locationJob: Job? = null
+    private var navigationJob: Job? = null
     private var expiryJob: Job? = null
     private var subscription: ChatSubscription? = null
     private var generation = 0
@@ -92,10 +98,23 @@ internal class LocationMapController(
             else repository?.observeLiveFriends(
                 uid,
                 configuration.friends
-            ) { if (token == generation) state = state.copy(contacts = it) }
+            ) {
+                if (token == generation) {
+                    val target = state.navigationTargetUid?.takeIf { targetUid ->
+                        it.any { point -> point.uid == targetUid && point.live }
+                    } ?: it.firstOrNull { point -> point.live }?.uid
+                    state = state.copy(
+                        contacts = it,
+                        navigationTargetUid = target,
+                        route = state.route.takeIf { target != null },
+                        navigating = state.navigating && target != null,
+                        routeWorking = state.routeWorking && target != null,
+                    )
+                }
+            }
         }
         locationJob = scope.launch {
-            if (configuration.profile.role == AccountRole.USER && requestPermission()) {
+            if (requestPermission()) {
                 while (isActive) {
                     DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
                         if (token == generation) {
@@ -154,12 +173,13 @@ internal class LocationMapController(
                         )
                     }
                 }
-                if (state.staticSharing && !configuration.localMode) updateStaticSharing(
-                    configuration,
-                    true
-                )
             }
         }
+        if (
+            configuration.profile.role == AccountRole.SAFE_CONTACT &&
+            state.staticSharing &&
+            !configuration.localMode
+        ) updateStaticSharing(configuration, true)
         watchExpiry()
     }
 
@@ -168,6 +188,8 @@ internal class LocationMapController(
         generation++
         locationJob?.cancel()
         locationJob = null
+        navigationJob?.cancel()
+        navigationJob = null
         expiryJob?.cancel()
         expiryJob = null
         subscription?.close()
@@ -177,6 +199,111 @@ internal class LocationMapController(
     fun clear() {
         closeMap()
         state = LocationMapState()
+    }
+
+    fun selectNavigationTarget(uid: String) {
+        if (!state.navigating && state.contacts.any { it.uid == uid && it.live })
+            state = state.copy(navigationTargetUid = uid, routeError = null)
+    }
+
+    fun startNavigation(
+        notConfiguredMessage: String,
+        unavailableMessage: String,
+        failedMessage: String,
+    ) {
+        if (state.navigating || state.routeWorking) return
+        if (!MapboxDirectionsClient.configured) {
+            state = state.copy(routeError = notConfiguredMessage)
+            return
+        }
+        val targetUid = state.navigationTargetUid ?: state.contacts.firstOrNull { it.live }?.uid
+        if (state.ownPoint == null || targetUid == null) {
+            state = state.copy(routeError = unavailableMessage)
+            return
+        }
+        state = state.copy(
+            navigating = true,
+            navigationTargetUid = targetUid,
+            routeWorking = true,
+            routeError = null,
+        )
+        navigationJob?.cancel()
+        navigationJob = scope.launch {
+            var lastRoutedTarget: MapLocationPoint? = null
+            var lastRequestAt = 0L
+            while (isActive && state.navigating) {
+                val origin = state.ownPoint
+                val target = state.contacts.firstOrNull {
+                    it.uid == state.navigationTargetUid && it.live
+                }
+                if (origin == null || target == null) {
+                    state = state.copy(routeWorking = false, routeError = unavailableMessage)
+                } else if (routeNeedsRefresh(origin, target, lastRoutedTarget) &&
+                    System.currentTimeMillis() - lastRequestAt >= MIN_ROUTE_REQUEST_INTERVAL_MILLIS
+                ) {
+                    lastRequestAt = System.currentTimeMillis()
+                    state = state.copy(routeWorking = true, routeError = null)
+                    runCatching {
+                        MapboxDirectionsClient.drivingRoute(
+                            origin.latitude,
+                            origin.longitude,
+                            target.latitude,
+                            target.longitude,
+                        )
+                    }.onSuccess { route ->
+                        state = if (route == null) state.copy(
+                            routeWorking = false,
+                            routeError = failedMessage,
+                        ) else state.copy(
+                            route = route,
+                            routeWorking = false,
+                            routeError = null,
+                        ).also {
+                            lastRoutedTarget = target
+                        }
+                    }.onFailure {
+                        state = state.copy(routeWorking = false, routeError = failedMessage)
+                    }
+                } else {
+                    state = state.copy(routeWorking = false)
+                }
+                delay(NAVIGATION_CHECK_MILLIS.milliseconds)
+            }
+        }
+    }
+
+    fun stopNavigation() {
+        navigationJob?.cancel()
+        navigationJob = null
+        state = state.copy(
+            navigating = false,
+            routeWorking = false,
+            route = null,
+            routeError = null,
+        )
+    }
+
+    private fun routeNeedsRefresh(
+        origin: MapLocationPoint,
+        target: MapLocationPoint,
+        lastTarget: MapLocationPoint?,
+    ): Boolean {
+        val route = state.route ?: return true
+        if (lastTarget == null || distanceBetween(target, lastTarget) >= TARGET_REROUTE_METERS)
+            return true
+        return distanceFromRouteMeters(origin.latitude, origin.longitude, route) >= OFF_ROUTE_METERS
+    }
+
+    private fun distanceBetween(first: MapLocationPoint, second: MapLocationPoint): Float {
+        val result = FloatArray(1)
+        Location.distanceBetween(
+            first.latitude,
+            first.longitude,
+            second.latitude,
+            second.longitude,
+            result,
+        )
+        return result[0]
     }
 
     // Selects contact.
@@ -306,6 +433,10 @@ internal class LocationMapController(
     private companion object {
         const val MAX_SHARED_CONTACTS = 10
         const val MAP_LOCATION_REFRESH_MILLIS = 2_000L
+        const val NAVIGATION_CHECK_MILLIS = 2_000L
+        const val MIN_ROUTE_REQUEST_INTERVAL_MILLIS = 20_000L
+        const val TARGET_REROUTE_METERS = 25f
+        const val OFF_ROUTE_METERS = 45.0
         const val TRAIL_WINDOW_MILLIS = 30 * 60_000L
         const val MIN_TRAIL_DISTANCE_METERS = 2f
         const val MAX_TRAIL_POINTS = 1_000

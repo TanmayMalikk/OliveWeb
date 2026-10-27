@@ -11,14 +11,22 @@ import com.olive.app.data.*
 import com.olive.app.ui.session.SessionRuntime
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.location.LocationMapController
-import com.olive.app.ui.media.MediaTransferController
+import com.olive.app.ui.users.user.documents.MediaTransferController
 import com.olive.app.security.SafeEntryMethod
 import com.olive.app.security.allowsAppPin
+import okhttp3.OkHttpClient
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 internal class SessionViewModel(application: Application) : AndroidViewModel(application) {
     private val runtime = SessionRuntime(application, viewModelScope)
-    internal val media = if (runtime.localMode) null else MediaTransferController(application, viewModelScope)
+    internal val media = if (runtime.localMode) null else MediaTransferController(
+        application,
+        viewModelScope,
+        MediaTransferStore(application),
+        MediaRepository(),
+        OkHttpClient(),
+        PassThroughMediaPreprocessor,
+    )
     internal val documents =
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)
     internal val locationMap =
@@ -26,6 +34,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val screen get() = runtime.state.screen
     // Counts changes to PIN challenge.
     val pinChallengeVersion get() = runtime.state.pinChallengeVersion
+    val unlockAnimationVersion get() = runtime.state.unlockAnimationVersion
     // Counts changes to accessibility exit.
     val accessibilityExitVersion get() = runtime.state.accessibilityExitVersion
     val page get() = runtime.state.page
@@ -224,6 +233,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
     fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
     fun shareSafetyPlanInChat() = runtime.secureSharing.shareSafetyPlan()
+    fun requestAdminHelp(ownerUid: String) = runtime.safety.requestAdminHelp(ownerUid)
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 

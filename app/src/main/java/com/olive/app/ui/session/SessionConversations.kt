@@ -156,6 +156,11 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         with(runtime) {
             val uid = enrollment?.uid ?: return
             if (target.uid == uid || text.isBlank() || text.length > 2_000) return
+            val organizationAccount = state.profile?.role in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+            if (!organizationAccount && state.friends.none { it.uid == target.uid }) {
+                state.message = runtime.application.getString(R.string.private_note_friends_only)
+                return
+            }
             state.messagingBusy = true
             scope.launch {
                 try {

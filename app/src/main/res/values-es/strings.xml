@@ -350,6 +350,8 @@ Buen humor.</string>
     <string name="no_friends_yet">Aún no hay amigos.</string>
     <string name="direct_messages">Mensajes directos</string>
     <string name="direct_message">mensaje directo</string>
+    <string name="support_conversation">Conversación de apoyo</string>
+    <string name="request_admin_help">Solicitar ayuda de administración</string>
     <string name="select_a_friend_or_conversation_to_start_messaging">Seleccione un amigo o una conversación para comenzar a enviar mensajes.</string>
     <string name="unsend_message">Dejar enviar mensaje</string>
     <string name="message_unsent">Mensaje no enviado</string>
@@ -451,4 +453,22 @@ Buen humor.</string>
     <string name="back_to_messages">Volver a mensajes</string>
     <string name="unable_to_update_archived_chat">No se pudo actualizar este chat archivado.</string>
     <string name="unable_to_save_private_contact_note">No se pudo guardar esta nota privada.</string>
+    <string name="safe_contact_live_location">Tu ubicación en vivo</string>
+    <string name="safe_contact_live_location_help">El punto azul parpadeante muestra tu ubicación actual. Se mantiene privada y no se muestra al usuario.</string>
+    <string name="location_no_shared_users">Ningún usuario comparte su ubicación en vivo contigo ahora.</string>
+    <string name="location_navigation_destination">Navegar hacia</string>
+    <string name="location_route_summary">%1$s · aproximadamente %2$s</string>
+    <string name="location_next_direction">Siguiente: %1$s</string>
+    <string name="location_start_navigation">Navegar</string>
+    <string name="location_stop_navigation">Detener navegación</string>
+    <string name="location_route_privacy">Tu ubicación actual se envía al proveedor de mapas solo para calcular esta ruta. No se comparte con el usuario.</string>
+    <string name="location_route_unavailable">Activa el acceso a la ubicación y espera la ubicación en vivo del usuario antes de navegar.</string>
+    <string name="location_route_failed">No se pudo encontrar una ruta. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="private_note_friends_only">Solo puedes añadir notas privadas para tus amigos.</string>
+    <string name="location_route_not_configured">La navegación de Mapbox no está configurada para esta versión.</string>
+    <string name="location_full_screen_navigation">Navegación a pantalla completa</string>
+    <string name="location_exit_full_screen">Salir de la navegación a pantalla completa</string>
+    <string name="location_finding_route">Buscando la mejor ruta…</string>
+    <string name="location_navigating_to">Navegando hacia %1$s</string>
+    <string name="location_map_view">Vista del mapa</string>
 </resources>

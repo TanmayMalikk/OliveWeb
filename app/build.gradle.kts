@@ -20,6 +20,8 @@ val localProperties = Properties().apply {
 }
 val geoapifyApiKey = localProperties.getProperty("GEOAPIFY_API_KEY").orEmpty()
 require(geoapifyApiKey.matches(Regex("[A-Za-z0-9_-]*"))) { "GEOAPIFY_API_KEY contains unsupported characters" }
+val mapboxAccessToken = localProperties.getProperty("MAPBOX_ACCESS_TOKEN").orEmpty()
+require(mapboxAccessToken.matches(Regex("[A-Za-z0-9._-]*"))) { "MAPBOX_ACCESS_TOKEN contains unsupported characters" }
 val realtimeDatabaseUrl = localProperties.getProperty("REALTIME_DATABASE_URL").orEmpty()
 require(realtimeDatabaseUrl.isBlank() || realtimeDatabaseUrl.startsWith("https://")) { "REALTIME_DATABASE_URL must use HTTPS" }
 val releaseProperties = Properties().apply {
@@ -66,6 +68,7 @@ android {
         versionName = automatedVersionName ?: "0.2.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("String", "GEOAPIFY_API_KEY", "\"$geoapifyApiKey\"")
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
         buildConfigField("String", "REALTIME_DATABASE_URL", "\"$realtimeDatabaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -135,6 +138,8 @@ val verifyReleaseConfiguration = tasks.register("verifyReleaseConfiguration") {
     description = "Checks that Firebase and release-signing files are available before a release build."
     doLast {
         check(firebaseConfigured) { "Release requires app/google-services.json. Local test accounts are debug-only." }
+        check(geoapifyApiKey.isNotBlank()) { "Release requires GEOAPIFY_API_KEY for address suggestions." }
+        check(mapboxAccessToken.isNotBlank()) { "Release requires MAPBOX_ACCESS_TOKEN for navigation." }
         check(releaseSigningReady) { "Release requires keystore.properties. See docs/DISTRIBUTION.md." }
         check(rootProject.file(releaseProperties.getProperty("storeFile")).isFile) { "Release signing keystore was not found." }
     }

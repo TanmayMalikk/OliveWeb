@@ -43,6 +43,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
           REALTIME_DATABASE_URL: ${{ secrets.REALTIME_DATABASE_URL }}
         run: |
           test -n "$SIGNING_KEY"
@@ -58,6 +59,7 @@ jobs:
           } > keystore.properties
           {
             printf 'GEOAPIFY_API_KEY=%s\n' "$GEOAPIFY_API_KEY"
+            printf 'MAPBOX_ACCESS_TOKEN=%s\n' "$MAPBOX_ACCESS_TOKEN"
             printf 'REALTIME_DATABASE_URL=%s\n' "$REALTIME_DATABASE_URL"
           } > local.properties
 

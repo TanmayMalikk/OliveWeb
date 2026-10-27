@@ -47,6 +47,8 @@ internal data class SafetyPlan(
     val fields: Map<String, SafetyField>,
     val staffUid: String = "",
     val staffName: String = "",
+    val adminUid: String = "",
+    val adminName: String = "",
     val consultationRequested: Boolean = false,
     val shareAction: String = "",
     val safeContactUids: List<String> = emptyList(),
@@ -68,6 +70,7 @@ internal data class SafetyPlan(
                 }
             })
         .put("staffUid", staffUid).put("staffName", staffName)
+        .put("adminUid", adminUid).put("adminName", adminName)
         .put("consultationRequested", consultationRequested).put("shareAction", shareAction)
         .put("safeContactUids", org.json.JSONArray(safeContactUids))
         .put("safeContactNames", JSONObject(safeContactNames))
@@ -84,6 +87,8 @@ internal data class SafetyPlan(
                 }.toMap(),
                 json.optString("staffUid"),
                 json.optString("staffName"),
+                json.optString("adminUid"),
+                json.optString("adminName"),
                 json.optBoolean("consultationRequested"),
                 json.optString("shareAction"),
                 json.optJSONArray("safeContactUids")
@@ -124,6 +129,8 @@ internal fun mergeSafetyPlan(
         fields = fields,
         staffUid = remote.staffUid,
         staffName = remote.staffName,
+        adminUid = remote.adminUid,
+        adminName = remote.adminName,
         consultationRequested = remote.consultationRequested,
         safeContactUids = remote.safeContactUids,
         safeContactNames = remote.safeContactNames,
