@@ -4,6 +4,19 @@ rules_version = '2';
 service cloud.firestore {
 
   match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed data model: files/{fileId}
+    // ===============================================================
+    // Legacy Firebase Storage record:
+    // owner_id, storage_path, file_name, file_type, allowed_users, created_at.
+    // OCR fields are intentionally forbidden because OCR output is private payload data.
+    //
+    // Encrypted R2 record (written only by trusted Cloud Functions):
+    // owner_id, object_key, encrypted_metadata, wrapped_keys, allowed_users,
+    // ciphertext_size, ciphertext_sha256, encryption_version, created_at.
+    // encrypted_metadata contains the file name, MIME type, media kind, and optional OCR result.
+    // ===============================================================
+
     // Web entry URLs are a discreet entry gate, never a replacement for account authentication.
     // Each authenticated owner may rotate their own token hash; anonymous lookups are forbidden.
     match /webEntryLinks/{uid} {
@@ -143,10 +156,10 @@ service cloud.firestore {
     }
 
     // File access lists can grant reads, but only the authenticated owner can create, edit, or delete metadata.
+    // OCR output is payload data. It is permitted only inside encrypted_metadata and never as plaintext fields.
     match /files/{fileId} {
       function validFileMetadata(data, id) {
-        return data.keys().hasOnly(['owner_id','storage_path','file_name','file_type','allowed_users','created_at',
-            'ocr_text','ocr_confidence','ocr_successful'])
+        return data.keys().hasOnly(['owner_id','storage_path','file_name','file_type','allowed_users','created_at'])
           && data.owner_id is string
           && data.storage_path == 'users/' + data.owner_id + '/media/' + id
           && data.file_name is string && data.file_name.size() <= 160
@@ -154,11 +167,7 @@ service cloud.firestore {
           && data.allowed_users is list
           && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25
           && data.allowed_users.hasAny([data.owner_id])
-          && (!data.keys().hasAny(['ocr_text','ocr_confidence','ocr_successful']) ||
-            (data.keys().hasAll(['ocr_text','ocr_confidence','ocr_successful'])
-              && data.ocr_text is string && data.ocr_text.size() <= 50000
-              && data.ocr_confidence is number && data.ocr_confidence >= 0 && data.ocr_confidence <= 1
-              && data.ocr_successful is bool));
+          && data.created_at is timestamp;
       }
       function validEncryptedMedia(data, id) {
         return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','allowed_users',
@@ -177,7 +186,8 @@ service cloud.firestore {
           && data.ciphertext_size <= 250 * 1024 * 1024
           && data.ciphertext_sha256 is string
           && data.ciphertext_sha256.matches('^[0-9a-f]{64}$')
-          && data.encryption_version is int && data.encryption_version >= 1;
+          && data.encryption_version is int && data.encryption_version >= 1
+          && data.created_at is timestamp;
       }
       allow create: if signedIn()
         && request.resource.data.owner_id == request.auth.uid

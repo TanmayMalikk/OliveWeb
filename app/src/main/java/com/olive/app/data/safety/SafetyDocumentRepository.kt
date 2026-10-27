@@ -37,6 +37,16 @@ data class SafetyDocument(
 // Groups the data and actions for document OCR metadata.
 data class DocumentOcrMetadata(val text: String, val confidence: Float, val successful: Boolean)
 
+/** Accepts OCR only after the containing metadata has been decrypted on the client. */
+internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata? {
+    metadata ?: return null
+    val text = metadata.opt("ocrText") as? String ?: return null
+    val confidence = (metadata.opt("ocrConfidence") as? Number)?.toFloat() ?: return null
+    val successful = metadata.opt("ocrSuccessful") as? Boolean ?: return null
+    if (text.length > MAX_OCR_TEXT_LENGTH || !confidence.isFinite() || confidence !in 0f..1f) return null
+    return DocumentOcrMetadata(text, confidence, successful)
+}
+
 // Groups the data and actions for safety document data source.
 interface SafetyDocumentDataSource {
     suspend fun listFor(uid: String): List<SafetyDocument>
@@ -192,6 +202,7 @@ class SafetyDocumentRepository(
                 ?: error("Encryption key is unavailable")
             JSONObject(EncryptionUtils.decryptText(encryptedMetadata, key))
         }.getOrNull()
+        val ocr = documentOcrMetadataFrom(metadata)
         return SafetyDocument(
             id = row.id,
             ownerUid = owner,
@@ -202,11 +213,9 @@ class SafetyDocumentRepository(
                 ?: row.getString("file_type").orEmpty().ifBlank { "application/octet-stream" },
             allowedUsers = (row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty(),
             createdAt = row.getTimestamp("created_at")?.toDate()?.time ?: 0,
-            ocrText = metadata?.optString("ocrText")?.takeIf(String::isNotBlank) ?: row.getString("ocr_text"),
-            ocrConfidence = metadata?.takeIf { it.has("ocrConfidence") }?.optDouble("ocrConfidence")?.toFloat()
-                ?: row.getDouble("ocr_confidence")?.toFloat(),
-            ocrSuccessful = metadata?.takeIf { it.has("ocrSuccessful") }?.optBoolean("ocrSuccessful")
-                ?: row.getBoolean("ocr_successful"),
+            ocrText = ocr?.text,
+            ocrConfidence = ocr?.confidence,
+            ocrSuccessful = ocr?.successful,
             objectKey = row.getString("object_key").orEmpty(),
             encryptedMetadata = encryptedMetadata,
             wrappedKeys = wrapped,
@@ -221,3 +230,5 @@ class SafetyDocumentRepository(
         fun accessKey(uid: String) = "access_$uid"
     }
 }
+
+private const val MAX_OCR_TEXT_LENGTH = 50_000
