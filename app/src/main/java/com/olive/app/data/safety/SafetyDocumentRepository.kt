@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
@@ -57,7 +58,7 @@ interface SafetyDocumentDataSource {
 class SafetyDocumentRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
-    private val media: MediaTicketDataSource = MediaRepository(),
+    private val media: MediaTicketDataSource,
 ) : SafetyDocumentDataSource {
     override suspend fun listFor(uid: String): List<SafetyDocument> = firestore.collection("files")
         .whereArrayContains("allowed_users", uid).get().await().documents.mapNotNull { documentFrom(it, uid) }

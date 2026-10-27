@@ -1,4 +1,4 @@
-package com.olive.app.data
+package com.olive.app.data.media
 
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
