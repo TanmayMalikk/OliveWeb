@@ -195,10 +195,11 @@ class SafetyDocumentRepository(
     private fun documentFrom(row: DocumentSnapshot, viewerUid: String): SafetyDocument? {
         val owner = row.getString("owner_id") ?: return null
         val encryptedMetadata = row.getString("encrypted_metadata").orEmpty()
+        val encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0
         @Suppress("UNCHECKED_CAST")
         val wrapped = (row.get("wrapped_keys") as? Map<String, String>).orEmpty()
         val metadata = if (encryptedMetadata.isBlank()) null else runCatching {
-            val key = wrapped[viewerUid]?.let(KeyManager::unwrapKey)
+            val key = wrapped[viewerUid]?.let { KeyManager.unwrapKey(it, encryptionVersion) }
                 ?: error("Encryption key is unavailable")
             JSONObject(EncryptionUtils.decryptText(encryptedMetadata, key))
         }.getOrNull()
@@ -221,7 +222,7 @@ class SafetyDocumentRepository(
             wrappedKeys = wrapped,
             ciphertextSize = row.getLong("ciphertext_size") ?: 0,
             ciphertextSha256 = row.getString("ciphertext_sha256").orEmpty(),
-            encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0,
+            encryptionVersion = encryptionVersion,
         )
     }
 
