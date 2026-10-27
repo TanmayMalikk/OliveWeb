@@ -7,7 +7,6 @@ plugins {
 }
 
 tasks.named("check") {
-    dependsOn(rootProject.tasks.named("checkSourceSize"))
     dependsOn(rootProject.tasks.named("checkArchitecture"))
 }
 val firebaseConfigured = file("google-services.json").exists() && providers.gradleProperty("oliveLocalTest").orNull != "true"

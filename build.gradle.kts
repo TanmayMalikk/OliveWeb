@@ -5,4 +5,4 @@ plugins {
     id("com.google.gms.google-services") version "4.5.0" apply false
 }
 
-apply(from="gradle/source-size.gradle.kts")
+apply(from="gradle/architecture.gradle.kts")

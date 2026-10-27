@@ -229,10 +229,11 @@ abstract class OliveUiTestBase {
         } catch (e: Exception) {
             val session =
                 androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
+            val hierarchy = runCatching { compose.onRoot().printToString() }
+                .getOrElse { "Compose hierarchy unavailable: ${it.message}" }
             throw AssertionError(
-                "Expected cover; screen=${session.screen}, busy=${session.busy}, message=${session.message}\n${
-                    compose.onRoot().printToString()
-                }", e
+                "Expected cover; screen=${session.screen}, busy=${session.busy}, message=${session.message}\n$hierarchy",
+                e
             )
         }
     }
