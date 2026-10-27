@@ -1,4 +1,4 @@
-package com.olive.app.data
+package com.olive.app.data.media
 
 import org.json.JSONArray
 import org.json.JSONObject

@@ -16,8 +16,8 @@ import com.olive.app.data.SafetyDocument
 import com.olive.app.data.SafetyDocumentDataSource
 import com.olive.app.data.ChatSubscription
 import com.olive.app.data.DocumentOcrMetadata
-import com.olive.app.data.MediaKind
-import com.olive.app.data.OcrReview
+import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.OcrReview
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
@@ -35,7 +35,7 @@ internal class SafetyDocumentsController(
     context: Context,
     private val scope: CoroutineScope,
     private val repository: SafetyDocumentDataSource?,
-    private val media: MediaTransferController?,
+    private val media: MediaTransferOperations?,
 ) {
     private val applicationContext = context.applicationContext
     private var generation = 0
@@ -114,41 +114,42 @@ internal class SafetyDocumentsController(
     }
 
     fun download(document: SafetyDocument, onReady: (File) -> Unit) {
-        if (document.objectKey.isNotBlank()) {
-            val uid = state.ownerUid ?: return
+        val viewerUid = state.ownerUid ?: return
+        val token = generation
+        scope.launch {
             state = state.copy(loading = true, error = null)
-            media?.download(document, uid,
-                { state = state.copy(loading = false, error = null); onReady(it) },
-                { state = state.copy(loading = false, error = it) })
-                ?: reportError("Encrypted media is unavailable")
-            return
+            runCatching { openDocument(document, viewerUid) }
+                .onSuccess { file ->
+                    if (token == generation && state.ownerUid == viewerUid) onReady(file)
+                }
+                .onFailure { failure ->
+                    if (token == generation) {
+                        state = state.copy(error = failure.localizedMessage ?: "Unable to open document")
+                    }
+                }
+            if (token == generation) state = state.copy(loading = false)
         }
-        run { onReady(checkNotNull(repository).download(applicationContext, document)) }
     }
 
     // Opens shared.
     fun openShared(
-        ownerUid: String,
+        viewerUid: String,
         documentId: String,
         onReady: (SafetyDocument, File) -> Unit,
         onFinished: () -> Unit
     ) {
-        if (state.ownerUid != ownerUid) {
+        if (state.ownerUid != viewerUid) {
             generation++
-            state = SafetyDocumentsState(ownerUid = ownerUid)
+            state = SafetyDocumentsState(ownerUid = viewerUid)
         }
         val token = generation
         scope.launch {
             state = state.copy(loading = true, error = null)
             runCatching {
                 val source = checkNotNull(repository)
-                val document = source.getFor(ownerUid, documentId)
-                val file = if (document.objectKey.isNotBlank()) {
-                    checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, ownerUid)
-                } else {
-                    source.download(applicationContext, document)
-                }
-                if (token == generation && state.ownerUid == ownerUid) onReady(document, file)
+                val document = source.getFor(viewerUid, documentId)
+                val file = openDocument(document, viewerUid)
+                if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
             }.onFailure { if (token == generation) state = state.copy(error = it.localizedMessage) }
             if (token == generation) {
                 state = state.copy(loading = false)
@@ -209,5 +210,12 @@ internal class SafetyDocumentsController(
         val files = checkNotNull(repository).listFor(ownerUid)
         if (state.ownerUid == ownerUid) state = state.copy(files = files, error = null)
     }
+
+    private suspend fun openDocument(document: SafetyDocument, viewerUid: String): File =
+        if (document.objectKey.isNotBlank()) {
+            checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, viewerUid)
+        } else {
+            checkNotNull(repository).download(applicationContext, document)
+        }
 
 }

@@ -10,19 +10,21 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
-import com.olive.app.data.MediaKind
-import com.olive.app.data.MediaPreprocessor
-import com.olive.app.data.MediaRepository
-import com.olive.app.data.MediaTicketDataSource
-import com.olive.app.data.MediaTransferState
-import com.olive.app.data.MediaTransferStatus
-import com.olive.app.data.MediaTransferStore
-import com.olive.app.data.MediaUploadJob
-import com.olive.app.data.MediaUploadPresentation
-import com.olive.app.data.MediaUploadWorker
-import com.olive.app.data.OcrReview
-import com.olive.app.data.PassThroughMediaPreprocessor
-import com.olive.app.data.PreparedEncryptedMedia
+import com.olive.app.data.SafetyDocument
+import com.olive.app.data.media.DocumentDownloadGate
+import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.copyAndVerifyEncryptedDownload
+import com.olive.app.data.media.MediaPreprocessor
+import com.olive.app.data.media.MediaTicketDataSource
+import com.olive.app.data.media.MediaTransferState
+import com.olive.app.data.media.MediaTransferStatus
+import com.olive.app.data.media.MediaTransferStore
+import com.olive.app.data.media.MediaUploadJob
+import com.olive.app.data.media.MediaUploadPresentation
+import com.olive.app.data.media.MediaUploadWorker
+import com.olive.app.data.media.OcrReview
+import com.olive.app.data.media.PassThroughMediaPreprocessor
+import com.olive.app.data.media.PreparedEncryptedMedia
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import com.olive.app.security.MediaCipher
@@ -36,12 +38,25 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.ensureActive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import kotlin.coroutines.coroutineContext
-import com.olive.app.data.SafetyDocument
+
+internal interface MediaTransferOperations {
+    fun observeUploads(ownerUid:String)
+    fun acknowledgePublished(mediaIds:Set<String>)
+    fun queueDocument(
+        uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
+        onQueued:(String)->Unit,onFailure:(String)->Unit,
+    )
+    fun queueFile(
+        file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
+        ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
+        onQueued:(String)->Unit,onFailure:(String)->Unit,
+    )
+    suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File
+    fun clearState()
+}
 
 /**
  * Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
@@ -69,16 +84,17 @@ import com.olive.app.data.SafetyDocument
 internal class MediaTransferController(
     context:Context,
     private val scope:CoroutineScope,
-    private val store:MediaTransferStore,
     private val repository:MediaTicketDataSource,
-    private val client:OkHttpClient,
-    private val preprocessor:MediaPreprocessor,
-) {
+    private val store:MediaTransferStore=MediaTransferStore(context),
+    private val client:OkHttpClient=OkHttpClient(),
+    private val preprocessor:MediaPreprocessor=PassThroughMediaPreprocessor,
+):MediaTransferOperations {
     private val applicationContext=context.applicationContext
     private var observedOwnerUid:String?=null
     private var publishedMediaIds:Set<String> = emptySet()
     private val observationJobs=mutableMapOf<String,Job>()
     private val workProgress=mutableMapOf<String,Pair<Long,Long>>()
+    private val downloadGate=DocumentDownloadGate()
     var state by mutableStateOf<MediaTransferState>(MediaTransferState.Idle)
         private set
     var uploads by mutableStateOf<List<MediaUploadPresentation>>(emptyList())
@@ -91,7 +107,7 @@ internal class MediaTransferController(
      * Re-entering the screen after process death reconstructs pending cards from the encrypted
      * [MediaTransferStore] and reconnects to the already scheduled unique work chains.
      */
-    fun observeUploads(ownerUid:String) {
+    override fun observeUploads(ownerUid:String) {
         if(observedOwnerUid!=ownerUid) {
             observationJobs.values.forEach(Job::cancel);observationJobs.clear();workProgress.clear()
             observedOwnerUid=ownerUid;publishedMediaIds=emptySet();uploads=emptyList()
@@ -111,7 +127,7 @@ internal class MediaTransferController(
      * Removes completed local bookkeeping only after Firestore publishes the matching media record.
      * This prevents a blank gap: the pending card remains until the finalized document can replace it.
      */
-    fun acknowledgePublished(mediaIds:Set<String>) {
+    override fun acknowledgePublished(mediaIds:Set<String>) {
         val owner=observedOwnerUid ?: return
         publishedMediaIds=mediaIds
         scope.launch {
@@ -129,9 +145,9 @@ internal class MediaTransferController(
      * [OcrReview.RETAKE_RECOMMENDED] pauses before any plaintext processing; declining is represented
      * by calling again with [OcrReview.RETAKE_DECLINED].
      */
-    fun queueDocument(
-        uri:Uri,owner:AccountIdentity,ocrReview:OcrReview=OcrReview.NOT_RUN,
-        onQueued:(String)->Unit={},onFailure:(String)->Unit={},
+    override fun queueDocument(
+        uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
+        onQueued:(String)->Unit,onFailure:(String)->Unit,
     ) {
         if(ocrReview==OcrReview.RETAKE_RECOMMENDED) {
             // OCR is advisory: pause for a user decision instead of silently rejecting the document.
@@ -154,11 +170,10 @@ internal class MediaTransferController(
     }
 
     /** Queues a camera/capture file through the same preprocessing and encryption pipeline. */
-    fun queueFile(
+    override fun queueFile(
         file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
-        ocrReview:OcrReview=if(kind==MediaKind.DOCUMENT) OcrReview.NOT_RUN else OcrReview.NOT_APPLICABLE,
-        ocr:DocumentOcrMetadata?=null,
-        onQueued:(String)->Unit={},onFailure:(String)->Unit={},
+        ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
+        onQueued:(String)->Unit,onFailure:(String)->Unit,
     ) {
         if(ocrReview==OcrReview.RETAKE_RECOMMENDED) {
             val message="Document quality review recommends another capture"
@@ -188,27 +203,25 @@ internal class MediaTransferController(
         MediaUploadWorker.enqueue(applicationContext,jobId);observe(jobId);state=MediaTransferState.Queued(jobId)
     }
 
-    /** Downloads and decrypts a new R2-backed document; legacy Firebase Storage uses its repository. */
-    fun download(document:SafetyDocument,viewerUid:String,onReady:(File)->Unit,onFailure:(String)->Unit={}) {
+    /** Downloads and decrypts an R2-backed document for the authenticated viewer. */
+    override suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File {
         require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
-        scope.launch {
-            state=MediaTransferState.Preparing("downloading")
-            runCatching { downloadFile(document,viewerUid) }
-                .onSuccess { file -> state=MediaTransferState.Idle;onReady(file) }
-                .onFailure { failure ->
-                    val message=failure.localizedMessage ?: "Unable to download encrypted media"
-                    state=MediaTransferState.Failed(null,message,true);onFailure(message)
+        state=MediaTransferState.Preparing("downloading")
+        return try {
+            withContext(Dispatchers.IO) {
+                downloadGate.withDocumentLock(document.id) {
+                    downloadEncrypted(document,viewerUid)
                 }
+            }
+                .also { state=MediaTransferState.Idle }
+        } catch(failure:Exception) {
+            val message=failure.localizedMessage ?: "Unable to download encrypted media"
+            state=MediaTransferState.Failed(null,message,true)
+            throw failure
         }
     }
 
-    /** Opens encrypted media for controller workflows that already own their coroutine lifecycle. */
-    suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File {
-        require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
-        return withContext(Dispatchers.IO) { downloadEncrypted(document,viewerUid) }
-    }
-
-    fun clearState() {
+    override fun clearState() {
         observationJobs.values.forEach(Job::cancel);observationJobs.clear();workProgress.clear()
         observedOwnerUid=null;publishedMediaIds=emptySet();uploads=emptyList();state=MediaTransferState.Idle
     }
@@ -252,7 +265,8 @@ internal class MediaTransferController(
             owned.filterNot { it in retired }.sortedByDescending { it.createdAt }.map { job ->
                 val metadata=runCatching {
                     val wrapped=job.source.wrappedKeys[ownerUid] ?: error("Encryption key is unavailable")
-                    JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,KeyManager.unwrapKey(wrapped)))
+                    JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,
+                        KeyManager.unwrapKey(wrapped,job.source.encryptionVersion)))
                 }.getOrNull()
                 val progress=progressSnapshot[job.id]
                 MediaUploadPresentation(job.id,job.ownerUid,
@@ -322,7 +336,8 @@ internal class MediaTransferController(
             // The server stores only wrapped key material; it never receives the raw AES key.
             val wrapped=mapOf(owner.uid to KeyManager.wrapKey(key,KeyManager.getOrCreatePublicKey()))
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
-                EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),1,kind,ocrReview)
+                EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
+                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview)
             return MediaUploadJob(jobId,owner.uid,prepared)
         } catch(failure:Exception) { target.delete();throw failure }
     }
@@ -341,25 +356,27 @@ internal class MediaTransferController(
         val ticket=repository.downloadTicket(document.id)
         val builder=Request.Builder().url(ticket.url).get();ticket.headers.forEach(builder::header)
         val encryptedFolder=File(applicationContext.cacheDir,"encrypted-media").apply { mkdirs() }
-        val encrypted=File(encryptedFolder,"${document.id}.olive.part")
-        val digest=MessageDigest.getInstance("SHA-256");val buffer=ByteArray(64*1024)
+        val encrypted=File.createTempFile("${document.id}.",".olive.part",encryptedFolder)
         try {
             client.newCall(builder.build()).execute().use { response ->
                 if(!response.isSuccessful) error("Cloud download failed with HTTP ${response.code}")
                 val body=response.body ?: error("Cloud download was empty")
+                val declaredSize=body.contentLength()
+                require(declaredSize<0 || declaredSize==document.ciphertextSize) {
+                    sizeMismatch(document.ciphertextSize,declaredSize)
+                }
                 encrypted.outputStream().buffered().use { output -> body.byteStream().use { input ->
-                    while(true) {
-                        coroutineContext.ensureActive()
-                        val count=input.read(buffer);if(count<0) break;if(count==0) continue
-                        digest.update(buffer,0,count);output.write(buffer,0,count)
-                    }
+                    copyAndVerifyEncryptedDownload(input,output,document.ciphertextSize,
+                        document.ciphertextSha256)
                 } }
             }
             // Verify the complete encrypted object before attempting key use or plaintext output.
-            require(encrypted.length()==document.ciphertextSize) { "Encrypted download size does not match" }
-            val checksum=digest.digest().joinToString("") { "%02x".format(it) }
-            require(checksum.equals(document.ciphertextSha256,true)) { "Encrypted download checksum does not match" }
-            val key=document.wrappedKeys[viewerUid]?.let(KeyManager::unwrapKey) ?: error("Encryption key is unavailable")
+            require(encrypted.length()==document.ciphertextSize) {
+                sizeMismatch(document.ciphertextSize,encrypted.length())
+            }
+            val key=document.wrappedKeys[viewerUid]?.let {
+                KeyManager.unwrapKey(it,document.encryptionVersion)
+            } ?: error("Encryption key is unavailable")
             val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
             val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
             val target=File(opened,document.id+(extension?.let { ".$it" } ?: ""));val partial=File(target.path+".part")
@@ -373,11 +390,13 @@ internal class MediaTransferController(
                 check(partial.renameTo(target)) { "Unable to publish decrypted media" }
                 return target
             } catch(failure:Exception) { partial.delete();throw failure }
-        } finally { buffer.fill(0);encrypted.delete() }
+        } finally { encrypted.delete() }
     }
 
     private companion object {
         const val MAX_CIPHERTEXT_BYTES=250L*1024L*1024L
         const val MAX_OCR_TEXT=50_000
+        fun sizeMismatch(expected:Long,received:Long)=
+            "Encrypted download size does not match (expected $expected bytes, received $received bytes)"
     }
 }
