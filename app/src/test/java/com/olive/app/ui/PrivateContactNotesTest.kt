@@ -7,6 +7,26 @@ import org.junit.Test
 
 class PrivateContactNotesTest {
     @Test
+    fun supportChatsHideOrganizationNamesAndAreHighlightedForUsers() {
+        val conversation = ChatConversation(
+            id = "support",
+            friendshipId = "support",
+            participantIds = listOf("user", "staff", "admin"),
+            participantUsernames = mapOf("user" to "olive_user", "staff" to "real_staff_name"),
+            type = "SUPPORT",
+            ownerUid = "user",
+            staffUid = "staff",
+            adminUid = "admin",
+        )
+
+        assertEquals("Olive Staff", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.USER, "Olive Staff"))
+        assertEquals("Olive Staff", conversation.senderDisplayName("admin", "real_admin_name", AccountRole.SAFE_CONTACT, "Olive Staff"))
+        assertEquals("real_staff_name", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals(true, conversation.highlightedFor(AccountRole.USER))
+        assertEquals(false, conversation.highlightedFor(AccountRole.STAFF))
+    }
+
+    @Test
     fun directChatsOfferTheOtherParticipantForPrivateNotes() {
         val conversation = ChatConversation(
             id = "chat",

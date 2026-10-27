@@ -18,6 +18,8 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,6 +45,9 @@ import com.olive.app.data.*
 internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = null) {
     val active = session.activeConversation
     val currentUid = session.coverAccountId.orEmpty()
+    val chatExit = exit.takeUnless {
+        session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
@@ -56,11 +61,11 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
                     stringResource(R.string.select_a_friend_or_conversation_to_start_messaging),
                     color = Muted
                 )
-            } else ChatPane(session, currentUid, false, exit, Modifier.weight(1f).fillMaxHeight())
+            } else ChatPane(session, currentUid, false, chatExit, Modifier.weight(1f).fillMaxHeight())
         } else if (active == null) MessagingSidebar(session, currentUid, portalExit(session, exit), Modifier.fillMaxSize())
         else {
             BackHandler { session.closeConversation() }
-            ChatPane(session, currentUid, true, exit, Modifier.fillMaxSize())
+            ChatPane(session, currentUid, true, chatExit, Modifier.fillMaxSize())
         }
     }
 }
@@ -78,8 +83,10 @@ private fun MessagingSidebar(
 ) {
     val uiText = rememberResourceText()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
-    val roleConversations = if (organizationAccount) session.conversations.filter { it.type == "SUPPORT" }
-    else session.conversations
+    var supportFilter by rememberSaveable { mutableStateOf(SUPPORT_TAG_SUPPORT) }
+    val roleConversations = if (organizationAccount) session.conversations.filter {
+        it.type == "SUPPORT" && it.supportTag == supportFilter
+    } else session.conversations
     var showingArchived by rememberSaveable { mutableStateOf(false) }
     val shownConversations = roleConversations.filter {
         (it.id in session.archivedConversationIds) == showingArchived
@@ -165,6 +172,25 @@ private fun MessagingSidebar(
                     modifier = Modifier.padding(14.dp),
                     color = OliveGreen,
                 )
+            }
+        }
+        if (organizationAccount) item {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(
+                    SUPPORT_TAG_PLAN_CONSULT to stringResource(R.string.support_filter_plan_consults),
+                    SUPPORT_TAG_SUPPORT to stringResource(R.string.support_filter_support),
+                    SUPPORT_TAG_NEEDS_ADMIN to stringResource(R.string.support_filter_needs_admin),
+                ).forEach { (tag, label) ->
+                    FilterChip(
+                        selected = supportFilter == tag,
+                        onClick = { supportFilter = tag },
+                        label = { Text(label) },
+                        modifier = Modifier.testTag("support_filter_$tag"),
+                    )
+                }
             }
         }
         if (!organizationAccount) item {
@@ -403,6 +429,10 @@ private fun MessagingSidebar(
             )
         }
         items(shownConversations, key = { "conversation-${it.id}" }) { conversation ->
+            val highlightedSupport = conversation.highlightedFor(session.accountRole)
+            val conversationColor = if (highlightedSupport) OliveGreen else MaterialTheme.colorScheme.surface
+            val conversationContentColor = if (highlightedSupport) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurface
             OutlinedCard(
                 modifier = Modifier.animateItem().fillMaxWidth()
                     .testTag("conversation_" + conversation.id)
@@ -410,10 +440,19 @@ private fun MessagingSidebar(
                         onClick = { session.openConversation(conversation) },
                         onLongClick = { conversationActions = conversation },
                     ),
+                colors = CardDefaults.outlinedCardColors(
+                    containerColor = conversationColor,
+                    contentColor = conversationContentColor,
+                ),
             ) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
+                    if (organizationAccount) Text(
+                        supportTagLabel(conversation.supportTag),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = OliveGreen,
+                    )
                     Text(
-                        conversation.displayName(currentUid),
+                        conversation.displayName(currentUid, uiText(R.string.support_chat_name)),
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
@@ -421,7 +460,8 @@ private fun MessagingSidebar(
                             conversation.lastMessage == "Message unsent" -> uiText(R.string.message_unsent)
                             conversation.lastMessageId.isNotBlank() -> uiText(R.string.secure_message)
                             else -> uiText(R.string.new_conversation)
-                        }, maxLines = 1, color = Muted
+                        }, maxLines = 1,
+                        color = if (highlightedSupport) conversationContentColor.copy(alpha = .82f) else Muted
                     )
                 }
             }
@@ -463,3 +503,12 @@ private fun MessagingSidebar(
         PrivateContactNoteDialog(session, targets, onDismiss = { noteTargets = null })
     }
 }
+
+@Composable
+private fun supportTagLabel(tag: String) = stringResource(
+    when (tag) {
+        SUPPORT_TAG_PLAN_CONSULT -> R.string.support_filter_plan_consults
+        SUPPORT_TAG_NEEDS_ADMIN -> R.string.support_filter_needs_admin
+        else -> R.string.support_filter_support
+    }
+)

@@ -9,6 +9,11 @@
     <string name="support_staff_help">Request help from staff</string>
     <string name="support_looking_for_staff">Looking for staff members…</string>
     <string name="support_staff_found">%1$s was assigned. Opening your support chat…</string>
+    <string name="support_staff_ready">A staff member was assigned. Opening Olive Staff…</string>
+    <string name="support_chat_name">Olive Staff</string>
+    <string name="support_filter_plan_consults">Plan Consults</string>
+    <string name="support_filter_support">Support</string>
+    <string name="support_filter_needs_admin">Need Admins</string>
     <string name="support_staff_search_help">Olive Branch will securely connect you with an available staff member.</string>
     <string name="support_cancel_staff_request">Cancel request</string>
     <string name="support_emergency">Emergency</string>

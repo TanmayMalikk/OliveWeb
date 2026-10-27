@@ -91,6 +91,7 @@ internal class SessionRuntime(val application: Application, val scope: Coroutine
     val history = SessionHistory(this)
     val notes = SessionNotes(this)
     val safety = SessionSafetyPlans(this)
+    val support = SessionSupport(this)
     val settings = SessionSettings(this)
     val operations = SessionOperations(this)
 

@@ -49,7 +49,6 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.focus.FocusRequester
@@ -99,26 +98,14 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
 // Requests a staff assignment, keeps the user informed, then opens the assigned support chat.
 @Composable
 private fun StaffHelpScreen(session: SessionViewModel) {
-    val controller = session.safetyPlans
-    val context = LocalContext.current
-    val lease = remember { Any() }
-    DisposableEffect(lease) { onDispose { controller.close(lease) } }
-    LaunchedEffect(lease) {
+    val controller = session.support
+    LaunchedEffect(session.coverAccountId) {
         session.ensureMessagingObservation()
-        controller.open(
-            session.coverAccountId.orEmpty(), session.coverUsername,
-            safetyDefaults(context), lease
-        )
-        val plan = controller.plan
-        if (plan != null && plan.staffUid.isBlank() && plan.shareAction != "request") {
-            controller.consult()
-        }
+        controller.request()
     }
-    val plan = controller.plan
-    LaunchedEffect(plan?.staffUid, session.conversations) {
-        if (plan?.staffUid.isNullOrBlank()) return@LaunchedEffect
+    LaunchedEffect(controller.conversationId, session.conversations) {
         val chat = session.conversations.firstOrNull {
-            it.type == "SUPPORT" && it.ownerUid == session.coverAccountId
+            it.id == controller.conversationId
         } ?: return@LaunchedEffect
         session.back()
         session.navigate(SafePage.Messages)
@@ -133,19 +120,21 @@ private fun StaffHelpScreen(session: SessionViewModel) {
             stringResource(R.string.support_staff_help),
             stringResource(R.string.support_staff_search_help)
         )
-        CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+        if (controller.staffUid.isBlank()) {
+            CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+        }
         Text(
-            if (plan?.staffUid.isNullOrBlank()) stringResource(R.string.support_looking_for_staff)
-            else stringResource(R.string.support_staff_found, plan.staffName),
+            if (controller.staffUid.isBlank()) stringResource(R.string.support_looking_for_staff)
+            else stringResource(R.string.support_staff_ready),
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center
         )
         controller.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-        if (plan?.consultationRequested == true || plan?.shareAction == "request") {
+        if (controller.requested) {
             OutlinedButton(
                 onClick = {
-                    controller.consult(stop = true)
+                    controller.request(stop = true)
                     session.back()
                 },
                 enabled = controller.saving == 0,
