@@ -437,7 +437,7 @@ private fun DocumentSharingDialog(
     friends: List<Friend>,
     contacts: List<SafeContact>,
     onDismiss: () -> Unit,
-    onSave: (List<String>) -> Unit
+    onSave: (Map<String, String>) -> Unit
 ) {
     var selected by remember(file.id) {
         mutableStateOf(file.allowedUsers.filterNot { it == currentUid }.toSet())
@@ -478,6 +478,14 @@ private fun DocumentSharingDialog(
                 }
             }
         },
-        confirmButton = { Button(onClick = { onSave(selected.toList()) }) { Text(stringResource(R.string.save)) } },
+        confirmButton = {
+            Button(onClick = {
+                val namedRecipients = friends.filter { it.uid in selected }.associate { it.uid to it.username }
+                val existingHiddenRecipients = selected
+                    .filter { it in file.allowedUsers && it !in namedRecipients }
+                    .associateWith { "" }
+                onSave(existingHiddenRecipients + namedRecipients)
+            }) { Text(stringResource(R.string.save)) }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
 }

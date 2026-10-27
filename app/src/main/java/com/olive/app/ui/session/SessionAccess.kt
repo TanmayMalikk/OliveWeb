@@ -204,6 +204,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 safePageHistory.clear()
                 page = SafePage.Home
                 screen = SessionScreen.Safe
+                unlockAnimationVersion++
                 privacy.startIdleTimer()
             }
         }

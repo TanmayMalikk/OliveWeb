@@ -4,7 +4,7 @@ const {db} = require("./firebase");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");
-const {saveSupportConversation} = require("./supportGroups");
+const {closeSupportConversation, saveSupportConversation} = require("./supportGroups");
 exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   if (caller.role !== "USER" || !["request", "stop"].includes(request.data?.action)) throw new HttpsError("permission-denied", "Owner only.");
@@ -32,10 +32,13 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
     }
     if (selected && selected.uid !== plan.staffUid) transaction.set(references.get(selected.uid), {activeCount: (selected.activeCount || 0) + 1}, {merge: true});
     const updated = {...plan, staffUid: selected?.uid || "", staffName: selected?.name || "",
+      adminUid: request.data.action === "request" ? plan.adminUid || "" : "",
+      adminName: request.data.action === "request" ? plan.adminName || "" : "",
       consultationRequested: request.data.action === "request", updatedAt: Date.now()};
     transaction.set(reference, updated);
     return {plan: updated};
   });
   if (result.plan.staffUid) await saveSupportConversation(result.plan, result.plan.supportSafeContactUid || "");
+  else if (request.data.action === "stop") await closeSupportConversation(caller.uid);
   return result;
 });

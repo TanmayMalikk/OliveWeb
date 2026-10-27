@@ -52,6 +52,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -160,6 +162,13 @@ internal fun SafeSupportControls(
     showSupport: Boolean, expanded: Boolean, onExpanded: (Boolean) -> Unit
 ) {
     if (!showExit && !showSupport) return
+    val firstActionFocus = remember { FocusRequester() }
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            withFrameNanos { }
+            firstActionFocus.requestFocus()
+        }
+    }
     BackHandler(enabled = expanded) { onExpanded(false) }
     val menuTitle = stringResource(R.string.support_menu)
     val iconRotation by animateFloatAsState(
@@ -206,7 +215,8 @@ internal fun SafeSupportControls(
                     Icons.Outlined.LocationOn,
                     "support_location",
                     true,
-                    150
+                    150,
+                    Modifier.focusRequester(firstActionFocus)
                 ) {
                     if (expanded) {
                         onExpanded(false)
@@ -309,14 +319,14 @@ internal fun SafeSupportControls(
 @Composable
 private fun AnimatedVisibilityScope.SupportAction(
     labelId: Int, icon: ImageVector, tag: String, enabled: Boolean,
-    delayMillis: Int, onClick: () -> Unit
+    delayMillis: Int, modifier: Modifier = Modifier, onClick: () -> Unit
 ) {
     val label = stringResource(labelId)
     val title = if (enabled) label else stringResource(R.string.support_coming_soon, label)
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(tag)
+        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp).testTag(tag)
             .animateEnterExit(
                 enter = fadeIn(tween(160, delayMillis)) + slideInVertically(
                     tween(

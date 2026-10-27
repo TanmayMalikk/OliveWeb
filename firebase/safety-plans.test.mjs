@@ -11,6 +11,7 @@ const {auth, db, bucket} = require("./src/firebase");
 const {safetyPlanSync, safetyPlanConsultations, safetyPlanAvailability, safetyPlanShareContacts,
   safetyPlansSharedWithMe} = require("./src/safetyPlans");
 const {safetyPlanConsult} = require("./src/safetyConsultations");
+const {safetySupportAdmin} = require("./src/supportGroups");
 const users = new Map([
   ["plan-owner",{uid:"plan-owner",email:"owner@users.olive.invalid",displayName:"Owner"}],
   ["plan-share-owner",{uid:"plan-share-owner",email:"share-owner@users.olive.invalid",displayName:"Sharing owner"}],
@@ -41,6 +42,12 @@ test("full consultation workflow enforces owner consent, assigned-staff edits, c
   response=await call(safetyPlanConsult,owner,{action:"request"});
   const staff=response.plan.staffUid;
   assert.ok(["plan-staff","plan-staff2"].includes(staff));
+  const escalation=await call(safetySupportAdmin,staff,{ownerUid:owner});
+  assert.equal(escalation.adminUid,"plan-admin");
+  const otherStaff=staff==="plan-staff" ? "plan-staff2" : "plan-staff";
+  await assert.rejects(call(safetySupportAdmin,otherStaff,{ownerUid:owner}));
+  const supportConversation=await db.collection("conversations").doc(`support-${owner}`).get();
+  assert.deepEqual(new Set(supportConversation.data().participantIds),new Set([owner,staff,"plan-admin"]));
   assert.equal((await call(safetyPlanConsultations,staff)).plans[0].ownerUid,owner);
   await call(safetyPlanSync,staff,{ownerUid:owner,changes:[{key:"primary_destination",value:"Staff edit",revision:1,mutationId:"staff-1"}]});
   response=await call(safetyPlanSync,owner,{ownerUid:owner,changes:[{key:"primary_destination",value:"Offline owner edit",revision:1,mutationId:"owner-1"}]});
@@ -52,6 +59,7 @@ test("full consultation workflow enforces owner consent, assigned-staff edits, c
   assert.equal(response.plan.fields.primary_destination.value,"Admin edit");
   assert.ok((await call(safetyPlanConsultations,"plan-admin")).plans.some((plan) => plan.ownerUid===owner));
   await call(safetyPlanConsult,owner,{action:"stop"});
+  assert.equal((await db.collection("conversations").doc(`support-${owner}`).get()).exists,false);
   await assert.rejects(call(safetyPlanSync,staff,{ownerUid:owner}));
   assert.equal((await call(safetyPlanConsultations,staff)).plans.length,0);
   // All content uses verified callables: clients cannot bypass sharing or revisions with raw Firestore writes.

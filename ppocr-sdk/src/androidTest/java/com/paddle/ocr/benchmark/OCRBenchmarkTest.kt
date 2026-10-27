@@ -28,6 +28,7 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeNoException
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,6 +58,12 @@ class OCRBenchmarkTest {
         @BeforeClass
         fun setUp() {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
+            try {
+                context.assets.open("models/det/inference.onnx").close()
+            } catch (missingModel: Exception) {
+                // The SDK test APK does not package the app's large private OCR models.
+                assumeNoException("OCR benchmark requires the app model assets", missingModel)
+            }
             OpenCVUtils.init(context)
 
             outputDir = File(context.getExternalFilesDir(null), "ocr_benchmark")

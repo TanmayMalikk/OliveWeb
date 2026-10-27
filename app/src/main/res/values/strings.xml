@@ -349,6 +349,8 @@
     <string name="no_friends_yet">No friends yet.</string>
     <string name="direct_messages">Direct messages</string>
     <string name="direct_message">Direct message</string>
+    <string name="support_conversation">Support conversation</string>
+    <string name="request_admin_help">Request admin help</string>
     <string name="select_a_friend_or_conversation_to_start_messaging">Select a friend or conversation to start messaging.</string>
     <string name="unsend_message">Unsend message</string>
     <string name="message_unsent">Message unsent</string>
@@ -437,4 +439,22 @@
     <string name="back_to_messages">Back to messages</string>
     <string name="unable_to_update_archived_chat">Unable to update this archived chat.</string>
     <string name="unable_to_save_private_contact_note">Unable to save this private note.</string>
+    <string name="safe_contact_live_location">Your live location</string>
+    <string name="safe_contact_live_location_help">The blinking blue dot is your current location. It stays private and is not shown to the user.</string>
+    <string name="location_no_shared_users">No user is sharing a live location with you right now.</string>
+    <string name="location_navigation_destination">Navigate to</string>
+    <string name="location_route_summary">%1$s · about %2$s</string>
+    <string name="location_next_direction">Next: %1$s</string>
+    <string name="location_start_navigation">Navigate</string>
+    <string name="location_stop_navigation">Stop navigation</string>
+    <string name="location_route_privacy">Your current location is sent to the map provider only to calculate this route. It is not shared with the user.</string>
+    <string name="location_route_unavailable">Turn on location access and wait for the user’s live location before starting navigation.</string>
+    <string name="location_route_failed">A route could not be found. Check your connection and try again.</string>
+    <string name="private_note_friends_only">You can add private notes only for friends.</string>
+    <string name="location_route_not_configured">Mapbox navigation has not been configured for this build.</string>
+    <string name="location_full_screen_navigation">Full-screen navigation</string>
+    <string name="location_exit_full_screen">Exit full-screen navigation</string>
+    <string name="location_finding_route">Finding the best route…</string>
+    <string name="location_navigating_to">Navigating to %1$s</string>
+    <string name="location_map_view">Map view</string>
 </resources>

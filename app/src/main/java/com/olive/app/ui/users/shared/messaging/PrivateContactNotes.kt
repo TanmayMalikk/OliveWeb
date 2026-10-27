@@ -17,6 +17,7 @@ import com.olive.app.ui.users.shared.navigation.SessionViewModel
 internal fun ChatConversation.privateNoteTargets(
     currentUid: String,
     role: AccountRole,
+    friendUids: Set<String>,
 ): List<DirectoryUser> {
     val ids = if (type == "SUPPORT" && role in setOf(
             AccountRole.SAFE_CONTACT,
@@ -24,7 +25,9 @@ internal fun ChatConversation.privateNoteTargets(
             AccountRole.ADMIN,
         ) && ownerUid.isNotBlank()
     ) listOf(ownerUid) else participantIds.filter { it != currentUid }
-    return ids.distinct().map { uid ->
+    val allowedIds = if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) ids
+    else ids.filter(friendUids::contains)
+    return allowedIds.distinct().map { uid ->
         DirectoryUser(uid, participantUsernames[uid].orEmpty().ifBlank { uid })
     }
 }
@@ -35,11 +38,12 @@ internal fun ConversationActionsDialog(
     archived: Boolean,
     currentUid: String,
     role: AccountRole,
+    friendUids: Set<String>,
     onArchive: () -> Unit,
     onNotes: (List<DirectoryUser>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val targets = conversation.privateNoteTargets(currentUid, role)
+    val targets = conversation.privateNoteTargets(currentUid, role, friendUids)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(conversation.displayName(currentUid)) },

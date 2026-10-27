@@ -39,7 +39,6 @@ internal fun createOliveComposeRule() = Intent(Intent.ACTION_MAIN).setClass(
 
 // Shared setup keeps every end-to-end UI test isolated and gives feature files the same common actions.
 abstract class OliveUiTestBase {
-    protected open val grantLocationPermissions: Boolean get() = true
     protected fun tapOnScreen(x: Float, y: Float) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val time = SystemClock.uptimeMillis()
@@ -60,29 +59,6 @@ abstract class OliveUiTestBase {
             check(!BuildConfig.FIREBASE_CONFIGURED) { "These tests only run against local test accounts." }
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val context = instrumentation.targetContext
-            if (grantLocationPermissions) {
-                instrumentation.uiAutomation.grantRuntimePermission(
-                    context.packageName,
-                    android.Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-                instrumentation.uiAutomation.grantRuntimePermission(
-                    context.packageName,
-                    android.Manifest.permission.ACCESS_FINE_LOCATION
-                )
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q)
-                    instrumentation.uiAutomation.grantRuntimePermission(
-                        context.packageName,
-                        android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                    )
-            }
-            instrumentation.uiAutomation.grantRuntimePermission(
-                context.packageName,
-                android.Manifest.permission.CAMERA
-            )
-            instrumentation.uiAutomation.grantRuntimePermission(
-                context.packageName,
-                android.Manifest.permission.RECORD_AUDIO
-            )
             val directory = context.noBackupFilesDir
             listOf(
                 "olive-demo.vault",
@@ -145,7 +121,8 @@ abstract class OliveUiTestBase {
     }
 
     // A clean install stays inside the cover until the discreet olive is double-tapped.
-    protected fun openOnboarding() {
+    protected fun openOnboarding(grantPermissions: Boolean = true) {
+        if (grantPermissions) grantFeaturePermissions()
         waitCover()
         click("cover_tab_account")
         waitFor("discreet_cover_olive")
@@ -183,12 +160,9 @@ abstract class OliveUiTestBase {
             "abuser_name",
             "Test Person Causing Harm"
         )
-        nextOnboarding()
-        fill("address_line1", "123 Test Street")
+        advanceOnboarding("full_name", "address_city")
         fill("address_city", "Edmonton")
-        fill("address_province", "Alberta")
-        fill("address_postal", "T5J 0N3")
-        nextOnboarding()
+        advanceOnboarding("address_city", "trigger")
         fill("trigger", "moon garden")
         waitFor("profile_submit")
         click("profile_submit")
@@ -197,6 +171,45 @@ abstract class OliveUiTestBase {
         fill("confirm_pin", pin)
         click("pin_setup_submit")
         waitCover()
+    }
+
+    // Most flows skip Android's permission dialogs so they can test their own feature directly.
+    // The dedicated permission test runs first on a fresh install and does not call this helper.
+    private fun grantFeaturePermissions() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val packageName = instrumentation.targetContext.packageName
+        listOf(
+            android.Manifest.permission.ACCESS_COARSE_LOCATION,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.RECORD_AUDIO,
+        ).forEach { permission ->
+            instrumentation.uiAutomation.grantRuntimePermission(packageName, permission)
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            instrumentation.uiAutomation.grantRuntimePermission(
+                packageName,
+                android.Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            )
+        }
+    }
+
+    // Wait for one onboarding page to settle before moving to the next one. A second click handles
+    // a button event that Android can drop while the keyboard or dropdown is closing under load.
+    private fun advanceOnboarding(currentTag: String, nextTag: String) {
+        compose.waitForIdle()
+        click("onboarding_next")
+        val moved = runCatching {
+            compose.waitUntil(5_000) {
+                compose.onAllNodesWithTag(nextTag).fetchSemanticsNodes().isNotEmpty()
+            }
+        }.isSuccess
+        if (!moved) {
+            waitFor(currentTag)
+            compose.waitForIdle()
+            click("onboarding_next")
+        }
+        waitFor(nextTag)
     }
 
     protected fun chooseAppPin() {

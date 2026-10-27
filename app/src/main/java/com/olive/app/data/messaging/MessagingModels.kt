@@ -42,6 +42,8 @@ data class ChatConversation(
     val lastSenderUid: String = "",
     val type: String = "DIRECT",
     val ownerUid: String = "",
+    val staffUid: String = "",
+    val adminUid: String = "",
 ) {
     fun displayName(currentUid: String) = if (type == "SUPPORT") {
         participantUsernames.filterKeys { it != currentUid }.values.joinToString(" • ")

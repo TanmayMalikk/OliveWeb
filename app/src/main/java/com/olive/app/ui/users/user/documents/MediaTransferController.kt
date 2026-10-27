@@ -1,4 +1,4 @@
-package com.olive.app.ui.media
+package com.olive.app.ui.users.user.documents
 
 import android.content.Context
 import android.net.Uri
@@ -69,10 +69,10 @@ import com.olive.app.data.SafetyDocument
 internal class MediaTransferController(
     context:Context,
     private val scope:CoroutineScope,
-    private val store:MediaTransferStore=MediaTransferStore(context),
-    private val repository:MediaTicketDataSource=MediaRepository(),
-    private val client:OkHttpClient=OkHttpClient(),
-    private val preprocessor:MediaPreprocessor=PassThroughMediaPreprocessor,
+    private val store:MediaTransferStore,
+    private val repository:MediaTicketDataSource,
+    private val client:OkHttpClient,
+    private val preprocessor:MediaPreprocessor,
 ) {
     private val applicationContext=context.applicationContext
     private var observedOwnerUid:String?=null
@@ -193,13 +193,19 @@ internal class MediaTransferController(
         require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
         scope.launch {
             state=MediaTransferState.Preparing("downloading")
-            runCatching { withContext(Dispatchers.IO) { downloadEncrypted(document,viewerUid) } }
+            runCatching { downloadFile(document,viewerUid) }
                 .onSuccess { file -> state=MediaTransferState.Idle;onReady(file) }
                 .onFailure { failure ->
                     val message=failure.localizedMessage ?: "Unable to download encrypted media"
                     state=MediaTransferState.Failed(null,message,true);onFailure(message)
                 }
         }
+    }
+
+    /** Opens encrypted media for controller workflows that already own their coroutine lifecycle. */
+    suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File {
+        require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
+        return withContext(Dispatchers.IO) { downloadEncrypted(document,viewerUid) }
     }
 
     fun clearState() {

@@ -54,14 +54,30 @@ class SafeEntryUiTest : OliveUiTestBase() {
 
     @Test
     fun correctPinRunsOliveAnimationBeforeSafeAreaBecomesInteractive() {
-        register()
+        entrySetup()
+        chooseAppPin()
+        fill("new_pin", "123456")
+        fill("confirm_pin", "123456")
+        click("pin_setup_submit")
+        waitCover()
         trigger()
-        enterPin("123456")
-        waitFor("pin_safe_animation")
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
-        compose.runOnIdle { assertEquals(SessionScreen.Safe, session.screen) }
-        compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag("pin_safe_animation").fetchSemanticsNodes().isEmpty()
+        val unlockVersion = session.unlockAnimationVersion
+        compose.mainClock.autoAdvance = false
+        try {
+            enterPin("123456")
+            compose.waitUntil(30_000) { session.unlockAnimationVersion > unlockVersion }
+            compose.runOnIdle {
+                assertEquals(SessionScreen.Safe, session.screen)
+                assertTrue(session.unlockAnimationVersion > unlockVersion)
+            }
+            // Devices with animations disabled may complete the overlay before Compose exposes it.
+            val overlay = compose.onAllNodesWithTag("pin_safe_animation", useUnmergedTree = true)
+            compose.mainClock.advanceTimeBy(3_000)
+            compose.waitForIdle()
+            overlay.assertCountEquals(0)
+        } finally {
+            compose.mainClock.autoAdvance = true
         }
         compose.onNodeWithTag("safe_settings").assertIsDisplayed()
     }
@@ -134,7 +150,8 @@ class SafeEntryUiTest : OliveUiTestBase() {
     @Test
     fun deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        org.junit.Assume.assumeTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
+        DeviceCredentialTestDriver(compose).ensurePhonePin()
+        assertTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
         entrySetup()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         TalkBackTestSession(compose.activity).use { talkBack ->
@@ -195,7 +212,8 @@ class SafeEntryUiTest : OliveUiTestBase() {
     @Test
     fun deviceLockEnrollmentAndEveryReentryRequireAndroidAuthentication() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        org.junit.Assume.assumeTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
+        DeviceCredentialTestDriver(compose).ensurePhonePin()
+        assertTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
         entrySetup()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         click("entry_knows_pin_no")

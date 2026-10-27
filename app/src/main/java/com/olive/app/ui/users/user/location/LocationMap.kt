@@ -13,6 +13,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.view.View
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -31,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.R
+import com.olive.app.data.LocationRoute
 import com.olive.app.data.MapLocationPoint
 import kotlinx.coroutines.delay
 import org.json.JSONArray
@@ -42,7 +44,10 @@ import kotlin.time.Duration.Companion.seconds
 @Composable
 internal fun InteractiveLocationMap(
     points: List<MapLocationPoint>, modifier: Modifier = Modifier,
-    ownPointUid: String? = points.firstOrNull()?.uid
+    ownPointUid: String? = points.firstOrNull()?.uid,
+    showOwnPointInBlue: Boolean = false,
+    route: LocationRoute? = null,
+    navigationActive: Boolean = false,
 ) {
     val description = stringResource(R.string.location_map_accessibility)
     val lastKnownLabel = stringResource(R.string.location_last_known)
@@ -50,7 +55,9 @@ internal fun InteractiveLocationMap(
     var loadState by remember { mutableStateOf(MapLoadState.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
     var following by remember { mutableStateOf(false) }
-    val followTargetUid = points.firstOrNull { it.live || it.lastKnown }?.uid ?: ownPointUid
+    var routeWasShown by remember { mutableStateOf(false) }
+    val followTargetUid = if (navigationActive) ownPointUid
+    else points.firstOrNull { it.live || it.lastKnown }?.uid ?: ownPointUid
 
     LaunchedEffect(attempt) {
         delay(15.seconds)
@@ -79,6 +86,7 @@ internal fun InteractiveLocationMap(
                         "own",
                         point.uid == ownPointUid
                     )
+                    put("blue", showOwnPointInBlue && point.uid == ownPointUid && point.live)
                     point.accuracy?.let { put("accuracy", it.toDouble()) }
                     put("trail", JSONArray().apply {
                         point.trail.forEach { trailPoint ->
@@ -98,6 +106,15 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveSetPoints($encoded,$moveCamera);", null)
     }
 
+    fun updateRoute(view: WebView, fitRoute: Boolean) {
+        val encoded = JSONArray().apply {
+            route?.coordinates?.forEach { coordinate ->
+                put(JSONArray().put(coordinate.latitude).put(coordinate.longitude))
+            }
+        }
+        view.evaluateJavascript("window.oliveSetRoute($encoded,$fitRoute);", null)
+    }
+
     fun resizeMap(view: WebView) {
         if (view.height <= 0) return
         val cssHeight =
@@ -112,12 +129,27 @@ internal fun InteractiveLocationMap(
         )
     }
 
+    LaunchedEffect(navigationActive) {
+        following = navigationActive
+        if (!navigationActive) routeWasShown = false
+    }
+
+    LaunchedEffect(route, loadState, attempt) {
+        if (loadState == MapLoadState.Ready) webView[0]?.let {
+            updateRoute(it, route != null && !routeWasShown)
+            routeWasShown = route != null
+        }
+    }
+
     Box(modifier.semantics { contentDescription = description }) {
         key(attempt) {
             AndroidView(
                 factory = { context ->
                     WebView(context).apply {
                         webView[0] = this
+                        // The native Compose controls provide the map actions. Hiding the WebView's
+                        // virtual nodes prevents touch exploration from bouncing between two layers.
+                        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
                         setBackgroundColor(Color.rgb(241, 237, 228))
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = false
@@ -162,6 +194,7 @@ internal fun InteractiveLocationMap(
                         view,
                         false
                     )
+                    if (loadState == MapLoadState.Ready) updateRoute(view, false)
                 },
                 onRelease = { view ->
                     view.stopLoading()

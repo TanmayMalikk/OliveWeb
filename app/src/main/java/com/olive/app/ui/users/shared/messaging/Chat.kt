@@ -103,7 +103,7 @@ internal fun ChatPane(
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        stringResource(R.string.direct_message),
+                        stringResource(if (active.type == "SUPPORT") R.string.support_conversation else R.string.direct_message),
                         style = MaterialTheme.typography.labelLarge,
                         color = Muted
                     )
@@ -119,6 +119,18 @@ internal fun ChatPane(
                 ) { Text(uiText(R.string.ui_exit)) }
             }
             HorizontalDivider()
+            if (session.accountRole == com.olive.app.data.AccountRole.STAFF &&
+                active.type == "SUPPORT" && active.adminUid.isBlank()) {
+                OutlinedButton(
+                    onClick = { session.requestAdminHelp(active.ownerUid) },
+                    enabled = session.safetyPlans.saving == 0,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                        .testTag("request_admin_help"),
+                ) { Text(stringResource(R.string.request_admin_help)) }
+                session.safetyPlans.error?.let { message ->
+                    Text(stringResource(message), color = MaterialTheme.colorScheme.error)
+                }
+            }
             Column(Modifier.weight(1f).fillMaxWidth().imePadding().padding(bottom = 10.dp)) {
                 LazyColumn(
                     Modifier.weight(1f).fillMaxWidth(),

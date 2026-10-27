@@ -349,6 +349,8 @@
     <string name="no_friends_yet">Aucun ami pour le moment.</string>
     <string name="direct_messages">Messages directs</string>
     <string name="direct_message">Message direct</string>
+    <string name="support_conversation">Conversation de soutien</string>
+    <string name="request_admin_help">Demander l’aide d’un administrateur</string>
     <string name="select_a_friend_or_conversation_to_start_messaging">Sélectionnez un ami ou une conversation pour commencer.</string>
     <string name="unsend_message">Annuler l’envoi</string>
     <string name="message_unsent">Message annulé</string>
@@ -450,4 +452,22 @@
     <string name="back_to_messages">Retour aux messages</string>
     <string name="unable_to_update_archived_chat">Impossible de modifier cette discussion archivée.</string>
     <string name="unable_to_save_private_contact_note">Impossible d’enregistrer cette note privée.</string>
+    <string name="safe_contact_live_location">Votre position en direct</string>
+    <string name="safe_contact_live_location_help">Le point bleu clignotant indique votre position actuelle. Elle reste privée et n’est pas montrée à l’utilisateur.</string>
+    <string name="location_no_shared_users">Aucun utilisateur ne partage sa position en direct avec vous.</string>
+    <string name="location_navigation_destination">Naviguer vers</string>
+    <string name="location_route_summary">%1$s · environ %2$s</string>
+    <string name="location_next_direction">Prochaine étape : %1$s</string>
+    <string name="location_start_navigation">Naviguer</string>
+    <string name="location_stop_navigation">Arrêter la navigation</string>
+    <string name="location_route_privacy">Votre position actuelle est envoyée au fournisseur de cartes uniquement pour calculer cet itinéraire. Elle n’est pas partagée avec l’utilisateur.</string>
+    <string name="location_route_unavailable">Activez l’accès à la position et attendez la position en direct de l’utilisateur avant de naviguer.</string>
+    <string name="location_route_failed">Aucun itinéraire n’a été trouvé. Vérifiez votre connexion et réessayez.</string>
+    <string name="private_note_friends_only">Vous pouvez ajouter des notes privées uniquement pour vos amis.</string>
+    <string name="location_route_not_configured">La navigation Mapbox n’est pas configurée pour cette version.</string>
+    <string name="location_full_screen_navigation">Navigation plein écran</string>
+    <string name="location_exit_full_screen">Quitter la navigation plein écran</string>
+    <string name="location_finding_route">Recherche du meilleur itinéraire…</string>
+    <string name="location_navigating_to">Navigation vers %1$s</string>
+    <string name="location_map_view">Vue de la carte</string>
 </resources>

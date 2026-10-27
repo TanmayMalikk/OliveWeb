@@ -44,6 +44,7 @@ import coil3.compose.AsyncImage
 import com.olive.app.R
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
+import com.olive.app.data.MediaKind
 import com.olive.app.ocr.OcrResult
 import java.io.File
 import java.util.UUID
@@ -55,6 +56,7 @@ private data class CapturedMedia(
     val file: File,
     val mimeType: String,
     val name: String,
+    val kind: MediaKind,
     val ocrResult: OcrResult? = null
 )
 
@@ -96,11 +98,11 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     val captureFolder = remember { File(context.cacheDir, "captured-media").apply { mkdirs() } }
 
     fun newCapture(extension: String) = File(captureFolder, "${UUID.randomUUID()}.$extension")
-    fun accept(file: File, mime: String, name: String, ocrResult: OcrResult? = null) {
+    fun accept(file: File, mime: String, name: String, kind: MediaKind, ocrResult: OcrResult? = null) {
         pendingFile = null
         viewModel.leaveCamera()
         captured =
-            CapturedMedia(file, mime, name, ocrResult)
+            CapturedMedia(file, mime, name, kind, ocrResult)
     }
 
     fun discardCapture() {
@@ -153,6 +155,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                         media.mimeType,
                         AccountIdentity(uid, session.coverUsername),
                         uploadError,
+                        media.kind,
                         ocr
                     ) {
                         captured = null
@@ -247,7 +250,8 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                                 accept(
                                     it,
                                     "image/jpeg",
-                                    "Olive photo.jpg"
+                                    "Olive photo.jpg",
+                                    MediaKind.IMAGE,
                                 )
                             }
                         }
@@ -256,7 +260,13 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                             val file = newCapture("jpg")
                             pendingFile = file
                             viewModel.captureDocument(file) { capturedFile, result ->
-                                accept(capturedFile, "image/jpeg", "Olive document.jpg", result)
+                                accept(
+                                    capturedFile,
+                                    "image/jpeg",
+                                    "Olive document.jpg",
+                                    MediaKind.DOCUMENT,
+                                    result,
+                                )
                             }
                         }
 
@@ -268,7 +278,8 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                                 accept(
                                     it,
                                     "video/mp4",
-                                    "Olive video.mp4"
+                                    "Olive video.mp4",
+                                    MediaKind.VIDEO,
                                 )
                             }
                         }

@@ -13,6 +13,22 @@ import org.junit.Test
 // Groups the data and actions for cover account flow test.
 class CoverAccountFlowTest : OliveUiTestBase() {
     @Test
+    fun guestDeliveryAreaOpensAddressEditorWithoutStartingOnboarding() {
+        waitCover()
+        compose.onNodeWithText("DELIVER TO").performClick()
+        waitFor("save_address")
+        compose.onNodeWithTag("new_user").assertDoesNotExist()
+        fill("address_line1", "123 Test Street")
+        fill("address_city", "Edmonton")
+        fill("address_province", "Alberta")
+        fill("address_postal", "T5J 0N3")
+        fill("address_country", "Canada")
+        click("save_address")
+        compose.onNodeWithTag("save_address").assertDoesNotExist()
+        compose.onNodeWithText("Edmonton", substring = true).assertExists()
+    }
+
+    @Test
     fun coverChoiceSwitchesNewsAndCalculatorAndBothReachSafeArea() {
         register(username = "cover_switch_tester")
         unlock()
@@ -44,6 +60,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("calc_key_equals").performClick()
         waitFor("safe_settings")
         click("sign_out")
+        openOnboarding()
         waitFor("returning_user")
     }
 
@@ -93,6 +110,6 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         org.junit.Assert.assertEquals(originalLanguage, session.profile?.language)
         assertEquals("1999-01-02", session.profile?.dob)
         assertEquals("Calgary", session.profile?.address?.city)
-        assertEquals("123 Test Street", session.profile?.address?.line1)
+        assertEquals("", session.profile?.address?.line1)
     }
 }

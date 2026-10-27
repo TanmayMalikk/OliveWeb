@@ -377,8 +377,15 @@ service cloud.firestore {
       return getAfter(/databases/$(database)/documents/friendships/$(data.friendshipId)).data;
     }
 
+    function validSupportAdmin(data) {
+      return (!data.keys().hasAny(['adminUid']) && data.participantIds.size() <= 3)
+        || (data.keys().hasAny(['adminUid']) && data.adminUid is string
+          && ((data.adminUid == '' && data.participantIds.size() <= 3)
+            || (data.adminUid != '' && data.adminUid in data.participantIds)));
+    }
+
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['type','ownerUid','staffUid','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys'])
+      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys'])
         && data.friendshipId == conversationId
         && data.lastMessage is string && data.lastMessage.size() <= 160
         && data.lastMessageId is string && data.lastMessageId.size() <= 128
@@ -391,8 +398,22 @@ service cloud.firestore {
           || (data.type == 'SUPPORT' && data.ownerUid is string && data.staffUid is string
               && conversationId == 'support-' + data.ownerUid
               && data.participantIds is list && data.participantIds.size() >= 2
-              && data.participantIds.size() <= 3 && data.ownerUid in data.participantIds
-              && data.staffUid in data.participantIds));
+              && data.participantIds.size() <= 4 && data.ownerUid in data.participantIds
+              && data.staffUid in data.participantIds
+              && validSupportAdmin(data)));
+    }
+
+    function validAdditionalConversationKeys(data) {
+      return data.participantIds.size() == 2
+        || (data.participantIds.size() >= 3
+          && data.roomKeys[data.participantIds[2]] is string
+          && data.roomKeys[data.participantIds[2]].size() <= 1000
+          && data.participantPublicKeys[data.participantIds[2]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[2]])).data.publicKey
+          && (data.participantIds.size() == 3
+            || (data.participantIds.size() == 4
+              && data.roomKeys[data.participantIds[3]] is string
+              && data.roomKeys[data.participantIds[3]].size() <= 1000
+              && data.participantPublicKeys[data.participantIds[3]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[3]])).data.publicKey)));
     }
 
     function validConversationKeys(data) {
@@ -404,15 +425,16 @@ service cloud.firestore {
         && data.roomKeys[data.participantIds[1]] is string && data.roomKeys[data.participantIds[1]].size() <= 1000
         && data.participantPublicKeys[data.participantIds[0]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[0]])).data.publicKey
         && data.participantPublicKeys[data.participantIds[1]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[1]])).data.publicKey
-        && (data.participantIds.size() == 2 ||
-          (data.roomKeys[data.participantIds[2]] is string && data.roomKeys[data.participantIds[2]].size() <= 1000
-            && data.participantPublicKeys[data.participantIds[2]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[2]])).data.publicKey));
+        && validAdditionalConversationKeys(data);
     }
 
     match /conversations/{conversationId} {
       // Collection listeners must constrain participantIds to the authenticated UID.
       // Firestore rejects unfiltered and other-user queries because it cannot prove this predicate.
-      allow get: if conversationParticipant(resource.data);
+      allow get: if conversationParticipant(resource.data)
+        || (signedIn()
+          && exists(/databases/$(database)/documents/friendships/$(conversationId))
+          && request.auth.uid in get(/databases/$(database)/documents/friendships/$(conversationId)).data.participantIds);
       allow list: if signedIn()
         && request.auth.uid in resource.data.participantIds;
       allow create: if conversationParticipant(request.resource.data)

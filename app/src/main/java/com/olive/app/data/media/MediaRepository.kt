@@ -22,6 +22,8 @@ interface MediaTicketDataSource {
     suspend fun abortUpload(jobId:String)
     /** Returns a short-lived GET capability after the callable checks `allowed_users`. */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
+    /** Replaces the owner-controlled recipient list and wrapped AES keys without exposing plaintext. */
+    suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord
     /** Deletes both the owner's R2 object and its Firestore metadata through trusted code. */
     suspend fun deleteMedia(mediaId:String)
 }
@@ -73,6 +75,11 @@ class MediaRepository(
     override suspend fun downloadTicket(mediaId:String):MediaDownloadTicket {
         val result=call("mediaDownloadTicket",mapOf("mediaId" to mediaId))
         return MediaDownloadTicket(mediaId,validateUrl(result.string("url")),result.stringMap("headers"),result.long("expiresAt"))
+    }
+
+    override suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord {
+        require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
+        return call("mediaUpdateAccess",mapOf("mediaId" to mediaId,"wrappedKeys" to wrappedKeys)).record()
     }
 
     override suspend fun deleteMedia(mediaId:String) { call("mediaDelete",mapOf("mediaId" to mediaId)) }
