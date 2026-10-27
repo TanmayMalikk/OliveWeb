@@ -53,10 +53,6 @@ internal class SafetyPlanRepository(
         call("safetySupportContact", mapOf("safeContactUid" to uid))
     }
 
-    suspend fun requestAdminHelp(ownerUid: String) {
-        call("safetySupportAdmin", mapOf("ownerUid" to ownerUid))
-    }
-
     suspend fun sharedWithMe(): List<SharedSafetyPlan> {
         val plans = call("safetyPlansSharedWithMe").getJSONArray("plans")
         return (0 until plans.length()).map { index ->

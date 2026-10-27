@@ -263,6 +263,12 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             row.getString("ownerUid").orEmpty(),
             row.getString("staffUid").orEmpty(),
             row.getString("adminUid").orEmpty(),
+            row.getString("supportOrigin").orEmpty().ifBlank {
+                if (row.getString("type") == "SUPPORT") SUPPORT_TAG_SUPPORT else ""
+            },
+            row.getString("supportTag").orEmpty().ifBlank {
+                if (row.getString("type") == "SUPPORT") SUPPORT_TAG_SUPPORT else ""
+            },
         )
     }
 

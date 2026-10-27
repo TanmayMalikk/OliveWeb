@@ -436,7 +436,7 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val message = when {
             plan.shareAction == "stop" -> stringResource(R.string.safety_share_queued)
-            plan.staffUid.isNotBlank() -> stringResource(R.string.safety_shared, plan.staffName)
+            plan.consultationRequested && plan.staffUid.isNotBlank() -> stringResource(R.string.safety_shared, plan.staffName)
             plan.shareAction == "request" && !plan.consultationRequested -> stringResource(R.string.safety_share_queued)
             plan.consultationRequested -> stringResource(R.string.safety_waiting)
             else -> null
@@ -445,7 +445,7 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
             message, style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.testTag("safety_sharing_status")
                 .semantics { liveRegion = LiveRegionMode.Polite })
-        if (plan.staffUid.isBlank() && plan.shareAction != "request" && !plan.consultationRequested) {
+        if (plan.shareAction != "request" && !plan.consultationRequested) {
             OutlinedButton(
                 onClick = { controller.consult() },
                 enabled = !plan.hasConflicts && controller.saving == 0,

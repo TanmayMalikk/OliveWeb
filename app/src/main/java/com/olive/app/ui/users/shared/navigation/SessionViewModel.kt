@@ -71,6 +71,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val privateEntries get() = runtime.state.privateEntries
     val viewedSharedEntry get() = runtime.state.viewedSharedEntry
     internal val safetyPlans get() = runtime.safety
+    internal val support get() = runtime.support
     val userSearchResults get() = runtime.state.userSearchResults
     val friends get() = runtime.state.friends
     val incomingFriendRequests get() = runtime.state.incomingFriendRequests
@@ -233,7 +234,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
     fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
     fun shareSafetyPlanInChat() = runtime.secureSharing.shareSafetyPlan()
-    fun requestAdminHelp(ownerUid: String) = runtime.safety.requestAdminHelp(ownerUid)
+    fun requestAdminHelp(conversationId: String) = runtime.support.requestAdmin(conversationId)
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 

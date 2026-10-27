@@ -385,7 +385,7 @@ service cloud.firestore {
     }
 
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys'])
+      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys'])
         && data.friendshipId == conversationId
         && data.lastMessage is string && data.lastMessage.size() <= 160
         && data.lastMessageId is string && data.lastMessageId.size() <= 128
@@ -396,7 +396,9 @@ service cloud.firestore {
               && data.participantIds == friendshipForConversation(data).participantIds
               && data.participantUsernames == friendshipForConversation(data).participantUsernames)
           || (data.type == 'SUPPORT' && data.ownerUid is string && data.staffUid is string
-              && conversationId == 'support-' + data.ownerUid
+              && data.supportOrigin in ['PLAN_CONSULT', 'SUPPORT']
+              && data.supportTag in ['PLAN_CONSULT', 'SUPPORT', 'NEEDS_ADMIN']
+              && conversationId == (data.supportOrigin == 'PLAN_CONSULT' ? 'plan-consult-' : 'support-') + data.ownerUid
               && data.participantIds is list && data.participantIds.size() >= 2
               && data.participantIds.size() <= 4 && data.ownerUid in data.participantIds
               && data.staffUid in data.participantIds

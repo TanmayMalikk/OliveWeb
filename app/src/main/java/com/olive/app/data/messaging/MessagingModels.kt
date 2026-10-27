@@ -44,12 +44,32 @@ data class ChatConversation(
     val ownerUid: String = "",
     val staffUid: String = "",
     val adminUid: String = "",
+    val supportOrigin: String = "",
+    val supportTag: String = "",
 ) {
-    fun displayName(currentUid: String) = if (type == "SUPPORT") {
-        participantUsernames.filterKeys { it != currentUid }.values.joinToString(" • ")
-            .ifBlank { "Support chat" }
+    fun displayName(currentUid: String, supportName: String = "Your Olive Branch") = if (type == "SUPPORT") {
+        supportName
     } else participantUsernames.entries.firstOrNull { it.key != currentUid }?.value ?: "Conversation"
+
+    // Personal accounts see a role label instead of an organization member's account name.
+    fun senderDisplayName(
+        senderUid: String,
+        senderUsername: String,
+        viewerRole: AccountRole,
+        anonymousStaffName: String,
+    ) = if (
+        type == "SUPPORT" &&
+        viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+        senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() }
+    ) anonymousStaffName else senderUsername
+
+    fun highlightedFor(viewerRole: AccountRole) =
+        type == "SUPPORT" && viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN)
 }
+
+internal const val SUPPORT_TAG_PLAN_CONSULT = "PLAN_CONSULT"
+internal const val SUPPORT_TAG_SUPPORT = "SUPPORT"
+internal const val SUPPORT_TAG_NEEDS_ADMIN = "NEEDS_ADMIN"
 
 // Groups the data and actions for chat message.
 data class ChatMessage(
