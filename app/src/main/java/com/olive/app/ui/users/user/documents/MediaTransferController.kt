@@ -11,7 +11,9 @@ import androidx.work.WorkManager
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
 import com.olive.app.data.SafetyDocument
+import com.olive.app.data.media.DocumentDownloadGate
 import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.copyAndVerifyEncryptedDownload
 import com.olive.app.data.media.MediaPreprocessor
 import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.data.media.MediaTransferState
@@ -36,11 +38,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.ensureActive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
-import kotlin.coroutines.coroutineContext
 
 internal interface MediaTransferOperations {
     fun observeUploads(ownerUid:String)
@@ -94,6 +94,7 @@ internal class MediaTransferController(
     private var publishedMediaIds:Set<String> = emptySet()
     private val observationJobs=mutableMapOf<String,Job>()
     private val workProgress=mutableMapOf<String,Pair<Long,Long>>()
+    private val downloadGate=DocumentDownloadGate()
     var state by mutableStateOf<MediaTransferState>(MediaTransferState.Idle)
         private set
     var uploads by mutableStateOf<List<MediaUploadPresentation>>(emptyList())
@@ -207,7 +208,11 @@ internal class MediaTransferController(
         require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
         state=MediaTransferState.Preparing("downloading")
         return try {
-            withContext(Dispatchers.IO) { downloadEncrypted(document,viewerUid) }
+            withContext(Dispatchers.IO) {
+                downloadGate.withDocumentLock(document.id) {
+                    downloadEncrypted(document,viewerUid)
+                }
+            }
                 .also { state=MediaTransferState.Idle }
         } catch(failure:Exception) {
             val message=failure.localizedMessage ?: "Unable to download encrypted media"
@@ -260,7 +265,8 @@ internal class MediaTransferController(
             owned.filterNot { it in retired }.sortedByDescending { it.createdAt }.map { job ->
                 val metadata=runCatching {
                     val wrapped=job.source.wrappedKeys[ownerUid] ?: error("Encryption key is unavailable")
-                    JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,KeyManager.unwrapKey(wrapped)))
+                    JSONObject(EncryptionUtils.decryptText(job.source.encryptedMetadata,
+                        KeyManager.unwrapKey(wrapped,job.source.encryptionVersion)))
                 }.getOrNull()
                 val progress=progressSnapshot[job.id]
                 MediaUploadPresentation(job.id,job.ownerUid,
@@ -330,7 +336,8 @@ internal class MediaTransferController(
             // The server stores only wrapped key material; it never receives the raw AES key.
             val wrapped=mapOf(owner.uid to KeyManager.wrapKey(key,KeyManager.getOrCreatePublicKey()))
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
-                EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),1,kind,ocrReview)
+                EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
+                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview)
             return MediaUploadJob(jobId,owner.uid,prepared)
         } catch(failure:Exception) { target.delete();throw failure }
     }
@@ -349,25 +356,27 @@ internal class MediaTransferController(
         val ticket=repository.downloadTicket(document.id)
         val builder=Request.Builder().url(ticket.url).get();ticket.headers.forEach(builder::header)
         val encryptedFolder=File(applicationContext.cacheDir,"encrypted-media").apply { mkdirs() }
-        val encrypted=File(encryptedFolder,"${document.id}.olive.part")
-        val digest=MessageDigest.getInstance("SHA-256");val buffer=ByteArray(64*1024)
+        val encrypted=File.createTempFile("${document.id}.",".olive.part",encryptedFolder)
         try {
             client.newCall(builder.build()).execute().use { response ->
                 if(!response.isSuccessful) error("Cloud download failed with HTTP ${response.code}")
                 val body=response.body ?: error("Cloud download was empty")
+                val declaredSize=body.contentLength()
+                require(declaredSize<0 || declaredSize==document.ciphertextSize) {
+                    sizeMismatch(document.ciphertextSize,declaredSize)
+                }
                 encrypted.outputStream().buffered().use { output -> body.byteStream().use { input ->
-                    while(true) {
-                        coroutineContext.ensureActive()
-                        val count=input.read(buffer);if(count<0) break;if(count==0) continue
-                        digest.update(buffer,0,count);output.write(buffer,0,count)
-                    }
+                    copyAndVerifyEncryptedDownload(input,output,document.ciphertextSize,
+                        document.ciphertextSha256)
                 } }
             }
             // Verify the complete encrypted object before attempting key use or plaintext output.
-            require(encrypted.length()==document.ciphertextSize) { "Encrypted download size does not match" }
-            val checksum=digest.digest().joinToString("") { "%02x".format(it) }
-            require(checksum.equals(document.ciphertextSha256,true)) { "Encrypted download checksum does not match" }
-            val key=document.wrappedKeys[viewerUid]?.let(KeyManager::unwrapKey) ?: error("Encryption key is unavailable")
+            require(encrypted.length()==document.ciphertextSize) {
+                sizeMismatch(document.ciphertextSize,encrypted.length())
+            }
+            val key=document.wrappedKeys[viewerUid]?.let {
+                KeyManager.unwrapKey(it,document.encryptionVersion)
+            } ?: error("Encryption key is unavailable")
             val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
             val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
             val target=File(opened,document.id+(extension?.let { ".$it" } ?: ""));val partial=File(target.path+".part")
@@ -381,11 +390,13 @@ internal class MediaTransferController(
                 check(partial.renameTo(target)) { "Unable to publish decrypted media" }
                 return target
             } catch(failure:Exception) { partial.delete();throw failure }
-        } finally { buffer.fill(0);encrypted.delete() }
+        } finally { encrypted.delete() }
     }
 
     private companion object {
         const val MAX_CIPHERTEXT_BYTES=250L*1024L*1024L
         const val MAX_OCR_TEXT=50_000
+        fun sizeMismatch(expected:Long,received:Long)=
+            "Encrypted download size does not match (expected $expected bytes, received $received bytes)"
     }
 }
