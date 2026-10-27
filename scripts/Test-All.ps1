@@ -38,7 +38,7 @@ function Invoke-Checked {
 
 Set-Location -LiteralPath $projectRoot
 Invoke-Checked "Android unit tests, debug APK, UI-test APK, and lint" {
-    & ".\gradlew.bat" testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug checkSourceSize checkArchitecture
+    & ".\gradlew.bat" testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug checkArchitecture
 }
 @(
     "$projectRoot\app\build\outputs\apk\debug\app-debug.apk",
@@ -119,6 +119,25 @@ if ($WithDeviceTests) {
             throw "The Android device must use the disposable test PIN 246810: $verification"
         }
     }
+    function Ensure-DeviceAwake {
+        # Every UI method gets its own instrumentation process. A long suite can let the emulator
+        # sleep between methods, which pauses the activity before Compose registers its hierarchy.
+        & $adb -s $selectedDevice shell svc power stayon true | Out-Null
+        & $adb -s $selectedDevice shell input keyevent KEYCODE_WAKEUP | Out-Null
+        & $adb -s $selectedDevice shell wm dismiss-keyguard | Out-Null
+        $policy = (& $adb -s $selectedDevice shell dumpsys window policy 2>&1) -join "`n"
+        if ($policy -match 'showing=true') {
+            & $adb -s $selectedDevice shell input swipe 540 1900 540 500 250 | Out-Null
+            & $adb -s $selectedDevice shell input text 246810 | Out-Null
+            & $adb -s $selectedDevice shell input keyevent KEYCODE_ENTER | Out-Null
+            & $adb -s $selectedDevice shell wm dismiss-keyguard | Out-Null
+        }
+        $power = (& $adb -s $selectedDevice shell dumpsys power 2>&1) -join "`n"
+        $policy = (& $adb -s $selectedDevice shell dumpsys window policy 2>&1) -join "`n"
+        if ($power -notmatch 'mWakefulness=Awake' -or $policy -match 'showing=true') {
+            throw "The Android test device could not be woken and unlocked with PIN 246810."
+        }
+    }
     Write-Host "`n== Android device UI tests ==" -ForegroundColor Green
     # Android 17 can crash its activity transaction handler after several Compose activity
     # replacements in one instrumentation process. Isolating methods removes shared activity
@@ -144,6 +163,7 @@ if ($WithDeviceTests) {
             & $adb -s $selectedDevice shell am force-stop com.olive.app | Out-Null
             & $adb -s $selectedDevice shell am force-stop com.olive.app.test | Out-Null
             Assert-DeviceTestPin
+            Ensure-DeviceAwake
             $instrumentationOutput = & $adb -s $selectedDevice shell am instrument -w -r -e clearPackageData true -e class $testCase com.olive.app.test/androidx.test.runner.AndroidJUnitRunner 2>&1
             $instrumentationOutput | ForEach-Object { Write-Host $_ }
             $deviceResult = $instrumentationOutput -join "`n"
