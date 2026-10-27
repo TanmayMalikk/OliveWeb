@@ -10,7 +10,7 @@ Open Android Studio's **Terminal** tab at the project root and run:
 
 This automatically runs:
 
-1. Android/Kotlin JVM unit tests, debug and UI-test APK builds, lint, source-size checks, and architecture checks.
+1. Android/Kotlin JVM unit tests, debug and UI-test APK builds, lint, and architecture checks.
 2. Web unit tests, a production build, Playwright user flows, responsive checks, and axe accessibility checks.
 3. Cloud Functions unit tests and a production-dependency security audit.
 4. Firestore and Firebase Storage rules tests in local emulators.
