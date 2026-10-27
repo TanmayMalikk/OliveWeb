@@ -1,8 +1,5 @@
 // Contains the olive activity code for this part of Olive.
 package com.olive.app
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import com.olive.app.ui.shared.observeAccessibilityInteractions
 import android.app.ActivityManager
 import android.os.Bundle
@@ -30,7 +27,6 @@ import androidx.lifecycle.Lifecycle
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
 import com.olive.app.notification.OliveNotificationManager
-import com.olive.app.ui.shared.AppLocaleManager
 import com.olive.app.ui.covers.shared.CoverLauncher
 import com.olive.app.ui.users.shared.navigation.OliveRoot
 import com.olive.app.ui.shared.OliveTheme
@@ -75,7 +71,6 @@ class OliveActivity : ComponentActivity() {
     // Runs when Android creates this part of the app.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppLocaleManager.initSystemDefaultLocale()
         OliveNotificationManager.createNotificationChannels(this)
         CoverLauncher.ensureStudioLauncher(this)
         applyScreenCaptureProtection()
