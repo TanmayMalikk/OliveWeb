@@ -1,12 +1,10 @@
-package com.olive.app.ui
+package com.olive.app.data
 
-import com.olive.app.data.HistoryRecord
-import com.olive.app.data.PrivateEntry
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class SessionHistorySyncTest {
+class PrivateEntryHistorySyncTest {
 
     @Test
     fun `test offline history sync correctly parses PrivateEntry records`() {

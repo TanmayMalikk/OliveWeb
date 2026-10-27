@@ -9,6 +9,8 @@ import android.app.Application
 import androidx.compose.runtime.*
 import com.olive.app.BuildConfig
 import com.olive.app.data.*
+import com.olive.app.data.media.MediaRepository
+import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.R
 import com.olive.app.security.*
 import kotlin.time.Duration.Companion.milliseconds
@@ -45,7 +47,8 @@ internal class SessionRuntime(val application: Application, val scope: Coroutine
     val messagingRepository = if (localMode) null else MessagingRepository()
     val secureChatRepository = if (localMode) null else SecureChatRepository()
     val secureDocumentRepository = if (localMode) null else SecureDocumentRepository()
-    val safetyDocumentRepository = if (localMode) null else SafetyDocumentRepository()
+    val mediaRepository: MediaTicketDataSource? = if (localMode) null else MediaRepository()
+    val safetyDocumentRepository = mediaRepository?.let { SafetyDocumentRepository(media = it) }
     val locationSharingRepository = if (localMode) null else LocationSharingRepository(application)
     val messageReadState: android.content.SharedPreferences =
         application.getSharedPreferences(
