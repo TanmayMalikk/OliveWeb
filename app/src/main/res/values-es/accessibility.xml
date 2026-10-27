@@ -19,6 +19,8 @@
     <string name="a11y_zoom">Zoom</string>
     <string name="a11y_zoom_in">Acercar</string>
     <string name="a11y_zoom_out">Alejar</string>
+    <string name="a11y_reset_zoom">Restablecer zoom</string>
+    <string name="a11y_zoom_percent">Zoom: %1$d%%</string>
     <string name="a11y_pan_left">Desplazar a la izquierda</string>
     <string name="a11y_pan_right">Desplazar a la derecha</string>
     <string name="a11y_pan_up">Desplazar hacia arriba</string>

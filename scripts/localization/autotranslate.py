@@ -39,7 +39,6 @@ QUALIFIER_TO_LANG = {
     "values-fr": "fr",
     "values-zh-rCN": "zh-CN",
     "values-zh-rTW": "zh-TW",
-    "values-zh": "zh-CN",
     "values-de": "de",
     "values-it": "it",
     "values-ja": "ja",
@@ -51,6 +50,7 @@ QUALIFIER_TO_LANG = {
     "values-fr-rCA": "fr",
 }
 
+# Runs the parse strings xml steps.
 def parse_strings_xml(file_path):
     """Parses an Android resource XML file into a dictionary of key -> text."""
     if not os.path.exists(file_path):
@@ -68,10 +68,12 @@ def parse_strings_xml(file_path):
         print(f"Error parsing {file_path}: {e}", file=sys.stderr)
         return {}
 
+# Runs the protect placeholders steps.
 def protect_placeholders(text):
     """Masks formatting placeholders (%1$s, %1$d, \\n, HTML tags) prior to translation."""
     placeholders = []
     
+    # Runs the mask match steps.
     def mask_match(m):
         placeholders.append(m.group(0))
         return f"__PARAM_{len(placeholders) - 1}__"
@@ -80,6 +82,7 @@ def protect_placeholders(text):
     masked_text = pattern.sub(mask_match, text)
     return masked_text, placeholders
 
+# Runs the restore placeholders steps.
 def restore_placeholders(text, placeholders):
     """Restores masked placeholders after translation."""
     result = text
@@ -89,6 +92,7 @@ def restore_placeholders(text, placeholders):
         result = result.replace(token, ph)
     return result
 
+# Runs the translate batch gtx steps.
 def translate_batch_gtx(masked_texts, target_lang, max_retries=3):
     """Translates a batch of texts in a single HTTP request."""
     delimiter = "\n\n"
@@ -120,6 +124,7 @@ def translate_batch_gtx(masked_texts, target_lang, max_retries=3):
             
     return None, "Rate limit retries exhausted."
 
+# Runs the escape xml steps.
 def escape_xml(val):
     """Escapes special characters for Android resource XMLs."""
     val = val.replace("&", "&amp;")
@@ -129,6 +134,7 @@ def escape_xml(val):
     val = val.replace("'", "\\'")
     return val
 
+# Runs the save strings xml steps.
 def save_strings_xml(file_path, strings_dict):
     """Saves dictionary into XML with clean Android formatting."""
     lines = ['<?xml version="1.0" encoding="utf-8"?>', '<resources>']
@@ -141,6 +147,7 @@ def save_strings_xml(file_path, strings_dict):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
+# Runs the get target lang steps.
 def get_target_lang(folder_name):
     if folder_name in QUALIFIER_TO_LANG:
         return QUALIFIER_TO_LANG[folder_name]
@@ -169,6 +176,7 @@ def process_file_for_locale(folder_name, file_name, base_strings, delay=2.0, bat
 
     print(f"  Found {len(missing_keys)} missing strings to translate...")
     
+    # Process missing keys in batches of batch_size
     translated_count = 0
     total_missing = len(missing_keys)
     
@@ -176,6 +184,7 @@ def process_file_for_locale(folder_name, file_name, base_strings, delay=2.0, bat
         chunk_keys = missing_keys[i : i + batch_size]
         chunk_originals = [base_strings[k] for k in chunk_keys]
         
+        # Mask placeholders for chunk
         masked_chunks = []
         placeholders_list = []
         for text in chunk_originals:
@@ -211,6 +220,7 @@ def process_file_for_locale(folder_name, file_name, base_strings, delay=2.0, bat
             if not dry_run:
                 save_strings_xml(xml_path, updated_strings)
 
+        # Sleep between batch cycles to avoid triggering rate limits
         if i + batch_size < total_missing and delay > 0:
             time.sleep(delay)
 
@@ -222,6 +232,7 @@ def process_file_for_locale(folder_name, file_name, base_strings, delay=2.0, bat
     elif dry_run:
         print(f"  [Dry Run] No changes written to '{xml_path}'.")
 
+# Runs the main steps.
 def main():
     parser = argparse.ArgumentParser(description="Auto-translate missing Android resource XML entries in batches.")
     parser.add_argument("--target-locale", "-l", help="Target specific locale folder (e.g., 'values-es', 'es')")
@@ -243,7 +254,7 @@ def main():
     if not base_files:
         print(f"Error: No XML files found in '{BASE_VALUES_DIR}'", file=sys.stderr)
         sys.exit(1)
-        
+
     print(f"Found {len(base_files)} base XML files in 'values/': {base_files}")
     
     # Discover all target locale directories (values-*)
@@ -251,9 +262,9 @@ def main():
     for entry in sorted(os.listdir(RES_DIR)):
         if entry.startswith("values-") and os.path.isdir(os.path.join(RES_DIR, entry)):
             locale_dirs.append(entry)
-            
+
     print(f"Found {len(locale_dirs)} target locale directories: {locale_dirs}")
-    
+
     # Filter by target locale if specified
     if args.target_locale:
         target = args.target_locale
@@ -263,14 +274,14 @@ def main():
         if not locale_dirs:
             print(f"Error: Target locale directory '{target}' not found.", file=sys.stderr)
             sys.exit(1)
-            
+
     # Filter by target file if specified
     if args.target_file:
         if args.target_file not in base_files:
             print(f"Error: Target file '{args.target_file}' not found in 'values/'. Available: {base_files}", file=sys.stderr)
             sys.exit(1)
         base_files = [args.target_file]
-    
+
     # Iterate through all base XML files and target locale directories dynamically
     for file_name in base_files:
         base_file_path = os.path.join(BASE_VALUES_DIR, file_name)
@@ -278,9 +289,9 @@ def main():
         if not base_strings:
             print(f"Skipping empty or non-string base file: {file_name}")
             continue
-            
+
         print(f"\n--- Processing base file: {file_name} ({len(base_strings)} strings) ---")
-        
+
         for folder_name in locale_dirs:
             process_file_for_locale(
                 folder_name=folder_name,

@@ -1,169 +1,393 @@
+// Contains the session safety plans code for this part of Olive.
 package com.olive.app.ui.session
+
+import com.olive.app.ui.shared.*
+
+import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.runtime.*
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
 import com.olive.app.data.*
-import com.olive.app.ui.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.seconds
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
-internal class SessionSafetyPlans(private val runtime:SessionRuntime) {
-    private val store=SafetyPlanStore(runtime.application,runtime.localMode)
+internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
+    private val store = SafetyPlanStore(runtime.application, runtime.localMode)
     private val repository by lazy { SafetyPlanRepository() }
-    private val writes=Mutex()
-    private val sync=Mutex()
-    private var activeOwner:String?=null
-    private var lease:Any?=null
-    private var generation=0
-    var plan by mutableStateOf<SafetyPlan?>(null);private set
-    var error by mutableStateOf<Int?>(null);private set
-    var saving by mutableIntStateOf(0);private set
-    var consultations by mutableStateOf<List<SafetyConsultation>>(emptyList());private set
-    var sharedPlans by mutableStateOf<List<SharedSafetyPlan>>(emptyList());private set
-    var available by mutableStateOf(true);private set
-    private fun authorized()=runtime.enrollment!=null &&
-        ((runtime.state.accountRole in setOf(AccountRole.USER,AccountRole.SAFE_CONTACT) && runtime.state.screen==SessionScreen.Safe && runtime.state.page==SafePage.SafetyPlan) ||
-            (runtime.state.accountRole==AccountRole.STAFF && runtime.state.screen==SessionScreen.Portal))
-    private fun current(actor:String,owner:String,token:Int)=authorized() && runtime.coverAccountId==actor && activeOwner==owner && generation==token
-    fun close(screenLease:Any?=null) { if(screenLease!=null && lease!==screenLease) return;lease=null;generation++;activeOwner=null;plan=null;error=null;saving=0;if(screenLease==null) consultations=emptyList() }
-    suspend fun open(ownerUid:String,ownerName:String,defaults:Map<String,String>,screenLease:Any) {
-        if(!authorized() || (runtime.state.accountRole==AccountRole.USER && ownerUid!=runtime.coverAccountId)) return
-        val actor=runtime.coverAccountId ?: return
-        lease=screenLease;generation++;val token=generation;activeOwner=ownerUid;plan=null;error=null;saving=0
+    private val writes = Mutex()
+    private val sync = Mutex()
+    private var activeOwner: String? = null
+    private var lease: Any? = null
+    private var generation = 0
+    var plan by mutableStateOf<SafetyPlan?>(null)
+        private set
+    var error by mutableStateOf<Int?>(null)
+        private set
+    var saving by mutableIntStateOf(0)
+        private set
+    var consultations by mutableStateOf<List<SafetyConsultation>>(emptyList())
+        private set
+    var sharedPlans by mutableStateOf<List<SharedSafetyPlan>>(emptyList())
+        private set
+    var available by mutableStateOf(true)
+        private set
+
+    // Runs the authorized code.
+    // Allows plan work only while the signed-in role is on a screen that may use safety plans.
+    private fun authorized() = runtime.enrollment != null &&
+            ((runtime.state.accountRole in setOf(
+                AccountRole.USER,
+                AccountRole.SAFE_CONTACT
+            ) && runtime.state.screen == SessionScreen.Safe && runtime.state.page in setOf(SafePage.SafetyPlan, SafePage.StaffHelp)) ||
+                    (runtime.state.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+                            runtime.state.screen == SessionScreen.Portal))
+
+    // Runs the current code.
+    // Rejects old background results after the account, plan owner, or screen session changes.
+    private fun current(actor: String, owner: String, token: Int) =
+        authorized() && runtime.coverAccountId == actor && activeOwner == owner && generation == token
+
+    // Runs the close code.
+    // Clears private plan data when its screen closes; a different screen cannot clear the active one.
+    fun close(screenLease: Any? = null) {
+        if (screenLease != null && lease !== screenLease) return
+        lease =
+            null
+        generation++
+        activeOwner = null
+        plan = null
+        error = null
+        saving =
+            0
+        if (screenLease == null) consultations = emptyList()
+    }
+
+    // Runs the open code.
+    // Checks access, loads or creates the selected plan, queues cloud sync, and ignores stale results.
+    suspend fun open(
+        ownerUid: String,
+        ownerName: String,
+        defaults: Map<String, String>,
+        screenLease: Any
+    ) {
+        if (!authorized() || (runtime.state.accountRole == AccountRole.USER && ownerUid != runtime.coverAccountId)) return
+        val actor = runtime.coverAccountId ?: return
+        lease = screenLease
+        generation++
+        val token = generation
+        activeOwner = ownerUid
+        plan = null
+        error = null
+        saving = 0
         try {
-            val value=withContext(Dispatchers.IO) { store.ensure(actor,ownerUid,ownerName,defaults) }
-            if(!runtime.localMode && value.pending) SafetyPlanSyncWorker.enqueue(runtime.application,actor,ownerUid)
-            if(current(actor,ownerUid,token)) plan=value
+            val value =
+                withContext(Dispatchers.IO) { store.ensure(actor, ownerUid, ownerName, defaults) }
+            if (!runtime.localMode && value.pending) SafetyPlanSyncWorker.enqueue(
+                runtime.application,
+                actor,
+                ownerUid
+            )
+            if (current(actor, ownerUid, token)) plan = value
             refresh()
-        } catch(cancelled:CancellationException) { throw cancelled }
-        catch(_:Exception) { if(current(actor,ownerUid,token)) error=R.string.safety_storage_error }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            if (current(actor, ownerUid, token)) error = R.string.safety_storage_error
+        }
     }
-    fun edit(key:String,value:String) {
-        val old=plan ?: return
-        if(!authorized() || runtime.state.accountRole==AccountRole.SAFE_CONTACT || key !in SAFETY_FIELD_KEYS || value.length>4000) return
-        val field=old.fields[key] ?: return
-        if(field.value==value) return
-        val edited=field.edit(value)
-        plan=old.copy(fields=old.fields+(key to edited))
-        persist { saved -> saved.copy(fields=saved.fields+(key to edited)) }
+
+    // Runs the edit code.
+    // Applies an allowed field change locally and saves it for background sync.
+    fun edit(key: String, value: String) {
+        val old = plan ?: return
+        if (!authorized() || runtime.state.accountRole == AccountRole.SAFE_CONTACT || key !in SAFETY_FIELD_KEYS || value.length > 4000) return
+        val field = old.fields[key] ?: return
+        if (field.value == value) return
+        val edited = field.edit(value)
+        plan = old.copy(fields = old.fields + (key to edited))
+        persist { saved -> saved.copy(fields = saved.fields + (key to edited)) }
     }
-    fun resolve(key:String,keepMine:Boolean) {
-        val old=plan ?: return
-        if(runtime.state.accountRole==AccountRole.SAFE_CONTACT) return
-        val field=old.fields[key] ?: return
-        val revision=field.conflictRevision ?: return
-        val edited=if(keepMine) field.copy(revision=revision,conflictRevision=null,conflictValue=null).edit(field.value)
-            else SafetyField(field.conflictValue.orEmpty(),revision)
-        plan=old.copy(fields=old.fields+(key to edited))
-        persist { saved -> saved.copy(fields=saved.fields+(key to edited)) }
+
+    // Runs the resolve code.
+    // Resolves a sync conflict by keeping either the local text or the newer server text.
+    fun resolve(key: String, keepMine: Boolean) {
+        val old = plan ?: return
+        if (runtime.state.accountRole == AccountRole.SAFE_CONTACT) return
+        val field = old.fields[key] ?: return
+        val revision = field.conflictRevision ?: return
+        val edited = if (keepMine) field.copy(
+            revision = revision,
+            conflictRevision = null,
+            conflictValue = null
+        ).edit(field.value)
+        else SafetyField(field.conflictValue.orEmpty(), revision)
+        plan = old.copy(fields = old.fields + (key to edited))
+        persist { saved -> saved.copy(fields = saved.fields + (key to edited)) }
     }
-    fun consult(stop:Boolean=false) {
-        if(runtime.localMode) { error=R.string.safety_account_required;return }
-        val old=plan ?: return
-        if(runtime.state.accountRole!=AccountRole.USER || (!stop && old.hasConflicts)) return
-        val action=if(stop) "stop" else "request"
-        plan=old.copy(shareAction=action)
-        persist { it.copy(shareAction=action) }
+
+    // Runs the consult code.
+    // Requests or ends staff help for the account owner's safety plan.
+    fun consult(stop: Boolean = false) {
+        if (runtime.localMode) {
+            error = R.string.safety_account_required
+            return
+        }
+        val old = plan ?: return
+        if (runtime.state.accountRole != AccountRole.USER || (!stop && old.hasConflicts)) return
+        val action = if (stop) "stop" else "request"
+        val actor = runtime.coverAccountId ?: return
+        val token = generation
+        val staged = old.copy(shareAction = action)
+        plan = staged
+        saving++
+        error = null
+        runtime.scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    writes.withLock {
+                        store.update(actor, actor) { it.copy(shareAction = action) }
+                    }
+                }
+                if (!hasSafetyConnection(runtime.application)) {
+                    SafetyPlanSyncWorker.enqueue(runtime.application, actor, actor)
+                    return@launch
+                }
+                sync.withLock {
+                    withTimeout(35.seconds) {
+                        withContext(Dispatchers.IO) {
+                            syncSafetyPlan(store, repository, actor, actor)
+                        }
+                    }
+                }
+                val updated = withContext(Dispatchers.IO) { store.read(actor, actor) }
+                if (current(actor, actor, token) && updated != null) {
+                    plan = updated
+                    error = null
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                SafetyPlanSyncWorker.enqueue(runtime.application, actor, actor)
+                if (current(actor, actor, token)) error = R.string.safety_sync_error
+            } finally {
+                if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
     }
-    fun shareWithContacts(friends:List<Friend>) {
-        if(!authorized() || runtime.state.accountRole!=AccountRole.USER || runtime.localMode || friends.size>10) return
-        val draft=plan ?: return
-        val actor=runtime.coverAccountId ?: return
-        val token=generation
-        saving++;error=null
+
+    // Runs the share with contacts code.
+    // Verifies the selected friends, syncs pending edits, and shares the plan with up to ten contacts.
+    fun shareWithContacts(friends: List<Friend>) {
+        if (!authorized() || runtime.state.accountRole != AccountRole.USER || runtime.localMode || friends.size > 10) return
+        val draft = plan ?: return
+        val actor = runtime.coverAccountId ?: return
+        val token = generation
+        saving++
+        error = null
         runtime.scope.launch {
             try {
                 repository.sync(draft)
-                val updated=repository.shareContacts(friends)
-                if(current(actor,actor,token)) {
-                    plan=updated
-                    error=null
-                    withContext(Dispatchers.IO) { store.write(actor,actor,updated) }
+                val updated = repository.shareContacts(friends)
+                if (current(actor, actor, token)) {
+                    plan = updated
+                    error = null
+                    withContext(Dispatchers.IO) { store.write(actor, actor, updated) }
                 }
-            } catch(cancelled:CancellationException) { throw cancelled }
-            catch(_:Exception) { if(current(actor,actor,token)) error=R.string.safety_sync_error }
-            finally { if(current(actor,actor,token)) saving=(saving-1).coerceAtLeast(0) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current(actor, actor, token)) error = R.string.safety_sync_error
+            } finally {
+                if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
+            }
         }
     }
+
+    // Adds one already-approved safe contact to the user's staff support conversation.
+    fun setSupportContact(uid: String) {
+        if (!authorized() || runtime.state.accountRole != AccountRole.USER || runtime.localMode) return
+        val old = plan ?: return
+        if (old.staffUid.isBlank() || (uid.isNotBlank() && uid !in old.safeContactUids)) return
+        val actor = runtime.coverAccountId ?: return
+        val token = generation
+        saving++
+        error = null
+        runtime.scope.launch {
+            try {
+                repository.setSupportContact(uid)
+                if (current(actor, actor, token)) {
+                    val updated = old.copy(supportSafeContactUid = uid)
+                    plan = updated
+                    withContext(Dispatchers.IO) { store.write(actor, actor, updated) }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current(actor, actor, token)) error = R.string.safety_sync_error
+            } finally {
+                if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
+    // Loads the plans that other users currently share with this safe contact.
     fun refreshSharedPlans() {
-        if(!authorized() || runtime.state.accountRole!=AccountRole.SAFE_CONTACT || runtime.localMode) return
-        val actor=runtime.coverAccountId;val token=generation
+        if (!authorized() || runtime.state.accountRole != AccountRole.SAFE_CONTACT || runtime.localMode) return
+        val actor = runtime.coverAccountId
+        val token = generation
         runtime.scope.launch {
             try {
-                val result=repository.sharedWithMe()
-                if(actor!=null && runtime.coverAccountId==actor && authorized() && generation==token) {
-                    sharedPlans=result
-                    error=null
+                val result = repository.sharedWithMe()
+                if (actor != null && runtime.coverAccountId == actor && authorized() && generation == token) {
+                    sharedPlans = result
+                    error = null
                 }
-            } catch(cancelled:CancellationException) { throw cancelled }
-            catch(_:Exception) { if(actor!=null && runtime.coverAccountId==actor && authorized()) error=R.string.safety_sync_error }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (actor != null && runtime.coverAccountId == actor && authorized()) error =
+                    R.string.safety_sync_error
+            }
         }
     }
-    private fun persist(change:(SafetyPlan)->SafetyPlan) {
-        if(!authorized()) return
-        val actor=runtime.coverAccountId ?: return
-        val owner=activeOwner ?: return
-        val token=generation
-        saving++;error=null
+
+    // Runs the persist code.
+    // Writes one plan change in order, then asks the durable worker to sync it when online.
+    private fun persist(change: (SafetyPlan) -> SafetyPlan) {
+        if (!authorized()) return
+        val actor = runtime.coverAccountId ?: return
+        val owner = activeOwner ?: return
+        val token = generation
+        saving++
+        error = null
         runtime.scope.launch {
             try {
-                withContext(Dispatchers.IO) { writes.withLock { store.update(actor,owner,change) } }
-                if(!runtime.localMode) SafetyPlanSyncWorker.enqueue(runtime.application,actor,owner)
-            } catch(cancelled:CancellationException) { throw cancelled }
-            catch(_:Exception) { if(current(actor,owner,token)) error=R.string.safety_storage_error }
-            finally { if(current(actor,owner,token)) saving=(saving-1).coerceAtLeast(0) }
+                withContext(Dispatchers.IO) {
+                    writes.withLock {
+                        store.update(
+                            actor,
+                            owner,
+                            change
+                        )
+                    }
+                }
+                if (!runtime.localMode) SafetyPlanSyncWorker.enqueue(
+                    runtime.application,
+                    actor,
+                    owner
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current(actor, owner, token)) error = R.string.safety_storage_error
+            } finally {
+                if (current(actor, owner, token)) saving = (saving - 1).coerceAtLeast(0)
+            }
         }
     }
+
+    // Runs the retry save code.
+    // Saves the current draft again after a local storage failure.
     fun retrySave() {
-        val draft=plan ?: return
-        persist { saved -> saved.copy(fields=draft.fields,shareAction=draft.shareAction) }
+        val draft = plan ?: return
+        persist { saved -> saved.copy(fields = draft.fields, shareAction = draft.shareAction) }
     }
+
+    // Runs the refresh code.
+    // Syncs queued changes, reloads the saved plan, and removes a shared copy when access is revoked.
     suspend fun refresh() {
-        if(error==R.string.safety_storage_error) return
-        if(!authorized() || saving>0 || !sync.tryLock()) return
-        val actor=runtime.coverAccountId ?: run { sync.unlock();return }
-        val owner=activeOwner ?: run { sync.unlock();return }
-        val token=generation
+        if (error == R.string.safety_storage_error) return
+        if (!authorized() || saving > 0 || !sync.tryLock()) return
+        val actor = runtime.coverAccountId ?: run {
+            sync.unlock()
+            return
+        }
+        val owner = activeOwner ?: run {
+            sync.unlock()
+            return
+        }
+        val token = generation
         try {
-            if(!runtime.localMode && hasSafetyConnection(runtime.application)) {
-                withTimeout(35.seconds) { withContext(Dispatchers.IO) { syncSafetyPlan(store,repository,actor,owner) } }
+            if (!runtime.localMode && hasSafetyConnection(runtime.application)) {
+                withTimeout(35.seconds) {
+                    withContext(Dispatchers.IO) {
+                        syncSafetyPlan(
+                            store,
+                            repository,
+                            actor,
+                            owner
+                        )
+                    }
+                }
             }
-            val saved=withContext(Dispatchers.IO) { store.read(actor,owner) }
-            if(current(actor,owner,token) && saving==0) { plan=saved;error=null }
-        } catch(_:TimeoutCancellationException) { /* Retain the local draft; the durable queue retries when connected. */ }
-        catch(cancelled:CancellationException) { throw cancelled }
-        catch(failure:FirebaseFunctionsException) {
-            if(failure.code==FirebaseFunctionsException.Code.PERMISSION_DENIED && actor!=owner) {
-                withContext(Dispatchers.IO) { store.remove(actor,owner) }
-                if(current(actor,owner,token)) { plan=null;error=R.string.safety_access_revoked }
+            val saved = withContext(Dispatchers.IO) { store.read(actor, owner) }
+            if (current(actor, owner, token) && saving == 0) {
+                plan = saved
+                error = null
             }
-        } catch(_:Exception) { /* Like Notes, connection failures leave saved edits queued without a warning banner. */ }
-        finally { sync.unlock() }
+        } catch (_: TimeoutCancellationException) { /* Retain the local draft; the durable queue retries when connected. */
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: FirebaseFunctionsException) {
+            if (failure.code == FirebaseFunctionsException.Code.PERMISSION_DENIED && actor != owner) {
+                withContext(Dispatchers.IO) { store.remove(actor, owner) }
+                if (current(actor, owner, token)) {
+                    plan = null
+                    error = R.string.safety_access_revoked
+                }
+            }
+        } catch (_: Exception) { /* Like Notes, connection failures leave saved edits queued without a warning banner. */
+        } finally {
+            sync.unlock()
+        }
     }
+
+    // Loads assigned consultations and the staff member's availability from local and cloud storage.
     suspend fun refreshConsultations() {
-        if(!authorized() || runtime.state.accountRole!=AccountRole.STAFF || runtime.localMode) return
-        val actor=runtime.coverAccountId ?: return
+        if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return
+        val actor = runtime.coverAccountId ?: return
         try {
-            val cached=withContext(Dispatchers.IO) { store.all(actor) }
-            if(authorized() && actor==runtime.coverAccountId) consultations=cached.map { SafetyConsultation(it.ownerUid,it.ownerName) }
-            if(!hasSafetyConnection(runtime.application)) return
-            val result=repository.consultations()
-            withContext(Dispatchers.IO) { cached.filter { old -> result.second.none { it.ownerUid==old.ownerUid } }.forEach { store.remove(actor,it.ownerUid) } }
-            if(authorized() && actor==runtime.coverAccountId) { available=result.first;consultations=result.second;error=null }
-        } catch(cancelled:CancellationException) { throw cancelled }
-        catch(_:Exception) { if(authorized() && actor==runtime.coverAccountId) error=R.string.safety_sync_error }
+            val cached = withContext(Dispatchers.IO) { store.all(actor) }
+            if (authorized() && actor == runtime.coverAccountId) consultations =
+                cached.map { SafetyConsultation(it.ownerUid, it.ownerName) }
+            if (!hasSafetyConnection(runtime.application)) return
+            val result = repository.consultations()
+            withContext(Dispatchers.IO) {
+                cached.filter { old -> result.second.none { it.ownerUid == old.ownerUid } }
+                    .forEach { store.remove(actor, it.ownerUid) }
+            }
+            if (authorized() && actor == runtime.coverAccountId) {
+                available = result.first
+                consultations = result.second
+                error = null
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
+        }
     }
-    fun changeAvailability(value:Boolean) {
-        if(!authorized() || runtime.state.accountRole!=AccountRole.STAFF || runtime.localMode) return
-        val actor=runtime.coverAccountId
+
+    // Runs the change availability code.
+    // Updates whether this staff member can receive new consultation requests.
+    fun changeAvailability(value: Boolean) {
+        if (!authorized() || runtime.state.accountRole != AccountRole.STAFF || runtime.localMode) return
+        val actor = runtime.coverAccountId
         runtime.scope.launch {
-            try { repository.available(value);if(authorized() && actor==runtime.coverAccountId) available=value }
-            catch(cancelled:CancellationException) { throw cancelled }
-            catch(_:Exception) { if(authorized() && actor==runtime.coverAccountId) error=R.string.safety_sync_error }
+            try {
+                repository.available(value)
+                if (authorized() && actor == runtime.coverAccountId) available =
+                    value
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (authorized() && actor == runtime.coverAccountId) error =
+                    R.string.safety_sync_error
+            }
         }
     }
 }

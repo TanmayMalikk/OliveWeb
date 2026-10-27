@@ -1,16 +1,30 @@
+// Contains the index.test code for this part of Olive.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId: "olive-test", storageBucket: "olive-test.appspot.com"});
 const { _test } = require("./index");
+const mediaTest = require("./src/mediaTickets")._test;
 
 test("deployment keeps the existing callable endpoint names", () => {
   const endpoints = require("./index");
-  const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount",
+  const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount", "createPublicAccount",
     "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
-    "safetyPlanShareContacts", "safetyPlansSharedWithMe"];
+    "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
+    "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
+    "mediaDownloadTicket", "mediaUpdateAccess", "mediaDelete", "staffSupportRequest",
+    "safetySupportContact", "safetySupportAdmin"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+test("encrypted media access keeps the owner and exact wrapped-key recipients", () => {
+  assert.deepEqual(
+    mediaTest.accessRequest({wrappedKeys:{owner:"owner-key",staff:"staff-key"}}, "owner"),
+    {wrappedKeys:{owner:"owner-key",staff:"staff-key"},allowedUsers:["owner","staff"]},
+  );
+  assert.throws(() => mediaTest.accessRequest({wrappedKeys:{staff:"staff-key"}}, "owner"));
+  assert.throws(() => mediaTest.accessRequest({wrappedKeys:{}}, "owner"));
 });
 
 test("role aliases and real organization emails are deterministic", () => {

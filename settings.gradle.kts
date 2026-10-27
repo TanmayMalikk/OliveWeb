@@ -1,3 +1,4 @@
+// Contains the settings.gradle code for this part of Olive.
 pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
@@ -5,3 +6,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Olive Branch"
 include(":app")
+include(":ppocr-sdk")

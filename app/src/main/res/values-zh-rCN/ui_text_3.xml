@@ -102,4 +102,6 @@
     <string name="ui_update_your_profile_details">更新你的个人资料。</string>
     <string name="ui_profile_required_fields">请填写全名、有效的出生日期和城市。</string>
     <string name="password_excludes_username">密码不能包含用户名。</string>
+<string name="ocr_no_text">未从文档中识别出文字。</string>
+    <string name="ocr_error_detail">OCR 错误：%1$s</string>
 </resources>
