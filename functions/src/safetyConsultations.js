@@ -44,7 +44,7 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
     return {plan: updated};
   });
   if (result.plan.staffUid) await saveSupportConversation(
-      {...result.plan, supportOrigin: PLAN_CONSULT}, result.plan.supportSafeContactUid || "");
+      {...result.plan, supportOrigin: PLAN_CONSULT}, result.plan.supportSafeContactUid || "", true);
   else if (action === "stop") await closeSupportConversation(caller.uid, PLAN_CONSULT);
   return result;
 });

@@ -10,6 +10,7 @@ import com.olive.app.ui.users.shared.organization.OrganizationSettings
 import com.olive.app.ui.users.shared.organization.OrganizationMap
 import com.olive.app.ui.users.shared.organization.OrganizationDashboardCard
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
+import com.olive.app.ui.users.safecontact.SharedEntryViewer
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -63,6 +64,7 @@ internal fun StaffPortal(session: SessionViewModel) {
         }
         StaffPage.Map -> OrganizationMap(onBack = { page = StaffPage.Dashboard })
     }
+    if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
 @Composable

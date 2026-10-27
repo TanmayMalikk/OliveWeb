@@ -50,7 +50,7 @@ internal class SessionSupport(private val runtime: SessionRuntime) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                if (runtime.coverAccountId == actor) error = R.string.safety_sync_error
+                if (runtime.coverAccountId == actor) error = R.string.support_request_error
             } finally {
                 if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
             }
@@ -67,9 +67,30 @@ internal class SessionSupport(private val runtime: SessionRuntime) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                error = R.string.safety_sync_error
+                error = R.string.support_admin_request_error
             } finally {
                 saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
+    fun close(conversationId: String) {
+        if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || conversationId.isBlank() || saving > 0) return
+        val actor = runtime.coverAccountId ?: return
+        saving++
+        error = null
+        runtime.scope.launch {
+            try {
+                withContext(Dispatchers.IO) { repository.close(conversationId) }
+                if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
+                    runtime.conversationActions.closeConversation()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (runtime.coverAccountId == actor) error = R.string.support_close_error
+            } finally {
+                if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
             }
         }
     }

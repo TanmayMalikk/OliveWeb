@@ -317,6 +317,18 @@ test('support conversations allow one user, safe contact, staff member, and admi
   await assertSucceeds(setDoc(doc(staff,`conversations/${conversationId}/messages/staff-message`),
     {senderUid:'support-staff',senderUsername:'support_staff',ciphertext:'encrypted-support-message',
       deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+  for (const [client,uid,username] of [[staff,'support-staff','support_staff'],
+    [owner,'support-owner','support_owner']]) {
+    const batch=writeBatch(client);
+    const messageId=`batch-${uid}`;
+    batch.set(doc(client,`conversations/${conversationId}/messages/${messageId}`),
+      {senderUid:uid,senderUsername:username,ciphertext:'encrypted-support-message',
+        deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()});
+    batch.update(doc(client,`conversations/${conversationId}`),
+      {lastMessage:'Secure message',lastMessageId:messageId,lastSenderUid:uid,
+        updatedAt:serverTimestamp()});
+    await assertSucceeds(batch.commit());
+  }
   await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}/messages/staff-message`)));
 });
 

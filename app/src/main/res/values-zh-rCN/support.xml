@@ -11,6 +11,13 @@
     <string name="support_staff_found">已分配 %1$s。正在打开支持聊天…</string>
     <string name="support_staff_ready">已分配一名工作人员。正在打开 Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
+    <string name="support_no_conversations">暂无支持对话。</string>
+    <string name="messaging_send_denied">服务器拒绝了这条消息。请重新打开对话并重试。</string>
+    <string name="support_ticket_consultation">咨询</string>
+    <string name="support_ticket_support">支持</string>
+    <string name="support_ticket_escalation">升级处理</string>
+    <string name="support_request_error">无法请求工作人员帮助。请检查网络连接并重试。</string>
+    <string name="support_admin_request_error">无法请求管理员帮助。请重试。</string>
     <string name="support_filter_plan_consults">计划咨询</string>
     <string name="support_filter_support">支持</string>
     <string name="support_filter_needs_admin">需要管理员</string>
@@ -61,4 +68,7 @@
     <string name="support_location_permissions">应用权限设置</string>
     <string name="support_resource_hotline">求助热线</string>
     <string name="support_resource_shelter">庇护所</string>
+    <string name="support_close_chat">为所有人关闭聊天</string>
+    <string name="support_chat_closed">工作人员已关闭。此聊天已为所有人归档。</string>
+    <string name="support_close_error">无法关闭聊天。请检查网络连接并重试。</string>
 </resources>

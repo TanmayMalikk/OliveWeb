@@ -6,9 +6,11 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 
 import com.olive.app.R
+import android.util.Log
 
 import androidx.core.content.edit
 import com.olive.app.data.*
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,7 +56,14 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_secure_conversation)
                     } finally {
-                        if (epoch == token) messagingBusy = false
+                        if (epoch == token) {
+                            messagingBusy = false
+                            val updated = activeConversation
+                            if (messageSubscription == null && updated?.id == conversation.id &&
+                                updated.updatedAt != conversation.updatedAt) {
+                                openConversation(updated)
+                            }
+                        }
                     }
                 }
             }
@@ -97,9 +106,14 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         if (epoch == token && activeConversation?.id == conversation.id) onSent()
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
-                        if (epoch == token) message =
-                            runtime.application.getString(R.string.ui_unable_to_send_the_message)
+                    } catch (error: Exception) {
+                        Log.e("OliveMessaging", "Encrypted message send failed", error)
+                        if (epoch == token) message = runtime.application.getString(
+                            if (error is FirebaseFirestoreException &&
+                                error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+                            ) R.string.messaging_send_denied
+                            else R.string.ui_unable_to_send_the_message
+                        )
                     } finally {
                         if (epoch == token) messagingBusy = false
                     }

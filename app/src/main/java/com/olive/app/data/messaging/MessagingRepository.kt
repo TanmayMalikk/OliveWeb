@@ -269,6 +269,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             row.getString("supportTag").orEmpty().ifBlank {
                 if (row.getString("type") == "SUPPORT") SUPPORT_TAG_SUPPORT else ""
             },
+            row.getTimestamp("closedAt")?.toDate()?.time ?: 0L,
         )
     }
 
