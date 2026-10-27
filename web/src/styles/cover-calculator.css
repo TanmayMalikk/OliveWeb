@@ -1,0 +1,368 @@
+/* Styles the cover-calculator part of the web app. */
+.calculator-page {
+  max-width: 75rem;
+  margin: auto;
+  padding-bottom: 4rem;
+}
+.calculator-heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-block: 2.5rem;
+}
+.calculator-heading > svg {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.calculator-heading h1 {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  margin-top: 0.4rem;
+}
+.calculator-mode-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.32rem;
+  margin-bottom: 1.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  background: #eef1e7;
+}
+.calculator-mode-tabs > button {
+  min-width: 8.5rem;
+  min-height: 2.8rem;
+  padding: 0.6rem 1.25rem;
+  border-radius: 0.62rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+.calculator-mode-tabs > button[aria-selected="true"] {
+  background: var(--paper);
+  color: var(--olive);
+  box-shadow: 0 1px 5px rgb(48 62 41 / 12%);
+}
+.graphing-workspace {
+  display: grid;
+  grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr);
+  min-height: 38rem;
+  border: 1px solid var(--line);
+  border-radius: 1.1rem;
+  background: var(--paper);
+  overflow: hidden;
+  box-shadow: 0 16px 42px rgb(52 66 43 / 8%);
+}
+.graph-expression-panel {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+  background: #fafbf6;
+}
+.graph-expression-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.15rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.graph-expression-heading h2 {
+  margin-top: 0.2rem;
+  font-size: 1.75rem;
+}
+.angle-mode {
+  min-width: 3.4rem;
+  min-height: 2.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: var(--paper);
+  color: var(--olive);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.graph-expression-row {
+  display: grid;
+  grid-template-columns: 1.25rem 0.35rem auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 1.2rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+.graph-expression-number {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.graph-expression-colour {
+  width: 0.35rem;
+  height: 2.7rem;
+  border-radius: 999px;
+  background: #3f6b43;
+}
+.graph-y-label {
+  font: 1.25rem var(--serif);
+  color: var(--olive);
+}
+.graph-expression-row input {
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.4rem 0.25rem;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font:
+    1.15rem ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+}
+.graph-expression-row input:focus {
+  outline: none;
+  border-bottom-color: var(--olive);
+}
+.graph-expression-row button,
+.graph-table-button {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 0.5rem;
+  background: var(--olive);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+.graph-expression-details {
+  padding: 1rem 1.15rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.graph-expression-details > p:last-child {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.graph-expression-details strong {
+  color: var(--ink);
+  font:
+    1rem ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  overflow-wrap: anywhere;
+}
+.graph-table-button {
+  margin: auto 1.15rem 1.15rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--olive);
+}
+.graph-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 38rem;
+  overflow: hidden;
+  background: #fbfcf8;
+}
+.graph-stage .graph {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 38rem;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.graph-zoom-controls,
+.graph-pan-controls {
+  position: absolute;
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #cdd4c7;
+  border-radius: 0.65rem;
+  background: #cdd4c7;
+  box-shadow: 0 4px 14px rgb(44 56 38 / 12%);
+}
+.graph-zoom-controls {
+  top: 1rem;
+  right: 1rem;
+}
+.graph-pan-controls {
+  right: 1rem;
+  bottom: 1rem;
+  grid-template-columns: repeat(5, 2.55rem);
+}
+.graph-zoom-controls > button,
+.graph-pan-controls > button {
+  display: grid;
+  place-items: center;
+  width: 2.55rem;
+  height: 2.55rem;
+  background: rgb(255 255 252 / 94%);
+  color: var(--olive);
+}
+.graph-zoom-controls > button:hover,
+.graph-pan-controls > button:hover {
+  background: #edf2e7;
+}
+.graph-error {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 5rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.6rem;
+  background: rgb(255 250 246 / 94%);
+}
+.calculator-layout {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 4rem;
+  margin-top: 2rem;
+  align-items: start;
+}
+.calculator-body {
+  padding: clamp(1rem, 3vw, 2rem);
+}
+.calculator-tool-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: calc(-1 * clamp(1rem, 3vw, 2rem)) calc(-1 * clamp(1rem, 3vw, 2rem))
+    1.25rem;
+  padding: 0.65rem;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.calculator-tool-tabs > button {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+.calculator-tool-tabs > button:hover,
+.calculator-tool-tabs > button[aria-current] {
+  background: #e9ede2;
+  color: var(--olive);
+}
+.calculator-display {
+  padding: 1.5rem 0.5rem;
+  background: #eef1e6;
+  border-radius: 1rem;
+  display: grid;
+  gap: 1rem;
+  text-align: right;
+}
+.calculator-display > input {
+  border: 0;
+  background: transparent;
+  text-align: right;
+  font-size: 1.2rem;
+  padding: 0.5rem;
+}
+.calculator-display > output {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  font-weight: 350;
+}
+.calculator-options {
+  display: flex;
+  justify-content: space-between;
+  margin-block: 0.5rem;
+}
+.calculator-keys {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.calculator-keys > button {
+  min-height: clamp(3.7rem, 8vw, 5rem);
+  background: #eef0e6;
+  border-radius: 1rem;
+  font-size: 1.5rem;
+  font-weight: 350;
+}
+.calculator-keys > button:hover {
+  background: #dce4cf;
+}
+.calculator-keys .equals {
+  background: var(--olive);
+  color: white;
+}
+.calculator-keys .operator {
+  background: #dfe6d4;
+}
+.scientific-keys {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.3rem;
+  margin-bottom: 0.7rem;
+}
+.scientific-keys > button {
+  min-height: 2.75rem;
+  font-size: 0.8rem;
+  background: var(--soft);
+  border-radius: 0.4rem;
+}
+.calculator-note {
+  padding: 3rem 0;
+}
+.calculator-note h2 {
+  font-size: clamp(2.8rem, 4.8vw, 5rem);
+  margin-block: 1rem 2rem;
+}
+.calculator-note p {
+  max-width: 22rem;
+  font-size: 0.85rem;
+}
+.calculator-note-line {
+  height: 1px;
+  background: var(--line);
+  width: 4rem;
+  margin-block: 2rem;
+}
+.graph {
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  margin-top: 1.5rem;
+}
+.graph-controls {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: 0.8rem;
+}
+.graph-controls .button {
+  padding: 0.6rem;
+  min-width: 2.75rem;
+  border-radius: 0.7rem;
+}
+.calculation-history > h2 {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+}
+.calculation-history > button {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  border-bottom: 1px solid var(--line);
+  padding: 1.2rem 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.tool-result {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+  line-height: 1.8;
+}

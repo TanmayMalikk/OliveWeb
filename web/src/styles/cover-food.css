@@ -1,0 +1,423 @@
+/* Styles the cover-food part of the web app. */
+.cover-public-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1.4rem;
+  padding: 0.5rem clamp(1rem, 4vw, 4rem);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.7rem;
+}
+.cover-public-bar a {
+  padding: 0.4rem;
+}
+.cover-container {
+  width: min(100% - clamp(2rem, 7vw, 8rem), 88rem);
+  margin: auto;
+}
+.cover-tabs {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.5rem, 2vw, 2rem);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  padding-block: 0.5rem;
+  scrollbar-width: thin;
+}
+.cover-tabs > button {
+  min-height: 2.75rem;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  color: var(--muted);
+  padding: 0.5rem 0.4rem;
+}
+.cover-tabs > button[aria-current] {
+  border-bottom: 2px solid var(--olive);
+  color: var(--olive);
+}
+.food-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding-block: 2rem;
+}
+.food-wordmark {
+  font: 700 3.8rem/0.8 var(--serif);
+  letter-spacing: -0.08em;
+}
+.food-wordmark > span {
+  display: block;
+  letter-spacing: 0.13em;
+  font: 600 0.46rem system-ui;
+  margin-top: 0.9rem;
+}
+.delivery-location {
+  display: flex;
+  gap: 0.6rem;
+}
+.delivery-location > span {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  font-weight: 400;
+}
+.delivery-location strong {
+  display: inline-block;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  padding-top: 0.3rem;
+}
+.badge {
+  display: inline-grid;
+  place-items: center;
+  background: #dde4d2;
+  border-radius: 50%;
+  min-width: 1.4rem;
+  min-height: 1.4rem;
+  color: var(--olive);
+  font-size: 0.65rem;
+}
+.food-hero {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+  margin-block: clamp(2rem, 4vw, 5rem);
+  background: #ebeee0;
+  border-radius: 1.5rem;
+  padding: clamp(2rem, 5vw, 5rem);
+  overflow: hidden;
+}
+.food-hero h1 {
+  font-size: clamp(3.1rem, 5.8vw, 6.7rem);
+  margin-block: 1.5rem;
+}
+.food-hero p {
+  font-size: 0.9rem;
+}
+.food-hero .text-link {
+  margin-top: 1.7rem;
+}
+.food-hero-image {
+  position: relative;
+  min-width: 0;
+}
+.food-hero-image > img {
+  aspect-ratio: 1;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  box-shadow: 0 1rem 2rem #26351b15;
+}
+.food-hero-image > svg {
+  position: absolute;
+  width: 45%;
+  bottom: -8%;
+  left: -18%;
+  color: #8c9e6d;
+  transform: rotate(-35deg);
+}
+.food-stamp {
+  position: absolute;
+  right: -5%;
+  top: -4%;
+  width: 6.5rem;
+  height: 6.5rem;
+  border: 1px dashed #809365;
+  border-radius: 50%;
+  background: #eef0e4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  text-align: center;
+  line-height: 1.3;
+  font-size: 0.53rem;
+  letter-spacing: 0.1em;
+  transform: rotate(12deg);
+}
+.food-stamp br {
+  display: none;
+}
+.menu-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 2rem;
+  margin-bottom: 1.8rem;
+}
+.menu-heading h2 {
+  margin-top: 1rem;
+}
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 3rem;
+  padding: 0.3rem 1rem;
+  background: var(--white);
+  min-width: 0;
+  color: var(--muted);
+}
+.search-field input {
+  border: 0;
+  min-height: 2.5rem;
+  background: transparent;
+  outline-offset: 0;
+  padding: 0.3rem 0.1rem;
+  font-size: 0.8rem;
+}
+.search-field > svg {
+  flex-shrink: 0;
+}
+.menu-heading > .search-field {
+  width: min(100%, 23rem);
+}
+.filter-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  max-width: 100%;
+  padding-block: 0.4rem 0.9rem;
+}
+.filter-row > button {
+  flex-shrink: 0;
+  min-height: 2.65rem;
+  padding: 0.5rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 3rem;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--paper);
+}
+.filter-row > button[aria-pressed="true"] {
+  background: var(--olive);
+  border-color: var(--olive);
+  color: white;
+}
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 2.5rem 1.5rem;
+  margin-block: 1.4rem 5rem;
+}
+.dish-card {
+  min-width: 0;
+}
+.dish-photo {
+  position: relative;
+}
+.dish-photo > button:first-child {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 1rem;
+}
+.dish-photo img {
+  width: 100%;
+  aspect-ratio: 1.4;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+.dish-photo > button:first-child:hover img {
+  transform: scale(1.03);
+}
+.favorite {
+  position: absolute;
+  right: 0.8rem;
+  top: 0.8rem;
+  border-radius: 50%;
+  width: 2.6rem;
+  height: 2.6rem;
+  background: var(--paper);
+  display: grid;
+  place-items: center;
+  color: var(--olive);
+}
+.favorite.saved {
+  background: var(--olive);
+  color: white;
+}
+.dish-diet {
+  position: absolute;
+  bottom: 0.8rem;
+  left: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 1rem;
+  background: #fdfdf0e6;
+  font-size: 0.62rem;
+}
+.dish-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-block: 0.9rem 0.6rem;
+}
+.dish-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.dish-name {
+  font: 1.45rem/1.1 var(--serif);
+  letter-spacing: -0.025em;
+  text-align: left;
+  padding: 0;
+  min-height: 2.3rem;
+}
+.dish-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.dish-card > p {
+  font-size: 0.78rem;
+  margin-top: 0.4rem;
+  min-height: 2.7rem;
+}
+.dish-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.9rem;
+}
+.dish-bottom > strong {
+  font-size: 0.95rem;
+  font-weight: 550;
+}
+.add-dish {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  background: var(--soft);
+  border-radius: 50%;
+}
+.quantity {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+  background: var(--soft);
+  border-radius: 2rem;
+  font-size: 0.8rem;
+}
+.quantity > button {
+  min-width: 2.3rem;
+  min-height: 2.6rem;
+  display: grid;
+  place-items: center;
+}
+.quantity > span {
+  min-width: 1.2rem;
+  text-align: center;
+}
+.modal-food {
+  width: 100%;
+  aspect-ratio: 2;
+  object-fit: cover;
+  border-radius: 1rem;
+  margin-bottom: 1.5rem;
+}
+.ingredient-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-block: 1rem 2rem;
+  gap: 0.5rem;
+}
+.ingredient-list label,
+.checkbox-row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  font-size: 0.85rem;
+  min-height: 2.75rem;
+}
+.ingredient-list input,
+.checkbox-row input {
+  width: 1.15rem;
+  height: 1.15rem;
+  min-height: 0;
+  accent-color: var(--olive);
+  flex-shrink: 0;
+}
+.cart-layout {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 3rem;
+  margin-block: 3rem 5rem;
+}
+.cart-layout h1 {
+  margin-block: 1rem 2rem;
+  font-size: 3.5rem;
+}
+.cart-row {
+  display: flex;
+  gap: 1.2rem;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-block: 1.3rem;
+  flex-wrap: wrap;
+}
+.cart-row > img {
+  width: 5rem;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 0.8rem;
+}
+.cart-row > div:nth-child(2) {
+  flex: 1;
+  min-width: 8rem;
+}
+.cart-row h3 {
+  font: 1.2rem var(--serif);
+}
+.cart-row small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.cart-row > strong {
+  font-size: 0.85rem;
+}
+.order-summary {
+  align-self: start;
+  position: sticky;
+  top: 2rem;
+  margin-top: 3rem;
+}
+.order-summary h2 {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+.order-summary > div {
+  display: flex;
+  justify-content: space-between;
+}
+.order-summary p {
+  font-size: 0.8rem;
+  margin-block: 1rem 1.5rem;
+}
+.order-summary > .button {
+  width: 100%;
+}
+.order-summary > .text-link {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.8rem;
+}
+.cover-account {
+  max-width: 40rem;
+  margin: 4rem auto;
+}
+.cover-account h1 {
+  font-size: 3rem;
+  margin-block: 1rem;
+}
+.cover-account > .button {
+  margin-top: 1.5rem;
+}

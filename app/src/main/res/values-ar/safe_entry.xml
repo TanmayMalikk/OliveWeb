@@ -22,5 +22,5 @@
     <string name="entry_auth_cancelled">ألغيت المصادقة أو إنها غير متاحة. يظل الدخول مقفلًا.</string>
 <string name="entry_verify_trigger">أكد هويتك بقفل الجهاز لتغيير كلمة الدخول.</string>
     <string name="entry_invalid_trigger">اختر كلمة أو عبارة من 3 إلى 64 حرفًا.</string>
-    <string name="entry_calculator_help">للدخول الآمن، أدخل رمز التطبيق (أو أي 4 إلى 6 أرقام عند استخدام قفل الجهاز)، ثم اضغط يساوي مرتين. يظل قفل الجهاز يتطلب مصادقة Android.</string>
+    <string name="entry_calculator_help">تحتاج الحاسبة إلى رمز تطبيق احتياطي. أدخله واضغط يساوي مرتين للدخول الآمن. يمكن أن يظل قفل الجهاز طريقة الدخول المفضلة.</string>
 </resources>

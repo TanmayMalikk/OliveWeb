@@ -1,0 +1,155 @@
+/* Styles the landing-responsive part of the web app. */
+@media (max-width: 68rem) {
+  .landing > .site-header nav {
+    display: none;
+  }
+  .landing-hero {
+    gap: 2rem;
+  }
+  .hero-food {
+    top: 12%;
+  }
+  .hero-news {
+    top: 35%;
+  }
+  .art-caption {
+    font-size: 1.2rem;
+  }
+  .cover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .account-aside {
+    padding: 2.5rem;
+  }
+  .account-main {
+    padding: 2rem;
+  }
+  .setup-covers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 48rem) {
+  .landing-hero {
+    grid-template-columns: 1fr;
+    padding-top: 2rem;
+  }
+  .hero-copy {
+    max-width: 35rem;
+  }
+  .hero-copy h1 {
+    font-size: clamp(3.5rem, 11vw, 5.6rem);
+  }
+  .hero-art {
+    max-width: 35rem;
+    width: 100%;
+    margin: 1rem auto 0;
+  }
+  .hero-art .art-caption {
+    font-size: 1.6rem;
+  }
+  .header-actions .quiet {
+    display: none;
+  }
+  .values-strip {
+    gap: 1rem;
+    font-size: 0.63rem;
+  }
+  .values-strip i:nth-of-type(2) {
+    display: none;
+  }
+  .section-heading {
+    display: block;
+  }
+  .section-heading > p {
+    margin-top: 1.3rem;
+  }
+  .cover-section {
+    padding-block: 3.5rem;
+  }
+  .how-section {
+    grid-template-columns: 1fr;
+    padding-bottom: 3rem;
+    gap: 0;
+  }
+  .how-branch {
+    display: none;
+  }
+  .how-steps li {
+    gap: 1rem;
+  }
+  .landing-cta {
+    display: block;
+  }
+  .landing-cta > .button {
+    margin-top: 2rem;
+  }
+  .site-footer {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .site-footer > span {
+    margin-left: 0;
+    width: 100%;
+  }
+  .account-layout {
+    grid-template-columns: 1fr;
+  }
+  .account-aside {
+    display: none;
+  }
+  .account-main {
+    padding: 1.5rem;
+  }
+  .account-form {
+    margin-block: 2rem;
+  }
+  .download-account {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .step-progress {
+    margin-bottom: 2.5rem;
+  }
+  .cover-caption {
+    gap: 0.5rem;
+  }
+  .cover-caption h3 {
+    font-size: 0.8rem;
+  }
+  .cover-caption p {
+    font-size: 0.68rem;
+  }
+  .cover-grid {
+    gap: 1rem 0.7rem;
+  }
+  .cover-preview-button {
+    padding: 0.5rem;
+  }
+  .cover-preview {
+    padding: 0.7rem;
+  }
+  .preview-masthead {
+    font-size: 1.2rem;
+  }
+  .preview-food > span {
+    font-size: 1rem;
+  }
+  .preview-news > strong {
+    font-size: 1rem;
+  }
+  .preview-masthead.newspaper {
+    font-size: 0.8rem;
+  }
+  .preview-masthead > span {
+    display: none;
+  }
+  .setup-covers .cover-preview {
+    aspect-ratio: 1.1;
+  }
+  .hero-art .cover-preview {
+    padding: 1rem;
+  }
+  .hero-art .preview-food > span {
+    font-size: 1.3rem;
+  }
+}

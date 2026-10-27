@@ -19,6 +19,8 @@
     <string name="a11y_zoom">التكبير</string>
     <string name="a11y_zoom_in">تكبير</string>
     <string name="a11y_zoom_out">تصغير</string>
+    <string name="a11y_reset_zoom">إعادة ضبط التكبير</string>
+    <string name="a11y_zoom_percent">التكبير: %1$d%%</string>
     <string name="a11y_pan_left">تحريك لليسار</string>
     <string name="a11y_pan_right">تحريك لليمين</string>
     <string name="a11y_pan_up">تحريك للأعلى</string>

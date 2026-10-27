@@ -19,6 +19,8 @@
     <string name="a11y_zoom">Zoom</string>
     <string name="a11y_zoom_in">Zoom in</string>
     <string name="a11y_zoom_out">Zoom out</string>
+    <string name="a11y_reset_zoom">Reset zoom</string>
+    <string name="a11y_zoom_percent">Zoom: %1$d%%</string>
     <string name="a11y_pan_left">Pan left</string>
     <string name="a11y_pan_right">Pan right</string>
     <string name="a11y_pan_up">Pan up</string>
