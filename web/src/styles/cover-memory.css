@@ -1,0 +1,211 @@
+/* The grid gives the play area the remaining viewport height. Container units
+   fit the artwork inside that space without stretching its physics coordinates. */
+@media (min-width: 48.01rem) {
+  .grove {
+    height: 100svh;
+    min-height: 32rem;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding-inline: clamp(1.5rem, 4vw, 5rem);
+  }
+  .grove-main {
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: clamp(1.5rem, 4vw, 5rem);
+    padding-block: clamp(0.5rem, 2svh, 1.5rem);
+    margin: 0 auto;
+  }
+  .grove-intro h1 {
+    font-size: clamp(2.1rem, min(4.6vw, 7svh), 5rem);
+    margin-block: clamp(0.75rem, 2.5svh, 1.5rem);
+  }
+  .grove-intro p {
+    font-size: clamp(0.8rem, 1.4svh, 0.95rem);
+    line-height: 1.75;
+  }
+  .grove-games {
+    margin-top: clamp(1rem, 3svh, 2rem);
+  }
+  .grove-game {
+    height: 100%;
+    min-height: 0;
+    width: 100%;
+    max-width: 46rem;
+    justify-self: end;
+    display: flex;
+    flex-direction: column;
+    padding: clamp(0.85rem, 2svh, 1.5rem);
+    border-radius: 1.25rem;
+  }
+  .game-score {
+    flex: none;
+    padding-bottom: clamp(0.5rem, 1.3svh, 0.85rem);
+    margin-bottom: clamp(0.6rem, 1.5svh, 1rem);
+  }
+  .game-score strong {
+    font-size: clamp(1.4rem, 3.2svh, 2rem);
+  }
+  .flight-arena,
+  .crossing-arena,
+  .memory-arena {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    container-type: size;
+    display: grid;
+    place-items: center;
+    border-radius: 0.85rem;
+    background: #eef1e3;
+  }
+  .flight-stage {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    max-height: 100%;
+    border-radius: 0.85rem;
+  }
+  .flight-stage > svg {
+    width: 100%;
+    height: 100%;
+  }
+  .crossing-stage {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0.85rem;
+  }
+  .flight-overlay {
+    padding: 1rem;
+    gap: 0.5rem;
+  }
+  .flight-overlay strong {
+    font-size: clamp(1.1rem, 4cqi, 1.8rem);
+  }
+  .flight-instructions {
+    flex: none;
+    margin-top: 0.5rem;
+    font-size: 0.7rem;
+    line-height: 1.5;
+  }
+  .game-bottom {
+    flex: none;
+    margin-top: clamp(0.4rem, 1svh, 0.8rem);
+    gap: 0.5rem;
+  }
+  .game-bottom p {
+    max-width: none;
+    flex: 1 1 9rem;
+  }
+  .game-bottom .button {
+    min-height: 44px;
+    padding: 0.6rem 0.8rem;
+  }
+  .memory-arena {
+    background: transparent;
+  }
+  .memory-grid {
+    width: min(100cqi, calc(100cqb * 1.2), 35rem);
+  }
+  .memory-card > span > svg {
+    width: 55%;
+    height: 55%;
+  }
+  .flight-controls {
+    flex-shrink: 0;
+  }
+}
+
+.memory-options {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: start;
+  gap: 0.5rem 1rem;
+  margin-top: 1rem;
+  max-width: 25rem;
+}
+.memory-options label {
+  font-size: 0.8rem;
+}
+.memory-options select {
+  min-height: 44px;
+  border: 1px solid #b9c4a9;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  color: #344b2d;
+  background: #fdfdf4;
+}
+.memory-options small {
+  grid-column: 1 / -1;
+  font-size: 0.7rem;
+  line-height: 1.6;
+  color: #626d59;
+}
+.memory-arena > .memory-grid {
+  grid-template-columns: repeat(var(--board-size, 5), minmax(0, 1fr));
+  gap: clamp(2px, 0.65cqi, 7px);
+  aspect-ratio: 1;
+}
+.memory-grid > .memory-card {
+  container-type: inline-size;
+  aspect-ratio: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border-radius: clamp(0.2rem, 1cqi, 0.65rem);
+}
+.memory-card > span {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.memory-card > span > svg {
+  width: 48%;
+  height: 48%;
+}
+.memory-card.turned > span > svg,
+.memory-card.matched > span > svg {
+  width: 32%;
+  height: 32%;
+}
+.memory-card b {
+  font-size: clamp(0.5rem, 28cqi, 1.5rem);
+  line-height: 1.1;
+  font-weight: 600;
+}
+.memory-free {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4e9;
+  border-style: dashed;
+  color: #526d3d;
+}
+.memory-free > svg {
+  width: 38%;
+  height: 38%;
+}
+.memory-free > span {
+  width: auto;
+  height: auto;
+  font-size: clamp(0.4rem, 17cqi, 0.7rem);
+  line-height: 1.3;
+}
+@media (min-width: 48.01rem) {
+  .memory-arena > .memory-grid {
+    width: min(100cqi, 100cqb, 42rem);
+  }
+}
+@media (max-width: 48rem) {
+  .memory-options {
+    margin-inline: auto;
+    text-align: left;
+  }
+}

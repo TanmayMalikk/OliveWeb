@@ -10,7 +10,14 @@ local.properties
 keystore.properties
 .DS_Store
 node_modules/
+web/dist/
+web/.env
+web/.env.local
+web/.env.*.local
+web/test-results/
+web/playwright-report/
 *-debug.log
 .firebase/
 
 distribution/
+web/*.tsbuildinfo
