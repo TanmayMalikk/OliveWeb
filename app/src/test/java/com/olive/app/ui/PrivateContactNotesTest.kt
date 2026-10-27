@@ -16,7 +16,7 @@ class PrivateContactNotesTest {
         )
         assertEquals(
             listOf("friend"),
-            conversation.privateNoteTargets("current", AccountRole.USER).map { it.uid },
+            conversation.privateNoteTargets("current", AccountRole.USER, setOf("friend")).map { it.uid },
         )
     }
 
@@ -36,7 +36,24 @@ class PrivateContactNotesTest {
         )
         assertEquals(
             listOf("user"),
-            conversation.privateNoteTargets("staff", AccountRole.STAFF).map { it.uid },
+            conversation.privateNoteTargets("staff", AccountRole.STAFF, emptySet()).map { it.uid },
+        )
+    }
+
+    @Test
+    fun personalAccountsCannotNotePeopleWhoAreNotFriends() {
+        val conversation = ChatConversation(
+            id = "support",
+            friendshipId = "support",
+            participantIds = listOf("user", "contact", "staff"),
+            participantUsernames = mapOf("user" to "olive_user", "contact" to "safe_contact"),
+            type = "SUPPORT",
+            ownerUid = "user",
+        )
+
+        assertEquals(
+            emptyList<String>(),
+            conversation.privateNoteTargets("contact", AccountRole.SAFE_CONTACT, emptySet()).map { it.uid },
         )
     }
 }

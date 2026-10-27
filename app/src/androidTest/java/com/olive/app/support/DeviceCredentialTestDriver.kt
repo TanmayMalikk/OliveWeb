@@ -6,6 +6,7 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 
 import android.app.UiAutomation
+import android.app.KeyguardManager
 import android.os.ParcelFileDescriptor
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.ui.test.junit4.ComposeTestRule
@@ -17,6 +18,14 @@ internal class DeviceCredentialTestDriver(
     private val compose: ComposeTestRule,
     private val automation: UiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
 ) {
+    fun ensurePhonePin() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val keyguard = context.getSystemService(KeyguardManager::class.java)
+        if (keyguard.isDeviceSecure) return
+        shell("locksettings set-pin 246810")
+        compose.waitUntil(10_000) { keyguard.isDeviceSecure }
+    }
+
     fun confirmPhonePin() {
         waitForPhonePin()
         // This PIN belongs only to the disposable emulator used by this test run.
@@ -52,7 +61,14 @@ internal class DeviceCredentialTestDriver(
                     it.text?.toString()?.contains("Use PIN", ignoreCase = true) == true
                 }
                     ?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                false
+                val hasPinText = findNode(root) {
+                    it.text?.toString()?.contains("PIN", ignoreCase = true) == true
+                } != null
+                val hasDigitKey = findNode(root) {
+                    it.className?.toString() == "android.widget.Button" &&
+                            it.text?.toString()?.length == 1 && it.text?.toString()?.all(Char::isDigit) == true
+                } != null
+                hasPinText || hasDigitKey
             }
         }
         // SystemUI creates keypad nodes before its opening animation starts accepting PIN input.

@@ -21,6 +21,7 @@ Add these repository secrets before the workflow runs:
   permission to deploy Firebase Storage rules and replace objects in
   `olive-21239.firebasestorage.app`.
 - `GEOAPIFY_API_KEY`: the production Geoapify browser key used by the Android app.
+- `MAPBOX_ACCESS_TOKEN`: the public Mapbox token used only for traffic-aware navigation routes.
 - `REALTIME_DATABASE_URL`: the production Firebase Realtime Database HTTPS URL.
 
 On Windows, create the keystore secret with:

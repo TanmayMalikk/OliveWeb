@@ -1,4 +1,4 @@
-package com.olive.app.ui.session
+package com.olive.app.ui
 
 import com.olive.app.data.HistoryRecord
 import com.olive.app.data.PrivateEntry

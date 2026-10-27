@@ -180,7 +180,7 @@ class OliveActivity : ComponentActivity() {
 
     // Runs when this part of the app leaves the screen.
     override fun onStop() {
-        if (!deviceLock.awaitingCredential && !session.externalFilePickerOpen && (session.deviceLockRequest != null ||
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen && (session.deviceLockRequest != null ||
                     session.screen in setOf(
                 SessionScreen.Pin,
                 SessionScreen.DevicePin,

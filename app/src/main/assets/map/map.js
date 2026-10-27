@@ -16,15 +16,17 @@ const markerAnimations={};
 const markerTargets={};
 const trails={};
 let accuracyCircle=null;
+let routeLine=null;
+let mapboxAttributionAdded=false;
 let points=[];
 let followEnabled=false;
 let followUid=null;
 function markerIcon(point){
-  const className=point.live?'olive-live-dot':(point.lastKnown?'olive-last-known-dot':'olive-contact-dot');
+  const className=point.blue?'olive-own-live-dot':(point.live?'olive-live-dot':(point.lastKnown?'olive-last-known-dot':'olive-contact-dot'));
   const size=(point.live||point.lastKnown)?24:22;
   return L.divIcon({className:'olive-live-marker',html:'<div class="'+className+'"></div>',iconSize:[size,size],iconAnchor:[size/2,size/2]});
 }
-function markerStyle(point){return point.live?'live':(point.lastKnown?'last-known':'contact');}
+function markerStyle(point){return point.blue?'blue':(point.live?'live':(point.lastKnown?'last-known':'contact'));}
 function animateMarker(uid,marker,target,duration){
   if(markerAnimations[uid]) cancelAnimationFrame(markerAnimations[uid]);
   const start=marker.getLatLng();
@@ -64,8 +66,8 @@ window.oliveSetPoints=function(next,moveCamera){
     if(marker.getPopup()) marker.setPopupContent(label); else marker.bindPopup(label);
     const trailPoints=(point.trail||[]).map(entry=>[entry.latitude,entry.longitude]);
     if(trailPoints.length>1){
-      if(trails[uid]) trails[uid].setLatLngs(trailPoints);
-      else trails[uid]=L.polyline(trailPoints,{color:'#c52b25',weight:4,opacity:.78,lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
+      if(trails[uid]) trails[uid].setLatLngs(trailPoints).setStyle({color:point.blue?'#1769aa':'#c52b25'});
+      else trails[uid]=L.polyline(trailPoints,{color:point.blue?'#1769aa':'#c52b25',weight:4,opacity:.78,lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
       trails[uid].bringToBack();
     }else if(trails[uid]){
       map.removeLayer(trails[uid]);delete trails[uid];
@@ -78,15 +80,28 @@ window.oliveSetPoints=function(next,moveCamera){
   }});
   const tracked=points.find(point=>point.live&&point.accuracy);
   if(tracked){
-    if(accuracyCircle) accuracyCircle.setLatLng([tracked.latitude,tracked.longitude]).setRadius(tracked.accuracy);
+    if(accuracyCircle) accuracyCircle.setLatLng([tracked.latitude,tracked.longitude]).setRadius(tracked.accuracy).setStyle({color:tracked.blue?'#1769aa':'#c52b25',fillColor:tracked.blue?'#1769aa':'#c52b25'});
     else accuracyCircle=L.circle([tracked.latitude,tracked.longitude],{
-      radius:tracked.accuracy,color:'#c52b25',weight:1,fillColor:'#c52b25',fillOpacity:.08,interactive:false
+      radius:tracked.accuracy,color:tracked.blue?'#1769aa':'#c52b25',weight:1,fillColor:tracked.blue?'#1769aa':'#c52b25',fillOpacity:.08,interactive:false
     }).addTo(map);
   }else if(accuracyCircle){map.removeLayer(accuracyCircle);accuracyCircle=null;}
   if((moveCamera||firstLocation)&&points.length){
     if(points.length===1) map.setView([points[0].latitude,points[0].longitude],14);
     else map.fitBounds(L.latLngBounds(points.map(point=>[point.latitude,point.longitude])),{padding:[36,36],maxZoom:14});
   }
+};
+window.oliveSetRoute=function(coordinates,fitRoute){
+  const line=coordinates||[];
+  if(line.length>1){
+    if(!mapboxAttributionAdded){
+      map.attributionControl.addAttribution('&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a>');
+      mapboxAttributionAdded=true;
+    }
+    if(routeLine) routeLine.setLatLngs(line);
+    else routeLine=L.polyline(line,{color:'#1769aa',weight:6,opacity:.86,lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
+    routeLine.bringToBack();
+    if(fitRoute) map.fitBounds(routeLine.getBounds(),{padding:[38,38],maxZoom:16});
+  }else if(routeLine){map.removeLayer(routeLine);routeLine=null;}
 };
 window.oliveZoomIn=function(){map.zoomIn();};
 window.oliveZoomOut=function(){map.zoomOut();};

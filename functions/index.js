@@ -7,7 +7,9 @@ Object.assign(exports, require("./src/organizationAccounts"));
 Object.assign(exports, require("./src/accountDeletion"));
 Object.assign(exports, require("./src/safetyPlans"));
 Object.assign(exports, require("./src/safetyConsultations"));
-exports.safetySupportContact = require("./src/supportGroups").safetySupportContact;
+const supportGroups = require("./src/supportGroups");
+exports.safetySupportContact = supportGroups.safetySupportContact;
+exports.safetySupportAdmin = supportGroups.safetySupportAdmin;
 Object.assign(exports, require("./src/mediaTickets"));
 
 const {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,

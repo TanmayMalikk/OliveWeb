@@ -350,6 +350,8 @@
     <string name="no_friends_yet">还没有朋友。</string>
     <string name="direct_messages">直接消息</string>
     <string name="direct_message">直接留言</string>
+    <string name="support_conversation">支持对话</string>
+    <string name="request_admin_help">请求管理员协助</string>
     <string name="select_a_friend_or_conversation_to_start_messaging">选择朋友或对话以开始发送消息。</string>
     <string name="unsend_message">取消发送消息</string>
     <string name="message_unsent">消息未发送</string>
@@ -451,4 +453,22 @@
     <string name="back_to_messages">返回消息</string>
     <string name="unable_to_update_archived_chat">无法更新此归档聊天。</string>
     <string name="unable_to_save_private_contact_note">无法保存此私人备注。</string>
+    <string name="safe_contact_live_location">你的实时位置</string>
+    <string name="safe_contact_live_location_help">闪烁的蓝点是你的当前位置。该位置保持私密，不会显示给用户。</string>
+    <string name="location_no_shared_users">目前没有用户与你共享实时位置。</string>
+    <string name="location_navigation_destination">导航至</string>
+    <string name="location_route_summary">%1$s · 约 %2$s</string>
+    <string name="location_next_direction">下一步：%1$s</string>
+    <string name="location_start_navigation">导航</string>
+    <string name="location_stop_navigation">停止导航</string>
+    <string name="location_route_privacy">你的当前位置只会发送给地图服务商用于计算路线，不会与用户共享。</string>
+    <string name="location_route_unavailable">请开启位置权限，并等待用户的实时位置后再开始导航。</string>
+    <string name="location_route_failed">无法找到路线。请检查网络连接后重试。</string>
+    <string name="private_note_friends_only">你只能为好友添加私人备注。</string>
+    <string name="location_route_not_configured">此版本尚未配置 Mapbox 导航。</string>
+    <string name="location_full_screen_navigation">全屏导航</string>
+    <string name="location_exit_full_screen">退出全屏导航</string>
+    <string name="location_finding_route">正在查找最佳路线…</string>
+    <string name="location_navigating_to">正在导航至 %1$s</string>
+    <string name="location_map_view">地图视图</string>
 </resources>

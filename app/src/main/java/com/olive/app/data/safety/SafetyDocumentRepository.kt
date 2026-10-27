@@ -48,7 +48,7 @@ interface SafetyDocumentDataSource {
 
     // Gets for.
     suspend fun getFor(uid: String, id: String): SafetyDocument
-    suspend fun share(document: SafetyDocument, ownerUid: String, recipientUids: List<String>)
+    suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
     suspend fun delete(document: SafetyDocument, ownerUid: String)
     suspend fun download(context: Context, document: SafetyDocument): File
 }
@@ -93,12 +93,15 @@ class SafetyDocumentRepository(
     override suspend fun share(
         document: SafetyDocument,
         ownerUid: String,
-        recipientUids: List<String>
+        recipients: Map<String, String>
     ) {
-        require(document.ownerUid == ownerUid && recipientUids.distinct().size <= 10)
-        require(document.objectKey.isBlank()) { "Encrypted media sharing will be enabled with chat attachment migration" }
+        require(document.ownerUid == ownerUid && recipients.size <= 10 && ownerUid !in recipients)
         val current = getFor(ownerUid, document.id)
-        val updated = (listOf(ownerUid) + recipientUids.distinct()).distinct()
+        if (current.objectKey.isNotBlank()) {
+            media.updateAccess(current.id, encryptedAccess(current, ownerUid, recipients))
+            return
+        }
+        val updated = (listOf(ownerUid) + recipients.keys).distinct()
         updateStorageAccess(current, current.allowedUsers.toSet(), updated.toSet())
         try {
             firestore.collection("files").document(document.id).update("allowed_users", updated)
@@ -115,10 +118,28 @@ class SafetyDocumentRepository(
         }
     }
 
-    suspend fun grantAccess(document: SafetyDocument, ownerUid: String, recipientUid: String) {
+    suspend fun grantAccess(
+        document: SafetyDocument,
+        ownerUid: String,
+        recipientUid: String,
+        recipientUsername: String,
+    ) {
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
-        require(document.objectKey.isBlank()) { "Encrypted media sharing will be enabled with chat attachment migration" }
         val current = getFor(ownerUid, document.id)
+        if (current.objectKey.isNotBlank()) {
+            if (recipientUid in current.allowedUsers && current.wrappedKeys[recipientUid]?.isNotBlank() == true) return
+            val ownerWrapped = current.wrappedKeys[ownerUid]
+                ?: error("The owner encryption key is unavailable")
+            val documentKey = KeyManager.unwrapKey(ownerWrapped)
+            val wrapped = current.wrappedKeys + (
+                recipientUid to KeyManager.wrapKey(
+                    documentKey,
+                    directoryPublicKey(recipientUid, recipientUsername),
+                )
+            )
+            media.updateAccess(current.id, wrapped)
+            return
+        }
         val updated = current.allowedUsers.toSet() + recipientUid
         updateStorageAccess(current, current.allowedUsers.toSet(), updated)
         try {
@@ -133,7 +154,12 @@ class SafetyDocumentRepository(
     suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) {
         val document = getFor(ownerUid, documentId)
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
-        require(document.objectKey.isBlank()) { "Encrypted media sharing will be enabled with chat attachment migration" }
+        if (document.objectKey.isNotBlank()) {
+            val wrapped = document.wrappedKeys - recipientUid
+            require(ownerUid in wrapped) { "The owner encryption key cannot be removed" }
+            media.updateAccess(document.id, wrapped)
+            return
+        }
         val updated = document.allowedUsers.toSet() - recipientUid
         updateStorageAccess(document, document.allowedUsers.toSet(), updated)
         try {
@@ -179,6 +205,40 @@ class SafetyDocumentRepository(
             (before - after).forEach { setCustomMetadata(accessKey(it), null) }
         }.build()
         storage.reference.child(document.storagePath).updateMetadata(metadata).await()
+    }
+
+    /** Re-wraps the document key for the exact final recipient set using registered device keys. */
+    private suspend fun encryptedAccess(
+        document: SafetyDocument,
+        ownerUid: String,
+        recipients: Map<String, String>,
+    ): Map<String, String> {
+        val ownerWrapped = document.wrappedKeys[ownerUid]
+            ?: error("The owner encryption key is unavailable")
+        val documentKey = KeyManager.unwrapKey(ownerWrapped)
+        return buildMap {
+            put(ownerUid, ownerWrapped)
+            recipients.forEach { (uid, username) ->
+                require(uid != ownerUid) { "The owner cannot be added as a recipient" }
+                val existing = document.wrappedKeys[uid]
+                put(
+                    uid,
+                    if (username.isBlank() && existing != null) existing
+                    else KeyManager.wrapKey(documentKey, directoryPublicKey(uid, username)),
+                )
+            }
+        }
+    }
+
+    /** Loads one exact messaging-directory entry and verifies it still belongs to the expected UID. */
+    private suspend fun directoryPublicKey(uid: String, username: String): java.security.PublicKey {
+        val normalized = username.trim().lowercase()
+        require(normalized.matches(Regex("[a-z0-9_]{4,24}"))) { "Recipient username is invalid" }
+        val row = firestore.collection("messageDirectory").document(normalized).get().await()
+        require(row.getString("uid") == uid) { "Recipient encryption identity is unavailable" }
+        return KeyManager.decodePublicKey(
+            row.getString("publicKey").orEmpty().ifBlank { error("Recipient encryption key is unavailable") }
+        )
     }
 
     private fun documentFrom(row: DocumentSnapshot, viewerUid: String): SafetyDocument? {

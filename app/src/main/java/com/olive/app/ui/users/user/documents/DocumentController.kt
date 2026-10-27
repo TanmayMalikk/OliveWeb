@@ -18,7 +18,6 @@ import com.olive.app.data.ChatSubscription
 import com.olive.app.data.DocumentOcrMetadata
 import com.olive.app.data.MediaKind
 import com.olive.app.data.OcrReview
-import com.olive.app.ui.media.MediaTransferController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
@@ -92,12 +91,12 @@ internal class SafetyDocumentsController(
         mimeType: String,
         identity: AccountIdentity,
         fallbackError: String,
+        kind: MediaKind,
         ocr: DocumentOcrMetadata? = null,
         onComplete: () -> Unit
     ) {
         val transfers = media ?: return reportError(fallbackError)
         state = state.copy(loading = true, error = null)
-        val kind = if (mimeType.startsWith("video/")) MediaKind.VIDEO else MediaKind.DOCUMENT
         val review = when {
             kind != MediaKind.DOCUMENT -> OcrReview.NOT_APPLICABLE
             ocr == null -> OcrReview.NOT_RUN
@@ -144,7 +143,11 @@ internal class SafetyDocumentsController(
             runCatching {
                 val source = checkNotNull(repository)
                 val document = source.getFor(ownerUid, documentId)
-                val file = source.download(applicationContext, document)
+                val file = if (document.objectKey.isNotBlank()) {
+                    checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, ownerUid)
+                } else {
+                    source.download(applicationContext, document)
+                }
                 if (token == generation && state.ownerUid == ownerUid) onReady(document, file)
             }.onFailure { if (token == generation) state = state.copy(error = it.localizedMessage) }
             if (token == generation) {
@@ -161,10 +164,10 @@ internal class SafetyDocumentsController(
     fun share(
         document: SafetyDocument,
         ownerUid: String,
-        recipientUids: List<String>,
+        recipients: Map<String, String>,
         onComplete: () -> Unit
     ) = run(refreshAfter = true, onComplete = onComplete) {
-        checkNotNull(repository).share(document, ownerUid, recipientUids)
+        checkNotNull(repository).share(document, ownerUid, recipients)
     }
 
     fun reportError(message: String?) {

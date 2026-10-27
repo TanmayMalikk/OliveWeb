@@ -123,7 +123,9 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                     try {
                         conversation.participantIds.filter { it != device.uid }.forEach { recipient ->
                             if (recipient !in document.allowedUsers) newlyGrantedRecipients += recipient
-                            documents.grantAccess(document, device.uid, recipient)
+                            val username = conversation.participantUsernames[recipient]
+                                ?: error("Recipient username is unavailable")
+                            documents.grantAccess(document, device.uid, recipient, username)
                         }
                         chat.send(
                             conversation.id, AccountIdentity(device.uid, coverUsername),

@@ -262,15 +262,17 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
       sentAt:serverTimestamp(),clientSentAt:Date.now()}));
 });
 
-test('support conversations allow exactly the server-selected user, staff, and safe contact', async () => {
+test('support conversations allow one user, safe contact, staff member, and admin', async () => {
   const owner=env.authenticatedContext('support-owner',{email:'support_owner@users.olive.invalid'}).firestore();
   const staff=env.authenticatedContext('support-staff',{email:'support_staff@staff.olive.invalid'}).firestore();
   const contact=env.authenticatedContext('support-contact',{email:'support_contact@safe.olive.invalid'}).firestore();
+  const admin=env.authenticatedContext('support-admin',{email:'support_admin@admin.olive.invalid'}).firestore();
   const stranger=env.authenticatedContext('support-stranger',{email:'support_stranger@users.olive.invalid'}).firestore();
   const directory=[
     [owner,'support_owner','support-owner','owner-key'],
     [staff,'support_staff','support-staff','staff-key'],
     [contact,'support_contact','support-contact','contact-key'],
+    [admin,'support_admin','support-admin','admin-key'],
   ];
   for (const [client,username,uid,publicKey] of directory) {
     await assertSucceeds(setDoc(doc(client,`messageDirectory/${username}`),
@@ -281,9 +283,9 @@ test('support conversations allow exactly the server-selected user, staff, and s
     recipientUsername:'support_owner',friendshipId:'support-staff--support-owner',createdAt:serverTimestamp(),
   }));
   const conversationId='support-support-owner';
-  const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',
-    friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact'],
-    participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact'},
+  const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',adminUid:'support-admin',
+    friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-admin'],
+    participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact','support-admin':'support_admin'},
     createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:''};
   await env.withSecurityRulesDisabled(async context => {
     await setDoc(doc(context.firestore(),`conversations/${conversationId}`),conversation);
@@ -291,11 +293,12 @@ test('support conversations allow exactly the server-selected user, staff, and s
   await assertSucceeds(getDoc(doc(owner,`conversations/${conversationId}`)));
   await assertSucceeds(getDoc(doc(staff,`conversations/${conversationId}`)));
   await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}`)));
+  await assertSucceeds(getDoc(doc(admin,`conversations/${conversationId}`)));
   await assertFails(getDoc(doc(stranger,`conversations/${conversationId}`)));
   await assertFails(updateDoc(doc(owner,`conversations/${conversationId}`),
     {participantIds:['support-owner','support-staff'],updatedAt:serverTimestamp()}));
-  const keys={roomKeys:{'support-owner':'owner-wrap','support-staff':'staff-wrap','support-contact':'contact-wrap'},
-    participantPublicKeys:{'support-owner':'owner-key','support-staff':'staff-key','support-contact':'contact-key'},
+  const keys={roomKeys:{'support-owner':'owner-wrap','support-staff':'staff-wrap','support-contact':'contact-wrap','support-admin':'admin-wrap'},
+    participantPublicKeys:{'support-owner':'owner-key','support-staff':'staff-key','support-contact':'contact-key','support-admin':'admin-key'},
     updatedAt:serverTimestamp()};
   await assertSucceeds(updateDoc(doc(owner,`conversations/${conversationId}`),keys));
   await assertFails(updateDoc(doc(staff,`conversations/${conversationId}`),{

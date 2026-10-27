@@ -16,7 +16,7 @@ data class AddressSuggestion(
     val address: DeliveryAddress
 )
 
-// Typed address lookup only; live device coordinates never pass through this provider.
+// Handles typed address searches through Geoapify.
 internal object GeoapifyClient {
     val configured get() = BuildConfig.GEOAPIFY_API_KEY.isNotBlank()
 

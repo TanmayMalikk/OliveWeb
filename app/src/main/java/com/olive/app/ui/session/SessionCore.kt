@@ -171,6 +171,8 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         }
     // Counts changes to PIN challenge.
     var pinChallengeVersion by mutableIntStateOf(0)
+    // Counts successful unlocks so the UI can run the safe-area reveal once.
+    var unlockAnimationVersion by mutableIntStateOf(0)
     // Counts changes to accessibility exit.
     var accessibilityExitVersion by mutableIntStateOf(0)
     var page by mutableStateOf(SafePage.Home)

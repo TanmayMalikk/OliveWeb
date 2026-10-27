@@ -36,7 +36,11 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.R
@@ -49,14 +53,17 @@ import kotlin.random.Random
 // Requirement bullets begin neutral, then turn green or red as the user types.
 @Composable
 internal fun RequirementBullet(text: String, met: Boolean, active: Boolean) {
-    val uiText = rememberResourceText()
     val color = when {
         !active -> Color.Black
         met -> OliveGreen
         else -> MaterialTheme.colorScheme.error
     }
     Row(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().clearAndSetSemantics {
+            contentDescription = text
+            role = Role.Checkbox
+            toggleableState = if (active && met) ToggleableState.On else ToggleableState.Off
+        },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -70,7 +77,7 @@ internal fun RequirementBullet(text: String, met: Boolean, active: Boolean) {
         ) {
             Icon(
                 Icons.Outlined.CheckCircle,
-                contentDescription = uiText(R.string.ui_requirement_met),
+                contentDescription = null,
                 tint = OliveGreen,
                 modifier = Modifier.size(14.dp)
             )

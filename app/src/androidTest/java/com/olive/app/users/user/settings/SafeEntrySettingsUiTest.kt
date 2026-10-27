@@ -42,6 +42,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     private fun session() = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
     // Sets up.
     private fun setup(deviceLock: Boolean = false): SessionViewModel {
+        if (deviceLock) driver.ensurePhonePin()
         openOnboarding()
         val model = session()
         compose.runOnIdle {
@@ -106,6 +107,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     }
 
     private fun enableDevice(model: SessionViewModel, pin: String = "123456") {
+        driver.ensurePhonePin()
         settings(model)
         fill("current_device_pin", pin)
         activate("entry_use_device")

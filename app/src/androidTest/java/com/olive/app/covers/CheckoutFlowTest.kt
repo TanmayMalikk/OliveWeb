@@ -22,6 +22,11 @@ class CheckoutFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Add to cart").performScrollTo().performClick()
         compose.onNodeWithText("Cart").performClick()
         compose.onNodeWithText("Continue to checkout").performScrollTo().performClick()
+        // Onboarding now asks only for a city, so checkout collects the rest of the delivery address.
+        fill("address_line1", "123 Test Street")
+        fill("address_province", "Alberta")
+        fill("address_postal", "T5J 0N3")
+        fill("address_country", "Canada")
         fill("checkout_recipient", "Transient Recipient")
         fill(
             "cardholder",

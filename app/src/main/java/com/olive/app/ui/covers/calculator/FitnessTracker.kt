@@ -26,6 +26,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -43,6 +44,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -55,6 +57,9 @@ internal fun FitnessTrackerScreen(accountId: String, onBack: () -> Unit) {
     var walk by remember(store) { mutableStateOf(store.walk()) }
     var message by remember { mutableStateOf<String?>(null) }
     var tick by remember { mutableIntStateOf(0) }
+    val activityPermissionNeeded = stringResource(R.string.activity_permission_needed)
+    val fitnessSettingsSaved = stringResource(R.string.fitness_settings_saved)
+    val locationNeededForWalk = stringResource(R.string.location_needed_for_walk)
     val requestLocation = LocalLocationPermissionRequest.current
     val scope = rememberCoroutineScope()
     val sensorManager = remember(context) { context.getSystemService(SensorManager::class.java) }
@@ -67,7 +72,7 @@ internal fun FitnessTrackerScreen(accountId: String, onBack: () -> Unit) {
     }
     val activityPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         activityAllowed = it
-        if (!it) message = context.getString(R.string.activity_permission_needed)
+        if (!it) message = activityPermissionNeeded
     }
 
     // Listen while this page is open; the hardware counter supplies the accumulated total.
@@ -132,7 +137,7 @@ internal fun FitnessTrackerScreen(accountId: String, onBack: () -> Unit) {
                 FitnessProfileCard(snapshot.profile) { updated ->
                     store.saveProfile(updated)
                     snapshot = store.snapshot()
-                    message = context.getString(R.string.fitness_settings_saved)
+                    message = fitnessSettingsSaved
                 }
             }
             item {
@@ -145,7 +150,7 @@ internal fun FitnessTrackerScreen(accountId: String, onBack: () -> Unit) {
                                 FitnessWalkService.start(context, accountId)
                                 message = null
                             } else {
-                                message = context.getString(R.string.location_needed_for_walk)
+                                message = locationNeededForWalk
                             }
                         }
                     },
@@ -195,6 +200,8 @@ private fun FitnessScaffold(onBack: () -> Unit, content: @Composable (PaddingVal
 
 @Composable
 private fun FitnessSummary(snapshot: FitnessSnapshot) {
+    val locale = LocalConfiguration.current.locales[0]
+    val numberFormat = remember(locale) { NumberFormat.getIntegerInstance(locale) }
     val distance = FitnessMath.distanceKm(snapshot.stepsToday, snapshot.profile.heightCm)
     val calories = FitnessMath.calories(snapshot.stepsToday, snapshot.profile)
     Card(colors = CardDefaults.cardColors(containerColor = Paper)) {
@@ -208,7 +215,7 @@ private fun FitnessSummary(snapshot: FitnessSnapshot) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.steps_today), color = Muted)
                     Text(
-                        String.format(Locale.getDefault(), "%,d", snapshot.stepsToday),
+                        numberFormat.format(snapshot.stepsToday),
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                     )
@@ -339,6 +346,8 @@ private fun WalkTrackerCard(
 
 @Composable
 private fun FitnessHistoryRow(day: FitnessDay, goal: Int) {
+    val locale = LocalConfiguration.current.locales[0]
+    val numberFormat = remember(locale) { NumberFormat.getIntegerInstance(locale) }
     val date = remember(day.date) {
         day.date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
     }
@@ -349,7 +358,7 @@ private fun FitnessHistoryRow(day: FitnessDay, goal: Int) {
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(10.dp))
-        Text(String.format(Locale.getDefault(), "%,d", day.steps))
+        Text(numberFormat.format(day.steps))
     }
 }
 

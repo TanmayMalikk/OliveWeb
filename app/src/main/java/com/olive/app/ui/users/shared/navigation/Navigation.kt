@@ -23,6 +23,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
@@ -113,16 +116,18 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
         session.page,
         session.coverAccountId
     ) { mutableStateOf(false) }
-    var observedScreen by remember { mutableStateOf(session.screen) }
+    var observedUnlock by remember { mutableIntStateOf(session.unlockAnimationVersion) }
     var pinAnimationRunning by remember { mutableStateOf(false) }
-    val correctPinJustUnlocked =
-        observedScreen == SessionScreen.Pin && session.screen == SessionScreen.Safe
-    val showPinAnimation = correctPinJustUnlocked || pinAnimationRunning
-    SideEffect {
-        if (correctPinJustUnlocked) pinAnimationRunning = true
-        observedScreen = session.screen
-        if (session.screen != SessionScreen.Safe) pinAnimationRunning = false
+    LaunchedEffect(session.unlockAnimationVersion, session.screen) {
+        val currentUnlock = session.unlockAnimationVersion
+        if (currentUnlock > observedUnlock && session.screen == SessionScreen.Safe) {
+            pinAnimationRunning = true
+        } else if (session.screen != SessionScreen.Safe) {
+            pinAnimationRunning = false
+        }
+        observedUnlock = currentUnlock
     }
+    val showPinAnimation = pinAnimationRunning
     Box(Modifier.fillMaxSize().then(if (isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(
@@ -323,7 +328,6 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                     if (showPinAnimation) PinSafeOliveTransition(
                         backgroundColor = MaterialTheme.colorScheme.background,
                         modifier = Modifier.fillMaxSize().testTag("pin_safe_animation")
-                            .clearAndSetSemantics {}
                             .pointerInput(Unit) {
                                 awaitPointerEventScope {
                                     while (true) awaitPointerEvent().changes.forEach { it.consume() }
@@ -378,8 +382,14 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
 
 // UI sizing: shared forms use 24dp side/top padding, 16dp row gaps, and 112dp bottom room for Quick exit.
 @Composable
-internal fun FormColumn(content: @Composable ColumnScope.() -> Unit) {
+internal fun FormColumn(
+    scrollResetKey: Any? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
     val scrollState = rememberScrollState()
+    LaunchedEffect(scrollResetKey) {
+        if (scrollResetKey != null) scrollState.scrollTo(0)
+    }
     Column(
         Modifier.fillMaxSize().oliveScrollbar(scrollState).verticalScroll(scrollState)
             .padding(horizontal = 24.dp).padding(top = 24.dp, bottom = 112.dp),
@@ -392,12 +402,20 @@ internal fun FormColumn(content: @Composable ColumnScope.() -> Unit) {
 internal fun Heading(
     title: String,
     subtitle: String,
-    appName: String = stringResource(R.string.olive_branch)
+    appName: String = stringResource(R.string.olive_branch),
+    focusKey: Any? = title,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(focusKey) {
+        if (focusKey != null) {
+            withFrameNanos { }
+            focusRequester.requestFocus()
+        }
+    }
     Text(appName, fontFamily = FontFamily.Serif, fontSize = 30.sp, color = OliveGreen)
     Text(
         title,
-        modifier = Modifier.semantics { heading() },
+        modifier = Modifier.focusRequester(focusRequester).focusable().semantics { heading() },
         style = MaterialTheme.typography.headlineMedium
     )
     Text(subtitle, color = Muted)

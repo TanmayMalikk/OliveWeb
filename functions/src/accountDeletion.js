@@ -3,6 +3,7 @@ const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebase");
 const {text, roleFromUser, protectedAccount} = require("./accountPolicy");
 const {readProfile, deleteOrganizationLogin, requireAdmin, listEveryUser} = require("./accountStorage");
+const {saveSupportConversation} = require("./supportGroups");
 
 async function deleteQuery(query) {
   const snapshot = await query.get();
@@ -38,6 +39,12 @@ exports.adminDeleteAccount = onCall(async (request) => {
   await db.recursiveDelete(db.collection("safetyPlans").doc(uid));
   const sharedPlans = await db.collection("safetyPlans").where("staffUid", "==", uid).get();
   for (const plan of sharedPlans.docs) await plan.ref.update({staffUid: "", staffName: "", consultationRequested: true});
+  const escalatedPlans = await db.collection("safetyPlans").where("adminUid", "==", uid).get();
+  for (const snapshot of escalatedPlans.docs) {
+    const plan = {...snapshot.data(), adminUid: "", adminName: ""};
+    await snapshot.ref.update({adminUid: "", adminName: ""});
+    if (plan.staffUid) await saveSupportConversation(plan, plan.supportSafeContactUid || "");
+  }
   await db.collection("safetyStaff").doc(uid).delete();
   await deleteQuery(db.collection("friendRequests").where("senderUid", "==", uid));
   await deleteQuery(db.collection("friendRequests").where("recipientUid", "==", uid));

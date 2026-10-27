@@ -350,6 +350,8 @@
     <string name="no_friends_yet">لا أصدقاء بعد.</string>
     <string name="direct_messages">رسائل مباشرة</string>
     <string name="direct_message">رسالة مباشرة</string>
+    <string name="support_conversation">محادثة دعم</string>
+    <string name="request_admin_help">طلب مساعدة مسؤول</string>
     <string name="select_a_friend_or_conversation_to_start_messaging">حدد صديقًا أو محادثة لبدء المراسلة.</string>
     <string name="unsend_message">إلغاء إرسال الرسالة</string>
     <string name="message_unsent">لم يتم إرسال الرسالة</string>
@@ -451,4 +453,22 @@
     <string name="back_to_messages">العودة إلى الرسائل</string>
     <string name="unable_to_update_archived_chat">تعذر تحديث هذه المحادثة المؤرشفة.</string>
     <string name="unable_to_save_private_contact_note">تعذر حفظ هذه الملاحظة الخاصة.</string>
+    <string name="safe_contact_live_location">موقعك المباشر</string>
+    <string name="safe_contact_live_location_help">النقطة الزرقاء الوامضة هي موقعك الحالي. يبقى خاصًا ولا يظهر للمستخدم.</string>
+    <string name="location_no_shared_users">لا يشارك أي مستخدم موقعه المباشر معك الآن.</string>
+    <string name="location_navigation_destination">التنقل إلى</string>
+    <string name="location_route_summary">%1$s · حوالي %2$s</string>
+    <string name="location_next_direction">التالي: %1$s</string>
+    <string name="location_start_navigation">بدء التنقل</string>
+    <string name="location_stop_navigation">إيقاف التنقل</string>
+    <string name="location_route_privacy">يُرسل موقعك الحالي إلى مزود الخرائط فقط لحساب المسار، ولا تتم مشاركته مع المستخدم.</string>
+    <string name="location_route_unavailable">فعّل إذن الموقع وانتظر موقع المستخدم المباشر قبل بدء التنقل.</string>
+    <string name="location_route_failed">تعذر العثور على مسار. تحقق من الاتصال وحاول مرة أخرى.</string>
+    <string name="private_note_friends_only">يمكنك إضافة ملاحظات خاصة للأصدقاء فقط.</string>
+    <string name="location_route_not_configured">لم يتم إعداد تنقل Mapbox لهذا الإصدار.</string>
+    <string name="location_full_screen_navigation">التنقل بملء الشاشة</string>
+    <string name="location_exit_full_screen">الخروج من التنقل بملء الشاشة</string>
+    <string name="location_finding_route">جارٍ البحث عن أفضل مسار…</string>
+    <string name="location_navigating_to">التنقل إلى %1$s</string>
+    <string name="location_map_view">عرض الخريطة</string>
 </resources>

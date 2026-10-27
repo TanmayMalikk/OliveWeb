@@ -234,6 +234,24 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
+    // Adds one admin to this staff member's assigned support chat when extra help is needed.
+    fun requestAdminHelp(ownerUid: String) {
+        if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || ownerUid.isBlank()) return
+        saving++
+        error = null
+        runtime.scope.launch {
+            try {
+                repository.requestAdminHelp(ownerUid)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                error = R.string.safety_sync_error
+            } finally {
+                saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
     // Loads the plans that other users currently share with this safe contact.
     fun refreshSharedPlans() {
         if (!authorized() || runtime.state.accountRole != AccountRole.SAFE_CONTACT || runtime.localMode) return

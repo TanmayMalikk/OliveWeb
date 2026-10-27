@@ -112,8 +112,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
             role = session.accountRole
         )
     )
-    FormColumn {
-        Heading(uiText(R.string.your_profile), pages[page])
+    FormColumn(scrollResetKey = page) {
+        Heading(uiText(R.string.your_profile), pages[page], focusKey = page)
         OnboardingProgress(progressCompleted, totalRequired, progressPage, stages, pageCompletion)
         AnimatedContent(targetState = pages[page], label = "onboarding page") { current ->
             when (current) {
