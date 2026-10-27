@@ -11,6 +11,7 @@ import com.olive.app.ui.users.shared.organization.OrganizationMap
 import com.olive.app.ui.users.shared.organization.OrganizationDashboardCard
 import com.olive.app.ui.users.staff.portal.SafetyConsultations
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
+import com.olive.app.ui.users.safecontact.SharedEntryViewer
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -70,6 +71,7 @@ internal fun AdminPortal(session: SessionViewModel) {
         AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
         AdminPage.Messages -> MessagesScreen(session, exit = { page = AdminPage.Dashboard })
     }
+    if (session.viewedSharedEntry != null) SharedEntryViewer(session)
     if (createOpen) CreateAccountDialog(session, onDismiss = { createOpen = false })
     deleteTarget?.let { account ->
         AlertDialog(

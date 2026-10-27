@@ -2,12 +2,15 @@ package com.olive.app.ui.users.shared.messaging
 
 import com.olive.app.data.AccountRole
 import com.olive.app.data.ChatConversation
+import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
+import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
+import com.olive.app.data.SUPPORT_TAG_SUPPORT
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PrivateContactNotesTest {
     @Test
-    fun supportChatsHideOrganizationNamesAndAreHighlightedForUsers() {
+    fun supportChatsShowTheUserToStaffAndHideOrganizationNamesFromPersonalAccounts() {
         val conversation = ChatConversation(
             id = "support",
             friendshipId = "support",
@@ -17,13 +20,30 @@ class PrivateContactNotesTest {
             ownerUid = "user",
             staffUid = "staff",
             adminUid = "admin",
+            supportOrigin = SUPPORT_TAG_SUPPORT,
+            supportTag = SUPPORT_TAG_SUPPORT,
         )
 
         assertEquals("Olive Staff", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.USER, "Olive Staff"))
         assertEquals("Olive Staff", conversation.senderDisplayName("admin", "real_admin_name", AccountRole.SAFE_CONTACT, "Olive Staff"))
         assertEquals("real_staff_name", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.ADMIN, "Olive Staff"))
-        assertEquals(true, conversation.highlightedFor(AccountRole.USER))
-        assertEquals(false, conversation.highlightedFor(AccountRole.STAFF))
+        val anonymousName = conversation.anonymousStaffDisplayName(
+            "Olive Staff", "Consultation", "Support", "Escalation"
+        )
+        assertEquals("Olive Staff • Support", conversation.displayName("user", AccountRole.USER, anonymousName))
+        assertEquals("Olive Staff • Support", conversation.displayName("contact", AccountRole.SAFE_CONTACT, anonymousName))
+        assertEquals("olive_user", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("olive_user", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals(
+            "Olive Staff • Consultation",
+            conversation.copy(supportOrigin = SUPPORT_TAG_PLAN_CONSULT, supportTag = SUPPORT_TAG_PLAN_CONSULT)
+                .anonymousStaffDisplayName("Olive Staff", "Consultation", "Support", "Escalation"),
+        )
+        assertEquals(
+            "Olive Staff • Escalation",
+            conversation.copy(supportTag = SUPPORT_TAG_NEEDS_ADMIN)
+                .anonymousStaffDisplayName("Olive Staff", "Consultation", "Support", "Escalation"),
+        )
     }
 
     @Test

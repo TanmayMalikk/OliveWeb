@@ -110,7 +110,16 @@ internal fun ChatPane(
                         color = Muted
                     )
                     Text(
-                        active.displayName(currentUid, uiText(R.string.support_chat_name)),
+                        active.displayName(
+                            currentUid,
+                            session.accountRole,
+                            active.anonymousStaffDisplayName(
+                                uiText(R.string.support_chat_name),
+                                uiText(R.string.support_ticket_consultation),
+                                uiText(R.string.support_ticket_support),
+                                uiText(R.string.support_ticket_escalation),
+                            ),
+                        ),
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.semantics { heading() })
                     if (active.type == "SUPPORT" && session.accountRole in setOf(
@@ -137,16 +146,24 @@ internal fun ChatPane(
             }
             HorizontalDivider()
             if (session.accountRole == com.olive.app.data.AccountRole.STAFF &&
-                active.type == "SUPPORT" && active.adminUid.isBlank()) {
+                active.type == "SUPPORT" && active.closedAt == 0L && active.adminUid.isBlank()) {
                 OutlinedButton(
                     onClick = { session.requestAdminHelp(active.id) },
                     enabled = session.support.saving == 0,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                         .testTag("request_admin_help"),
                 ) { Text(stringResource(R.string.request_admin_help)) }
-                session.support.error?.let { message ->
-                    Text(stringResource(message), color = MaterialTheme.colorScheme.error)
-                }
+            }
+            if (session.accountRole == com.olive.app.data.AccountRole.STAFF &&
+                active.type == "SUPPORT" && active.closedAt == 0L) {
+                OutlinedButton(
+                    onClick = { session.closeSupportChat(active.id) },
+                    enabled = session.support.saving == 0,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("close_support_chat"),
+                ) { Text(stringResource(R.string.support_close_chat)) }
+            }
+            session.support.error?.let { message ->
+                Text(stringResource(message), color = MaterialTheme.colorScheme.error)
             }
             Column(Modifier.weight(1f).fillMaxWidth().imePadding().padding(bottom = 10.dp)) {
                 LazyColumn(

@@ -384,7 +384,7 @@
     <string name="organization_live_map">Live location map</string>
     <string name="organization_live_map_description">This protected view is ready to show assigned users as blinking red points.</string>
     <string name="organization_location_feed_not_enabled">Live organization location sharing is not enabled yet. No user location is being collected for this view.</string>
-    <string name="support_conversations">Support conversations</string>
+    <string name="support_conversations">Support chats</string>
     <string name="assigned_users_count">Assigned users: %1$d</string>
     <string name="safety_plan_shared_in_chat">Safety plan shared in the support chat.</string>
     <string name="share_safety_plan_support_chat">Share it with the assigned staff member and safe contact.</string>

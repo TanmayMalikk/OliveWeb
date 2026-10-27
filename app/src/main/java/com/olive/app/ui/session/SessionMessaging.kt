@@ -156,7 +156,9 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                             conversations = rows
                             activeConversation?.let { active ->
                                 rows.firstOrNull { it.id == active.id }?.let { updated ->
-                                    if (active.participantIds != updated.participantIds) {
+                                    if (active.closedAt == 0L && updated.closedAt > 0L) {
+                                        conversationActions.closeConversation()
+                                    } else if (active.participantIds != updated.participantIds) {
                                         messageSubscription?.close()
                                         messageSubscription = null
                                         activeConversation = null
@@ -164,6 +166,10 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                                     } else {
                                         activeConversation = updated
                                         conversationActions.markConversationRead(updated)
+                                        if (messageSubscription == null && !messagingBusy &&
+                                            active.updatedAt != updated.updatedAt) {
+                                            conversationActions.openConversation(updated)
+                                        }
                                     }
                                 }
                             }

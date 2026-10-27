@@ -230,6 +230,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
     fun shareSafetyPlanInChat() = runtime.secureSharing.shareSafetyPlan()
     fun requestAdminHelp(conversationId: String) = runtime.support.requestAdmin(conversationId)
+    fun closeSupportChat(conversationId: String) = runtime.support.close(conversationId)
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 

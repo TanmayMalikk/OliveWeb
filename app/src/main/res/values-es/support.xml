@@ -11,6 +11,13 @@
     <string name="support_staff_found">Se asignó a %1$s. Abriendo el chat de apoyo…</string>
     <string name="support_staff_ready">Se asignó un miembro del personal. Abriendo Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
+    <string name="support_no_conversations">Aún no hay conversaciones de soporte.</string>
+    <string name="messaging_send_denied">El servidor rechazó este mensaje. Vuelve a abrir el chat e inténtalo de nuevo.</string>
+    <string name="support_ticket_consultation">Consulta</string>
+    <string name="support_ticket_support">Soporte</string>
+    <string name="support_ticket_escalation">Escalada</string>
+    <string name="support_request_error">No se pudo solicitar ayuda del personal. Comprueba tu conexión e inténtalo de nuevo.</string>
+    <string name="support_admin_request_error">No se pudo solicitar ayuda de un administrador. Inténtalo de nuevo.</string>
     <string name="support_filter_plan_consults">Consultas del plan</string>
     <string name="support_filter_support">Soporte</string>
     <string name="support_filter_needs_admin">Necesita administradores</string>
@@ -61,4 +68,7 @@
     <string name="support_location_permissions">Permisos de la aplicación</string>
     <string name="support_resource_hotline">Línea de ayuda</string>
     <string name="support_resource_shelter">Refugio</string>
+    <string name="support_close_chat">Cerrar chat para todos</string>
+    <string name="support_chat_closed">Cerrado por el personal. Este chat está archivado para todos.</string>
+    <string name="support_close_error">No se pudo cerrar el chat. Comprueba tu conexión e inténtalo de nuevo.</string>
 </resources>
