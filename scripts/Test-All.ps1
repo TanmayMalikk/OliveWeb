@@ -94,7 +94,13 @@ if ($WithDeviceTests) {
         $selectedDevice = $DeviceSerial
     } else {
         $selectedDevice = @($readyDevices | Where-Object { $_ -like 'emulator-*' } | Select-Object -First 1)[0]
-        if (-not $selectedDevice) { $selectedDevice = $readyDevices[0] }
+        if (-not $selectedDevice) {
+            throw "Android device tests require a disposable emulator. No running emulator was found."
+        }
+    }
+    $isEmulator = ((& $adb -s $selectedDevice shell getprop ro.kernel.qemu 2>&1) -join "`n").Trim()
+    if ($isEmulator -ne '1') {
+        throw "Android device tests are blocked on physical phones. Select a disposable emulator."
     }
     Write-Host "Using Android device: $selectedDevice" -ForegroundColor Cyan
     Invoke-Checked "Build Android UI tests" { & ".\gradlew.bat" -PoliveLocalTest=true assembleDebug assembleDebugAndroidTest }
@@ -113,8 +119,7 @@ if ($WithDeviceTests) {
     function Assert-DeviceTestPin {
         $verification = (& $adb -s $selectedDevice shell locksettings verify --old 246810 2>&1) -join "`n"
         if ($verification -match 'user has no password') {
-            $setResult = (& $adb -s $selectedDevice shell locksettings set-pin 246810 2>&1) -join "`n"
-            if ($setResult -notmatch "Pin set to '246810'") { throw "Could not configure the disposable emulator PIN: $setResult" }
+            throw "Device-lock UI tests require a disposable emulator that is already secured with test PIN 246810. The test runner will not create or change a device PIN."
         } elseif ($verification -notmatch 'Lock credential verified successfully') {
             throw "The Android device must use the disposable test PIN 246810: $verification"
         }
