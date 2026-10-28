@@ -1,6 +1,6 @@
-// Regular support tickets are independent from safety plans and plan consultations.
+// Users and staff: opens regular support tickets separately from plan consultations.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {db} = require("./firebase");
+const {db} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller} = require("./safetyPlanAccess");

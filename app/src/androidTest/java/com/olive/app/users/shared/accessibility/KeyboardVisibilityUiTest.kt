@@ -1,4 +1,4 @@
-// Tests the keyboard visibility UI test behavior.
+// Tests cover navigation while the keyboard is open.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -18,12 +18,10 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 
-// Groups the data and actions for keyboard visibility UI test.
 class KeyboardVisibilityUiTest : OliveUiTestBase() {
     private var originalHardwareKeyboardImeSetting = "0"
 
     @Before
-    // Shows software keyboard with hardware input.
     fun showSoftwareKeyboardWithHardwareInput() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         originalHardwareKeyboardImeSetting = android.os.ParcelFileDescriptor.AutoCloseInputStream(
@@ -33,7 +31,6 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
     }
 
     @After
-    // Restores software keyboard setting.
     fun restoreSoftwareKeyboardSetting() {
         InstrumentationRegistry.getInstrumentation().uiAutomation
             .executeShellCommand("settings put secure show_ime_with_hard_keyboard $originalHardwareKeyboardImeSetting")
@@ -121,7 +118,6 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
     }
 
     @Test
-    // Sets tings and chat fields stay above the keyboard.
     fun settingsAndChatFieldsStayAboveTheKeyboard() {
         register(username = "keyboard_tester")
         unlock()
@@ -133,8 +129,8 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         compose.runOnIdle {
             val uid = requireNotNull(session.coverAccountId)
-            session.navigate(SafePage.Messages)
-            session.openConversation(
+            session.navigation.openSafePage(SafePage.Messages)
+            session.messages.openConversation(
                 ChatConversation(
                     "keyboard-chat",
                     "fixture",

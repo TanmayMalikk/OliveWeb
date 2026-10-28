@@ -1,4 +1,4 @@
-// Contains the android device lock code for this part of Olive.
+// All signed-in roles: checks device credentials before safe-app entry.
 package com.olive.app.security
 
 import android.app.Activity
@@ -59,12 +59,10 @@ internal class AndroidDeviceLock(
                     activity.mainExecutor,
                     // Handles replies from authentication callback.
                     object : BiometricPrompt.AuthenticationCallback() {
-                        // Runs when authentication succeeded happens.
                         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                             finish(value, result.cryptoObject?.cipher)
                         }
 
-                        // Runs when authentication error happens.
                         override fun onAuthenticationError(code: Int, error: CharSequence) {
                             finish(value, null)
                         }
@@ -103,12 +101,10 @@ internal class AndroidDeviceLock(
             activity.mainExecutor,
             // Handles replies from authentication callback.
             object : BiometricPrompt.AuthenticationCallback() {
-                // Runs when authentication succeeded happens.
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     finish(value, runCatching { value.challenge.legacyCipher() }.getOrNull())
                 }
 
-                // Runs when authentication error happens.
                 override fun onAuthenticationError(code: Int, error: CharSequence) {
                     if (code == BiometricPrompt.BIOMETRIC_ERROR_NO_BIOMETRICS || code == BiometricPrompt.BIOMETRIC_ERROR_HW_NOT_PRESENT ||
                         code == BiometricPrompt.BIOMETRIC_ERROR_HW_UNAVAILABLE || code == BiometricPrompt.BIOMETRIC_ERROR_LOCKOUT ||

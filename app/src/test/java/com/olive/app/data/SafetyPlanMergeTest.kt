@@ -1,4 +1,4 @@
-// Tests the safety plan merge test behavior.
+// Tests offline safety-plan edits and conflict merging for users.
 package com.olive.app.data
 
 import com.olive.app.ui.shared.*
@@ -6,7 +6,6 @@ import com.olive.app.ui.shared.*
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for safety plan merge test.
 class SafetyPlanMergeTest {
     private val old =
         SafetyPlan("owner", "owner", mapOf("primary_destination" to SafetyField("Old", 1)))

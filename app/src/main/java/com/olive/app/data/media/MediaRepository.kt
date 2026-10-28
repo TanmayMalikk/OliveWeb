@@ -1,3 +1,4 @@
+// Users and approved viewers: requests encrypted media upload and download access.
 package com.olive.app.data.media
 
 import com.google.firebase.functions.FirebaseFunctions

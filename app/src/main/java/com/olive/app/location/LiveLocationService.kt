@@ -1,4 +1,4 @@
-// Contains the live location service code for this part of Olive.
+// Users and approved supporters: shares a user location while sharing is enabled.
 package com.olive.app.location
 
 import android.Manifest
@@ -39,13 +39,11 @@ class LiveLocationService : Service() {
     private var lastMotionAt = 0L
     private var lastTrailPruneAt = 0L
     private val callback = object : LocationCallback() {
-        // Runs when location result happens.
         override fun onLocationResult(result: LocationResult) {
             result.lastLocation?.let(::handleLocation)
         }
     }
 
-    // Runs when Android creates this part of the app.
     override fun onCreate() {
         super.onCreate()
         fused =
@@ -53,9 +51,7 @@ class LiveLocationService : Service() {
         createChannel()
     }
 
-    // Runs when bind happens.
     override fun onBind(intent: Intent?): IBinder? = null
-    // Runs when start command happens.
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == STOP) {
             intent.getStringExtra(OWNER_UID)?.let { ownerUid = it }
@@ -181,7 +177,6 @@ class LiveLocationService : Service() {
             }
     }
 
-    // Stops sharing.
     private fun stopSharing() {
         expiryHandler.removeCallbacks(expireSharing)
         if (::fused.isInitialized) fused.removeLocationUpdates(callback)
@@ -213,7 +208,6 @@ class LiveLocationService : Service() {
         }
     }
 
-    // Runs when Android removes this part of the app.
     override fun onDestroy() {
         expiryHandler.removeCallbacks(expireSharing)
         if (::fused.isInitialized) fused.removeLocationUpdates(callback)

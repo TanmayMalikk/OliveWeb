@@ -1,18 +1,16 @@
-// Contains the safety checklist code for this part of Olive.
+// Safe-app users and support staff: defines safety steps shown to users.
 package com.olive.app.data
 
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-// Groups the data and actions for safety checklist item.
 internal data class SafetyChecklistItem(
     val id: String,
     val text: String,
     val checked: Boolean = false
 )
 
-// Groups the data and actions for safety plan contact.
 internal data class SafetyPlanContact(val id: String, val name: String, val details: String)
 
 private const val SAFETY_CONTACT_PREFIX = "trusted-contact:"

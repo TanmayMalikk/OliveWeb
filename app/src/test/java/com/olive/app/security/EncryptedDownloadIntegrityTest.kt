@@ -1,3 +1,4 @@
+// Tests encrypted document size and checksum checks for approved viewers.
 package com.olive.app.security
 
 import com.olive.app.data.media.copyAndVerifyEncryptedDownload

@@ -1,3 +1,4 @@
+// Users and approved viewers: encrypts media files before upload and decrypts them after download.
 package com.olive.app.security
 
 import java.io.DataInputStream

@@ -1,4 +1,4 @@
-// Tests the security policy test behavior.
+// Tests username, password, PIN, and idle-lock rules for users.
 package com.olive.app.security
 
 import com.olive.app.ui.shared.*
@@ -6,7 +6,6 @@ import com.olive.app.ui.shared.*
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for security policy test.
 class SecurityPolicyTest {
     @Test
     fun newUsernamesNeedALetterAndPasswordsCannotContainTheirUsername() {

@@ -1,4 +1,4 @@
-// Contains the equation solver code for this part of Olive.
+// Calculator cover users: solves entered equations.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -96,7 +96,6 @@ internal object EquationSolver {
         return PolynomialParser(side).parse()
     }
 
-    // Groups the data and actions for polynomial parser.
     private class PolynomialParser(private val source: String) {
         private var index = 0
 
@@ -186,7 +185,6 @@ internal object EquationSolver {
             throw ResourceFailure(R.string.ui_unexpected_value, source[index])
         }
 
-        // Starts s primary.
         private fun startsPrimary() =
             index < source.length && (source[index] == '(' || source[index] == 'x' || source[index] == '.' || source[index].isDigit())
 
@@ -320,7 +318,6 @@ internal object EquationSolver {
         return formatCalculatorNumber(cleaned, 9)
     }
 
-    // Groups the data and actions for complex.
     private data class Complex(val real: Double, val imaginary: Double = 0.0) {
         val magnitude get() = sqrt(real * real + imaginary * imaginary)
         operator fun plus(other: Complex) = Complex(real + other.real, imaginary + other.imaginary)
@@ -340,7 +337,6 @@ internal object EquationSolver {
     }
 }
 
-// Groups the data and actions for calculator solver.
 internal enum class CalculatorSolver { Polynomial, Quadratic }
 
 // Each solver stays in a small calculator-style popup and handles the equation entirely on this device.

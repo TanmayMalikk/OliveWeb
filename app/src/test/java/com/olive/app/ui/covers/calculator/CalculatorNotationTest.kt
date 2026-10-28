@@ -1,4 +1,4 @@
-// Tests the calculator notation test behavior.
+// Tests scientific notation input and output in the calculator cover.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -6,7 +6,6 @@ import com.olive.app.ui.shared.*
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-// Groups the data and actions for calculator notation test.
 class CalculatorNotationTest {
     @Test
     fun normalizesEverySupportedScientificNotationSpelling() {

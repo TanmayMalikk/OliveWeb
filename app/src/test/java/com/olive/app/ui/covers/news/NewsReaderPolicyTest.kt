@@ -1,4 +1,4 @@
-// Tests the news reader policy test behavior.
+// Tests which article links the news reader may open safely.
 package com.olive.app.ui.covers.news
 
 import com.olive.app.ui.shared.*
@@ -7,7 +7,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for news reader policy test.
 class NewsReaderPolicyTest {
     @Test
     fun keepsSecureGoogleAndPublisherLinksInTheReader() {

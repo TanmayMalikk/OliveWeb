@@ -1,4 +1,4 @@
-// Tests the checkout flow test behavior.
+// Tests declined checkout and payment-form clearing in the food cover.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -12,10 +12,8 @@ import com.olive.app.security.EncryptedVault
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for checkout flow test.
 class CheckoutFlowTest : OliveUiTestBase() {
     @Test
-    // Checks out declines discards payment and background clears form.
     fun checkoutDeclinesDiscardsPaymentAndBackgroundClearsForm() {
         register(username = "checkout_tester")
         compose.onNodeWithText("Garden harvest bowl").performClick()

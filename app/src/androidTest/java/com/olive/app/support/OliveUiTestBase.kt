@@ -1,4 +1,4 @@
-// Tests the olive UI test base behavior.
+// Starts and resets the app for Android UI tests across user roles.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -241,7 +241,7 @@ abstract class OliveUiTestBase {
     protected fun trigger() {
         val session =
             androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
-        compose.runOnIdle { org.junit.Assert.assertTrue(session.interceptSearch("moon garden")) }
+        compose.runOnIdle { org.junit.Assert.assertTrue(session.account.interceptSearch("moon garden")) }
         waitFor("unlock_pin")
     }
 

@@ -1,4 +1,4 @@
-// Tests the test behavior.
+// Tests domain routing for all app roles.
 import { expect, it } from "vitest";
 import config from "../../site.config.json";
 import {
@@ -7,7 +7,7 @@ import {
   siteDestination,
   entryLinkUrl,
   siteMode,
-} from ".";
+} from "./SiteRouting";
 it("recognizes legacy cover paths while keeping their canonical cover identity", () => {
   for (const site of config.covers) {
     expect(coverForRoute(site.path)?.id).toBe(site.id);

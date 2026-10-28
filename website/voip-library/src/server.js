@@ -23,14 +23,6 @@ function sendJson(response, status, data) {
 }
 
 function hasValidToken(request, expectedToken){
-  response.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'cache-control': 'no-store'
-  });
-  response.end(JSON.stringify(data));
-}
-
-function hasValidToken(request, expectedToken){
   const header = request.headers.authorization || '';
   //TODO: understand the below regex expression and how it relates to authentication.
   const match = /^Bearer (.+)$/.exec(header);

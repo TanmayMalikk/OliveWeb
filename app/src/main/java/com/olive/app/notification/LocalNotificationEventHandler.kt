@@ -1,4 +1,4 @@
-// Contains the local notification event handler code for this part of Olive.
+// Signed-in users: handles account and support alerts on the device.
 package com.olive.app.notification
 
 import android.content.Context
@@ -74,7 +74,6 @@ class LocalSafeUpdateCheckWorker(context: Context, parameters: WorkerParameters)
     }
 }
 
-// Groups the data and actions for local notification event handler.
 object LocalNotificationEventHandler {
     private const val IMMEDIATE_WORK = "olive_local_notification_check_now"
     private const val BACKGROUND_WORK = "olive_local_notification_check_background"
@@ -175,7 +174,6 @@ object LocalNotificationEventHandler {
             }
     }
 
-    // Records conversation marker.
     private fun recordConversationMarker(
         context: Context, uid: String, conversationId: String, currentMessageId: String,
         senderUid: String
@@ -200,7 +198,6 @@ object LocalNotificationEventHandler {
         preferences.edit { putString(key, currentMessageId) }
     }
 
-    // Stops foreground listeners.
     private fun stopForegroundListeners() {
         friendListListener?.remove()
         friendListListener = null

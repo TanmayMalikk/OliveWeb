@@ -1,4 +1,4 @@
-// Contains the device lock key code for this part of Olive.
+// All signed-in roles: stores the key tied to the device lock.
 package com.olive.app.security
 
 import android.os.Build
@@ -60,7 +60,6 @@ internal class DeviceLockKey(private val namespace: String) {
     }
 }
 
-// Groups the data and actions for device lock challenge.
 class DeviceLockChallenge internal constructor(
     private val uid: String, private val key: SecretKey, private val saved: JSONObject?,
     private val keyId: String, private val alias: String,

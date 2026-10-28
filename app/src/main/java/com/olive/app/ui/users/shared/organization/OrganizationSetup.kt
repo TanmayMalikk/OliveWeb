@@ -1,4 +1,4 @@
-// Contains the organization setup code for this part of Olive.
+// All safe-app roles: collects staff and admin setup details.
 package com.olive.app.ui.users.shared.organization
 
 import com.olive.app.ui.shared.*
@@ -23,7 +23,7 @@ import com.olive.app.security.InputPolicy
 @Composable
 internal fun OrganizationProfileSetup(session: SessionViewModel) {
     val uiText = rememberResourceText()
-    val existing = session.setupProfile
+    val existing = session.account.setupProfile
     var fullName by remember(existing) { mutableStateOf(existing?.fullName.orEmpty()) }
     var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
     var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
@@ -39,7 +39,7 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
         Heading(
             uiText(
                 R.string.ui_complete_your_value_profile,
-                session.accountRole.localizedTitle(uiText)
+                session.account.role.localizedTitle(uiText)
             ), pages[page], uiText(R.string.olive_tree)
         )
         OnboardingProgress(
@@ -51,14 +51,14 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
                 uiText(R.string.full_name_required),
                 fullName,
                 "organization_full_name",
-                enabled = !session.busy,
+                enabled = !session.account.busy,
                 error = if (showErrors && fullName.isBlank()) uiText(R.string.ui_name_required) else null
             ) {
                 fullName = it.take(120)
                 showErrors = false
             }
             BirthdayPicker(
-                dob, "organization_dob", !session.busy,
+                dob, "organization_dob", !session.account.busy,
                 error = if (showErrors && !InputPolicy.validDob(dob)) uiText(R.string.ui_birthday_required) else null
             ) {
                 dob = it
@@ -69,7 +69,7 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
                 uiText(R.string.ui_email_required),
                 email,
                 "organization_email",
-                enabled = !session.busy,
+                enabled = !session.account.busy,
                 error = if (showErrors && !emailValid) uiText(R.string.ui_invalid_email) else null
             ) {
                 email = it.take(254)
@@ -79,14 +79,14 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
                 uiText(R.string.ui_phone_optional),
                 phone,
                 "organization_phone",
-                enabled = !session.busy
+                enabled = !session.account.busy
             ) { phone = it.take(40) }
         }
         Status(session)
         OnboardingNavigation(
             back = {
                 showErrors = false
-                if (page > 0) page-- else session.back()
+                if (page > 0) page-- else session.navigation.back()
             },
             next = {
                 showErrors = true
@@ -102,7 +102,7 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
             },
             last = page == pages.lastIndex,
             nextTag = if (page == pages.lastIndex) "organization_profile_submit" else "onboarding_next",
-            enabled = !session.busy
+            enabled = !session.account.busy
         )
     }
 }

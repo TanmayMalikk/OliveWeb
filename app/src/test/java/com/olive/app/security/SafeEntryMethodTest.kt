@@ -1,4 +1,4 @@
-// Tests the safe entry method test behavior.
+// Tests PIN and device-lock entry choices for safe-app users.
 package com.olive.app.security
 
 import com.olive.app.ui.shared.*
@@ -6,7 +6,6 @@ import com.olive.app.ui.shared.*
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for safe entry method test.
 class SafeEntryMethodTest {
     @Test
     fun recommendsSeparatePinWhenPhonePinIsKnown() {

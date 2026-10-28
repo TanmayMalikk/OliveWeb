@@ -1,4 +1,4 @@
-// Tests the safe update notification scheduler test behavior.
+// Tests the notification delay used by discreet cover updates.
 package com.olive.app.notification
 
 import com.olive.app.ui.shared.*
@@ -7,7 +7,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.random.Random
 
-// Groups the data and actions for safe update notification scheduler test.
 class SafeUpdateNotificationSchedulerTest {
     @Test
     fun randomDelayAlwaysStaysInsideConfiguredWindow() {

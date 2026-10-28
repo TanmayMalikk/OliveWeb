@@ -1,3 +1,4 @@
+// Tests that OCR text stays in encrypted document metadata for safe-app users.
 package com.olive.app.data
 
 import com.olive.app.security.EncryptionUtils

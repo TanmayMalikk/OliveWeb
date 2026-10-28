@@ -1,3 +1,4 @@
+// Users and approved viewers: defines encrypted media transfer states and metadata.
 package com.olive.app.data.media
 
 import org.json.JSONArray

@@ -7,7 +7,7 @@ import {readFile} from "node:fs/promises";
 const require = createRequire(new URL("../functions/package.json", import.meta.url));
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId:"demo-olive-rules",storageBucket:"demo-olive-rules.appspot.com"});
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8180";
-const {auth, db, bucket} = require("./src/firebase");
+const {auth, db, bucket} = require("./src/firebaseAdminClient");
 const {safetyPlanSync, safetyPlanConsultations, safetyPlanAvailability, safetyPlanShareContacts,
   safetyPlansSharedWithMe} = require("./src/safetyPlans");
 const {safetyPlanConsult} = require("./src/safetyConsultations");

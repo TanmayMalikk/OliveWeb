@@ -1,4 +1,4 @@
-// Tests the account policy test behavior.
+// Tests role sign-in IDs and required setup steps for users and safe contacts.
 package com.olive.app.data
 
 import com.olive.app.ui.shared.*
@@ -7,7 +7,6 @@ import com.olive.app.security.InputPolicy
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for account policy test.
 class AccountPolicyTest {
     private fun profile(role: AccountRole, trigger: String = "hash", email: String = "") =
         UserProfile(

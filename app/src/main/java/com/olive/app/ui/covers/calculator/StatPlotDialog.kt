@@ -1,4 +1,4 @@
-// Contains the stat plot dialog code for this part of Olive.
+// Calculator cover users: shows options for calculator statistics plots.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.sp
 import org.apache.commons.math3.distribution.NormalDistribution
 import kotlin.math.*
 
-// Groups the data and actions for stat plot type.
 private enum class StatPlotType(val label: Int) {
     Scatter(R.string.ui_scatter), XYLine(R.string.ui_xy_line), Histogram(
         R.string.ui_histogram
@@ -40,7 +39,6 @@ private enum class StatPlotType(val label: Int) {
     Box(R.string.ui_box_plot), ModifiedBox(R.string.ui_modified_box), Normal(R.string.ui_normal_probability)
 }
 
-// Groups the data and actions for stat axis.
 internal data class StatAxis(val minimum: Double, val maximum: Double, val increment: Double)
 
 // Pick clean increments from the data span so axes use values such as 1, 5, 10, 25, or 50.

@@ -1,10 +1,8 @@
-// Contains the messaging models code for this part of Olive.
+// All chat roles: defines friends, conversations, and message records.
 package com.olive.app.data
 
-// Groups the data and actions for directory user.
 data class DirectoryUser(val uid: String, val username: String, val publicKey: String = "")
 
-// Groups the data and actions for friend request.
 data class FriendRequest(
     val id: String,
     val senderUid: String,
@@ -14,23 +12,19 @@ data class FriendRequest(
     val createdAt: Long,
 )
 
-// Groups the data and actions for friend.
 data class Friend(val friendshipId: String, val uid: String, val username: String)
 
 // A private note belongs only to the signed-in account on this device.
 data class PrivateContactNote(val uid: String, val username: String, val body: String)
 
-// Groups the data and actions for social snapshot.
 data class SocialSnapshot(
     val friends: List<Friend> = emptyList(),
     val incoming: List<FriendRequest> = emptyList(),
     val outgoing: List<FriendRequest> = emptyList(),
 )
 
-// Groups the data and actions for friend relationship.
 enum class FriendRelationship { AddFriend, RequestSent, IncomingRequest, Friends }
 
-// Groups the data and actions for chat conversation.
 data class ChatConversation(
     val id: String,
     val friendshipId: String,
@@ -91,7 +85,6 @@ internal const val SUPPORT_TAG_PLAN_CONSULT = "PLAN_CONSULT"
 internal const val SUPPORT_TAG_SUPPORT = "SUPPORT"
 internal const val SUPPORT_TAG_NEEDS_ADMIN = "NEEDS_ADMIN"
 
-// Groups the data and actions for chat message.
 data class ChatMessage(
     val id: String,
     val senderUid: String,

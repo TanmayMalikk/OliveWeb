@@ -1,4 +1,4 @@
-// Tests the responsive persistence test behavior.
+// Tests restored accounts, chats, notes, covers, and news after restart.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -25,12 +25,10 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.util.UUID
 
-// Groups the data and actions for responsive persistence test.
 class ResponsivePersistenceTest {
     private val context get() = ApplicationProvider.getApplicationContext<android.content.Context>()
 
     @Test
-    // Starts up session restores enrollment and profile together.
     fun startupSessionRestoresEnrollmentAndProfileTogether() {
         val suffix = UUID.randomUUID().toString()
         val store = DeviceStore(

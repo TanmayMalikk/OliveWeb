@@ -1,4 +1,4 @@
-// Contains the secure document repository code for this part of Olive.
+// Safe-app users and support staff: opens encrypted documents for approved viewers.
 package com.olive.app.data
 
 import com.google.firebase.firestore.FieldValue
@@ -11,7 +11,6 @@ import org.json.JSONObject
 import java.security.PublicKey
 import javax.crypto.SecretKey
 
-// Groups the data and actions for secure document repository.
 class SecureDocumentRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
     /**

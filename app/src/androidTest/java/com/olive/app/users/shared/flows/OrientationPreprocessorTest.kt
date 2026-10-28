@@ -1,4 +1,4 @@
-// Tests the orientation preprocessor test behavior.
+// Tests rotation correction before OCR reads user documents.
 package com.olive.app.ocr
 
 import com.olive.app.ui.shared.*
@@ -19,7 +19,6 @@ import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
 
 @RunWith(AndroidJUnit4::class)
-// Groups the data and actions for orientation preprocessor test.
 class OrientationPreprocessorTest {
 
     private lateinit var context: Context
@@ -27,7 +26,6 @@ class OrientationPreprocessorTest {
     private lateinit var testDocBytes: ByteArray
 
     @Before
-    // Sets up.
     fun setUp() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         context = instrumentation.targetContext
@@ -45,12 +43,10 @@ class OrientationPreprocessorTest {
 
     @Test
     fun testProcessUprightDocument() {
-        // Process the original test_doc.png
         val processedBytes = preprocessor.process(testDocBytes)
         assertNotNull(processedBytes)
         assertTrue(processedBytes.isNotEmpty())
 
-        // Verify output can be decoded back into a valid Bitmap
         val resultBitmap = BitmapFactory.decodeByteArray(processedBytes, 0, processedBytes.size)
         assertNotNull("Result should be a valid bitmap", resultBitmap)
         resultBitmap.recycle()
@@ -67,7 +63,6 @@ class OrientationPreprocessorTest {
 
         val rotations = listOf(0f, 90f, 180f, 270f)
         for (rotation in rotations) {
-            // Rotate the original bitmap artificially
             val matrix = Matrix().apply { postRotate(rotation) }
             val rotatedBitmap = Bitmap.createBitmap(
                 originalBitmap, 0, 0,
@@ -81,12 +76,10 @@ class OrientationPreprocessorTest {
             // Bitmap.createBitmap may return its input unchanged for a zero-degree transform.
             if (rotatedBitmap !== originalBitmap) rotatedBitmap.recycle()
 
-            // Process through OrientationPreprocessor
             val correctedBytes = preprocessor.process(rotatedBytes)
             assertNotNull(correctedBytes)
             assertTrue(correctedBytes.isNotEmpty())
 
-            // Verify corrected output is a valid decodable image
             val correctedBitmap =
                 BitmapFactory.decodeByteArray(correctedBytes, 0, correctedBytes.size)
             assertNotNull(

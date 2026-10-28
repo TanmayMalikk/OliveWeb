@@ -1,4 +1,4 @@
-// Contains the safety plan sync worker code for this part of Olive.
+// Safe-app users and support staff: handles background safety plan sync work.
 package com.olive.app.data
 
 import android.content.Context

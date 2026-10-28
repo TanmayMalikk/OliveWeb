@@ -1,4 +1,4 @@
-// Tests the test behavior.
+// Tests account and cover rules for all app roles.
 import { describe, it, expect } from "vitest";
 import {
   signInEmail,
@@ -9,7 +9,7 @@ import {
   purgeEntry,
   TRASH_RETENTION_MS,
   type Entry,
-} from ".";
+} from "./DomainModels";
 import {
   encrypt,
   decrypt,
@@ -17,7 +17,7 @@ import {
   wrapKey,
   unwrapKey,
   triggerHash,
-} from "../services/crypto";
+} from "../services/EncryptionService";
 describe("mobile-compatible contracts", () => {
   it("keeps the existing role-specific authentication aliases", () => {
     expect(signInEmail(" Alice_User ", "USER")).toBe(

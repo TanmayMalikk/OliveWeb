@@ -1,4 +1,4 @@
-// Contains the sites.spec code for this part of Olive.
+// Tests domain routing for public visitors and signed-in users.
 import { expect, test } from "@playwright/test";
 
 test("short cover URLs and legacy bookmarks open the same cover with the right install identity", async ({

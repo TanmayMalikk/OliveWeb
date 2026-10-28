@@ -1,8 +1,8 @@
 // Run this trusted deployment script to create or repair the protected demo organization accounts.
 const {initializeApp, refreshToken} = require("firebase-admin/app");
 const {getAuth} = require("firebase-admin/auth");
-const cliAuth = require("../../firebase/node_modules/firebase-tools/lib/auth");
-const cliApi = require("../../firebase/node_modules/firebase-tools/lib/api");
+const cliAuth = require("../../firebaseAdminClient/node_modules/firebase-tools/lib/auth");
+const cliApi = require("../../firebaseAdminClient/node_modules/firebase-tools/lib/api");
 const {defaultProfile, signInEmail} = require("../src/accountPolicy");
 
 const cliAccount = cliAuth.getProjectDefaultAccount(require("node:path").resolve(__dirname, "../.."));

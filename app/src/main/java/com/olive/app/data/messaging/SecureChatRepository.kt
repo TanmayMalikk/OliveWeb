@@ -1,4 +1,4 @@
-// Contains the secure chat repository code for this part of Olive.
+// All chat roles: stores encrypted chats between allowed participants.
 package com.olive.app.data
 
 import com.google.firebase.firestore.FieldValue

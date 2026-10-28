@@ -1,4 +1,4 @@
-// Tests the olive notification manager test behavior.
+// Tests discreet notification text and icons for each cover.
 package com.olive.app.notification
 
 import com.olive.app.ui.shared.*
@@ -9,7 +9,6 @@ import com.olive.app.R
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-// Groups the data and actions for olive notification manager test.
 class OliveNotificationManagerTest {
     @Test
     fun coverTypesUseMatchingDiscreetDefaults() {

@@ -1,4 +1,4 @@
-// Contains the safety document repository code for this part of Olive.
+// Safe-app users and support staff: loads and saves a user’s safety documents.
 package com.olive.app.data
 
 import android.content.Context
@@ -14,7 +14,6 @@ import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import java.io.File
 
-// Groups the data and actions for safety document.
 data class SafetyDocument(
     val id: String,
     val ownerUid: String,
@@ -34,7 +33,6 @@ data class SafetyDocument(
     val encryptionVersion: Int = 0,
 )
 
-// Groups the data and actions for document OCR metadata.
 data class DocumentOcrMetadata(val text: String, val confidence: Float, val successful: Boolean)
 
 /** Accepts OCR only after the containing metadata has been decrypted on the client. */
@@ -47,7 +45,6 @@ internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata
     return DocumentOcrMetadata(text, confidence, successful)
 }
 
-// Groups the data and actions for safety document data source.
 interface SafetyDocumentDataSource {
     suspend fun listFor(uid: String): List<SafetyDocument>
     // Watches for for changes.
@@ -57,14 +54,12 @@ interface SafetyDocumentDataSource {
         onError: (String) -> Unit
     ): ChatSubscription
 
-    // Gets for.
     suspend fun getFor(uid: String, id: String): SafetyDocument
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
     suspend fun delete(document: SafetyDocument, ownerUid: String)
     suspend fun download(context: Context, document: SafetyDocument): File
 }
 
-// Groups the data and actions for safety document repository.
 class SafetyDocumentRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
@@ -93,7 +88,6 @@ class SafetyDocumentRepository(
         return ChatSubscription { listener.remove() }
     }
 
-    // Gets for.
     override suspend fun getFor(uid: String, id: String): SafetyDocument {
         val document = documentFrom(firestore.collection("files").document(id).get().await(), uid)
             ?: error("File is no longer available")

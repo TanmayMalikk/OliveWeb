@@ -1,4 +1,4 @@
-// Tests the graph table analysis test behavior.
+// Tests graph value tables and invalid ranges for calculator users.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -7,7 +7,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
-// Groups the data and actions for graph table analysis test.
 class GraphTableAnalysisTest {
     @Test
     fun rangeBuildsAnXColumnAndOneColumnPerEquation() {

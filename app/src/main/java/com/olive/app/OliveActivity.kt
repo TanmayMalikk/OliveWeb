@@ -1,4 +1,4 @@
-// Contains the olive activity code for this part of Olive.
+// All app roles: starts the Android UI and handles private-screen behavior.
 package com.olive.app
 import com.olive.app.ui.shared.observeAccessibilityInteractions
 import android.app.ActivityManager
@@ -27,7 +27,7 @@ import androidx.lifecycle.Lifecycle
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
 import com.olive.app.notification.OliveNotificationManager
-import com.olive.app.ui.covers.shared.CoverLauncher
+import com.olive.app.ui.covers.CoverLauncher
 import com.olive.app.ui.users.shared.navigation.OliveRoot
 import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
@@ -47,7 +47,7 @@ internal fun shouldApplyTaskIdentity(
 
 // Android launches this activity first; it hosts the Compose UI and protects private content.
 class OliveActivity : ComponentActivity() {
-    private val deviceLock = com.olive.app.security.AndroidDeviceLock(this) { session.background() }
+    private val deviceLock = com.olive.app.security.AndroidDeviceLock(this) { session.navigation.background() }
 
     // The resource toggle avoids hard-coding the privacy mode into this activity's control flow.
     private val screenCaptureProtectionEnabled by lazy {
@@ -68,7 +68,6 @@ class OliveActivity : ComponentActivity() {
             session.syncLocalNotificationHandler()
         }
 
-    // Runs when Android creates this part of the app.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         OliveNotificationManager.createNotificationChannels(this)
@@ -99,7 +98,7 @@ class OliveActivity : ComponentActivity() {
                 if (notificationAccountId != null) permissions.afterOnboarding()
                 session.syncLocalNotificationHandler()
             }
-            CompositionLocalProvider(com.olive.app.ui.users.user.home.LocalLocationPermissionRequest provides permissions::requestLocation) {
+            CompositionLocalProvider(com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest provides permissions::requestLocation) {
                 OliveTheme { OliveRoot(session, locationPermissionVersion) }
             }
         }
@@ -111,7 +110,7 @@ class OliveActivity : ComponentActivity() {
         applyScreenCaptureProtection()
         // Authentication and runtime permission dialogs temporarily own another window.
         // Home/onStop still lock the safe area; a permission result never restores a private screen.
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.background()
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onPause()
     }
@@ -120,7 +119,7 @@ class OliveActivity : ComponentActivity() {
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.background()
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onUserLeaveHint()
     }
@@ -128,7 +127,7 @@ class OliveActivity : ComponentActivity() {
     // Coming back just refreshes screen protection; it never auto-reopens private pages.
     override fun onResume() {
         super.onResume()
-        session.refreshDeviceSecurity()
+        session.account.refreshDeviceSecurity()
         deviceLock.resume()
         applyScreenCaptureProtection()
         updateRecentAppIdentity(session.coverType, session.accountRole)
@@ -141,7 +140,6 @@ class OliveActivity : ComponentActivity() {
         }
     }
 
-    // Runs when user interaction happens.
     override fun onUserInteraction() {
         super.onUserInteraction()
         session.noteInteraction()
@@ -173,7 +171,6 @@ class OliveActivity : ComponentActivity() {
         }
     }
 
-    // Runs when this part of the app leaves the screen.
     override fun onStop() {
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen && (session.deviceLockRequest != null ||
                     session.screen in setOf(
@@ -183,7 +180,7 @@ class OliveActivity : ComponentActivity() {
             ))
         ) {
             deviceLock.cancel()
-            session.background()
+            session.navigation.background()
         }
         if (Build.VERSION.SDK_INT >= 34) screenshotCallback?.let {
             runCatching {

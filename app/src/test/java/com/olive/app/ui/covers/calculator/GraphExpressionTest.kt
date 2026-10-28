@@ -1,4 +1,4 @@
-// Tests the graph expression test behavior.
+// Tests graph equations, errors, and angle modes for calculator users.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -8,7 +8,6 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 import kotlin.math.PI
 
-// Groups the data and actions for graph expression test.
 class GraphExpressionTest {
     @Test
     fun evaluatesCommonGraphEquations() {

@@ -1,4 +1,4 @@
-// Tests the onboarding branch layout test behavior.
+// Tests the order and progress of onboarding steps for each role.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -8,7 +8,6 @@ import com.olive.app.ui.users.shared.onboarding.OnboardingBranchLayout
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for onboarding branch layout test.
 class OnboardingBranchLayoutTest {
     @Test
     fun everySupportedFlowHasOrderedStepsAndStableLeaves() {

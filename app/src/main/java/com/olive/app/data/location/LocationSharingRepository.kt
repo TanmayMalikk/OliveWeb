@@ -1,4 +1,4 @@
-// Contains the location sharing repository code for this part of Olive.
+// Users and approved supporters: reads and writes live location data for approved viewers.
 package com.olive.app.data
 
 import android.content.Context
@@ -13,10 +13,8 @@ import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import javax.crypto.SecretKey
 
-// Groups the data and actions for location trail point.
 data class LocationTrailPoint(val latitude: Double, val longitude: Double, val updatedAt: Long)
 
-// Groups the data and actions for map location point.
 data class MapLocationPoint(
     val uid: String,
     val name: String,
@@ -29,7 +27,6 @@ data class MapLocationPoint(
     val trail: List<LocationTrailPoint> = emptyList()
 )
 
-// Groups the data and actions for location database.
 internal object LocationDatabase {
     fun instance(): FirebaseDatabase {
         val configured = com.olive.app.BuildConfig.REALTIME_DATABASE_URL
@@ -40,24 +37,19 @@ internal object LocationDatabase {
     }
 }
 
-// Groups the data and actions for saved location unavailable exception.
 internal class SavedLocationUnavailableException :
     IllegalStateException("Saved location is unavailable")
 
-// Groups the data and actions for location sharing preferences.
 internal interface LocationSharingPreferences {
     fun staticSharingEnabled(uid: String): Boolean
-    // Sets static sharing enabled.
     fun setStaticSharingEnabled(uid: String, enabled: Boolean)
 }
 
-// Groups the data and actions for android location sharing preferences.
 private class AndroidLocationSharingPreferences(context: Context) : LocationSharingPreferences {
     private val values =
         context.getSharedPreferences("olive_location_sharing", Context.MODE_PRIVATE)
 
     override fun staticSharingEnabled(uid: String) = values.getBoolean("static_$uid", false)
-    // Sets static sharing enabled.
     override fun setStaticSharingEnabled(uid: String, enabled: Boolean) {
         values.edit { putBoolean("static_$uid", enabled) }
     }
@@ -67,14 +59,12 @@ internal fun interface AddressCoordinateResolver {
     suspend fun coordinates(address: DeliveryAddress): Pair<Double, Double>?
 }
 
-// Groups the data and actions for android address coordinate resolver.
 private class AndroidAddressCoordinateResolver(private val context: Context) :
     AddressCoordinateResolver {
     override suspend fun coordinates(address: DeliveryAddress) = GeoapifyClient.coordinates(address)
         ?: DeviceLocation.coordinatesForAddress(context, address)
 }
 
-// Groups the data and actions for static location sharing data source.
 private class StaticLocationSharingDataSource(
     private val preferences: LocationSharingPreferences,
     private val resolver: AddressCoordinateResolver,
@@ -158,12 +148,10 @@ private class StaticLocationSharingDataSource(
     }
 }
 
-// Groups the data and actions for live location sharing data source.
 private class LiveLocationSharingDataSource(
     private val firestore: FirebaseFirestore,
     private val databaseProvider: () -> FirebaseDatabase,
 ) {
-    // Sets recipients.
     suspend fun setRecipients(ownerUid: String, friends: List<Friend>): SecretKey? {
         require(friends.size <= 10)
         val collection =
@@ -231,7 +219,6 @@ private class LiveLocationSharingDataSource(
                             .orderByChild("updatedAt")
                             .startAt((System.currentTimeMillis() - TRAIL_WINDOW_MILLIS).toDouble())
                     val listener = object : ValueEventListener {
-                        // Runs when data change happens.
                         override fun onDataChange(snapshot: DataSnapshot) {
                             val updated =
                                 snapshot.child("updatedAt").getValue(Long::class.java) ?: 0L
@@ -264,38 +251,32 @@ private class LiveLocationSharingDataSource(
                             publish()
                         }
 
-                        // Runs when cancelled happens.
                         override fun onCancelled(error: DatabaseError) {
                             points.remove(friend.uid)
                             publish()
                         }
                     }
                     val trailListener = object : ChildEventListener {
-                        // Runs when child added happens.
                         override fun onChildAdded(
                             snapshot: DataSnapshot,
                             previousChildName: String?
                         ) = update(snapshot)
 
-                        // Runs when child changed happens.
                         override fun onChildChanged(
                             snapshot: DataSnapshot,
                             previousChildName: String?
                         ) = update(snapshot)
 
-                        // Runs when child removed happens.
                         override fun onChildRemoved(snapshot: DataSnapshot) {
                             trails[friend.uid]?.remove(snapshot.key)
                             attachTrail(friend.uid)
                         }
 
-                        // Runs when child moved happens.
                         override fun onChildMoved(
                             snapshot: DataSnapshot,
                             previousChildName: String?
                         ) = Unit
 
-                        // Runs when cancelled happens.
                         override fun onCancelled(error: DatabaseError) = Unit
                         private fun update(snapshot: DataSnapshot) {
                             val updated =
@@ -334,7 +315,6 @@ private class LiveLocationSharingDataSource(
         }
     }
 
-    // Groups the data and actions for live subscription.
     private data class LiveSubscription(
         val location: DatabaseReference, val locationListener: ValueEventListener,
         val trail: Query, val trailListener: ChildEventListener
@@ -350,10 +330,8 @@ private class LiveLocationSharingDataSource(
     }
 }
 
-// Groups the data and actions for location sharing data source.
 internal interface LocationSharingDataSource {
     fun staticSharingEnabled(uid: String): Boolean
-    // Sets static sharing.
     suspend fun setStaticSharing(
         identity: AccountIdentity,
         profile: UserProfile,
@@ -361,7 +339,6 @@ internal interface LocationSharingDataSource {
         enabled: Boolean
     )
 
-    // Sets live recipients.
     suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>): SecretKey?
     // Watches static contacts for changes.
     fun observeStaticContacts(
@@ -395,7 +372,6 @@ internal class LocationSharingRepository private constructor(
     )
 
     override fun staticSharingEnabled(uid: String) = staticLocations.enabled(uid)
-    // Sets static sharing.
     override suspend fun setStaticSharing(
         identity: AccountIdentity,
         profile: UserProfile,
@@ -404,7 +380,6 @@ internal class LocationSharingRepository private constructor(
     ) =
         staticLocations.update(identity, profile, friends, enabled)
 
-    // Sets live recipients.
     override suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>) =
         liveLocations.setRecipients(ownerUid, friends)
 

@@ -1,4 +1,4 @@
-// Tests the system language test behavior.
+// Tests supported language names and English fallback in the app.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -7,7 +7,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Locale
 
-// Groups the data and actions for system language test.
 class SystemLanguageTest {
     @Test
     fun supportedSystemLanguagesSelectTheirDisplayNames() {

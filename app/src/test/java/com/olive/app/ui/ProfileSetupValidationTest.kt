@@ -1,4 +1,4 @@
-// Tests the profile setup validation test behavior.
+// Tests required profile fields for users and safe contacts.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -9,7 +9,6 @@ import com.olive.app.data.DeliveryAddress
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for profile setup validation test.
 class ProfileSetupValidationTest {
     private fun validation(
         safeContact: Boolean = false,

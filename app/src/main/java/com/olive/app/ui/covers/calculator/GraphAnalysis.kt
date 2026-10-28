@@ -1,31 +1,23 @@
-// Contains the graph analysis code for this part of Olive.
+// Calculator cover users: finds graph values and features.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.shared.ResourceFailure
 import com.olive.app.ui.shared.rememberResourceText
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.res.stringResource
 import com.olive.app.R
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.floor
 
 
 @Composable
