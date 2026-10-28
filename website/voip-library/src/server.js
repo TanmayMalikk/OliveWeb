@@ -16,14 +16,6 @@ class ApiError extends Error{
 
 function sendJson(response, status, data) {
   response.writeHead(status, {
-    'content-type': 'applicaton/json; charset=utf-8',
-    'cache-control': 'no-store'
-  });
-  response.end(JSON.stringify(data));
-}
-
-function hasValidToken(request, expectedToken){
-  response.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store'
   });
@@ -115,33 +107,55 @@ function createApiServer({callManager, apiToken, logger = console }) {
       if (request.method === 'POST' && url.pathname === '/api/calls') {
         const body = await readJson(request);
         const name = body?.name;
-                if (typeof name !== 'string' || name.trim().length === 0) {
-                    throw new ApiError(400, 'invalid_request',
-                        'name must be a non-empty string');
-                }
+        // callIdMatch is used to get the callId that the DELETE request is specifying.
+        const callIdMatch = url.pathname.match(/^\/api\/calls\/([^/]+)$/);
 
-                const call = await callManager.createCall(name.trim());
-                return sendJson(response, 201, call);
-            }
+          if (typeof name !== 'string' || name.trim().length === 0) {
+            throw new ApiError(400, 'invalid_request',
+            'name must be a non-empty string');
+          }
+          //Delete channel request.
+          if (request.method === 'DELETE' && callIdMatch) {
+            const callId =  callIdMatch[1];
+            const deleted = await callManager.closeCall(callId);
 
-            return sendJson(response, 404, {
-                error: { code: 'not_found', message: 'Route not found' }
-            });
-        } catch (error) {
-            if (error instanceof ApiError) {
-                return sendJson(response, error.status, {
-                    error: { code: error.code, message: error.message }
-                });
-            }
-
-            logger.error('API request failed:', error.message);
-            return sendJson(response, 502, {
+            if (!deleted) {
+              return sendJson(response, 404, {
                 error: {
-                    code: 'operation_failed',
-                    message: 'The requested operation failed'
+                code: 'call_not_found',
+                message: 'Call not found'
                 }
+              });
+            }
+                  
+            return sendJson(response, 200, {
+              deleted: true,
+              callId
             });
-        }
+          }
+                
+          const call = await callManager.createCall(name.trim());
+          return sendJson(response, 201, call);
+          }
+
+      return sendJson(response, 404, {
+        error: { code: 'not_found', message: 'Route not found' }
+        });
+      } catch (error) {
+          if (error instanceof ApiError) {
+            return sendJson(response, error.status, {
+              error: { code: error.code, message: error.message }
+              });
+          }
+
+        logger.error('API request failed:', error.message);
+        return sendJson(response, 502, {
+          error: {
+            code: 'operation_failed',
+            message: 'The requested operation failed'
+          }
+        });
+      }
     });
 }
 
