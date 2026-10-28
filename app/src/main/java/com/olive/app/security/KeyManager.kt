@@ -1,3 +1,4 @@
+// Contains the key manager code for this part of Olive.
 package com.olive.app.security
 
 import android.security.keystore.KeyGenParameterSpec
@@ -12,14 +13,21 @@ import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
 import java.security.KeyFactory
+import java.security.GeneralSecurityException
 import java.security.spec.X509EncodedKeySpec
+import java.security.spec.MGF1ParameterSpec
+import javax.crypto.spec.OAEPParameterSpec
+import javax.crypto.spec.PSource
 
+// Groups the data and actions for key manager.
 object KeyManager {
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-    private const val RSA_MODE = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding"
+    private const val RSA_MODE = "RSA/ECB/OAEPPadding"
+    const val CURRENT_KEY_WRAP_VERSION = 2
 
     // The alias used to locate the user's RSA keys securely inside the Android hardware
-    private const val USER_KEY_ALIAS = "olive.user.rsa.v1"
+    private const val USER_KEY_ALIAS = "olive.user.rsa.v2"
+    private const val LEGACY_KEY_ALIAS = "olive.user.rsa.v1"
 
     /**
      * Generates a persistent RSA Public/Private KeyPair in the Android Keystore.
@@ -36,7 +44,11 @@ object KeyManager {
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
         )
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_RSA_OAEP)
-            .setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512, KeyProperties.DIGEST_SHA1)
+            .setDigests(
+                KeyProperties.DIGEST_SHA256,
+                KeyProperties.DIGEST_SHA512,
+                KeyProperties.DIGEST_SHA1
+            )
             .setKeySize(2048)
             .build()
 
@@ -53,14 +65,17 @@ object KeyManager {
         return certificate?.publicKey
     }
 
+    // Gets or create public key.
     fun getOrCreatePublicKey(): PublicKey = getPublicKey() ?: generateUserKeyPair().public
 
     /**
      * Retrieves the user's Private Key to decrypt AES keys pulled from Firestore.
      */
-    private fun getPrivateKey(): PrivateKey? {
+    private fun getPrivateKeys(): List<PrivateKey> {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
-        return keyStore.getKey(USER_KEY_ALIAS, null) as? PrivateKey
+        return listOf(USER_KEY_ALIAS, LEGACY_KEY_ALIAS).mapNotNull { alias ->
+            keyStore.getKey(alias, null) as? PrivateKey
+        }
     }
 
     /**
@@ -69,9 +84,7 @@ object KeyManager {
      */
     fun wrapKey(secretKey: SecretKey, publicKey: PublicKey): String {
         val cipher = Cipher.getInstance(RSA_MODE)
-        val spec = javax.crypto.spec.OAEPParameterSpec(
-            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA1, javax.crypto.spec.PSource.PSpecified.DEFAULT
-        )
+        val spec = oaepSpec(MGF1ParameterSpec.SHA1)
         // Bypass WRAP_MODE entirely
         cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
         val wrappedBytes = cipher.doFinal(secretKey.encoded)
@@ -91,16 +104,44 @@ object KeyManager {
      * Unwraps (Decrypts) the Base64 string back into a usable AES SecretKey.
      * Uses the user's secure hardware Private Key.
      */
-    fun unwrapKey(wrappedKeyBase64: String): SecretKey {
+    fun unwrapKey(wrappedKeyBase64: String, keyWrapVersion: Int? = null): SecretKey {
         val decodedBytes = android.util.Base64.decode(wrappedKeyBase64, android.util.Base64.NO_WRAP)
-        val cipher = Cipher.getInstance(RSA_MODE)
-        val privateKey = getPrivateKey() ?: throw Exception("Private key missing")
-        val spec = javax.crypto.spec.OAEPParameterSpec(
-            "SHA-256", "MGF1", java.security.spec.MGF1ParameterSpec.SHA1, javax.crypto.spec.PSource.PSpecified.DEFAULT
-        )
-        // Bypass UNWRAP_MODE entirely and manually rebuild the AES key
-        cipher.init(Cipher.DECRYPT_MODE, privateKey, spec)
-        val decryptedBytes = cipher.doFinal(decodedBytes)
-        return SecretKeySpec(decryptedBytes, "AES")
+        val privateKeys = getPrivateKeys()
+        if (privateKeys.isEmpty()) error("Private key missing")
+        val candidates = when {
+            keyWrapVersion != null && keyWrapVersion >= CURRENT_KEY_WRAP_VERSION ->
+                listOf(MGF1ParameterSpec.SHA1)
+            keyWrapVersion == 1 ->
+                listOf(MGF1ParameterSpec.SHA256)
+            else ->
+                listOf(MGF1ParameterSpec.SHA1, MGF1ParameterSpec.SHA256)
+        }
+        var lastFailure: GeneralSecurityException? = null
+        privateKeys.forEach { privateKey ->
+            candidates.forEach { digest ->
+                try {
+                    val cipher = Cipher.getInstance(RSA_MODE)
+                    // Bypass UNWRAP_MODE entirely and manually rebuild the AES key.
+                    cipher.init(Cipher.DECRYPT_MODE, privateKey, oaepSpec(digest))
+                    val decryptedBytes = cipher.doFinal(decodedBytes)
+                    return SecretKeySpec(decryptedBytes, "AES")
+                } catch (failure: GeneralSecurityException) {
+                    lastFailure = failure
+                }
+            }
+        }
+        throw checkNotNull(lastFailure) { "No key-wrap algorithm was attempted" }
     }
+
+    /**
+     * Android Keystore uses SHA-1 as OAEP's MGF1 digest unless API 35+ keys explicitly opt into
+     * another value. The OAEP content digest remains SHA-256; SHA-1 is used only by the mask
+     * generation function for cross-device Keystore compatibility.
+     */
+    private fun oaepSpec(mgf1Digest: MGF1ParameterSpec) = OAEPParameterSpec(
+        "SHA-256",
+        "MGF1",
+        mgf1Digest,
+        PSource.PSpecified.DEFAULT
+    )
 }

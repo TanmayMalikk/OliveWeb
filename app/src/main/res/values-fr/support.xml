@@ -7,6 +7,22 @@
     <string name="support_collapsed">Réduit</string>
     <string name="support_walkthrough">Guide</string>
     <string name="support_staff_help">Demander de l’aide au personnel</string>
+    <string name="support_looking_for_staff">Recherche de membres du personnel…</string>
+    <string name="support_staff_found">%1$s a été affecté. Ouverture de votre clavardage de soutien…</string>
+    <string name="support_staff_ready">Un membre du personnel a été affecté. Ouverture d’Olive Staff…</string>
+    <string name="support_chat_name">Olive Staff</string>
+    <string name="support_no_conversations">Aucune conversation de soutien pour le moment.</string>
+    <string name="messaging_send_denied">Le serveur a refusé ce message. Rouvrez la conversation et réessayez.</string>
+    <string name="support_ticket_consultation">Consultation</string>
+    <string name="support_ticket_support">Soutien</string>
+    <string name="support_ticket_escalation">Escalade</string>
+    <string name="support_request_error">Impossible de demander l’aide du personnel. Vérifiez votre connexion et réessayez.</string>
+    <string name="support_admin_request_error">Impossible de demander l’aide d’un administrateur. Veuillez réessayer.</string>
+    <string name="support_filter_plan_consults">Consultations du plan</string>
+    <string name="support_filter_support">Soutien</string>
+    <string name="support_filter_needs_admin">Besoin d’admins</string>
+    <string name="support_staff_search_help">Olive Branch vous mettra en contact de façon sécurisée avec un membre du personnel disponible.</string>
+    <string name="support_cancel_staff_request">Annuler la demande</string>
     <string name="support_emergency">Urgence</string>
     <string name="support_hotlines">Lignes d’aide</string>
     <string name="support_coming_soon">%1$s · Bientôt disponible</string>
@@ -52,4 +68,7 @@
     <string name="support_location_permissions">Autorisations de l’application</string>
     <string name="support_resource_hotline">Ligne d’aide</string>
     <string name="support_resource_shelter">Refuge</string>
+    <string name="support_close_chat">Fermer la discussion pour tous</string>
+    <string name="support_chat_closed">Fermée par le personnel. Cette discussion est archivée pour tous.</string>
+    <string name="support_close_error">Impossible de fermer la discussion. Vérifiez votre connexion et réessayez.</string>
 </resources>

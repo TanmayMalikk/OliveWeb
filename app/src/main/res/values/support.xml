@@ -7,6 +7,22 @@
     <string name="support_collapsed">Collapsed</string>
     <string name="support_walkthrough">Walkthrough</string>
     <string name="support_staff_help">Request help from staff</string>
+    <string name="support_looking_for_staff">Looking for staff members…</string>
+    <string name="support_staff_found">%1$s was assigned. Opening your support chat…</string>
+    <string name="support_staff_ready">A staff member was assigned. Opening Olive Staff…</string>
+    <string name="support_chat_name">Olive Staff</string>
+    <string name="support_no_conversations">No support chats yet.</string>
+    <string name="messaging_send_denied">The server denied this message. Reopen the chat and try again.</string>
+    <string name="support_ticket_consultation">Consultation</string>
+    <string name="support_ticket_support">Support</string>
+    <string name="support_ticket_escalation">Escalation</string>
+    <string name="support_request_error">Could not request staff help. Check your connection and try again.</string>
+    <string name="support_admin_request_error">Could not request administrator help. Please try again.</string>
+    <string name="support_filter_plan_consults">Plan Consults</string>
+    <string name="support_filter_support">Support</string>
+    <string name="support_filter_needs_admin">Need Admins</string>
+    <string name="support_staff_search_help">Olive Branch will securely connect you with an available staff member.</string>
+    <string name="support_cancel_staff_request">Cancel request</string>
     <string name="support_emergency">Emergency</string>
     <string name="support_hotlines">Hotline resources</string>
     <string name="support_coming_soon">%1$s · Coming soon</string>
@@ -52,4 +68,7 @@
     <string name="support_location_permissions">App permission settings</string>
     <string name="support_resource_hotline">Hotline</string>
     <string name="support_resource_shelter">Shelter</string>
+    <string name="support_close_chat">Close chat for everyone</string>
+    <string name="support_chat_closed">Closed by staff. This chat is archived for everyone.</string>
+    <string name="support_close_error">Could not close the chat. Check your connection and try again.</string>
 </resources>

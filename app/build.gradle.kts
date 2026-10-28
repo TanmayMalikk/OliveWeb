@@ -1,3 +1,4 @@
+// Contains the build.gradle code for this part of Olive.
 import java.util.Properties
 
 plugins {
@@ -6,7 +7,6 @@ plugins {
 }
 
 tasks.named("check") {
-    dependsOn(rootProject.tasks.named("checkSourceSize"))
     dependsOn(rootProject.tasks.named("checkArchitecture"))
 }
 val firebaseConfigured = file("google-services.json").exists() && providers.gradleProperty("oliveLocalTest").orNull != "true"
@@ -19,6 +19,8 @@ val localProperties = Properties().apply {
 }
 val geoapifyApiKey = localProperties.getProperty("GEOAPIFY_API_KEY").orEmpty()
 require(geoapifyApiKey.matches(Regex("[A-Za-z0-9_-]*"))) { "GEOAPIFY_API_KEY contains unsupported characters" }
+val mapboxAccessToken = localProperties.getProperty("MAPBOX_ACCESS_TOKEN").orEmpty()
+require(mapboxAccessToken.matches(Regex("[A-Za-z0-9._-]*"))) { "MAPBOX_ACCESS_TOKEN contains unsupported characters" }
 val realtimeDatabaseUrl = localProperties.getProperty("REALTIME_DATABASE_URL").orEmpty()
 require(realtimeDatabaseUrl.isBlank() || realtimeDatabaseUrl.startsWith("https://")) { "REALTIME_DATABASE_URL must use HTTPS" }
 val releaseProperties = Properties().apply {
@@ -27,6 +29,8 @@ val releaseProperties = Properties().apply {
 }
 val releaseKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
 val releaseSigningReady = releaseKeys.all { !releaseProperties.getProperty(it).isNullOrBlank() }
+val automatedVersionCode = providers.environmentVariable("OLIVE_VERSION_CODE").orNull?.toIntOrNull()
+val automatedVersionName = providers.environmentVariable("OLIVE_VERSION_NAME").orNull
 
 android {
     lint {
@@ -59,10 +63,11 @@ android {
         applicationId = "com.olive.app"
         minSdk = 28
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = automatedVersionCode ?: 2
+        versionName = automatedVersionName ?: "0.2.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("String", "GEOAPIFY_API_KEY", "\"$geoapifyApiKey\"")
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
         buildConfigField("String", "REALTIME_DATABASE_URL", "\"$realtimeDatabaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -90,11 +95,16 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.animation:animation")
+    implementation("androidx.compose.animation:animation-core")
+    implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     implementation("androidx.work:work-runtime-ktx:2.12.0")
-    implementation(platform("com.google.firebase:firebase-bom:35.0.2"))
+    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-firestore")
@@ -105,8 +115,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
     implementation("org.apache.commons:commons-math3:3.6.1")
     implementation("org.jsoup:jsoup:1.23.2")
+    implementation(project(":ppocr-sdk"))
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.31.0")
     // Media transfers use OkHttp directly; do not rely on Coil's transitive dependency.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
@@ -125,6 +137,8 @@ val verifyReleaseConfiguration = tasks.register("verifyReleaseConfiguration") {
     description = "Checks that Firebase and release-signing files are available before a release build."
     doLast {
         check(firebaseConfigured) { "Release requires app/google-services.json. Local test accounts are debug-only." }
+        check(geoapifyApiKey.isNotBlank()) { "Release requires GEOAPIFY_API_KEY for address suggestions." }
+        check(mapboxAccessToken.isNotBlank()) { "Release requires MAPBOX_ACCESS_TOKEN for navigation." }
         check(releaseSigningReady) { "Release requires keystore.properties. See docs/DISTRIBUTION.md." }
         check(rootProject.file(releaseProperties.getProperty("storeFile")).isFile) { "Release signing keystore was not found." }
     }

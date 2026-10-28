@@ -81,6 +81,19 @@ function uploadRequest(data,uid) {
     throw new HttpsError("invalid-argument","Invalid encryptionVersion");
   return {jobId,size,checksum,encryptedMetadata,allowedUsers,wrappedKeys,encryptionVersion};
 }
+
+/** Validates a complete replacement access list for an already-published encrypted object. */
+function accessRequest(data,uid) {
+  const wrappedKeys=data?.wrappedKeys;
+  if(!wrappedKeys || typeof wrappedKeys!=="object" || Array.isArray(wrappedKeys))
+    throw new HttpsError("invalid-argument","Invalid wrappedKeys");
+  const allowedUsers=Object.keys(wrappedKeys);
+  if(allowedUsers.length<1 || allowedUsers.length>25 || !allowedUsers.includes(uid) ||
+      allowedUsers.some(id => id.length<1 || id.length>128 ||
+        typeof wrappedKeys[id]!=="string" || wrappedKeys[id].length<1 || wrappedKeys[id].length>2048))
+    throw new HttpsError("invalid-argument","Invalid wrappedKeys");
+  return {wrappedKeys,allowedUsers};
+}
 /** Callable-only resumable session record keyed by the client's stable job id. */
 function pendingRef(jobId) { return db.collection("mediaUploads").doc(jobId); }
 /** Published encrypted-media metadata record keyed by the server-generated media id. */
@@ -213,6 +226,19 @@ exports.mediaDownloadTicket=onCall(options,async request => {
   return {url,headers:{},expiresAt:Date.now()+ticketSeconds*1000};
 });
 
+/** Owner-only recipient update; ciphertext and encrypted display metadata remain unchanged. */
+exports.mediaUpdateAccess=onCall(options,async request => {
+  const uid=caller(request);const mediaId=string(request.data?.mediaId,"mediaId",64);
+  const access=accessRequest(request.data,uid);const reference=mediaRef(mediaId);
+  const snapshot=await reference.get();if(!snapshot.exists) throw new HttpsError("not-found","Media was not found");
+  const value=snapshot.data();
+  if(value.owner_id!==uid) throw new HttpsError("permission-denied","Only the owner can change media access");
+  if(typeof value.object_key!=="string" || typeof value.encrypted_metadata!=="string")
+    throw new HttpsError("failed-precondition","Only encrypted media supports this access update");
+  await reference.update({wrapped_keys:access.wrappedKeys,allowed_users:access.allowedUsers});
+  return publicRecord(await reference.get());
+});
+
 /** Owner-only deletion that removes the R2 object before deleting its Firestore metadata. */
 exports.mediaDelete=onCall(options,async request => {
   const uid=caller(request);const mediaId=string(request.data?.mediaId,"mediaId",64);const reference=mediaRef(mediaId);
@@ -221,3 +247,6 @@ exports.mediaDelete=onCall(options,async request => {
   await client().send(new DeleteObjectCommand({Bucket:bucketName.value(),Key:value.object_key}));
   await reference.delete();return {deleted:true};
 });
+
+// Keep validation helpers available to Node tests without exporting another deployed endpoint.
+Object.defineProperty(exports,"_test",{value:{accessRequest},enumerable:false});

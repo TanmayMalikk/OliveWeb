@@ -1,3 +1,4 @@
+// Contains the account storage code for this part of Olive.
 const {HttpsError} = require("firebase-functions/v2/https");
 const {auth, db, bucket, FieldValue} = require("./firebase");
 const {isTemporaryEmail, organizationEmailKey, signInEmail, roleFromUser} = require("./accountPolicy");
@@ -55,4 +56,18 @@ async function listEveryUser() {
   return users;
 }
 
-module.exports = {saveOrganizationLogin, deleteOrganizationLogin, profilePath, readProfile, writeProfile, requireAdmin, listEveryUser};
+async function usernameExistsGlobally(username) {
+  if ((await db.collection("accountDirectory").doc(username).get()).exists) return true;
+  if ((await listEveryUser()).some((user) => String(user.displayName || "").trim().toLowerCase() === username)) return true;
+  for (const domain of ["users", "safe", "staff", "admin"]) {
+    try {
+      await auth.getUserByEmail(`${username}@${domain}.olive.invalid`);
+      return true;
+    } catch (error) {
+      if (error.code !== "auth/user-not-found") throw error;
+    }
+  }
+  return false;
+}
+
+module.exports = {saveOrganizationLogin, deleteOrganizationLogin, profilePath, readProfile, writeProfile, requireAdmin, listEveryUser, usernameExistsGlobally};

@@ -4,7 +4,7 @@
     <string name="entry_set_pin_first">Configurez un code PIN ci-dessous avant de le choisir comme méthode d’accès.</string>
     <string name="entry_settings_saved">Paramètres d’accès sécurisé enregistrés.</string>
     <string name="entry_current_method">Méthode préférée : %1$s</string>
-    <string name="entry_backup_description">Vous pouvez configurer les deux méthodes. Si le verrouillage de l’appareil est choisi, le code PIN de l’application est disponible uniquement si le verrouillage du téléphone est supprimé. Annuler ou échouer l’authentification Android n’active pas le code PIN de secours.</string>
+    <string name="entry_backup_description">Vous pouvez configurer les deux méthodes. Le verrouillage de l’appareil reste la méthode préférée et le code PIN de secours offre une autre façon d’entrer.</string>
     <string name="entry_use_device">Configurer et utiliser le verrouillage de l’appareil</string>
     <string name="entry_use_pin">Utiliser le code PIN enregistré</string>
     <string name="entry_pin_setup">Configurer ou modifier le code PIN</string>
@@ -13,4 +13,9 @@
     <string name="entry_confirm_settings">Confirmez votre identité avec Android pour modifier les paramètres d’accès sécurisé.</string>
     <string name="entry_settings_cancelled">Authentification annulée. Vos paramètres d’accès sécurisé restent inchangés.</string>
     <string name="entry_settings_failed">Impossible de terminer la modification. Vérifiez la méthode sélectionnée et réessayez.</string>
+    <string name="calculator_pin_required_title">Créez d’abord un code PIN</string>
+    <string name="calculator_pin_required_description">La calculatrice exige un code PIN de secours de 4 à 6 chiffres afin que les calculs ordinaires n’ouvrent pas l’authentification Android. Le verrouillage de l’appareil restera votre méthode préférée.</string>
+    <string name="calculator_create_pin">Créer un code PIN de secours et choisir la calculatrice</string>
+    <string name="entry_use_backup_pin">Utiliser plutôt le code PIN de secours</string>
+    <string name="entry_missing_backup_pin">Le verrouillage de l’écran du téléphone semble désactivé et aucun code PIN de secours n’a été ajouté. Rétablissez le verrouillage, ouvrez l’espace sécurisé, puis ajoutez un code PIN de secours dans les paramètres.</string>
 </resources>

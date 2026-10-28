@@ -106,6 +106,19 @@ test('file metadata is owned, shareable for reads, and cannot be reshaped', asyn
   await assertFails(setDoc(doc(alice,'files/wrong-path'),metadata));
   await assertFails(updateDoc(doc(bob,'files/file-metadata-1'),{allowed_users:['file-alice','file-bob','file-charlie']}));
   await assertFails(updateDoc(target,{unexpected:'not allowed'}));
+  await assertFails(updateDoc(target,{ocr_text:'Recognized document text',ocr_confidence:0.82,ocr_successful:true}));
+  await assertFails(updateDoc(target,{ocr_confidence:1.2}));
+  await assertFails(updateDoc(target,{ocr_text:'x'.repeat(50001)}));
+  await assertFails(setDoc(doc(alice,'files/file-metadata-plaintext-ocr'),{...metadata,
+    storage_path:'users/file-alice/media/file-metadata-plaintext-ocr',
+    ocr_text:'Server-readable OCR must never be accepted',ocr_confidence:0.82,ocr_successful:true}));
+  await assertFails(setDoc(doc(alice,'files/client-injected-encrypted-metadata'),{
+    owner_id:'file-alice',object_key:'users/file-alice/media/client-injected-encrypted-metadata',
+    encrypted_metadata:'untrusted-client-ciphertext',wrapped_keys:{'file-alice':'wrapped-key'},
+    allowed_users:['file-alice'],ciphertext_size:1024,ciphertext_sha256:'a'.repeat(64),
+    encryption_version:1,created_at:serverTimestamp()}));
+  await assertFails(setDoc(doc(alice,'files/file-metadata-2'),{...metadata,
+    storage_path:'users/file-alice/media/file-metadata-2',ocr_text:'Incomplete OCR metadata'}));
   await assertSucceeds(updateDoc(target,{allowed_users:['file-alice','file-charlie']}));
   await assertSucceeds(getDoc(doc(charlie,'files/file-metadata-1')));
   await assertFails(deleteDoc(doc(bob,'files/file-metadata-1')));
@@ -149,6 +162,9 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   await assertSucceeds(setDoc(doc(alice,'messageDirectory/social_alice'),{uid:'social-a',username:'social_alice',publicKey:'alice-key',updatedAt:serverTimestamp()}));
   await assertSucceeds(setDoc(doc(bob,'messageDirectory/social_bob'),{uid:'social-b',username:'social_bob',publicKey:'bob-key',updatedAt:serverTimestamp()}));
   await assertSucceeds(setDoc(doc(charlie,'messageDirectory/social_charlie'),{uid:'social-c',username:'social_charlie',publicKey:'charlie-key',updatedAt:serverTimestamp()}));
+  const duplicateAlice=env.authenticatedContext('social-duplicate',{email:'social_alice@safe.olive.invalid'}).firestore();
+  await assertFails(setDoc(doc(duplicateAlice,'messageDirectory/social_alice'),
+    {uid:'social-duplicate',username:'social_alice',publicKey:'duplicate-key',updatedAt:serverTimestamp()}));
 
   await assertSucceeds(getDoc(doc(alice,'messageDirectory/social_bob')));
   await assertFails(getDocs(query(collection(alice,'messageDirectory'),where('username','>=','social_b'))));
@@ -255,6 +271,67 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
       sentAt:serverTimestamp(),clientSentAt:Date.now()}));
 });
 
+test('support conversations allow one user, safe contact, staff member, and admin', async () => {
+  const owner=env.authenticatedContext('support-owner',{email:'support_owner@users.olive.invalid'}).firestore();
+  const staff=env.authenticatedContext('support-staff',{email:'support_staff@staff.olive.invalid'}).firestore();
+  const contact=env.authenticatedContext('support-contact',{email:'support_contact@safe.olive.invalid'}).firestore();
+  const admin=env.authenticatedContext('support-admin',{email:'support_admin@admin.olive.invalid'}).firestore();
+  const stranger=env.authenticatedContext('support-stranger',{email:'support_stranger@users.olive.invalid'}).firestore();
+  const directory=[
+    [owner,'support_owner','support-owner','owner-key'],
+    [staff,'support_staff','support-staff','staff-key'],
+    [contact,'support_contact','support-contact','contact-key'],
+    [admin,'support_admin','support-admin','admin-key'],
+  ];
+  for (const [client,username,uid,publicKey] of directory) {
+    await assertSucceeds(setDoc(doc(client,`messageDirectory/${username}`),
+      {uid,username,publicKey,updatedAt:serverTimestamp()}));
+  }
+  await assertFails(setDoc(doc(staff,'friendRequests/support-staff--support-owner'),{
+    senderUid:'support-staff',senderUsername:'support_staff',recipientUid:'support-owner',
+    recipientUsername:'support_owner',friendshipId:'support-staff--support-owner',createdAt:serverTimestamp(),
+  }));
+  const conversationId='support-support-owner';
+  const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',adminUid:'support-admin',
+    supportOrigin:'SUPPORT',supportTag:'NEEDS_ADMIN',
+    friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-admin'],
+    participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact','support-admin':'support_admin'},
+    createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:''};
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(),`conversations/${conversationId}`),conversation);
+  });
+  await assertSucceeds(getDoc(doc(owner,`conversations/${conversationId}`)));
+  await assertSucceeds(getDoc(doc(staff,`conversations/${conversationId}`)));
+  await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}`)));
+  await assertSucceeds(getDoc(doc(admin,`conversations/${conversationId}`)));
+  await assertFails(getDoc(doc(stranger,`conversations/${conversationId}`)));
+  await assertFails(updateDoc(doc(owner,`conversations/${conversationId}`),
+    {participantIds:['support-owner','support-staff'],updatedAt:serverTimestamp()}));
+  const keys={roomKeys:{'support-owner':'owner-wrap','support-staff':'staff-wrap','support-contact':'contact-wrap','support-admin':'admin-wrap'},
+    participantPublicKeys:{'support-owner':'owner-key','support-staff':'staff-key','support-contact':'contact-key','support-admin':'admin-key'},
+    updatedAt:serverTimestamp()};
+  await assertSucceeds(updateDoc(doc(owner,`conversations/${conversationId}`),keys));
+  await assertFails(updateDoc(doc(staff,`conversations/${conversationId}`),{
+    roomKeys:{'support-owner':'owner-wrap','support-staff':'staff-wrap'},
+    participantPublicKeys:{'support-owner':'owner-key','support-staff':'staff-key'},updatedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(doc(staff,`conversations/${conversationId}/messages/staff-message`),
+    {senderUid:'support-staff',senderUsername:'support_staff',ciphertext:'encrypted-support-message',
+      deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+  for (const [client,uid,username] of [[staff,'support-staff','support_staff'],
+    [owner,'support-owner','support_owner']]) {
+    const batch=writeBatch(client);
+    const messageId=`batch-${uid}`;
+    batch.set(doc(client,`conversations/${conversationId}/messages/${messageId}`),
+      {senderUid:uid,senderUsername:username,ciphertext:'encrypted-support-message',
+        deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()});
+    batch.update(doc(client,`conversations/${conversationId}`),
+      {lastMessage:'Secure message',lastMessageId:messageId,lastSenderUid:uid,
+        updatedAt:serverTimestamp()});
+    await assertSucceeds(batch.commit());
+  }
+  await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}/messages/staff-message`)));
+});
+
 test('encrypted live coordinates are overwritten by their owner and readable only by authorized contacts', async () => {
   const owner=env.authenticatedContext('live-owner').database();
   const contact=env.authenticatedContext('live-contact').database();
@@ -301,4 +378,21 @@ test('encrypted private entries are restricted to wrapped-key recipients', async
   await assertSucceeds(updateDoc(target,{wrappedKeys:{'entry-owner':'owner-key'},
     allowedUsers:['entry-owner'],updatedAt:serverTimestamp()}));
   await assertFails(getDoc(doc(recipient,'privateEntries/secure-entry-1')));
+});
+
+test('web entry hashes are owner-only, cannot be listed, and never accept raw tokens', async () => {
+  const alice=env.authenticatedContext('entry-alice').firestore();
+  const bob=env.authenticatedContext('entry-bob').firestore();
+  const anonymous=env.unauthenticatedContext().firestore();
+  const value={tokenHash:'a'.repeat(64),updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(alice,'webEntryLinks/entry-alice'),value));
+  await assertSucceeds(getDoc(doc(alice,'webEntryLinks/entry-alice')));
+  await assertFails(getDoc(doc(bob,'webEntryLinks/entry-alice')));
+  await assertFails(getDoc(doc(anonymous,'webEntryLinks/entry-alice')));
+  await assertFails(setDoc(doc(bob,'webEntryLinks/entry-alice'),value));
+  await assertFails(getDocs(collection(alice,'webEntryLinks')));
+  await assertFails(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,token:'raw-secret'}));
+  await assertFails(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,tokenHash:'invalid'}));
+  await assertSucceeds(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,tokenHash:'b'.repeat(64)}));
+  await assertSucceeds(deleteDoc(doc(alice,'webEntryLinks/entry-alice')));
 });

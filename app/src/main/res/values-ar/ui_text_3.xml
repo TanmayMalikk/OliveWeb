@@ -102,4 +102,6 @@
     <string name="ui_update_your_profile_details">حدّث بيانات ملفك الشخصي.</string>
     <string name="ui_profile_required_fields">الاسم الكامل وتاريخ ميلاد صحيح والمدينة مطلوبة.</string>
     <string name="password_excludes_username">يجب ألا تحتوي كلمة المرور على اسم المستخدم.</string>
+<string name="ocr_no_text">لم يتم التعرف على نص في المستند.</string>
+    <string name="ocr_error_detail">خطأ OCR: %1$s</string>
 </resources>
