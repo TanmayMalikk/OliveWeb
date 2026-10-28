@@ -1,41 +1,44 @@
-# Android distribution
+# Android release build
 
-The download site uses one stable public Firebase Storage object:
+The workflow in `.github/workflows/publish-android-main.yml` builds a signed
+release APK after each push to `main`. It uploads the APK to the stable public
+Firebase Storage path `public/android/olive-branch.apk`, which the website QR
+code uses. The `olive-branch-release` GitHub Actions artifact is also available
+from a successful run.
 
-`public/android/olive-branch.apk`
+## GitHub Actions secrets
 
-The workflow in `.github/workflows/publish-android-main.yml` builds a debug APK
-and replaces that file after every successful push to `main`. Because the QR encodes the stable object
-URL, it always downloads the newest published build without needing a newly
-generated image or a changed web address.
+Add these repository secrets before running the workflow:
 
-## Required GitHub Actions secrets
+- `ANDROID_KEYSTORE_BASE64`: Base64 encoding of the release keystore file.
+- `ANDROID_KEYSTORE_PASSWORD`: keystore password.
+- `GEOAPIFY_API_KEY`: Android address-suggestion key.
+- `MAPBOX_ACCESS_TOKEN`: Android navigation token.
+- `FIREBASE_SERVICE_ACCOUNT`: service-account JSON with permission to replace
+  the APK object in `olive-21239.firebasestorage.app`.
 
-Add these repository secrets before the workflow runs:
+The workflow uses the keystore alias `oliveRelease`, the same password for the
+keystore and key, and the project's Realtime Database URL.
 
-- `FIREBASE_SERVICE_ACCOUNT`: a Google service-account JSON document with
-  permission to replace objects in
-  `olive-21239.firebasestorage.app`.
-- `GEOAPIFY_API_KEY`: the production Geoapify browser key used by the Android app.
-- `MAPBOX_ACCESS_TOKEN`: the public Mapbox token used only for traffic-aware navigation routes.
-- `REALTIME_DATABASE_URL`: the production Firebase Realtime Database HTTPS URL.
+The Firebase configuration file `app/google-services.json` is already in the
+repository. Keep the keystore and passwords out of Git and back them up securely.
+The same signing key must be used for every update.
 
-The Firebase service account needs Storage Object Admin permission. Keep its JSON
-only in repository secrets. Storage rules are deployed separately from this workflow.
+On Windows, encode the keystore for the first secret with:
 
-## Debug build behavior
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\path\to\olive-release.jks')) |
+  Set-Clipboard
+```
 
-CI assigns version code `200000 + GITHUB_RUN_NUMBER`, which lets Android install
-each published debug build over the preceding debug build while the cached debug
-signing key remains available. If GitHub evicts that cache, the next build gets
-a new signing key and requires uninstalling the old debug app. Debug APKs also
-cannot update an installed release-signed app; uninstall the release build first.
-The object is uploaded with caching disabled
-and an APK content type. Client SDKs cannot overwrite or delete it; Firebase
-Storage rules allow anonymous reads only for the exact published path. Firebase
-App Check uses its debug provider in this build, so the debug token must be
-registered in Firebase for protected services to work.
+CI sets the version code to `200000 + GITHUB_RUN_NUMBER` so later builds can
+update earlier release builds. An installed debug APK has a different signature
+and must be uninstalled before installing this release APK.
 
-The production URL is committed in `web/.env.download`. To use another bucket or
-path, change both that URL and `APK_OBJECT` in the workflow, then update the exact
-public path in `firebase/storage.rules`.
+## App Check
+
+The release app uses Firebase App Check with Play Integrity. Register the
+release certificate SHA-256 in Firebase App Check and link the Firebase project
+to the app in Google Play Console. For a directly downloaded APK, configure
+the outside-Google-Play verdict settings before relying on App Check-enforced
+services. Test sign-in and protected features on a clean phone.
