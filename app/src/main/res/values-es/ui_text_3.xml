@@ -102,4 +102,6 @@
     <string name="ui_update_your_profile_details">Actualiza los datos de tu perfil.</string>
     <string name="ui_profile_required_fields">Se requieren el nombre completo, una fecha de nacimiento válida y la ciudad.</string>
     <string name="password_excludes_username">La contraseña no debe contener tu nombre de usuario.</string>
+<string name="ocr_no_text">No se reconoció texto en el documento.</string>
+    <string name="ocr_error_detail">Error de OCR: %1$s</string>
 </resources>

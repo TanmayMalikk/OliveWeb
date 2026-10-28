@@ -1,0 +1,319 @@
+/* Styles the landing-account part of the web app. */
+.account-layout {
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(20rem, 0.9fr) minmax(0, 1.1fr);
+}
+.account-aside {
+  position: relative;
+  background: #e9eddf;
+  padding: clamp(2rem, 5vw, 5rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  gap: 4rem;
+}
+.account-aside > div {
+  position: relative;
+  z-index: 1;
+}
+.account-aside h1 {
+  font-size: clamp(3rem, 4.7vw, 5.3rem);
+  margin-block: 1rem 1.5rem;
+}
+.account-aside p {
+  max-width: 25rem;
+  font-size: 0.9rem;
+}
+.account-aside > svg {
+  position: absolute;
+  bottom: 0;
+  right: -12%;
+  width: 80%;
+  color: #a4b28d;
+  opacity: 0.6;
+  transform: rotate(-30deg);
+}
+.aside-bottom {
+  font-size: 0.7rem;
+  z-index: 1;
+}
+.account-main {
+  padding: 2.5rem clamp(1.5rem, 6vw, 7rem);
+}
+.account-form {
+  max-width: 28rem;
+  margin: clamp(2.5rem, 6vw, 6rem) auto;
+}
+.account-form h2 {
+  margin-block: 0.9rem 1rem;
+  font-size: clamp(2.6rem, 4vw, 3.7rem);
+}
+.account-form > p {
+  font-size: 0.88rem;
+  margin-bottom: 1.7rem;
+}
+.account-form form > .button {
+  width: 100%;
+  margin-top: 1rem;
+}
+.auth-switch {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.storage-note {
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 0.7rem;
+  padding-top: 1.3rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.storage-note svg {
+  flex-shrink: 0;
+}
+.step-progress {
+  display: flex;
+  max-width: 42rem;
+  margin: 2rem auto 4rem;
+  justify-content: space-between;
+  gap: 1rem;
+  position: relative;
+}
+.step-progress:before {
+  content: "";
+  position: absolute;
+  top: 1rem;
+  height: 1px;
+  left: 1rem;
+  right: 1rem;
+  background: #cbd3be;
+  z-index: -1;
+}
+.step-progress li {
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+}
+.step-progress li > span {
+  border: 1px solid #cbd3be;
+  background: var(--paper);
+  color: var(--muted);
+  border-radius: 50%;
+  height: 2.1rem;
+  width: 2.1rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+}
+.step-progress li.active > span {
+  background: var(--olive);
+  color: white;
+}
+.step-progress small {
+  font-size: 0.7rem;
+}
+.setup-heading {
+  text-align: center;
+  max-width: 42rem;
+  margin: 0 auto 3rem;
+}
+.setup-heading h1 {
+  font-size: clamp(2.8rem, 4.7vw, 4.8rem);
+  margin-block: 1rem;
+}
+.setup-heading p {
+  font-size: 0.9rem;
+}
+.setup-covers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 1.2rem;
+}
+.setup-cover {
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: #eceee4;
+  text-align: left;
+}
+.setup-cover.selected {
+  border-color: var(--olive);
+  box-shadow: 0 0 0 2px var(--olive);
+}
+.setup-cover > .cover-preview {
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+}
+.setup-cover > span {
+  padding: 1rem 0.5rem 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.setup-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-block: 2rem 4rem;
+}
+.setup-controls > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.setup-form {
+  max-width: 46rem;
+  margin: auto;
+}
+.setup-form.narrow {
+  max-width: 30rem;
+}
+.download-heading {
+  max-width: 47rem;
+  margin-block: 3rem;
+}
+.download-heading h1 {
+  margin-block: 1rem 1.5rem;
+}
+.download-heading p {
+  max-width: 30rem;
+}
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr));
+  gap: 1.5rem;
+}
+.install-card {
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid var(--line);
+  background: var(--white);
+  border-radius: 1.4rem;
+}
+.install-icon {
+  background: var(--soft);
+  border-radius: 1rem;
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  margin-bottom: 2rem;
+}
+.install-card h2 {
+  font-size: 2.2rem;
+  margin-block: 1rem;
+}
+.install-card > p {
+  font-size: 0.86rem;
+}
+.qr-area {
+  margin-block: 2rem;
+}
+.qr-area > img {
+  margin: auto;
+  max-width: 100%;
+  border-radius: 0.75rem;
+}
+.qr-area > small {
+  display: block;
+  text-align: center;
+  margin-top: 0.7rem;
+  color: var(--muted);
+}
+.qr-placeholder {
+  background: var(--soft);
+  min-height: 14rem;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 1rem;
+  border-radius: 1rem;
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.install-card > .button {
+  width: 100%;
+}
+.install-steps {
+  margin-block: 2rem;
+}
+.install-steps > li {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+}
+.install-steps > li > span {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+.install-steps h3 {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.install-steps p {
+  font-size: 0.78rem;
+  margin-top: 0.4rem;
+}
+.download-account {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  margin-block: 2rem 4rem;
+}
+.download-account h2 {
+  font-size: 2rem;
+  margin-block: 0.7rem;
+}
+.download-account p {
+  font-size: 0.85rem;
+}
+.link-page {
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 2rem;
+  gap: 2rem;
+}
+.personal-link-panel {
+  max-width: 37rem;
+  position: relative;
+  overflow: hidden;
+}
+.personal-link-panel > svg {
+  width: 9rem;
+  display: block;
+  margin-left: auto;
+  color: #a1af84;
+  height: 4rem;
+}
+.personal-link-panel h1 {
+  font-size: 3rem;
+  margin-block: 0.8rem 1.2rem;
+}
+.personal-link-panel > p {
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.personal-link-panel .field input {
+  font-size: 0.73rem;
+}
+.personal-link-panel > .button {
+  margin-top: 1rem;
+}

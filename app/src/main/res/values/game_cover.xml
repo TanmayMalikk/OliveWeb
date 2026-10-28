@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="game_cover_title">Olive Tap</string>
+    <string name="game_cover_instructions">Tap the olive and build your score.</string>
+    <string name="game_player_name">Player name</string>
+    <string name="game_tap_olive">Tap olive</string>
+    <string name="game_score">Score: %1$d</string>
+    <string name="game_cover_app_olive_tap">Game app · Olive Tap</string>
+</resources>

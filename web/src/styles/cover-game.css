@@ -1,0 +1,382 @@
+/* Styles the cover-game part of the web app. */
+.grove {
+  background: #f3f4e9;
+  min-height: 100svh;
+  color: #344b2d;
+  display: flex;
+  flex-direction: column;
+  padding-inline: clamp(1rem, 5vw, 5rem);
+}
+.grove-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-block: 2rem;
+  gap: 1rem;
+}
+.grove-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.grove-brand > svg {
+  width: 2.3rem;
+  height: 2.3rem;
+}
+.grove-brand > span {
+  font: 1.8rem/0.95 var(--serif);
+  letter-spacing: -0.05em;
+}
+.grove-brand small {
+  display: block;
+  font: 0.43rem system-ui;
+  letter-spacing: 0.17em;
+  margin-top: 0.6rem;
+}
+.grove-header nav {
+  display: flex;
+  gap: 1.5rem;
+}
+.grove-header nav a {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  min-height: 2.75rem;
+  font-size: 0.72rem;
+}
+.grove-main {
+  width: min(100%, 78rem);
+  margin: auto;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: clamp(2rem, 6vw, 7rem);
+  align-items: center;
+  padding-block: clamp(2rem, 5vw, 6rem);
+}
+.grove-intro h1 {
+  font-size: clamp(3rem, 5.5vw, 6rem);
+  margin-block: 1.5rem;
+}
+.grove-intro p {
+  font-size: 0.9rem;
+  max-width: 24rem;
+}
+.grove-game {
+  container-type: inline-size;
+  background: #fdfdf4;
+  border: 1px solid #dce2cc;
+  border-radius: 1.5rem;
+  padding: clamp(1rem, 2.6vw, 2rem);
+  box-shadow: 0 1rem 3rem #3b4e2510;
+}
+.game-score {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 1.3rem;
+  margin-bottom: 1.5rem;
+}
+.game-score > span {
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  color: #62714f;
+}
+.game-score strong {
+  display: block;
+  font: 1.8rem var(--serif);
+  letter-spacing: -0.03em;
+  color: #425936;
+  margin-top: 0.3rem;
+}
+.game-score strong small {
+  font-size: 1rem;
+  color: #5b704d;
+}
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.5rem, 2cqi, 0.8rem);
+}
+.memory-card {
+  aspect-ratio: 0.95;
+  background: #e4e9d5;
+  border: 1px solid #d9e0cb;
+  border-radius: 0.8rem;
+  display: grid;
+  place-items: center;
+  transition:
+    background 0.2s,
+    transform 0.2s;
+  color: #8c9d72;
+  min-height: 3rem;
+}
+.memory-card > span {
+  border: 1px solid #b8c4a05c;
+  border-radius: 50%;
+  width: 65%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+.memory-card:hover {
+  background: #d7e0c3;
+  transform: translateY(-2px);
+}
+.memory-card.turned {
+  background: #fbf8e9;
+  border-color: #b8c69f;
+  color: #526d3d;
+}
+.memory-card.matched {
+  background: #668352;
+  color: #fff;
+  border-color: #668352;
+}
+.memory-card.matched > span {
+  border-color: #ffffff26;
+}
+.game-bottom {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.3rem;
+}
+.game-bottom p {
+  font-size: 0.68rem;
+  max-width: 14rem;
+}
+.game-bottom .button {
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.grove-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 2rem;
+  border-top: 1px solid #dce2cd;
+  font-size: 0.65rem;
+  color: #61704f;
+}
+.grove-footer > span:last-child {
+  font-size: 0.5rem;
+  letter-spacing: 0.13em;
+}
+.cover-container > .grove {
+  margin-inline: calc(-1 * clamp(1rem, 3.5vw, 4rem));
+  min-height: 90svh;
+}
+@media (max-width: 60rem) {
+  .food-top {
+    gap: 1rem;
+  }
+  .food-hero {
+    gap: 1.5rem;
+  }
+  .food-hero h1 {
+    font-size: 3.5rem;
+  }
+  .calculator-layout {
+    grid-template-columns: 1.4fr 1fr;
+    gap: 2rem;
+  }
+  .graphing-workspace {
+    grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
+  }
+  .grove-main {
+    gap: 3rem;
+  }
+  .grove-intro h1 {
+    font-size: 3.6rem;
+  }
+}
+@media (max-width: 48rem) {
+  .cover-container {
+    width: calc(100% - 2rem);
+  }
+  .food-top {
+    padding-block: 1.4rem;
+    flex-wrap: wrap;
+  }
+  .food-wordmark {
+    font-size: 3rem;
+  }
+  .delivery-location {
+    order: 3;
+    width: 100%;
+  }
+  .food-top > .button {
+    font-size: 0.72rem;
+    padding: 0.7rem 1rem;
+  }
+  .food-hero {
+    grid-template-columns: 1fr;
+    padding: 2rem 1.5rem;
+    margin-top: 1.5rem;
+  }
+  .food-hero-image {
+    width: 70%;
+    margin: 0 auto 1rem;
+  }
+  .food-hero h1 {
+    font-size: 3.5rem;
+  }
+  .food-hero p {
+    font-size: 0.85rem;
+  }
+  .food-stamp {
+    width: 5.3rem;
+    height: 5.3rem;
+    font-size: 0.44rem;
+  }
+  .menu-heading {
+    display: block;
+  }
+  .menu-heading > .search-field {
+    margin-top: 1.5rem;
+    width: 100%;
+    max-width: none;
+  }
+  .menu-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 2rem 1rem;
+  }
+  .cart-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .order-summary {
+    position: static;
+    margin-top: 0;
+  }
+  .news-edition {
+    font-size: 0.48rem;
+  }
+  .news-edition > span:last-child {
+    max-width: 45%;
+    text-align: right;
+  }
+  .news-search-row {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .news-toolbar .filter-row > button {
+    padding-inline: 0.5rem;
+    font-size: 0.7rem;
+  }
+  .newspaper-grid {
+    grid-template-columns: 1fr;
+  }
+  .calculator-layout {
+    grid-template-columns: 1fr;
+  }
+  .calculator-heading {
+    padding-block: 1.5rem;
+  }
+  .calculator-mode-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+  .calculator-mode-tabs > button {
+    min-width: 0;
+  }
+  .graphing-workspace {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .graph-expression-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .graph-expression-details {
+    display: none;
+  }
+  .graph-table-button {
+    align-self: flex-start;
+    margin-top: 0.85rem;
+  }
+  .graph-stage,
+  .graph-stage .graph {
+    min-height: 30rem;
+  }
+  .graph-pan-controls {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+  .calculator-note {
+    display: none;
+  }
+  .calculator-keys > button {
+    min-height: 4rem;
+  }
+  .scientific-keys {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .grove-main {
+    grid-template-columns: 1fr;
+    padding-top: 1.5rem;
+    gap: 2rem;
+  }
+  .grove-intro {
+    text-align: center;
+  }
+  .grove-intro h1 {
+    font-size: clamp(2.8rem, 10vw, 4.3rem);
+  }
+  .grove-intro p {
+    margin: auto;
+  }
+  .grove-game {
+    max-width: 35rem;
+    width: 100%;
+    margin: auto;
+  }
+  .grove-header {
+    padding-top: 1.5rem;
+  }
+  .grove-brand > span {
+    font-size: 1.5rem;
+  }
+  .grove-header nav {
+    gap: 1rem;
+  }
+  .grove-header nav a {
+    font-size: 0.66rem;
+  }
+  .grove-footer {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .game-bottom {
+    gap: 0.5rem;
+  }
+  .ingredient-list {
+    grid-template-columns: 1fr;
+  }
+  .grove {
+    padding-inline: 1rem;
+  }
+}
+@container (max-width:22rem) {
+  .memory-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .game-bottom {
+    flex-wrap: wrap;
+  }
+  .game-bottom p {
+    max-width: none;
+  }
+}
+

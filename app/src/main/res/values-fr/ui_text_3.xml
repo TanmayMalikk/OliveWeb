@@ -102,4 +102,6 @@
     <string name="ui_update_your_profile_details">Mettez à jour les informations de votre profil.</string>
     <string name="ui_profile_required_fields">Le nom complet, une date de naissance valide et la ville sont obligatoires.</string>
     <string name="password_excludes_username">Le mot de passe ne doit pas contenir votre nom d’utilisateur.</string>
+<string name="ocr_no_text">Aucun texte reconnu dans le document.</string>
+    <string name="ocr_error_detail">Erreur OCR : %1$s</string>
 </resources>

@@ -1,0 +1,94 @@
+name: Publish latest Android app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-android-main
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APK_OBJECT: gs://olive-21239.firebasestorage.app/public/android/olive-branch.apk
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v5
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Set build version
+        run: |
+          echo "OLIVE_VERSION_CODE=$((200000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "OLIVE_VERSION_NAME=0.2.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+
+      - name: Prepare release signing
+        env:
+          SIGNING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          REALTIME_DATABASE_URL: ${{ secrets.REALTIME_DATABASE_URL }}
+        run: |
+          test -n "$SIGNING_KEY"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          printf '%s' "$SIGNING_KEY" | base64 --decode > release-signing.jks
+          {
+            printf 'storeFile=release-signing.jks\n'
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > keystore.properties
+          {
+            printf 'GEOAPIFY_API_KEY=%s\n' "$GEOAPIFY_API_KEY"
+            printf 'MAPBOX_ACCESS_TOKEN=%s\n' "$MAPBOX_ACCESS_TOKEN"
+            printf 'REALTIME_DATABASE_URL=%s\n' "$REALTIME_DATABASE_URL"
+          } > local.properties
+
+      - name: Build signed release APK
+        run: ./gradlew :app:assembleRelease
+
+      - name: Locate release APK
+        run: |
+          APK_PATH="$(find app/build/outputs/apk/release -name '*.apk' -type f | head -n 1)"
+          test -n "$APK_PATH"
+          cp "$APK_PATH" olive-branch.apk
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy Storage rules
+        run: |
+          npm install --global firebase-tools
+          firebase deploy --only storage --project olive-21239 --non-interactive
+
+      - name: Publish stable Android download
+        run: |
+          gsutil \
+            -h 'Cache-Control:no-cache, max-age=0' \
+            -h 'Content-Type:application/vnd.android.package-archive' \
+            -h 'Content-Disposition:attachment; filename="olive-branch.apk"' \
+            cp olive-branch.apk "$APK_OBJECT"
