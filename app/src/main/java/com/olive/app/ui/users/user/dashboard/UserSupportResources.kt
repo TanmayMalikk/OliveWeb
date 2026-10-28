@@ -107,7 +107,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (_: Exception) {
+                } catch (_: Exception) { // Location is optional here, so show the unavailable message and keep the support screen usable.
                     locationError = R.string.support_location_unavailable
                 } finally {
                     locating = false

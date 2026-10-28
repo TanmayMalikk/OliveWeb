@@ -1,4 +1,4 @@
-// Tests startup, chat registration, and calculator responsiveness.
+// Tests startup, TalkBack order, chat registration, and calculator responsiveness.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -17,6 +17,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ResponsivenessPolicyTest {
+    @Test
+    fun talkBackTraversalPolicyKeepsContentBeforeFloatingActions() {
+        val expected = listOf(
+            AccessibilityTraversalOrder.ScreenContent,
+            AccessibilityTraversalOrder.OverlayContent,
+            AccessibilityTraversalOrder.PersistentActions,
+        )
+
+        assertEquals(expected, AccessibilityTraversalOrder.entries.sortedBy { it.index })
+        assertEquals(expected.size, expected.map { it.index }.distinct().size)
+    }
+
     @Test
     fun coverIsConstructedForTheDefaultAndConfiguredUserRoutes() {
         assertFalse(shouldComposeCover(usesCover = false))

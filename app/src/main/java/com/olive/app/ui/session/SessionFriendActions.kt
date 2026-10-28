@@ -39,7 +39,7 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
-    // Sends friend request.
+    // Sends a request to the selected directory account and refreshes the social list on success.
     fun sendFriendRequest(user: DirectoryUser) {
         with(runtime) {
             with(state) {

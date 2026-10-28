@@ -43,7 +43,7 @@ internal object LiveLocationController {
         ) && expiresAt(context) > System.currentTimeMillis()
     }
 
-    // Selects ed.
+    // Reads the saved contact IDs that may receive this user's live location.
     fun selected(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .getStringSet("live_contacts", emptySet()).orEmpty()
 

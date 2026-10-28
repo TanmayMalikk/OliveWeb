@@ -7,6 +7,8 @@ const USERNAME = /^(?=.*[a-z])[a-z0-9_]{8,24}$/;
 const EXISTING_USERNAME = /^[a-z0-9_]{4,24}$/;
 const PASSWORD = /^(?=.*\p{L})(?=.*\p{N})(?=.*[^\p{L}\p{N}\s]).{8,24}$/u;
 const PROTECTED_USERNAMES = new Set([
+  "demoadmin",
+  "demostaff",
   "olive_admin",
   "oliveadmin",
   "olivestaff",

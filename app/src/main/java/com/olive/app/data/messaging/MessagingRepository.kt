@@ -56,7 +56,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         )
     }
 
-    // Watches social for changes.
+    // Streams friend requests, accepted friends, and directory changes for one signed-in account.
     fun observeSocial(
         uid: String,
         onUpdate: (SocialSnapshot) -> Unit,
@@ -106,7 +106,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return ChatSubscription { listeners.forEach(ListenerRegistration::remove) }
     }
 
-    // Sends friend request.
+    // Creates a pending request after confirming both accounts and their roles may connect.
     suspend fun sendFriendRequest(current: AccountIdentity, other: DirectoryUser) {
         require(current.uid != other.uid) { "You cannot add yourself." }
         require(other.username.matches(Regex("[a-z0-9_]{4,24}"))) { "That username is not valid." }
@@ -177,7 +177,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         firestore.collection("friendRequests").document(request.id).delete().await()
     }
 
-    // Cancels request.
+    // Removes an outgoing request only when the signed-in account originally sent it.
     suspend fun cancelRequest(currentUid: String, request: FriendRequest) {
         require(request.senderUid == currentUid) { "Only the sender can cancel this request." }
         firestore.collection("friendRequests").document(request.id).delete().await()
@@ -201,7 +201,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return ChatConversation(friend.friendshipId, friend.friendshipId, ids, names)
     }
 
-    // Watches conversations for changes.
+    // Streams direct and support conversations visible to the signed-in participant.
     fun observeConversations(
         currentUid: String,
         onUpdate: (List<ChatConversation>) -> Unit,

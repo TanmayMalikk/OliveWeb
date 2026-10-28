@@ -8,7 +8,6 @@
     <string name="support_walkthrough">使用指南</string>
     <string name="support_staff_help">向工作人员求助</string>
     <string name="support_looking_for_staff">正在寻找工作人员…</string>
-    <string name="support_staff_found">已分配 %1$s。正在打开支持聊天…</string>
     <string name="support_staff_ready">已分配一名工作人员。正在打开 Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
     <string name="support_no_conversations">暂无支持对话。</string>

@@ -303,7 +303,7 @@ internal class LocationMapController(
         return result[0]
     }
 
-    // Selects contact.
+    // Adds or removes one safe contact from the next live-location share.
     fun selectContact(uid: String, enabled: Boolean) {
         if (state.liveActive) return
         val updated = if (enabled) state.selected + uid else state.selected - uid
@@ -389,7 +389,7 @@ internal class LocationMapController(
         expiryJob = null
     }
 
-    // Updates static sharing.
+    // Publishes or removes the user's saved-address marker for approved safe contacts.
     fun updateStaticSharing(configuration: LocationMapConfiguration, enabled: Boolean) {
         if (configuration.localMode || state.working) return
         scope.launch {

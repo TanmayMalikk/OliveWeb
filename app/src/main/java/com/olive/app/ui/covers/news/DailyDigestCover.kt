@@ -129,7 +129,7 @@ internal fun NewsCover(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (_: Exception) { // Keep cached articles visible; show the error state only when no news is available.
             newsError = articles.isEmpty()
         }
         loading = false

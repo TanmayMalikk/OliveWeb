@@ -66,7 +66,7 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
 
                 else -> Result.retry()
             }
-        } catch (_: Exception) {
+        } catch (_: Exception) { // Network and server failures are temporary; WorkManager retries the encrypted sync later.
             Result.retry()
         }
     }
@@ -94,7 +94,7 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
     }
 }
 
-// Syncs safety plan.
+// Uploads queued encrypted safety-plan edits and clears only changes confirmed by the server.
 internal suspend fun syncSafetyPlan(
     store: SafetyPlanStore,
     repository: SafetyPlanRepository,

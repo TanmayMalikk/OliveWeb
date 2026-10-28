@@ -17,7 +17,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Owns private note edits, trash and restoration.
 internal class SessionNotes(private val runtime: SessionRuntime) {
-    // Clears private entry status.
+    // Removes the last private-note success or error message before a new action begins.
     fun clearPrivateEntryStatus() {
         with(runtime) {
             with(state) {
@@ -148,7 +148,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
-    // Updates private entry.
+    // Encrypts and saves an edited private note, then reports success or failure to its screen.
     fun updatePrivateEntry(entry: PrivateEntry, failure: String, success: String) {
         with(runtime) {
             with(state) {

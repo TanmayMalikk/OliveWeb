@@ -52,7 +52,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             })
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Do not expose key details; show the safe conversation error when encrypted room setup fails.
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_secure_conversation)
                     } finally {
@@ -159,7 +159,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     withContext(Dispatchers.IO) {
                         store.setConversationArchived(uid, conversation.id, archived)
                     }
-                } catch (_: Exception) {
+                } catch (_: Exception) { // Restore the local archive state because the device could not persist the requested change.
                     state.archivedConversationIds = previous
                     state.message = runtime.application.getString(R.string.unable_to_update_archived_chat)
                 }
@@ -194,7 +194,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reads message key.
+    // Builds the device-storage key that tracks the last message read in one conversation.
     fun readMessageKey(uid: String, conversationId: String) = "read_message_${uid}_$conversationId"
 
     fun markConversationRead(conversation: ChatConversation) {

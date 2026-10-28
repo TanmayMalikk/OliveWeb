@@ -1,11 +1,7 @@
 // Chat roles: defines planned voice-call states; calling is not implemented yet.
 package com.olive.app.data
 
-// Gemini recommends packages "kotlinx.coroutines.asFlow and kotlinx.coroutines.StateFlow" which do not appear to exit
-// perhaps outdated training data.
-
-//TODO: Create the other end of the API's
-//TODO: install and setup the mumble voip server/service on yourolivebranch.ca
+// Voice calling remains a design stub until the server API and Mumble service are implemented.
 /*
 Class VoipManager:
     This class is meant to handle the application layer of Voip

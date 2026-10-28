@@ -64,7 +64,7 @@ internal fun InteractiveLocationMap(
         if (loadState == MapLoadState.Loading) loadState = MapLoadState.Error
     }
 
-    // Updates points.
+    // Sends the latest user and safe-contact markers to the embedded map and optionally recentres it.
     fun updatePoints(view: WebView, moveCamera: Boolean) {
         val encoded = JSONArray().apply {
             points.forEach { point ->

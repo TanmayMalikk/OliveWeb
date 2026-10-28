@@ -177,7 +177,7 @@ class FirebaseAccountRepository : AccountRepository {
 
     override fun signOut() = auth.signOut()
 
-    // Reads able history.
+    // Converts a stored activity JSON record into short text suitable for the history screen.
     private fun readableHistory(category: String, raw: String): String {
         val value = JSONObject(raw)
         return when (category) {

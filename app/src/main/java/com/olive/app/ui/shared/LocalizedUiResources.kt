@@ -116,7 +116,7 @@ internal object AppLocaleManager {
         }
     }
 
-    // Applies locale.
+    // Saves the selected language and asks Android to recreate UI resources in that locale.
     fun applyLocale(language: String) {
         val tag = getLanguageTag(language)
         val locales = LocaleListCompat.forLanguageTags(tag)

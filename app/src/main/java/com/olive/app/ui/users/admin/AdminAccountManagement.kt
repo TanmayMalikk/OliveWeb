@@ -176,7 +176,7 @@ private fun AccountRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-// Creates account dialog.
+// Collects and validates the details an admin uses to create a managed staff or admin account.
 internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Unit) {
     val uiText = rememberResourceText()
     var role by remember { mutableStateOf(AccountRole.USER) }

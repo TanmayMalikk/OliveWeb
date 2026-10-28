@@ -111,7 +111,7 @@ internal object EquationSolver {
             return result
         }
 
-        // Adds ition.
+        // Combines polynomial terms joined by addition or subtraction.
         private fun addition(): DoubleArray {
             var left = multiplication()
             while (true) left = when {

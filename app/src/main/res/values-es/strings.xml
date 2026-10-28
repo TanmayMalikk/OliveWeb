@@ -111,7 +111,6 @@ Buen humor.</string>
     <string name="a_little_space_of_your_own">Un pequeño espacio propio.</string>
     <string name="welcome_to_olive">Bienvenido a Oliva</string>
     <string name="browse_the_menu_and_collect_your_favourites">Explore el menú y recopile sus favoritos.</string>
-    <string name="set_up_account">Configurar cuenta</string>
     <string name="your_olive_account">Tu cuenta de Oliva</string>
     <string name="no_delivery_address_saved">No se ha guardado ninguna dirección de entrega</string>
     <string name="change_delivery_address">Cambiar dirección de entrega</string>
@@ -252,14 +251,11 @@ Buen humor.</string>
 <string name="the_new_passwords_do_not_match">Las nuevas contraseñas no coinciden.</string>
     <string name="unable_to_change_the_password_check_your_current_password_and_connection">No se puede cambiar la contraseña. Verifique su contraseña y conexión actuales.</string>
     <string name="password_changed">Contraseña cambiada.</string>
-    <string name="enter_4_6_digits_for_both_pins">Ingrese de 4 a 6 dígitos para ambos PIN.</string>
     <string name="the_new_pins_do_not_match">Los nuevos PIN no coinciden.</string>
     <string name="choose_your_cover_app">Elige tu aplicación de portada</string>
     <string name="food_delivery_app_olive">Aplicación de entrega de comida · Oliva</string>
-    <string name="game_in_development">Juego · En desarrollo</string>
     <string name="news_app_daily_digest">Aplicación de noticias · Resumen diario</string>
     <string name="calculator_better_calculator">Calculadora · Mejor calculadora</string>
-    <string name="in_development">En desarrollo</string>
     <string name="olive_branch">rama de olivo</string>
 <string name="sign_out">¿Desconectar?</string>
 <string name="cancel">Cancelar</string>
@@ -269,8 +265,6 @@ Buen humor.</string>
 <string name="back">Volver</string>
 <string name="home">Inicio</string>
     <string name="culture">Cultura</string>
-<string name="unable_to_change_the_pin">No se puede cambiar el PIN.</string>
-    <string name="device_pin_changed">El PIN del dispositivo cambió.</string>
     <string name="unable_to_save_contacts_on_this_device_please_retry">No se pueden guardar contactos en este dispositivo. Vuelva a intentarlo.</string>
     <string name="contacts_saved_on_this_device">Contactos guardados en este dispositivo.</string>
     <string name="changes_are_saved_on_this_device_cloud_sync_is_unavailable_retry_when_connected">Los cambios se guardan en este dispositivo. La sincronización en la nube no está disponible; Vuelva a intentarlo cuando esté conectado.</string>

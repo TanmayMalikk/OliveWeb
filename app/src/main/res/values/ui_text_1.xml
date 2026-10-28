@@ -19,7 +19,6 @@
     <string name="ui_passwords_match">Passwords match</string>
     <string name="ui_delete_value">Delete %1$s?</string>
     <string name="ui_signed_in_as_value">Signed in as %1$s</string>
-    <string name="ui_active_chats_with_staff_and_users">Active chats with staff and users</string>
     <string name="ui_back">Back</string>
     <string name="ui_no_accounts_found">No accounts found.</string>
     <string name="ui_profile_information">Profile information</string>
@@ -45,7 +44,6 @@
     <string name="ui_reconnect_your_account">Reconnect your account</string>
     <string name="ui_your_local_olive_branch_account_is_locked_safely_but_firebase_nee">Your local Olive Branch account is locked safely, but Firebase needs your password again before friends and messages can load.</string>
     <string name="ui_account_password">Account password</string>
-    <string name="ui_requirement_met">Requirement met</string>
     <string name="ui_finish">Finish</string>
     <string name="ui_step_value_of_value">Step %1$s of %2$s</string>
     <string name="ui_value_of_value_required">%1$s of %2$s required</string>

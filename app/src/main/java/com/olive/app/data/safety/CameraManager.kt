@@ -85,7 +85,7 @@ class CameraManager(private val context: Context) {
         }
         capture.takePicture(
             ImageCapture.OutputFileOptions.Builder(file).build(), cameraExecutor,
-            // Handles replies from on image saved callback.
+            // Returns the saved photo or deletes the partial file when CameraX reports an error.
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                     if (continuation.isActive) continuation.resume(file)
@@ -132,7 +132,7 @@ class CameraManager(private val context: Context) {
         recording?.stop()
     }
 
-    // Cancels video.
+    // Stops the current video recording without keeping an unfinished capture.
     fun cancelVideo() {
         recording?.close()
         recording = null

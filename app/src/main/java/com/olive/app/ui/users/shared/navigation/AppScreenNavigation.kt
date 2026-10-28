@@ -168,9 +168,11 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                 session.navigation.back()
             }
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Box(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize().accessibilityTraversalGroup()) {
                     Scaffold(
-                        modifier = if (supportExpanded || showPinAnimation) Modifier.clearAndSetSemantics {} else Modifier,
+                        modifier = Modifier.testTag("session_screen_content")
+                            .accessibilityTraversal(AccessibilityTraversalOrder.ScreenContent)
+                            .then(if (supportExpanded || showPinAnimation) Modifier.clearAndSetSemantics {} else Modifier),
                         bottomBar = {
                             if (showQuickExit || showSupport) Spacer(
                                 Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp)
