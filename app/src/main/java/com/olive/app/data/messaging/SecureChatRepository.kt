@@ -11,6 +11,13 @@ import javax.crypto.SecretKey
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
 class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+    // Opens the copy of an existing room key that was encrypted for this account.
+    suspend fun existingRoomKey(conversationId: String, currentUid: String): SecretKey? {
+        val snapshot = firestore.collection("conversations").document(conversationId).get().await()
+        val wrappedKey = snapshot.roomKeys().orEmpty()[currentUid] ?: return null
+        return KeyManager.unwrapKey(wrappedKey)
+    }
+
     // Makes sure room key is ready.
     suspend fun ensureRoomKey(
         conversation: ChatConversation, currentUid: String,

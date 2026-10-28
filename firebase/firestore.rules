@@ -42,7 +42,9 @@ service cloud.firestore {
       return request.auth.token.email == username + '@users.olive.invalid'
         || request.auth.token.email == username + '@safe.olive.invalid'
         || request.auth.token.email == username + '@staff.olive.invalid'
-        || request.auth.token.email == username + '@admin.olive.invalid';
+        || request.auth.token.email == username + '@admin.olive.invalid'
+        || request.auth.token.role == 'STAFF'
+        || request.auth.token.role == 'ADMIN';
     }
 
     function personalMessagingAccount() {
@@ -409,7 +411,8 @@ service cloud.firestore {
               && (!data.keys().hasAny(['closedAt']) || data.closedAt is timestamp)
               && data.supportOrigin in ['PLAN_CONSULT', 'SUPPORT']
               && data.supportTag in ['PLAN_CONSULT', 'SUPPORT', 'NEEDS_ADMIN']
-              && conversationId == (data.supportOrigin == 'PLAN_CONSULT' ? 'plan-consult-' : 'support-') + data.ownerUid
+              && conversationId.matches('^' + (data.supportOrigin == 'PLAN_CONSULT' ? 'plan-consult-' : 'support-')
+                + data.ownerUid + '(-[A-Za-z0-9_-]{1,64})?$')
               && data.participantIds is list && data.participantIds.size() >= 2
               && data.participantIds.size() <= 4 && data.ownerUid in data.participantIds
               && data.staffUid in data.participantIds
@@ -476,7 +479,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['senderUid','senderUsername','body','ciphertext','deleted','sentAt','clientSentAt'])
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderUsername is string
-          && validMessagingEmail(request.resource.data.senderUsername)
+          && request.resource.data.senderUsername == parentConversation().participantUsernames[request.auth.uid]
             && request.resource.data.ciphertext is string && request.resource.data.ciphertext.size() > 0
             && request.resource.data.ciphertext.size() <= 12000
             && !request.resource.data.keys().hasAny(['body'])

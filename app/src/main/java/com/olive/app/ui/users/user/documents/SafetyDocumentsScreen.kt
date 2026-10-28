@@ -306,6 +306,8 @@ private fun PreparingUploadCard() {
 @Composable
 private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
     val failed = upload.status == MediaTransferStatus.FAILED
+    val waitingToRetry = upload.status == MediaTransferStatus.QUEUED && upload.error != null
+    val retryable = failed || waitingToRetry
     val status = when (upload.status) {
         MediaTransferStatus.QUEUED -> stringResource(
             if (upload.error == null) R.string.documents_upload_queued
@@ -321,7 +323,7 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
         MediaTransferStatus.FAILED -> stringResource(R.string.documents_upload_failed)
         MediaTransferStatus.CANCELLED -> stringResource(R.string.documents_upload_cancelled)
     }
-    val summary = listOfNotNull(upload.name, status, upload.error?.takeIf { failed }).joinToString(". ")
+    val summary = listOfNotNull(upload.name, status, upload.error?.takeIf { retryable }).joinToString(". ")
     OutlinedCard(Modifier.fillMaxWidth().testTag("document_upload_${upload.jobId}")) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
@@ -334,7 +336,7 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
                 Icon(
                     Icons.Outlined.CloudUpload,
                     null,
-                    tint = if (failed) MaterialTheme.colorScheme.error else OliveGreen
+                    tint = if (retryable) MaterialTheme.colorScheme.error else OliveGreen
                 )
                 Column(Modifier.weight(1f)) {
                     Text(upload.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
@@ -342,7 +344,7 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
                         status,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                        color = if (failed) MaterialTheme.colorScheme.error else Muted
+                        color = if (retryable) MaterialTheme.colorScheme.error else Muted
                     )
                 }
             }
@@ -354,12 +356,12 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
                     LinearProgressIndicator(Modifier.fillMaxWidth().clearAndSetSemantics {})
                 }
             }
-            upload.error?.takeIf { failed }?.let {
+            upload.error?.takeIf { retryable }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.clearAndSetSemantics {})
             }
-            if (failed) OutlinedButton(onClick = onRetry, modifier = Modifier.align(Alignment.End)) {
+            if (retryable) OutlinedButton(onClick = onRetry, modifier = Modifier.align(Alignment.End)) {
                 Icon(Icons.Outlined.Refresh, null)
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.retry))
