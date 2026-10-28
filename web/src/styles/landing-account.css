@@ -213,33 +213,6 @@
 .install-card > p {
   font-size: 0.86rem;
 }
-.qr-area {
-  margin-block: 2rem;
-}
-.qr-area > img {
-  margin: auto;
-  max-width: 100%;
-  border-radius: 0.75rem;
-}
-.qr-area > small {
-  display: block;
-  text-align: center;
-  margin-top: 0.7rem;
-  color: var(--muted);
-}
-.qr-placeholder {
-  background: var(--soft);
-  min-height: 14rem;
-  display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: 1rem;
-  border-radius: 1rem;
-  padding: 2rem;
-  text-align: center;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
 .install-card > .button {
   width: 100%;
 }
