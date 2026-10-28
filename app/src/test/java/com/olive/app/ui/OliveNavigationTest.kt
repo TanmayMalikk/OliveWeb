@@ -1,4 +1,7 @@
+// Tests the olive navigation test behavior.
 package com.olive.app.ui
+
+import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.covers.olive.CoverTab
 import com.olive.app.ui.covers.olive.OliveViewModel
@@ -10,27 +13,32 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+// Groups the data and actions for olive navigation test.
 class OliveNavigationTest {
-    @Test fun backReturnsThroughTabsInVisitOrder() {
-        val viewModel=OliveViewModel(DemoCatalogRepository(com.olive.app.ui.testResourceText()::invoke))
+    @Test
+    fun backReturnsThroughTabsInVisitOrder() {
+        val viewModel =
+            OliveViewModel(DemoCatalogRepository(com.olive.app.ui.testResourceText()::invoke))
 
         viewModel.navigate(CoverTab.Saved)
         viewModel.navigate(CoverTab.Cart)
 
         assertTrue(viewModel.back())
-        assertEquals(CoverTab.Saved,viewModel.tab)
+        assertEquals(CoverTab.Saved, viewModel.tab)
         assertTrue(viewModel.back())
-        assertEquals(CoverTab.Discover,viewModel.tab)
+        assertEquals(CoverTab.Discover, viewModel.tab)
         assertFalse(viewModel.back())
     }
 
-    @Test fun backClosesADishBeforeChangingTabs() {
-        val viewModel=OliveViewModel(DemoCatalogRepository(com.olive.app.ui.testResourceText()::invoke))
+    @Test
+    fun backClosesADishBeforeChangingTabs() {
+        val viewModel =
+            OliveViewModel(DemoCatalogRepository(com.olive.app.ui.testResourceText()::invoke))
         viewModel.navigate(CoverTab.Saved)
         viewModel.select(viewModel.dishes.first())
 
         assertTrue(viewModel.back())
         assertNull(viewModel.selectedDish)
-        assertEquals(CoverTab.Saved,viewModel.tab)
+        assertEquals(CoverTab.Saved, viewModel.tab)
     }
 }

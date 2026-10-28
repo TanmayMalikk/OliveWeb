@@ -1,4 +1,7 @@
+// Tests the secure document repository test behavior.
 package com.olive.app.data
+
+import com.olive.app.ui.shared.*
 
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
@@ -10,9 +13,11 @@ import org.robolectric.RobolectricTestRunner
 import java.security.KeyPairGenerator
 
 @RunWith(RobolectricTestRunner::class)
+// Groups the data and actions for secure document repository test.
 class SecureDocumentRepositoryTest {
 
     @Test
+    // Runs the test that checks envelope encryption math and json mapping.
     fun `test envelope encryption math and json mapping`() {
         // 1. Generate standard RSA Test Keys to simulate device Keystores
         val keyGen = KeyPairGenerator.getInstance("RSA")

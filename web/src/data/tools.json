@@ -1,0 +1,182 @@
+[
+  {
+    "title": "Evaluate expression",
+    "id": "Expression",
+    "example": "sqrt(81) + 5! or nCr(10,3)",
+    "category": "Basic"
+  },
+  {
+    "title": "Function value",
+    "id": "FunctionValue",
+    "example": "x^2 + 2x ; 3",
+    "category": "Algebra"
+  },
+  {
+    "title": "System of equations",
+    "id": "LinearSystem",
+    "example": "1,1,5;2,-1,1",
+    "category": "Algebra"
+  },
+  {
+    "title": "Fraction / decimal",
+    "id": "Fraction",
+    "example": "1.25 or 7/4",
+    "category": "Basic"
+  },
+  {
+    "title": "Mixed / improper fraction",
+    "id": "MixedFraction",
+    "example": "2 1/3 or 7/3",
+    "category": "Basic"
+  },
+  {
+    "title": "Scientific notation",
+    "id": "Scientific",
+    "example": "1.2E5 or 1.2×10^5",
+    "category": "Basic"
+  },
+  {
+    "title": "Numerical derivative",
+    "id": "Derivative",
+    "example": "x^3 - 2x ; 2",
+    "category": "Calculus"
+  },
+  {
+    "title": "Definite integral",
+    "id": "Integral",
+    "example": "sin(x) ; 0 ; pi",
+    "category": "Calculus"
+  },
+  {
+    "title": "Find zero",
+    "id": "Zero",
+    "example": "x^2 - 4 ; 0 ; 5",
+    "category": "Calculus"
+  },
+  {
+    "title": "Find minimum",
+    "id": "Minimum",
+    "example": "x^2 - 4x ; -10 ; 10",
+    "category": "Calculus"
+  },
+  {
+    "title": "Find maximum",
+    "id": "Maximum",
+    "example": "-x^2 + 4x ; -10 ; 10",
+    "category": "Calculus"
+  },
+  {
+    "title": "Find intersection",
+    "id": "Intersection",
+    "example": "x^2 ; 2x + 3 ; -10 ; 10",
+    "category": "Calculus"
+  },
+  {
+    "title": "Investigate limit",
+    "id": "Limit",
+    "example": "sin(x)/x ; 0",
+    "category": "Calculus"
+  },
+  {
+    "title": "Complex arithmetic",
+    "id": "ComplexMath",
+    "example": "(2,3) * (4,-1)",
+    "category": "Complex"
+  },
+  {
+    "title": "Complex details",
+    "id": "ComplexDetails",
+    "example": "3,4",
+    "category": "Complex"
+  },
+  {
+    "title": "Complex power / roots",
+    "id": "ComplexPower",
+    "example": "3,4 ; 2",
+    "category": "Complex"
+  },
+  {
+    "title": "Matrix add / subtract",
+    "id": "MatrixAdd",
+    "example": "1,2;3,4 | 5,6;7,8 | +",
+    "category": "Matrices"
+  },
+  {
+    "title": "Matrix multiply",
+    "id": "MatrixMultiply",
+    "example": "1,2;3,4 | 5,6;7,8",
+    "category": "Matrices"
+  },
+  {
+    "title": "Scalar multiplication",
+    "id": "MatrixScalar",
+    "example": "1,2;3,4 | 3",
+    "category": "Matrices"
+  },
+  {
+    "title": "Matrix power",
+    "id": "MatrixPower",
+    "example": "1,2;3,4 | 3",
+    "category": "Matrices"
+  },
+  {
+    "title": "Inverse",
+    "id": "MatrixInverse",
+    "example": "1,2;3,4",
+    "category": "Matrices"
+  },
+  {
+    "title": "Determinant",
+    "id": "MatrixDeterminant",
+    "example": "1,2;3,4",
+    "category": "Matrices"
+  },
+  {
+    "title": "Transpose",
+    "id": "MatrixTranspose",
+    "example": "1,2,3;4,5,6",
+    "category": "Matrices"
+  },
+  {
+    "title": "Identity matrix",
+    "id": "MatrixIdentity",
+    "example": "3",
+    "category": "Matrices"
+  },
+  {
+    "title": "RREF / augmented matrix",
+    "id": "MatrixReducedRowEchelonForm",
+    "example": "1,2,5;3,4,11",
+    "category": "Matrices"
+  },
+  {
+    "title": "Row operation",
+    "id": "MatrixRowOperation",
+    "example": "1,2;3,4 | swap 1 2",
+    "category": "Matrices"
+  },
+  {
+    "title": "One-variable statistics",
+    "id": "OneVariableStats",
+    "example": "1,2,2,4,8",
+    "category": "Statistics"
+  },
+  {
+    "title": "Two-variable statistics",
+    "id": "TwoVariableStats",
+    "example": "1,2,3 | 2,4,5",
+    "category": "Statistics"
+  },
+  {
+    "title": "Polynomial regression",
+    "id": "PolynomialRegression",
+    "example": "degree 2 | 1,2,3 | 2,5,10",
+    "category": "Statistics"
+  },
+  {
+    "title": "Other regression",
+    "id": "Regression",
+    "example": "exponential | 1,2,3 | 2,4,8",
+    "category": "Statistics"
+  }
+]

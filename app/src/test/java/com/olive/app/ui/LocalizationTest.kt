@@ -1,12 +1,17 @@
+// Tests the localization test behavior.
 package com.olive.app.ui
+
+import com.olive.app.ui.shared.*
 
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
+// Groups the data and actions for localization test.
 class LocalizationTest {
 
+    // Finds res dir.
     private fun findResDir(): File {
         val candidates = listOf(
             File("src/main/res"),
@@ -30,6 +35,7 @@ class LocalizationTest {
     }
 
     @Test
+    // Checks that strings xml exists and is populated for supported languages is valid.
     fun verifyStringsXmlExistsAndIsPopulatedForSupportedLanguages() {
         val resDir = findResDir()
         assertTrue("Base res directory must exist", resDir.exists())
@@ -40,7 +46,10 @@ class LocalizationTest {
         val defaultStringsFile = File(resDir, "values/strings.xml")
         assertTrue("Default values/strings.xml must exist", defaultStringsFile.exists())
         val defaultCount = countStringsInXml(defaultStringsFile)
-        assertTrue("Default strings.xml should be populated (found $defaultCount strings)", defaultCount > 100)
+        assertTrue(
+            "Default strings.xml should be populated (found $defaultCount strings)",
+            defaultCount > 100
+        )
 
         // 2. Check each target locale strings.xml
         for (localeDirName in targetLocales) {
@@ -51,11 +60,15 @@ class LocalizationTest {
             assertTrue("strings.xml must exist in '$localeDirName'", stringsFile.exists())
 
             val stringCount = countStringsInXml(stringsFile)
-            assertTrue("strings.xml in '$localeDirName' must be populated (found $stringCount strings)", stringCount > 50)
+            assertTrue(
+                "strings.xml in '$localeDirName' must be populated (found $stringCount strings)",
+                stringCount > 50
+            )
         }
     }
 
     @Test
+    // Checks that app locale manager resolution is valid.
     fun verifyAppLocaleManagerResolution() {
         assertEquals("en", AppLocaleManager.getLanguageTag("English"))
         assertEquals("fr", AppLocaleManager.getLanguageTag("French"))

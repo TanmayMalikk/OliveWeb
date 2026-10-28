@@ -4,7 +4,7 @@
     <string name="entry_set_pin_first">Configura un PIN abajo antes de elegirlo como método de acceso.</string>
     <string name="entry_settings_saved">Ajustes de acceso seguro guardados.</string>
     <string name="entry_current_method">Método preferido: %1$s</string>
-    <string name="entry_backup_description">Puedes configurar ambos métodos. Si eliges el bloqueo del dispositivo, el PIN de la aplicación solo estará disponible si se elimina el bloqueo del teléfono. Cancelar o fallar la autenticación de Android no activa el PIN de respaldo.</string>
+    <string name="entry_backup_description">Puedes configurar ambos métodos. El bloqueo del dispositivo sigue siendo el método preferido y el PIN de respaldo ofrece otra forma de entrar.</string>
     <string name="entry_use_device">Configurar y usar el bloqueo del dispositivo</string>
     <string name="entry_use_pin">Usar el PIN guardado</string>
     <string name="entry_pin_setup">Configurar o cambiar el PIN</string>
@@ -13,4 +13,9 @@
     <string name="entry_confirm_settings">Confirma tu identidad con Android para cambiar los ajustes de acceso seguro.</string>
     <string name="entry_settings_cancelled">Autenticación cancelada. Los ajustes de acceso seguro no se cambiaron.</string>
     <string name="entry_settings_failed">No se pudo completar el cambio. Comprueba el método seleccionado e inténtalo de nuevo.</string>
+    <string name="calculator_pin_required_title">Primero crea un PIN de la aplicación</string>
+    <string name="calculator_pin_required_description">La calculadora necesita un PIN de respaldo de 4 a 6 dígitos para que los cálculos normales no abran la autenticación de Android. El bloqueo del dispositivo seguirá siendo el método preferido.</string>
+    <string name="calculator_create_pin">Crear PIN de respaldo y seleccionar Calculadora</string>
+    <string name="entry_use_backup_pin">Usar el PIN de respaldo</string>
+    <string name="entry_missing_backup_pin">El bloqueo de pantalla del teléfono parece estar desactivado y no se añadió un PIN de respaldo. Restaura el bloqueo, abre el área segura y añade un PIN de respaldo en Ajustes.</string>
 </resources>

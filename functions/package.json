@@ -4,7 +4,9 @@
   "main": "index.js",
   "engines": { "node": "22" },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "provision-demo-accounts": "node scripts/provision-demo-accounts.js",
+    "purge-plaintext-ocr": "node scripts/purgePlaintextOcr.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.922.0",

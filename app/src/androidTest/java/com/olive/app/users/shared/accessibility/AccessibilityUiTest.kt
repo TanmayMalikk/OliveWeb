@@ -1,0 +1,307 @@
+// Tests the accessibility UI test behavior.
+package com.olive.app
+
+import com.olive.app.ui.shared.*
+
+import com.olive.app.ui.users.shared.navigation.*
+
+import android.view.View
+import android.view.ViewGroup
+import android.view.accessibility.AccessibilityEvent
+import androidx.activity.compose.setContent
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.*
+import androidx.lifecycle.ViewModelProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import com.olive.app.ui.*
+import com.olive.app.data.ChatConversation
+import org.junit.Assert.*
+import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
+
+// Groups the data and actions for accessibility UI test.
+class AccessibilityUiTest : OliveUiTestBase() {
+    @Test
+    fun gameCoverKeepsItsControlsIndividuallyAccessible() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            compose.activity.setContent {
+                OliveTheme { com.olive.app.ui.covers.game.GameCover() }
+            }
+        }
+        compose.onNodeWithTag("cover_brand_game", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Olive Tap").assertExists()
+        compose.onNodeWithTag("game_score").assertTextContains("Score: 0")
+        compose.onNodeWithTag("game_entry").assertHasClickAction()
+        compose.onNodeWithTag("game_olive").assertHasClickAction().performClick()
+        compose.onNodeWithTag("game_score").assertTextContains("Score: 1")
+    }
+
+    @Test
+    fun pinErrorsAndQuickExitUseLiveRegionsWithoutStealingTalkBackFocus() {
+        register()
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            session.interceptSearch("moon garden")
+        }
+        repeat(6) { compose.onNodeWithTag("pin_digit_9").performClick() }
+        compose.onNodeWithTag("unlock_pin").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Digits entered: 6")
+        )
+        compose.onNodeWithTag("unlock_submit").performClick()
+        waitFor("session_message")
+        compose.onNodeWithTag("session_message")
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.LiveRegion,
+                    LiveRegionMode.Polite
+                )
+            )
+            .assertTextContains("Incorrect PIN", substring = true)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            session.submitPin("123456")
+        }
+        waitFor("safe_settings")
+        compose.onNodeWithTag("quick_exit").performClick()
+        waitCover()
+        compose.onNodeWithContentDescription("Returned to Olive")
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.LiveRegion,
+                    LiveRegionMode.Polite
+                )
+            )
+        compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+    }
+
+    @Test
+    fun foodCardDetailsAreMergedWhileFavouriteAndQuantityActionsStayAvailable() {
+        register()
+        compose.onNodeWithTag("dish_card_bowl").performScrollTo()
+            .assertTextContains("Garden harvest bowl", substring = true)
+            .assertTextContains("$14.95", substring = true)
+            .assertHasClickAction()
+        compose.onNodeWithContentDescription("Save Garden harvest bowl").assertHasClickAction()
+        compose.onNodeWithTag("dish_card_bowl").performClick()
+        compose.onNodeWithText("Add to cart").performScrollTo().performClick()
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithText("Cart").performClick()
+        compose.onNodeWithTag("cart_row_bowl")
+            .assertTextContains("Garden harvest bowl", substring = true)
+        compose.onNodeWithContentDescription("Remove one Garden harvest bowl")
+            .assertHasClickAction()
+        compose.onNodeWithContentDescription("Add one Garden harvest bowl").assertHasClickAction()
+    }
+
+    @Test
+    fun nativeAccessibilityEventsReachTheInteractionObserver() {
+        openOnboarding()
+        val observed = AtomicInteger(0)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            val content = compose.activity.findViewById<ViewGroup>(android.R.id.content)
+            observeAccessibilityInteractions(content) { observed.incrementAndGet() }
+            // Exercise native child-to-parent event delivery without replacing Compose's delegate.
+            val host = content.getChildAt(0) as ComposeView
+            host.getChildAt(0)
+                .sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED)
+        }
+        compose.waitUntil(5_000) { observed.get() > 0 }
+    }
+
+    @Test
+    fun chatTipAppearsOncePointsToExitAndHidesTheFloatingMenu() {
+        register()
+        unlock()
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val uid = requireNotNull(session.coverAccountId)
+            session.navigate(SafePage.Messages)
+            session.openConversation(
+                ChatConversation(
+                    "a11y-chat",
+                    "fixture",
+                    listOf(uid, "peer"),
+                    mapOf(uid to "olive_tester", "peer" to "Test Friend")
+                )
+            )
+        }
+        waitFor("chat_quick_exit_hint")
+        compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
+        compose.onNodeWithTag("chat_hint_quick_exit").assertDoesNotExist()
+        compose.onNodeWithTag("dismiss_chat_quick_exit_hint").performClick()
+        compose.onNodeWithTag("chat_quick_exit_hint").assertDoesNotExist()
+        compose.runOnIdle {
+            session.closeConversation()
+            val uid = requireNotNull(session.coverAccountId)
+            session.openConversation(
+                ChatConversation(
+                    "a11y-chat",
+                    "fixture",
+                    listOf(uid, "peer"),
+                    mapOf(uid to "olive_tester", "peer" to "Test Friend")
+                )
+            )
+        }
+        compose.onNodeWithTag("chat_quick_exit_hint").assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").performClick()
+        waitCover()
+    }
+
+    @Test
+    fun pinActionsAndDigitCountAreSpokenWithoutExposingThePin() {
+        register()
+        trigger()
+        compose.onNodeWithTag("pin_backspace").assertContentDescriptionEquals("Delete digit")
+        compose.onNodeWithTag("unlock_submit").assertContentDescriptionEquals("Unlock")
+            .assertIsNotEnabled()
+        compose.onNodeWithTag("unlock_pin").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                "Digits entered: 0"
+            )
+        )
+        compose.onNodeWithTag("pin_digit_1").performClick()
+        compose.onNodeWithTag("pin_digit_2").performClick()
+        compose.onNodeWithTag("unlock_pin").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                "Digits entered: 2"
+            )
+        )
+        compose.onNodeWithTag("pin_backspace").performClick()
+        compose.onNodeWithTag("unlock_pin").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                "Digits entered: 1"
+            )
+        )
+        compose.onNodeWithTag("pin_backspace").performClick()
+        enterPin("9999")
+        waitFor("session_message")
+        compose.onNodeWithTag("session_message").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.LiveRegion,
+                LiveRegionMode.Polite
+            )
+        )
+        enterPin("123456")
+        waitFor("safe_settings")
+        compose.onNodeWithTag("quick_exit").performClick()
+        waitCover()
+        unlock()
+    }
+
+    @Test
+    fun blackoutHidesTheNativeAccessibilityTreeAndRestoresTheCoverAfterwards() {
+        register()
+        unlock()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        instrumentation.runOnMainSync { session.captureDetected("Screen recording") }
+        waitFor("privacy_blackout")
+        compose.waitForIdle()
+        // Finds compose.
+        fun findCompose(view: View): ComposeView? {
+            if (view is ComposeView) return view
+            if (view is ViewGroup) for (index in 0 until view.childCount) findCompose(
+                view.getChildAt(
+                    index
+                )
+            )?.let { return it }
+            return null
+        }
+        instrumentation.runOnMainSync {
+            assertEquals(
+                View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS,
+                findCompose(compose.activity.window.decorView)!!.importantForAccessibility
+            )
+            session.recordingStopped()
+        }
+        waitCover()
+        compose.waitForIdle()
+        instrumentation.runOnMainSync {
+            assertEquals(
+                View.IMPORTANT_FOR_ACCESSIBILITY_AUTO,
+                findCompose(compose.activity.window.decorView)!!.importantForAccessibility
+            )
+        }
+    }
+
+    @Test
+    fun iconLabelsUseTheSelectedAppLanguage() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            compose.activity.setContent {
+                val configuration =
+                    android.content.res.Configuration(compose.activity.resources.configuration)
+                        .apply {
+                            setLocale(java.util.Locale.FRENCH)
+                        }
+                val context = compose.activity.createConfigurationContext(configuration)
+                OliveTheme {
+                    CompositionLocalProvider(
+                        LocalContext provides context,
+                        LocalConfiguration provides configuration
+                    ) {
+                        LocalizedIcon(
+                            Icons.Outlined.Visibility,
+                            rememberResourceText()(
+                                R.string.ui_show_value,
+                                rememberResourceText()(R.string.a11y_password)
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        val french = android.content.res.Configuration(compose.activity.resources.configuration)
+            .apply { setLocale(java.util.Locale.FRENCH) }
+        val resources = compose.activity.createConfigurationContext(french).resources
+        compose.onNodeWithContentDescription(
+            resources.getString(
+                R.string.ui_show_value,
+                resources.getString(R.string.a11y_password)
+            )
+        ).assertExists()
+    }
+
+    @Test
+    // Runs when ly user accessibility events count as activity happens.
+    fun onlyUserAccessibilityEventsCountAsActivity() {
+        assertTrue(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED))
+        assertTrue(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_VIEW_CLICKED))
+        assertTrue(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_VIEW_TEXT_TRAVERSED_AT_MOVEMENT_GRANULARITY))
+        // Incoming messages, animations and automatic scrolling must not keep a private session unlocked.
+        assertFalse(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED))
+        assertFalse(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_VIEW_SCROLLED))
+    }
+
+    @Test
+    fun accessibilityLabelsFollowAllSupportedAndroidLocales() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        mapOf(
+            "English" to "en",
+            "French" to "fr",
+            "Spanish" to "es",
+            "Arabic" to "ar",
+            "Chinese" to "zh-CN"
+        ).forEach { (name, tag) ->
+            val configuration =
+                android.content.res.Configuration(context.resources.configuration).apply {
+                    setLocale(java.util.Locale.forLanguageTag(tag))
+                }
+            val expected =
+                context.createConfigurationContext(configuration).getString(R.string.a11y_unlock)
+            assertEquals(
+                expected,
+                ResourceText(context.createConfigurationContext(configuration).resources)(R.string.a11y_unlock)
+            )
+        }
+    }
+}
