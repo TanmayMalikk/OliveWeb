@@ -62,7 +62,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Shows activity category.
+    // Opens the private activity page with the requested history category selected.
     fun showActivityCategory(value: ActivityCategory) {
         with(runtime) {
             with(state) {
@@ -83,7 +83,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Loads cloud history.
+    // Downloads account activity, merges it with local records, and refreshes the selected history page.
     fun loadCloudHistory(uid: String, username: String) {
         with(runtime) {
             scope.launch {
@@ -130,7 +130,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
                                     }
                                 } catch (error: CancellationException) {
                                     throw error
-                                } catch (_: Exception) {
+                                } catch (_: Exception) { // Local history is already saved, so a failed cloud copy waits for the next refresh.
                                     return@withLock
                                 }
                             }

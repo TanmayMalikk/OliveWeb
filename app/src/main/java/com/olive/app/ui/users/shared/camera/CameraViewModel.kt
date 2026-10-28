@@ -139,7 +139,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun stopVideo() = camera.stopVideo()
-    // Clears error.
+    // Dismisses the current camera error after the user acknowledges or retries it.
     fun clearError() {
         _error.value = null
     }

@@ -47,7 +47,7 @@ internal data class NewsArticleMetadata(
             .put("topic", topic).put("isPaywalled", isPaywalled ?: JSONObject.NULL)
             .put("description", description)
 
-    // Applies to.
+    // Fills missing article fields with publisher metadata while preserving existing feed values.
     fun applyTo(article: NewsArticle): NewsArticle = article.copy(
         publisherUrl = publisherUrl.ifBlank { article.publisherUrl },
         imageUrl = imageUrl.ifBlank { article.imageUrl },
@@ -275,7 +275,7 @@ internal class NewsMetadataRepository(context: Context) {
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (_: Exception) { // One malformed metadata source should be skipped so the remaining article fallbacks can still be tried.
                 null
             }
             val metadata =
@@ -298,7 +298,7 @@ internal class NewsMetadataRepository(context: Context) {
         }
     }
 
-    // Works out publisher.
+    // Follows a safe article URL and returns the final publisher host after redirects.
     private suspend fun resolvePublisher(link: String): String? {
         if (!isSecureNewsUrl(link)) return null
         if (!URI(link).host.equals("news.google.com", true)) return link

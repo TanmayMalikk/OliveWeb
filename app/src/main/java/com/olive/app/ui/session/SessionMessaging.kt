@@ -23,7 +23,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         screen == SessionScreen.Safe ||
                 (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN))
     }
-    // Makes sure messaging observation is ready.
+    // Starts the account's friend and conversation listeners once the current screen may show messages.
     fun ensureMessagingObservation(showFeedback: Boolean = false) {
         with(runtime) {
             with(state) {
@@ -120,7 +120,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                         messagingNeedsReconnect = false
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Keep the social screen open and offer account reconnection when messaging setup fails.
                         if (epoch == token) {
                             messagingNeedsReconnect = true
                             message =
@@ -265,7 +265,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Syncs local notification handler.
+    // Reconnects device notifications to the conversations visible to the current account.
     fun syncLocalNotificationHandler() {
         with(runtime) {
             with(state) {

@@ -174,7 +174,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                         if (!localMode) syncProfile(device.uid, updated, token)
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Restore the previous cover choice and explain that the requested change failed.
                         if (epoch == token) message =
                             runtime.application.getString(R.string.ui_unable_to_change_the_cover_app)
                     } finally {
@@ -296,7 +296,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
-    // Syncs profile.
+    // Uploads a locally edited user profile and clears its pending-sync marker after confirmation.
     suspend fun syncProfile(uid: String, value: UserProfile, token: Long) {
         with(runtime) {
             with(state) {
@@ -317,7 +317,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                     }
                 } catch (e: CancellationException) {
                     throw e
-                } catch (_: Exception) {
+                } catch (_: Exception) { // Keep the profile edit locally and mark it for a later cloud sync.
                     if (epoch == token) {
                         pendingSync = true
                         message =

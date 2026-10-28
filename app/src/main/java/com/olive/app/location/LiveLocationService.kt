@@ -118,7 +118,7 @@ class LiveLocationService : Service() {
         return START_REDELIVER_INTENT
     }
 
-    // Handles location.
+    // Stops expired shares, tracks movement, and uploads a fresh encrypted location when needed.
     private fun handleLocation(location: Location) {
         val now = System.currentTimeMillis()
         val moved = lastUploaded?.distanceTo(location)?.let { it >= 3f } ?: true
@@ -223,7 +223,7 @@ class LiveLocationService : Service() {
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
 
-    // Creates channel.
+    // Creates the low-visibility Android channel used while live sharing runs in the background.
     private fun createChannel() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(

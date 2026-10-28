@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.withLock
 
 // Owns account-scoped cover persistence and checkout records.
 internal class SessionCoverState(private val runtime: SessionRuntime) {
-    // Restores cover data.
+    // Loads the signed-in account's cart, favourites, customizations, and saved news state.
     suspend fun restoreCoverData(uid: String) {
         with(runtime) {
             with(state) {

@@ -82,7 +82,7 @@ object OliveNotificationManager {
     ) =
         AppNotifications.contentFor(title, body, coverType, text = text)
 
-    // Shows discreet notification.
+    // Posts role- and cover-safe notification text without revealing private app activity.
     fun showDiscreetNotification(
         context: Context,
         title: String?,

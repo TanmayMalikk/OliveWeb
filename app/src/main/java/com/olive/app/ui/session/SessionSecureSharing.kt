@@ -103,7 +103,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                             runtime.application.getString(R.string.private_entry_shared)
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Hide encryption details and report only that the private entry could not be shared.
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_share_private_entry)
                     } finally {
@@ -147,7 +147,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                             }
                         }
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Revoke any access granted before a later recipient or chat update failed.
                         newlyGrantedRecipients.forEach { recipient ->
                             runCatching {
                                 documents.revokeAccess(document.id, device.uid, recipient)
@@ -185,7 +185,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         if (epoch == token) message = runtime.application.getString(R.string.safety_plan_shared_in_chat)
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Leave the safety plan unchanged and show the shared sync error.
                         if (epoch == token) message = runtime.application.getString(R.string.safety_sync_error)
                     } finally {
                         if (epoch == token) messagingBusy = false
@@ -244,7 +244,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         if (epoch == token) viewedSharedEntry = entry
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Keep the encrypted entry closed and display a safe opening error.
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_shared_entry)
                     } finally {

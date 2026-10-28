@@ -47,7 +47,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
     var customizations by mutableStateOf<Map<String, Set<String>>>(emptyMap())
         private set
     var persistCover: ((Map<String, Int>, Set<String>, Map<String, Set<String>>) -> Unit)? = null
-    // Restores cover.
+    // Restores this account's cart, favourites, and ingredient choices after sign-in.
     fun restoreCover(
         cart: Map<String, Int>,
         favorites: Set<String>,
@@ -66,7 +66,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
     }
 
     private var localizedSearch by mutableStateOf<Map<String, String>>(emptyMap())
-    // Updates search labels.
+    // Replaces searchable dish labels when Android loads a different language.
     fun updateSearchLabels(labels: Map<String, String>) {
         localizedSearch = labels
     }
@@ -125,7 +125,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         persistCover?.invoke(cart, favorites, customizations)
     }
 
-    // Selects ed ingredients.
+    // Returns the user's saved ingredient choices or the dish defaults when none were changed.
     fun selectedIngredients(dish: Dish) = customizations[dish.id] ?: dish.ingredients.toSet()
     // Switches ingredient on or off.
     fun toggleIngredient(dish: Dish, ingredient: String) {

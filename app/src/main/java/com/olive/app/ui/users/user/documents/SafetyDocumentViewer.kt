@@ -235,7 +235,7 @@ private fun PdfViewer(file: File) {
     }
 }
 
-// Shows pdf page.
+// Renders one bounded PDF page into a bitmap for the in-app document viewer.
 private fun renderPdfPage(file: File, index: Int): PdfPage {
     ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
         PdfRenderer(descriptor).use { renderer ->
@@ -274,7 +274,7 @@ private fun TextViewer(file: File, docx: Boolean) {
     }
 }
 
-// Reads docx.
+// Extracts readable paragraph text from the main XML file inside a DOCX archive.
 private fun readDocx(file: File): String {
     ZipFile(file).use { zip ->
         val entry = zip.getEntry("word/document.xml") ?: error("Missing document content")

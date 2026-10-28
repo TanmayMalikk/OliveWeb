@@ -165,7 +165,7 @@ internal class CalculatorInput(
         }
     }
 
-    // Updates entry.
+    // Stores a bounded calculator expression and immediately recalculates its preview.
     private fun updateEntry(value: String) {
         expression = value.take(MAX_EXPRESSION_LENGTH)
         display = expression.ifBlank { "0" }
@@ -179,7 +179,7 @@ internal class CalculatorInput(
         armedPin = null
     }
 
-    // Clears history.
+    // Removes every saved calculator result from memory and device storage.
     fun clearHistory() = updateHistory(emptyList())
 
     // Disk history arrives after the keypad is already interactive.
@@ -191,7 +191,7 @@ internal class CalculatorInput(
         )
     }
 
-    // Updates history.
+    // Limits, displays, and persists the newest calculator history entries.
     private fun updateHistory(value: List<CalculatorHistoryEntry>) {
         history = value.take(CALCULATOR_HISTORY_LIMIT)
         onHistoryChanged(history)

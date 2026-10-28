@@ -164,10 +164,12 @@ internal fun SafeSupportControls(
         if (expanded) 45f else 0f,
         animationSpec = tween(240, easing = FastOutSlowInEasing), label = "support button rotation"
     )
-    BoxWithConstraints(Modifier.fillMaxSize().then(if (expanded) Modifier.semantics {
-        paneTitle = menuTitle
-        isTraversalGroup = true
-    } else Modifier)) {
+    BoxWithConstraints(
+        Modifier.fillMaxSize().testTag("safe_support_controls")
+            .accessibilityTraversal(AccessibilityTraversalOrder.PersistentActions)
+            .accessibilityTraversalGroup()
+            .then(if (expanded) Modifier.semantics { paneTitle = menuTitle } else Modifier)
+    ) {
         AnimatedVisibility(
             visible = expanded,
             enter = fadeIn(tween(180)),
@@ -182,7 +184,9 @@ internal fun SafeSupportControls(
             visible = expanded,
             modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding()
                 .padding(start = 12.dp, end = 12.dp, bottom = 92.dp)
-                .widthIn(max = 360.dp).heightIn(max = (maxHeight - 116.dp).coerceAtLeast(0.dp)),
+                .widthIn(max = 360.dp).heightIn(max = (maxHeight - 116.dp).coerceAtLeast(0.dp))
+                .testTag("support_action_list")
+                .accessibilityTraversal(AccessibilityTraversalOrder.OverlayContent),
             enter = fadeIn(tween(160)) + scaleIn(
                 tween(260, easing = FastOutSlowInEasing), initialScale = .92f,
                 transformOrigin = TransformOrigin(0f, 1f)
@@ -266,7 +270,8 @@ internal fun SafeSupportControls(
         }
         Row(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
-                .padding(12.dp),
+                .padding(12.dp).testTag("support_persistent_actions")
+                .accessibilityTraversal(AccessibilityTraversalOrder.PersistentActions),
             verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween
         ) {
             if (showSupport) {

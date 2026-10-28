@@ -259,7 +259,7 @@ internal fun NewsArticleReader(
     }
     DisposableEffect(browser, active, lifecycle) {
         val view = browser
-        // Updates visibility.
+        // Pauses the WebView off-screen and resumes it only while this article is visible.
         fun updateVisibility() {
             if (active && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) view?.onResume()
             else view?.onPause()

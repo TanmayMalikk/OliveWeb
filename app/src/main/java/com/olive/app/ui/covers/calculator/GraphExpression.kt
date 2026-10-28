@@ -46,7 +46,7 @@ internal class GraphExpression private constructor(private val root: Node) {
             return result
         }
 
-        // Adds ition.
+        // Parses addition and subtraction after higher-priority multiplication terms.
         private fun addition(): Node {
             var left = multiplication()
             while (true) {

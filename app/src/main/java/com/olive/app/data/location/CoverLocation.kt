@@ -70,7 +70,7 @@ object CoverLocation {
             suspendCancellableCoroutine<Address?> { continuation ->
                 Geocoder(context, Locale.getDefault()).getFromLocation(
                     location.latitude, location.longitude, 1,
-                    // Handles replies from geocode listener.
+                    // Converts the cover's coordinates into the first local address returned by Android.
                     object : Geocoder.GeocodeListener {
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())

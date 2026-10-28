@@ -111,7 +111,6 @@
     <string name="a_little_space_of_your_own">مساحة صغيرة خاصة بك.</string>
     <string name="welcome_to_olive">مرحبا بكم في الزيتون</string>
     <string name="browse_the_menu_and_collect_your_favourites">تصفح القائمة وجمع المفضلة لديك.</string>
-    <string name="set_up_account">قم بإعداد الحساب</string>
     <string name="your_olive_account">حساب الزيتون الخاص بك</string>
     <string name="no_delivery_address_saved">لم يتم حفظ عنوان التسليم</string>
     <string name="change_delivery_address">تغيير عنوان التسليم</string>
@@ -252,14 +251,11 @@
 <string name="the_new_passwords_do_not_match">كلمات المرور الجديدة غير متطابقة.</string>
     <string name="unable_to_change_the_password_check_your_current_password_and_connection">غير قادر على تغيير كلمة المرور. تحقق من كلمة المرور والاتصال الحاليين.</string>
     <string name="password_changed">تم تغيير كلمة المرور.</string>
-    <string name="enter_4_6_digits_for_both_pins">أدخل من 4 إلى 6 أرقام لكلا رقم التعريف الشخصي (PIN).</string>
     <string name="the_new_pins_do_not_match">أرقام التعريف الشخصية الجديدة غير متطابقة.</string>
     <string name="choose_your_cover_app">اختر تطبيق الغلاف الخاص بك</string>
     <string name="food_delivery_app_olive">تطبيق توصيل الطعام · زيتون</string>
-    <string name="game_in_development">لعبة · قيد التطوير</string>
     <string name="news_app_daily_digest">تطبيق الأخبار · الملخص اليومي</string>
     <string name="calculator_better_calculator">الحاسبة · آلة حاسبة أفضل</string>
-    <string name="in_development">في التنمية</string>
     <string name="olive_branch">غصن الزيتون</string>
 <string name="sign_out">تسجيل الخروج؟</string>
 <string name="cancel">إلغاء</string>
@@ -269,8 +265,6 @@
 <string name="back">العودة</string>
 <string name="home">الصفحة الرئيسية</string>
     <string name="culture">الثقافة</string>
-<string name="unable_to_change_the_pin">غير قادر على تغيير رقم التعريف الشخصي.</string>
-    <string name="device_pin_changed">تم تغيير رقم التعريف الشخصي للجهاز.</string>
     <string name="unable_to_save_contacts_on_this_device_please_retry">غير قادر على حفظ جهات الاتصال على هذا الجهاز. يرجى إعادة المحاولة.</string>
     <string name="contacts_saved_on_this_device">جهات الاتصال المحفوظة على هذا الجهاز.</string>
     <string name="changes_are_saved_on_this_device_cloud_sync_is_unavailable_retry_when_connected">يتم حفظ التغييرات على هذا الجهاز. المزامنة السحابية غير متاحة؛ أعد المحاولة عند الاتصال.</string>

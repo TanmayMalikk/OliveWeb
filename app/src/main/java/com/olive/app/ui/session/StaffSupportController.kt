@@ -54,7 +54,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Keep the existing ticket state and show that the support request failed.
                 if (runtime.coverAccountId == actor) error = R.string.support_request_error
             } finally {
                 if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
@@ -71,7 +71,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
                 withContext(Dispatchers.IO) { repository.requestAdmin(conversationId) }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Do not change the ticket category unless the admin escalation succeeds.
                 error = R.string.support_admin_request_error
             } finally {
                 saving = (saving - 1).coerceAtLeast(0)
@@ -92,7 +92,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Leave the chat active when the server cannot archive it for every participant.
                 if (runtime.coverAccountId == actor) error = R.string.support_close_error
             } finally {
                 if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)

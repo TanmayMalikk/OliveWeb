@@ -145,7 +145,7 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
                             application.getString(R.string.the_operation_timed_out_check_your_connection_and_retry_your_account_may_already_exist)
                     } catch (e: CancellationException) {
                         throw e
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Convert unexpected operation failures into the feature's prepared user-facing error.
                         if (epoch == token) finalFailure = failure
                     } finally {
                         if (operationJob === runningJob) {

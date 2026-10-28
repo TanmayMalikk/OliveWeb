@@ -8,7 +8,6 @@
     <string name="support_walkthrough">دليل إرشادي</string>
     <string name="support_staff_help">طلب المساعدة من الموظفين</string>
     <string name="support_looking_for_staff">جارٍ البحث عن موظفين…</string>
-    <string name="support_staff_found">تم تعيين %1$s. جارٍ فتح محادثة الدعم…</string>
     <string name="support_staff_ready">تم تعيين أحد الموظفين. جارٍ فتح Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
     <string name="support_no_conversations">لا توجد محادثات دعم حتى الآن.</string>
