@@ -91,7 +91,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             refresh()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (_: Exception) { // Keep locally available plan data on screen and report that cloud storage could not be loaded.
             if (current(actor, ownerUid, token)) error = R.string.safety_storage_error
         }
     }
@@ -163,7 +163,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // The edit is already local, so queue an encrypted retry instead of losing the user's change.
                 SafetyPlanSyncWorker.enqueue(runtime.application, actor, actor)
                 if (current(actor, actor, token)) error = R.string.safety_sync_error
             } finally {
@@ -191,7 +191,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Preserve the local conflict resolution and tell the user that cloud sync must be retried.
                 if (current(actor, actor, token)) error = R.string.safety_sync_error
             } finally {
                 if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
@@ -218,7 +218,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Contact sharing stays unchanged when the server rejects or cannot receive the update.
                 if (current(actor, actor, token)) error = R.string.safety_sync_error
             } finally {
                 if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
@@ -240,7 +240,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Keep the current consultation state and show a storage error when the request fails.
                 if (actor != null && runtime.coverAccountId == actor && authorized()) error =
                     R.string.safety_sync_error
             }
@@ -273,7 +273,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Keep the local draft and show a storage error when saving fails.
                 if (current(actor, owner, token)) error = R.string.safety_storage_error
             } finally {
                 if (current(actor, owner, token)) saving = (saving - 1).coerceAtLeast(0)
@@ -329,7 +329,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                     error = R.string.safety_access_revoked
                 }
             }
-        } catch (_: Exception) { /* Like Notes, connection failures leave saved edits queued without a warning banner. */
+        } catch (_: Exception) { // Connection failures leave already-saved edits queued for the next background sync.
         } finally {
             sync.unlock()
         }
@@ -356,7 +356,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (_: Exception) { // Retain the last plan snapshot and tell the signed-in account that refresh failed.
             if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
         }
     }
@@ -372,7 +372,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                     value
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Keep the current availability value when the staff setting cannot be updated.
                 if (authorized() && actor == runtime.coverAccountId) error =
                     R.string.safety_sync_error
             }

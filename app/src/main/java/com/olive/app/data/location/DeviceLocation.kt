@@ -77,7 +77,7 @@ internal object DeviceLocation {
         return address.latitude to address.longitude
     }
 
-    // Adds ress.
+    // Reads the phone location and converts it into a delivery address for the food cover.
     suspend fun address(context: Context): DeliveryAddress? {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -127,7 +127,7 @@ internal object DeviceLocation {
                 .getCurrentLocation(request, cancellation.token).await()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (_: Exception) { // A location fix is optional; callers handle null by retaining the last known location or showing unavailable.
             null
         } finally {
             cancellation.cancel()
@@ -165,7 +165,7 @@ internal object DeviceLocation {
                     location.latitude,
                     location.longitude,
                     1,
-                    // Handles replies from geocode listener.
+                    // Returns the first matching address, or null when Android geocoding fails.
                     object : Geocoder.GeocodeListener {
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())

@@ -152,7 +152,7 @@ class DeviceStore(
         return DeviceEnrollment(identity.uid, "", profile.role, hasAppPin = false)
     }
 
-    // Removes PIN.
+    // Deletes the account's backup PIN while leaving its device-lock enrollment unchanged.
     fun removePin(uid: String) {
         vault.update { root ->
             root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
@@ -218,7 +218,7 @@ class DeviceStore(
         audit?.let { recordSettings(uid, it) }
     }
 
-    // Updates trigger.
+    // Saves the discreet trigger phrase and whether matching should ignore letter case.
     fun updateTrigger(
         uid: String,
         profile: UserProfile,

@@ -47,7 +47,7 @@ internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata
 
 interface SafetyDocumentDataSource {
     suspend fun listFor(uid: String): List<SafetyDocument>
-    // Watches for for changes.
+    // Streams every document the account may open and reports storage-listener failures separately.
     fun observeFor(
         uid: String,
         onUpdate: (List<SafetyDocument>) -> Unit,
@@ -69,7 +69,7 @@ class SafetyDocumentRepository(
         .whereArrayContains("allowed_users", uid).get().await().documents.mapNotNull { documentFrom(it, uid) }
         .sortedByDescending { it.createdAt }
 
-    // Watches for for changes.
+    // Converts live Firestore file updates into the user's readable document list.
     override fun observeFor(
         uid: String,
         onUpdate: (List<SafetyDocument>) -> Unit,
@@ -199,7 +199,7 @@ class SafetyDocumentRepository(
         return target
     }
 
-    // Updates storage access.
+    // Grants or removes encrypted-file access for the selected document recipients.
     private suspend fun updateStorageAccess(
         document: SafetyDocument,
         before: Set<String>,

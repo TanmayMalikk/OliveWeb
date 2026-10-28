@@ -110,7 +110,6 @@
     <string name="a_little_space_of_your_own">A little space of your own.</string>
     <string name="welcome_to_olive">Welcome to Olive</string>
     <string name="browse_the_menu_and_collect_your_favourites">Browse the menu and collect your favourites.</string>
-    <string name="set_up_account">Set up account</string>
     <string name="your_olive_account">Your Olive account</string>
     <string name="no_delivery_address_saved">No delivery address saved</string>
     <string name="change_delivery_address">Change delivery address</string>
@@ -251,14 +250,11 @@
 <string name="the_new_passwords_do_not_match">The new passwords do not match.</string>
     <string name="unable_to_change_the_password_check_your_current_password_and_connection">Unable to change the password. Check your current password and connection.</string>
     <string name="password_changed">Password changed.</string>
-    <string name="enter_4_6_digits_for_both_pins">Enter 4–6 digits for both PINs.</string>
     <string name="the_new_pins_do_not_match">The new PINs do not match.</string>
     <string name="choose_your_cover_app">Choose your cover app</string>
     <string name="food_delivery_app_olive">Food Delivery App · Olive</string>
-    <string name="game_in_development">Game · In development</string>
     <string name="news_app_daily_digest">News App · Daily Digest</string>
     <string name="calculator_better_calculator">Calculator · Better Calculator</string>
-    <string name="in_development">In development</string>
     <string name="olive_branch">Olive Branch</string>
 <string name="sign_out">Sign out?</string>
 <string name="cancel">Cancel</string>
@@ -268,8 +264,6 @@
 <string name="back">Back</string>
 <string name="home">Home</string>
     <string name="culture">Culture</string>
-<string name="unable_to_change_the_pin">Unable to change the PIN.</string>
-    <string name="device_pin_changed">Device PIN changed.</string>
     <string name="unable_to_save_contacts_on_this_device_please_retry">Unable to save contacts on this device. Please retry.</string>
     <string name="contacts_saved_on_this_device">Contacts saved on this device.</string>
     <string name="changes_are_saved_on_this_device_cloud_sync_is_unavailable_retry_when_connected">Changes are saved on this device. Cloud sync is unavailable; retry when connected.</string>

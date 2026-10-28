@@ -33,9 +33,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
@@ -45,6 +47,23 @@ import androidx.core.view.ViewCompat
 import kotlin.math.max
 
 internal val LocalAccessibilityMessagesVisible = staticCompositionLocalOf { true }
+
+// TalkBack reads normal screen content first, temporary overlay content next, and persistent
+// floating actions last. New overlapping layouts should use these values instead of raw numbers.
+internal enum class AccessibilityTraversalOrder(val index: Float) {
+    ScreenContent(0f),
+    OverlayContent(1f),
+    PersistentActions(2f),
+}
+
+// Marks a layout as the boundary where TalkBack applies the shared traversal order.
+internal fun Modifier.accessibilityTraversalGroup(): Modifier = semantics {
+    isTraversalGroup = true
+}
+
+// Assigns one part of an overlapping layout to its place in the shared TalkBack order.
+internal fun Modifier.accessibilityTraversal(order: AccessibilityTraversalOrder): Modifier =
+    semantics { traversalIndex = order.index }
 
 /**
  * Exposes status changes through Compose semantics. Live regions let TalkBack

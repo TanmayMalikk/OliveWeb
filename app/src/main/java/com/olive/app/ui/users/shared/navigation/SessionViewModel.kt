@@ -8,8 +8,6 @@ import com.olive.app.ui.session.SessionRuntime
 import com.olive.app.ui.users.user.documents.MediaTransferController
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.location.LocationMapController
-import com.olive.app.security.SafeEntryMethod
-import com.olive.app.security.allowsAppPin
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 internal class SessionViewModel(application: Application) : AndroidViewModel(application),

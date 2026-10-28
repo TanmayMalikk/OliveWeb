@@ -8,7 +8,6 @@
     <string name="support_walkthrough">Walkthrough</string>
     <string name="support_staff_help">Request help from staff</string>
     <string name="support_looking_for_staff">Looking for staff members…</string>
-    <string name="support_staff_found">%1$s was assigned. Opening your support chat…</string>
     <string name="support_staff_ready">A staff member was assigned. Opening Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
     <string name="support_no_conversations">No support chats yet.</string>

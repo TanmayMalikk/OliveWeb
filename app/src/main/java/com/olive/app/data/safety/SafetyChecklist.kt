@@ -20,7 +20,7 @@ internal fun safetyPlanContactItem(contact: SafeContact) = SafetyChecklistItem(
     JSONObject().put("name", contact.name).put("details", contact.details).toString()
 )
 
-// Reads safety plan contact.
+// Parses one contact row stored inside the safety-plan checklist format.
 internal fun readSafetyPlanContact(item: SafetyChecklistItem): SafetyPlanContact? {
     if (!item.id.startsWith(SAFETY_CONTACT_PREFIX)) return null
     return runCatching {

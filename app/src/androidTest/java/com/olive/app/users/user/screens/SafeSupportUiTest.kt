@@ -32,6 +32,30 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafeSupportUiTest : OliveUiTestBase() {
+    @Test
+    fun supportOverlayUsesTheSharedTalkBackTraversalOrder() {
+        setup()
+        compose.onNodeWithTag("session_screen_content").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.TraversalIndex,
+                AccessibilityTraversalOrder.ScreenContent.index
+            )
+        )
+        compose.onNodeWithTag("support_menu_toggle").performClick()
+        compose.onNodeWithTag("support_action_list").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.TraversalIndex,
+                AccessibilityTraversalOrder.OverlayContent.index
+            )
+        )
+        compose.onNodeWithTag("support_persistent_actions").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.TraversalIndex,
+                AccessibilityTraversalOrder.PersistentActions.index
+            )
+        )
+    }
+
     private fun setup(): SessionViewModel {
         openOnboarding()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()

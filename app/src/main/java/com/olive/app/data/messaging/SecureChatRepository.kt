@@ -18,7 +18,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         return KeyManager.unwrapKey(wrappedKey)
     }
 
-    // Makes sure room key is ready.
+    // Creates or unwraps the encrypted room key required before this participant can read messages.
     suspend fun ensureRoomKey(
         conversation: ChatConversation, currentUid: String,
         participantPublicKeys: Map<String, PublicKey>
@@ -102,7 +102,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         batch.commit().await()
     }
 
-    // Watches messages for changes.
+    // Streams encrypted chat records and decrypts each message with the active room key.
     fun observeMessages(
         conversationId: String, roomKey: SecretKey, onUpdate: (List<ChatMessage>) -> Unit,
         onError: (String) -> Unit

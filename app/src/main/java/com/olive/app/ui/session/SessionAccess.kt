@@ -117,7 +117,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
         }
     }
 
-    // Submits calculator PIN.
+    // Checks a PIN typed through calculator keys and opens the private app only when it matches.
     fun submitCalculatorPin(pin: String) {
         with(runtime) {
             with(state) {

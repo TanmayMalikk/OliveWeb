@@ -35,7 +35,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 if (runtime.enrollment?.role == AccountRole.ADMIN && !runtime.localMode) {
                     runtime.organization.queueAdminRefresh()
                 }
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Incomplete account restoration is unsafe, so route to the storage error screen instead.
                 state.screen = SessionScreen.StorageError
             } finally {
                 state.busy = false
@@ -144,7 +144,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Creates device PIN.
+    // Validates and encrypts a new backup PIN before completing user enrollment.
     fun createDevicePin(pin: String, confirmation: String) {
         with(runtime) { if (state.busy || state.screen != SessionScreen.DevicePin || enrollment != null || state.accountRole != AccountRole.USER) return }
         with(runtime) {
@@ -274,7 +274,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         privateContactNotes = emptyMap()
                         coverDataVersion++
                         screen = SessionScreen.Cover
-                    } catch (_: Exception) { /* Fail closed: the interface remains locked. */
+                    } catch (_: Exception) { // A failed quick exit must fail closed and leave the private interface locked.
                     } finally {
                         busy = false
                     }
@@ -283,7 +283,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Restores stored session.
+    // Reads the encrypted device session without blocking the main UI thread.
     private suspend fun restoreStoredSession(): DeviceSession? = with(runtime) {
         withContext(Dispatchers.IO) {
             store.currentSession() ?: if (!localMode) {
@@ -295,7 +295,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Restores presentation.
+    // Rebuilds the correct cover, PIN, safe-app, or staff/admin screen from a saved session.
     private suspend fun restorePresentation(restored: DeviceSession) {
         with(runtime) {
             with(state) {

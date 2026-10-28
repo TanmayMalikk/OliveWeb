@@ -51,8 +51,7 @@ class LocalSafeUpdateCheckWorker(context: Context, parameters: WorkerParameters)
             preferences.edit { putBoolean(initializedKey(uid), true) }
             if (incomingUpdate) SafeUpdateNotificationScheduler.schedule(applicationContext)
             Result.success()
-        } catch (_: Exception) {
-            // If background checks are enabled, the next scheduled check handles retries instead of WorkManager backoff.
+        } catch (_: Exception) { // The next scheduled background check retries this work, so this worker must not add a second backoff loop.
             Result.success()
         }
         if (FirebaseAuth.getInstance().currentUser != null)

@@ -52,7 +52,7 @@ object AppNotifications {
         R.string.ui_new_activity_is_waiting,
     )
 
-    // Shows random safe update.
+    // Chooses a harmless update message that matches the active cover and posts it locally.
     fun showRandomSafeUpdate(
         context: Context, coverType: CoverType, role: AccountRole = AccountRole.USER,
         random: Random = Random.Default

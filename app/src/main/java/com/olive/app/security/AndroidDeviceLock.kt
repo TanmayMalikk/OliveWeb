@@ -57,7 +57,7 @@ internal class AndroidDeviceLock(
                     BiometricPrompt.CryptoObject(checkNotNull(value.challenge.promptCipher)),
                     signal,
                     activity.mainExecutor,
-                    // Handles replies from authentication callback.
+                    // Unlocks only when Android returns the cipher from a successful device authentication.
                     object : BiometricPrompt.AuthenticationCallback() {
                         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                             finish(value, result.cryptoObject?.cipher)
@@ -69,7 +69,7 @@ internal class AndroidDeviceLock(
                         // A failed biometric sample keeps Android's prompt open; it never grants access.
                     })
             } else showLegacyPrompt(value)
-        } catch (_: Exception) {
+        } catch (_: Exception) { // If Android cannot open its lock prompt, deny access by returning no authentication result.
             finish(value, null)
         }
     }
@@ -82,7 +82,7 @@ internal class AndroidDeviceLock(
         }
     )
 
-    // Shows legacy prompt.
+    // Opens the Android 9/10 biometric or device-credential prompt used by older phones.
     private fun showLegacyPrompt(value: DeviceLockRequest) {
         val builder = BiometricPrompt.Builder(activity)
             .setTitle(activity.getString(R.string.entry_device_lock)).setSubtitle(subtitle(value))
@@ -99,7 +99,7 @@ internal class AndroidDeviceLock(
         builder.build().authenticate(
             signal,
             activity.mainExecutor,
-            // Handles replies from authentication callback.
+            // Converts the older Android authentication result into the same locked/unlocked result.
             object : BiometricPrompt.AuthenticationCallback() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     finish(value, runCatching { value.challenge.legacyCipher() }.getOrNull())
