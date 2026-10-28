@@ -1,4 +1,4 @@
-// Tests the calculator input test behavior.
+// Tests calculator input, history, angle mode, and PIN trigger behavior.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -8,7 +8,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for calculator input test.
 class CalculatorInputTest {
     @Test
     fun historyRetainsOnlyFiveNewestCalculationsIncludingRestoredEntries() {
@@ -127,7 +126,6 @@ class CalculatorInputTest {
     }
 
     @Test
-    // Formats s large and small answers and reuses history.
     fun formatsLargeAndSmallAnswersAndReusesHistory() {
         val input = CalculatorInput()
         listOf("1", "e", "1", "0", "=").forEach { input.press(it) }

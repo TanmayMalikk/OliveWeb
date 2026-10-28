@@ -1,4 +1,4 @@
-// Contains the memory-board.spec code for this part of Olive.
+// Tests the olive memory cover game's board and controls.
 import { expect, test } from "@playwright/test";
 
 test("all board sizes fit the laptop viewport and contain only complete pairs", async ({

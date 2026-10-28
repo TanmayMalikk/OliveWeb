@@ -1,4 +1,4 @@
-// Contains the session access code for this part of Olive.
+// Signed-in users: checks which screens each signed-in role may open.
 package com.olive.app.ui.session
 
 import com.olive.app.ui.shared.*
@@ -50,7 +50,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 if (accountRole != AccountRole.USER || screen != SessionScreen.Cover || busy || privacyBlackout) return
                 val device = enrollment
                 if (device == null) {
-                    auth.setup()
+                    accountSession.openAccountSetup()
                     return
                 }
                 if (device.role != AccountRole.USER) return

@@ -1,3 +1,4 @@
+// Approved viewers: serializes document opens so downloads cannot overwrite each other.
 package com.olive.app.data.media
 
 import java.util.concurrent.ConcurrentHashMap

@@ -1,4 +1,4 @@
-// Tests the olive activity privacy test behavior.
+// Tests private-screen previews and task identity for safe-app users.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -9,7 +9,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for olive activity privacy test.
 class OliveActivityPrivacyTest {
     @Test
     fun recentPreviewOnlyBlanksWhenProtectionAndPrivateContentAreBothActive() {

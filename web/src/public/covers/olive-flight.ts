@@ -1,4 +1,4 @@
-// Contains the olive-flight code for this part of Olive.
+// Cover users: calculates branch movement and collisions for the flight game.
 export const FLIGHT = {
   width: 400,
   height: 480,
@@ -12,7 +12,6 @@ export const FLIGHT = {
   gravity: 740,
   lift: -270,
 };
-// Groups the data and actions for branch.
 export interface Branch {
   x: number;
   gapY: number;
@@ -20,7 +19,6 @@ export interface Branch {
   passed: boolean;
   seed?: number;
 }
-// Groups the data and actions for flight world.
 export interface FlightWorld {
   y: number;
   velocity: number;
@@ -58,7 +56,6 @@ export function newFlight(
     over: false,
   };
 }
-// Groups the data and actions for point.
 type Point = { x: number; y: number };
 export const leafPaths = [
   "M0 3 Q-24 8 -25 28 Q-5 26 0 3",

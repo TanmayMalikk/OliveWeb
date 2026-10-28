@@ -1,4 +1,4 @@
-// Contains the calculator cover code for this part of Olive.
+// Calculator cover users: shows the calculator cover.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.olive.app.ui.covers.shared.CoverSettingsPage
+import com.olive.app.ui.covers.CoverSettingsPage
 
 // Keep the calculator looking like a calculator, with no account controls on the cover.
 // This shell owns responsive keypad layout; CalculatorDisplay renders history/results and ScientificKeypad dispatches keys.
@@ -241,7 +241,7 @@ internal fun CalculatorCover(session: SessionViewModel, interactive: Boolean = t
                                     key,
                                     angleMode,
                                     { inverseTrig = !inverseTrig },
-                                    session::submitCalculatorPin
+                                    session.account::submitCalculatorPin
                                 )
                             }
                         }

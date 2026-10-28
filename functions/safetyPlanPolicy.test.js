@@ -1,4 +1,4 @@
-// Contains the safety plan policy.test code for this part of Olive.
+// Tests who can edit and share a user's safety plan.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {mergeFields, staffEligible, chooseStaff} = require("./src/safetyPlanPolicy");

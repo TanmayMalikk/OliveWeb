@@ -1,3 +1,4 @@
+// Approved viewers: checks encrypted download size and checksum before decryption.
 package com.olive.app.data.media
 
 import java.io.InputStream

@@ -1,4 +1,4 @@
-// Tests the stat plot axis test behavior.
+// Tests readable plot axes for changing and constant data.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -7,7 +7,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for stat plot axis test.
 class StatPlotAxisTest {
     @Test
     fun incrementsScaleWithTheProvidedData() {

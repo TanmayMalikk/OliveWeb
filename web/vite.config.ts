@@ -1,4 +1,4 @@
-// Contains the vite.config code for this part of Olive.
+// Web developers: builds the cover sites and safe-app pages with Vite.
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 export default defineConfig({

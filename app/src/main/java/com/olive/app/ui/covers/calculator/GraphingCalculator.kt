@@ -1,4 +1,4 @@
-// Contains the graphing calculator code for this part of Olive.
+// Calculator cover users: draws interactive equation graphs.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*

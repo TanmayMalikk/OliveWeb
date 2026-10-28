@@ -1,4 +1,4 @@
-// Contains the flows.spec code for this part of Olive.
+// Tests cover entry, sign-in, and safe-app navigation in the browser.
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const password = "Test-password1!";
@@ -426,6 +426,28 @@ test("public game and account screens meet core accessibility checks", async ({
         id: v.id,
         description: v.description,
         nodes: v.nodes.map((n) => n.target),
+      })),
+    ).toEqual([]);
+  }
+});
+
+test("signed-in safe app pages meet core accessibility checks", async ({ page }) => {
+  const link = await onboard(page);
+  await unlock(page, link);
+  for (const section of [
+    "Home", "Notes", "Messages", "SafetyPlan", "Contacts", "Profile", "Settings", "Activity",
+  ]) {
+    if (section !== "Home") {
+      await page.getByRole("button", { name: section, exact: true }).click();
+    }
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    expect(
+      results.violations.map((violation) => ({
+        page: section,
+        rule: violation.id,
+        elements: violation.nodes.map((node) => node.target),
       })),
     ).toEqual([]);
   }

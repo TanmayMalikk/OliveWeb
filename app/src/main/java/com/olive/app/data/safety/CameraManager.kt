@@ -1,4 +1,4 @@
-// Contains the camera manager code for this part of Olive.
+// Safe-app users and support staff: captures photos and documents for safe-app uploads.
 package com.olive.app.data
 
 import android.content.Context
@@ -87,12 +87,10 @@ class CameraManager(private val context: Context) {
             ImageCapture.OutputFileOptions.Builder(file).build(), cameraExecutor,
             // Handles replies from on image saved callback.
             object : ImageCapture.OnImageSavedCallback {
-                // Runs when image saved happens.
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                     if (continuation.isActive) continuation.resume(file)
                 }
 
-                // Runs when error happens.
                 override fun onError(error: ImageCaptureException) {
                     file.delete()
                     if (continuation.isActive) continuation.resumeWithException(error)
@@ -102,7 +100,6 @@ class CameraManager(private val context: Context) {
     }
 
     @SuppressLint("MissingPermission")
-    // Starts video.
     fun startVideo(
         file: File,
         includeAudio: Boolean,
@@ -131,7 +128,6 @@ class CameraManager(private val context: Context) {
             }
     }
 
-    // Stops video.
     fun stopVideo() {
         recording?.stop()
     }

@@ -1,4 +1,4 @@
-// Contains the geoapify client code for this part of Olive.
+// Users and approved supporters: looks up addresses and place suggestions.
 package com.olive.app.data
 
 import com.olive.app.BuildConfig
@@ -8,7 +8,6 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import javax.net.ssl.HttpsURLConnection
 
-// Groups the data and actions for address suggestion.
 data class AddressSuggestion(
     val id: String,
     val primary: String,

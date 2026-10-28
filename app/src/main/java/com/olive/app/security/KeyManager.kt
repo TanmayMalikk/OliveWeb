@@ -1,4 +1,4 @@
-// Contains the key manager code for this part of Olive.
+// All signed-in roles: creates and opens keys for encrypted media.
 package com.olive.app.security
 
 import android.security.keystore.KeyGenParameterSpec
@@ -19,7 +19,6 @@ import java.security.spec.MGF1ParameterSpec
 import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PSource
 
-// Groups the data and actions for key manager.
 object KeyManager {
     private const val ANDROID_KEYSTORE = "AndroidKeyStore"
     private const val RSA_MODE = "RSA/ECB/OAEPPadding"
@@ -65,7 +64,6 @@ object KeyManager {
         return certificate?.publicKey
     }
 
-    // Gets or create public key.
     fun getOrCreatePublicKey(): PublicKey = getPublicKey() ?: generateUserKeyPair().public
 
     /**

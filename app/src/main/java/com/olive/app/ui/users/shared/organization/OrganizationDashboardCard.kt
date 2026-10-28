@@ -1,3 +1,4 @@
+// Staff and admins: shows account and support totals on dashboard cards.
 package com.olive.app.ui.users.shared.organization
 
 import androidx.compose.foundation.layout.Arrangement

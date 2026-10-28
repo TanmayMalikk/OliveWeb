@@ -1,3 +1,4 @@
+// Tests step and calorie calculations for calculator cover users.
 package com.olive.app.ui.covers.calculator
 
 import org.junit.Assert.assertEquals

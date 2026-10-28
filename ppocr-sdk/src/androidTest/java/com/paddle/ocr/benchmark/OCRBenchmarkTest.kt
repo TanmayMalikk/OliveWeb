@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Users scanning documents: benchmarks OCR speed and memory on Android devices.
+
 package com.paddle.ocr.benchmark
 
 import android.os.Build
 import android.os.Debug
-import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.paddle.ocr.EngineConfig

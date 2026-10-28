@@ -1,4 +1,4 @@
-// Tests the calculator cover UI test behavior.
+// Tests calculator layout, graph controls, and TalkBack actions.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -67,7 +67,6 @@ class CalculatorCoverUiTest {
     private lateinit var session: SessionViewModel
 
     @Before
-    // Shows calculator.
     fun showCalculator() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         context.getSharedPreferences(
@@ -142,7 +141,6 @@ class CalculatorCoverUiTest {
     }
 
     @Test
-    // Clears history removes every visible calculation.
     fun clearHistoryRemovesEveryVisibleCalculation() {
         compose.onNodeWithTag("calc_key_9").performClick()
         compose.onNodeWithTag("calc_key_equals").performClick()

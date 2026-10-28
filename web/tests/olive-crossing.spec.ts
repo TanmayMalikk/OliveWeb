@@ -1,4 +1,4 @@
-// Contains the olive-crossing.spec code for this part of Olive.
+// Tests lane movement and obstacles in the olive crossing cover game.
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 

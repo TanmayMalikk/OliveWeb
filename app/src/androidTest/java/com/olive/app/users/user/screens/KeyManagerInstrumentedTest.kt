@@ -1,3 +1,4 @@
+// Tests Android key wrapping for encrypted user documents.
 package com.olive.app.users.user.screens
 
 import androidx.test.ext.junit.runners.AndroidJUnit4

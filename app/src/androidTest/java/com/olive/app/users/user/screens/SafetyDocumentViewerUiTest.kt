@@ -1,4 +1,4 @@
-// Tests the safety document viewer UI test behavior.
+// Tests that a user photo opens inside the private document viewer.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -18,7 +18,6 @@ import org.junit.runner.RunWith
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
-// Groups the data and actions for safety document viewer UI test.
 class SafetyDocumentViewerUiTest {
     @get:Rule
     val compose = createOliveComposeRule()

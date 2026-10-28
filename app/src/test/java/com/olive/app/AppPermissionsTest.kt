@@ -1,4 +1,4 @@
-// Tests the app permissions test behavior.
+// Tests the permission prompt order and avoids asking users again after a choice.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -6,7 +6,6 @@ import com.olive.app.ui.shared.*
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-// Groups the data and actions for app permissions test.
 class AppPermissionsTest {
     @Test
     fun notificationsAlwaysPrecedeTheLocationPrompt() {

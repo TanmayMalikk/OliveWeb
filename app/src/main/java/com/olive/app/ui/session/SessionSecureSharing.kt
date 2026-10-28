@@ -1,4 +1,4 @@
-// Contains the session secure sharing code for this part of Olive.
+// Signed-in users: controls who can receive shared safety items.
 package com.olive.app.ui.session
 
 import com.olive.app.ui.shared.*

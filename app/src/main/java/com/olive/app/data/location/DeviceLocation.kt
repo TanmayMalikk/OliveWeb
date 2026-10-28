@@ -1,4 +1,4 @@
-// Contains the device location code for this part of Olive.
+// Users and approved supporters: reads the device position for safe-app maps.
 package com.olive.app.data
 
 import android.Manifest
@@ -27,7 +27,6 @@ import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.seconds
 
-// Groups the data and actions for device coordinates.
 internal data class DeviceCoordinates(
     val latitude: Double,
     val longitude: Double,
@@ -168,12 +167,10 @@ internal object DeviceLocation {
                     1,
                     // Handles replies from geocode listener.
                     object : Geocoder.GeocodeListener {
-                        // Runs when geocode happens.
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                         }
 
-                        // Runs when error happens.
                         override fun onError(errorMessage: String?) {
                             if (continuation.isActive) continuation.resume(null)
                         }
@@ -186,12 +183,10 @@ internal object DeviceLocation {
         if (Build.VERSION.SDK_INT >= 33) suspendCancellableCoroutine { continuation ->
             runCatching {
                 geocoder.getFromLocationName(query, 1, object : Geocoder.GeocodeListener {
-                    // Runs when geocode happens.
                     override fun onGeocode(addresses: MutableList<Address>) {
                         if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                     }
 
-                    // Runs when error happens.
                     override fun onError(errorMessage: String?) {
                         if (continuation.isActive) continuation.resume(null)
                     }

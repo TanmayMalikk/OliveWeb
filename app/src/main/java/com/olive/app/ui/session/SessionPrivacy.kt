@@ -1,4 +1,4 @@
-// Contains the session privacy code for this part of Olive.
+// Signed-in users: clears private state when the safe app closes.
 package com.olive.app.ui.session
 
 import com.olive.app.ui.shared.*
@@ -52,7 +52,6 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
-    // Records ing stopped.
     fun recordingStopped() {
         with(runtime) {
             with(state) {

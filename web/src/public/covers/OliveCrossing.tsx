@@ -1,4 +1,4 @@
-// Contains the olive crossing code for this part of Olive.
+// Cover users: shows the olive crossing game.
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -9,9 +9,9 @@ import {
   Play,
   RotateCcw,
 } from "lucide-react";
-import { Button } from "../../components";
-import CrossingBoard from "./CrossingBoard";
-import { readCover, writeCover } from "../../services/cover-storage";
+import { Button } from "../../components/SharedComponents";
+import CrossingBoard from "./OliveCrossingBoard";
+import { readCover, writeCover } from "../../services/CoverStateStore";
 import {
   CROSSING,
   advanceCrossing,
@@ -20,7 +20,6 @@ import {
   type CrossingDirection,
 } from "./olive-crossing";
 
-// Groups the data and actions for crossing phase.
 type CrossingPhase = "ready" | "running" | "paused" | "over";
 
 

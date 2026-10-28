@@ -1,4 +1,4 @@
-// Contains the olive-crossing code for this part of Olive.
+// Cover users: calculates lanes, traffic, and collisions for the crossing game.
 export const CROSSING = {
   columns: 18,
   rows: 8,
@@ -7,10 +7,8 @@ export const CROSSING = {
   vehicleInset: 0.06,
 };
 
-// Groups the data and actions for crossing direction.
 export type CrossingDirection = "up" | "down" | "left" | "right";
 
-// Groups the data and actions for crossing vehicle.
 export interface CrossingVehicle {
   id: number;
   x: number;
@@ -19,7 +17,6 @@ export interface CrossingVehicle {
   speed: number;
 }
 
-// Groups the data and actions for crossing lane.
 export interface CrossingLane {
   id: number;
   type: "grass" | "road" | "rail" | "water";
@@ -30,7 +27,6 @@ export interface CrossingLane {
   spawnCount: number;
 }
 
-// Groups the data and actions for crossing world.
 export interface CrossingWorld {
   lanes: CrossingLane[];
   playerColumn: number;

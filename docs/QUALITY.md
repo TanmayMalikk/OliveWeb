@@ -14,16 +14,16 @@ This document defines the boundaries that keep the Android and web applications 
 The web safe area follows this split:
 
 ```text
-src/users/shared/safe_app/SafeApp.tsx  signed-in app navigation
-src/users/shared/safe_app/             Home, Profile, Settings, Activity, Messages, Safety Plan
-src/users/user/safe_app/               Notes and Contacts
-src/session.tsx             account workflows and shared session state
-src/useSessionSecurity.ts   exit, visibility, history and idle-lock behavior
-src/covers/                 one controller and focused renderer/form components per cover
-src/styles/                 styles grouped by page or cover
+src/users/shared/safe_app/SafeAppLayout.tsx  signed-in app navigation
+src/users/shared/safe_app/                dashboard, profile, settings, activity, messages, safety plan
+src/users/user/contacts_and_notes/        user contacts and notes
+src/session/SessionProvider.tsx           account workflows and shared session state
+src/session/useSessionSecurity.ts         exit, visibility, history and idle-lock behavior
+src/public/covers/                       one controller and focused renderer/form components per cover
+src/styles/                              styles grouped by page or cover
 ```
 
-Android currently keeps shared Compose primitives in `com.olive.app.ui`, cover UI under `ui.covers`, repositories under `data`, OCR under `ocr`, and location integration under `location`. New work must preserve those dependency directions while feature packages are migrated incrementally.
+Android keeps shared Compose primitives under `ui.shared`, cover UI under `ui.covers`, repositories under `data`, OCR under `ocr`, and location integration under `location`. New work must preserve those dependency directions.
 
 ## Accessibility
 

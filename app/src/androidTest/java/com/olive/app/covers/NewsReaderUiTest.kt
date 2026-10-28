@@ -1,4 +1,4 @@
-// Tests the news reader UI test behavior.
+// Tests article reading, bookmarks, and back navigation in Daily Digest.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -38,7 +38,6 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
 
-// Groups the data and actions for news reader UI test.
 class NewsReaderUiTest : OliveUiTestBase() {
     @Test
     fun fullStoryNavigationBookmarksAndBackStayInTheApp() {
@@ -128,14 +127,12 @@ class NewsReaderUiTest : OliveUiTestBase() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) =
                     readerClient.shouldOverrideUrlLoading(view, request)
 
-                // Runs when page started happens.
                 override fun onPageStarted(
                     view: WebView,
                     url: String,
                     favicon: android.graphics.Bitmap?
                 ) = readerClient.onPageStarted(view, url, favicon)
 
-                // Runs when page finished happens.
                 override fun onPageFinished(view: WebView, url: String) {
                     readerClient.onPageFinished(view, url)
                     finishedUrl.set(url)
@@ -209,7 +206,6 @@ class NewsReaderUiTest : OliveUiTestBase() {
             val visible = AtomicBoolean(false)
             instrumentation.runOnMainSync {
                 browser.postVisualStateCallback(1, object : WebView.VisualStateCallback() {
-                    // Runs when complete happens.
                     override fun onComplete(requestId: Long) {
                         browser.postOnAnimation { visible.set(true) }
                     }
@@ -303,7 +299,6 @@ class NewsReaderUiTest : OliveUiTestBase() {
             .assertTextContains("Paywall")
     }
 
-    // Finds browser.
     private fun findBrowser(view: View): WebView? {
         if (view is WebView) return view
         if (view is ViewGroup) for (index in 0 until view.childCount) {

@@ -1,4 +1,4 @@
-// Tests the resource localization test behavior.
+// Tests translated strings, placeholders, and food-menu labels.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -7,13 +7,12 @@ import com.olive.app.R
 import com.olive.app.data.DemoCatalogRepository
 import com.olive.app.data.CoverType
 import com.olive.app.notification.AppNotifications
-import com.olive.app.ui.covers.olive.*
+import com.olive.app.ui.covers.food.*
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
-// Groups the data and actions for resource localization test.
 class ResourceLocalizationTest {
     private val root = listOf(File("src/main"), File("app/src/main")).first { it.isDirectory }
     private val locales = listOf("values-fr", "values-es", "values-ar", "values-zh-rCN")

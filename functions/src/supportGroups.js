@@ -1,6 +1,6 @@
-// Builds the private support conversation shared by a user, assigned staff, and one safe contact.
+// Users, safe contacts, and staff: creates their private support conversation.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {db, FieldValue} = require("./firebase");
+const {db, FieldValue} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");
 

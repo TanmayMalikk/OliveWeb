@@ -1,4 +1,4 @@
-// Contains the use session security code for this part of Olive.
+// Signed-in users: locks or exits the web safe app after privacy events.
 import {
   useCallback,
   useEffect,
@@ -7,13 +7,12 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react";
-import { accounts } from "../services/accounts";
-import { validEntryToken } from "../services/entry-links";
-import { coverPath, emptyHistory, type Enrollment, type Profile } from "../domain";
-import type { SiteMode } from "../sites";
-import type { SessionPhase } from "./context";
+import { accounts } from "../services/AccountService";
+import { validEntryToken } from "../services/PrivateEntryLinks";
+import { coverPath, emptyHistory, type Enrollment, type Profile } from "../domain/DomainModels";
+import type { SiteMode } from "../sites/SiteRouting";
+import type { SessionPhase } from "./SessionContext";
 
-// Groups the data and actions for setter.
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
 export function useSessionSecurity({
@@ -72,7 +71,6 @@ export function useSessionSecurity({
       setPhase("public");
       setMessage("");
     };
-    // Runs when pop happens.
     const onPop = () => {
       resetPrivateSession();
       setPath(
@@ -84,7 +82,6 @@ export function useSessionSecurity({
       );
       window.history.replaceState({}, "", "/");
     };
-    // Runs when hash happens.
     const onHash = () => {
       const candidate = location.hash.slice(1);
       if (!validEntryToken(candidate)) return;
@@ -106,11 +103,9 @@ export function useSessionSecurity({
   }, [enrollment, entryOwner, epoch, mode, pendingEntry]);
 
   useEffect(() => {
-    // Runs when hidden happens.
     const onHidden = () => {
       if (document.hidden && phaseRef.current !== "public") quickExit();
     };
-    // Runs when key happens.
     const onKey = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" &&
@@ -120,7 +115,6 @@ export function useSessionSecurity({
         quickExit();
       }
     };
-    // Runs when page hide happens.
     const onPageHide = () => {
       if (phaseRef.current !== "public") quickExit();
       else {

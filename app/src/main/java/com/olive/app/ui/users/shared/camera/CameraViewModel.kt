@@ -1,4 +1,4 @@
-// Contains the camera view model code for this part of Olive.
+// All safe-app roles: holds camera view state.
 package com.olive.app.ui.users.shared.camera
 
 import com.olive.app.ui.shared.*
@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-// Groups the data and actions for camera view model.
 internal class CameraViewModel(application: Application) : AndroidViewModel(application) {
     private val camera = CameraManager(application)
     private val ocr = PaddleOcrManager(application)
@@ -120,7 +119,6 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    // Starts video.
     fun startVideo(file: File, includeAudio: Boolean, onCaptured: (File) -> Unit) {
         _error.value = null
         runCatching {
@@ -140,7 +138,6 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    // Stops video.
     fun stopVideo() = camera.stopVideo()
     // Clears error.
     fun clearError() {
@@ -159,7 +156,6 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         _busy.value = false
     }
 
-    // Runs when cleared happens.
     override fun onCleared() {
         leaveCamera()
         camera.release()

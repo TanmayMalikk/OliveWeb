@@ -1,4 +1,4 @@
-// Contains the cover location code for this part of Olive.
+// Cover users: reads the device location for cover app features.
 package com.olive.app.data
 
 import android.Manifest
@@ -72,12 +72,10 @@ object CoverLocation {
                     location.latitude, location.longitude, 1,
                     // Handles replies from geocode listener.
                     object : Geocoder.GeocodeListener {
-                        // Runs when geocode happens.
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                         }
 
-                        // Runs when error happens.
                         override fun onError(errorMessage: String?) {
                             if (continuation.isActive) continuation.resume(null)
                         }

@@ -1,4 +1,4 @@
-// Contains the session messaging code for this part of Olive.
+// Signed-in users: loads and sends chat messages.
 package com.olive.app.ui.session
 
 import com.olive.app.ui.shared.*
@@ -33,7 +33,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Starts messaging.
     fun startMessaging(showFeedback: Boolean = true) {
         with(runtime) {
             with(state) {
@@ -187,7 +186,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Runs messaging action.
     fun runMessagingAction(
         failure: String,
         block: suspend (MessagingRepository, DeviceEnrollment, Long) -> Unit
@@ -224,7 +222,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Stops messaging.
     fun stopMessaging(clearRows: Boolean = true) {
         with(runtime) {
             with(state) {

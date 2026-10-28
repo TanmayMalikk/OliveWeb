@@ -1,3 +1,4 @@
+// Tests how a user document opens through the correct media viewer.
 package com.olive.app.ui
 
 import android.content.Context

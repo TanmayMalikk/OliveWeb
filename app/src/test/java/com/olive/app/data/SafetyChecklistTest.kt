@@ -1,4 +1,4 @@
-// Tests the safety checklist test behavior.
+// Tests user checklist edits, saved checks, and old note conversion.
 package com.olive.app.data
 
 import com.olive.app.ui.shared.*
@@ -6,7 +6,6 @@ import com.olive.app.ui.shared.*
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for safety checklist test.
 class SafetyChecklistTest {
     @Test
     fun existingMultilineNotesArePreservedAndDocumentsAreAddedOnFirstConversion() {
@@ -19,7 +18,6 @@ class SafetyChecklistTest {
     }
 
     @Test
-    // Checks ed state unicode and user edits survive saving.
     fun checkedStateUnicodeAndUserEditsSurviveSaving() {
         val items = listOf(
             SafetyChecklistItem("one", "Passeport / جواز سفر", true),
@@ -29,7 +27,6 @@ class SafetyChecklistTest {
     }
 
     @Test
-    // Removes d items stay removed including an entirely empty checklist.
     fun removedItemsStayRemovedIncludingAnEntirelyEmptyChecklist() {
         val stored = writeSafetyChecklist(emptyList())
         assertEquals(
@@ -49,7 +46,6 @@ class SafetyChecklistTest {
     }
 
     @Test
-    // Selects ed trusted contact survives plan storage without depending on the profile.
     fun selectedTrustedContactSurvivesPlanStorageWithoutDependingOnTheProfile() {
         val saved =
             safetyPlanContactItem(SafeContact("trusted-id", "Trusted Friend", "555-0100", true))

@@ -1,4 +1,4 @@
-// Tests the talk back test session behavior.
+// Enables TalkBack for UI tests and restores emulator settings afterward.
 package com.olive.app
 
 import com.olive.app.ui.shared.*

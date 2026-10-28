@@ -1,6 +1,6 @@
-// Contains the organization accounts code for this part of Olive.
+// Admins: creates and updates staff and admin accounts.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {auth, db} = require("./firebase");
+const {auth, db} = require("./firebaseAdminClient");
 const {text, normalizedExistingUsername, normalizedRole, signInEmail, organizationEmailKey, roleFromUser, isTemporaryEmail, defaultProfile} = require("./accountPolicy");
 const {readProfile, writeProfile, saveOrganizationLogin, deleteOrganizationLogin} = require("./accountStorage");
 

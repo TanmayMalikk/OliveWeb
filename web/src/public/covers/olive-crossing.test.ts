@@ -1,4 +1,4 @@
-// Tests the test behavior.
+// Tests traffic and collision rules for cover users.
 import { describe, expect, it } from "vitest";
 import {
   CROSSING,

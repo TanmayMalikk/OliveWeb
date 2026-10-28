@@ -1,4 +1,4 @@
-// Contains traffic-aware routing and local route progress helpers.
+// Safe contacts: gets traffic-aware routes to a user and tracks route progress.
 package com.olive.app.data
 
 import com.olive.app.BuildConfig

@@ -1,4 +1,4 @@
-// Tests the privacy security flow test behavior.
+// Tests stale actions and PIN retries cannot unlock the safe app.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -13,7 +13,6 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 
-// Groups the data and actions for privacy security flow test.
 class PrivacySecurityFlowTest : OliveUiTestBase() {
     @Test
     fun staleAccountActionsAndRapidPinAttemptsCannotUnlock() {
@@ -29,24 +28,24 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
 
         // These calls represent accessibility callbacks from old onboarding nodes.
         fun staleActions() {
-            com.olive.app.data.AccountRole.entries.forEach(session::selectRole)
-            session.setup()
-            session.chooseNew()
-            session.chooseReturning()
-            session.createDevicePin("999999", "999999")
-            session.navigate(com.olive.app.ui.users.shared.navigation.SafePage.Notes)
+            com.olive.app.data.AccountRole.entries.forEach(session.account::selectRole)
+            session.account.openAccountSetup()
+            session.account.chooseNew()
+            session.account.chooseReturning()
+            session.account.createDevicePin("999999", "999999")
+            session.navigation.openSafePage(com.olive.app.ui.users.shared.navigation.SafePage.Notes)
         }
         compose.runOnIdle {
             staleActions()
             assertLocked()
-            session.interceptSearch("moon garden")
+            session.account.interceptSearch("moon garden")
         }
         val obsoleteChallenge = session.pinChallengeVersion
         repeat(5) { index ->
             compose.runOnIdle {
                 staleActions()
                 // Many queued callbacks must start only one verification operation.
-                repeat(100) { session.submitPin("999999") }
+                repeat(100) { session.account.submitPin("999999") }
             }
             compose.waitUntil(30_000) { !session.busy }
             compose.runOnIdle {
@@ -62,19 +61,19 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
             }
         }
         compose.runOnIdle {
-            session.interceptSearch("moon garden")
-            session.submitPin("739182", obsoleteChallenge)
+            session.account.interceptSearch("moon garden")
+            session.account.submitPin("739182", obsoleteChallenge)
             assertFalse(session.busy)
             assertLocked()
             // Even a correct verification cannot complete after exit/re-entry.
-            session.submitPin("739182")
-            session.quickExit()
-            session.interceptSearch("moon garden")
+            session.account.submitPin("739182")
+            session.navigation.quickExit()
+            session.account.interceptSearch("moon garden")
         }
         compose.waitForIdle()
         compose.runOnIdle {
             assertLocked()
-            session.submitPin("739182")
+            session.account.submitPin("739182")
         }
         waitFor("safe_settings")
         compose.runOnIdle { assertNotNull(session.profile) }
@@ -82,7 +81,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         waitCover()
         compose.runOnIdle {
             staleActions()
-            session.quickExit()
+            session.navigation.quickExit()
             assertLocked()
         }
     }

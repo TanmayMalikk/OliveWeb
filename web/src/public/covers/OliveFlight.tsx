@@ -1,8 +1,8 @@
-// Contains the olive flight code for this part of Olive.
+// Cover users: shows the olive flight game.
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
-import { Button } from "../../components";
-import { readCover, writeCover } from "../../services/cover-storage";
+import { Button } from "../../components/SharedComponents";
+import { readCover, writeCover } from "../../services/CoverStateStore";
 import {
   advanceFlight,
   branchPath,

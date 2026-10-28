@@ -1,3 +1,4 @@
+// All safe-app roles: shows private notes linked to friends or assigned users.
 package com.olive.app.ui.users.shared.messaging
 
 import androidx.compose.foundation.layout.*
@@ -108,7 +109,7 @@ internal fun PrivateContactNoteDialog(
                     }
                 } else {
                     Text(target.username, style = MaterialTheme.typography.titleMedium)
-                    session.privateContactNotes[target.uid]?.body?.let { existing ->
+                    session.messages.privateContactNotes[target.uid]?.body?.let { existing ->
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = MaterialTheme.shapes.medium,
@@ -128,8 +129,8 @@ internal fun PrivateContactNoteDialog(
         },
         confirmButton = {
             if (target != null) Button(
-                onClick = { session.appendPrivateContactNote(target, addition, onDismiss) },
-                enabled = addition.isNotBlank() && !session.messagingBusy,
+                onClick = { session.messages.appendPrivateContactNote(target, addition, onDismiss) },
+                enabled = addition.isNotBlank() && !session.messages.busy,
                 modifier = Modifier.testTag("save_private_contact_note"),
             ) { Text(stringResource(R.string.append_note)) }
         },

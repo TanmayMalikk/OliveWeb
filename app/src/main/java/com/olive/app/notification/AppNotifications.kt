@@ -1,4 +1,4 @@
-// Contains the app notifications code for this part of Olive.
+// Cover users: chooses notification text that does not reveal private activity.
 package com.olive.app.notification
 
 import com.olive.app.R
@@ -8,7 +8,6 @@ import com.olive.app.data.AccountRole
 import com.olive.app.data.CoverType
 import kotlin.random.Random
 
-// Groups the data and actions for cover notification content.
 internal data class CoverNotificationContent(
     val channelId: String,
     val title: String,

@@ -4,12 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node server/dev.mjs",
+    "dev": "node server/developmentServer.mjs",
     "build": "tsc -b && vite build",
     "build:user": "tsc -b && vite build --mode user",
     "build:download": "tsc -b && vite build --mode download",
     "build:admin": "tsc -b && vite build --mode admin",
-    "start": "node server/index.mjs",
+    "start": "node server/productionServer.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },
@@ -18,14 +18,14 @@
     "dompurify": "^3.4.17",
     "express": "^5.3.0",
     "fast-xml-parser": "^5.11.2",
-    "firebase": "^13.0.0",
+    "firebase": "^13.1.0",
     "idb": "^8.0.4",
-    "linkedom": "^0.18.13",
-    "lucide-react": "^1.57.0",
+    "linkedom": "^0.18.14",
+    "lucide-react": "^1.62.0",
     "mathjs": "^15.2.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "undici": "^8.12.2"
+    "undici": "^8.12.3"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
@@ -37,10 +37,10 @@
     "prettier": "^3.9.10",
     "sharp": "^0.35.5",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4",
+    "vite": "^8.3.5",
     "vitest": "^4.1.12"
   },
   "overrides": {
-    "@grpc/grpc-js": "1.13.6"
+    "@grpc/grpc-js": "1.14.6"
   }
 }

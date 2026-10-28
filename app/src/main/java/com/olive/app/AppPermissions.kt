@@ -1,4 +1,4 @@
-// Contains the app permissions code for this part of Olive.
+// All app roles: checks Android permissions needed by each app feature.
 package com.olive.app
 
 import android.Manifest
@@ -14,7 +14,6 @@ import androidx.lifecycle.withResumed
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 
-// Groups the data and actions for onboarding permission.
 internal enum class OnboardingPermission { Notifications, Location, Camera, Microphone, Done }
 
 internal fun nextOnboardingPermission(
