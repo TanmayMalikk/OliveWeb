@@ -1,3 +1,4 @@
+// Safe-app users: draws the PIN-to-safe-app olive animation in Compose.
 package com.olive.app.ui.shared
 
 import android.graphics.PathMeasure
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope

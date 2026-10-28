@@ -1,4 +1,4 @@
-// Tests the equation solver test behavior.
+// Tests equation roots and expression parsing for calculator users.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -7,7 +7,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
-// Groups the data and actions for equation solver test.
 class EquationSolverTest {
     @Test
     fun solvesQuadraticWithRealAndComplexRoots() {
@@ -36,7 +35,6 @@ class EquationSolverTest {
     }
 
     @Test
-    // Calculates s polynomial arithmetic and returns polynomials or numbers.
     fun calculatesPolynomialArithmeticAndReturnsPolynomialsOrNumbers() {
         assertEquals("2x", EquationSolver.calculatePolynomial("(x + 1) + (x - 1)"))
         assertEquals("2", EquationSolver.calculatePolynomial("(x + 1) - (x - 1)"))

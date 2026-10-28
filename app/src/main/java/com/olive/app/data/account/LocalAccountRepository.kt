@@ -1,4 +1,4 @@
-// Contains the local account repository code for this part of Olive.
+// All account roles: loads and saves offline account profiles.
 package com.olive.app.data
 
 import com.olive.app.security.*
@@ -57,13 +57,11 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
             ?.let(UserProfile::fromJson)
     }
 
-    // Saves profile.
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) =
         withContext(Dispatchers.IO) {
             vault.update { it.child("profiles").put(identity.uid, profile.toJson()) }
         }
 
-    // Saves history record.
     override suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord) = Unit
     override suspend fun historyRecords(identity: AccountIdentity) = emptyList<HistoryRecord>()
     override suspend fun changePassword(

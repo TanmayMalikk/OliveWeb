@@ -1,4 +1,4 @@
-// Contains the playwright.config code for this part of Olive.
+// Web developers: runs browser tests for public covers and safe-app flows.
 import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",

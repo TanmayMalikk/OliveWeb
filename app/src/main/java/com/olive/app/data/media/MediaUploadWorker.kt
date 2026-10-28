@@ -1,3 +1,4 @@
+// Safe-app users: resumes encrypted uploads in the background.
 package com.olive.app.data.media
 
 import android.content.Context
@@ -141,11 +142,15 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
     }
 
     companion object {
-        private const val JOB_ID="jobId"
-        const val MEDIA_ID="mediaId";const val ERROR="error"
-        const val BYTES_SENT="bytesSent";const val TOTAL_BYTES="totalBytes"
+        private const val JOB_ID = "jobId"
+        const val MEDIA_ID = "mediaId"
+        const val ERROR = "error"
+        const val BYTES_SENT = "bytesSent"
+        const val TOTAL_BYTES = "totalBytes"
         /** Stable unique-work name shared with the controller's observer. */
-        fun workName(jobId:String)="olive_media_$jobId"
+        fun workName(jobId: String): String {
+            return "olive_media_$jobId"
+        }
 
         /**
          * Schedules one network-constrained worker per job. KEEP prevents repeated UI taps from
@@ -176,7 +181,9 @@ private class FileSliceRequestBody(
                 if(count<=0) throw IOException("Unable to seek encrypted upload")
                 skipped+=count
             }
-            val buffer=ByteArray(64*1024);var remaining=length;var sent=0L
+            val buffer = ByteArray(64 * 1024)
+            var remaining = length
+            var sent = 0L
             try {
                 while(remaining>0) {
                     val count=input.read(buffer,0,minOf(buffer.size.toLong(),remaining).toInt())

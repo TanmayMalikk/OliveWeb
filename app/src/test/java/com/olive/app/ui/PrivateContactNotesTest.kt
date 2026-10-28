@@ -1,3 +1,4 @@
+// Tests private notes linked to friends and assigned users.
 package com.olive.app.ui.users.shared.messaging
 
 import com.olive.app.data.AccountRole

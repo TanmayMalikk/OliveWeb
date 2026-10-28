@@ -1,4 +1,4 @@
-// Tests the device credential test driver behavior.
+// Drives real Android PIN prompts during safe-app security tests.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -76,7 +76,6 @@ internal class DeviceCredentialTestDriver(
     }
 
 
-    // Finds node.
     private fun findNode(
         node: AccessibilityNodeInfo?,
         predicate: (AccessibilityNodeInfo) -> Boolean

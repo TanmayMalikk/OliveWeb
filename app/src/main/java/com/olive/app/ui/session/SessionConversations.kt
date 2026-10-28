@@ -1,4 +1,4 @@
-// Contains the session conversations code for this part of Olive.
+// Signed-in users: opens and closes direct and support chats.
 package com.olive.app.ui.session
 
 import com.olive.app.ui.shared.*
@@ -18,7 +18,6 @@ import kotlinx.coroutines.CancellationException
 
 // Owns conversation selection, messages and read markers.
 internal class SessionConversations(private val runtime: SessionRuntime) {
-    // Opens conversation.
     fun openConversation(conversation: ChatConversation) {
         with(runtime) {
             with(state) {
@@ -70,7 +69,6 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
-    // Closes conversation.
     fun closeConversation() {
         with(runtime) {
             with(state) {
@@ -83,44 +81,46 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
-    // Sends message.
+    // Sending a message: check the active chat, encrypt for its room, then report success to the composer.
     fun sendMessage(text: String, onSent: () -> Unit = {}) {
-        with(runtime) {
-            with(state) {
-                val repository = secureChatRepository ?: return
-                val device = enrollment ?: return
-                val conversation = activeConversation ?: return
-                if (messagingBusy) return
-                val token = epoch
-                messagingBusy = true
-                message = null
-                scope.launch {
-                    try {
-                        val key = secureSharing.roomKey(conversation)
-                        repository.send(
-                            conversation.id,
-                            AccountIdentity(device.uid, coverUsername),
-                            text,
-                            key
-                        )
-                        if (epoch == token && activeConversation?.id == conversation.id) onSent()
-                    } catch (error: CancellationException) {
-                        throw error
-                    } catch (error: Exception) {
-                        Log.e("OliveMessaging", "Encrypted message send failed", error)
-                        if (epoch == token) message = runtime.application.getString(
-                            if (error is FirebaseFirestoreException &&
-                                error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
-                            ) R.string.messaging_send_denied
-                            else R.string.ui_unable_to_send_the_message
-                        )
-                    } finally {
-                        if (epoch == token) messagingBusy = false
-                    }
+        val state = runtime.state
+        val repository = runtime.secureChatRepository ?: return
+        val device = runtime.enrollment ?: return
+        val conversation = state.activeConversation ?: return
+        if (state.messagingBusy) return
+
+        val sessionVersion = runtime.epoch
+        state.messagingBusy = true
+        state.message = null
+        runtime.scope.launch {
+            try {
+                val roomKey = runtime.secureSharing.roomKey(conversation)
+                repository.send(
+                    conversation.id,
+                    AccountIdentity(device.uid, state.coverUsername),
+                    text,
+                    roomKey,
+                )
+                if (runtime.epoch == sessionVersion && state.activeConversation?.id == conversation.id) {
+                    onSent()
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                Log.e("OliveMessaging", "Encrypted message send failed", failure)
+                if (runtime.epoch == sessionVersion) {
+                    state.message = runtime.application.getString(sendFailureMessage(failure))
+                }
+            } finally {
+                if (runtime.epoch == sessionVersion) state.messagingBusy = false
             }
         }
     }
+
+    private fun sendFailureMessage(failure: Exception): Int =
+        if (failure is FirebaseFirestoreException &&
+            failure.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+        ) R.string.messaging_send_denied else R.string.ui_unable_to_send_the_message
 
     fun unsendMessage(chat: ChatMessage) {
         with(runtime) {

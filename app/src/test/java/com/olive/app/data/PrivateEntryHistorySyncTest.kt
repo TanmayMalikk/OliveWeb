@@ -1,3 +1,4 @@
+// Tests that private-entry history syncs for safe-app users.
 package com.olive.app.data
 
 import org.json.JSONObject
@@ -8,7 +9,6 @@ class PrivateEntryHistorySyncTest {
 
     @Test
     fun `test offline history sync correctly parses PrivateEntry records`() {
-        // Create a fake offline PrivateEntry
         val entry = PrivateEntry(
             id = "entry-123",
             title = "Test Title",
@@ -17,7 +17,7 @@ class PrivateEntryHistorySyncTest {
 
         val record = HistoryRecord("private_entries", entry.id, entry.toJson().toString())
 
-        // Simply parsing it to ensure our JSON mapping matches the object model
+        // The JSON round trip must keep the private entry fields.
         val parsedJson = JSONObject(record.json)
         val decodedEntry = PrivateEntry.fromJson(parsedJson)
 

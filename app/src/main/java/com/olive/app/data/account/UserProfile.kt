@@ -1,4 +1,4 @@
-// Contains the user profile code for this part of Olive.
+// Users and safe contacts: defines their profile details.
 package com.olive.app.data
 
 import org.json.JSONArray

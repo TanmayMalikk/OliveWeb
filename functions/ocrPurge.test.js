@@ -1,3 +1,4 @@
+// Tests removal of old plaintext OCR fields from user documents.
 "use strict";
 
 const assert = require("node:assert/strict");

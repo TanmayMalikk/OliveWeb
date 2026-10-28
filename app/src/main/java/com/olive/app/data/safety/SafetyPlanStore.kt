@@ -1,4 +1,4 @@
-// Contains the safety plan store code for this part of Olive.
+// Safe-app users and support staff: keeps safety-plan drafts on the device.
 package com.olive.app.data
 
 import android.content.Context

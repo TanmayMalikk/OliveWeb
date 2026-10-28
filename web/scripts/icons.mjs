@@ -1,3 +1,4 @@
+// Web developers: prepares icon assets used by the cover pages.
 import sharp from "sharp";
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";

@@ -1,4 +1,4 @@
-// Tests the camera UI test behavior.
+// Tests photo and video capture in the shared safe-app camera.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -13,7 +13,6 @@ import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import org.junit.Test
 
-// Groups the data and actions for camera UI test.
 class CameraUiTest : OliveUiTestBase() {
     @Test
     fun embeddedCameraCapturesPhotosAndVideosForPrivateReview() {
@@ -29,7 +28,7 @@ class CameraUiTest : OliveUiTestBase() {
         register()
         unlock()
         compose.runOnIdle {
-            ViewModelProvider(compose.activity)[SessionViewModel::class.java].navigate(
+            ViewModelProvider(compose.activity)[SessionViewModel::class.java].navigation.openSafePage(
                 SafePage.Camera
             )
         }

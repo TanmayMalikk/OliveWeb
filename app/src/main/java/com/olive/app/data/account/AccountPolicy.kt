@@ -1,9 +1,8 @@
-// Contains the account policy code for this part of Olive.
+// All account roles: checks usernames, passwords, and account roles.
 package com.olive.app.data
 
 import com.olive.app.security.InputPolicy
 
-// Groups the data and actions for account setup step.
 enum class AccountSetupStep { PersonalProfile, PrivateTrigger, DevicePin, OrganizationProfile, Ready }
 
 // Account rules stay pure here so sign-in aliases and first-login routing can be unit tested without Firebase.

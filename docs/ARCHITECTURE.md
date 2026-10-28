@@ -6,24 +6,52 @@ The project uses feature-first folders. Put new code with the feature that owns 
 
 `app/src/main/java/com/olive/app/` contains the Android application.
 
-- `ui/users/user/home` contains the user's home screen, activity history, and support resources.
+- `ui/users/user/dashboard` contains the user's dashboard, activity history, and support resources.
 - `ui/users/user/account` contains profile, settings, and app-entry security screens.
 - `ui/users/user/notes`, `documents`, and `location` contain those named features.
 - `ui/users/safecontact` contains its single role interface and supporting cards, without another feature folder.
-- `ui/users/staff/portal` contains the staff dashboard and safety-plan consultations.
-- `ui/users/admin/portal` contains the administrator dashboard and account management.
+- `ui/users/staff` contains the staff dashboard and safety-plan consultations.
+- `ui/users/admin` contains the administrator dashboard and account management.
 - `ui/users/shared/organization` contains setup and settings screens used by both organization roles.
 - `ui/users/shared` contains features used by multiple signed-in roles: `auth`, `camera`, `messaging`, `onboarding`, `safetyplan`, and `navigation`.
-- `ui/covers` contains the calculator, game, news, food, and shared cover UI.
+- `ui/covers` contains the calculator, game, news, food, and shared cover UI. Food cover screens live in `ui/covers/food`.
 - `ui/session` owns authenticated workflow orchestration; it is application infrastructure rather than a user interface feature.
 - `ui/shared` contains presentation primitives used across roles.
 - `ocr`, `security`, `notification`, and top-level `location` contain platform integrations that are shared across UI features.
 - `OliveActivity.kt` is Android's launcher activity. Android creates it when the user opens Olive; it hosts the Compose application, applies privacy protection, and connects platform lifecycle events to the session.
 - `app/src/androidTest/java/com/olive/app` mirrors the production features; reusable emulator rules and drivers live in `support`.
 
-`data/account`, `activity`, `camera`, `cover`, `location`, `messaging`, `news`, and `safety` contain models, repositories, persistence, and remote data access for each feature.
+`data/account`, `cover`, `location`, `media`, `messaging`, `news`, and `safety` contain models, repositories, persistence, and remote data access for each feature.
 
 Compose screens receive state and actions from controllers or view models. They must not create repositories or import Firebase directly.
+
+### Finding the code behind a screen action
+
+Start at the screen named for the feature. Each major feature exposes one clearly named property on `SessionViewModel`. That property keeps the state and actions used by the screen together. Its action calls a workflow in `ui/session`, and the workflow calls a repository in `data`.
+
+| User action | Screen to open first | Workflow to follow | Data owner |
+| --- | --- | --- | --- |
+| Sign in or create an account | `ui/users/shared/auth` and `onboarding` | `ui/session/SessionAccountSignIn.kt` and `AccountSessionController.kt` | `data/account` |
+| Find a friend or send a message | `ui/users/shared/messaging` | `ui/session/SessionFriendActions.kt` or `SessionConversations.kt` | `data/messaging` |
+| Request staff or admin help | `ui/users/user/dashboard` or `ui/users/staff` | `ui/session/StaffSupportController.kt` | `data/messaging/SupportRepository.kt` |
+| Edit a safety plan | `ui/users/shared/safetyplan` | `ui/session/SessionSafetyPlans.kt` | `data/safety` |
+| Upload or open a document | `ui/users/user/documents` | `SafetyDocumentController.kt` and `EncryptedMediaTransferController.kt` in that folder | `data/media` and `data/safety` |
+| Show or share a location | `ui/users/user/location` (also used by the safe-contact dashboard) | `UserLocationController.kt` | `data/location` |
+
+The three most common paths are:
+
+```text
+Credentials screen -> session.account.authenticate()
+  -> SessionAccountSignIn -> AccountRepository
+
+Conversation screen -> session.messages.sendMessage()
+  -> SessionConversations -> SecureChatRepository
+
+Staff-help screen -> session.staffSupport.requestHelp()
+  -> StaffSupportController -> SupportRepository
+```
+
+`SessionAccountEntry.kt` keeps entry state and actions together. `SessionMessages.kt` does the same for friends and chats. `SessionCoverNotesActivityActions.kt` covers covers, notes and history, while `SessionAccountManagementActions.kt` covers settings and admin accounts. `SessionViewModel.kt` holds the remaining shared screen state and clears screen controllers when the session ends. `SessionRuntimeCore.kt` creates workflows and holds shared account state; feature behavior belongs in the named workflow file.
 
 Kotlin packages mirror the feature folders. For example, `ui/users/user/notes` declares `com.olive.app.ui.users.user.notes`. The old flat `com.olive.app.ui` package is intentionally empty, so unrelated screens cannot behave like one large global module. `ui.shared` is the small cross-feature presentation API, while `users.shared.navigation` owns root navigation and `SessionViewModel`.
 
@@ -31,17 +59,17 @@ Use classes for mutable state, long-running work, and workflows. `SessionViewMod
 
 Keep closely related composables, helpers, and dialogs in one feature file. Split a file when it approaches 500 lines or contains an independently testable engine or a separate responsibility. Do not create a new file solely for one small helper or one companion composable.
 
-Keep names short and literal. Use the feature shown to the user, such as `home`, `notes`, `account`, `safetyplan`, and `Profile.kt`. Avoid vague containers such as `workspace`, `shell`, `helpers`, or `misc`. A leaf feature folder must contain at least two source files. If a feature needs only one file, place it beside a closely related feature instead of wrapping it in another directory.
+Keep names short and literal. Use the feature shown to the user, such as `dashboard`, `notes`, `account`, and `safetyplan`. Give a source file enough context to identify its contents from its name, such as `UserProfileScreen.kt`. Avoid vague containers such as `workspace`, `shell`, `helpers`, or `misc`. A leaf feature folder must contain at least two source files. If a feature needs only one file, place it beside a closely related feature instead of wrapping it in another directory.
 
-Write Kotlin for a reader who is still learning the language: use one statement per line, include spaces around operators, and give state and callbacks descriptive names. Comments should explain why a rule or workaround exists; the code itself should show what happens.
+Write Kotlin, TypeScript, and JavaScript for a reader who is still learning: use one statement per line, spaces around operators, braces for control flow, and clear names. Split long conditions and multi-step expressions into named steps. Comments should explain why a rule or workaround exists; the code itself should show what happens.
 
-Every handwritten source file starts with a short purpose comment. Classes, functions, important state, and meaningful code sections use plain comments with simple words. Do not comment every local variable; clear names should explain those. Keep comments short enough for a new developer to scan, and use them to explain behavior, timing, decisions, security rules, or other details the code does not make obvious.
+Every handwritten source file starts with a short comment naming its feature, who uses it, and what the file does. Add simple comments to important code sections when behavior, timing, access, or security rules are not clear from the code. Do not comment every function or variable just to repeat its name.
 
 ## Web UI by user type
 
 `web/src/` contains only `main.tsx`, the application entry point, and `styles.css`, the stylesheet entry point.
 
-- `users/user/safe_app` contains the account owner's contacts and notes.
+- `users/user/contacts_and_notes` contains the account owner's contacts and notes.
 - `users/safe_contact` is reserved for UI that only safe contacts can access. Current safe-contact workflows reuse the shared safe-app, messaging, and safety-plan features.
 - `users/staff` and `users/admin` contain separate organization portals for their distinct responsibilities.
 - `users/shared/safe_app` contains the signed-in home, profile, settings, activity, messaging, and safety-plan screens shared across roles.

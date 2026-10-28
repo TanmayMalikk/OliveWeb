@@ -1,4 +1,4 @@
-// Tests the advanced calculator engine test behavior.
+// Tests fractions, calculus, matrices, and statistics for calculator users.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -6,12 +6,10 @@ import com.olive.app.ui.shared.*
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for advanced calculator engine test.
 class AdvancedCalculatorEngineTest {
     private val radians = CalculatorAngleMode.RADIANS
 
     @Test
-    // Calculates s fractions and calculus.
     fun calculatesFractionsAndCalculus() {
         assertTrue(
             AdvancedCalculatorEngine.calculate(
@@ -48,7 +46,6 @@ class AdvancedCalculatorEngineTest {
     }
 
     @Test
-    // Calculates s complex numbers and matrices.
     fun calculatesComplexNumbersAndMatrices() {
         assertTrue(
             AdvancedCalculatorEngine.calculate(
@@ -85,7 +82,6 @@ class AdvancedCalculatorEngineTest {
     }
 
     @Test
-    // Calculates s statistics.
     fun calculatesStatistics() {
         val stats = AdvancedCalculatorEngine.calculate(
             AdvancedTool.OneVariableStats,

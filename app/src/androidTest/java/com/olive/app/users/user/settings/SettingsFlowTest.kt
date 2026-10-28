@@ -1,4 +1,4 @@
-// Tests the settings flow test behavior.
+// Tests user language, trigger, and address settings.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -12,10 +12,8 @@ import com.olive.app.security.EncryptedVault
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for settings flow test.
 class SettingsFlowTest : OliveUiTestBase() {
     @Test
-    // Sets tings preserve language without apicker and keep trigger and address working.
     fun settingsPreserveLanguageWithoutAPickerAndKeepTriggerAndAddressWorking() {
         register("1234", username = "settings_tester")
         unlock("1234")

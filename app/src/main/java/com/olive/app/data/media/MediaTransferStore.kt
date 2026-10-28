@@ -1,3 +1,4 @@
+// Safe-app users: saves pending encrypted uploads across app restarts.
 package com.olive.app.data.media
 
 import android.content.Context

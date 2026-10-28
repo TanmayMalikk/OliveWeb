@@ -1,4 +1,4 @@
-// Contains the index.test code for this part of Olive.
+// Tests that cloud endpoints for accounts, support, and media keep their public names.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId: "olive-test", storageBucket: "olive-test.appspot.com"});

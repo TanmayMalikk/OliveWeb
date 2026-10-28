@@ -1,4 +1,4 @@
-// Contains the news feed cache store code for this part of Olive.
+// News cover users: stores news feed cache state.
 package com.olive.app.data
 
 import android.content.Context
@@ -6,7 +6,6 @@ import androidx.core.content.edit
 import org.json.JSONArray
 import org.json.JSONObject
 
-// Groups the data and actions for cached news feed.
 data class CachedNewsFeed(val place: String, val articles: List<NewsArticle>)
 
 // Keep the last successful feed local so Daily Digest can paint content before the network responds.

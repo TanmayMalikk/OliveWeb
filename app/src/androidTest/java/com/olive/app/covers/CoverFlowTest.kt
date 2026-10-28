@@ -1,4 +1,4 @@
-// Tests the cover flow test behavior.
+// Tests food-cover search, cart removal, and saved dishes.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -7,19 +7,17 @@ import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.*
-import com.olive.app.ui.covers.olive.OliveCover
+import com.olive.app.ui.covers.food.OliveCover
 import com.olive.app.ui.shared.OliveTheme
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
-// Groups the data and actions for cover flow test.
 class CoverFlowTest {
     @get:Rule
     val compose = createOliveComposeRule()
 
     @Before
-    // Shows cover.
     fun showCover() {
         compose.runOnIdle { compose.activity.setContent { OliveTheme { OliveCover() } } }
     }
@@ -44,7 +42,6 @@ class CoverFlowTest {
     }
 
     @Test
-    // Saves d dishes can be removed.
     fun savedDishesCanBeRemoved() {
         compose.onNodeWithText("Garden harvest bowl").performClick()
         compose.onNodeWithText("Save for later").performScrollTo().performClick()

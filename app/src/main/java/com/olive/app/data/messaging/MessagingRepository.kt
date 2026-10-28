@@ -1,4 +1,4 @@
-// Contains the messaging repository code for this part of Olive.
+// All chat roles: loads and saves direct messages and friend requests.
 package com.olive.app.data
 
 import com.google.firebase.firestore.DocumentSnapshot
@@ -13,7 +13,6 @@ import com.olive.app.security.KeyManager
 import java.security.PublicKey
 import java.util.Base64
 
-// Groups the data and actions for messaging repository.
 class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
     init {
         firestore.firestoreSettings = FirebaseFirestoreSettings.Builder()

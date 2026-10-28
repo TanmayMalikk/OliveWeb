@@ -1,4 +1,4 @@
-// Tests the accessibility UI test behavior.
+// Tests TalkBack labels, focus, and live updates across cover and safe-app screens.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -22,17 +22,30 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.ui.*
 import com.olive.app.data.ChatConversation
+import com.olive.app.data.AccountCounts
+import com.olive.app.ui.users.admin.AccountCountGrid
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
-// Groups the data and actions for accessibility UI test.
 class AccessibilityUiTest : OliveUiTestBase() {
+    @Test
+    fun adminCountsReadAsOneLabelPerCard() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            compose.activity.setContent {
+                AccountCountGrid(AccountCounts(users = 5, safeContacts = 2, staff = 1, admins = 1))
+            }
+        }
+        val label = compose.activity.getString(R.string.ui_users)
+        compose.onNodeWithContentDescription("5 $label").assertExists()
+        compose.onNodeWithText("5").assertDoesNotExist()
+    }
+
     @Test
     fun gameCoverKeepsItsControlsIndividuallyAccessible() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             compose.activity.setContent {
-                OliveTheme { com.olive.app.ui.covers.game.GameCover() }
+                OliveTheme { com.olive.app.ui.covers.GameCover() }
             }
         }
         compose.onNodeWithTag("cover_brand_game", useUnmergedTree = true).assertIsDisplayed()
@@ -48,7 +61,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         register()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            session.interceptSearch("moon garden")
+            session.account.interceptSearch("moon garden")
         }
         repeat(6) { compose.onNodeWithTag("pin_digit_9").performClick() }
         compose.onNodeWithTag("unlock_pin").assert(
@@ -65,7 +78,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
             )
             .assertTextContains("Incorrect PIN", substring = true)
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            session.submitPin("123456")
+            session.account.submitPin("123456")
         }
         waitFor("safe_settings")
         compose.onNodeWithTag("quick_exit").performClick()
@@ -122,8 +135,8 @@ class AccessibilityUiTest : OliveUiTestBase() {
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val uid = requireNotNull(session.coverAccountId)
-            session.navigate(SafePage.Messages)
-            session.openConversation(
+            session.navigation.openSafePage(SafePage.Messages)
+            session.messages.openConversation(
                 ChatConversation(
                     "a11y-chat",
                     "fixture",
@@ -138,9 +151,9 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("dismiss_chat_quick_exit_hint").performClick()
         compose.onNodeWithTag("chat_quick_exit_hint").assertDoesNotExist()
         compose.runOnIdle {
-            session.closeConversation()
+            session.messages.closeConversation()
             val uid = requireNotNull(session.coverAccountId)
-            session.openConversation(
+            session.messages.openConversation(
                 ChatConversation(
                     "a11y-chat",
                     "fixture",
@@ -152,6 +165,37 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("chat_quick_exit_hint").assertDoesNotExist()
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
+    }
+
+    @Test
+    fun attachmentPickerMovesFocusToEachNewCategoryTitle() {
+        register()
+        unlock()
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val uid = requireNotNull(session.coverAccountId)
+            session.navigation.openSafePage(SafePage.Messages)
+            session.messages.openConversation(
+                ChatConversation(
+                    "attachment-focus-chat",
+                    "fixture",
+                    listOf(uid, "peer"),
+                    mapOf(uid to "olive_tester", "peer" to "Test Friend")
+                )
+            )
+        }
+        waitFor("chat_quick_exit_hint")
+        compose.onNodeWithTag("dismiss_chat_quick_exit_hint").performClick()
+        compose.onNodeWithTag("attach_private_entry").performClick()
+        compose.onNodeWithTag("attachment_picker_title").assertIsFocused()
+        compose.onNodeWithTag("attachment_category_notes").performClick()
+        val notesTitle = compose.activity.getString(
+            R.string.select_attachment_category,
+            compose.activity.getString(R.string.private_notes)
+        )
+        compose.onNodeWithTag("attachment_picker_title")
+            .assertTextEquals(notesTitle)
+            .assertIsFocused()
     }
 
     @Test
@@ -207,7 +251,6 @@ class AccessibilityUiTest : OliveUiTestBase() {
         instrumentation.runOnMainSync { session.captureDetected("Screen recording") }
         waitFor("privacy_blackout")
         compose.waitForIdle()
-        // Finds compose.
         fun findCompose(view: View): ComposeView? {
             if (view is ComposeView) return view
             if (view is ViewGroup) for (index in 0 until view.childCount) findCompose(
@@ -272,7 +315,6 @@ class AccessibilityUiTest : OliveUiTestBase() {
     }
 
     @Test
-    // Runs when ly user accessibility events count as activity happens.
     fun onlyUserAccessibilityEventsCountAsActivity() {
         assertTrue(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED))
         assertTrue(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_VIEW_CLICKED))

@@ -1,4 +1,4 @@
-// Contains the news article metadata code for this part of Olive.
+// News cover users: extracts titles and images for news articles.
 package com.olive.app.data
 
 import android.content.Context
@@ -38,7 +38,6 @@ internal fun isSecureNewsUrl(url: String): Boolean = runCatching {
     ) && !uri.host.isNullOrBlank() && uri.rawUserInfo == null
 }.getOrDefault(false)
 
-// Groups the data and actions for news article metadata.
 internal data class NewsArticleMetadata(
     val publisherUrl: String = "", val imageUrl: String = "", val topic: String = "",
     val isPaywalled: Boolean? = null, val description: String = ""
@@ -338,7 +337,6 @@ internal class NewsMetadataRepository(context: Context) {
                                     return !isSecureNewsUrl(url)
                                 }
 
-                                // Runs when page finished happens.
                                 override fun onPageFinished(view: WebView, url: String) {
                                     if (isSecureNewsUrl(url) && !isGoogleHost(URI(url).host) && continuation.isActive) continuation.resume(
                                         url

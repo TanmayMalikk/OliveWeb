@@ -1,5 +1,5 @@
 // Deployment entry point: keep callable names stable while implementations stay feature-scoped.
-require("./src/firebase");
+require("./src/firebaseAdminClient");
 Object.assign(exports, require("./src/adminAccounts"));
 const publicAccounts = require("./src/publicAccounts");
 exports.createPublicAccount = publicAccounts.createPublicAccount;

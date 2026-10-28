@@ -1,3 +1,4 @@
+// Tests the olive animation between user PIN entry and the safe app.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.pinSafeBackgroundAlpha

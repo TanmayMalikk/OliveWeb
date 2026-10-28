@@ -1,3 +1,4 @@
+// Admins: removes old plaintext OCR fields after an explicit project check.
 "use strict";
 
 const {deleteApp, initializeApp} = require("firebase-admin/app");

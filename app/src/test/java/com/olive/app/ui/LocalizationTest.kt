@@ -1,4 +1,4 @@
-// Tests the localization test behavior.
+// Tests translated Android resources and language selection for all roles.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -8,10 +8,8 @@ import org.junit.Test
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 
-// Groups the data and actions for localization test.
 class LocalizationTest {
 
-    // Finds res dir.
     private fun findResDir(): File {
         val candidates = listOf(
             File("src/main/res"),
@@ -35,14 +33,12 @@ class LocalizationTest {
     }
 
     @Test
-    // Checks that strings xml exists and is populated for supported languages is valid.
     fun verifyStringsXmlExistsAndIsPopulatedForSupportedLanguages() {
         val resDir = findResDir()
         assertTrue("Base res directory must exist", resDir.exists())
 
         val targetLocales = listOf("values-fr", "values-es", "values-ar", "values-zh-rCN")
 
-        // 1. Check default English strings.xml
         val defaultStringsFile = File(resDir, "values/strings.xml")
         assertTrue("Default values/strings.xml must exist", defaultStringsFile.exists())
         val defaultCount = countStringsInXml(defaultStringsFile)
@@ -51,7 +47,6 @@ class LocalizationTest {
             defaultCount > 100
         )
 
-        // 2. Check each target locale strings.xml
         for (localeDirName in targetLocales) {
             val localeDir = File(resDir, localeDirName)
             assertTrue("Locale directory '$localeDirName' must exist", localeDir.exists())
@@ -68,7 +63,6 @@ class LocalizationTest {
     }
 
     @Test
-    // Checks that app locale manager resolution is valid.
     fun verifyAppLocaleManagerResolution() {
         assertEquals("en", AppLocaleManager.getLanguageTag("English"))
         assertEquals("fr", AppLocaleManager.getLanguageTag("French"))

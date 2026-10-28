@@ -1,4 +1,4 @@
-// Tests the safe contact test behavior.
+// Tests safe-contact profile storage and older profile defaults.
 package com.olive.app.data
 
 import com.olive.app.ui.shared.*
@@ -9,7 +9,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for safe contact test.
 class SafeContactTest {
     private fun profile(contact: SafeContact) = UserProfile(
         username = "trusted_contact_test",

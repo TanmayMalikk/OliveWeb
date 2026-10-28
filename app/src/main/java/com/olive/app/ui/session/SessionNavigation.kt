@@ -1,4 +1,4 @@
-// Contains the session navigation code for this part of Olive.
+// Signed-in users: moves between cover, login, and safe-app screens.
 package com.olive.app.ui.session
 
 import com.olive.app.ui.shared.*
@@ -9,7 +9,6 @@ import com.olive.app.data.*
 
 // Owns navigation history and background locking; quick exit clears PIN authorization and invalidates pending operations.
 internal class SessionNavigation(private val runtime: SessionRuntime) {
-    // Opens screen.
     fun openScreen(value: SessionScreen) {
         with(runtime) {
             with(state) {

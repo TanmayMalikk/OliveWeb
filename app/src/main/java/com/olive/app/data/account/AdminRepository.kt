@@ -1,11 +1,10 @@
-// Contains the admin repository code for this part of Olive.
+// Admins: loads staff and admin accounts for the management screen.
 package com.olive.app.data
 
 import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.tasks.await
 
-// Groups the data and actions for account counts.
 data class AccountCounts(
     val users: Int = 0,
     val safeContacts: Int = 0,
@@ -13,7 +12,6 @@ data class AccountCounts(
     val admins: Int = 0
 )
 
-// Groups the data and actions for admin account summary.
 data class AdminAccountSummary(
     val uid: String,
     val username: String,
@@ -26,7 +24,6 @@ data class AdminAccountSummary(
     val assignedUsers: Int = 0,
 )
 
-// Groups the data and actions for admin account draft.
 data class AdminAccountDraft(
     val username: String,
     val password: String,

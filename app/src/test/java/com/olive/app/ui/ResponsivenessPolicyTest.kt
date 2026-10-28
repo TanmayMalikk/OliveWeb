@@ -1,4 +1,4 @@
-// Tests the responsiveness policy test behavior.
+// Tests startup, chat registration, and calculator responsiveness.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -16,7 +16,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for responsiveness policy test.
 class ResponsivenessPolicyTest {
     @Test
     fun coverIsConstructedForTheDefaultAndConfiguredUserRoutes() {

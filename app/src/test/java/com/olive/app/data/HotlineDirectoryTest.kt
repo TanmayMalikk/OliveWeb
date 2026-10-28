@@ -1,4 +1,4 @@
-// Tests the hotline directory test behavior.
+// Tests Canadian support numbers and city-based matches for users.
 package com.olive.app.data
 
 import com.olive.app.ui.shared.*
@@ -7,7 +7,6 @@ import java.io.File
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for hotline directory test.
 class HotlineDirectoryTest {
     private val assets = listOf(
         File("src/main/assets/hotlines/provinces"),

@@ -1,4 +1,4 @@
-// Tests the safe entry settings UI test behavior.
+// Tests changing PIN and device-lock settings for users.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -17,7 +17,6 @@ import com.olive.app.ui.*
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for safe entry settings UI test.
 class SafeEntrySettingsUiTest : OliveUiTestBase() {
     private var activeAutomation: android.app.UiAutomation? = null
     private val driver
@@ -40,14 +39,13 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     }
 
     private fun session() = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
-    // Sets up.
     private fun setup(deviceLock: Boolean = false): SessionViewModel {
         if (deviceLock) driver.ensurePhonePin()
         openOnboarding()
         val model = session()
         compose.runOnIdle {
-            model.chooseNew()
-            model.authenticate(
+            model.account.chooseNew()
+            model.account.authenticate(
                 "entry_tester",
                 "test-password-123",
                 true
@@ -55,7 +53,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         }
         waitFor("full_name")
         compose.runOnIdle {
-            model.saveSetupProfile(
+            model.account.saveSetupProfile(
                 UserProfile(
                     "entry_tester",
                     "Entry Tester",
@@ -90,9 +88,8 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         return model
     }
 
-    // Sets tings.
     private fun settings(model: SessionViewModel) {
-        compose.runOnIdle { model.navigate(SafePage.Settings) }
+        compose.runOnIdle { model.navigation.openSafePage(SafePage.Settings) }
         waitFor("entry_use_device")
     }
 
@@ -101,9 +98,9 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     }
 
     private fun trigger(model: SessionViewModel) {
-        compose.runOnIdle { model.quickExit() }
+        compose.runOnIdle { model.navigation.quickExit() }
         waitCover()
-        compose.runOnIdle { assertTrue(model.interceptSearch("moon garden")) }
+        compose.runOnIdle { assertTrue(model.account.interceptSearch("moon garden")) }
     }
 
     private fun enableDevice(model: SessionViewModel, pin: String = "123456") {
@@ -113,10 +110,9 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         activate("entry_use_device")
         driver.confirmPhonePin()
         finished(model)
-        assertEquals(SafeEntryMethod.DEVICE_LOCK, model.preferredEntryMethod)
+        assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
     }
 
-    // Saves d PIN matches.
     private fun savedPinMatches(model: SessionViewModel, pin: String): Boolean {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val entry = EncryptedVault(context, "demo").read().getJSONObject("enrollments")
@@ -127,7 +123,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     @Test
     fun calculatorCoverAddsBackupPinWithoutChangingPreferredDeviceLock() {
         val model = setup(deviceLock = true)
-        assertFalse(model.hasAppPin)
+        assertFalse(model.account.hasAppPin)
         trigger(model)
         driver.confirmPhonePin()
         waitFor("safe_settings")
@@ -143,13 +139,13 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         driver.confirmPhonePin()
 
         compose.waitUntil(20_000) {
-            !model.busy && model.hasAppPin && model.coverType == CoverType.CALCULATOR
+            !model.busy && model.account.hasAppPin && model.coverType == CoverType.CALCULATOR
         }
-        assertTrue(model.hasAppPin)
-        assertEquals(SafeEntryMethod.DEVICE_LOCK, model.preferredEntryMethod)
+        assertTrue(model.account.hasAppPin)
+        assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
         compose.onNodeWithTag("calculator_pin_required").assertDoesNotExist()
 
-        compose.runOnIdle { model.quickExit() }
+        compose.runOnIdle { model.navigation.quickExit() }
         waitFor("calculator_cover")
         "1234".forEach { digit ->
             compose.onNodeWithTag("calc_key_$digit").performClick()
@@ -165,7 +161,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     @Test
     fun switchingAndBackupSetupRequireProofAndNeverExposePinDuringDeviceLock() {
         val model = setup(deviceLock = true)
-        assertFalse(model.hasAppPin)
+        assertFalse(model.account.hasAppPin)
         trigger(model)
         driver.confirmPhonePin()
         waitFor("safe_settings")
@@ -179,8 +175,8 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         activate("entry_save_backup")
         driver.confirmPhonePin()
         finished(model)
-        assertTrue(model.hasAppPin)
-        assertEquals(SafeEntryMethod.DEVICE_LOCK, model.preferredEntryMethod)
+        assertTrue(model.account.hasAppPin)
+        assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
         TalkBackTestSession(compose.activity).use { talkBack ->
             activeAutomation = talkBack.automation
             val manager =
@@ -209,7 +205,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
                 "Status announcements must preserve the current TalkBack focus",
                 talkBack.focused.none { it.contains(cancelled) })
             assertTrue(savedPinMatches(model, "123456"))
-            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.preferredEntryMethod)
+            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
             fill("new_device_pin", "654321")
             fill(
                 "confirm_new_device_pin",
@@ -230,7 +226,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
             waitFor("unlock_pin")
             accessiblePin("654321")
             waitFor("safe_settings")
-            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.preferredEntryMethod)
+            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
             assertTrue(savedPinMatches(model, "654321"))
         }
         activeAutomation = null
@@ -241,41 +237,41 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         val model = setup()
         enableDevice(model)
         try {
-            compose.runOnIdle { model.quickExit() }
+            compose.runOnIdle { model.navigation.quickExit() }
             waitCover()
             driver.shell("locksettings clear --old 246810")
             compose.activityRule.scenario.recreate()
             waitCover()
-            assertFalse(model.phoneHasLock)
-            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.preferredEntryMethod)
-            assertTrue(model.canUseAppPin)
-            compose.runOnIdle { model.interceptSearch("moon garden") }
+            assertFalse(model.account.phoneHasLock)
+            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
+            assertTrue(model.account.canUseAppPin)
+            compose.runOnIdle { model.account.interceptSearch("moon garden") }
             waitFor("unlock_pin")
             enterPin("123456")
             waitFor("safe_settings")
             assertNull(model.deviceLockRequest)
-            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.preferredEntryMethod)
+            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
         } finally {
             driver.shell("locksettings set-pin 246810")
-            compose.runOnIdle { model.refreshDeviceSecurity() }
+            compose.runOnIdle { model.account.refreshDeviceSecurity() }
         }
     }
 
     @Test
     fun removingPhoneLockWithoutBackupNeverCreatesAnAppPinBypass() {
         val model = setup(deviceLock = true)
-        assertFalse(model.hasAppPin)
+        assertFalse(model.account.hasAppPin)
         try {
             driver.shell("locksettings clear --old 246810")
             compose.activityRule.scenario.recreate()
             waitCover()
-            compose.runOnIdle { model.interceptSearch("moon garden") }
+            compose.runOnIdle { model.account.interceptSearch("moon garden") }
             compose.waitUntil(10_000) { model.screen == SessionScreen.Pin }
             compose.onNodeWithTag("pin_digit_1").assertDoesNotExist()
             compose.onNodeWithTag("device_lock_unlock").assertDoesNotExist()
             compose.onNodeWithTag("missing_backup_pin").assertExists()
-            assertFalse(model.canUseAppPin)
-            compose.runOnIdle { model.submitPin("123456") }
+            assertFalse(model.account.canUseAppPin)
+            compose.runOnIdle { model.account.submitPin("123456") }
             assertEquals(SessionScreen.Pin, model.screen)
             assertNull(model.profile)
         } finally {

@@ -1,3 +1,4 @@
+// Safe-app users: prepares images and video before encrypted upload.
 package com.olive.app.data.media
 
 import java.io.Closeable

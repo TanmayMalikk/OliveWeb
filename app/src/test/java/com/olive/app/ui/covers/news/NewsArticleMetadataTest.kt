@@ -1,4 +1,4 @@
-// Tests the news article metadata test behavior.
+// Tests article images and paywall hints in the news cover.
 package com.olive.app.ui.covers.news
 
 import com.olive.app.ui.shared.*
@@ -10,7 +10,6 @@ import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for news article metadata test.
 class NewsArticleMetadataTest {
     private val url = "https://publisher.example/news/article"
 
@@ -32,7 +31,6 @@ class NewsArticleMetadataTest {
     }
 
     @Test
-    // Finds s articles in graphs and accepts image arrays.
     fun findsArticlesInGraphsAndAcceptsImageArrays() {
         val result = parseNewsArticleMetadata(
             """
@@ -79,7 +77,6 @@ class NewsArticleMetadataTest {
     }
 
     @Test
-    // Reads s article open graph without depending on attribute order.
     fun readsArticleOpenGraphWithoutDependingOnAttributeOrder() {
         val result = parseNewsArticleMetadata(
             """
@@ -110,7 +107,6 @@ class NewsArticleMetadataTest {
     }
 
     @Test
-    // Selects s acard sized publisher variant of the actual photo.
     fun selectsACardSizedPublisherVariantOfTheActualPhoto() {
         val result = parseNewsArticleMetadata(
             """

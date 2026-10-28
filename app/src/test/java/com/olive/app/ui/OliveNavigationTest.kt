@@ -1,10 +1,10 @@
-// Tests the olive navigation test behavior.
+// Tests back navigation between cover tabs and food details.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.covers.olive.CoverTab
-import com.olive.app.ui.covers.olive.OliveViewModel
+import com.olive.app.ui.covers.food.CoverTab
+import com.olive.app.ui.covers.food.OliveViewModel
 
 import com.olive.app.data.DemoCatalogRepository
 import org.junit.Assert.assertEquals
@@ -13,7 +13,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for olive navigation test.
 class OliveNavigationTest {
     @Test
     fun backReturnsThroughTabsInVisitOrder() {

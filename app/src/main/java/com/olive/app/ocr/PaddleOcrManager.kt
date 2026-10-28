@@ -1,4 +1,4 @@
-// Contains the paddle OCR manager code for this part of Olive.
+// Users scanning documents: reads text from scanned document images.
 package com.olive.app.ocr
 
 import android.content.Context
@@ -15,7 +15,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-// Groups the data and actions for OCR result.
 data class OcrResult(
     val success: Boolean,
     val extractedText: String,

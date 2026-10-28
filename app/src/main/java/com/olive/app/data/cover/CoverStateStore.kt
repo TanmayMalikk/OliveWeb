@@ -6,7 +6,6 @@ import com.olive.app.security.child
 import org.json.JSONArray
 import org.json.JSONObject
 
-// Groups the data and actions for food cover state.
 data class FoodCoverState(
     val cart: Map<String, Int> = emptyMap(),
     val favorites: Set<String> = emptySet(),
@@ -46,7 +45,6 @@ class CoverStateStore(private val vault: EncryptedVault) {
             })
     }
 
-    // Saves food.
     fun saveFood(uid: String, state: FoodCoverState) {
         vault.update { root ->
             val item = root.child("accounts").child(uid)
@@ -87,7 +85,6 @@ class CoverStateStore(private val vault: EncryptedVault) {
         }
     }
 
-    // Saves news.
     fun saveNews(uid: String, articles: List<NewsArticle>) {
         vault.update { root ->
             root.child("accounts").child(uid).put(

@@ -1,4 +1,4 @@
-// Tests the OCR review policy test behavior.
+// Tests the retake or save choice for low-confidence user scans.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -10,7 +10,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for OCR review policy test.
 class OcrReviewPolicyTest {
     @Test
     fun confidenceBelowSeventyFiveAlwaysOffersLowConfidenceChoice() {

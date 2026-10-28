@@ -1,4 +1,4 @@
-// Tests the onboarding flow test behavior.
+// Tests first entry, profile rules, and role-specific onboarding.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -14,7 +14,6 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 
-// Groups the data and actions for onboarding flow test.
 class OnboardingFlowTest : OliveUiTestBase() {
     @Test
     fun cleanInstallOpensOnboardingOnlyAfterTheOliveIsDoubleTapped() {
@@ -93,7 +92,6 @@ class OnboardingFlowTest : OliveUiTestBase() {
     }
 
     @Test
-    // Runs when boarding needs city but not afull delivery address happens.
     fun onboardingNeedsCityButNotAFullDeliveryAddress() {
         openOnboarding()
         click("new_user")
@@ -134,7 +132,6 @@ class OnboardingFlowTest : OliveUiTestBase() {
     }
 
     @Test
-    // Runs when boarding contacts quick exit and returning user happens.
     fun onboardingContactsQuickExitAndReturningUser() {
         register(username = "returning_user_tester")
         compose.runOnIdle { assertFalse(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }

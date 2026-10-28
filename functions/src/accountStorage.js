@@ -1,6 +1,6 @@
-// Contains the account storage code for this part of Olive.
+// All account roles: stores account profiles and username claims.
 const {HttpsError} = require("firebase-functions/v2/https");
-const {auth, db, bucket, FieldValue} = require("./firebase");
+const {auth, db, bucket, FieldValue} = require("./firebaseAdminClient");
 const {isTemporaryEmail, organizationEmailKey, signInEmail, roleFromUser} = require("./accountPolicy");
 
 async function saveOrganizationLogin(uid, username, role, email) {

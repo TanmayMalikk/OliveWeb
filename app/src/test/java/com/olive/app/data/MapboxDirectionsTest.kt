@@ -1,3 +1,4 @@
+// Tests route results shown to safe contacts navigating to a user.
 package com.olive.app.data
 
 import org.junit.Assert.*

@@ -1,4 +1,4 @@
-// Contains the encrypted vault code for this part of Olive.
+// All signed-in roles: keeps private app data encrypted on the device.
 package com.olive.app.security
 
 import android.content.Context

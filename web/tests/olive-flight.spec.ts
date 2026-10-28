@@ -1,4 +1,4 @@
-// Contains the olive-flight.spec code for this part of Olive.
+// Tests controls and collisions in the olive flight cover game.
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 

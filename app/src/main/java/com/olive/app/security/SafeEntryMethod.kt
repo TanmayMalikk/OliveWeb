@@ -1,7 +1,6 @@
-// Contains the safe entry method code for this part of Olive.
+// All signed-in roles: defines PIN and device-lock entry choices.
 package com.olive.app.security
 
-// Groups the data and actions for safe entry method.
 enum class SafeEntryMethod {
     APP_PIN, DEVICE_LOCK;
 

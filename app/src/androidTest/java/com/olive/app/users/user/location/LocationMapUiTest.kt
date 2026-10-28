@@ -1,4 +1,4 @@
-// Tests the location map UI test behavior.
+// Tests user map controls and location-sharing duration limits.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
@@ -16,7 +16,6 @@ import com.olive.app.ui.users.user.location.ShareDurationDialog
 import org.junit.Test
 import org.junit.Assert.assertEquals
 
-// Groups the data and actions for location map UI test.
 class LocationMapUiTest : OliveUiTestBase() {
     @Test
     fun mapLoadsAndExposesInteractiveControls() {

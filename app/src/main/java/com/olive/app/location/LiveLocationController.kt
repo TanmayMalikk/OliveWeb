@@ -1,4 +1,4 @@
-// Contains the live location controller code for this part of Olive.
+// Users and approved supporters: manages live location actions.
 package com.olive.app.location
 
 import android.content.Context
@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.crypto.SecretKey
 
-// Groups the data and actions for live location state.
 internal object LiveLocationState {
     private val mutable = MutableStateFlow<MapLocationPoint?>(null)
     val current = mutable.asStateFlow()

@@ -1,21 +1,12 @@
-// Contains the advanced matrices code for this part of Olive.
+// Calculator cover users: calculates matrix operations.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.shared.ResourceFailure
 import com.olive.app.R
 
 import org.apache.commons.math3.complex.Complex
 import org.apache.commons.math3.linear.Array2DRowRealMatrix
-import org.apache.commons.math3.linear.LUDecomposition
-import org.apache.commons.math3.linear.MatrixUtils
-import org.apache.commons.math3.stat.StatUtils
-import org.apache.commons.math3.stat.correlation.PearsonsCorrelation
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
-import org.apache.commons.math3.stat.regression.SimpleRegression
-import org.apache.commons.math3.fitting.SimpleCurveFitter
-import org.apache.commons.math3.fitting.WeightedObservedPoint
 import kotlin.math.*
 
 

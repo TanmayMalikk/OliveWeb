@@ -1,6 +1,6 @@
-// Contains the safety consultations code for this part of Olive.
+// Users and support staff: opens and updates safety-plan consultations.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {db} = require("./firebase");
+const {db} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");

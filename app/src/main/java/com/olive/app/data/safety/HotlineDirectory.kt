@@ -1,4 +1,4 @@
-// Contains the hotline directory code for this part of Olive.
+// Safe-app users and support staff: lists support phone numbers for users.
 package com.olive.app.data
 
 import org.json.JSONObject
@@ -6,10 +6,8 @@ import java.net.URI
 import java.text.Normalizer
 import java.util.Locale
 
-// Groups the data and actions for hotline resource kind.
 enum class HotlineResourceKind { Hotline, Shelter }
 
-// Groups the data and actions for hotline resource.
 data class HotlineResource(
     val id: String,
     val region: String,
