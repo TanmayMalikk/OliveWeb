@@ -1,10 +1,7 @@
 // Contains the download code for this part of Olive.
-import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import {
   ArrowLeft,
   ArrowUpRight,
-  Download,
   Smartphone,
   Share,
   PlusSquare,
@@ -13,68 +10,8 @@ import {
 import { Logo, Button, Forward, External } from "../components";
 import { useSession } from "../session";
 import { siteHref } from "../sites";
-// Groups the data and actions for distribution.
-interface Distribution {
-  androidAvailable: boolean;
-  androidUrl: string | null;
-  phoneReady: boolean;
-  androidLabel?: string | null;
-}
-
-function configuredAndroidUrl() {
-  const configured = import.meta.env.VITE_ANDROID_DOWNLOAD_URL?.trim();
-  if (!configured) return null;
-  try {
-    const url = new URL(configured);
-    return url.protocol === "https:" ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function DownloadPage() {
   const { go } = useSession();
-  const publishedAndroidUrl = configuredAndroidUrl();
-  const [info, setInfo] = useState<Distribution | null>(null);
-  const [qr, setQr] = useState("");
-  const [error, setError] = useState("");
-  useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/distribution", { signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error();
-        return res.json();
-      })
-      .then((value: Distribution) => {
-        setInfo(value);
-      })
-      .catch((e) => {
-        if (e.name !== "AbortError" && !publishedAndroidUrl)
-          setError("Download information is unavailable. Try again shortly.");
-      });
-    return () => controller.abort();
-  }, [publishedAndroidUrl]);
-  const androidUrl = publishedAndroidUrl ?? info?.androidUrl ?? null;
-  const androidAvailable = Boolean(
-    publishedAndroidUrl || (info?.androidAvailable && info.androidUrl),
-  );
-  useEffect(() => {
-    if (!androidUrl) {
-      setQr("");
-      return;
-    }
-    let active = true;
-    void QRCode.toDataURL(androidUrl, {
-      width: 280,
-      margin: 2,
-      color: { dark: "#30432b", light: "#ffffff" },
-    }).then((value) => {
-      if (active) setQr(value);
-    });
-    return () => {
-      active = false;
-    };
-  }, [androidUrl]);
   return (
     <div className="page-width download-page">
       <header className="site-header">
@@ -107,55 +44,15 @@ export default function DownloadPage() {
         <div className="download-grid">
           <section className="install-card">
             <div className="install-icon">
-              <Download size={30} />
+              <Smartphone size={30} />
             </div>
             <span className="eyebrow">FOR ANDROID</span>
-            <h2>Your everyday, in an app.</h2>
-            {info?.androidLabel && (
-              <p className="help-note">{info.androidLabel}</p>
-            )}
+            <h2>Test from Android Studio.</h2>
             <p>
-              Scan the code with your Android camera to download the newest
-              signed app, then open the APK to install it. Android may ask you
-              to allow installation from your browser.
+              For now, connect your Android phone to your computer, select it
+              in Android Studio, and press Run to install the app. There is no
+              Android download on this website.
             </p>
-            <div className="qr-area">
-              {qr ? (
-                <>
-                  <img
-                    src={qr}
-                    width="240"
-                    height="240"
-                    alt="QR code linking to the Android APK download"
-                  />
-                  <small>Scan with your Android phone’s camera.</small>
-                </>
-              ) : (
-                <div className="qr-placeholder">
-                  <Smartphone size={40} />
-                  <span>
-                    {androidAvailable
-                      ? "A phone-accessible QR link is not configured yet."
-                      : "The Android download is not available in this local preview yet."}
-                  </span>
-                </div>
-              )}
-            </div>
-            {androidAvailable && androidUrl ? (
-              <a className="button" href={androidUrl}>
-                <Download size={17} /> Download Android APK
-              </a>
-            ) : (
-              <Button disabled>Android download unavailable</Button>
-            )}
-            {!publishedAndroidUrl &&
-              info?.androidAvailable &&
-              !info.phoneReady && (
-                <p className="help-note">
-                  You can download on this computer. A phone cannot use this
-                  computer’s localhost address.
-                </p>
-              )}
           </section>
           <section className="install-card">
             <div className="install-icon">
@@ -220,11 +117,6 @@ export default function DownloadPage() {
             </External>
           </section>
         </div>
-        {error && (
-          <p role="alert" className="form-error">
-            {error}
-          </p>
-        )}
         <div className="download-account panel">
           <div>
             <span className="eyebrow">NEW HERE?</span>

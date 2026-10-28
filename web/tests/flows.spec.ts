@@ -356,7 +356,7 @@ test("news reader sanitizes publisher HTML and bookmarks stay available", async 
     /javascript:/,
   );
 });
-test("PWA manifests use cover-specific identities and download page does not fabricate an APK or QR", async ({
+test("PWA manifests use cover-specific identities and the download page gives Android Studio instructions", async ({
   page,
   request,
 }) => {
@@ -373,17 +373,11 @@ test("PWA manifests use cover-specific identities and download page does not fab
   await expect(
     page.getByRole("button", { name: "Begin onboarding" }),
   ).toBeVisible();
-  const info = await (await request.get("/api/distribution")).json();
-  if (!info.androidAvailable) {
-    await expect(
-      page.getByRole("button", { name: "Android download unavailable" }),
-    ).toBeDisabled();
-    await expect(
-      page.getByRole("img", {
-        name: "QR code linking to the Android APK download",
-      }),
-    ).toHaveCount(0);
-  }
+  await expect(
+    page.getByRole("heading", { name: "Test from Android Studio." }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /Download Android APK/i })).toHaveCount(0);
+  expect((await request.get("/download/android")).status()).toBe(410);
 });
 for (const size of [
   { width: 390, height: 844 },
