@@ -45,7 +45,8 @@ exports.adminDeleteAccount = onCall(async (request) => {
     const plan = {...snapshot.data(), adminUid: "", adminName: ""};
     await snapshot.ref.update({adminUid: "", adminName: ""});
     if (plan.staffUid) await saveSupportConversation(
-        {...plan, supportOrigin: PLAN_CONSULT}, plan.supportSafeContactUid || "");
+        {...plan, conversationId: plan.consultationConversationId, supportOrigin: PLAN_CONSULT},
+        plan.supportSafeContactUid || "");
   }
   await db.collection("safetyStaff").doc(uid).delete();
   await deleteQuery(db.collection("friendRequests").where("senderUid", "==", uid));

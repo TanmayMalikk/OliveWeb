@@ -43,13 +43,19 @@ import com.olive.app.data.*
 internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = null) {
     val active = session.messages.activeConversation
     val currentUid = session.coverAccountId.orEmpty()
+    // Keep the chosen list visible while a phone opens a chat and returns from it.
+    var showingArchived by rememberSaveable { mutableStateOf(false) }
     val chatExit = exit.takeUnless {
         session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
-            MessagingSidebar(session, currentUid, portalExit(session, exit), Modifier.width(340.dp).fillMaxHeight())
+            MessagingSidebar(
+                session, currentUid, portalExit(session, exit), showingArchived,
+                onShowingArchivedChange = { showingArchived = it },
+                modifier = Modifier.width(340.dp).fillMaxHeight(),
+            )
             VerticalDivider()
             if (active == null) Box(
                 Modifier.weight(1f).fillMaxHeight(),
@@ -60,7 +66,11 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
                     color = Muted
                 )
             } else ChatPane(session, currentUid, false, chatExit, Modifier.weight(1f).fillMaxHeight())
-        } else if (active == null) MessagingSidebar(session, currentUid, portalExit(session, exit), Modifier.fillMaxSize())
+        } else if (active == null) MessagingSidebar(
+            session, currentUid, portalExit(session, exit), showingArchived,
+            onShowingArchivedChange = { showingArchived = it },
+            modifier = Modifier.fillMaxSize(),
+        )
         else {
             BackHandler { session.messages.closeConversation() }
             ChatPane(session, currentUid, true, chatExit, Modifier.fillMaxSize())
@@ -77,6 +87,8 @@ private fun MessagingSidebar(
     session: SessionViewModel,
     currentUid: String,
     exit: (() -> Unit)?,
+    showingArchived: Boolean,
+    onShowingArchivedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiText = rememberResourceText()
@@ -85,7 +97,6 @@ private fun MessagingSidebar(
     val roleConversations = if (organizationAccount) session.messages.conversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
     } else session.messages.conversations
-    var showingArchived by rememberSaveable { mutableStateOf(false) }
     val shownConversations = roleConversations.filter {
         (it.closedAt > 0L || it.id in session.messages.archivedConversationIds) == showingArchived
     }
@@ -269,7 +280,7 @@ private fun MessagingSidebar(
         }
         item {
             OutlinedButton(
-                onClick = { showingArchived = !showingArchived },
+                onClick = { onShowingArchivedChange(!showingArchived) },
                 modifier = Modifier.fillMaxWidth().testTag("archived_chats"),
             ) {
                 Text(

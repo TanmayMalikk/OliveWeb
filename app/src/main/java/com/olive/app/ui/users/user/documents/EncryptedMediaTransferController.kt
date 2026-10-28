@@ -217,7 +217,8 @@ internal class MediaTransferController(
     fun retry(jobId:String) {
         val job=store.get(jobId) ?: return
         store.write(job.copy(status=MediaTransferStatus.QUEUED,error=null))
-        MediaUploadWorker.enqueue(applicationContext,jobId)
+        // A manual retry replaces a worker that may still be waiting in exponential backoff.
+        MediaUploadWorker.enqueue(applicationContext,jobId,replaceDelayedWork=true)
         observe(jobId)
         state = MediaTransferState.Queued(jobId)
     }

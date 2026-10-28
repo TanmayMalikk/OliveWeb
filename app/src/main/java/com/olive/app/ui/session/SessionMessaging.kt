@@ -160,8 +160,8 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                                     } else if (active.participantIds != updated.participantIds) {
                                         messageSubscription?.close()
                                         messageSubscription = null
-                                        activeConversation = null
-                                        conversationActions.openConversation(updated)
+                                        activeConversation = updated
+                                        conversationActions.openConversation(updated, preserveMessages = true)
                                     } else {
                                         activeConversation = updated
                                         conversationActions.markConversationRead(updated)
