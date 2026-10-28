@@ -1,7 +1,5 @@
 import express from "express";
 import { news, article } from "./news.mjs";
-import { existsSync, statSync } from "node:fs";
-import { resolve } from "node:path";
 import siteConfig from "../site.config.json" with { type: "json" };
 export function createServerApp({ development = false } = {}) {
   const app = express();
@@ -22,49 +20,9 @@ export function createServerApp({ development = false } = {}) {
     next();
   });
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
-  const apk = () => {
-    const configured = process.env.ANDROID_APK_PATH;
-    return configured &&
-      configured.toLowerCase().endsWith(".apk") &&
-      existsSync(configured) &&
-      statSync(configured).isFile()
-      ? resolve(configured)
-      : null;
-  };
-  app.get("/api/distribution", (_req, res) => {
-    let origin = null;
-    try {
-      const parsed = new URL(process.env.PUBLIC_ORIGIN ?? "");
-      if (
-        ["https:", "http:"].includes(parsed.protocol) &&
-        !parsed.username &&
-        !parsed.password
-      )
-        origin = parsed.origin;
-    } catch {}
-    const phoneReady = Boolean(
-      origin &&
-      !["localhost", "127.0.0.1", "[::1]"].includes(new URL(origin).hostname),
-    );
-    res.json({
-      androidAvailable: Boolean(apk()),
-      androidUrl: origin && apk() ? `${origin}/download/android` : null,
-      phoneReady,
-      androidLabel: process.env.ANDROID_APK_LABEL ?? null,
-    });
-  });
-  app.get("/download/android", (_req, res) => {
-    const path = apk();
-    if (!path)
-      return res
-        .status(404)
-        .type("text/plain")
-        .send(
-          "The Android APK has not been configured for this local preview.",
-        );
-    res.type("application/vnd.android.package-archive");
-    res.download(path, "olive-branch.apk");
-  });
+  app.get("/download/android", (_req, res) =>
+    res.status(410).type("text/plain").send("Android downloads are unavailable. Install from Android Studio."),
+  );
   app.get(
     [
       "/manifest.webmanifest",
