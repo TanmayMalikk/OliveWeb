@@ -32,7 +32,7 @@ const secretAccessKey=defineSecret("R2_SECRET_ACCESS_KEY");
 const bucketName=defineSecret("R2_BUCKET_NAME");
 const secrets=[accountId,accessKeyId,secretAccessKey,bucketName];
 // App Check plus Firebase Auth protects every exported media callable.
-const options={secrets,enforceAppCheck:true};
+const options={secrets,enforceAppCheck:true,invoker:"public"};
 
 // Small ciphertext is cheaper/faster as one PUT. Larger ciphertext uses resumable 8 MiB parts.
 const maxBytes=250*1024*1024;
