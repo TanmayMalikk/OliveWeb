@@ -18,6 +18,7 @@ class MumbleHandler {
         return call;
     }
 
+
     getCall (callId){
         return this.calls.get(callId);
     }
@@ -29,7 +30,7 @@ class MumbleHandler {
     async closeCall(callId){
         const call = this.getCall(callId);
         if (!call){return false};
-        await this.mumbleServer.removeChannel(call.channelId); //mumbleserver.removeChannel not implemented yet, undefined behaviour.
+        await this.mumbleServer.removeChannel(call.channelId);
         this.calls.delete(callId);
         return true;
     }
