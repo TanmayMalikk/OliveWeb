@@ -13,17 +13,20 @@ import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
 
-// Drive the actual Android prompt and Keystore operation on the disposable emulator.
+// Drive the actual Android prompt and Keystore operation on a prepared disposable emulator.
 internal class DeviceCredentialTestDriver(
     private val compose: ComposeTestRule,
     private val automation: UiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
 ) {
-    fun ensurePhonePin() {
+    fun requirePreparedEmulator() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val keyguard = context.getSystemService(KeyguardManager::class.java)
-        if (keyguard.isDeviceSecure) return
-        shell("locksettings set-pin 246810")
-        compose.waitUntil(10_000) { keyguard.isDeviceSecure }
+        val emulator = shellOutput("getprop ro.kernel.qemu").trim() == "1"
+        assertTrue("Device-lock tests may only run on a disposable emulator.", emulator)
+        assertTrue(
+            "Prepare the emulator with test PIN 246810 before running device-lock tests.",
+            keyguard.isDeviceSecure
+        )
     }
 
     fun confirmPhonePin() {
@@ -90,7 +93,13 @@ internal class DeviceCredentialTestDriver(
     }
 
     fun shell(command: String) {
+        shellOutput(command)
+    }
+
+    private fun shellOutput(command: String): String {
         val fd = automation.executeShellCommand(command)
-        ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes() }
+        return ParcelFileDescriptor.AutoCloseInputStream(fd).use {
+            it.readBytes().toString(Charsets.UTF_8)
+        }
     }
 }
