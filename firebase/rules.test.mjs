@@ -273,9 +273,9 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
 
 test('support conversations allow one user, safe contact, staff member, and admin', async () => {
   const owner=env.authenticatedContext('support-owner',{email:'support_owner@users.olive.invalid'}).firestore();
-  const staff=env.authenticatedContext('support-staff',{email:'support_staff@staff.olive.invalid'}).firestore();
+  const staff=env.authenticatedContext('support-staff',{email:'staff@example.ca',role:'STAFF'}).firestore();
   const contact=env.authenticatedContext('support-contact',{email:'support_contact@safe.olive.invalid'}).firestore();
-  const admin=env.authenticatedContext('support-admin',{email:'support_admin@admin.olive.invalid'}).firestore();
+  const admin=env.authenticatedContext('support-admin',{email:'admin@example.ca',role:'ADMIN'}).firestore();
   const stranger=env.authenticatedContext('support-stranger',{email:'support_stranger@users.olive.invalid'}).firestore();
   const directory=[
     [owner,'support_owner','support-owner','owner-key'],
@@ -291,7 +291,7 @@ test('support conversations allow one user, safe contact, staff member, and admi
     senderUid:'support-staff',senderUsername:'support_staff',recipientUid:'support-owner',
     recipientUsername:'support_owner',friendshipId:'support-staff--support-owner',createdAt:serverTimestamp(),
   }));
-  const conversationId='support-support-owner';
+  const conversationId='support-support-owner-ticket-1';
   const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',adminUid:'support-admin',
     supportOrigin:'SUPPORT',supportTag:'NEEDS_ADMIN',
     friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-admin'],
@@ -318,7 +318,7 @@ test('support conversations allow one user, safe contact, staff member, and admi
     {senderUid:'support-staff',senderUsername:'support_staff',ciphertext:'encrypted-support-message',
       deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
   for (const [client,uid,username] of [[staff,'support-staff','support_staff'],
-    [owner,'support-owner','support_owner']]) {
+    [owner,'support-owner','support_owner'],[admin,'support-admin','support_admin']]) {
     const batch=writeBatch(client);
     const messageId=`batch-${uid}`;
     batch.set(doc(client,`conversations/${conversationId}/messages/${messageId}`),

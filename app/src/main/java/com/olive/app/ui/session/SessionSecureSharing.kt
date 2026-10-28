@@ -26,22 +26,29 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             val device = enrollment ?: error("No active account")
             val repository = messagingRepository ?: error("Messaging unavailable")
             val secure = secureChatRepository ?: error("Secure messaging unavailable")
-            val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
-                val username = conversation.participantUsernames[uid]
-                    ?: error("Conversation participant unavailable")
-                repository.searchUsers(username, device.uid).firstOrNull()
-                    ?: error("Every participant needs to open the updated app before secure messages can be sent.")
-            }
-            require(peers.all { it.publicKey.isNotBlank() }) {
-                "Every participant needs to open the updated app before secure messages can be sent."
-            }
-            val keys: Map<String, PublicKey> = withContext(Dispatchers.Default) {
-                buildMap {
-                    put(device.uid, KeyManager.getOrCreatePublicKey())
-                    peers.forEach { put(it.uid, KeyManager.decodePublicKey(it.publicKey)) }
+            try {
+                val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
+                    val username = conversation.participantUsernames[uid]
+                        ?: error("Conversation participant unavailable")
+                    repository.searchUsers(username, device.uid).firstOrNull()
+                        ?: error("Every participant needs to open the updated app before secure messages can be sent.")
                 }
+                require(peers.all { it.publicKey.isNotBlank() }) {
+                    "Every participant needs to open the updated app before secure messages can be sent."
+                }
+                val keys: Map<String, PublicKey> = withContext(Dispatchers.Default) {
+                    buildMap {
+                        put(device.uid, KeyManager.getOrCreatePublicKey())
+                        peers.forEach { put(it.uid, KeyManager.decodePublicKey(it.publicKey)) }
+                    }
+                }
+                return secure.ensureRoomKey(conversation, device.uid, keys)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (keySharingFailure: Exception) {
+                // Existing members can still read history while a newly added member finishes key setup.
+                return secure.existingRoomKey(conversation.id, device.uid) ?: throw keySharingFailure
             }
-            return secure.ensureRoomKey(conversation, device.uid, keys)
         }
     }
 

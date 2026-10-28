@@ -18,7 +18,7 @@ import kotlinx.coroutines.CancellationException
 
 // Owns conversation selection, messages and read markers.
 internal class SessionConversations(private val runtime: SessionRuntime) {
-    fun openConversation(conversation: ChatConversation) {
+    fun openConversation(conversation: ChatConversation, preserveMessages: Boolean = false) {
         with(runtime) {
             with(state) {
                 if (!((screen == SessionScreen.Safe && page == SafePage.Messages) ||
@@ -26,7 +26,8 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 val uid = enrollment?.uid ?: return
                 if (uid !in conversation.participantIds) return
                 messageSubscription?.close()
-                chatMessages = emptyList()
+                val sameConversation = activeConversation?.id == conversation.id
+                if (!preserveMessages || !sameConversation) chatMessages = emptyList()
                 activeConversation =
                     conversation
                 message = null

@@ -36,11 +36,12 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
         transaction.delete(reference);
       });
     } else await reference.delete();
-    await closeSupportConversation(caller.uid, SUPPORT);
+    await closeSupportConversation(current?.conversationId || "");
     return {ticket: {ownerUid: caller.uid, requested: false, staffUid: "", conversationId: ""}};
   }
 
   const staffCandidates = await candidates();
+  const newConversationId = supportConversationId(caller.uid, SUPPORT);
   const ticket = await db.runTransaction(async transaction => {
     const current = (await transaction.get(reference)).data();
     if (current?.requested && current.staffUid) return current;
@@ -59,11 +60,11 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
       ownerUid: caller.uid, ownerName: caller.name, requested: true,
       staffUid: selected?.uid || "", staffName: selected?.name || "",
       adminUid: "", adminName: "", supportOrigin: SUPPORT,
-      conversationId: supportConversationId(caller.uid, SUPPORT), updatedAt: Date.now(),
+      conversationId: newConversationId, updatedAt: Date.now(),
     };
     transaction.set(reference, created);
     return created;
   });
-  if (ticket.staffUid) await saveSupportConversation(ticket, "", true);
+  if (ticket.staffUid) await saveSupportConversation(ticket, "", false);
   return {ticket};
 });

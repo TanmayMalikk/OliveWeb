@@ -1,6 +1,8 @@
 // Users and approved viewers: requests encrypted media upload and download access.
 package com.olive.app.data.media
 
+import com.google.firebase.appcheck.FirebaseAppCheck
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
 import kotlinx.coroutines.tasks.await
@@ -43,6 +45,8 @@ interface MediaTicketDataSource {
  */
 class MediaRepository(
     private val functions:FirebaseFunctions=FirebaseFunctions.getInstance("northamerica-northeast1"),
+    private val auth:FirebaseAuth=FirebaseAuth.getInstance(),
+    private val appCheck:FirebaseAppCheck=FirebaseAppCheck.getInstance(),
 ):MediaTicketDataSource {
     override suspend fun createUpload(job:MediaUploadJob):MediaUploadSession {
         // Only ciphertext facts and already-encrypted metadata cross the Firebase boundary.
@@ -85,8 +89,15 @@ class MediaRepository(
 
     override suspend fun deleteMedia(mediaId:String) { call("mediaDelete",mapOf("mediaId" to mediaId)) }
 
-    private suspend fun call(name:String,data:Map<String,Any>):Map<*,*> =
-        functions.getHttpsCallable(name).call(data).await().data as? Map<*,*> ?: error("Invalid $name response")
+    private suspend fun call(name:String,data:Map<String,Any>):Map<*,*> {
+        // WorkManager can start before the SDK has restored its cached tokens. Waiting here makes
+        // sure the callable receives both the signed-in account and the required App Check proof.
+        val user=auth.currentUser ?: error("Sign in again before uploading files")
+        user.getIdToken(false).await()
+        appCheck.getAppCheckToken(false).await()
+        return functions.getHttpsCallable(name).call(data).await().data as? Map<*,*>
+            ?: error("Invalid $name response")
+    }
 
     private fun validateUrl(value:String):String {
         // Signed URLs are bearer capabilities. Reject credentials, plaintext HTTP, and foreign hosts.

@@ -2,6 +2,7 @@
 package com.olive.app.data.media
 
 import android.content.Context
+import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -87,12 +88,16 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             Result.success(workDataOf(MEDIA_ID to record.id))
         } catch(cancelled:CancellationException) { throw cancelled }
         catch(error:FirebaseFunctionsException) {
+            Log.e("OliveMediaUpload", "Firebase rejected encrypted upload ${job.id}", error)
             if(error.code in setOf(FirebaseFunctionsException.Code.INVALID_ARGUMENT,FirebaseFunctionsException.Code.PERMISSION_DENIED,
                     FirebaseFunctionsException.Code.UNAUTHENTICATED,
                     FirebaseFunctionsException.Code.NOT_FOUND, FirebaseFunctionsException.Code.FAILED_PRECONDITION))
                 permanent(job,error.localizedMessage ?: "Media upload was rejected")
             else retry(job,error)
-        } catch(error:Exception) { retry(job,error) }
+        } catch(error:Exception) {
+            Log.e("OliveMediaUpload", "Encrypted upload ${job.id} will retry", error)
+            retry(job,error)
+        }
     }
 
     private suspend fun upload(file:File,initial:MediaUploadJob):List<MediaCompletedPart> {
@@ -156,11 +161,12 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
          * Schedules one network-constrained worker per job. KEEP prevents repeated UI taps from
          * creating concurrent writers for the same multipart session.
          */
-        fun enqueue(context:Context,jobId:String) {
+        fun enqueue(context:Context,jobId:String,replaceDelayedWork:Boolean=false) {
             val request=OneTimeWorkRequestBuilder<MediaUploadWorker>().setInputData(workDataOf(JOB_ID to jobId))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).build()
-            WorkManager.getInstance(context).enqueueUniqueWork(workName(jobId),ExistingWorkPolicy.KEEP,request)
+            val policy=if(replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
+            WorkManager.getInstance(context).enqueueUniqueWork(workName(jobId),policy,request)
         }
     }
 }
