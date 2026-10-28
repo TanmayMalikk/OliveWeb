@@ -153,7 +153,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
     @Test
     fun deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        DeviceCredentialTestDriver(compose).ensurePhonePin()
+        DeviceCredentialTestDriver(compose).requirePreparedEmulator()
         assertTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
         entrySetup()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
@@ -215,7 +215,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
     @Test
     fun deviceLockEnrollmentAndEveryReentryRequireAndroidAuthentication() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        DeviceCredentialTestDriver(compose).ensurePhonePin()
+        DeviceCredentialTestDriver(compose).requirePreparedEmulator()
         assertTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
         entrySetup()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
