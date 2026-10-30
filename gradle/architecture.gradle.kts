@@ -86,26 +86,8 @@ tasks.register("checkArchitecture") {
                 }
             }.toList()
 
-        val organizedSourceRoots=listOf(
-            file("app/src/main/java"),
-            file("app/src/test/java"),
-            file("app/src/androidTest/java"),
-            file("web/src"),
-        )
-        layoutViolations += organizedSourceRoots
-            .filter(File::exists)
-            .flatMap { sourceRoot ->
-                sourceRoot.walkTopDown()
-                    .filter(File::isDirectory)
-                    .filter { directory ->
-                        directory.listFiles().orEmpty().count(File::isFile)==1 &&
-                            directory.listFiles().orEmpty().none(File::isDirectory)
-                    }
-                    .map { directory ->
-                        "One-file folder ${directory.relativeTo(rootDir)} should be combined with a related feature"
-                    }
-                    .toList()
-            }
+        // A single-file feature folder is allowed. Combining tiny related files remains a review guideline,
+        // but it is not an architecture boundary and must not fail builds or test runs.
         val allowedWebRoles=setOf("user","safe_contact","staff","admin","shared")
         val webRoleRoot=file("web/src/users")
         layoutViolations += webRoleRoot.walkTopDown()

@@ -14,15 +14,20 @@ internal class DeviceCredentialTestDriver(
     private val compose: ComposeTestRule,
     private val automation: UiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
 ) {
-    fun requirePreparedEmulator() {
+    // Prepares only an Android emulator with the known UI-test PIN; physical devices are rejected.
+    fun ensurePhonePin() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val keyguard = context.getSystemService(KeyguardManager::class.java)
         val emulator = shellOutput("getprop ro.kernel.qemu").trim() == "1"
         assertTrue("Device-lock tests may only run on a disposable emulator.", emulator)
-        assertTrue(
-            "Prepare the emulator with test PIN 246810 before running device-lock tests.",
-            keyguard.isDeviceSecure
-        )
+        if (!keyguard.isDeviceSecure) {
+            val result = shellOutput("locksettings set-pin 246810")
+            assertTrue(
+                "Could not configure the disposable emulator PIN: $result",
+                result.contains("Pin set to '246810'")
+            )
+            compose.waitUntil(10_000) { keyguard.isDeviceSecure }
+        }
     }
 
     fun confirmPhonePin() {
