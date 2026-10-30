@@ -1,8 +1,6 @@
 // Signed-in users: controls who can receive shared safety items.
 package com.olive.app.ui.session
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.R
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.ChatConversation

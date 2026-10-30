@@ -1,10 +1,6 @@
 // Tests cover account setup without opening safe-app onboarding.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import androidx.compose.ui.test.*
 
 import org.junit.Assert.*

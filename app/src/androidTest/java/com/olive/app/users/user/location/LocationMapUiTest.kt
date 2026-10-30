@@ -1,10 +1,6 @@
 // Tests user map controls and location-sharing duration limits.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier

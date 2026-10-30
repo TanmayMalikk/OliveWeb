@@ -40,7 +40,6 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import com.olive.app.data.*
 
 // Formats card number.
 private fun formatCardNumber(value: String) =

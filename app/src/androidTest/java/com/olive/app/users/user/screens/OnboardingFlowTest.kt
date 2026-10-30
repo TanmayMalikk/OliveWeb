@@ -1,8 +1,6 @@
 // Tests first entry, profile rules, and role-specific onboarding.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import android.view.WindowManager

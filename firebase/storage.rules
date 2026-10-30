@@ -7,6 +7,12 @@ service firebase.storage {
       return request.auth != null && request.auth.uid == uid;
     }
 
+    // GitHub Actions replaces this debug APK; website visitors can only download it.
+    match /public/android/olive-branch.apk {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Keep this path aligned with FirebaseAccountRepository.profileObject and its tests; each profile belongs to its owner.
     match /accounts/{uid}/profile.json {
       allow read: if owner(uid);

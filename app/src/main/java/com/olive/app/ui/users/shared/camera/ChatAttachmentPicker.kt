@@ -1,8 +1,6 @@
 // All safe-app roles: lets chat participants choose a photo, video, or document.
 package com.olive.app.ui.users.shared.camera
 
-import com.olive.app.ui.shared.*
-
 
 import com.olive.app.ui.users.shared.navigation.*
 

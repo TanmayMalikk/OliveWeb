@@ -1,10 +1,6 @@
 // Safe-app users: manages user location actions.
 package com.olive.app.ui.users.user.location
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 
 import android.content.Context
 import android.location.Location

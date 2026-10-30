@@ -1,8 +1,6 @@
 // Tests news-feed locale queries for Daily Digest cover users.
 package com.olive.app.data
 
-import com.olive.app.ui.shared.*
-
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -10,6 +8,7 @@ class NewsRepositoryTest {
 
     private val repository = GoogleNewsRepository()
 
+    // Inputs: the values shown below. Expected: rss locale query generates correct google news parameters for each language.
     @Test
     fun rssLocaleQueryGeneratesCorrectGoogleNewsParametersForEachLanguage() {
         // Chinese needs both the region and script tag in the news query.

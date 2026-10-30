@@ -1,37 +1,62 @@
 // Safe-app users: shows deleted notes that a user can restore.
 package com.olive.app.ui.users.user.notes
 
-import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.users.shared.navigation.*
-
-
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import com.olive.app.ui.shared.LocalizedIcon as Icon
-import androidx.compose.ui.res.stringResource
-import com.olive.app.R
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.RestoreFromTrash
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
+import com.olive.app.R
+import com.olive.app.data.PRIVATE_ENTRY_TRASH_RETENTION_MS
+import com.olive.app.data.PrivateEntry
+import com.olive.app.data.PrivateEntryKind
+import com.olive.app.data.trashDaysRemaining
+import com.olive.app.data.trashSecondsRemaining
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.oliveScrollbar
+import com.olive.app.ui.shared.rememberResourceText
 import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.milliseconds
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import kotlin.time.Duration.Companion.milliseconds
+import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 
 @Composable

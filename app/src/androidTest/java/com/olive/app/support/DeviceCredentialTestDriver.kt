@@ -1,10 +1,6 @@
 // Drives real Android PIN prompts during safe-app security tests.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.app.UiAutomation
 import android.app.KeyguardManager
 import android.os.ParcelFileDescriptor

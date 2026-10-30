@@ -42,15 +42,15 @@ after(async () => {
   await env?.cleanup();
 });
 
-test("the unpublished Android installer cannot be read or changed by clients", async () => {
+test("the published Android installer is public but cannot be changed by clients", async () => {
   const path = "public/android/olive-branch.apk";
   await env.withSecurityRulesDisabled(async (context) => {
     await uploadString(ref(context.storage(), path), "signed apk");
   });
   const anonymous = env.unauthenticatedContext().storage();
   const signedIn = env.authenticatedContext("alice-uid").storage();
-  await assertFails(getBytes(ref(anonymous, path)));
-  await assertFails(getBytes(ref(signedIn, path)));
+  await assertSucceeds(getBytes(ref(anonymous, path)));
+  await assertSucceeds(getBytes(ref(signedIn, path)));
   await assertFails(uploadString(ref(anonymous, path), "replacement"));
   await assertFails(uploadString(ref(signedIn, path), "replacement"));
   await assertFails(deleteObject(ref(signedIn, path)));

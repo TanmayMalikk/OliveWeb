@@ -18,6 +18,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class EncryptedDownloadIntegrityTest {
+    // Inputs: the values shown below. Expected: accepts ciphertext with exact size and digest.
     @Test
     fun `accepts ciphertext with exact size and digest`() = runBlocking {
         val ciphertext="authenticated ciphertext".toByteArray()
@@ -29,6 +30,7 @@ class EncryptedDownloadIntegrityTest {
         assertArrayEquals(ciphertext,output.toByteArray())
     }
 
+    // Inputs: the values shown below. Expected: rejects truncated ciphertext.
     @Test
     fun `rejects truncated ciphertext`() {
         val ciphertext="short".toByteArray()
@@ -38,6 +40,7 @@ class EncryptedDownloadIntegrityTest {
         } }
     }
 
+    // Inputs: the values shown below. Expected: rejects oversized ciphertext before publishing it.
     @Test
     fun `rejects oversized ciphertext before publishing it`() {
         val ciphertext="too long".toByteArray()
@@ -47,6 +50,7 @@ class EncryptedDownloadIntegrityTest {
         } }
     }
 
+    // Inputs: the values shown below. Expected: rejects same-size corrupted ciphertext.
     @Test
     fun `rejects same-size corrupted ciphertext`() {
         val expected="expected".toByteArray()
@@ -57,6 +61,7 @@ class EncryptedDownloadIntegrityTest {
         } }
     }
 
+    // Inputs: the values shown below. Expected: serializes concurrent opens of the same document.
     @Test
     fun `serializes concurrent opens of the same document`() = runBlocking {
         val gate=DocumentDownloadGate()

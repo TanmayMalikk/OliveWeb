@@ -58,7 +58,8 @@ private data class CapturedMedia(
     val ocrResult: OcrResult? = null
 )
 
-internal fun isLowOcrConfidence(result: OcrResult) = result.confidence < .75f
+internal fun isLowOcrConfidence(result: OcrResult) =
+    !result.success || !result.confidence.isFinite() || result.confidence !in .75f..1f
 
 /** Embedded camera whose temporary media stays inside the app cache until it reaches safe storage. */
 @Composable

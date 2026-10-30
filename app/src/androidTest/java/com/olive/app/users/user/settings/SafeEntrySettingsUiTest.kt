@@ -1,8 +1,6 @@
 // Tests changing PIN and device-lock settings for users.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.ui.test.*
@@ -13,7 +11,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.*
 import com.olive.app.security.*
-import com.olive.app.ui.*
 import org.junit.Assert.*
 import org.junit.Test
 
