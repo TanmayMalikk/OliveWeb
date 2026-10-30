@@ -4,8 +4,8 @@ import { database } from "./LocalDataStore";
 import { readCover, writeCover } from "./CoverStateStore";
 import { toBase64 } from "./EncryptionService";
 import { entryLinkUrl } from "../sites/SiteRouting";
-export const validEntryToken = (token: string) =>
-  /^[A-Za-z0-9_-]{43}$/.test(token);
+import { tokenDigest, validEntryToken } from "./EntryTokenPolicy";
+export { tokenDigest, validEntryToken } from "./EntryTokenPolicy";
 export async function issueEntryLink(uid: string) {
   const token = toBase64(crypto.getRandomValues(new Uint8Array(32)))
     .replaceAll("+", "-")
@@ -25,14 +25,6 @@ export async function issueEntryLink(uid: string) {
   await (await database).put("device", hash, `entry-hash:${uid}`);
   await writeCover(`${uid}:personal-link`, token);
   return entryLinkUrl(token, location.origin);
-}
-export async function tokenDigest(token: string) {
-  return Array.from(
-    new Uint8Array(
-      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)),
-    ),
-    (b) => b.toString(16).padStart(2, "0"),
-  ).join("");
 }
 export async function verifyEntryLink(
   uid: string,

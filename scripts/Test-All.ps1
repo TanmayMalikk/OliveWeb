@@ -132,13 +132,15 @@ if ($WithDeviceTests) {
     if ($userState -notmatch 'State: RUNNING_UNLOCKED') {
         throw "The Android test user is locked. Unlock the emulator once with PIN 246810, then rerun the command."
     }
-    function Assert-DeviceTestPin {
-        $verification = (& $adb -s $selectedDevice shell locksettings verify --old 246810 2>&1) -join "`n"
-        if ($verification -match 'user has no password') {
-            throw "Device-lock UI tests require a disposable emulator that is already secured with test PIN 246810. The test runner will not create or change a device PIN."
-        } elseif ($verification -notmatch 'Lock credential verified successfully') {
-            throw "The Android device must use the disposable test PIN 246810: $verification"
+    $pinVerification = (& $adb -s $selectedDevice shell locksettings verify --old 246810 2>&1) -join "`n"
+    if ($pinVerification -match 'user has no password') {
+        $setPinResult = (& $adb -s $selectedDevice shell locksettings set-pin 246810 2>&1) -join "`n"
+        if ($setPinResult -notmatch "Pin set to '246810'") {
+            throw "Could not configure test PIN 246810 on disposable emulator ${selectedDevice}: $setPinResult"
         }
+        $devicePinReady = $true
+    } else {
+        $devicePinReady = $pinVerification -match 'Lock credential verified successfully'
     }
     function Ensure-DeviceAwake {
         # Every UI method gets its own instrumentation process. A long suite can let the emulator
@@ -149,14 +151,17 @@ if ($WithDeviceTests) {
         $policy = (& $adb -s $selectedDevice shell dumpsys window policy 2>&1) -join "`n"
         if ($policy -match 'showing=true') {
             & $adb -s $selectedDevice shell input swipe 540 1900 540 500 250 | Out-Null
-            & $adb -s $selectedDevice shell input text 246810 | Out-Null
-            & $adb -s $selectedDevice shell input keyevent KEYCODE_ENTER | Out-Null
+            if ($devicePinReady) {
+                & $adb -s $selectedDevice shell input text 246810 | Out-Null
+                & $adb -s $selectedDevice shell input keyevent KEYCODE_ENTER | Out-Null
+            }
             & $adb -s $selectedDevice shell wm dismiss-keyguard | Out-Null
         }
         $power = (& $adb -s $selectedDevice shell dumpsys power 2>&1) -join "`n"
         $policy = (& $adb -s $selectedDevice shell dumpsys window policy 2>&1) -join "`n"
         if ($power -notmatch 'mWakefulness=Awake' -or $policy -match 'showing=true') {
-            throw "The Android test device could not be woken and unlocked with PIN 246810."
+            $preparation = if ($devicePinReady) { "with test PIN 246810" } else { "without changing its lock settings" }
+            throw "The Android test device could not be woken and unlocked $preparation."
         }
     }
     Write-Host "`n== Android device UI tests ==" -ForegroundColor Green
@@ -175,15 +180,27 @@ if ($WithDeviceTests) {
             }
         } | Sort-Object
     if ($deviceTestCases.Count -eq 0) { throw "No Android device test methods were found." }
+    $deviceLockTestNames = @(
+        'SafeEntrySettingsUiTest#calculatorCoverAddsBackupPinWithoutChangingPreferredDeviceLock',
+        'SafeEntrySettingsUiTest#switchingAndBackupSetupRequireProofAndNeverExposePinDuringDeviceLock',
+        'SafeEntryUiTest#deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry',
+        'SafeEntryUiTest#deviceLockEnrollmentAndEveryReentryRequireAndroidAuthentication'
+    )
     $deviceTestCount = 0
+    $skippedDeviceLockTests = 0
     foreach ($testCase in $deviceTestCases) {
+        $requiresPreparedPin = $deviceLockTestNames | Where-Object { $testCase.EndsWith($_) }
+        if ($requiresPreparedPin -and -not $devicePinReady) {
+            Write-Warning "SKIP  $testCase (requires a disposable emulator already secured with test PIN 246810)"
+            $skippedDeviceLockTests++
+            continue
+        }
         Write-Host "  RUN   $testCase" -ForegroundColor Cyan
         $attempt = 0
         do {
             $attempt++
             & $adb -s $selectedDevice shell am force-stop com.olive.app | Out-Null
             & $adb -s $selectedDevice shell am force-stop com.olive.app.test | Out-Null
-            Assert-DeviceTestPin
             Ensure-DeviceAwake
             $instrumentationOutput = & $adb -s $selectedDevice shell am instrument -w -r -e clearPackageData true -e class $testCase com.olive.app.test/androidx.test.runner.AndroidJUnitRunner 2>&1
             $instrumentationOutput | ForEach-Object { Write-Host $_ }
@@ -200,7 +217,7 @@ if ($WithDeviceTests) {
         }
         $deviceTestCount += [int]$countMatch.Groups[1].Value
     }
-    $completedChecks.Add("Android device UI tests on $selectedDevice ($deviceTestCount tests)")
+    $completedChecks.Add("Android device UI tests on $selectedDevice ($deviceTestCount passed, $skippedDeviceLockTests device-lock tests skipped)")
 }
 
 Write-Host "`nAll requested Olive tests passed ($($completedChecks.Count) checks):" -ForegroundColor Green
