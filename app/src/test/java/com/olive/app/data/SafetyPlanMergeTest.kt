@@ -1,8 +1,6 @@
 // Tests offline safety-plan edits and conflict merging for users.
 package com.olive.app.data
 
-import com.olive.app.ui.shared.*
-
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -10,6 +8,7 @@ class SafetyPlanMergeTest {
     private val old =
         SafetyPlan("owner", "owner", mapOf("primary_destination" to SafetyField("Old", 1)))
 
+    // Inputs: the values shown below. Expected: new prompts upgrade only untouched local placeholders.
     @Test
     fun newPromptsUpgradeOnlyUntouchedLocalPlaceholders() {
         val blank = writeSafetyChecklist(emptyList())
@@ -30,6 +29,7 @@ class SafetyPlanMergeTest {
         assertEquals(migrated, safetyFieldsWithDefaults(migrated, defaults))
     }
 
+    // Inputs: the values shown below. Expected: independent remote change is accepted without discarding another pending section.
     @Test
     fun independentRemoteChangeIsAcceptedWithoutDiscardingAnotherPendingSection() {
         val local = old.copy(
@@ -47,6 +47,7 @@ class SafetyPlanMergeTest {
         assertTrue(merged.hasEdits)
     }
 
+    // Inputs: the values shown below. Expected: competing offline edits keep local and remote versions.
     @Test
     fun competingOfflineEditsKeepLocalAndRemoteVersions() {
         val local =
@@ -66,6 +67,7 @@ class SafetyPlanMergeTest {
         assertEquals(2L, merged.conflictRevision)
     }
 
+    // Inputs: the values shown below. Expected: acknowledged edits clear the queue but newer typing survives.
     @Test
     fun acknowledgedEditsClearTheQueueButNewerTypingSurvives() {
         val sent = old.copy(fields = mapOf("primary_destination" to SafetyField("Sent", 1, "sent")))
@@ -81,6 +83,7 @@ class SafetyPlanMergeTest {
         assertNull(merged.conflictRevision)
     }
 
+    // Inputs: the values shown below. Expected: late responses cannot roll back an already merged revision.
     @Test
     fun lateResponsesCannotRollBackAnAlreadyMergedRevision() {
         val current = old.copy(fields = mapOf("primary_destination" to SafetyField("Latest", 3)))
@@ -90,6 +93,7 @@ class SafetyPlanMergeTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: encrypted record serialization keeps empty edits and conflicts.
     @Test
     fun encryptedRecordSerializationKeepsEmptyEditsAndConflicts() {
         val plan = old.copy(

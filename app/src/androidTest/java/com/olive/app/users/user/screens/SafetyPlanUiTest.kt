@@ -1,8 +1,6 @@
 // Tests plan edits, quick exit, and trusted-contact sharing for users.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.ui.test.*
@@ -12,7 +10,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.*
 import com.olive.app.security.InputPolicy
-import com.olive.app.ui.*
 import org.junit.Assert.*
 import org.junit.Test
 

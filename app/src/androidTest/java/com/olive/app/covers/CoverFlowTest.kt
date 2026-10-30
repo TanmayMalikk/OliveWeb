@@ -1,10 +1,6 @@
 // Tests food-cover search, cart removal, and saved dishes.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.*
 import com.olive.app.ui.covers.food.OliveCover

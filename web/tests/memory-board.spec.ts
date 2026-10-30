@@ -1,6 +1,7 @@
 // Tests the olive memory cover game's board and controls.
 import { expect, test } from "@playwright/test";
 
+// Inputs: the values in this case. Expected: all board sizes fit the laptop viewport and contain only complete pairs.
 test("all board sizes fit the laptop viewport and contain only complete pairs", async ({
   page,
 }) => {
@@ -60,6 +61,7 @@ test("all board sizes fit the laptop viewport and contain only complete pairs", 
   }
 });
 
+// Inputs: the values in this case. Expected: changing size cancels pending flips, and odd boards can be completed.
 test("changing size cancels pending flips, and odd boards can be completed", async ({
   page,
 }) => {

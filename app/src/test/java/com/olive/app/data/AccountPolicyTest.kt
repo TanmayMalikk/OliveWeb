@@ -1,8 +1,6 @@
 // Tests role sign-in IDs and required setup steps for users and safe contacts.
 package com.olive.app.data
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.security.InputPolicy
 import org.junit.Assert.*
 import org.junit.Test
@@ -24,6 +22,7 @@ class AccountPolicyTest {
             email = email,
         )
 
+    // Inputs: the values shown below. Expected: every role uses the expected sign in identifier.
     @Test
     fun everyRoleUsesTheExpectedSignInIdentifier() {
         assertEquals(
@@ -49,6 +48,7 @@ class AccountPolicyTest {
         assertEquals("olive_test@users.olive.invalid", AccountPolicy.legacyUserEmail("Olive_Test"))
     }
 
+    // Inputs: the values shown below. Expected: user setup requires profile then private trigger then device pin.
     @Test
     fun userSetupRequiresProfileThenPrivateTriggerThenDevicePin() {
         assertEquals(
@@ -69,6 +69,7 @@ class AccountPolicyTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: safe contacts never need atrigger or pin.
     @Test
     fun safeContactsNeverNeedATriggerOrPin() {
         assertEquals(
@@ -84,6 +85,7 @@ class AccountPolicyTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: staff and admin require areal email but no pin.
     @Test
     fun staffAndAdminRequireARealEmailButNoPin() {
         for (role in listOf(AccountRole.STAFF, AccountRole.ADMIN)) {
@@ -104,6 +106,7 @@ class AccountPolicyTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: profile json keeps organization fields and reads older profiles.
     @Test
     fun profileJsonKeepsOrganizationFieldsAndReadsOlderProfiles() {
         val original =
@@ -117,5 +120,37 @@ class AccountPolicyTest {
         assertEquals("", restored.email)
         assertEquals("", restored.phone)
         assertTrue(InputPolicy.validDob(restored.dob))
+    }
+
+    // Inputs: the values shown below. Expected: sign in identifiers trim case and keep role namespaces separate.
+    @Test
+    fun signInIdentifiersTrimCaseAndKeepRoleNamespacesSeparate() {
+        assertEquals(
+            "staff@example.ca",
+            AccountPolicy.signInEmail("  Staff@Example.CA  ", AccountRole.STAFF),
+        )
+        assertEquals(
+            "same_name@users.olive.invalid",
+            AccountPolicy.signInEmail(" Same_Name ", AccountRole.USER),
+        )
+        assertEquals(
+            "same_name@safe.olive.invalid",
+            AccountPolicy.signInEmail(" Same_Name ", AccountRole.SAFE_CONTACT),
+        )
+    }
+
+    // Inputs: the values shown below. Expected: invalid dates locations and placeholder organization emails require setup.
+    @Test
+    fun invalidDatesLocationsAndPlaceholderOrganizationEmailsRequireSetup() {
+        assertTrue(AccountPolicy.personalProfileNeedsSetup(profile(AccountRole.USER).copy(dob = "not-a-date")))
+        assertTrue(AccountPolicy.personalProfileNeedsSetup(
+            profile(AccountRole.USER).copy(address = DeliveryAddress(city = "x".repeat(161)))
+        ))
+        assertTrue(AccountPolicy.organizationProfileNeedsSetup(
+            profile(AccountRole.ADMIN, email = "ADMIN@ADMIN.OLIVE.INVALID")
+        ))
+        assertTrue(AccountPolicy.organizationProfileNeedsSetup(
+            profile(AccountRole.STAFF, email = "")
+        ))
     }
 }

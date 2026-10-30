@@ -1,10 +1,6 @@
 // Tests restored accounts, chats, notes, covers, and news after restart.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import androidx.test.core.app.ApplicationProvider
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.AccountRole

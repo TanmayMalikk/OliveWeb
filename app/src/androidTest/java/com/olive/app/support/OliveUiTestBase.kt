@@ -1,10 +1,6 @@
 // Starts and resets the app for Android UI tests across user roles.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import androidx.compose.ui.test.*
 import android.content.Intent
 import androidx.compose.ui.test.junit4.v2.AndroidComposeTestRule

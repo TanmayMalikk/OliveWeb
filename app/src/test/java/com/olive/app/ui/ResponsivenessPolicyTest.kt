@@ -17,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ResponsivenessPolicyTest {
+    // Inputs: the values shown below. Expected: talk back traversal policy keeps content before floating actions.
     @Test
     fun talkBackTraversalPolicyKeepsContentBeforeFloatingActions() {
         val expected = listOf(
@@ -29,12 +30,14 @@ class ResponsivenessPolicyTest {
         assertEquals(expected.size, expected.map { it.index }.distinct().size)
     }
 
+    // Inputs: the values shown below. Expected: cover is constructed for the default and configured user routes.
     @Test
     fun coverIsConstructedForTheDefaultAndConfiguredUserRoutes() {
         assertFalse(shouldComposeCover(usesCover = false))
         assertTrue(shouldComposeCover(usesCover = true))
     }
 
+    // Inputs: the values shown below. Expected: messaging directory registration is deduplicated per identity.
     @Test
     fun messagingDirectoryRegistrationIsDeduplicatedPerIdentity() {
         val identity = AccountIdentity("uid-1", "Olive_User")
@@ -53,6 +56,7 @@ class ResponsivenessPolicyTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: calculator history can arrive after the input is already interactive.
     @Test
     fun calculatorHistoryCanArriveAfterTheInputIsAlreadyInteractive() {
         val input = CalculatorInput()

@@ -7,6 +7,18 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $completedChecks = [System.Collections.Generic.List[string]]::new()
+$testReportDirectory = Join-Path $projectRoot "build\reports"
+New-Item -ItemType Directory -Force -Path $testReportDirectory | Out-Null
+Remove-Item -LiteralPath (Join-Path $projectRoot "app\build\test-results\testDebugUnitTest") -Recurse -Force -ErrorAction SilentlyContinue
+@(
+    "current-test-check.txt",
+    "failed-test-check.txt",
+    "completed-test-checks.txt",
+    "web-unit-tests.xml",
+    "web-browser-tests.xml",
+    "functions-tests.xml",
+    "firebase-rules-tests.xml"
+) | ForEach-Object { Remove-Item -LiteralPath (Join-Path $testReportDirectory $_) -Force -ErrorAction SilentlyContinue }
 $androidJava = "C:\Program Files\Android\Android Studio\jbr"
 if (Test-Path -LiteralPath $androidJava) {
     $env:JAVA_HOME = $androidJava
@@ -31,8 +43,12 @@ if ($firebaseJava -and -not (Test-Path -LiteralPath (Join-Path $firebaseJava "bi
 function Invoke-Checked {
     param([string]$Label,[scriptblock]$Command)
     Write-Host "`n== $Label ==" -ForegroundColor Green
+    Set-Content -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Value $Label
     & $Command
-    if ($LASTEXITCODE -ne 0) { throw "$Label failed with exit code $LASTEXITCODE." }
+    if ($LASTEXITCODE -ne 0) {
+        Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value "$Label|$LASTEXITCODE"
+        throw "$Label failed with exit code $LASTEXITCODE."
+    }
     $completedChecks.Add($Label)
 }
 
@@ -189,3 +205,5 @@ if ($WithDeviceTests) {
 
 Write-Host "`nAll requested Olive tests passed ($($completedChecks.Count) checks):" -ForegroundColor Green
 $completedChecks | ForEach-Object { Write-Host "  PASS  $_" -ForegroundColor Green }
+Set-Content -LiteralPath (Join-Path $testReportDirectory "completed-test-checks.txt") -Value $completedChecks
+Remove-Item -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Force -ErrorAction SilentlyContinue

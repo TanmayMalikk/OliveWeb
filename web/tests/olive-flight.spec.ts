@@ -2,6 +2,7 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+// Inputs: the values in this case. Expected: all games and controls fit the available laptop and desktop viewport.
 test("all games and controls fit the available laptop and desktop viewport", async ({
   page,
 }) => {
@@ -92,6 +93,7 @@ test("all games and controls fit the available laptop and desktop viewport", asy
   ).toBe(true);
 });
 
+// Inputs: the values in this case. Expected: Olive Flight supports keyboard flight, pause, collision, restart and returning to Nature Pairs.
 test("Olive Flight supports keyboard flight, pause, collision, restart and returning to Nature Pairs", async ({
   page,
 }) => {
@@ -132,6 +134,7 @@ test("Olive Flight supports keyboard flight, pause, collision, restart and retur
   ).toBeVisible();
 });
 
+// Inputs: the values in this case. Expected: Olive Flight fits phone and desktop widths and accepts touch input.
 test("Olive Flight fits phone and desktop widths and accepts touch input", async ({
   browser,
 }) => {

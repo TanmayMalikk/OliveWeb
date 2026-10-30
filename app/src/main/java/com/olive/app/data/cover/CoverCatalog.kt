@@ -443,6 +443,8 @@ fun filterDishes(dishes: List<Dish>, query: String, category: String): List<Dish
     }
 }
 
-// Adds up cents as integers so money math stays clean and predictable.
+// Adds with Long values first, then caps the displayed Int total so extreme quantities cannot wrap negative.
 fun cartTotal(dishes: List<Dish>, quantities: Map<String, Int>): Int =
-    dishes.sumOf { it.priceCents * (quantities[it.id] ?: 0).coerceAtLeast(0) }
+    dishes.sumOf { dish ->
+        dish.priceCents.toLong() * (quantities[dish.id] ?: 0).coerceAtLeast(0).toLong()
+    }.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()

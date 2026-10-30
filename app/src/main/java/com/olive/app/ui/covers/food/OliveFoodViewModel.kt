@@ -1,8 +1,6 @@
 // Food cover users: holds olive food view state.
 package com.olive.app.ui.covers.food
 
-import com.olive.app.ui.shared.*
-
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue

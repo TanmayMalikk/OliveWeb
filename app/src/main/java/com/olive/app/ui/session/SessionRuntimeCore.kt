@@ -1,8 +1,6 @@
 // Signed-in users: holds the active account and screen state.
 package com.olive.app.ui.session
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import android.app.Application

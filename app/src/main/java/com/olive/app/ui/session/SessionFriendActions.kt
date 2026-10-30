@@ -1,8 +1,6 @@
 // Signed-in users: sends and accepts friend requests.
 package com.olive.app.ui.session
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import com.olive.app.R

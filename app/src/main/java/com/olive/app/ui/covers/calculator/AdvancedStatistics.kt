@@ -1,8 +1,6 @@
 // Calculator cover users: calculates statistics and distributions.
 package com.olive.app.ui.covers.calculator
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.R
 
 import org.apache.commons.math3.linear.Array2DRowRealMatrix

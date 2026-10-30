@@ -1,8 +1,6 @@
 // Tests safe-contact profile storage and older profile defaults.
 package com.olive.app.data
 
-import com.olive.app.ui.shared.*
-
 import org.json.JSONObject
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
@@ -23,6 +21,7 @@ class SafeContactTest {
         contacts = listOf(contact)
     )
 
+    // Inputs: the values shown below. Expected: safe to stay survives profile storage round trip.
     @Test
     fun safeToStaySurvivesProfileStorageRoundTrip() {
         val restored = UserProfile.fromJson(
@@ -40,6 +39,7 @@ class SafeContactTest {
         assertEquals("friend-uid", restored.contacts.single().linkedUid)
     }
 
+    // Inputs: the values shown below. Expected: contacts saved before safe to stay default to false.
     @Test
     fun contactsSavedBeforeSafeToStayDefaultToFalse() {
         val legacy = JSONObject(

@@ -1,24 +1,29 @@
 // Safe-app users: lets users change PIN and device-lock options.
 package com.olive.app.ui.users.user.account
 
-import com.olive.app.ui.shared.*
-
-
-import com.olive.app.ui.users.shared.navigation.*
-
-import com.olive.app.ui.users.shared.auth.AppPinSetup
-import com.olive.app.ui.users.shared.onboarding.*
 
 import android.app.KeyguardManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,11 +34,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.security.InputPolicy
 import com.olive.app.security.SafeEntryMethod
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.ui.users.shared.auth.AppPinSetup
+import com.olive.app.ui.users.shared.navigation.Field
+import com.olive.app.ui.users.shared.navigation.FormColumn
+import com.olive.app.ui.users.shared.navigation.Heading
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import com.olive.app.ui.users.shared.navigation.Status
+import com.olive.app.ui.users.shared.onboarding.OnboardingNavigation
+import com.olive.app.ui.users.shared.onboarding.OnboardingProgress
+import com.olive.app.ui.users.shared.onboarding.RequirementBullet
 
 // The safety answer changes the recommendation, never silently chooses an unlock method.
 @Composable

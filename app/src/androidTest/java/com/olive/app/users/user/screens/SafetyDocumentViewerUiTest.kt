@@ -1,10 +1,6 @@
 // Tests that a user photo opens inside the private document viewer.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.graphics.Bitmap
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.*
