@@ -1,8 +1,6 @@
 // Calculator cover users: handles calculator keys and expressions.
 package com.olive.app.ui.covers.calculator
 
-import com.olive.app.ui.shared.*
-
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue

@@ -16,6 +16,7 @@ web/.env.local
 web/.env.*.local
 web/test-results/
 web/playwright-report/
+test-reports/
 *-debug.log
 .firebase/
 

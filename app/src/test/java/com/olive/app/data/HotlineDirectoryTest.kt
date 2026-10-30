@@ -1,8 +1,6 @@
 // Tests Canadian support numbers and city-based matches for users.
 package com.olive.app.data
 
-import com.olive.app.ui.shared.*
-
 import java.io.File
 import org.junit.Assert.*
 import org.junit.Test
@@ -20,6 +18,7 @@ class HotlineDirectoryTest {
 
     private fun directory() = HotlineDirectory.parseProvinceFiles(files())
 
+    // Inputs: the values shown below. Expected: lars datasets cover every canadian region.
     @Test
     fun larsDatasetsCoverEveryCanadianRegion() {
         val catalog = directory()
@@ -37,6 +36,7 @@ class HotlineDirectoryTest {
         assertEquals(catalog.resources.size, catalog.resources.map { it.id }.distinct().size)
     }
 
+    // Inputs: the values shown below. Expected: city only profiles and localized provinces resolve without gps.
     @Test
     fun cityOnlyProfilesAndLocalizedProvincesResolveWithoutGps() {
         val catalog = directory()
@@ -56,6 +56,7 @@ class HotlineDirectoryTest {
         assertNull(catalog.regionFor(DeliveryAddress(city = "Unknown town")))
     }
 
+    // Inputs: the values shown below. Expected: explicit province wins and postal codes distinguish northern territories.
     @Test
     fun explicitProvinceWinsAndPostalCodesDistinguishNorthernTerritories() {
         val catalog = directory()
@@ -77,6 +78,7 @@ class HotlineDirectoryTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: foreign addresses never receive canadian resources automatically.
     @Test
     fun foreignAddressesNeverReceiveCanadianResourcesAutomatically() {
         val catalog = directory()
@@ -100,6 +102,7 @@ class HotlineDirectoryTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: local province and national results respect service areas.
     @Test
     fun localProvinceAndNationalResultsRespectServiceAreas() {
         val catalog = directory()
@@ -112,6 +115,7 @@ class HotlineDirectoryTest {
         assertEquals(catalog.resources.size, catalog.matching("CA", "").size)
     }
 
+    // Inputs: the values shown below. Expected: searches include names descriptions categories and phone numbers.
     @Test
     fun searchesIncludeNamesDescriptionsCategoriesAndPhoneNumbers() {
         val catalog = directory()
@@ -124,6 +128,7 @@ class HotlineDirectoryTest {
         assertTrue(catalog.matching("AB", "Edmonton", "not-a-real-service").isEmpty())
     }
 
+    // Inputs: the values shown below. Expected: dialer targets strip tracking without changing the number.
     @Test
     fun dialerTargetsStripTrackingWithoutChangingTheNumber() {
         assertEquals("988", hotlineDialNumber("tel:988?oai_link_source=model_response_hotline"))
@@ -133,6 +138,7 @@ class HotlineDirectoryTest {
         assertNull(hotlineDialNumber("intent:988"))
     }
 
+    // Inputs: the values shown below. Expected: unsafe links and invalid phone numbers are rejected.
     @Test
     fun unsafeLinksAndInvalidPhoneNumbersAreRejected() {
         val originals = files()

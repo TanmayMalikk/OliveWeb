@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {hasPlaintextOcr, parseArgs} = require("./scripts/purgePlaintextOcr");
 
+// Inputs: the values in this case. Expected: plaintext OCR detection checks every legacy field without inspecting values.
 test("plaintext OCR detection checks every legacy field without inspecting values", () => {
   assert.equal(hasPlaintextOcr({ocr_text: "private"}), true);
   assert.equal(hasPlaintextOcr({ocr_confidence: 0.8}), true);
@@ -12,6 +13,7 @@ test("plaintext OCR detection checks every legacy field without inspecting value
   assert.equal(hasPlaintextOcr({encrypted_metadata: "ciphertext"}), false);
 });
 
+// Inputs: the values in this case. Expected: purge is dry-run by default and requires explicit matching confirmation.
 test("purge is dry-run by default and requires explicit matching confirmation", () => {
   assert.deepEqual(parseArgs(["--project", "olive-test"]), {projectId: "olive-test", apply: false});
   assert.throws(

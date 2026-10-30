@@ -8,6 +8,7 @@ import org.junit.Test
 import java.util.Locale
 
 class SystemLanguageTest {
+    // Inputs: the values shown below. Expected: supported system languages select their display names.
     @Test
     fun supportedSystemLanguagesSelectTheirDisplayNames() {
         val original = Locale.getDefault()
@@ -24,6 +25,7 @@ class SystemLanguageTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: unsupported system and legacy account languages fall back to english.
     @Test
     fun unsupportedSystemAndLegacyAccountLanguagesFallBackToEnglish() {
         val original = Locale.getDefault()

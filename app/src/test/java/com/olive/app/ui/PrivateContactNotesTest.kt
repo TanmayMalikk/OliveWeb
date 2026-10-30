@@ -10,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PrivateContactNotesTest {
+    // Inputs: the values shown below. Expected: support chats show the user to staff and hide organization names from personal accounts.
     @Test
     fun supportChatsShowTheUserToStaffAndHideOrganizationNamesFromPersonalAccounts() {
         val conversation = ChatConversation(
@@ -47,6 +48,7 @@ class PrivateContactNotesTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: direct chats offer the other participant for private notes.
     @Test
     fun directChatsOfferTheOtherParticipantForPrivateNotes() {
         val conversation = ChatConversation(
@@ -61,6 +63,7 @@ class PrivateContactNotesTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: organization support chats offer only the user who owns the request.
     @Test
     fun organizationSupportChatsOfferOnlyTheUserWhoOwnsTheRequest() {
         val conversation = ChatConversation(
@@ -81,6 +84,7 @@ class PrivateContactNotesTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: personal accounts cannot note people who are not friends.
     @Test
     fun personalAccountsCannotNotePeopleWhoAreNotFriends() {
         val conversation = ChatConversation(

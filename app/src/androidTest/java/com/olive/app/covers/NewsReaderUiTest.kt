@@ -1,10 +1,6 @@
 // Tests article reading, bookmarks, and back navigation in Daily Digest.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.view.View
 import androidx.activity.compose.setContent
 import android.view.ViewGroup

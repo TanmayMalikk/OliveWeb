@@ -29,6 +29,7 @@ class DocumentControllerMediaRoutingTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val scope = CoroutineScope(Dispatchers.Unconfined)
 
+    // Inputs: the values shown below. Expected: shared R2 document uses authenticated media download.
     @Test
     fun `shared R2 document uses authenticated media download`() {
         val document = document(objectKey = "users/owner/media/r2-document")
@@ -52,6 +53,7 @@ class DocumentControllerMediaRoutingTest {
         assertTrue(finished)
     }
 
+    // Inputs: the values shown below. Expected: shared legacy document keeps Firebase Storage compatibility path.
     @Test
     fun `shared legacy document keeps Firebase Storage compatibility path`() {
         val document = document(objectKey = "")

@@ -14,7 +14,6 @@ import androidx.compose.ui.res.stringResource
 import com.olive.app.R
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll

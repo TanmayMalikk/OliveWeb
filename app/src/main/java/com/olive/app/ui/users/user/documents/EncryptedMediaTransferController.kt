@@ -398,7 +398,7 @@ internal class MediaTransferController(
         try {
             client.newCall(builder.build()).execute().use { response ->
                 if(!response.isSuccessful) error("Cloud download failed with HTTP ${response.code}")
-                val body=response.body ?: error("Cloud download was empty")
+                val body=response.body
                 val declaredSize=body.contentLength()
                 require(declaredSize<0 || declaredSize==document.ciphertextSize) {
                     sizeMismatch(document.ciphertextSize,declaredSize)

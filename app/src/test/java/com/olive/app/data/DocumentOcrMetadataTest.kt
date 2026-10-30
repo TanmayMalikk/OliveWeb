@@ -8,6 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DocumentOcrMetadataTest {
+    // Inputs: the values shown below. Expected: encrypted metadata restores ocr only after client decryption.
     @Test
     fun encryptedMetadataRestoresOcrOnlyAfterClientDecryption() {
         val key = EncryptionUtils.generateSymmetricKey()
@@ -27,6 +28,7 @@ class DocumentOcrMetadataTest {
         assertEquals(true, metadata?.successful)
     }
 
+    // Inputs: the values shown below. Expected: incomplete or invalid encrypted ocr fails closed.
     @Test
     fun incompleteOrInvalidEncryptedOcrFailsClosed() {
         assertNull(documentOcrMetadataFrom(null))
@@ -34,6 +36,23 @@ class DocumentOcrMetadataTest {
         assertNull(documentOcrMetadataFrom(JSONObject()
             .put("ocrText", "invalid confidence")
             .put("ocrConfidence", 1.2)
+            .put("ocrSuccessful", true)))
+    }
+
+    // Inputs: the values shown below. Expected: wrong json types non finite confidence and oversized text fail closed.
+    @Test
+    fun wrongJsonTypesNonFiniteConfidenceAndOversizedTextFailClosed() {
+        assertNull(documentOcrMetadataFrom(JSONObject()
+            .put("ocrText", 123)
+            .put("ocrConfidence", 0.8)
+            .put("ocrSuccessful", true)))
+        assertNull(documentOcrMetadataFrom(JSONObject()
+            .put("ocrText", "text")
+            .put("ocrConfidence", "0.8")
+            .put("ocrSuccessful", true)))
+        assertNull(documentOcrMetadataFrom(JSONObject()
+            .put("ocrText", "x".repeat(50_001))
+            .put("ocrConfidence", 0.8)
             .put("ocrSuccessful", true)))
     }
 }

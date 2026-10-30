@@ -3,8 +3,6 @@ package com.olive.app.ui.covers.food
 
 import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.users.shared.navigation.*
-
 import com.olive.app.ui.shared.rememberResourceText
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -25,8 +23,6 @@ import androidx.compose.ui.window.SecureFlagPolicy
 import com.olive.app.data.DeliveryAddress
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
-import androidx.compose.animation.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.foundation.clickable
 import com.olive.app.data.*
 import kotlinx.coroutines.CancellationException

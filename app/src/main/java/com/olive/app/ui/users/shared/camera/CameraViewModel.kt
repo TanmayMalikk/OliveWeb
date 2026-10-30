@@ -1,10 +1,6 @@
 // All safe-app roles: holds camera view state.
 package com.olive.app.ui.users.shared.camera
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 
 import android.app.Application
 import androidx.camera.view.PreviewView
