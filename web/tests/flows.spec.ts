@@ -72,6 +72,27 @@ async function newsFixture(page: Page) {
     }),
   );
 }
+
+// Inputs: numeric username, mismatched password, then corrected credentials. Expected: errors stay inline and valid setup advances.
+test("account creation enforces current credential rules before onboarding", async ({ page }) => {
+  await page.goto("/account/create");
+  const username = page.getByLabel("Username", { exact: true });
+  const passwordField = page.getByLabel("Password", { exact: true });
+  const confirmation = page.getByLabel("Confirm password", { exact: true });
+  const submit = page.getByRole("button", { name: "Create account", exact: true });
+  await username.fill("12345678");
+  await passwordField.fill(password);
+  await confirmation.fill(password);
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("lowercase letters");
+  await username.fill("boundary_user");
+  await confirmation.fill("Different123!");
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("Passwords do not match");
+  await confirmation.fill(password);
+  await submit.click();
+  await expect(page.getByRole("heading", { name: "Choose your familiar." })).toBeVisible();
+});
 // Inputs: the values in this case. Expected: plain domain and guessed private paths show the game, never a private workspace.
 test("plain domain and guessed private paths show the game, never a private workspace", async ({
   page,
