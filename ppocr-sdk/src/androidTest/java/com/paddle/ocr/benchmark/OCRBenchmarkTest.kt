@@ -81,7 +81,7 @@ class OCRBenchmarkTest {
 
         private fun getInstrumentationArgument(key: String): String? {
             val args = InstrumentationRegistry.getArguments()
-            return args[key] as? String
+            return args.getString(key)
         }
 
         private fun saveAndPrint(filename: String, json: JSONObject) {

@@ -1,10 +1,6 @@
 // Tests rotation correction before OCR reads user documents.
 package com.olive.app.ocr
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

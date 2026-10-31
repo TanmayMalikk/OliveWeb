@@ -3,8 +3,6 @@ package com.olive.app.ui.users.shared.safetyplan
 
 import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.users.shared.navigation.*
-
 
 import android.content.Context
 import androidx.compose.foundation.layout.*
@@ -17,9 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
 import com.olive.app.data.Friend
 import com.olive.app.data.SafetyChecklistItem
 import com.olive.app.data.writeSafetyChecklist

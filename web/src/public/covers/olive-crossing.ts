@@ -39,6 +39,10 @@ export interface CrossingWorld {
 
 const wrap = (value: number, length: number) =>
   ((value % length) + length) % length;
+const validRandom = (random: () => number) => {
+  const value = random();
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
+};
 
 // Creates crossing lane.
 export function createCrossingLane(
@@ -47,7 +51,7 @@ export function createCrossingLane(
   forceGrass = false,
   forcedType?: CrossingLane["type"],
 ): CrossingLane {
-  const roll = random();
+  const roll = validRandom(random);
   const type: CrossingLane["type"] = forceGrass
     ? "grass"
     : forcedType
@@ -59,7 +63,7 @@ export function createCrossingLane(
           : roll < 13 / 15
             ? "water"
             : "rail";
-  const direction: 1 | -1 = random() < 0.5 ? 1 : -1;
+  const direction: 1 | -1 = validRandom(random) < 0.5 ? 1 : -1;
   if (type === "grass")
     return {
       id,
@@ -75,10 +79,10 @@ export function createCrossingLane(
       Math.floor(CROSSING.columns / 3),
       Math.floor((CROSSING.columns * 2) / 3),
     ]);
-    let column = Math.floor(random() * 2);
+    let column = Math.floor(validRandom(random) * 2);
     while (column < CROSSING.columns) {
       padColumns.add(column);
-      column += 2 + Math.floor(random() * 2);
+      column += 2 + Math.floor(validRandom(random) * 2);
     }
     const pads = [...padColumns].sort((a, b) => a - b);
     return {
@@ -98,20 +102,20 @@ export function createCrossingLane(
       direction,
       vehicles: [],
       pads: [],
-      spawnIn: 2.4 + random() * 2.4,
+      spawnIn: 2.4 + validRandom(random) * 2.4,
       spawnCount: 0,
     };
-  const vehicleCount = 2 + Math.floor(random() * 3);
-  let cursor = random() * 3 - 1;
+  const vehicleCount = 2 + Math.floor(validRandom(random) * 3);
+  let cursor = validRandom(random) * 3 - 1;
   const vehicles = Array.from({ length: vehicleCount }, (_, index) => {
-    const gap = 2.2 + random() * 4;
-    const kind = random() < 0.45 ? "truck" : "tractor";
+    const gap = 2.2 + validRandom(random) * 4;
+    const kind = validRandom(random) < 0.45 ? "truck" : "tractor";
     const vehicle: CrossingVehicle = {
       id: id * 1000 + index,
       x: wrap(cursor, CROSSING.columns + 2) - 1,
       width: kind === "truck" ? 1.15 : 0.9,
       kind,
-      speed: 0.65 + random() * 1.25,
+      speed: 0.65 + validRandom(random) * 1.25,
     };
     cursor += gap;
     return vehicle;
@@ -122,7 +126,7 @@ export function createCrossingLane(
     direction,
     vehicles,
     pads: [],
-    spawnIn: 0.75 + random() * 2.5,
+    spawnIn: 0.75 + validRandom(random) * 2.5,
     spawnCount: vehicleCount,
   };
 }
@@ -174,6 +178,7 @@ export function moveCrossing(
   random: () => number = Math.random,
 ): CrossingWorld {
   if (world.over) return world;
+  if (!["up", "down", "left", "right"].includes(direction)) return world;
   let playerColumn = world.playerColumn;
   let playerRow = world.playerRow;
   let position = world.position;
@@ -214,7 +219,7 @@ export function advanceCrossing(
   seconds: number,
   random: () => number = Math.random,
 ) {
-  if (world.over || seconds <= 0) return world;
+  if (world.over || !Number.isFinite(seconds) || seconds <= 0) return world;
   const delta = Math.min(seconds, 0.05);
   const lanes = world.lanes.map((lane) => {
     if (lane.type === "grass" || lane.type === "water") return lane;

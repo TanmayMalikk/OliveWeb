@@ -23,7 +23,10 @@ function protectedAccount(user, username) {
 }
 
 function validPassword(value, username) {
-  const password = String(value || "");
+  if (typeof value !== "string" || (username !== undefined && typeof username !== "string")) {
+    return false;
+  }
+  const password = value;
   return (
     PASSWORD.test(password) &&
     (username === undefined ||
@@ -38,7 +41,10 @@ function text(value, max = 2000) {
 }
 
 function normalizedUsername(value) {
-  const username = text(value, 24).toLowerCase();
+  if (typeof value !== "string") {
+    throw new HttpsError("invalid-argument", "Username must be text.");
+  }
+  const username = value.trim().toLowerCase();
   if (!USERNAME.test(username)) {
     throw new HttpsError(
       "invalid-argument",
@@ -49,7 +55,10 @@ function normalizedUsername(value) {
 }
 
 function normalizedExistingUsername(value) {
-  const username = text(value, 24).toLowerCase();
+  if (typeof value !== "string") {
+    throw new HttpsError("invalid-argument", "Username must be text.");
+  }
+  const username = value.trim().toLowerCase();
   if (!EXISTING_USERNAME.test(username)) {
     throw new HttpsError(
       "invalid-argument",
@@ -60,7 +69,10 @@ function normalizedExistingUsername(value) {
 }
 
 function normalizedRole(value) {
-  const role = text(value, 20).toUpperCase();
+  if (typeof value !== "string") {
+    throw new HttpsError("invalid-argument", "Account type must be text.");
+  }
+  const role = value.trim().toUpperCase();
   if (!ROLES.has(role)) {
     throw new HttpsError("invalid-argument", "Choose a valid account type.");
   }
@@ -116,18 +128,18 @@ function isTemporaryEmail(email) {
 }
 
 function profileComplete(role, profile) {
-  if (!profile) {
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
     return false;
   }
-  const hasName = Boolean(text(profile.fullName, 120));
-  const hasDateOfBirth = /^\d{4}-\d{2}-\d{2}$/.test(profile.dob || "");
+  const hasName = typeof profile.fullName === "string" && Boolean(text(profile.fullName, 120));
+  const hasDateOfBirth = typeof profile.dob === "string" && /^\d{4}-\d{2}-\d{2}$/.test(profile.dob);
   if (role === "STAFF" || role === "ADMIN") {
     const hasRealEmail =
-      Boolean(text(profile.email, 254)) && !isTemporaryEmail(profile.email);
+      typeof profile.email === "string" && Boolean(text(profile.email, 254)) && !isTemporaryEmail(profile.email);
     return hasName && hasDateOfBirth && hasRealEmail;
   }
-  const hasLanguage = Boolean(text(profile.language, 60));
-  const hasCity = Boolean(text(profile.address?.city, 160));
+  const hasLanguage = typeof profile.language === "string" && Boolean(text(profile.language, 60));
+  const hasCity = typeof profile.address?.city === "string" && Boolean(text(profile.address.city, 160));
   return hasName && hasDateOfBirth && hasLanguage && hasCity;
 }
 

@@ -1,8 +1,6 @@
 // Cover users: shows the olive game cover and its entry controls.
 package com.olive.app.ui.covers
 
-import com.olive.app.ui.shared.*
-
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -28,7 +26,6 @@ import com.olive.app.R
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
-import com.olive.app.ui.covers.CoverSettingsPage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
 /** A small, usable game cover. The nickname field also accepts the configured safe-entry phrase. */

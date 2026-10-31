@@ -4,11 +4,13 @@ import { calculateTool, safeExpression } from "./AdvancedCalculatorService";
 import tools from "../data/CalculatorTools.json";
 describe("mobile math-tool examples", () => {
   for (const tool of tools)
+    // Inputs: the values in this case. Expected: ${tool.title} accepts its mobile example.
     it(`${tool.title} accepts its mobile example`, () => {
       expect(() =>
         calculateTool(tool.id, tool.example.split(" or ")[0]),
       ).not.toThrow();
     });
+  // Inputs: the values in this case. Expected: computes calculus, matrix, regression and complex results.
   it("computes calculus, matrix, regression and complex results", () => {
     expect(calculateTool("Integral", "x^2 ; 0 ; 3")).toBeCloseTo(9, 7);
     expect(calculateTool("Zero", "x^2-4 ; 0 ; 5")).toBeCloseTo(2, 7);
@@ -18,6 +20,7 @@ describe("mobile math-tool examples", () => {
     ).toMatchObject({ coefficients: expect.any(Array) });
     expect(safeExpression("asin(1)", true).evaluate()).toBeCloseTo(90, 8);
   });
+  // Inputs: the values in this case. Expected: does not expose assignment, property access or function imports.
   it("does not expose assignment, property access or function imports", () => {
     for (const input of ["a=3", "x.constructor", "import(1)", "[1,2]"])
       expect(() => safeExpression(input)).toThrow();

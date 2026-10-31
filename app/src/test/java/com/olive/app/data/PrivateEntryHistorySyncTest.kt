@@ -7,6 +7,7 @@ import org.junit.Test
 
 class PrivateEntryHistorySyncTest {
 
+    // Inputs: the values shown below. Expected: test offline history sync correctly parses PrivateEntry records.
     @Test
     fun `test offline history sync correctly parses PrivateEntry records`() {
         val entry = PrivateEntry(

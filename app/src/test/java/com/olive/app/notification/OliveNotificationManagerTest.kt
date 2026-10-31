@@ -1,8 +1,6 @@
 // Tests discreet notification text and icons for each cover.
 package com.olive.app.notification
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
 import com.olive.app.R
@@ -10,6 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class OliveNotificationManagerTest {
+    // Inputs: the values shown below. Expected: cover types use matching discreet defaults.
     @Test
     fun coverTypesUseMatchingDiscreetDefaults() {
         assertEquals(
@@ -62,6 +61,7 @@ class OliveNotificationManagerTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: supplied cover text is preserved.
     @Test
     fun suppliedCoverTextIsPreserved() {
         assertEquals(
@@ -75,6 +75,7 @@ class OliveNotificationManagerTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: every cover uses its own status icon.
     @Test
     fun everyCoverUsesItsOwnStatusIcon() {
         assertEquals(

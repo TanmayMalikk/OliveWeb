@@ -19,6 +19,7 @@ import {
   triggerHash,
 } from "../services/EncryptionService";
 describe("mobile-compatible contracts", () => {
+  // Inputs: the values in this case. Expected: keeps the existing role-specific authentication aliases.
   it("keeps the existing role-specific authentication aliases", () => {
     expect(signInEmail(" Alice_User ", "USER")).toBe(
       "alice_user@users.olive.invalid",
@@ -28,6 +29,7 @@ describe("mobile-compatible contracts", () => {
     );
     expect(signInEmail("Staff@Example.com", "STAFF")).toBe("staff@example.com");
   });
+  // Inputs: the values in this case. Expected: matches mobile credential limits.
   it("matches mobile credential limits", () => {
     expect(validUsername("short")).toBe(false);
     expect(validUsername("olive_user")).toBe(true);
@@ -36,6 +38,21 @@ describe("mobile-compatible contracts", () => {
     expect(validPin("123456")).toBe(true);
     expect(validPin("1234567")).toBe(false);
   });
+  // Inputs: SQL-like strings in every credential field. Expected: browser validation rejects them as ordinary invalid text.
+  it("rejects injection-like credential values", () => {
+    const injectionText = "' OR 1=1; DROP TABLE users; --";
+    expect(validUsername(injectionText)).toBe(false);
+    expect(validPassword(injectionText)).toBe(false);
+    expect(validPin(injectionText)).toBe(false);
+  });
+  // Inputs: empty strings and strings far beyond field limits. Expected: boundary validation rejects all oversized values.
+  it("rejects empty and oversized browser credentials", () => {
+    expect(validUsername("")).toBe(false);
+    expect(validUsername("a".repeat(100_000))).toBe(false);
+    expect(validPassword(`A1!${"x".repeat(100_000)}`)).toBe(false);
+    expect(validPin("9".repeat(100_000))).toBe(false);
+  });
+  // Inputs: the values in this case. Expected: routes each cover and irreversibly redacts expired trash copies.
   it("routes each cover and irreversibly redacts expired trash copies", () => {
     expect(coverPath("NEWS")).toBe("/daily-digest");
     const entry: Entry = {
@@ -60,11 +77,13 @@ describe("mobile-compatible contracts", () => {
   });
 });
 describe("encrypted browser vault", () => {
+  // Inputs: the values in this case. Expected: uses the mobile trigger normalization.
   it("uses the mobile trigger normalization", async () => {
     expect(await triggerHash(" Moon Garden ")).toBe(
       await triggerHash("moongarden"),
     );
   });
+  // Inputs: the values in this case. Expected: uses randomized ciphertext and rejects changed or wrong-key data.
   it("uses randomized ciphertext and rejects changed or wrong-key data", async () => {
     const raw = crypto.getRandomValues(new Uint8Array(32));
     const key = await importKey(raw);
@@ -80,6 +99,7 @@ describe("encrypted browser vault", () => {
       ),
     ).rejects.toThrow();
   });
+  // Inputs: the values in this case. Expected: requires the correct password or PIN to unwrap an account key.
   it("requires the correct password or PIN to unwrap an account key", async () => {
     const raw = crypto.getRandomValues(new Uint8Array(32));
     const wrapped = await wrapKey("test-pass1!", raw);

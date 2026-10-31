@@ -1,10 +1,6 @@
 // Tests moving map markers and trails without rebuilding the map.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView

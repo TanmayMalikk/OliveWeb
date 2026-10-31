@@ -1,18 +1,27 @@
 // Safe-app users: shows profile details and cover selection.
 package com.olive.app.ui.users.user.account
 
-import com.olive.app.ui.shared.*
 
-
-import com.olive.app.ui.users.shared.navigation.*
-
-import com.olive.app.ui.users.shared.safetyplan.TrustedContactLinkPicker
-
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -20,10 +29,23 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
 import com.olive.app.R
-import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.data.AccountRole
+import com.olive.app.data.SafeContact
+import com.olive.app.data.UserProfile
+import com.olive.app.ui.shared.LightSage
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.localizedTitle
+import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.ui.users.shared.navigation.Field
+import com.olive.app.ui.users.shared.navigation.FormColumn
+import com.olive.app.ui.users.shared.navigation.Heading
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import com.olive.app.ui.users.shared.navigation.Status
+import com.olive.app.ui.users.shared.safetyplan.TrustedContactLinkPicker
 import java.util.UUID
+import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 // UI sizing/text: this back action keeps Material button sizing and localized text rather than a custom fixed size.
 @Composable

@@ -2,6 +2,7 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+// Inputs: the values in this case. Expected: Olive Crossing supports keyboard play, pausing and restarting.
 test("Olive Crossing supports keyboard play, pausing and restarting", async ({
   page,
 }) => {
@@ -50,6 +51,7 @@ test("Olive Crossing supports keyboard play, pausing and restarting", async ({
   await expect(page.getByRole("status")).toContainText("0 lanes cleared");
 });
 
+// Inputs: the values in this case. Expected: Olive Crossing has touch controls and fits a phone.
 test("Olive Crossing has touch controls and fits a phone", async ({
   browser,
 }) => {

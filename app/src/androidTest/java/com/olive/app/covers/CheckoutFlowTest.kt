@@ -1,10 +1,6 @@
 // Tests declined checkout and payment-form clearing in the food cover.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.security.EncryptedVault

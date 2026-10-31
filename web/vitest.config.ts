@@ -4,5 +4,7 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts", "server/**/*.test.mjs"],
     environment: "node",
+    reporters: ["default", "junit"],
+    outputFile: { junit: "../build/reports/web-unit-tests.xml" },
   },
 });

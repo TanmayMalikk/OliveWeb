@@ -1,11 +1,7 @@
 // Calculator cover users: lists advanced calculator operations.
 package com.olive.app.ui.covers.calculator
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.R
-
-import kotlin.math.*
 
 
 // These are the advanced calculator choices. Add a choice here and handle it in calculate() below.

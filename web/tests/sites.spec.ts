@@ -1,6 +1,7 @@
 // Tests domain routing for public visitors and signed-in users.
 import { expect, test } from "@playwright/test";
 
+// Inputs: the values in this case. Expected: short cover URLs and legacy bookmarks open the same cover with the right install identity.
 test("short cover URLs and legacy bookmarks open the same cover with the right install identity", async ({
   page,
   request,

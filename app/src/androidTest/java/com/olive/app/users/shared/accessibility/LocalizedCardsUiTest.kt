@@ -3,8 +3,6 @@ package com.olive.app
 
 import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.content.res.Configuration
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.CompositionLocalProvider
@@ -14,7 +12,6 @@ import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.DemoCatalogRepository
 import com.olive.app.data.NewsArticle
-import com.olive.app.ui.*
 import com.olive.app.ui.covers.news.NewsArticleCard
 import com.olive.app.ui.covers.food.*
 import org.junit.Assert.assertEquals

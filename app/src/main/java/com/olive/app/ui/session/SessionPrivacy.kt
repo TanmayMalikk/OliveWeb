@@ -1,8 +1,6 @@
 // Signed-in users: clears private state when the safe app closes.
 package com.olive.app.ui.session
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import android.os.SystemClock

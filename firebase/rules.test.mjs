@@ -396,3 +396,54 @@ test('web entry hashes are owner-only, cannot be listed, and never accept raw to
   await assertSucceeds(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,tokenHash:'b'.repeat(64)}));
   await assertSucceeds(deleteDoc(doc(alice,'webEntryLinks/entry-alice')));
 });
+
+test('profile field types lengths and coordinate boundaries are enforced', async () => {
+  const owner=env.authenticatedContext('profile-boundary',{email:'profile_bound@users.olive.invalid'}).firestore();
+  const target=doc(owner,'users/profile-boundary');
+  const base={...profile,username:'profile_bound',address:{line1:'',line2:'',city:'Edmonton',province:'AB',postalCode:'',country:'Canada'}};
+  await assertSucceeds(setDoc(target,{...base,address:{...base.address,latitude:90,longitude:180}}));
+  await assertFails(setDoc(target,{...base,address:{...base.address,latitude:90.0001,longitude:0}}));
+  await assertFails(setDoc(target,{...base,address:{...base.address,latitude:0,longitude:-180.0001}}));
+  await assertFails(setDoc(target,{...base,fullName:'x'.repeat(121)}));
+  await assertFails(setDoc(target,{...base,language:7}));
+  await assertFails(setDoc(target,{...base,situation:'x'.repeat(2001)}));
+});
+
+test('directory owners cannot rename or transfer an existing identity', async () => {
+  const alice=env.authenticatedContext('directory-a',{email:'directory_a@users.olive.invalid'}).firestore();
+  const bob=env.authenticatedContext('directory-b',{email:'directory_b@users.olive.invalid'}).firestore();
+  const target=doc(alice,'messageDirectory/directory_a');
+  const row={uid:'directory-a',username:'directory_a',publicKey:'public-key',updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(target,row));
+  await assertFails(updateDoc(target,{uid:'directory-b'}));
+  await assertFails(updateDoc(target,{username:'directory_b'}));
+  await assertFails(updateDoc(target,{publicKey:''}));
+  await assertFails(updateDoc(doc(bob,'messageDirectory/directory_a'),{publicKey:'stolen'}));
+  await assertSucceeds(updateDoc(target,{publicKey:'rotated-key',updatedAt:serverTimestamp()}));
+});
+
+test('entry link hashes rotate only with exact lowercase sha256 data', async () => {
+  const owner=env.authenticatedContext('entry-owner').firestore();
+  const other=env.authenticatedContext('entry-other').firestore();
+  const target=doc(owner,'webEntryLinks/entry-owner');
+  await assertSucceeds(setDoc(target,{tokenHash:'a'.repeat(64),updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(target,{tokenHash:'b'.repeat(64),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(target,{tokenHash:'B'.repeat(64),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(target,{tokenHash:'b'.repeat(63),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(target,{tokenHash:'b'.repeat(64),rawToken:'secret',updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(other,'webEntryLinks/entry-owner'),{tokenHash:'c'.repeat(64),updatedAt:serverTimestamp()}));
+});
+
+test('private entry recipients and wrapped keys must match exactly', async () => {
+  const owner=env.authenticatedContext('private-owner').firestore();
+  const target=doc(owner,'privateEntries/private-entry-boundary');
+  const base={id:'private-entry-boundary',ownerUid:'private-owner',ciphertext:'encrypted',
+    wrappedKeys:{'private-owner':'owner-key'},allowedUsers:['private-owner'],createdAt:1,updatedAt:1};
+  await assertSucceeds(setDoc(target,base));
+  await assertFails(setDoc(doc(owner,'privateEntries/missing-owner'),{...base,id:'missing-owner',allowedUsers:['other'],wrappedKeys:{other:'key'}}));
+  await assertFails(setDoc(doc(owner,'privateEntries/missing-key'),{...base,id:'missing-key',allowedUsers:['private-owner','other']}));
+  await assertFails(setDoc(doc(owner,'privateEntries/extra-key'),{...base,id:'extra-key',wrappedKeys:{'private-owner':'key',other:'extra'}}));
+  const recipients=Array.from({length:26},(_,index)=>`recipient-${index}`);
+  await assertFails(setDoc(doc(owner,'privateEntries/too-many'),{...base,id:'too-many',allowedUsers:['private-owner',...recipients],
+    wrappedKeys:Object.fromEntries(['private-owner',...recipients].map(uid=>[uid,'key']))}));
+});

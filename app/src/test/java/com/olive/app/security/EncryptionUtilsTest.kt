@@ -1,8 +1,6 @@
 // Tests text encryption, decryption, and invalid-key handling.
 package com.olive.app.security
 
-import com.olive.app.ui.shared.*
-
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -10,6 +8,7 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class EncryptionUtilsTest {
+    // Inputs: the values shown below. Expected: test AES text encryption and decryption.
     @Test
     fun `test AES text encryption and decryption`() {
         val originalText = "My safe word is pineapple."
@@ -26,6 +25,7 @@ class EncryptionUtilsTest {
         assertThrows(Exception::class.java) { EncryptionUtils.decryptText(tampered, secretKey) }
     }
 
+    // Inputs: the values shown below. Expected: test binary encryption and decryption.
     @Test
     fun `test binary encryption and decryption`() {
         val originalBytes = byteArrayOf(
@@ -43,6 +43,7 @@ class EncryptionUtilsTest {
         assertArrayEquals(originalBytes, decryptedBytes)
     }
 
+    // Inputs: the values shown below. Expected: test binary encryption uses a unique IV.
     @Test
     fun `test binary encryption uses a unique IV`() {
         val originalBytes = "private media".toByteArray()
@@ -54,6 +55,7 @@ class EncryptionUtilsTest {
         assertNotEquals(firstPayload.toList(), secondPayload.toList())
     }
 
+    // Inputs: the values shown below. Expected: test tampered binary payload fails authentication.
     @Test
     fun `test tampered binary payload fails authentication`() {
         val secretKey = EncryptionUtils.generateSymmetricKey()
@@ -66,6 +68,7 @@ class EncryptionUtilsTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: test truncated binary payload is rejected.
     @Test
     fun `test truncated binary payload is rejected`() {
         val secretKey = EncryptionUtils.generateSymmetricKey()
@@ -75,6 +78,7 @@ class EncryptionUtilsTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: test empty binary payload round trip.
     @Test
     fun `test empty binary payload round trip`() {
         val secretKey = EncryptionUtils.generateSymmetricKey()

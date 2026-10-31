@@ -1,8 +1,6 @@
 // Food cover users: holds olive food view state.
 package com.olive.app.ui.covers.food
 
-import com.olive.app.ui.shared.*
-
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -53,9 +51,12 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         favorites: Set<String>,
         customizations: Map<String, Set<String>>
     ) {
-        this.cart = cart
-        this.favorites = favorites
-        this.customizations = customizations
+        val knownIds = dishes.mapTo(mutableSetOf()) { it.id }
+        this.cart = cart.mapNotNull { (id, amount) ->
+            id.takeIf { it in knownIds && amount > 0 }?.let { it to amount.coerceAtMost(99) }
+        }.toMap()
+        this.favorites = favorites.filterTo(mutableSetOf()) { it in knownIds }
+        this.customizations = customizations.filterKeys { it in knownIds }
     }
 
     var deliveryArea by mutableStateOf("")
@@ -138,7 +139,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
     // Keeps cart quantities sane and removes a dish when its count hits zero.
     fun changeQuantity(id: String, delta: Int) {
         if (dishes.none { it.id == id }) return
-        val quantity = ((cart[id] ?: 0) + delta).coerceIn(0, 99)
+        val quantity = ((cart[id] ?: 0).toLong() + delta.toLong()).coerceIn(0L, 99L).toInt()
         cart = if (quantity == 0) cart - id else cart + (id to quantity)
         if (quantity > 0 && id !in customizations) dishes.firstOrNull { it.id == id }
             ?.let { customizations = customizations + (id to it.ingredients.toSet()) }

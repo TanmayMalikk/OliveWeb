@@ -1,8 +1,6 @@
 // Signed-in users: controls safety-plan access, editing, sharing, and sync.
 package com.olive.app.ui.session
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.runtime.*

@@ -1,13 +1,10 @@
 // Calculator cover users: calculates advanced calculator results.
 package com.olive.app.ui.covers.calculator
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.R
 
 import org.apache.commons.math3.linear.LUDecomposition
 import org.apache.commons.math3.linear.MatrixUtils
-import kotlin.math.*
 
 internal object AdvancedCalculatorEngine {
     fun calculate(
