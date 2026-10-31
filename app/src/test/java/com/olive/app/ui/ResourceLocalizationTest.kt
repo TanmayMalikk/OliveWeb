@@ -1,8 +1,6 @@
 // Tests translated strings, placeholders, and food-menu labels.
 package com.olive.app.ui
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.R
 import com.olive.app.data.DemoCatalogRepository
 import com.olive.app.data.CoverType
@@ -28,6 +26,7 @@ class ResourceLocalizationTest {
                 }
             }.toMap()
 
+    // Inputs: the values shown below. Expected: every referenced string has translations with matching placeholders.
     @Test
     fun everyReferencedStringHasTranslationsWithMatchingPlaceholders() {
         val used =
@@ -50,6 +49,7 @@ class ResourceLocalizationTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: translating menu labels preserves ingredients and cart identity.
     @Test
     fun translatingMenuLabelsPreservesIngredientsAndCartIdentity() {
         val english = testResourceText()
@@ -69,6 +69,7 @@ class ResourceLocalizationTest {
         assertFalse(vm.selectedIngredients(dish).contains(ingredient))
     }
 
+    // Inputs: the values shown below. Expected: notification defaults use resources and preserve supplied content.
     @Test
     fun notificationDefaultsUseResourcesAndPreserveSuppliedContent() {
         val french = testResourceText("values-fr")
@@ -85,6 +86,7 @@ class ResourceLocalizationTest {
         assertEquals("Original content", custom.body)
     }
 
+    // Inputs: the values shown below. Expected: ordinary ui copy does not return to literal text arguments.
     @Test
     fun ordinaryUiCopyDoesNotReturnToLiteralTextArguments() {
         val directEnglish =

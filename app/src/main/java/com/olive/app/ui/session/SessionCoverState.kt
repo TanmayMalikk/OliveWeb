@@ -1,8 +1,6 @@
 // Signed-in users: stores the selected discreet cover.
 package com.olive.app.ui.session
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.R
 
 import com.olive.app.data.*

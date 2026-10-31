@@ -1,8 +1,6 @@
 // Tests article images and paywall hints in the news cover.
 package com.olive.app.ui.covers.news
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.data.NewsArticle
 import com.olive.app.data.fallbackNewsTopic
 import com.olive.app.data.parseNewsArticleMetadata
@@ -13,6 +11,7 @@ import org.junit.Test
 class NewsArticleMetadataTest {
     private val url = "https://publisher.example/news/article"
 
+    // Inputs: the values shown below. Expected: uses the articles image section and explicit paywall flag.
     @Test
     fun usesTheArticlesImageSectionAndExplicitPaywallFlag() {
         val result = parseNewsArticleMetadata(
@@ -30,6 +29,7 @@ class NewsArticleMetadataTest {
         assertEquals("The publisher's article preview.", result.description)
     }
 
+    // Inputs: the values shown below. Expected: finds articles in graphs and accepts image arrays.
     @Test
     fun findsArticlesInGraphsAndAcceptsImageArrays() {
         val result = parseNewsArticleMetadata(
@@ -46,6 +46,7 @@ class NewsArticleMetadataTest {
         assertEquals(false, result.isPaywalled)
     }
 
+    // Inputs: the values shown below. Expected: detects partially paywalled articles.
     @Test
     fun detectsPartiallyPaywalledArticles() {
         val result = parseNewsArticleMetadata(
@@ -57,6 +58,7 @@ class NewsArticleMetadataTest {
         assertEquals(true, result.isPaywalled)
     }
 
+    // Inputs: the values shown below. Expected: subscription footer and missing metadata do not prove apaywall.
     @Test
     fun subscriptionFooterAndMissingMetadataDoNotProveAPaywall() {
         val result = parseNewsArticleMetadata(
@@ -67,6 +69,7 @@ class NewsArticleMetadataTest {
         assertEquals("", result.imageUrl)
     }
 
+    // Inputs: the values shown below. Expected: generic site logos are not used as article images.
     @Test
     fun genericSiteLogosAreNotUsedAsArticleImages() {
         val result = parseNewsArticleMetadata(
@@ -76,6 +79,7 @@ class NewsArticleMetadataTest {
         assertEquals("", result.imageUrl)
     }
 
+    // Inputs: the values shown below. Expected: reads article open graph without depending on attribute order.
     @Test
     fun readsArticleOpenGraphWithoutDependingOnAttributeOrder() {
         val result = parseNewsArticleMetadata(
@@ -91,6 +95,7 @@ class NewsArticleMetadataTest {
         assertEquals(true, result.isPaywalled)
     }
 
+    // Inputs: the values shown below. Expected: rejects local and insecure image references.
     @Test
     fun rejectsLocalAndInsecureImageReferences() {
         listOf(
@@ -106,6 +111,7 @@ class NewsArticleMetadataTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: selects acard sized publisher variant of the actual photo.
     @Test
     fun selectsACardSizedPublisherVariantOfTheActualPhoto() {
         val result = parseNewsArticleMetadata(
@@ -117,6 +123,7 @@ class NewsArticleMetadataTest {
         assertEquals("https://publisher.example/photo.jpg?w=960", result.imageUrl)
     }
 
+    // Inputs: the values shown below. Expected: responsive images do not substitute adifferent photo or crop.
     @Test
     fun responsiveImagesDoNotSubstituteADifferentPhotoOrCrop() {
         val result = parseNewsArticleMetadata(
@@ -130,6 +137,7 @@ class NewsArticleMetadataTest {
         assertEquals("https://publisher.example/proxy?photo=story&crop=wide", result.imageUrl)
     }
 
+    // Inputs: the values shown below. Expected: responsive images handle commas inside image urls and relative paths.
     @Test
     fun responsiveImagesHandleCommasInsideImageUrlsAndRelativePaths() {
         val result = parseNewsArticleMetadata(
@@ -141,6 +149,7 @@ class NewsArticleMetadataTest {
         assertEquals("https://publisher.example/photo.jpg?crop=0,0,100,100&w=800", result.imageUrl)
     }
 
+    // Inputs: the values shown below. Expected: old bookmarks remain compatible and new details round trip.
     @Test
     fun oldBookmarksRemainCompatibleAndNewDetailsRoundTrip() {
         val original = NewsArticle("Title", "Summary", url, "Publisher", "Today")
@@ -158,6 +167,7 @@ class NewsArticleMetadataTest {
         assertNull(NewsArticle.fromJson(original.toJson()).isPaywalled)
     }
 
+    // Inputs: the values shown below. Expected: falls back to broad topics without guessing access status.
     @Test
     fun fallsBackToBroadTopicsWithoutGuessingAccessStatus() {
         assertEquals("Politics", fallbackNewsTopic("Message ahead of separation referendum"))

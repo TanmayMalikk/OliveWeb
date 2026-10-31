@@ -1,10 +1,6 @@
 // Tests photo and video capture in the shared safe-app camera.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.Manifest
 import androidx.compose.ui.test.*
 import androidx.lifecycle.ViewModelProvider

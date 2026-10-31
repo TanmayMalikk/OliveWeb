@@ -1,8 +1,6 @@
 // Tests changing PIN and device-lock settings for users.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.ui.test.*
@@ -13,7 +11,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.*
 import com.olive.app.security.*
-import com.olive.app.ui.*
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -40,7 +37,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
 
     private fun session() = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
     private fun setup(deviceLock: Boolean = false): SessionViewModel {
-        if (deviceLock) driver.requirePreparedEmulator()
+        if (deviceLock) driver.ensurePhonePin()
         openOnboarding()
         val model = session()
         compose.runOnIdle {
@@ -104,7 +101,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     }
 
     private fun enableDevice(model: SessionViewModel, pin: String = "123456") {
-        driver.requirePreparedEmulator()
+        driver.ensurePhonePin()
         settings(model)
         fill("current_device_pin", pin)
         activate("entry_use_device")
@@ -194,6 +191,9 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
             finished(model)
             val cancelled =
                 InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.entry_settings_cancelled)
+            // Android closes its credential window before Compose receives and draws the cancellation result.
+            // Wait for that result instead of racing the system-window transition.
+            waitFor("session_message")
             compose.onNodeWithTag("session_message").assertTextContains(cancelled)
                 .assert(
                     SemanticsMatcher.expectValue(
@@ -230,6 +230,57 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
             assertTrue(savedPinMatches(model, "654321"))
         }
         activeAutomation = null
+    }
+
+    // Inputs: device lock plus a backup app PIN, followed by removing the emulator lock. Expected: the backup PIN still opens the safe app without changing the preferred method.
+    @Test
+    fun backupPinOpensAutomaticallyWhenPhoneScreenLockIsRemoved() {
+        driver.ensurePhonePin()
+        val model = setup()
+        enableDevice(model)
+        try {
+            compose.runOnIdle { model.navigation.quickExit() }
+            waitCover()
+            driver.shell("locksettings clear --old 246810")
+            compose.activityRule.scenario.recreate()
+            waitCover()
+            assertFalse(model.account.phoneHasLock)
+            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
+            assertTrue(model.account.canUseAppPin)
+            compose.runOnIdle { model.account.interceptSearch("moon garden") }
+            waitFor("unlock_pin")
+            enterPin("123456")
+            waitFor("safe_settings")
+            assertNull(model.deviceLockRequest)
+            assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
+        } finally {
+            driver.shell("locksettings set-pin 246810")
+            compose.runOnIdle { model.account.refreshDeviceSecurity() }
+        }
+    }
+
+    // Inputs: device lock without a backup app PIN, followed by removing the emulator lock. Expected: no number can become an automatic app-PIN bypass.
+    @Test
+    fun removingPhoneLockWithoutBackupNeverCreatesAnAppPinBypass() {
+        driver.ensurePhonePin()
+        val model = setup(deviceLock = true)
+        assertFalse(model.account.hasAppPin)
+        try {
+            driver.shell("locksettings clear --old 246810")
+            compose.activityRule.scenario.recreate()
+            waitCover()
+            compose.runOnIdle { model.account.interceptSearch("moon garden") }
+            compose.waitUntil(10_000) { model.screen == SessionScreen.Pin }
+            compose.onNodeWithTag("pin_digit_1").assertDoesNotExist()
+            compose.onNodeWithTag("device_lock_unlock").assertDoesNotExist()
+            compose.onNodeWithTag("missing_backup_pin").assertExists()
+            assertFalse(model.account.canUseAppPin)
+            compose.runOnIdle { model.account.submitPin("123456") }
+            assertEquals(SessionScreen.Pin, model.screen)
+            assertNull(model.profile)
+        } finally {
+            driver.shell("locksettings set-pin 246810")
+        }
     }
 
 }

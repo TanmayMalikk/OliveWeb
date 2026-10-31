@@ -1,8 +1,6 @@
 // Signed-in users: checks which screens each signed-in role may open.
 package com.olive.app.ui.session
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import com.olive.app.R
@@ -121,28 +119,11 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
     fun submitCalculatorPin(pin: String) {
         with(runtime) {
             with(state) {
-                if (busy || privacyBlackout || accountRole != AccountRole.USER || screen != SessionScreen.Cover || coverType != CoverType.CALCULATOR || !InputPolicy.validPin(
-                        pin
-                    )
+                if (busy || privacyBlackout || accountRole != AccountRole.USER ||
+                    screen != SessionScreen.Cover || coverType != CoverType.CALCULATOR
                 ) return
                 val device = enrollment ?: return
-                if (device.role != AccountRole.USER) return
-                if (!device.allowsAppPin()) {
-                    // Calculator digits open a fresh challenge; Android must still authenticate the account.
-                    val event = TriggerEvent(source = "Better Calculator")
-                    activeTriggerId = event.id
-                    triggerJob = scope.launch(Dispatchers.IO) {
-                        store.recordTrigger(
-                            device.uid,
-                            event
-                        )
-                        history.queueHistorySync()
-                    }
-                    pinChallengeVersion++
-                    message = null
-                    screen = SessionScreen.Pin
-                    return
-                }
+                if (!device.allowsCalculatorPinAttempt(pin)) return
                 val newTrigger =
                     if (activeTriggerId == null) TriggerEvent(source = "Better Calculator").also {
                         activeTriggerId = it.id

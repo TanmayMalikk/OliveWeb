@@ -1,14 +1,13 @@
 // Tests fractions, calculus, matrices, and statistics for calculator users.
 package com.olive.app.ui.covers.calculator
 
-import com.olive.app.ui.shared.*
-
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AdvancedCalculatorEngineTest {
     private val radians = CalculatorAngleMode.RADIANS
 
+    // Inputs: the values shown below. Expected: calculates fractions and calculus.
     @Test
     fun calculatesFractionsAndCalculus() {
         assertTrue(
@@ -45,6 +44,7 @@ class AdvancedCalculatorEngineTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: calculates complex numbers and matrices.
     @Test
     fun calculatesComplexNumbersAndMatrices() {
         assertTrue(
@@ -81,6 +81,7 @@ class AdvancedCalculatorEngineTest {
         assertTrue(system.contains("[ 0, 1, 3 ]"))
     }
 
+    // Inputs: the values shown below. Expected: calculates statistics.
     @Test
     fun calculatesStatistics() {
         val stats = AdvancedCalculatorEngine.calculate(

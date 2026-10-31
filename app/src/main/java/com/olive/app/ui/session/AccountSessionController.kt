@@ -1,6 +1,5 @@
 // All account roles: restores sessions, completes account setup, and signs out.
 package com.olive.app.ui.session
-import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import com.olive.app.BuildConfig

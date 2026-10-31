@@ -89,18 +89,24 @@ data class PrivateEntry(
     }
 }
 
+// Calculates elapsed time without letting Long boundary values wrap around.
+private fun elapsedSince(timestamp: Long, now: Long): Long {
+    if (now <= timestamp) return 0L
+    return runCatching { Math.subtractExact(now, timestamp) }.getOrDefault(Long.MAX_VALUE)
+}
+
 fun PrivateEntry.trashExpired(now: Long = System.currentTimeMillis()) =
-    deletedAt?.let { now - it >= PRIVATE_ENTRY_TRASH_RETENTION_MS } == true
+    deletedAt?.let { elapsedSince(it, now) >= PRIVATE_ENTRY_TRASH_RETENTION_MS } == true
 
 fun PrivateEntry.trashDaysRemaining(now: Long = System.currentTimeMillis()): Int {
     val deleted = deletedAt ?: return 0
-    val remaining = (PRIVATE_ENTRY_TRASH_RETENTION_MS - (now - deleted)).coerceAtLeast(0L)
+    val remaining = (PRIVATE_ENTRY_TRASH_RETENTION_MS - elapsedSince(deleted, now)).coerceAtLeast(0L)
     return ((remaining + 86_399_999L) / 86_400_000L).toInt()
 }
 
 fun PrivateEntry.trashSecondsRemaining(now: Long = System.currentTimeMillis()): Int {
     val deleted = deletedAt ?: return 0
-    return ((PRIVATE_ENTRY_TRASH_RETENTION_MS - (now - deleted)).coerceAtLeast(0L) + 999L).div(
+    return ((PRIVATE_ENTRY_TRASH_RETENTION_MS - elapsedSince(deleted, now)).coerceAtLeast(0L) + 999L).div(
         1_000L
     ).toInt()
 }

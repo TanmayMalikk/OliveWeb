@@ -43,13 +43,7 @@ internal object GeoapifyClient {
                 }
             try {
                 if (connection.responseCode !in 200..299) return@withContext emptyList()
-                val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                val rows = root.optJSONArray("results") ?: return@withContext emptyList()
-                (0 until rows.length()).mapNotNull { index ->
-                    suggestion(
-                        rows.optJSONObject(index) ?: return@mapNotNull null
-                    )
-                }
+                parseGeoapifySuggestions(connection.inputStream.bufferedReader().use { it.readText() })
             } finally {
                 connection.disconnect()
             }
@@ -70,10 +64,17 @@ internal object GeoapifyClient {
         ).firstOrNull()?.address?.let { value -> value.latitude?.let { lat -> value.longitude?.let { lat to it } } }
     }
 
+    internal fun parseGeoapifySuggestions(raw: String): List<AddressSuggestion> = runCatching {
+        val rows = JSONObject(raw).optJSONArray("results") ?: return@runCatching emptyList()
+        (0 until rows.length()).mapNotNull { index ->
+            suggestion(rows.optJSONObject(index) ?: return@mapNotNull null)
+        }
+    }.getOrDefault(emptyList())
+
     private fun suggestion(row: JSONObject): AddressSuggestion? {
         val lat = row.optDouble("lat", Double.NaN)
         val lon = row.optDouble("lon", Double.NaN)
-        if (lat.isNaN() || lon.isNaN()) return null
+        if (!lat.isFinite() || !lon.isFinite() || lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
         val city = listOf(
             "city",
             "town",

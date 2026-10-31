@@ -3,6 +3,7 @@ import { expect, it } from "vitest";
 import { createMemoryBoard } from "./olive-memory-board";
 
 for (let size = 5; size <= 8; size++) {
+  // Inputs: the values in this case. Expected: builds a solvable ${size}x${size} board.
   it(`builds a solvable ${size}x${size} board`, () => {
     const board = createMemoryBoard(size);
     expect(board).toHaveLength(size * size);
@@ -15,7 +16,8 @@ for (let size = 5; size <= 8; size++) {
     if (size % 2) expect(board[Math.floor(board.length / 2)]).toBe(-1);
   });
 }
+// Inputs: the values in this case. Expected: rejects sizes outside the supported range.
 it("rejects sizes outside the supported range", () => {
-  for (const size of [4, 9, 12, 5.5, NaN])
-    expect(() => createMemoryBoard(size)).toThrow();
+  for (const size of [4, 9, 12, 5.5, NaN, Infinity, -Infinity, "6", null])
+    expect(() => createMemoryBoard(size as unknown as number)).toThrow();
 });

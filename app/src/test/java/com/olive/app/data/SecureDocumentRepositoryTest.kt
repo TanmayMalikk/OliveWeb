@@ -1,8 +1,6 @@
 // Tests wrapped keys and document metadata for approved viewers.
 package com.olive.app.data
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import org.json.JSONObject
@@ -15,6 +13,7 @@ import java.security.KeyPairGenerator
 @RunWith(RobolectricTestRunner::class)
 class SecureDocumentRepositoryTest {
 
+    // Inputs: the values shown below. Expected: test envelope encryption math and json mapping.
     @Test
     fun `test envelope encryption math and json mapping`() {
         // Use test RSA keys in place of Android Keystore keys.
