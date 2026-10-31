@@ -45,6 +45,7 @@ internal fun AttachmentPicker(
     val requestLocationPermission = LocalLocationPermissionRequest.current
     var locationDuration by remember { mutableStateOf(false) }
     val titleFocus = remember { FocusRequester() }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sheetTitle = if (selectedCategory == null) stringResource(R.string.share_attachment) else stringResource(
         R.string.select_attachment_category,
         stringResource(
@@ -59,6 +60,9 @@ internal fun AttachmentPicker(
         )
     )
     LaunchedEffect(selectedCategory) {
+        // The sheet takes focus while its opening animation creates the dialog window. Wait until
+        // that transition finishes, then move focus to the heading for the newly displayed step.
+        while (sheetState.currentValue != SheetValue.Expanded) withFrameNanos { }
         withFrameNanos { }
         titleFocus.requestFocus()
     }
@@ -67,7 +71,7 @@ internal fun AttachmentPicker(
         session.documents.load(uid, false)
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.fillMaxWidth().padding(bottom = 24.dp).semantics { paneTitle = sheetTitle }) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

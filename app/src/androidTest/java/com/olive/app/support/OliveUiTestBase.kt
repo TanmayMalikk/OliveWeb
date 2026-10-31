@@ -18,6 +18,7 @@ import org.junit.rules.ExternalResource
 import org.junit.rules.RuleChain
 import java.io.File
 import android.view.MotionEvent
+import android.view.inputmethod.InputMethodManager
 import android.os.SystemClock
 
 // ActivityScenario's class-based constructor can resolve the activity under the test APK after
@@ -114,6 +115,17 @@ abstract class OliveUiTestBase {
 
     protected fun click(tag: String) {
         visibleNode(tag).performClick()
+    }
+
+    // Hides the emulator keyboard before a UI test presses controls located below a text field.
+    protected fun hideKeyboard() {
+        compose.activityRule.scenario.onActivity { activity ->
+            val keyboard = activity.getSystemService(InputMethodManager::class.java)
+            val token = activity.currentFocus?.windowToken ?: activity.window.decorView.windowToken
+            keyboard.hideSoftInputFromWindow(token, 0)
+            activity.currentFocus?.clearFocus()
+        }
+        compose.waitForIdle()
     }
 
     // A clean install stays inside the cover until the discreet olive is double-tapped.

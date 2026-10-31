@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId: "olive-test", storageBucket: "olive-test.appspot.com"});
 const { _test } = require("./index");
 const mediaTest = require("./src/mediaTickets")._test;
+const supportGroups = require("./src/supportGroups");
 
 // Inputs: the values in this case. Expected: deployment keeps the existing callable endpoint names.
 test("deployment keeps the existing callable endpoint names", () => {
@@ -81,4 +82,91 @@ test("account input lengths cannot overflow field limits", () => {
   assert.equal(_test.text("x".repeat(5000), 120).length, 120);
   assert.throws(() => _test.normalizedUsername("a".repeat(100000)));
   assert.equal(_test.validPassword(`A1!${"x".repeat(100000)}`), false);
+});
+
+// Inputs: protected names, casing, owner claims, and similar-looking names. Expected: only exact protected accounts are undeletable.
+test("protected account detection is exact and claim aware", () => {
+  assert.equal(_test.protectedAccount({}, "DemoAdmin"), true);
+  assert.equal(_test.protectedAccount({}, " demoStaff "), true);
+  assert.equal(_test.protectedAccount({customClaims:{owner:true}}, "ordinary_user"), true);
+  assert.equal(_test.protectedAccount({customClaims:{protected:true}}, "ordinary_user"), true);
+  assert.equal(_test.protectedAccount({}, "demoadmin_copy"), false);
+  assert.equal(_test.protectedAccount({}, "staff"), false);
+});
+
+// Inputs: conflicting role claim, profile role, and email aliases. Expected: trusted claims win, then profile, then legacy email.
+test("role resolution follows claim profile and legacy email precedence", () => {
+  assert.equal(_test.roleFromUser({customClaims:{role:"ADMIN"},email:"x@users.olive.invalid"},{role:"USER"}),"ADMIN");
+  assert.equal(_test.roleFromUser({customClaims:{},email:"x@users.olive.invalid"},{role:"STAFF"}),"STAFF");
+  assert.equal(_test.roleFromUser({customClaims:{},email:"x@safe.olive.invalid"},{}),"SAFE_CONTACT");
+  assert.equal(_test.roleFromUser({customClaims:{role:"ROOT"},email:"x@admin.olive.invalid"},{role:"ROOT"}),"ADMIN");
+  assert.equal(_test.roleFromUser({customClaims:{},email:"person@example.ca"},{}),"USER");
+});
+
+// Inputs: organization email variants and malformed addresses. Expected: real addresses normalize and bad ones are rejected.
+test("organization sign-in emails reject malformed addresses", () => {
+  assert.equal(_test.signInEmail("staff_name","STAFF"," Staff@Example.CA "),"staff@example.ca");
+  for (const email of ["missing-at.example.ca","missing-domain@","@missing-user.ca","two words@example.ca"]) {
+    assert.throws(() => _test.signInEmail("staff_name","STAFF",email));
+  }
+  assert.equal(_test.signInEmail("staff_name","STAFF",""),"staff_name@staff.olive.invalid");
+});
+
+// Inputs: exact and over-limit password lengths with Unicode. Expected: policy accepts only complete bounded credentials.
+test("password policy enforces Unicode requirements and exact length bounds", () => {
+  assert.equal(_test.validPassword("Étoile12!"),true);
+  assert.equal(_test.validPassword("橄榄枝1234!"),true);
+  assert.equal(_test.validPassword("A1!" + "x".repeat(21)),true);
+  assert.equal(_test.validPassword("A1!" + "x".repeat(22)),false);
+  assert.equal(_test.validPassword("A1!x"),false);
+});
+
+// Inputs: user, safe-contact, staff, and admin drafts. Expected: private user fields never leak into other role profiles.
+test("default profiles keep role-specific fields separated", () => {
+  const input={fullName:" Person ",dob:"2000-01-01",language:"French",affectedNames:"Child",
+    abuserName:"Private",situation:"Support",phone:"555",address:{city:"Edmonton"}};
+  const user=_test.defaultProfile("olive_user","USER",input,"olive_user@users.olive.invalid");
+  assert.equal(user.affectedNames,"Child");
+  assert.equal(user.abuserName,"Private");
+  assert.equal(user.situation,"Support");
+  const safe=_test.defaultProfile("olive_safe","SAFE_CONTACT",input,"olive_safe@safe.olive.invalid");
+  assert.equal(safe.affectedNames,"");
+  assert.equal(safe.abuserName,"");
+  assert.equal(safe.situation,"");
+  const staff=_test.defaultProfile("olive_staff","STAFF",input,"staff@example.ca");
+  assert.equal(staff.language,"English");
+  assert.equal(staff.email,"staff@example.ca");
+});
+
+// Inputs: oversized profile strings and a non-object address. Expected: every stored field is bounded and defaults remain valid.
+test("default profile construction bounds untrusted fields", () => {
+  const huge="x".repeat(10000);
+  const profile=_test.defaultProfile("olive_user","USER",{fullName:huge,dob:huge,language:huge,
+    situation:huge,region:huge,phone:huge,address:"wrong"},"");
+  assert.equal(profile.fullName.length,120);
+  assert.equal(profile.dob.length,10);
+  assert.equal(profile.language.length,60);
+  assert.equal(profile.situation.length,2000);
+  assert.equal(profile.region.length,200);
+  assert.equal(profile.phone.length,40);
+  assert.equal(profile.address.country,"Canada");
+});
+
+// Inputs: plan-consult and support ticket creation. Expected: IDs use correct prefixes and never reuse a prior room.
+test("each support request receives a unique origin-specific conversation id", () => {
+  const supportOne=supportGroups.supportConversationId("owner-1",supportGroups.SUPPORT);
+  const supportTwo=supportGroups.supportConversationId("owner-1",supportGroups.SUPPORT);
+  const consultation=supportGroups.supportConversationId("owner-1",supportGroups.PLAN_CONSULT);
+  assert.match(supportOne,/^support-owner-1-[A-Za-z0-9-]+$/);
+  assert.match(consultation,/^plan-consult-owner-1-[A-Za-z0-9-]+$/);
+  assert.notEqual(supportOne,supportTwo);
+  assert.notEqual(supportOne,consultation);
+});
+
+// Inputs: missing, scalar, array, temporary-email, and complete profiles. Expected: completion never trusts wrong runtime types.
+test("profile completion rejects malformed and temporary organization profiles", () => {
+  for (const profile of [null,"profile",[],42]) assert.equal(_test.profileComplete("USER",profile),false);
+  assert.equal(_test.profileComplete("USER",{fullName:"A",dob:"2000-1-1",language:"English",address:{city:"Edmonton"}}),false);
+  assert.equal(_test.profileComplete("STAFF",{fullName:"A",dob:"2000-01-01",email:"staff@staff.olive.invalid"}),false);
+  assert.equal(_test.profileComplete("STAFF",{fullName:"A",dob:"2000-01-01",email:"staff@example.ca"}),true);
 });

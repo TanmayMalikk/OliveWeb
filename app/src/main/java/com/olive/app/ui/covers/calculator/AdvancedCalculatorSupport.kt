@@ -15,13 +15,14 @@ internal fun semi(raw: String, size: Int) = raw.split(';')
 
 internal fun list(raw: String) =
     raw.trim().split(Regex("[,\\s]+")).filter { it.isNotBlank() }.map(::parseCalculatorNumber)
-        .also { require(it.isNotEmpty()) }
+        .also { values -> require(values.isNotEmpty() && values.all(Double::isFinite)) }
 
 internal fun value(raw: String, mode: CalculatorAngleMode) =
     GraphExpression.compile(raw, mode).evaluate(0.0)
 
 internal fun number(value: Double): String = formatCalculatorNumber(value)
 internal fun approximateFraction(value: Double): Pair<Long, Long> {
+    require(value.isFinite())
     var bestN = 0L
     var bestD = 1L
     var bestError = Double.MAX_VALUE

@@ -15,6 +15,8 @@ exports.staffSupportClose = supportGroups.staffSupportClose;
 Object.assign(exports, require("./src/mediaTickets"));
 
 const {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,
-  organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text} = require("./src/accountPolicy");
+  organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text,
+  protectedAccount, roleFromUser, defaultProfile} = require("./src/accountPolicy");
 exports._test = {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,
-  organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text};
+  organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text,
+  protectedAccount, roleFromUser, defaultProfile};
