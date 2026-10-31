@@ -1,10 +1,6 @@
 // Tests cover navigation while the keyboard is open.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.view.WindowInsets
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
@@ -73,10 +69,7 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
             val focused = compose.activity.currentFocus
             val input =
                 compose.activity.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-            if (focused != null) input.showSoftInput(
-                focused,
-                android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT
-            )
+            if (focused != null) input.showSoftInput(focused, 0)
             compose.activity.window.insetsController?.show(WindowInsets.Type.ime())
         }
         val softwareImeAvailable = runCatching {

@@ -1,8 +1,6 @@
 // Food cover users: defines text and labels for food-cover items.
 package com.olive.app.ui.covers.food
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.R
 import com.olive.app.data.Dish
 import com.olive.app.ui.shared.ResourceText

@@ -1,10 +1,6 @@
 // Tests PIN and device-lock entry into the user safe app.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
-
 import android.app.KeyguardManager
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.*
@@ -153,7 +149,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
     @Test
     fun deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        DeviceCredentialTestDriver(compose).requirePreparedEmulator()
+        DeviceCredentialTestDriver(compose).ensurePhonePin()
         assertTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
         entrySetup()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
@@ -215,7 +211,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
     @Test
     fun deviceLockEnrollmentAndEveryReentryRequireAndroidAuthentication() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        DeviceCredentialTestDriver(compose).requirePreparedEmulator()
+        DeviceCredentialTestDriver(compose).ensurePhonePin()
         assertTrue(context.getSystemService(KeyguardManager::class.java).isDeviceSecure)
         entrySetup()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]

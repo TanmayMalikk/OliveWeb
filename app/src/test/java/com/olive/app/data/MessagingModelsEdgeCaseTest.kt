@@ -1,0 +1,87 @@
+// Tests direct-message names, anonymous staff names, and support-ticket labels for every role.
+package com.olive.app.data
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class MessagingModelsEdgeCaseTest {
+    private fun conversation(
+        type: String = "SUPPORT",
+        origin: String = SUPPORT_TAG_SUPPORT,
+        tag: String = SUPPORT_TAG_SUPPORT,
+        usernames: Map<String, String> = mapOf("owner" to "visible_user", "staff" to "real_staff"),
+    ) = ChatConversation(
+        id = "chat",
+        friendshipId = "",
+        participantIds = usernames.keys.toList(),
+        participantUsernames = usernames,
+        type = type,
+        ownerUid = "owner",
+        staffUid = "staff",
+        adminUid = "admin",
+        supportOrigin = origin,
+        supportTag = tag,
+    )
+
+    // Inputs: the values shown below. Expected: users see anonymous support name while staff and admins see the user.
+    @Test
+    fun usersSeeAnonymousSupportNameWhileStaffAndAdminsSeeTheUser() {
+        val chat = conversation()
+
+        assertEquals("Olive Staff", chat.displayName("owner", AccountRole.USER, "Olive Staff"))
+        assertEquals("Olive Staff", chat.displayName("safe", AccountRole.SAFE_CONTACT, "Olive Staff"))
+        assertEquals("visible_user", chat.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("visible_user", chat.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+    }
+
+    // Inputs: the values shown below. Expected: missing owner name uses safe fallback for organization accounts.
+    @Test
+    fun missingOwnerNameUsesSafeFallbackForOrganizationAccounts() {
+        val chat = conversation(usernames = mapOf("staff" to "real_staff"))
+
+        assertEquals("User", chat.displayName("staff", AccountRole.STAFF))
+    }
+
+    // Inputs: the values shown below. Expected: direct chats show the other participant or conversation fallback.
+    @Test
+    fun directChatsShowTheOtherParticipantOrConversationFallback() {
+        val direct = conversation(type = "DIRECT")
+        assertEquals("real_staff", direct.displayName("owner", AccountRole.USER))
+
+        val selfOnly = direct.copy(participantUsernames = mapOf("owner" to "visible_user"))
+        assertEquals("Conversation", selfOnly.displayName("owner", AccountRole.USER))
+    }
+
+    // Inputs: the values shown below. Expected: ticket labels distinguish consultation support and escalation.
+    @Test
+    fun ticketLabelsDistinguishConsultationSupportAndEscalation() {
+        fun name(chat: ChatConversation) = chat.anonymousStaffDisplayName(
+            staffName = "Olive Staff",
+            consultationName = "Consultation",
+            supportName = "Support",
+            escalationName = "Escalation",
+        )
+
+        assertEquals(
+            "Olive Staff • Consultation",
+            name(conversation(origin = SUPPORT_TAG_PLAN_CONSULT, tag = SUPPORT_TAG_PLAN_CONSULT)),
+        )
+        assertEquals("Olive Staff • Support", name(conversation()))
+        assertEquals(
+            "Olive Staff • Escalation",
+            name(conversation(origin = SUPPORT_TAG_PLAN_CONSULT, tag = SUPPORT_TAG_NEEDS_ADMIN)),
+        )
+        assertEquals("Olive Staff • Support", name(conversation(origin = "", tag = "UNKNOWN")))
+    }
+
+    // Inputs: the values shown below. Expected: organization sender names are hidden only from personal accounts.
+    @Test
+    fun organizationSenderNamesAreHiddenOnlyFromPersonalAccounts() {
+        val chat = conversation()
+
+        assertEquals("Olive Staff", chat.senderDisplayName("staff", "real_staff", AccountRole.USER, "Olive Staff"))
+        assertEquals("Olive Staff", chat.senderDisplayName("admin", "real_admin", AccountRole.SAFE_CONTACT, "Olive Staff"))
+        assertEquals("real_staff", chat.senderDisplayName("staff", "real_staff", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("visible_user", chat.senderDisplayName("owner", "visible_user", AccountRole.USER, "Olive Staff"))
+    }
+}

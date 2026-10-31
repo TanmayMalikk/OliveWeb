@@ -6,7 +6,10 @@ export default defineConfig({
   expect: { timeout: 10000 },
   fullyParallel: false,
   workers: 1,
-  reporter: "list",
+  reporter: [
+    ["list"],
+    ["junit", { outputFile: "../build/reports/web-browser-tests.xml" }],
+  ],
   use: {
     baseURL: "http://127.0.0.1:5173",
     channel: "chrome",

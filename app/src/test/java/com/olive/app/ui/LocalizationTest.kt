@@ -32,6 +32,7 @@ class LocalizationTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: verify strings xml exists and is populated for supported languages.
     @Test
     fun verifyStringsXmlExistsAndIsPopulatedForSupportedLanguages() {
         val resDir = findResDir()
@@ -62,6 +63,7 @@ class LocalizationTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: verify app locale manager resolution.
     @Test
     fun verifyAppLocaleManagerResolution() {
         assertEquals("en", AppLocaleManager.getLanguageTag("English"))

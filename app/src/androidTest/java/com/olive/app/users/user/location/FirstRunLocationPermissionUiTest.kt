@@ -1,19 +1,15 @@
 // Tests first-run permission order after a user denies a prompt.
 package com.olive.app
 
-import com.olive.app.ui.shared.*
-
 import com.olive.app.ui.users.shared.navigation.*
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.view.accessibility.AccessibilityNodeInfo
-import androidx.compose.ui.test.*
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.*
 import com.olive.app.security.InputPolicy
-import com.olive.app.ui.*
 import org.junit.Assert.*
 import org.junit.Test
 

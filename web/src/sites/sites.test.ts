@@ -8,6 +8,7 @@ import {
   entryLinkUrl,
   siteMode,
 } from "./SiteRouting";
+// Inputs: the values in this case. Expected: recognizes legacy cover paths while keeping their canonical cover identity.
 it("recognizes legacy cover paths while keeping their canonical cover identity", () => {
   for (const site of config.covers) {
     expect(coverForRoute(site.path)?.id).toBe(site.id);
@@ -18,6 +19,7 @@ it("recognizes legacy cover paths while keeping their canonical cover identity",
   expect(coverForRoute("/safe")).toBeUndefined();
 });
 
+// Inputs: the values in this case. Expected: keeps local preview routes usable.
 it("keeps local preview routes usable", () => {
   expect(siteDestination("/olive", "http://localhost:5173")).toBe(
     "http://localhost:5173/olive",
@@ -27,6 +29,7 @@ it("keeps local preview routes usable", () => {
   );
 });
 
+// Inputs: the values in this case. Expected: maps production traffic to three pathless sites.
 it("maps production traffic to three pathless sites", () => {
   expect(siteDestination("/olive", config.publicOrigin)).toBe(
     `${config.publicOrigin}/`,
@@ -42,6 +45,7 @@ it("maps production traffic to three pathless sites", () => {
   );
 });
 
+// Inputs: the values in this case. Expected: uses a root hash for private entry links.
 it("uses a root hash for private entry links", () => {
   const token = "a".repeat(43);
   expect(entryLinkUrl(token, config.publicOrigin)).toBe(
@@ -49,6 +53,7 @@ it("uses a root hash for private entry links", () => {
   );
 });
 
+// Inputs: the values in this case. Expected: selects site mode by build override or hostname.
 it("selects site mode by build override or hostname", () => {
   expect(siteMode("anything.test", "download")).toBe("download");
   expect(siteMode("admin.yourolivebranch.ca", "")).toBe("admin");

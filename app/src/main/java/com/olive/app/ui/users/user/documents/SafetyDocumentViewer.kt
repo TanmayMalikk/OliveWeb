@@ -3,8 +3,6 @@ package com.olive.app.ui.users.user.documents
 
 import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.users.shared.navigation.*
-
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

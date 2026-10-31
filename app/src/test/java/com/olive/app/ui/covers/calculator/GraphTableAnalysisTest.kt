@@ -1,13 +1,12 @@
 // Tests graph value tables and invalid ranges for calculator users.
 package com.olive.app.ui.covers.calculator
 
-import com.olive.app.ui.shared.*
-
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class GraphTableAnalysisTest {
+    // Inputs: the values shown below. Expected: range builds an xcolumn and one column per equation.
     @Test
     fun rangeBuildsAnXColumnAndOneColumnPerEquation() {
         val table =
@@ -18,6 +17,7 @@ class GraphTableAnalysisTest {
         assertEquals(listOf("1", "1", "3"), table.rows.last())
     }
 
+    // Inputs: the values shown below. Expected: unsafe table ranges are rejected.
     @Test
     fun unsafeTableRangesAreRejected() {
         assertThrows(IllegalArgumentException::class.java) {

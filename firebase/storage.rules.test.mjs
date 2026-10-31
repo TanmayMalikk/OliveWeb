@@ -42,15 +42,15 @@ after(async () => {
   await env?.cleanup();
 });
 
-test("the unpublished Android installer cannot be read or changed by clients", async () => {
+test("the published Android installer is public but cannot be changed by clients", async () => {
   const path = "public/android/olive-branch.apk";
   await env.withSecurityRulesDisabled(async (context) => {
     await uploadString(ref(context.storage(), path), "signed apk");
   });
   const anonymous = env.unauthenticatedContext().storage();
   const signedIn = env.authenticatedContext("alice-uid").storage();
-  await assertFails(getBytes(ref(anonymous, path)));
-  await assertFails(getBytes(ref(signedIn, path)));
+  await assertSucceeds(getBytes(ref(anonymous, path)));
+  await assertSucceeds(getBytes(ref(signedIn, path)));
   await assertFails(uploadString(ref(anonymous, path), "replacement"));
   await assertFails(uploadString(ref(signedIn, path), "replacement"));
   await assertFails(deleteObject(ref(signedIn, path)));
@@ -220,4 +220,37 @@ test("media owners can read their own object before sharing metadata is availabl
   await assertSucceeds(getBytes(ref(owner, path)));
   await assertFails(getBytes(ref(other, path)));
   await assertSucceeds(deleteObject(ref(owner, path)));
+});
+
+test("public download access is limited to the exact Android APK path", async () => {
+  await env.withSecurityRulesDisabled(async (context) => {
+    await uploadString(ref(context.storage(), "public/android/other.apk"), "other");
+    await uploadString(ref(context.storage(), "public/Android/olive-branch.apk"), "case variant");
+  });
+  const anonymous = env.unauthenticatedContext().storage();
+  await assertFails(getBytes(ref(anonymous, "public/android/other.apk")));
+  await assertFails(getBytes(ref(anonymous, "public/Android/olive-branch.apk")));
+  await assertFails(uploadString(ref(anonymous, "public/android/olive-branch.apk"), "replacement"));
+});
+
+test("history object names and category boundaries are exact", async () => {
+  const owner = env.authenticatedContext("history-owner").storage();
+  const options = { contentType: "application/json" };
+  await assertSucceeds(uploadString(ref(owner, "accounts/history-owner/history/settings/12345678.json"), "{}", "raw", options));
+  await assertSucceeds(uploadString(ref(owner, `accounts/history-owner/history/private_entries/${"a".repeat(64)}.json`), "{}", "raw", options));
+  await assertFails(uploadString(ref(owner, "accounts/history-owner/history/settings/1234567.json"), "{}", "raw", options));
+  await assertFails(uploadString(ref(owner, `accounts/history-owner/history/settings/${"a".repeat(65)}.json`), "{}", "raw", options));
+  await assertFails(uploadString(ref(owner, "accounts/history-owner/history/notes/12345678.json"), "{}", "raw", options));
+  await assertFails(uploadString(ref(owner, "accounts/history-owner/history/settings/../../profile.json"), "{}", "raw", options));
+});
+
+test("profile writes cannot use metadata tricks or another account path", async () => {
+  const owner = env.authenticatedContext("profile-owner").storage();
+  const other = env.authenticatedContext("profile-other").storage();
+  const path = "accounts/profile-owner/profile.json";
+  await assertSucceeds(uploadString(ref(owner, path), "{}", "raw", {contentType:"application/json",customMetadata:{purpose:"profile"}}));
+  await assertFails(updateMetadata(ref(other, path), {contentType:"application/json"}));
+  await assertFails(deleteObject(ref(other, path)));
+  await assertFails(uploadString(ref(owner, "accounts/profile-owner/profile.JSON"), "{}", "raw", {contentType:"application/json"}));
+  await assertFails(uploadString(ref(owner, path), "{}", "raw", {contentType:"application/json; charset=utf-8"}));
 });

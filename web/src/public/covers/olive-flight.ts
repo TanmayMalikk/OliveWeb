@@ -26,31 +26,38 @@ export interface FlightWorld {
   branches: Branch[];
   over: boolean;
 }
+const validScore = (score: number) =>
+  Number.isFinite(score) ? Math.max(0, Math.floor(score)) : 0;
+const validRandom = (random: () => number) => {
+  const value = random();
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
+};
 export function flightSpeedMultiplier(score: number) {
-  return Math.min(7.5, 1 + Math.floor(score / 2) / 10);
+  return Math.min(7.5, 1 + Math.floor(validScore(score) / 2) / 10);
 }
 export function flightGap(score: number) {
   // The rounded branch tips extend half a stroke into each end of the gap.
   // Keep the visible opening at least two complete olive bodies tall.
   const minimumGap = FLIGHT.radiusY * 4 + FLIGHT.branchStroke;
-  return Math.max(minimumGap, FLIGHT.gap - Math.floor(score / 10) * 8);
+  return Math.max(minimumGap, FLIGHT.gap - Math.floor(validScore(score) / 10) * 8);
 }
 export function newFlight(
   width: number = FLIGHT.width,
   random: () => number = () => 0.5,
 ): FlightWorld {
+  const safeWidth = Number.isFinite(width) ? Math.max(0, width) : FLIGHT.width;
   return {
     y: 230,
     velocity: 0,
     score: 0,
     branches: Array.from(
-      { length: Math.max(2, Math.ceil(width / 250)) },
+      { length: Math.max(2, Math.ceil(safeWidth / 250)) },
       (_, index) => ({
         x: 350 + index * 250,
         gapY: index % 2 ? 195 : 238,
         gap: flightGap(0),
         passed: false,
-        seed: random(),
+        seed: validRandom(random),
       }),
     ),
     over: false,
@@ -178,7 +185,8 @@ export function advanceFlight(
   width: number = FLIGHT.width,
 ): FlightWorld {
   if (world.over) return world;
-  const dt = Math.max(0, Math.min(seconds, 0.032));
+  const dt = Number.isFinite(seconds) ? Math.max(0, Math.min(seconds, 0.032)) : 0;
+  const safeWidth = Number.isFinite(width) ? Math.max(0, width) : FLIGHT.width;
   const velocity = world.velocity + FLIGHT.gravity * dt;
   const y = world.y + velocity * dt;
   let score = world.score;
@@ -192,13 +200,13 @@ export function advanceFlight(
       return { ...branch, x, passed };
     })
     .filter((branch) => branch.x + FLIGHT.branchWidth > -10);
-  while (branches.length < Math.max(2, Math.ceil(width / 250)))
+  while (branches.length < Math.max(2, Math.ceil(safeWidth / 250)))
     branches.push({
-      x: branches.length ? branches[branches.length - 1].x + 250 : width + 40,
-      gapY: 155 + random() * 165,
+      x: branches.length ? branches[branches.length - 1].x + 250 : safeWidth + 40,
+      gapY: 155 + validRandom(random) * 165,
       gap: flightGap(score),
       passed: false,
-      seed: random(),
+      seed: validRandom(random),
     });
   const angle = (oliveAngle(velocity) * Math.PI) / 180;
   const verticalRadius = Math.hypot(13 * Math.sin(angle), 17 * Math.cos(angle));

@@ -6,7 +6,7 @@
     "node": "22"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/functions-tests.xml",
     "provision-demo-accounts": "node scripts/provision-demo-accounts.js",
     "purge-plaintext-ocr": "node scripts/purgePlaintextOcr.js"
   },
@@ -17,6 +17,8 @@
     "firebase-functions": "^7.4.0"
   },
   "overrides": {
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "glob": "^14.0.3",
+    "minimatch": "^11.0.3"
   }
 }

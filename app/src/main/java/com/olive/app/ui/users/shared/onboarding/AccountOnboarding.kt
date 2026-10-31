@@ -3,8 +3,6 @@ package com.olive.app.ui.users.shared.onboarding
 
 import com.olive.app.ui.shared.*
 
-import com.olive.app.ui.users.shared.navigation.*
-
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState

@@ -1,35 +1,58 @@
 // Safe-app users: shows account, privacy, and entry settings.
 package com.olive.app.ui.users.user.account
 
-import com.olive.app.ui.shared.*
 
-
-import com.olive.app.ui.users.shared.navigation.*
-
-import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
-
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Calculate
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material.icons.outlined.SportsEsports
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
 import com.olive.app.R
+import com.olive.app.data.AccountRole
+import com.olive.app.data.CoverType
+import com.olive.app.data.UserProfile
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.covers.food.AddressFields
+import com.olive.app.ui.shared.Cream
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.ui.users.shared.navigation.Field
+import com.olive.app.ui.users.shared.navigation.FormColumn
+import com.olive.app.ui.users.shared.navigation.Heading
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import com.olive.app.ui.users.shared.navigation.Status
+import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 

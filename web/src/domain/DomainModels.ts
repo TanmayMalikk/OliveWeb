@@ -151,7 +151,7 @@ export const coverInfo = (id: Cover) => covers.find((c) => c.id === id)!;
 export const coverPath = (id: Cover) => coverSite(id).path;
 export const normalizeUsername = (v: string) => v.trim().toLowerCase();
 export const validUsername = (v: string) =>
-  /^[a-z0-9_]{8,24}$/.test(normalizeUsername(v));
+  /^(?=.*[a-z])[a-z0-9_]{8,24}$/.test(normalizeUsername(v));
 export const validPassword = (v: string) =>
   v.length >= 8 &&
   v.length <= 24 &&
