@@ -191,6 +191,9 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
             finished(model)
             val cancelled =
                 InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.entry_settings_cancelled)
+            // Android closes its credential window before Compose receives and draws the cancellation result.
+            // Wait for that result instead of racing the system-window transition.
+            waitFor("session_message")
             compose.onNodeWithTag("session_message").assertTextContains(cancelled)
                 .assert(
                     SemanticsMatcher.expectValue(

@@ -88,4 +88,82 @@ class MediaTransferModelsEdgeCaseTest {
             .put("wrappedKeys", "not an object")
         assertThrows(Exception::class.java) { MediaUploadJob.fromJson(badKeys) }
     }
+
+    // Inputs: every media kind and OCR review combination. Expected: durable storage preserves both enums exactly.
+    @Test
+    fun everyMediaKindAndOcrReviewRoundTrips() {
+        MediaKind.entries.forEach { kind ->
+            OcrReview.entries.forEach { review ->
+                val original = MediaUploadJob(
+                    id = "${kind.name}-${review.name}",
+                    ownerUid = "owner",
+                    source = source().copy(kind = kind, ocrReview = review),
+                    createdAt = 1L,
+                )
+                assertEquals(original, MediaUploadJob.fromJson(original.toJson()))
+            }
+        }
+    }
+
+    // Inputs: every durable transfer status and optional mode. Expected: restart recovery restores the exact state.
+    @Test
+    fun everyTransferStatusAndModeRoundTrips() {
+        MediaTransferStatus.entries.forEach { status ->
+            listOf(null, MediaUploadMode.SINGLE, MediaUploadMode.MULTIPART).forEach { mode ->
+                val original = MediaUploadJob(
+                    id = "$status-$mode",
+                    ownerUid = "owner",
+                    source = source(),
+                    status = status,
+                    mode = mode,
+                    createdAt = 2L,
+                )
+                assertEquals(original, MediaUploadJob.fromJson(original.toJson()))
+            }
+        }
+    }
+
+    // Inputs: invalid multipart part numbers. Expected: malformed recovery data cannot become an upload job.
+    @Test
+    fun malformedMultipartPartNumbersFailClosed() {
+        val malformed = MediaUploadJob("job", "owner", source()).toJson()
+            .put("completedParts", org.json.JSONObject().put("not-a-number", "etag"))
+        assertThrows(NumberFormatException::class.java) { MediaUploadJob.fromJson(malformed) }
+    }
+
+    // Inputs: blank and populated errors. Expected: blank legacy values restore as null while real errors survive.
+    @Test
+    fun persistedErrorsDistinguishBlankFromRealFailures() {
+        val blank = MediaUploadJob("job", "owner", source()).toJson().put("error", "")
+        assertNull(MediaUploadJob.fromJson(blank).error)
+        val failed = MediaUploadJob("job", "owner", source(), error = "Network unavailable", createdAt = 1L)
+        assertEquals("Network unavailable", MediaUploadJob.fromJson(failed.toJson()).error)
+    }
+
+    // Inputs: transferred-byte counters near Long boundaries. Expected: progress remains bounded and finite.
+    @Test
+    fun progressHandlesLongBoundariesWithoutOverflow() {
+        fun progress(done: Long, total: Long) = MediaUploadPresentation(
+            "job", "owner", "File", "application/octet-stream",
+            MediaTransferStatus.UPLOADING, done, total, "", null, 1L,
+        ).progress
+        assertEquals(1f, progress(Long.MAX_VALUE, Long.MAX_VALUE)!!, 0f)
+        assertEquals(0f, progress(Long.MIN_VALUE, Long.MAX_VALUE)!!, 0f)
+        assertEquals(1f, progress(Long.MAX_VALUE, 1L)!!, 0f)
+    }
+
+    // Inputs: wrong persisted status, mode, and OCR review names. Expected: unknown future or corrupted enums are rejected.
+    @Test
+    fun unknownPersistedTransferEnumsAreRejected() {
+        val base = MediaUploadJob("job", "owner", source()).toJson()
+        assertThrows(IllegalArgumentException::class.java) {
+            MediaUploadJob.fromJson(org.json.JSONObject(base.toString()).put("status", "PAUSED_FOREVER"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            MediaUploadJob.fromJson(org.json.JSONObject(base.toString()).put("mode", "STREAM"))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            MediaUploadJob.fromJson(org.json.JSONObject(base.toString()).put("ocrReview", "MAYBE"))
+        }
+    }
 }

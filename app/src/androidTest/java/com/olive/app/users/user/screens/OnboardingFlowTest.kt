@@ -13,6 +13,24 @@ import org.junit.Test
 import java.io.File
 
 class OnboardingFlowTest : OliveUiTestBase() {
+    // Opens the final private-entry page without saving the profile.
+    private fun reachCoverPicker(username: String) {
+        openOnboarding()
+        click("new_user")
+        fill("username", username)
+        fill("password", "test-password-123")
+        fill("confirm_password", "test-password-123")
+        click("credentials_submit")
+        waitFor("full_name")
+        fill("full_name", "Cover Picker Test")
+        chooseBirthday()
+        nextOnboarding()
+        fill("address_city", "Edmonton")
+        nextOnboarding()
+        fill("trigger", "moon garden")
+        hideKeyboard()
+    }
+
     @Test
     fun cleanInstallOpensOnboardingOnlyAfterTheOliveIsDoubleTapped() {
         waitCover()
@@ -110,9 +128,17 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("address_city", "Edmonton")
         nextOnboarding()
         fill("trigger", "moon garden")
+        hideKeyboard()
         compose.onNodeWithTag("cover_choice_food").assertIsSelected()
         compose.onNodeWithTag("cover_choice_news").assertIsNotSelected().performClick()
-            .assertIsSelected()
+        // The cover picker is inside AnimatedContent, so its semantics update can land on the
+        // following frame even though the click callback has already changed the draft profile.
+        compose.waitUntil(5_000) {
+            runCatching {
+                compose.onNodeWithTag("cover_choice_news").assertIsSelected()
+            }.isSuccess
+        }
+        compose.onNodeWithTag("cover_choice_news").assertIsSelected()
         compose.onNodeWithTag("cover_choice_food").assertIsNotSelected()
         waitFor(
             "profile_submit"
@@ -127,6 +153,22 @@ class OnboardingFlowTest : OliveUiTestBase() {
             androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
         assertEquals("Edmonton", session.deliveryAddress.city)
         assertFalse(session.deliveryAddress.valid)
+    }
+
+    // Inputs: each cover choice in sequence. Expected: the latest choice is the only selected cover every time.
+    @Test
+    fun everyCoverChoiceCanBecomeTheSingleSelectedOption() {
+        reachCoverPicker("cover_picker_test")
+        val tags = listOf("cover_choice_food", "cover_choice_news", "cover_choice_calculator", "cover_choice_game")
+        tags.forEach { selectedTag ->
+            compose.onNodeWithTag(selectedTag).performScrollTo().performClick()
+            compose.waitUntil(5_000) {
+                runCatching { compose.onNodeWithTag(selectedTag).assertIsSelected() }.isSuccess
+            }
+            tags.filterNot { it == selectedTag }.forEach { otherTag ->
+                compose.onNodeWithTag(otherTag).assertIsNotSelected()
+            }
+        }
     }
 
     @Test
@@ -281,16 +323,27 @@ class OnboardingFlowTest : OliveUiTestBase() {
             compose.onAllNodesWithText("Incorrect password").fetchSemanticsNodes().isNotEmpty()
         }
         compose.waitUntil(30_000) { !androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java].busy }
-        fill("password", "test-password-123")
         val returningSession =
             androidx.lifecycle.ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        // Clearing the wrong value removes its inline error and rebuilds the field semantics.
+        // Reacquire the field after that update before typing the correct password, matching how
+        // a person edits the field and avoiding a stale-node replacement in the UI test driver.
+        compose.onNodeWithTag("password").performTextClearance()
+        compose.waitForIdle()
+        compose.onNodeWithTag("password").performTextInput("test-password-123")
         compose.onNodeWithTag("credentials_submit").performScrollTo().assertIsEnabled().performClick()
-        compose.waitUntil(10_000) {
-            returningSession.busy || returningSession.screen != SessionScreen.ReturningCredentials
-        }
         compose.waitUntil(30_000) {
-            !returningSession.busy && returningSession.screen != SessionScreen.ReturningCredentials
+            !returningSession.busy && (
+                returningSession.screen != SessionScreen.ReturningCredentials ||
+                    returningSession.account.credentialFieldError != null ||
+                    returningSession.message != null
+                )
         }
+        assertNotEquals(
+            "Correct returning-user credentials should leave the sign-in screen; message=${returningSession.message}",
+            SessionScreen.ReturningCredentials,
+            returningSession.screen
+        )
         chooseAppPin()
         fill("new_pin", "654321")
         fill("confirm_pin", "654321")
