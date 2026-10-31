@@ -226,6 +226,7 @@ if ($WithDeviceTests) {
             throw "The Android test device could not be woken and unlocked $preparation."
         }
     }
+    try {
     Write-Host "`n== Android device UI tests ==" -ForegroundColor Green
     $deviceReportDirectory = Join-Path $testReportDirectory "device-ui-tests"
     New-Item -ItemType Directory -Force -Path $deviceReportDirectory | Out-Null
@@ -326,6 +327,26 @@ if ($WithDeviceTests) {
         $deviceTestCount += [int]$countMatch.Groups[1].Value
     }
     $completedChecks.Add("Android device UI tests on $selectedDevice ($deviceTestCount passed, $skippedDeviceLockTests device-lock tests skipped)")
+    } finally {
+        # Device-lock tests use a known PIN only on a disposable emulator. Always remove it when
+        # the suite ends, including after a failed test, so the emulator is not left secured.
+        $previousErrorPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            & $adb -s $selectedDevice shell am force-stop com.olive.app 2>&1 | Out-Null
+            & $adb -s $selectedDevice shell am force-stop com.olive.app.test 2>&1 | Out-Null
+            $clearPinResult = ((& $adb -s $selectedDevice shell locksettings clear --old 246810 2>&1) -join "`n").Trim()
+            $clearedVerification = ((& $adb -s $selectedDevice shell locksettings verify --old 246810 2>&1) -join "`n").Trim()
+            if ($clearedVerification -notmatch 'user has no password') {
+                Write-Warning "Could not remove the disposable emulator PIN from ${selectedDevice}: $clearPinResult $clearedVerification"
+            } else {
+                Write-Host "Removed the test device lock from $selectedDevice." -ForegroundColor Cyan
+            }
+            & $adb -s $selectedDevice shell svc power stayon false 2>&1 | Out-Null
+        } finally {
+            $ErrorActionPreference = $previousErrorPreference
+        }
+    }
 }
 
 Write-Host "`nAll requested Olive tests passed ($($completedChecks.Count) checks):" -ForegroundColor Green
