@@ -127,6 +127,7 @@ internal fun NewsArticleCard(
                     modifier = Modifier.weight(1f, fill = false).testTag("news_article_topic")
                 ) {
                     Text(
+                        // Choose what news article card should do for the current value.
                         when (topic) {
                             "News" -> uiText(R.string.ui_news)
                             "Politics" -> uiText(R.string.ui_politics)
@@ -257,6 +258,7 @@ internal fun NewsArticleReader(
         val view = browser
         if (view != null && view.canGoBack()) view.goBack() else onBack()
     }
+    // Update news article reader when information used by this screen changes.
     DisposableEffect(browser, active, lifecycle) {
         val view = browser
         // Pauses the WebView off-screen and resumes it only while this article is visible.
@@ -328,11 +330,13 @@ internal fun NewsArticleReader(
                             settings.setSupportMultipleWindows(false)
                             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
                             webChromeClient = object : WebChromeClient() {
+                                // News cover: Responds when progress changed. It uses the current cover data to update what the user sees.
                                 override fun onProgressChanged(view: WebView, newProgress: Int) {
                                     progress = newProgress
                                 }
                             }
                             webViewClient = object : WebViewClient() {
+                                // Checks whether override url loading for news cover. It uses the current cover data to update what the user sees.
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView,
                                     request: WebResourceRequest
@@ -342,6 +346,7 @@ internal fun NewsArticleReader(
                                     return blocked
                                 }
 
+                                // News cover: Responds when page started. It prepares the picture before the app reads or saves it.
                                 override fun onPageStarted(
                                     view: WebView,
                                     url: String,
@@ -352,11 +357,13 @@ internal fun NewsArticleReader(
                                     progress = 0
                                 }
 
+                                // Responds when page finished for news cover.
                                 override fun onPageFinished(view: WebView, url: String) {
                                     currentUrl = url
                                     progress = 100
                                 }
 
+                                // News cover: returns the do update visited history. It uses the current cover data to update what the user sees.
                                 override fun doUpdateVisitedHistory(
                                     view: WebView,
                                     url: String,
@@ -371,6 +378,7 @@ internal fun NewsArticleReader(
                                     currentUrl = url
                                 }
 
+                                // News cover: Responds when received error.
                                 override fun onReceivedError(
                                     view: WebView,
                                     request: WebResourceRequest,
@@ -382,6 +390,7 @@ internal fun NewsArticleReader(
                                     }
                                 }
 
+                                // News cover: Responds when received http error.
                                 override fun onReceivedHttpError(
                                     view: WebView,
                                     request: WebResourceRequest,
@@ -393,6 +402,7 @@ internal fun NewsArticleReader(
                                     }
                                 }
 
+                                // News cover: Responds when received ssl error. It waits for the set time and cancels the timer when the feature closes.
                                 override fun onReceivedSslError(
                                     view: WebView,
                                     handler: SslErrorHandler,

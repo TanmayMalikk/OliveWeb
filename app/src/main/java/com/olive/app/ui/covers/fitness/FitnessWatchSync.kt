@@ -12,6 +12,7 @@ internal object FitnessWatchSync {
     const val SYNC_PREFERENCES = "fitness_watch_sync"
     const val ACTIVE_ACCOUNT_ID = "active_account_id"
 
+    // returns the publish for fitness cover. It reads the value saved on this device.
     fun publish(context: Context, accountId: String, snapshot: FitnessSnapshot) {
         context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE).edit {
             putString(ACTIVE_ACCOUNT_ID, accountId)

@@ -34,6 +34,7 @@ export type SafetyPlan = {
   updatedAt?: number;
 };
 
+// Calls the matching backend service for web safety plan service. It sends a signed-in request to the protected cloud function and checks the reply.
 async function call<T>(name: string, data: unknown = {}): Promise<T> {
   const { functions } = await firebase();
   const { httpsCallable } = await import("firebase/functions");
@@ -54,6 +55,7 @@ export async function loadPlan(ownerUid: string) {
     })
   ).plan;
 }
+// Web safety plan service: Saves field.
 export async function saveField(plan: SafetyPlan, key: string, value: string) {
   const current = plan.fields[key] ?? { value: "", revision: 0 };
   return (
@@ -71,10 +73,12 @@ export async function saveField(plan: SafetyPlan, key: string, value: string) {
     })
   ).plan;
 }
+// returns the consultation for web safety plan service.
 export async function consultation(action: "request" | "stop") {
   return (await call<{ plan: SafetyPlan }>("safetyPlanConsult", { action }))
     .plan;
 }
+// returns the shared plans for web safety plan service.
 export async function sharedPlans() {
   return (
     await call<{
@@ -82,12 +86,14 @@ export async function sharedPlans() {
     }>("safetyPlansSharedWithMe")
   ).plans;
 }
+// returns the staff consultations for web safety plan service.
 export async function staffConsultations() {
   return call<{
     available: boolean;
     plans: { ownerUid: string; ownerName: string; updatedAt: number }[];
   }>("safetyPlanConsultations");
 }
+// Updates staff availability for web safety plan service.
 export async function setStaffAvailability(available: boolean) {
   return call<{ available: boolean }>("safetyPlanAvailability", { available });
 }

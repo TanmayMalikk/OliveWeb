@@ -17,6 +17,7 @@ export default function AdminPortal() {
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<ManagedAccount | null>(null);
 
+  // Web admin: Reloads the latest data.
   async function refresh() {
     setAccounts(await listAccounts());
   }

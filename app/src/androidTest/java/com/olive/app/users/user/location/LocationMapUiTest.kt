@@ -13,6 +13,7 @@ import org.junit.Test
 import org.junit.Assert.assertEquals
 
 class LocationMapUiTest : OliveUiTestBase() {
+    // User location map ui test: returns the map loads and exposes interactive controls. The test gives the code a clear input and checks the expected result.
     @Test
     fun mapLoadsAndExposesInteractiveControls() {
         compose.activity.setContent {
@@ -40,6 +41,7 @@ class LocationMapUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("recenter_map").assertIsDisplayed()
     }
 
+    // User location map ui test: returns the sharing duration includes ten second test option. The test gives the code a clear input and checks the expected result.
     @Test
     fun sharingDurationIncludesTenSecondTestOption() {
         var selected = 0L
@@ -52,6 +54,7 @@ class LocationMapUiTest : OliveUiTestBase() {
         compose.runOnIdle { assertEquals(10_000L, selected) }
     }
 
+    // User location map ui test: returns the custom sharing duration is capped at seventy two hours. The test gives the code a clear input and checks the expected result.
     @Test
     fun customSharingDurationIsCappedAtSeventyTwoHours() {
         var selected = 0L

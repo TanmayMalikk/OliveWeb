@@ -15,6 +15,7 @@ import com.olive.app.data.*
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
+// returns the private note targets for shared safe app private contact notes.
 internal fun ChatConversation.privateNoteTargets(
     currentUid: String,
     role: AccountRole,
@@ -32,7 +33,7 @@ internal fun ChatConversation.privateNoteTargets(
         DirectoryUser(uid, participantUsernames[uid].orEmpty().ifBlank { uid })
     }
 }
-
+// Shows conversation actions dialog for shared safe app private contact notes.
 @Composable
 internal fun ConversationActionsDialog(
     conversation: ChatConversation,
@@ -81,6 +82,7 @@ internal fun ConversationActionsDialog(
     )
 }
 
+// shared safe app private contact notes shows this private contact note dialog view so the user can view its details and use its actions.
 @Composable
 internal fun PrivateContactNoteDialog(
     session: SessionViewModel,
@@ -99,6 +101,7 @@ internal fun PrivateContactNoteDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(stringResource(R.string.private_contact_note_explanation), color = Muted)
+                // Only continue with private contact note dialog when target is null.
                 if (target == null) {
                     Text(stringResource(R.string.choose_person), style = MaterialTheme.typography.titleMedium)
                     targets.forEach { person ->

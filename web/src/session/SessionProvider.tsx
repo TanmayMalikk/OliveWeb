@@ -53,6 +53,7 @@ const initialEntryToken =
     : null;
 if (location.hash || location.pathname === "/entry")
   window.history.replaceState({}, "", "/");
+// Web session provider: Shows the session provider view.
 export function SessionProvider({
   children,
   mode = "user",
@@ -117,6 +118,7 @@ export function SessionProvider({
     if (location.pathname !== "/" || location.search || location.hash)
       window.history.replaceState({}, "", "/");
   }, []);
+  // Update internal download when information used by this screen changes.
   useEffect(() => {
     let live = true;
     void database
@@ -129,6 +131,7 @@ export function SessionProvider({
         setEnrollment(savedEnrollment);
         if (savedEnrollment && savedEnrollment.cover !== value?.cover)
           await (await database).put("device", savedEnrollment, "current");
+        // saved enrollment checks whether value and pending entry current before continuing.
         if (value && pendingEntry.current) {
           let authenticated = true;
           if (cloudMode) {
@@ -200,6 +203,7 @@ export function SessionProvider({
     setPhase,
     setProfile,
   });
+  // Update note interaction when information used by this screen changes.
   useEffect(() => {
     document.title =
       mode === "admin"
@@ -208,12 +212,14 @@ export function SessionProvider({
           ? "Olive Branch"
         : covers.find((candidate) => candidate.id === cover)?.name ?? "Game";
   }, [cover, mode]);
+  // Web session provider: returns the perform.
   async function perform(work: () => Promise<void>) {
     if (working.current) return;
     working.current = true;
     setBusy(true);
     setMessage("");
     const token = epoch.current;
+    // A token error is handled here instead of closing the app.
     try {
       await work();
     } catch (error) {
@@ -225,6 +231,7 @@ export function SessionProvider({
       }
     }
   }
+  // Authenticates the account for web session provider.
   async function authenticate(
     username: string,
     password: string,
@@ -265,6 +272,7 @@ export function SessionProvider({
       setPhase("setup");
       return;
     }
+    // role is staff or role is admin is handled here by p.
     if (role === "STAFF" || role === "ADMIN") {
       setProfile(p);
       setHistory(loaded.history);
@@ -280,6 +288,7 @@ export function SessionProvider({
       setPhase("safe");
       return;
     }
+    // role is safe contact and path is not /account/link is handled here by p.
     if (role === "SAFE_CONTACT" && path !== "/account/link") {
       accounts.lock();
       setPhase("public");
@@ -289,6 +298,7 @@ export function SessionProvider({
     const current: Enrollment | undefined = await (
       await database
     ).get("device", "current");
+    // current checks whether path is /account/link before continuing.
     if (path === "/account/link") {
       setPersonalLink(await issueEntryLink(accounts.identity!.uid));
       setEnrollment(
@@ -299,6 +309,7 @@ export function SessionProvider({
       setPhase("link");
       return;
     }
+    // Only continue with current when current and current uid is accounts identity uid.
     if (current && current.uid === accounts.identity?.uid) {
       setEnrollment({
         ...current,
@@ -321,6 +332,7 @@ export function SessionProvider({
       setPhase("setup");
     }
   }
+  // Starts entry for web session provider.
   async function beginEntry() {
     setMessage("");
     if (!enrollment) {
@@ -340,6 +352,7 @@ export function SessionProvider({
     setPhase("pin");
     window.history.replaceState({}, "", "/");
   }
+  // returns the complete setup for web session provider.
   async function completeSetup(p: Profile, pin: string) {
     const token = epoch.current;
     await accounts.saveProfile(p);
@@ -367,10 +380,12 @@ export function SessionProvider({
     setPersonalLink(await issueEntryLink(device.uid));
     setPhase("link");
   }
+  // Finds trigger for web session provider.
   async function searchTrigger(value: string) {
     if (!enrollment || enrollment.cover !== cover || enrollment.role !== "USER")
       return false;
     if ((await triggerHash(value)) !== enrollment.triggerHash) return false;
+    // search trigger checks whether entry owner current is enrollment uid is false before continuing.
     if (entryOwner.current !== enrollment.uid) {
       const saved = await savedEntryLink(enrollment.uid);
       const token = saved ? new URL(saved).hash.slice(1) : "";
@@ -382,6 +397,7 @@ export function SessionProvider({
     setPhase("pin");
     return true;
   }
+  // Unlocks the private area for web session provider.
   async function unlock(pin: string) {
     const token = epoch.current;
     if (
@@ -421,6 +437,7 @@ export function SessionProvider({
     setPage("Home");
     noteInteraction();
   }
+  // returns the record for web session provider.
   async function record(category: Category, value: Event | Entry) {
     const token = epoch.current;
     await accounts.saveRecord(category, value);
@@ -430,6 +447,7 @@ export function SessionProvider({
       [category]: [value, ...old[category].filter((e) => e.id !== value.id)],
     }));
   }
+  // Web session provider: Saves profile.
   async function saveProfile(p: Profile, action = "Saved profile settings") {
     const token = epoch.current;
     await accounts.saveProfile(p);
@@ -444,10 +462,12 @@ export function SessionProvider({
     await record("settings", newEvent(action));
     setMessage("Changes saved.");
   }
+  // Web session provider: Saves entry.
   async function saveEntry(entry: Entry) {
     await record("private_entries", entry);
     setMessage("Entry saved.");
   }
+  // Web session provider: Reloads the latest data.
   async function refresh() {
     const token = epoch.current;
     const loaded = await accounts.load();
@@ -457,6 +477,7 @@ export function SessionProvider({
       setMessage("Account is up to date.");
     }
   }
+  // Signs out the current account for web session provider.
   async function signOut() {
     await accounts.signOut();
     epoch.current++;

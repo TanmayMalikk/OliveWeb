@@ -24,6 +24,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
+    // Saves private entry for session private notes.
     fun savePrivateEntry(id: String?, kind: PrivateEntryKind?, title: String, body: String) {
         with(runtime) {
             with(state) {
@@ -45,6 +46,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                     id?.let { wanted -> privateEntries.firstOrNull { it.id == wanted && it.deletedAt == null } }
                 val changes = existing?.let { old ->
                     buildList {
+                        // Session private notes: returns the changed.
                         fun changed(field: String, before: String, after: String) {
                             if (before != after) add(FieldChange(field, before, after))
                         }
@@ -72,6 +74,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                 )
                 operations.runOperation(runtime.application.getString(R.string.unable_to_save_this_private_entry_please_retry)) { token ->
                     withContext(Dispatchers.IO) { store.savePrivateEntry(uid, entry) }
+                    // Only continue with changed when epoch is token and screen is session screen safe and page is safe page notes.
                     if (epoch == token && screen == SessionScreen.Safe && page == SafePage.Notes) {
                         privateEntries = withContext(Dispatchers.IO) { store.privateEntries(uid) }
                         message =
@@ -107,6 +110,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session private notes: returns the trash private entry. It waits for the set time and cancels the timer when the feature closes.
     fun trashPrivateEntry(id: String) {
         with(runtime) {
             with(state) {

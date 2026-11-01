@@ -77,6 +77,7 @@ import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import kotlin.math.ceil
 
+// The location map screen is part of user location screen. It gives the user the details and choices needed here.
 @Composable
 internal fun LocationMapScreen(session: SessionViewModel) {
     val profile = session.profile ?: return
@@ -358,6 +359,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
     }
 }
 
+// This shows the full screen navigation map view for user location screen. It fills the view with the latest details and actions.
 @Composable
 private fun FullScreenNavigationMap(
     points: List<MapLocationPoint>,
@@ -460,15 +462,18 @@ private fun FullScreenNavigationMap(
     }
 }
 
+// User location screen: Converts route distance.
 private fun formatRouteDistance(meters: Double): String =
     if (meters < 1_000) "${meters.toInt()} m"
     else String.format(java.util.Locale.getDefault(), "%.1f km", meters / 1_000)
 
+// User location screen: Converts route duration.
 private fun formatRouteDuration(seconds: Double): String =
     "${ceil(seconds / 60.0).toInt().coerceAtLeast(1)} min"
 
 private const val MAX_SHARED_CONTACTS = 10
 
+// user location screen shows this share duration dialog view so the user can view its details and use its actions.
 @Composable
 internal fun ShareDurationDialog(onDismiss: () -> Unit, onSelected: (Long) -> Unit) {
     var custom by remember { mutableStateOf("") }

@@ -65,7 +65,7 @@ import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-
+// Shows fitness outdoor workout card for fitness cover.
 @Composable
 internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     val context = LocalContext.current
@@ -89,7 +89,9 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
         }
     }
 
+    // Update fitness outdoor workout card when information used by this screen changes.
     LaunchedEffect(store) {
+        // Fitness cover: Keeps fitness outdoor workout card active while true.
         while (true) {
             workout = store.snapshot()
             recentWorkouts = store.history()
@@ -98,6 +100,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
         }
     }
 
+    // Fitness cover: Starts workout. It uses the saved health data to update the fitness screen.
     fun startWorkout(type: OutdoorWorkoutType) {
         val preciseLocationGranted = ContextCompat.checkSelfPermission(
             context,
@@ -152,6 +155,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
                 }
             }
 
+            // Only continue with start workout when workout active.
             if (workout.active) {
                 ActiveWorkoutContent(
                     workout = workout,
@@ -188,6 +192,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     }
 }
 
+// This shows the workout type selector view for fitness cover. It fills the view with the latest details and actions.
 @Composable
 private fun WorkoutTypeSelector(
     selected: OutdoorWorkoutType,
@@ -204,7 +209,7 @@ private fun WorkoutTypeSelector(
         }
     }
 }
-
+// Shows workout type chip for fitness cover.
 @Composable
 private fun WorkoutTypeChip(
     modifier: Modifier,
@@ -227,7 +232,7 @@ private fun WorkoutTypeChip(
         modifier = modifier,
     )
 }
-
+// Shows active workout content for fitness cover.
 @Composable
 private fun ActiveWorkoutContent(
     workout: OutdoorWorkoutSnapshot,
@@ -278,6 +283,7 @@ private fun ActiveWorkoutContent(
     }
 }
 
+// This shows the workout location map view for fitness cover. It fills the view with the latest details and actions.
 @Composable
 private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: Long) {
     val points = workout.route
@@ -285,6 +291,7 @@ private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: L
         modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(20.dp)),
         contentAlignment = Alignment.Center,
     ) {
+        // points is empty is handled here by workout location map.
         if (points.isEmpty()) {
             Text(
                 stringResource(R.string.fitness_waiting_for_gps),
@@ -323,6 +330,7 @@ private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: L
     }
 }
 
+// This is the recent workout history view for fitness cover. It shows current details and the actions available to the user.
 @Composable
 private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
     Column(
@@ -370,7 +378,7 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
         }
     }
 }
-
+// Shows workout metric for fitness cover.
 @Composable
 private fun WorkoutMetric(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -379,8 +387,10 @@ private fun WorkoutMetric(value: String, label: String) {
     }
 }
 
+// returns the workout type label for fitness cover. It uses the latest values so the user sees the right text and choices.
 @Composable
 private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
+    // Choose what workout type label should do for the current value.
     when (type) {
         OutdoorWorkoutType.WALK -> R.string.fitness_walking
         OutdoorWorkoutType.RUN -> R.string.fitness_running
@@ -389,9 +399,11 @@ private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
     }
 )
 
+// Converts distance for fitness cover. It uses the saved health data to update the fitness screen.
 private fun formatDistance(distanceMeters: Double) =
     String.format(Locale.ROOT, "%.2f km", distanceMeters / 1_000.0)
 
+// Converts duration for fitness cover. It uses the saved health data to update the fitness screen.
 private fun formatDuration(elapsedMillis: Long): String {
     val totalSeconds = elapsedMillis / 1_000L
     val hours = totalSeconds / 3_600L
@@ -404,12 +416,14 @@ private fun formatDuration(elapsedMillis: Long): String {
     }
 }
 
+// Converts pace for fitness cover. It uses the saved health data to update the fitness screen.
 private fun formatPace(pace: Double?) = pace?.let {
     val minutes = it.toInt()
     val seconds = ((it - minutes) * 60.0).toInt().coerceIn(0, 59)
     String.format(Locale.ROOT, "%d:%02d /km", minutes, seconds)
 } ?: "--"
 
+// Converts workout date for fitness cover. It uses the saved health data to update the fitness screen.
 private fun formatWorkoutDate(timestamp: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(timestamp))
 

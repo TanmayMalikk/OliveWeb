@@ -10,12 +10,14 @@ import org.junit.Test
 import java.io.File
 
 class PrivacySecurityFlowTest : OliveUiTestBase() {
+    // returns the stale account actions and rapid pin attempts cannot unlock for user privacy security flow test. The test gives the code a clear input and checks the expected result.
     @Test
     fun staleAccountActionsAndRapidPinAttemptsCannotUnlock() {
         register(pin = "739182", username = "strict_pin_tester")
         val session =
             androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
 
+        // returns the assert locked for user privacy security flow test. The test gives the code a clear input and checks the expected result.
         fun assertLocked() {
             assertNotEquals(com.olive.app.ui.users.shared.navigation.SessionScreen.Safe, session.screen)
             assertEquals(com.olive.app.data.AccountRole.USER, session.accountRole)
@@ -82,6 +84,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         }
     }
 
+    // returns the fifth failure allows immediate retry and legacy cooldown is ignored for user privacy security flow test. The test gives the code a clear input and checks the expected result.
     @Test
     fun fifthFailureAllowsImmediateRetryAndLegacyCooldownIsIgnored() {
         register(username = "pin_attempt_tester")
@@ -90,6 +93,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         repeat(5) { index ->
             if (index == 0) trigger()
             enterPin("999999")
+            // Only continue with fifth failure allows immediate retry and legacy cooldown is ignored when index < 4.
             if (index < 4) {
                 compose.waitUntil(30_000) { !session.busy }
                 val remaining = 4 - index
@@ -145,6 +149,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Cancel").performClick()
     }
 
+    // returns the background and in flight unlock never reopen safe area for user privacy security flow test. The test gives the code a clear input and checks the expected result.
     @Test
     fun backgroundAndInFlightUnlockNeverReopenSafeArea() {
         register(username = "privacy_tester")
@@ -171,6 +176,7 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Your safe space").assertDoesNotExist()
     }
 
+    // returns the password change requires the current password for user privacy security flow test. The test gives the code a clear input and checks the expected result.
     @Test
     fun passwordChangeRequiresTheCurrentPassword() {
         register(username = "password_tester")

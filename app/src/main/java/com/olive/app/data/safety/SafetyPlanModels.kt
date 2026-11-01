@@ -23,11 +23,13 @@ internal data class SafetyField(
     val value: String, val revision: Long = 0, val mutationId: String? = null,
     val conflictValue: String? = null, val conflictRevision: Long? = null
 ) {
+    // Safety: Converts this record into JSON.
     fun toJson(): JSONObject =
         JSONObject().put("value", value).put("revision", revision).put("mutationId", mutationId)
             .put("conflictValue", conflictValue).put("conflictRevision", conflictRevision)
 
     companion object {
+        // Builds this record from JSON for safety.
         fun fromJson(json: JSONObject) = SafetyField(
             json.getString("value"),
             json.optLong("revision"),
@@ -56,6 +58,7 @@ internal data class SafetyPlan(
     val hasEdits get() = fields.values.any { it.mutationId != null }
     val hasConflicts get() = fields.values.any { it.conflictRevision != null }
     val pending get() = hasEdits || shareAction.isNotEmpty()
+    // Safety: Converts this record into JSON.
     fun toJson(): JSONObject = JSONObject().put("ownerUid", ownerUid).put("ownerName", ownerName)
         .put(
             "fields",
@@ -75,6 +78,7 @@ internal data class SafetyPlan(
         .put("supportSafeContactUid", supportSafeContactUid)
 
     companion object {
+        // Safety: Builds this record from JSON.
         fun fromJson(json: JSONObject): SafetyPlan {
             val fields = json.getJSONObject("fields")
             return SafetyPlan(
@@ -108,6 +112,7 @@ internal fun mergeSafetyPlan(
 ): SafetyPlan {
     val fields = current.fields.mapValues { (key, local) ->
         val cloud = remote.fields[key] ?: return@mapValues local
+        // Choose what merge safety plan should do for the current value.
         when {
             cloud.revision < local.revision -> local
             local.mutationId == null -> cloud.copy(mutationId = null)
@@ -136,6 +141,7 @@ internal fun mergeSafetyPlan(
     )
 }
 
+// Safety: returns the edit.
 internal fun SafetyField.edit(value: String) =
     copy(value = value, mutationId = UUID.randomUUID().toString())
 

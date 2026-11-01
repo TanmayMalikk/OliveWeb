@@ -20,6 +20,7 @@ class EncryptedVault(context: Context, mode: String) {
     // Foreground editors and background workers use separate instances of the same file.
     private val fileLock = locks.computeIfAbsent(file.baseFile.absolutePath) { Any() }
     private val alias = "olive.vault.$mode.v1"
+    // Encrypted vault: returns the key.
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(alias, null) as? SecretKey)?.let { return it }
@@ -37,6 +38,7 @@ class EncryptedVault(context: Context, mode: String) {
         }
     }
 
+    // Reads the saved value for encrypted vault.
     fun read(): JSONObject = synchronized(fileLock) { readUnlocked() }
     // Reads and parses the encrypted vault file while the caller holds the shared file lock.
     private fun readUnlocked(): JSONObject {
@@ -53,6 +55,7 @@ class EncryptedVault(context: Context, mode: String) {
         }
     }
 
+    // Encrypted vault: Updates the feature state.
     fun update(change: (JSONObject) -> Unit) = synchronized(fileLock) {
         val root = readUnlocked()
         change(root)
@@ -65,6 +68,7 @@ class EncryptedVault(context: Context, mode: String) {
             plain.fill(0)
         }
         val stream = file.startWrite()
+        // If update fails, catch the error so the app can keep running and explain the problem.
         try {
             stream.write(bytes)
             file.finishWrite(stream)
@@ -79,5 +83,6 @@ class EncryptedVault(context: Context, mode: String) {
     }
 }
 
+// Encrypted vault: returns the child.
 fun JSONObject.child(name: String): JSONObject =
     optJSONObject(name) ?: JSONObject().also { put(name, it) }

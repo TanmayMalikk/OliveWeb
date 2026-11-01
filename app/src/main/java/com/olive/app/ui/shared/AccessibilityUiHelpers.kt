@@ -99,6 +99,7 @@ internal fun LocalizedIcon(
     Icon(imageVector, contentDescription, modifier, tint)
 }
 
+// Checks whether accessibility user interaction for accessibility ui helpers.
 internal fun isAccessibilityUserInteraction(eventType: Int): Boolean = eventType in setOf(
     AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED,
     AccessibilityEvent.TYPE_VIEW_CLICKED,
@@ -111,6 +112,7 @@ internal fun isAccessibilityUserInteraction(eventType: Int): Boolean = eventType
 internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: () -> Unit) {
     val previous = ViewCompat.getAccessibilityDelegate(view)
     ViewCompat.setAccessibilityDelegate(view, object : AccessibilityDelegateCompat() {
+        // Accessibility ui helpers: Responds when request send accessibility event.
         override fun onRequestSendAccessibilityEvent(
             host: ViewGroup,
             child: View,
@@ -122,6 +124,7 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             return accepted
         }
 
+        // Accessibility ui helpers: returns the dispatch populate accessibility event.
         override fun dispatchPopulateAccessibilityEvent(
             host: View,
             event: AccessibilityEvent
@@ -129,14 +132,17 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             previous?.dispatchPopulateAccessibilityEvent(host, event)
                 ?: super.dispatchPopulateAccessibilityEvent(host, event)
 
+        // Accessibility ui helpers: Loads accessibility node provider.
         override fun getAccessibilityNodeProvider(host: View): AccessibilityNodeProviderCompat? =
             previous?.getAccessibilityNodeProvider(host) ?: super.getAccessibilityNodeProvider(host)
 
+        // Accessibility ui helpers: Responds when initialize accessibility event.
         override fun onInitializeAccessibilityEvent(host: View, event: AccessibilityEvent) {
             if (previous != null) previous.onInitializeAccessibilityEvent(host, event)
             else super.onInitializeAccessibilityEvent(host, event)
         }
 
+        // Responds when initialize accessibility node info for accessibility ui helpers.
         override fun onInitializeAccessibilityNodeInfo(
             host: View,
             info: AccessibilityNodeInfoCompat
@@ -145,11 +151,13 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             else super.onInitializeAccessibilityNodeInfo(host, info)
         }
 
+        // Responds when populate accessibility event for accessibility ui helpers.
         override fun onPopulateAccessibilityEvent(host: View, event: AccessibilityEvent) {
             if (previous != null) previous.onPopulateAccessibilityEvent(host, event)
             else super.onPopulateAccessibilityEvent(host, event)
         }
 
+        // Accessibility ui helpers: Performs accessibility action.
         override fun performAccessibilityAction(host: View, action: Int, args: Bundle?): Boolean =
             previous?.performAccessibilityAction(host, action, args)
                 ?: super.performAccessibilityAction(host, action, args)
@@ -174,6 +182,7 @@ internal fun Modifier.keepVisibleWhileTyping(): Modifier = composed {
     val requester = remember { BringIntoViewRequester() }
     var focused by remember { mutableStateOf(false) }
     val keyboardBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    // Update keep visible while typing when information used by this screen changes.
     LaunchedEffect(focused, keyboardBottom) {
         if (focused) {
             withFrameNanos { }

@@ -31,9 +31,11 @@ export type BrowserDocument = {
   key?: CryptoKey;
 };
 
+// Creates a value from base64 for web media service. It checks access, protects the file, and then reads or saves it.
 const fromBase64 = (value: string) =>
   Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
 
+// Decrypts metadata for web media service.
 async function decryptMetadata(value: string, key: CryptoKey) {
   const payload = fromBase64(value);
   if (payload.length < 29) throw new Error("Encrypted document metadata is invalid.");
@@ -45,6 +47,7 @@ async function decryptMetadata(value: string, key: CryptoKey) {
   return JSON.parse(new TextDecoder().decode(plain)) as { name?: unknown; mimeType?: unknown };
 }
 
+// Lists browser documents for web media service. It sends a signed-in request to the protected cloud function and checks the reply.
 export async function listBrowserDocuments(identity: Identity): Promise<BrowserDocument[]> {
   const { db, functions } = await firebase();
   const { httpsCallable } = await import("firebase/functions");
@@ -59,11 +62,15 @@ export async function listBrowserDocuments(identity: Identity): Promise<BrowserD
     let key: CryptoKey | undefined;
     let name = "Encrypted document";
     let mimeType = "application/octet-stream";
+    // Only continue with mime type when typeof value encrypted metadata is string.
     if (typeof value.encrypted_metadata === "string") {
+      // If mime type fails, catch the error so the app can keep running and explain the problem.
       try {
         let raw: Uint8Array;
+        // mime type checks whether wrapped before continuing.
         if (wrapped) {
           raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
+          // Only continue with mime type when value owner id is identity uid.
           if (value.owner_id === identity.uid) {
             void httpsCallable(functions, "mediaStoreAccountAccessKey")({
               mediaId: row.id,
@@ -102,6 +109,7 @@ export async function listBrowserDocuments(identity: Identity): Promise<BrowserD
   })).then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt));
 }
 
+// Web media service: returns the hexadecimal.
 function hexadecimal(bytes: Uint8Array) {
   return [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
 }

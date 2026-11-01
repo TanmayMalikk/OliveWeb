@@ -31,6 +31,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafeSupportUiTest : OliveUiTestBase() {
+    // returns the support overlay uses the shared talk back traversal order for user safe support ui test. The test gives the code a clear input and checks the expected result.
     @Test
     fun supportOverlayUsesTheSharedTalkBackTraversalOrder() {
         setup()
@@ -55,6 +56,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         )
     }
 
+    // returns the setup for user safe support ui test. The test gives the code a clear input and checks the expected result.
     private fun setup(): SessionViewModel {
         openOnboarding()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
@@ -97,7 +99,9 @@ class SafeSupportUiTest : OliveUiTestBase() {
         return session
     }
 
+    // returns the toggle for user safe support ui test. The test gives the code a clear input and checks the expected result.
     private fun toggle() = compose.onNodeWithTag("support_menu_toggle").performClick()
+    // User safe support ui test: returns the capture. The test gives the code a clear input and checks the expected result.
     private fun capture(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val file = File(instrumentation.targetContext.getExternalFilesDir(null), name)
@@ -107,6 +111,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         }
     }
 
+    // returns the available support actions and quick exit work with the menu open for user safe support ui test. The test gives the code a clear input and checks the expected result.
     @Test
     fun availableSupportActionsAndQuickExitWorkWithTheMenuOpen() {
         setup()
@@ -124,6 +129,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
     }
 
+    // User safe support ui test: returns the trusted contacts open from the support menu instead of settings. The test gives the code a clear input and checks the expected result.
     @Test
     fun trustedContactsOpenFromTheSupportMenuInsteadOfSettings() {
         val session = setup()
@@ -138,6 +144,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safe_contacts").assertDoesNotExist()
     }
 
+    // returns the hotlines match the saved city and can browse another province for user safe support ui test. The test gives the code a clear input and checks the expected result.
     @Test
     fun hotlinesMatchTheSavedCityAndCanBrowseAnotherProvince() {
         val session = setup()
@@ -176,6 +183,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         }
     }
 
+    // returns the device location changes resources without changing the saved address for user safe support ui test. The test gives the code a clear input and checks the expected result.
     @Test
     fun deviceLocationChangesResourcesWithoutChangingTheSavedAddress() {
         val session = setup()
@@ -217,6 +225,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("hotline_city").assertDoesNotExist()
     }
 
+    // User safe support ui test: returns the back dismisses support before leaving the current safe page. The test gives the code a clear input and checks the expected result.
     @Test
     fun backDismissesSupportBeforeLeavingTheCurrentSafePage() {
         val session = setup()
@@ -233,6 +242,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         assertEquals(SafePage.Home, session.page)
     }
 
+    // User safe support ui test: returns the support menu fits compact screens with large french text. The test gives the code a clear input and checks the expected result.
     @Test
     fun supportMenuFitsCompactScreensWithLargeFrenchText() {
         val session = setup()
@@ -268,12 +278,14 @@ class SafeSupportUiTest : OliveUiTestBase() {
         capture("support-menu-large-text.png")
     }
 
+    // returns the talk back can open support and quick exit without reaching the underlying screen for user safe support ui test. The test gives the code a clear input and checks the expected result.
     @Test
     fun talkBackCanOpenSupportAndQuickExitWithoutReachingTheUnderlyingScreen() {
         val session = setup()
         TalkBackTestSession(compose.activity).use { talkBack ->
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             compose.waitUntil(10_000) { context.getSystemService(android.view.accessibility.AccessibilityManager::class.java).isTouchExplorationEnabled }
+            // User safe support ui test: returns the activate. The test gives the code a clear input and checks the expected result.
             fun activate(tag: String) =
                 compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { it() }
             activate("support_menu_toggle")

@@ -29,6 +29,7 @@ internal object FitnessCloudSync {
         summary.put("updatedAt", now)
         val payload = summary.toString()
         val bytes = payload.toByteArray(Charsets.UTF_8)
+        // A upload error is handled here instead of closing the app.
         try {
             FirebaseStorage.getInstance().reference
                 .child("accounts/${user.uid}/fitness/summary.json")
@@ -46,6 +47,7 @@ internal object FitnessCloudSync {
         }
     }
 
+    // returns the summary json for fitness cover.
     private fun summaryJson(snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) = JSONObject().apply {
         put("stepGoal", snapshot.profile.stepGoal)
         put("calorieGoal", snapshot.profile.calorieGoal)

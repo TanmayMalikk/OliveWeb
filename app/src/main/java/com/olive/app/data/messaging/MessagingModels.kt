@@ -42,6 +42,7 @@ data class ChatConversation(
     val supportTag: String = "",
     val closedAt: Long = 0L,
 ) {
+    // Messaging: returns the display name.
     fun displayName(
         currentUid: String,
         viewerRole: AccountRole,
@@ -94,7 +95,9 @@ data class ChatMessage(
     val unsent: Boolean = false,
 )
 
+// Messaging: Represents a live chat listener. It gives each screen one operation for stopping that listener safely.
 fun interface ChatSubscription {
+    // Messaging: Stops live chat updates. It checks the chat and uses its secure data before reading or saving a message.
     fun close()
 }
 

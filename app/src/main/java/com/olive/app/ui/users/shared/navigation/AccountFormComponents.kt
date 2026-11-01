@@ -88,6 +88,7 @@ internal fun Heading(
     focusKey: Any? = title,
 ) {
     val focusRequester = remember { FocusRequester() }
+    // Update heading when information used by this screen changes.
     LaunchedEffect(focusKey) {
         if (focusKey != null) {
             withFrameNanos { }
@@ -121,6 +122,7 @@ internal fun ModeNotice(session: SessionViewModel) {
 // Announces status changes to TalkBack and shows when the app is busy.
 @Composable
 internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
+    // Only continue with status when show message.
     if (showMessage) session.message?.let {
         AccessibleMessage(
             it,

@@ -50,9 +50,11 @@ import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.util.zip.ZipFile
 
+// The safety document viewer view is part of user safety document viewer. It gives the user the details and choices needed here.
 @Composable
 internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
+    // Update safety document viewer when information used by this screen changes.
     DisposableEffect(file) { onDispose { file.delete() } }
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -80,6 +82,7 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
             }
         }
         HorizontalDivider()
+        // Choose what safety document viewer should do for the current value.
         when {
             document.mimeType.startsWith("image/") -> ImageViewer(file, document.name)
             document.mimeType.startsWith("video/") -> VideoViewer(file)
@@ -100,7 +103,7 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
         }
     }
 }
-
+// Shows image viewer for user safety document viewer.
 @Composable
 private fun ImageViewer(file: File, name: String) {
     var scale by remember { mutableFloatStateOf(1f) }
@@ -158,10 +161,12 @@ private fun ImageViewer(file: File, name: String) {
     }
 }
 
+// This is the video viewer view for user safety document viewer. It shows current details and the actions available to the user.
 @Composable
 private fun VideoViewer(file: File) {
     val context = LocalContext.current
     var player by remember { mutableStateOf<VideoView?>(null) }
+    // Update video viewer when information used by this screen changes.
     DisposableEffect(Unit) { onDispose { player?.stopPlayback() } }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(factory = {
@@ -189,6 +194,7 @@ private fun VideoViewer(file: File) {
 
 private data class PdfPage(val bitmap: Bitmap, val count: Int)
 
+// This is the pdf viewer view for user safety document viewer. It shows current details and the actions available to the user.
 @Composable
 private fun PdfViewer(file: File) {
     var page by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
@@ -250,6 +256,7 @@ private fun renderPdfPage(file: File, index: Int): PdfPage {
     }
 }
 
+// user safety document viewer shows this text viewer view so the user can view its details and use its actions.
 @Composable
 private fun TextViewer(file: File, docx: Boolean) {
     val content by produceState<String?>(null, file) {
@@ -289,6 +296,7 @@ private fun readDocx(file: File): String {
     }
 }
 
+// user safety document viewer shows this unsupported viewer view so the user can view its details and use its actions.
 @Composable
 private fun UnsupportedViewer() {
     Column(

@@ -12,10 +12,12 @@ class HotlineDirectoryTest {
     )
         .first { it.isDirectory }
 
+    // returns the files for hotline directory test kt. The test gives the code a clear input and checks the expected result.
     private fun files() =
         assets.listFiles { file -> file.name.matches(Regex("Resources[A-Z]{2}\\.json")) }.orEmpty()
             .associate { it.name.removePrefix("Resources").removeSuffix(".json") to it.readText() }
 
+    // Hotline directory test kt: returns the directory. The test gives the code a clear input and checks the expected result.
     private fun directory() = HotlineDirectory.parseProvinceFiles(files())
 
     // Inputs: the values shown below. Expected: lars datasets cover every canadian region.

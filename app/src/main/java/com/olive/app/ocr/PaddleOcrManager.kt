@@ -38,7 +38,9 @@ class PaddleOcrManager(private val context: Context) {
     // Starts the OCR engine once and reuses that initialized instance for later scans.
     private suspend fun ensureInitialized(): PaddleOCR {
         check(!released) { "OCR engine has been released" }
+        // Only continue with ensure initialized when paddle ocr is null.
         if (paddleOcr == null) {
+            // If ensure initialized fails, catch the error so the app can keep running and explain the problem.
             try {
                 OpenCVUtils.init(context.applicationContext)
                 straightener = OrientationPreprocessor(context.applicationContext)
@@ -76,12 +78,15 @@ class PaddleOcrManager(private val context: Context) {
         return paddleOcr!!
     }
 
+    // Paddle ocr manager: Reads text from the selected document image. It prepares the picture before the app reads or saves it.
     suspend fun recognizeDocument(imageBytes: ByteArray): OcrResult =
         recognizeDocumentWithPreview(imageBytes).second
 
+    // Paddle ocr manager: Reads text and builds a preview for the selected document image. It prepares the picture before the app reads or saves it.
     suspend fun recognizeDocumentWithPreview(imageBytes: ByteArray): Pair<ByteArray, OcrResult> =
         withContext(Dispatchers.IO) {
             mutex.withLock {
+                // If recognize document with preview fails, catch the error so the app can keep running and explain the problem.
                 try {
                     val ocr = ensureInitialized()
                     val uprightBytes = checkNotNull(straightener).process(imageBytes)
@@ -120,6 +125,7 @@ class PaddleOcrManager(private val context: Context) {
             }
         }
 
+    // Releases the resources used by the feature for paddle ocr manager. It prepares the picture before the app reads or saves it.
     suspend fun release() = withContext(Dispatchers.IO) {
         mutex.withLock {
             if (released) return@withLock

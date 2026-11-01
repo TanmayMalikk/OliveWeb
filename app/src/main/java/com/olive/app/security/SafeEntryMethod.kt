@@ -9,6 +9,7 @@ enum class SafeEntryMethod {
         fun fromStored(value: String): SafeEntryMethod =
             entries.firstOrNull { it.name == value } ?: APP_PIN
 
+        // Safe entry method: returns the recommended.
         fun recommended(abuserKnowsDevicePin: Boolean) =
             if (abuserKnowsDevicePin) APP_PIN else DEVICE_LOCK
     }

@@ -35,6 +35,7 @@ internal fun PinSafeOliveTransition(
 ) {
     val progress = remember { Animatable(0f) }
 
+    // Update pin safe olive transition when information used by this screen changes.
     LaunchedEffect(Unit) {
         progress.snapTo(0f)
         progress.animateTo(
@@ -87,7 +88,9 @@ internal fun OliveBranchAnimation(
 ) {
     val progressAnimatable = remember { Animatable(0f) }
 
+    // Update olive branch animation when information used by this screen changes.
     LaunchedEffect(isAnimating) {
+        // Only continue with olive branch animation when is animating.
         if (isAnimating) {
             progressAnimatable.snapTo(0f)
             progressAnimatable.animateTo(
@@ -194,10 +197,10 @@ internal fun OliveBranchAnimationContent(
             val leafFractions = floatArrayOf(0.18f, 0.32f, 0.46f, 0.60f, 0.74f, 0.88f)
             val pos = FloatArray(2)
             val tan = FloatArray(2)
-
             for ((i, frac) in leafFractions.withIndex()) {
                 if (branchGrowth >= frac * 0.82f) {
                     val leafGrowth = ((branchGrowth - frac * 0.82f) / 0.22f).coerceIn(0f, 1f)
+                    // olive branch animation content checks whether path measure get pos tan total length * frac, pos, tan before continuing.
                     if (pathMeasure.getPosTan(totalLength * frac, pos, tan)) {
                         val baseAngle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
                         val side = if (i % 2 == 0) -1f else 1f
@@ -229,7 +232,6 @@ internal fun OliveBranchAnimationContent(
             val pathMeasure = PathMeasure(branchPath.asAndroidPath(), false)
             val pos = FloatArray(2)
             val tan = FloatArray(2)
-
             if (pathMeasure.getPosTan(pathMeasure.length * 0.68f, pos, tan)) {
                 val anchorX = pos[0]
                 val anchorY = pos[1]
@@ -246,6 +248,7 @@ internal fun OliveBranchAnimationContent(
                 val currentOliveY: Float
                 val oliveRotation: Float
 
+                // olive drop is 0f is handled here by olive branch animation content.
                 if (oliveDrop == 0f) {
                     currentOliveX = anchorX + 2.dp.toPx()
                     currentOliveY = anchorY + (16.dp.toPx() * budScale)
@@ -287,6 +290,7 @@ internal fun OliveBranchAnimationContent(
                     val currentRadius = maxRadius * FastOutSlowInEasing.transform(rippleProgress)
                     val rAlpha = (1f - rippleProgress).coerceIn(0f, 1f) * oliveAlpha
 
+                    // olive branch animation content checks whether r alpha > 0 01f before continuing.
                     if (rAlpha > 0.01f) {
                         drawCircle(
                             color = Color(0xFF6B8E23).copy(alpha = rAlpha * 0.45f),

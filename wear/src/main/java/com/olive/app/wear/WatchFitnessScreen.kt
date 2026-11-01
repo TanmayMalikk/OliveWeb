@@ -73,6 +73,7 @@ private enum class WatchPage(val label: String) {
     FOOD("Food"),
 }
 
+// Builds the light olive fitness theme used throughout the watch app.
 @Composable
 internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
     MaterialTheme(
@@ -104,6 +105,7 @@ internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
     }
 }
 
+// Shows the selected watch summary while keeping navigation usable on a round display.
 @Composable
 private fun WatchDashboard(state: WatchFitnessState) {
     var selectedPageName by rememberSaveable { mutableStateOf(WatchPage.HOME.name) }
@@ -113,6 +115,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
     var workoutStartSteps by rememberSaveable { mutableIntStateOf(state.displayedSteps) }
     var elapsedSeconds by rememberSaveable { mutableLongStateOf(0L) }
 
+    // Update watch dashboard when information used by this screen changes.
     LaunchedEffect(workoutRunning, workoutStartMillis) {
         while (workoutRunning) {
             elapsedSeconds = ((System.currentTimeMillis() - workoutStartMillis) / 1_000L)
@@ -141,6 +144,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
             }
         }
 
+        // Shows detailed movement totals and outdoor-workout controls on the Move page.
         if (selectedPage == WatchPage.MOVE) {
             WatchSummaryCard(title = null) {
                 CircularStepSummary(state, stepProgress, totalCaloriesBurned)
@@ -160,6 +164,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
             }
             Button(
                 onClick = {
+                    // Starts a new timer or stops the outdoor workout already in progress.
                     if (workoutRunning) {
                         workoutRunning = false
                     } else {
@@ -189,6 +194,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
             WatchVitalsSummary(state)
         }
 
+        // Shows phone-synchronized calorie and macro progress on the Food page.
         if (selectedPage == WatchPage.FOOD) {
             WatchSummaryCard(title = "Nutrition") {
             Row(
@@ -219,6 +225,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
 }
 
 // Watch vitals: shows today's live, peak, lowest, resting, and average heart rates.
+// Shows today's heart-rate range and explains when the watch has no usable reading.
 @Composable
 private fun WatchVitalsSummary(state: WatchFitnessState) {
     val summary = state.heartRateSummary
@@ -259,6 +266,7 @@ private fun WatchVitalsSummary(state: WatchFitnessState) {
     }
 }
 
+// Draws today's steps inside one readable circular progress indicator.
 @Composable
 private fun CircularStepSummary(
     state: WatchFitnessState,
@@ -308,6 +316,7 @@ private fun CircularStepSummary(
     }
 }
 
+// Lets watch users switch between Home, Move, Vitals, and Food summaries.
 @Composable
 private fun WatchTabs(
     selectedPage: WatchPage,
@@ -336,6 +345,7 @@ private fun WatchTabs(
     }
 }
 
+// Gives longer watch pages vertical scrolling without introducing horizontal movement.
 @Composable
 private fun ScrollableWatchPage(content: @Composable ColumnScope.() -> Unit) {
     val scrollState = rememberScrollState()
@@ -355,6 +365,7 @@ private fun ScrollableWatchPage(content: @Composable ColumnScope.() -> Unit) {
     )
 }
 
+// Places one related group of watch metrics inside a consistent summary surface.
 @Composable
 private fun WatchSummaryCard(
     title: String?,
@@ -374,6 +385,7 @@ private fun WatchSummaryCard(
     }
 }
 
+// Shows one macro's eaten amount, goal, and progress in the watch nutrition summary.
 @Composable
 private fun MacroProgressRow(label: String, value: Float, goal: Int) {
     val progress = (value / goal.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
@@ -401,6 +413,7 @@ private fun MacroProgressRow(label: String, value: Float, goal: Int) {
     }
 }
 
+// Displays one compact value and label without crowding the round watch screen.
 @Composable
 private fun TinyMetric(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {

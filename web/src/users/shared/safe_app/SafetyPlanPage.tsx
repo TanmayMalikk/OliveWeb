@@ -17,6 +17,7 @@ import {
 } from "../../../services/SafetyPlanService";
 import { useSession } from "../../../session/SessionProvider";
 
+// Web safe app: returns the label.
 const label = (value: string) =>
   value.replace(
     /(^|_)(\w)/g,
@@ -30,6 +31,7 @@ export default function SafetyPlan() {
   const [feedback, setFeedback] = useState("");
   const [activeKind, setActiveKind] = useState<"primary" | "backup">("primary");
   const editable = identity?.role === "USER";
+  // Update editable when information used by this screen changes.
   useEffect(() => {
     if (!cloudMode || !identity) return;
     let live = true;

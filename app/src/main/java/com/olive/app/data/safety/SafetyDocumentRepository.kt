@@ -48,6 +48,7 @@ internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata
 }
 
 interface SafetyDocumentDataSource {
+    // Lists for for safety.
     suspend fun listFor(uid: String): List<SafetyDocument>
     // Streams every document the account may open and reports storage-listener failures separately.
     fun observeFor(
@@ -56,9 +57,13 @@ interface SafetyDocumentDataSource {
         onError: (String) -> Unit
     ): ChatSubscription
 
+    // Loads for for safety.
     suspend fun getFor(uid: String, id: String): SafetyDocument
+    // Safety: Shares the selected item.
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
+    // Deletes the selected item for safety.
     suspend fun delete(document: SafetyDocument, ownerUid: String)
+    // Safety: Downloads the selected file.
     suspend fun download(context: Context, document: SafetyDocument): File
     /** Gives this account's registered phones and browsers encrypted copies of the document key. */
     suspend fun approveCurrentAccountDevices(document: SafetyDocument, currentUid: String, username: String)
@@ -69,6 +74,7 @@ class SafetyDocumentRepository(
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
     private val media: MediaTicketDataSource,
 ) : SafetyDocumentDataSource {
+    // Safety: Lists for. It reads or saves the matching protected record in Firebase.
     override suspend fun listFor(uid: String): List<SafetyDocument> = firestore.collection("files")
         .whereArrayContains("allowed_users", uid).get().await().documents.mapNotNull { documentFrom(it, uid) }
         .sortedByDescending { it.createdAt }
@@ -92,6 +98,7 @@ class SafetyDocumentRepository(
         return ChatSubscription { listener.remove() }
     }
 
+    // Safety: Loads for. It reads or saves the matching protected record in Firebase.
     override suspend fun getFor(uid: String, id: String): SafetyDocument {
         val document = documentFrom(firestore.collection("files").document(id).get().await(), uid)
             ?: error("File is no longer available")
@@ -99,6 +106,7 @@ class SafetyDocumentRepository(
         return document
     }
 
+    // Safety: Shares the selected item. It reads or saves the matching protected record in Firebase.
     override suspend fun share(
         document: SafetyDocument,
         ownerUid: String,
@@ -112,6 +120,7 @@ class SafetyDocumentRepository(
         }
         val updated = (listOf(ownerUid) + recipients.keys).distinct()
         updateStorageAccess(current, current.allowedUsers.toSet(), updated.toSet())
+        // If share fails, catch the error so the app can keep running and explain the problem.
         try {
             firestore.collection("files").document(document.id).update("allowed_users", updated)
                 .await()
@@ -127,6 +136,7 @@ class SafetyDocumentRepository(
         }
     }
 
+    // returns the grant access for safety. It reads or saves the matching protected record in Firebase.
     suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
@@ -151,6 +161,7 @@ class SafetyDocumentRepository(
         }
         val updated = current.allowedUsers.toSet() + recipientUid
         updateStorageAccess(current, current.allowedUsers.toSet(), updated)
+        // If grant access fails, catch the error so the app can keep running and explain the problem.
         try {
             firestore.collection("files").document(document.id)
                 .update("allowed_users", FieldValue.arrayUnion(recipientUid)).await()
@@ -160,6 +171,7 @@ class SafetyDocumentRepository(
         }
     }
 
+    // returns the revoke access for safety. It reads or saves the matching protected record in Firebase.
     suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) {
         val document = getFor(ownerUid, documentId)
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
@@ -171,6 +183,7 @@ class SafetyDocumentRepository(
         }
         val updated = document.allowedUsers.toSet() - recipientUid
         updateStorageAccess(document, document.allowedUsers.toSet(), updated)
+        // A revoke access error is handled here instead of closing the app.
         try {
             firestore.collection("files").document(documentId)
                 .update("allowed_users", FieldValue.arrayRemove(recipientUid)).await()
@@ -180,6 +193,7 @@ class SafetyDocumentRepository(
         }
     }
 
+    // Safety: Deletes the selected item. It reads or saves the matching protected record in Firebase.
     override suspend fun delete(document: SafetyDocument, ownerUid: String) {
         require(document.ownerUid == ownerUid)
         if (document.objectKey.isNotBlank()) {
@@ -190,6 +204,7 @@ class SafetyDocumentRepository(
         firestore.collection("files").document(document.id).delete().await()
     }
 
+    // Safety: Downloads the selected file.
     override suspend fun download(context: Context, document: SafetyDocument): File {
         require(document.objectKey.isBlank()) { "Encrypted media downloads use MediaTransferController" }
         val folder = File(context.cacheDir, "opened-documents").apply { mkdirs() }
@@ -203,6 +218,7 @@ class SafetyDocumentRepository(
         return target
     }
 
+    // returns the approve current account devices for safety. It reads or saves the matching protected record in Firebase.
     override suspend fun approveCurrentAccountDevices(
         document: SafetyDocument,
         currentUid: String,
@@ -278,6 +294,7 @@ class SafetyDocumentRepository(
         )
     }
 
+    // returns the document from for safety.
     private fun documentFrom(row: DocumentSnapshot, viewerUid: String): SafetyDocument? {
         val owner = row.getString("owner_id") ?: return null
         val encryptedMetadata = row.getString("encrypted_metadata").orEmpty()
@@ -320,6 +337,7 @@ class SafetyDocumentRepository(
 
     private companion object {
         const val CACHE_LIFETIME = 60L * 60L * 1000L
+        // returns the access key for safety.
         fun accessKey(uid: String) = "access_$uid"
     }
 }

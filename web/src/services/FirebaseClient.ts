@@ -41,6 +41,7 @@ if (
     isTokenAutoRefreshEnabled: true,
   });
 }
+// env vite use firebase emulators is true is handled here by functions.
 if (env.VITE_USE_FIREBASE_EMULATORS === "true") {
   if (!env.VITE_FIREBASE_PROJECT_ID?.startsWith("demo-"))
     throw new Error("Emulators require a demo- project ID.");

@@ -43,6 +43,7 @@ internal class DeviceLocationUpdates internal constructor(
     private val fusedLocation: FusedLocationProviderClient,
     private val callback: LocationCallback,
 ) {
+    // Stops the feature for location sharing.
     fun stop() {
         fusedLocation.removeLocationUpdates(callback)
     }
@@ -72,6 +73,7 @@ internal object DeviceLocation {
 
         val fusedLocation = LocationServices.getFusedLocationProviderClient(context.applicationContext)
         val callback = object : LocationCallback() {
+            // Location sharing: Responds when location result.
             override fun onLocationResult(result: LocationResult) {
                 result.locations.forEach { location ->
                     onLocation(
@@ -95,6 +97,7 @@ internal object DeviceLocation {
         return DeviceLocationUpdates(fusedLocation, callback)
     }
 
+    // returns the current coordinates for location sharing.
     suspend fun currentCoordinates(context: Context): DeviceCoordinates? {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -119,6 +122,7 @@ internal object DeviceLocation {
         }
     }
 
+    // returns the coordinates for address for location sharing.
     suspend fun coordinatesForAddress(
         context: Context,
         address: DeliveryAddress
@@ -163,6 +167,7 @@ internal object DeviceLocation {
         }
     }
 
+    // Location sharing: returns the recent.
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private fun recent(manager: LocationManager): Location? {
         val now = System.currentTimeMillis()
@@ -175,6 +180,7 @@ internal object DeviceLocation {
             }
     }
 
+    // Location sharing: returns the fused current. It asks the device for its location and turns the answer into map data.
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private suspend fun fusedCurrent(context: Context): Location? {
         val cancellation = CancellationTokenSource()
@@ -193,6 +199,7 @@ internal object DeviceLocation {
         }
     }
 
+    // Location sharing: returns the current.
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private suspend fun current(context: Context, manager: LocationManager): Location? =
         suspendCancellableCoroutine { continuation ->
@@ -216,6 +223,7 @@ internal object DeviceLocation {
             }.onFailure { if (continuation.isActive) continuation.resume(null) }
         }
 
+    // Location sharing: returns the geocode.
     private suspend fun geocode(context: Context, location: Location): Address? {
         val geocoder = Geocoder(context, Locale.getDefault())
         return if (Build.VERSION.SDK_INT >= 33) suspendCancellableCoroutine { continuation ->
@@ -226,10 +234,12 @@ internal object DeviceLocation {
                     1,
                     // Returns the first matching address, or null when Android geocoding fails.
                     object : Geocoder.GeocodeListener {
+                        // Location sharing: Responds when geocode. It returns the asynchronous result to the waiting task.
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                         }
 
+                        // Location sharing: Responds when error.
                         override fun onError(errorMessage: String?) {
                             if (continuation.isActive) continuation.resume(null)
                         }
@@ -238,14 +248,18 @@ internal object DeviceLocation {
         } else legacyReverseGeocode(geocoder, location)
     }
 
+    // Location sharing: returns the forward geocode.
     private suspend fun forwardGeocode(geocoder: Geocoder, query: String): Address? =
+        // forward geocode checks whether the Android version is at least 33 before continuing.
         if (Build.VERSION.SDK_INT >= 33) suspendCancellableCoroutine { continuation ->
             runCatching {
                 geocoder.getFromLocationName(query, 1, object : Geocoder.GeocodeListener {
+                    // Location sharing: Responds when geocode. It returns the asynchronous result to the waiting task.
                     override fun onGeocode(addresses: MutableList<Address>) {
                         if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                     }
 
+                    // Location sharing: Responds when error.
                     override fun onError(errorMessage: String?) {
                         if (continuation.isActive) continuation.resume(null)
                     }
@@ -253,6 +267,7 @@ internal object DeviceLocation {
             }.onFailure { if (continuation.isActive) continuation.resume(null) }
         } else legacyForwardGeocode(geocoder, query)
 
+    // Location sharing: returns the legacy forward geocode.
     @Suppress("DEPRECATION")
     private suspend fun legacyForwardGeocode(geocoder: Geocoder, query: String): Address? =
         withContext(Dispatchers.IO) {
@@ -260,6 +275,7 @@ internal object DeviceLocation {
             runCatching { geocoder.getFromLocationName(query, 1)?.firstOrNull() }.getOrNull()
         }
 
+    // Location sharing: returns the legacy reverse geocode.
     @Suppress("DEPRECATION")
     private suspend fun legacyReverseGeocode(geocoder: Geocoder, location: Location): Address? =
         withContext(Dispatchers.IO) {

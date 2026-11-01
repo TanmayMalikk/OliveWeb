@@ -105,6 +105,7 @@ object EncryptionUtils {
         return Base64.getEncoder().encodeToString(key.encoded)
     }
 
+    // Encryption utils: Converts string to key.
     fun decodeStringToKey(base64Key: String): SecretKey {
         val decoded = Base64.getDecoder().decode(base64Key)
         return SecretKeySpec(decoded, ALGORITHM)

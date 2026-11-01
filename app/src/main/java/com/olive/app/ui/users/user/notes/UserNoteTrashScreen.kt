@@ -59,6 +59,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 
+// The trash view is part of user note trash screen. It gives the user the details and choices needed here.
 @Composable
 internal fun Trash(
     entries: List<PrivateEntry>, formatter: DateTimeFormatter,
@@ -66,6 +67,7 @@ internal fun Trash(
 ) {
     val uiText = rememberResourceText()
     var now by remember(entries) { mutableLongStateOf(System.currentTimeMillis()) }
+    // Update trash when information used by this screen changes.
     LaunchedEffect(entries) {
         while (true) {
             delay(1_000.milliseconds)
@@ -99,6 +101,7 @@ internal fun Trash(
                 color = Muted
             )
         }
+        // entries is empty item text ui text r string ui trash is empty , color = muted is handled here by trash.
         if (entries.isEmpty()) item { Text(uiText(R.string.ui_trash_is_empty), color = Muted) }
         items(entries, key = { it.id }) { entry ->
             Card(

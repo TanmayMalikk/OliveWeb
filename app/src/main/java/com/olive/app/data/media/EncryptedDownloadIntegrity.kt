@@ -19,7 +19,9 @@ internal suspend fun copyAndVerifyEncryptedDownload(
     val digest=MessageDigest.getInstance("SHA-256")
     val buffer=ByteArray(64*1024)
     var received=0L
+    // A copy and verify encrypted download error is handled here instead of closing the app.
     try {
+        // Media: Keeps copy and verify encrypted download active while true.
         while(true) {
             currentCoroutineContext().ensureActive()
             val count=input.read(buffer)
