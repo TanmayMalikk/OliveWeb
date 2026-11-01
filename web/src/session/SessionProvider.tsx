@@ -47,6 +47,12 @@ import {
 import { SessionContext, useSession, type SessionValue } from "./SessionContext";
 import { useSessionSecurity } from "./useSessionSecurity";
 export { useSession };
+function accountSyncError(error: unknown) {
+  const code = (error as { code?: string })?.code;
+  if (code === "permission-denied" || code === "firestore/permission-denied")
+    return "You are signed in, but Firebase is blocking live account sync. Deploy the current Firestore rules to enable it.";
+  return error instanceof Error ? error.message : "Account sync is unavailable.";
+}
 const initialEntryToken =
   (location.pathname === "/" || location.pathname === "/entry") &&
   validEntryToken(location.hash.slice(1))
@@ -111,18 +117,18 @@ export function SessionProvider({
             setProfile(loaded.profile);
             setHistory(loaded.history);
           }).catch((error) => {
-            if (active) setMessage(error instanceof Error ? error.message : "Account sync failed.");
+            if (active) setMessage(accountSyncError(error));
           });
         }, 150);
       },
       (error) => {
-        if (active) setMessage(error.message);
+        if (active) setMessage(accountSyncError(error));
       },
     ).then((cleanup) => {
       if (active) stop = cleanup;
       else cleanup();
     }).catch((error) => {
-      if (active) setMessage(error instanceof Error ? error.message : "Account sync could not start.");
+      if (active) setMessage(accountSyncError(error));
     });
     return () => {
       active = false;
@@ -230,6 +236,7 @@ export function SessionProvider({
     mode,
     pendingEntry,
     phase,
+    role: profile?.role ?? null,
     quickExit,
     setBusy,
     setEnrollmentAttempt: setEntryAttempt,
