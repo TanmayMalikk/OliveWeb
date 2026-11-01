@@ -1,5 +1,10 @@
 package com.olive.app.data
 
+import com.olive.app.data.messaging.VoipApiException
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipManager
+import com.olive.app.data.messaging.VoipParticipant
+import com.olive.app.data.messaging.VoipParticipantStatus
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -12,6 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
+@Suppress("SameParameterValue", "SameParameterValue")
 class VoipSessionControllerTest {
     @Test
     fun startJoinMuteAndLeaveKeepsGroupCallOpen() = runBlocking {
@@ -203,12 +209,16 @@ class VoipSessionControllerTest {
                 val request = chain.request()
                 requests += request
                 val responseCode = if (request.method == "DELETE") deleteStatus else 200
-                val responseBody = if (request.method == "DELETE" && deleteStatus != 200) {
-                    """{"error":{"code":"unavailable","message":"Call service unavailable"}}"""
-                } else if (request.method == "DELETE") {
-                    """{"deleted":true,"callId":"call-1"}"""
-                } else {
-                    callResponse
+                val responseBody = when (request.method) {
+                    "DELETE" if deleteStatus != 200 -> {
+                        """{"error":{"code":"unavailable","message":"Call service unavailable"}}"""
+                    }
+                    "DELETE" -> {
+                        """{"deleted":true,"callId":"call-1"}"""
+                    }
+                    else -> {
+                        CALLRESPONSE
+                    }
                 }
                 Response.Builder()
                     .request(request)
@@ -272,7 +282,7 @@ class VoipSessionControllerTest {
                 VoipParticipant("user-2", VoipParticipantStatus.PENDING)
             )
         )
-        private const val callResponse =
+        private const val CALLRESPONSE =
             """{"callId":"call-1","channelId":42,"name":"Support","callerId":"caller-1","participants":[{"userId":"caller-1","status":"accepted"},{"userId":"user-2","status":"pending"}]}"""
     }
 }
