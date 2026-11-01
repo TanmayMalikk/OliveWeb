@@ -31,6 +31,11 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 runtime.enrollment = restoredSession?.enrollment
                 restoredSession?.let { restorePresentation(it) }
                 routeRestoredAccount()
+                runtime.enrollment?.uid?.takeIf { !runtime.localMode }?.let { uid ->
+                    withContext(Dispatchers.IO) {
+                        MessageSendWorker.enqueuePending(runtime.application, uid)
+                    }
+                }
                 if (runtime.enrollment?.role == AccountRole.ADMIN && !runtime.localMode) {
                     runtime.organization.queueAdminRefresh()
                 }
@@ -222,6 +227,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 navigation.quickExit()
                 historySyncJob?.cancel()
                 historySyncJob = null
+                MessageSendWorker.cancelOwner(application, uid)
                 busy = true
                 scope.launch {
                     try {
@@ -234,6 +240,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                                 )
                             )
                             store.forgetDevice()
+                            messageOutbox.purge(uid)
                         }
                         if (!localMode) runCatching {
                             withTimeoutOrNull(2_000.milliseconds) {

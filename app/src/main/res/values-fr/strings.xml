@@ -345,6 +345,11 @@
     <string name="select_a_friend_or_conversation_to_start_messaging">Sélectionnez un ami ou une conversation pour commencer.</string>
     <string name="unsend_message">Annuler l’envoi</string>
     <string name="message_unsent">Message annulé</string>
+    <string name="message_delivery_queued">En attente — connexion requise</string>
+    <string name="message_delivery_sending">Envoi…</string>
+    <string name="message_delivery_retrying">Pas encore envoyé — nouvelle tentative automatique</string>
+    <string name="message_delivery_failed_retry">Non envoyé — appuyez pour réessayer</string>
+    <string name="message_delivery_sent">Envoyé</string>
 <string name="share_attachment">Partager une pièce jointe</string><string name="select_attachment_category">Sélectionner %1$s</string>
     <string name="private_notes">Notes privées</string><string name="incident_reports">Rapports d’incident</string><string name="saved_media">Médias enregistrés</string>
     <string name="no_private_notes_found">Aucune note trouvée.</string><string name="untitled_note">Note sans titre</string><string name="no_incident_reports_found">Aucun rapport d’incident trouvé.</string>

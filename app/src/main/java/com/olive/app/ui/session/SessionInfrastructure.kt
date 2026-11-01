@@ -11,6 +11,7 @@ import com.olive.app.data.FirebaseAccountRepository
 import com.olive.app.data.LocalAccountRepository
 import com.olive.app.data.LocationSharingRepository
 import com.olive.app.data.MessagingRepository
+import com.olive.app.data.MessageOutboxStore
 import com.olive.app.data.SafetyDocumentRepository
 import com.olive.app.data.SecureChatRepository
 import com.olive.app.data.SecureDocumentRepository
@@ -40,6 +41,7 @@ internal class SessionLocalStorage(application: Application, localMode: Boolean)
         "olive_cloud_state",
         Context.MODE_PRIVATE,
     )
+    val messageOutbox = MessageOutboxStore(application)
 }
 
 // Builds cloud repositories only for a Firebase session. Tests can supply a replacement bundle.

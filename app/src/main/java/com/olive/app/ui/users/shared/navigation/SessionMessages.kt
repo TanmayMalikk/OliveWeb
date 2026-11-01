@@ -53,6 +53,7 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun sendMessage(text: String, onSent: () -> Unit = {}) =
         runtime.conversationActions.sendMessage(text, onSent)
 
+    fun retryMessage(chat: ChatMessage) = runtime.conversationActions.retryMessage(chat)
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
     fun dismissChatQuickExitHint() = runtime.conversationActions.dismissChatQuickExitHint()
 
