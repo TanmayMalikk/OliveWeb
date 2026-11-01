@@ -25,6 +25,7 @@ import {
 } from "../domain/DomainModels";
 export const cloudMode = Boolean(
   import.meta.env.VITE_FIREBASE_API_KEY &&
+  import.meta.env.VITE_FIREBASE_AUTH_DOMAIN &&
   import.meta.env.VITE_FIREBASE_PROJECT_ID &&
   import.meta.env.VITE_FIREBASE_STORAGE_BUCKET &&
   import.meta.env.VITE_FIREBASE_APP_ID,
@@ -68,7 +69,10 @@ export class Accounts {
             "Organization accounts must be provisioned by an administrator.",
           );
         const normalized = username.trim().toLowerCase();
-        await httpsCallable(functions, "createPublicAccount")({
+        await httpsCallable(
+          functions,
+          "createPublicAccount",
+        )({
           username: normalized,
           password,
           role,

@@ -74,12 +74,17 @@ async function newsFixture(page: Page) {
 }
 
 // Inputs: numeric username, mismatched password, then corrected credentials. Expected: errors stay inline and valid setup advances.
-test("account creation enforces current credential rules before onboarding", async ({ page }) => {
+test("account creation enforces current credential rules before onboarding", async ({
+  page,
+}) => {
   await page.goto("/account/create");
   const username = page.getByLabel("Username", { exact: true });
   const passwordField = page.getByLabel("Password", { exact: true });
   const confirmation = page.getByLabel("Confirm password", { exact: true });
-  const submit = page.getByRole("button", { name: "Create account", exact: true });
+  const submit = page.getByRole("button", {
+    name: "Create account",
+    exact: true,
+  });
   await username.fill("12345678");
   await passwordField.fill(password);
   await confirmation.fill(password);
@@ -91,7 +96,9 @@ test("account creation enforces current credential rules before onboarding", asy
   await expect(page.getByRole("alert")).toContainText("Passwords do not match");
   await confirmation.fill(password);
   await submit.click();
-  await expect(page.getByRole("heading", { name: "Choose your familiar." })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Choose your familiar." }),
+  ).toBeVisible();
 });
 // Inputs: the values in this case. Expected: plain domain and guessed private paths show the game, never a private workspace.
 test("plain domain and guessed private paths show the game, never a private workspace", async ({
@@ -316,9 +323,13 @@ test("fitness cover opens activity, vitals, and nutrition summaries", async ({
   page,
 }) => {
   await page.goto("/cover/fitness");
-  await expect(page.getByRole("heading", { name: "Fitness Tracker" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Fitness Tracker" }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: /Activity/ }).click();
-  await expect(page.getByRole("img", { name: "Steps, last 14 days" })).toBeVisible();
+  await expect(
+    page.getByRole("img", { name: "Steps, last 14 days" }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: /Vitals/ }).click();
   await expect(page.getByText("— No data —")).toBeVisible();
   await page.getByRole("tab", { name: /Nutrition/ }).click();
@@ -369,17 +380,25 @@ test("PWA manifests use cover-specific identities and the download page offers t
     page.getByRole("button", { name: "Begin onboarding" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Download the Android test app." }),
+    page.getByRole("heading", { name: "Download the Android app." }),
   ).toBeVisible();
   await expect(
     page.getByRole("img", {
-      name: "QR code linking to the Android debug APK download",
+      name: "QR code linking to the Android app APK download",
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /Download Android debug APK/i }),
-  ).toHaveAttribute("href", /olive-branch\.apk/);
-  expect((await request.get("/download/android")).status()).toBe(410);
+    page.getByRole("link", { name: /Download Android APK/i }),
+  ).toHaveAttribute("href", "/download/android");
+  const download = await request.get("/download/android", { maxRedirects: 0 });
+  expect(download.status()).toBe(302);
+  expect(download.headers().location).toContain("olive-branch.apk");
+  await expect(
+    page.getByRole("heading", { name: "Your space, on the web." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Open the web app/i }),
+  ).toHaveAttribute("href", "https://yourolivebranch.ca/account/sign-in");
 });
 for (const size of [
   { width: 390, height: 844 },
@@ -436,11 +455,20 @@ test("public game and account screens meet core accessibility checks", async ({
 });
 
 // Inputs: the values in this case. Expected: signed-in safe app pages meet core accessibility checks.
-test("signed-in safe app pages meet core accessibility checks", async ({ page }) => {
+test("signed-in safe app pages meet core accessibility checks", async ({
+  page,
+}) => {
   const link = await onboard(page);
   await unlock(page, link);
   for (const section of [
-    "Home", "Notes", "Messages", "SafetyPlan", "Contacts", "Profile", "Settings", "Activity",
+    "Home",
+    "Notes",
+    "Messages",
+    "SafetyPlan",
+    "Contacts",
+    "Profile",
+    "Settings",
+    "Activity",
   ]) {
     if (section !== "Home") {
       await page.getByRole("button", { name: section, exact: true }).click();
