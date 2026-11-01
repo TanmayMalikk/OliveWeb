@@ -1,4 +1,4 @@
-// Public web visitors: downloads the Android test app or installs the iOS web app.
+// Public visitors: download the Android debug app or install the iOS web app.
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import {
@@ -76,11 +76,11 @@ export default function DownloadPage() {
               <Download size={30} />
             </div>
             <span className="eyebrow">FOR ANDROID</span>
-            <h2>Download the Android app.</h2>
+            <h2>Download the Android debug app.</h2>
             <p>
-              Scan the code with your Android camera to download the APK shown
-              here. Open the downloaded file to install it. Android may ask you
-              to allow installation from your browser.
+              Scan the code with your Android camera to download the current
+              debug APK. Open the downloaded file to install it. Android may ask
+              you to allow installation from your browser.
             </p>
             <div className="qr-area">
               {androidQr ? (
@@ -89,7 +89,7 @@ export default function DownloadPage() {
                     src={androidQr}
                     width="240"
                     height="240"
-                    alt="QR code linking to the Android app APK download"
+                    alt="QR code linking to the Olive Branch debug APK download"
                   />
                   <small>Scan with your Android phone’s camera.</small>
                 </>
@@ -101,7 +101,7 @@ export default function DownloadPage() {
               )}
             </div>
             <a className="button" href={ANDROID_DOWNLOAD_URL}>
-              <Download size={17} /> Download Android APK
+              <Download size={17} /> Download debug APK
             </a>
             <p className="help-note">
               Android may show a warning because this APK is installed outside

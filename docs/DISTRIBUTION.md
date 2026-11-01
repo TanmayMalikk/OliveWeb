@@ -5,8 +5,9 @@ The download website uses one stable Firebase Storage object:
 `public/android/olive-branch.apk`
 
 After each push to `main`, `.github/workflows/publish-android-main.yml` builds
-the debug APK and replaces that object. The QR code does not need to change
-because its URL always points to the same object.
+the debug APK and replaces that object. The download server accepts only this
+specific object, so the QR code cannot accidentally be redirected to a release
+APK. The QR code itself does not need to change.
 
 ## Required GitHub Actions secrets
 

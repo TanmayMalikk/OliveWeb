@@ -1,0 +1,72 @@
+name: Publish Android debug APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-debug-apk
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    name: Build and publish debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Reuse the debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: olive-debug-signing-key-v1
+
+      - name: Create local Android settings
+        env:
+          GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          REALTIME_DATABASE_URL: ${{ secrets.REALTIME_DATABASE_URL }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          entries = [
+              f"GEOAPIFY_API_KEY={os.environ['GEOAPIFY_API_KEY']}",
+              f"MAPBOX_ACCESS_TOKEN={os.environ['MAPBOX_ACCESS_TOKEN']}",
+              f"REALTIME_DATABASE_URL={os.environ['REALTIME_DATABASE_URL']}",
+          ]
+          Path("local.properties").write_text("\n".join(entries) + "\n")
+          PY
+
+      - name: Build the debug app
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Sign in to Firebase Storage
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Install Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Publish debug APK to the QR download location
+        run: >-
+          gcloud storage cp
+          --content-type=application/vnd.android.package-archive
+          --cache-control="no-cache, no-store, max-age=0"
+          app/build/outputs/apk/debug/app-debug.apk
+          gs://olive-21239.firebasestorage.app/public/android/olive-branch.apk
