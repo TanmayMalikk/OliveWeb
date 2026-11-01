@@ -2,7 +2,9 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { randomUUID } = require('node:crypto');
 const { connectMumbleIce } = require('../src/ice-config');
 const { MumbleHandler } = require('../src/calls');
@@ -10,11 +12,15 @@ const { MumbleHandler } = require('../src/calls');
 test('creates and removes a channel on the local Mumble server', {
     skip: process.env.MUMBLE_INTEGRATION !== '1'
 }, async () => {
-    const bindingPath = process.env.MUMBLE_SLICE_MODULE;
-    assert.ok(bindingPath, 'Set MUMBLE_SLICE_MODULE to the generated MumbleServer.js file');
+    const bindingPath = process.env.MUMBLE_SLICE_MODULE
+        || path.join(__dirname, '../generated/MumbleServer.js');
+    assert.ok(fs.existsSync(bindingPath),
+        'Generate the Mumble bindings with npm run generate:mumble');
 
-    const Ice = require('@zeroc/ice');
-    const MumbleServer = require(path.resolve(bindingPath));
+    const [{ Ice }, { MumbleServer }] = await Promise.all([
+        import('@zeroc/ice'),
+        import(pathToFileURL(path.resolve(bindingPath)).href)
+    ]);
     const connection = await connectMumbleIce({
         Ice,
         MumbleServer,

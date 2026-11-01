@@ -6,13 +6,14 @@
   "scripts": {
     "start": "node src/start.js",
     "test": "node --test",
-    "test:integration": "MUMBLE_INTEGRATION=1 node --test test/mumble.integration.test.js"
+    "generate:mumble": "mkdir -p generated && slice2js -I node_modules/@zeroc/ice/slice --output-dir generated mumble/v1.5.939/MumbleServer.ice",
+    "test:integration": "npm run generate:mumble && MUMBLE_INTEGRATION=1 node --test test/mumble.integration.test.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.16.0"
   },
   "peerDependencies": {
-    "@zeroc/ice": "^3.7.0"
+    "@zeroc/ice": "^3.8.3"
   },
   "license": "UNLICENSED"
 }
