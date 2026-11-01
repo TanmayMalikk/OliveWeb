@@ -1,6 +1,6 @@
-// Contains the safety plans code for this part of Olive.
+// Users and support staff: saves safety-plan edits and shares approved plans.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {db} = require("./firebase");
+const {db} = require("./firebaseAdminClient");
 const {mergeFields} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference, canEdit, canRead} = require("./safetyPlanAccess");
 exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {

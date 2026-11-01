@@ -1,15 +1,13 @@
-// Tests the graph expression test behavior.
+// Tests graph equations, errors, and angle modes for calculator users.
 package com.olive.app.ui.covers.calculator
-
-import com.olive.app.ui.shared.*
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import kotlin.math.PI
 
-// Groups the data and actions for graph expression test.
 class GraphExpressionTest {
+    // Inputs: the values shown below. Expected: evaluates common graph equations.
     @Test
     fun evaluatesCommonGraphEquations() {
         assertEquals(9.0, GraphExpression.compile("y = x^2").evaluate(3.0), 1e-9)
@@ -19,6 +17,7 @@ class GraphExpressionTest {
         assertEquals(1.0, GraphExpression.compile("cos(2pi)").evaluate(PI), 1e-9)
     }
 
+    // Inputs: the values shown below. Expected: reports invalid graph equations.
     @Test
     fun reportsInvalidGraphEquations() {
         assertThrows(IllegalArgumentException::class.java) { GraphExpression.compile("") }
@@ -26,6 +25,7 @@ class GraphExpressionTest {
         assertThrows(IllegalArgumentException::class.java) { GraphExpression.compile("x +") }
     }
 
+    // Inputs: the values shown below. Expected: switches trigonometry between radians and degrees.
     @Test
     fun switchesTrigonometryBetweenRadiansAndDegrees() {
         assertEquals(
@@ -45,6 +45,7 @@ class GraphExpressionTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: evaluates scientific and combinatoric functions.
     @Test
     fun evaluatesScientificAndCombinatoricFunctions() {
         assertEquals(120.0, GraphExpression.compile("5!").evaluate(0.0), 1e-9)

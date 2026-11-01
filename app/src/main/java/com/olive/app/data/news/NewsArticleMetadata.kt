@@ -1,4 +1,4 @@
-// Contains the news article metadata code for this part of Olive.
+// News cover users: extracts titles and images for news articles.
 package com.olive.app.data
 
 import android.content.Context
@@ -38,7 +38,6 @@ internal fun isSecureNewsUrl(url: String): Boolean = runCatching {
     ) && !uri.host.isNullOrBlank() && uri.rawUserInfo == null
 }.getOrDefault(false)
 
-// Groups the data and actions for news article metadata.
 internal data class NewsArticleMetadata(
     val publisherUrl: String = "", val imageUrl: String = "", val topic: String = "",
     val isPaywalled: Boolean? = null, val description: String = ""
@@ -48,7 +47,7 @@ internal data class NewsArticleMetadata(
             .put("topic", topic).put("isPaywalled", isPaywalled ?: JSONObject.NULL)
             .put("description", description)
 
-    // Applies to.
+    // Fills missing article fields with publisher metadata while preserving existing feed values.
     fun applyTo(article: NewsArticle): NewsArticle = article.copy(
         publisherUrl = publisherUrl.ifBlank { article.publisherUrl },
         imageUrl = imageUrl.ifBlank { article.imageUrl },
@@ -276,7 +275,7 @@ internal class NewsMetadataRepository(context: Context) {
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (_: Exception) { // One malformed metadata source should be skipped so the remaining article fallbacks can still be tried.
                 null
             }
             val metadata =
@@ -299,7 +298,7 @@ internal class NewsMetadataRepository(context: Context) {
         }
     }
 
-    // Works out publisher.
+    // Follows a safe article URL and returns the final publisher host after redirects.
     private suspend fun resolvePublisher(link: String): String? {
         if (!isSecureNewsUrl(link)) return null
         if (!URI(link).host.equals("news.google.com", true)) return link
@@ -338,7 +337,6 @@ internal class NewsMetadataRepository(context: Context) {
                                     return !isSecureNewsUrl(url)
                                 }
 
-                                // Runs when page finished happens.
                                 override fun onPageFinished(view: WebView, url: String) {
                                     if (isSecureNewsUrl(url) && !isGoogleHost(URI(url).host) && continuation.isActive) continuation.resume(
                                         url

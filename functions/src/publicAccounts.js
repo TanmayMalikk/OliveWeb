@@ -1,6 +1,6 @@
-// Creates User and Safe Contact accounts while reserving one username across every account role.
+// Users and safe contacts: creates accounts with usernames unique across all roles.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {auth, db, FieldValue} = require("./firebase");
+const {auth, db, FieldValue} = require("./firebaseAdminClient");
 const {normalizedUsername, normalizedRole, validPassword, signInEmail} = require("./accountPolicy");
 const {usernameExistsGlobally} = require("./accountStorage");
 

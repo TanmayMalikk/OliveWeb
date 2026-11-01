@@ -1,4 +1,4 @@
-// Contains the firebase account repository code for this part of Olive.
+// All account roles: loads and saves Firebase account profiles.
 package com.olive.app.data
 
 import com.google.firebase.auth.FirebaseAuth
@@ -8,6 +8,7 @@ import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.StorageReference
 import com.google.firebase.functions.FirebaseFunctions
+import android.util.Log
 import com.olive.app.security.*
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
@@ -69,10 +70,12 @@ class FirebaseAccountRepository : AccountRepository {
                     .await().user
             }
         } ?: error("Missing account")
-        // Every organization login keeps the email lookup current and migrates older accounts back to the username alias.
+        // Sign-in has already succeeded. Refreshing the older email alias must not block access if that optional update fails.
         if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-            functions.getHttpsCallable("restoreOrganizationLoginAlias").call().await()
-            user.reload().await()
+            runCatching {
+                functions.getHttpsCallable("restoreOrganizationLoginAlias").call().await()
+                user.reload().await()
+            }.onFailure { Log.w("OliveAuth", "Organization login alias refresh failed", it) }
         }
         val accountName = user.displayName?.takeIf(InputPolicy::validExistingUsername)
             ?: user.email?.substringBefore('@')?.let(InputPolicy::username).orEmpty()
@@ -104,7 +107,6 @@ class FirebaseAccountRepository : AccountRepository {
         }
     }
 
-    // Saves profile.
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         check(profile.username == identity.username) { "Profile account mismatch" }
@@ -175,7 +177,7 @@ class FirebaseAccountRepository : AccountRepository {
 
     override fun signOut() = auth.signOut()
 
-    // Reads able history.
+    // Converts a stored activity JSON record into short text suitable for the history screen.
     private fun readableHistory(category: String, raw: String): String {
         val value = JSONObject(raw)
         return when (category) {

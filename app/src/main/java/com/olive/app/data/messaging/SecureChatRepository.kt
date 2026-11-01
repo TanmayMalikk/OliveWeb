@@ -1,4 +1,4 @@
-// Contains the secure chat repository code for this part of Olive.
+// All chat roles: stores encrypted chats between allowed participants.
 package com.olive.app.data
 
 import com.google.firebase.firestore.FieldValue
@@ -11,25 +11,32 @@ import javax.crypto.SecretKey
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
 class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
-    // Makes sure room key is ready.
+    // Opens the copy of an existing room key that was encrypted for this account.
+    suspend fun existingRoomKey(conversationId: String, currentUid: String): SecretKey? {
+        val snapshot = firestore.collection("conversations").document(conversationId).get().await()
+        val wrappedKey = snapshot.roomKeys().orEmpty()[currentUid] ?: return null
+        return KeyManager.unwrapKey(wrappedKey)
+    }
+
+    // Creates or unwraps the encrypted room key required before this participant can read messages.
     suspend fun ensureRoomKey(
         conversation: ChatConversation, currentUid: String,
         participantPublicKeys: Map<String, PublicKey>
     ): SecretKey {
         require(participantPublicKeys.keys.containsAll(conversation.participantIds))
-        val generated = EncryptionUtils.generateSymmetricKey()
-        val wrapped =
-            participantPublicKeys.mapValues { (_, key) -> KeyManager.wrapKey(generated, key) }
         val encodedPublicKeys = participantPublicKeys.mapValues { (_, key) ->
             java.util.Base64.getEncoder().encodeToString(key.encoded)
         }
         val ref = firestore.collection("conversations").document(conversation.id)
         val selected = firestore.runTransaction { transaction ->
             val snapshot = transaction.get(ref)
-            val savedKeys = snapshot.participantPublicKeys()
-            if (savedKeys == encodedPublicKeys) snapshot.wrappedKey(currentUid)
-                ?: error("Secure conversation key unavailable.")
-            else {
+            val savedKeys = snapshot.participantPublicKeys().orEmpty()
+            val savedWrapped = snapshot.roomKeys().orEmpty()
+            if (savedKeys.isEmpty() && savedWrapped.isEmpty()) {
+                val generated = EncryptionUtils.generateSymmetricKey()
+                val wrapped = participantPublicKeys.mapValues { (_, key) ->
+                    KeyManager.wrapKey(generated, key)
+                }
                 transaction.update(
                     ref, mapOf(
                         "roomKeys" to wrapped, "participantPublicKeys" to encodedPublicKeys,
@@ -37,6 +44,28 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                     )
                 )
                 wrapped.getValue(currentUid)
+            } else {
+                val ownWrappedKey = savedWrapped[currentUid]
+                    ?: error("An existing participant must open this chat to share its key.")
+                if (savedKeys == encodedPublicKeys && savedWrapped.keys.containsAll(conversation.participantIds)) {
+                    ownWrappedKey
+                } else {
+                    // Rewrap the same AES key for new participants and changed device keys.
+                    val existingKey = KeyManager.unwrapKey(ownWrappedKey)
+                    val updatedWrapped = participantPublicKeys.mapValues { (uid, publicKey) ->
+                        if (savedKeys[uid] == encodedPublicKeys[uid]) savedWrapped[uid]
+                            ?: KeyManager.wrapKey(existingKey, publicKey)
+                        else KeyManager.wrapKey(existingKey, publicKey)
+                    }
+                    transaction.update(
+                        ref, mapOf(
+                            "roomKeys" to updatedWrapped,
+                            "participantPublicKeys" to encodedPublicKeys,
+                            "updatedAt" to FieldValue.serverTimestamp()
+                        )
+                    )
+                    updatedWrapped.getValue(currentUid)
+                }
             }
         }.await()
         return KeyManager.unwrapKey(selected)
@@ -73,7 +102,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         batch.commit().await()
     }
 
-    // Watches messages for changes.
+    // Streams encrypted chat records and decrypts each message with the active room key.
     fun observeMessages(
         conversationId: String, roomKey: SecretKey, onUpdate: (List<ChatMessage>) -> Unit,
         onError: (String) -> Unit
@@ -131,8 +160,8 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun com.google.firebase.firestore.DocumentSnapshot.wrappedKey(uid: String) =
-        (get("roomKeys") as? Map<String, String>)?.get(uid)
+    private fun com.google.firebase.firestore.DocumentSnapshot.roomKeys() =
+        get("roomKeys") as? Map<String, String>
 
     @Suppress("UNCHECKED_CAST")
     private fun com.google.firebase.firestore.DocumentSnapshot.participantPublicKeys() =

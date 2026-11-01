@@ -19,7 +19,6 @@
     <string name="ui_passwords_match">كلمات المرور متطابقة</string>
     <string name="ui_delete_value">هل تريد حذف %1$s؟</string>
     <string name="ui_signed_in_as_value">تم تسجيل الدخول باسم %1$s</string>
-    <string name="ui_active_chats_with_staff_and_users">محادثات نشطة مع الموظفين والمستخدمين</string>
     <string name="ui_back">العودة</string>
     <string name="ui_no_accounts_found">لم يتم العثور على حسابات.</string>
     <string name="ui_profile_information">معلومات الملف الشخصي</string>
@@ -45,7 +44,6 @@
     <string name="ui_reconnect_your_account">أعد ربط حسابك</string>
     <string name="ui_your_local_olive_branch_account_is_locked_safely_but_firebase_nee">تم قفل حساب Olive Branch المحلي الخاص بك بأمان، ولكن يحتاج Firebase إلى كلمة المرور الخاصة بك مرة أخرى قبل أن يتمكن الأصدقاء والرسائل من التحميل.</string>
     <string name="ui_account_password">كلمة مرور الحساب</string>
-    <string name="ui_requirement_met">تم استيفاء المتطلبات</string>
     <string name="ui_finish">إنهاء</string>
     <string name="ui_step_value_of_value">الخطوة %1$s من %2$s</string>
     <string name="ui_value_of_value_required">%1$s من %2$s مطلوب</string>

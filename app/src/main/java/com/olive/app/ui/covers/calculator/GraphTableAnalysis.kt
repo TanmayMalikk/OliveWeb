@@ -1,4 +1,4 @@
-// Contains the graph table analysis code for this part of Olive.
+// Calculator cover users: builds a value table from a graph.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -24,10 +24,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlin.math.floor
 
-// Groups the data and actions for graph calculation.
 internal enum class GraphCalculation(val label: Int, val inputLabel: Int, val example: Int) {
     Value(R.string.ui_value, R.string.ui_x_value, R.string.ui_example_2),
     Zero(R.string.ui_zero, R.string.ui_search_range, R.string.ui_example_10_10),
@@ -38,7 +36,6 @@ internal enum class GraphCalculation(val label: Int, val inputLabel: Int, val ex
     Intersection(R.string.ui_intersection, R.string.ui_search_range, R.string.ui_example_10_10),
 }
 
-// Groups the data and actions for graph table data.
 internal data class GraphTableData(val headers: List<String>, val rows: List<List<String>>)
 
 // Build rows separately from the UI so range validation and every Y= column stay reliable.

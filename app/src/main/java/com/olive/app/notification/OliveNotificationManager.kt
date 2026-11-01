@@ -1,4 +1,4 @@
-// Contains the olive notification manager code for this part of Olive.
+// Signed-in users: posts app alerts on Android.
 package com.olive.app.notification
 
 import android.Manifest
@@ -17,7 +17,6 @@ import com.olive.app.R
 import com.olive.app.data.AccountRole
 import com.olive.app.data.CoverType
 
-// Groups the data and actions for olive notification manager.
 object OliveNotificationManager {
     const val CHANNEL_FOOD = "olive_food_channel"
     const val CHANNEL_NEWS = "olive_news_channel"
@@ -83,7 +82,7 @@ object OliveNotificationManager {
     ) =
         AppNotifications.contentFor(title, body, coverType, text = text)
 
-    // Shows discreet notification.
+    // Posts role- and cover-safe notification text without revealing private app activity.
     fun showDiscreetNotification(
         context: Context,
         title: String?,

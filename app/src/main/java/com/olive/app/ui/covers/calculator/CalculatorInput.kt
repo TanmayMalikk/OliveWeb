@@ -1,7 +1,5 @@
-// Contains the calculator input code for this part of Olive.
+// Calculator cover users: handles calculator keys and expressions.
 package com.olive.app.ui.covers.calculator
-
-import com.olive.app.ui.shared.*
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -9,13 +7,11 @@ import androidx.compose.runtime.setValue
 
 internal const val CALCULATOR_HISTORY_LIMIT = 5
 
-// Groups the data and actions for calculator history entry.
 internal data class CalculatorHistoryEntry(val expression: String, val result: String)
 
 // Build the visible equation here and wait for equals before calculating it locally.
 internal class CalculatorInput(
     initialHistory: List<CalculatorHistoryEntry> = emptyList(),
-    // Runs when history changed happens.
     private val onHistoryChanged: (List<CalculatorHistoryEntry>) -> Unit = {},
 ) {
     var display by mutableStateOf("0")
@@ -167,7 +163,7 @@ internal class CalculatorInput(
         }
     }
 
-    // Updates entry.
+    // Stores a bounded calculator expression and immediately recalculates its preview.
     private fun updateEntry(value: String) {
         expression = value.take(MAX_EXPRESSION_LENGTH)
         display = expression.ifBlank { "0" }
@@ -181,7 +177,7 @@ internal class CalculatorInput(
         armedPin = null
     }
 
-    // Clears history.
+    // Removes every saved calculator result from memory and device storage.
     fun clearHistory() = updateHistory(emptyList())
 
     // Disk history arrives after the keypad is already interactive.
@@ -193,7 +189,7 @@ internal class CalculatorInput(
         )
     }
 
-    // Updates history.
+    // Limits, displays, and persists the newest calculator history entries.
     private fun updateHistory(value: List<CalculatorHistoryEntry>) {
         history = value.take(CALCULATOR_HISTORY_LIMIT)
         onHistoryChanged(history)

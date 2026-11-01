@@ -1,6 +1,6 @@
-// Contains the admin accounts code for this part of Olive.
+// Admins: lets admins list and manage organization accounts.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {auth, db, bucket, FieldValue} = require("./firebase");
+const {auth, db, bucket, FieldValue} = require("./firebaseAdminClient");
 const {text, normalizedUsername, normalizedRole, validPassword, signInEmail, roleFromUser, isTemporaryEmail, profileComplete, defaultProfile, protectedAccount} = require("./accountPolicy");
 const {readProfile, writeProfile, saveOrganizationLogin, requireAdmin, listEveryUser, usernameExistsGlobally} = require("./accountStorage");
 

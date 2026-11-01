@@ -1,4 +1,4 @@
-// Contains the map code for this part of Olive.
+// Safe-app users and safe contacts: draws the interactive location map and route.
 const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([53.5461,-113.4938],12);
 window.oliveResizeTo=function(height){
   document.getElementById('map').style.height=height+'px';

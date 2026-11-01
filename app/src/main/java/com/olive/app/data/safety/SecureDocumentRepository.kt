@@ -1,4 +1,4 @@
-// Contains the secure document repository code for this part of Olive.
+// Safe-app users and support staff: opens encrypted documents for approved viewers.
 package com.olive.app.data
 
 import com.google.firebase.firestore.FieldValue
@@ -11,7 +11,6 @@ import org.json.JSONObject
 import java.security.PublicKey
 import javax.crypto.SecretKey
 
-// Groups the data and actions for secure document repository.
 class SecureDocumentRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
     /**
@@ -179,8 +178,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
                 // We reuse loadAndDecryptEntry but pass the already fetched snapshot ID
                 val decryptedEntry = loadAndDecryptEntry(doc.id, currentUid)
                 entries.add(decryptedEntry)
-            } catch (@Suppress("unused") ignored: Exception) {
-                // If one document fails to decrypt (e.g., bad key), skip it and continue loading the rest
+            } catch (_: Exception) { // Skip one unreadable entry so the rest of the private list can still load.
             }
         }
         return entries

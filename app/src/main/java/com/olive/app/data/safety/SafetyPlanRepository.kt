@@ -1,4 +1,4 @@
-// Contains the safety plan repository code for this part of Olive.
+// Safe-app users and support staff: loads and saves safety-plan edits.
 package com.olive.app.data
 
 import com.google.firebase.functions.FirebaseFunctions

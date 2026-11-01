@@ -1,6 +1,6 @@
-// Contains the account deletion code for this part of Olive.
+// All account roles: deletes an account and its stored records on request.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {auth, db, bucket, FieldValue} = require("./firebase");
+const {auth, db, bucket, FieldValue} = require("./firebaseAdminClient");
 const {text, roleFromUser, protectedAccount} = require("./accountPolicy");
 const {readProfile, deleteOrganizationLogin, requireAdmin, listEveryUser} = require("./accountStorage");
 const {saveSupportConversation, PLAN_CONSULT} = require("./supportGroups");
@@ -45,7 +45,8 @@ exports.adminDeleteAccount = onCall(async (request) => {
     const plan = {...snapshot.data(), adminUid: "", adminName: ""};
     await snapshot.ref.update({adminUid: "", adminName: ""});
     if (plan.staffUid) await saveSupportConversation(
-        {...plan, supportOrigin: PLAN_CONSULT}, plan.supportSafeContactUid || "");
+        {...plan, conversationId: plan.consultationConversationId, supportOrigin: PLAN_CONSULT},
+        plan.supportSafeContactUid || "");
   }
   await db.collection("safetyStaff").doc(uid).delete();
   await deleteQuery(db.collection("friendRequests").where("senderUid", "==", uid));

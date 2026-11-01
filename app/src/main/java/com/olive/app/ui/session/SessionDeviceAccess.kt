@@ -1,9 +1,5 @@
-// Contains the session device access code for this part of Olive.
+// Signed-in users: checks device-lock and PIN entry.
 package com.olive.app.ui.session
-
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
 
 import com.olive.app.R
 import com.olive.app.data.AccountRole
@@ -17,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.crypto.Cipher
 
-// Groups the data and actions for device lock request.
 internal class DeviceLockRequest internal constructor(
     val challenge: DeviceLockChallenge,
     val settingsChange: Boolean = false
@@ -82,7 +77,7 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
                             store.enrollDeviceLock(identity!!, value!!, checkNotNull(grant))
                                 .also { challenge.markEnrolled() }
                         }
-                        if (current(token, expectedScreen, uid, true)) auth.finishEnrollment(
+                        if (current(token, expectedScreen, uid, true)) accountSession.finishEnrollment(
                             saved,
                             value!!,
                             token

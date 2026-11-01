@@ -1,4 +1,4 @@
-// Contains the flows.spec code for this part of Olive.
+// Tests cover entry, sign-in, and safe-app navigation in the browser.
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const password = "Test-password1!";
@@ -72,6 +72,28 @@ async function newsFixture(page: Page) {
     }),
   );
 }
+
+// Inputs: numeric username, mismatched password, then corrected credentials. Expected: errors stay inline and valid setup advances.
+test("account creation enforces current credential rules before onboarding", async ({ page }) => {
+  await page.goto("/account/create");
+  const username = page.getByLabel("Username", { exact: true });
+  const passwordField = page.getByLabel("Password", { exact: true });
+  const confirmation = page.getByLabel("Confirm password", { exact: true });
+  const submit = page.getByRole("button", { name: "Create account", exact: true });
+  await username.fill("12345678");
+  await passwordField.fill(password);
+  await confirmation.fill(password);
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("lowercase letters");
+  await username.fill("boundary_user");
+  await confirmation.fill("Different123!");
+  await submit.click();
+  await expect(page.getByRole("alert")).toContainText("Passwords do not match");
+  await confirmation.fill(password);
+  await submit.click();
+  await expect(page.getByRole("heading", { name: "Choose your familiar." })).toBeVisible();
+});
+// Inputs: the values in this case. Expected: plain domain and guessed private paths show the game, never a private workspace.
 test("plain domain and guessed private paths show the game, never a private workspace", async ({
   page,
 }) => {
@@ -89,6 +111,7 @@ test("plain domain and guessed private paths show the game, never a private work
   await page.getByRole("button", { name: "Turn card 1", exact: true }).click();
   await expect(page.getByRole("button", { name: /Card 1: / })).toBeVisible();
 });
+// Inputs: the values in this case. Expected: account onboarding, unique-link gate, encrypted notes, contact CRUD, settings, exit and re-entry.
 test("account onboarding, unique-link gate, encrypted notes, contact CRUD, settings, exit and re-entry", async ({
   page,
 }) => {
@@ -163,6 +186,7 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
     page.getByRole("button", { name: "Quick Exit", exact: true }),
   ).toHaveCount(0);
 });
+// Inputs: the values in this case. Expected: invalid personal links cannot open an account even with valid account credentials.
 test("invalid personal links cannot open an account even with valid account credentials", async ({
   page,
 }) => {
@@ -175,6 +199,7 @@ test("invalid personal links cannot open an account even with valid account cred
     page.getByRole("button", { name: "Notes", exact: true }),
   ).toHaveCount(0);
 });
+// Inputs: the values in this case. Expected: returning account opens the PIN gate at the root URL without revealing private content.
 test("returning account opens the PIN gate at the root URL without revealing private content", async ({
   page,
 }) => {
@@ -190,6 +215,7 @@ test("returning account opens the PIN gate at the root URL without revealing pri
     page.getByRole("button", { name: "Notes", exact: true }),
   ).toHaveCount(0);
 });
+// Inputs: the values in this case. Expected: personal links can be rotated and wrong PINs do not reveal private data.
 test("personal links can be rotated and wrong PINs do not reveal private data", async ({
   page,
 }) => {
@@ -223,6 +249,7 @@ test("personal links can be rotated and wrong PINs do not reveal private data", 
   await expect(page.getByRole("alert")).toContainText("current personal link");
   await unlock(page, replacement);
 });
+// Inputs: the values in this case. Expected: food menu customizations, favourites, cart quantities and payment data stay inside their intended flows.
 test("food menu customizations, favourites, cart quantities and payment data stay inside their intended flows", async ({
   page,
 }) => {
@@ -256,6 +283,7 @@ test("food menu customizations, favourites, cart quantities and payment data sta
     page.getByLabel("Billing address", { exact: true }),
   ).toBeVisible();
 });
+// Inputs: the values in this case. Expected: Quick Exit cancels an in-flight PIN operation and idle dialog autofocus does not extend the timeout.
 test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus does not extend the timeout", async ({
   page,
 }) => {
@@ -283,6 +311,7 @@ test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus do
     page.getByRole("button", { name: "Notes", exact: true }),
   ).toHaveCount(0);
 });
+// Inputs: the values in this case. Expected: advanced matrix tools and statistical plots are usable through the calculator UI.
 test("advanced matrix tools and statistical plots are usable through the calculator UI", async ({
   page,
 }) => {
@@ -307,6 +336,7 @@ test("advanced matrix tools and statistical plots are usable through the calcula
   ).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
 });
+// Inputs: the values in this case. Expected: calculator worker, graph navigation, table and quadratic solver work.
 test("calculator worker, graph navigation, table and quadratic solver work", async ({
   page,
 }) => {
@@ -333,6 +363,7 @@ test("calculator worker, graph navigation, table and quadratic solver work", asy
     "x = 3, 2",
   );
 });
+// Inputs: the values in this case. Expected: news reader sanitizes publisher HTML and bookmarks stay available.
 test("news reader sanitizes publisher HTML and bookmarks stay available", async ({
   page,
 }) => {
@@ -356,7 +387,8 @@ test("news reader sanitizes publisher HTML and bookmarks stay available", async 
     /javascript:/,
   );
 });
-test("PWA manifests use cover-specific identities and download page does not fabricate an APK or QR", async ({
+// Inputs: the values in this case. Expected: PWA manifests use cover-specific identities and the download page offers the debug APK.
+test("PWA manifests use cover-specific identities and the download page offers the debug APK", async ({
   page,
   request,
 }) => {
@@ -373,17 +405,18 @@ test("PWA manifests use cover-specific identities and download page does not fab
   await expect(
     page.getByRole("button", { name: "Begin onboarding" }),
   ).toBeVisible();
-  const info = await (await request.get("/api/distribution")).json();
-  if (!info.androidAvailable) {
-    await expect(
-      page.getByRole("button", { name: "Android download unavailable" }),
-    ).toBeDisabled();
-    await expect(
-      page.getByRole("img", {
-        name: "QR code linking to the Android APK download",
-      }),
-    ).toHaveCount(0);
-  }
+  await expect(
+    page.getByRole("heading", { name: "Download the Android test app." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("img", {
+      name: "QR code linking to the Android debug APK download",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Download Android debug APK/i }),
+  ).toHaveAttribute("href", /olive-branch\.apk/);
+  expect((await request.get("/download/android")).status()).toBe(410);
 });
 for (const size of [
   { width: 390, height: 844 },
@@ -391,6 +424,7 @@ for (const size of [
   { width: 1280, height: 800 },
   { width: 1920, height: 1080 },
 ])
+  // Inputs: the values in this case. Expected: responsive layouts at ${size.width}×${size.height}.
   test(`responsive layouts at ${size.width}×${size.height}`, async ({
     page,
   }) => {
@@ -418,6 +452,7 @@ for (const size of [
         });
     }
   });
+// Inputs: the values in this case. Expected: public game and account screens meet core accessibility checks.
 test("public game and account screens meet core accessibility checks", async ({
   page,
 }) => {
@@ -432,6 +467,29 @@ test("public game and account screens meet core accessibility checks", async ({
         id: v.id,
         description: v.description,
         nodes: v.nodes.map((n) => n.target),
+      })),
+    ).toEqual([]);
+  }
+});
+
+// Inputs: the values in this case. Expected: signed-in safe app pages meet core accessibility checks.
+test("signed-in safe app pages meet core accessibility checks", async ({ page }) => {
+  const link = await onboard(page);
+  await unlock(page, link);
+  for (const section of [
+    "Home", "Notes", "Messages", "SafetyPlan", "Contacts", "Profile", "Settings", "Activity",
+  ]) {
+    if (section !== "Home") {
+      await page.getByRole("button", { name: section, exact: true }).click();
+    }
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+      .analyze();
+    expect(
+      results.violations.map((violation) => ({
+        page: section,
+        rule: violation.id,
+        elements: violation.nodes.map((node) => node.target),
       })),
     ).toEqual([]);
   }

@@ -8,9 +8,15 @@
     <string name="support_walkthrough">دليل إرشادي</string>
     <string name="support_staff_help">طلب المساعدة من الموظفين</string>
     <string name="support_looking_for_staff">جارٍ البحث عن موظفين…</string>
-    <string name="support_staff_found">تم تعيين %1$s. جارٍ فتح محادثة الدعم…</string>
     <string name="support_staff_ready">تم تعيين أحد الموظفين. جارٍ فتح Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
+    <string name="support_no_conversations">لا توجد محادثات دعم حتى الآن.</string>
+    <string name="messaging_send_denied">رفض الخادم هذه الرسالة. أعد فتح المحادثة وحاول مرة أخرى.</string>
+    <string name="support_ticket_consultation">استشارة</string>
+    <string name="support_ticket_support">دعم</string>
+    <string name="support_ticket_escalation">تصعيد</string>
+    <string name="support_request_error">تعذر طلب مساعدة الموظفين. تحقق من اتصالك وحاول مرة أخرى.</string>
+    <string name="support_admin_request_error">تعذر طلب مساعدة المسؤول. حاول مرة أخرى.</string>
     <string name="support_filter_plan_consults">استشارات الخطة</string>
     <string name="support_filter_support">الدعم</string>
     <string name="support_filter_needs_admin">يحتاج إلى مشرفين</string>
@@ -61,4 +67,7 @@
     <string name="support_location_permissions">إعدادات أذونات التطبيق</string>
     <string name="support_resource_hotline">خط مساعدة</string>
     <string name="support_resource_shelter">مأوى</string>
+    <string name="support_close_chat">إغلاق المحادثة للجميع</string>
+    <string name="support_chat_closed">أغلقها الموظف. أُرشفت هذه المحادثة للجميع.</string>
+    <string name="support_close_error">تعذر إغلاق المحادثة. تحقق من اتصالك وحاول مرة أخرى.</string>
 </resources>

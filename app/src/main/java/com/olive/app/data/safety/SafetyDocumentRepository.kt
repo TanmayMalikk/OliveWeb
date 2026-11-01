@@ -1,4 +1,4 @@
-// Contains the safety document repository code for this part of Olive.
+// Safe-app users and support staff: loads and saves a user’s safety documents.
 package com.olive.app.data
 
 import android.content.Context
@@ -7,13 +7,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import java.io.File
 
-// Groups the data and actions for safety document.
 data class SafetyDocument(
     val id: String,
     val ownerUid: String,
@@ -33,37 +33,43 @@ data class SafetyDocument(
     val encryptionVersion: Int = 0,
 )
 
-// Groups the data and actions for document OCR metadata.
 data class DocumentOcrMetadata(val text: String, val confidence: Float, val successful: Boolean)
 
-// Groups the data and actions for safety document data source.
+/** Accepts OCR only after the containing metadata has been decrypted on the client. */
+internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata? {
+    metadata ?: return null
+    val text = metadata.opt("ocrText") as? String ?: return null
+    val confidence = (metadata.opt("ocrConfidence") as? Number)?.toFloat() ?: return null
+    val successful = metadata.opt("ocrSuccessful") as? Boolean ?: return null
+    if (text.length > MAX_OCR_TEXT_LENGTH || !confidence.isFinite() || confidence !in 0f..1f) return null
+    return DocumentOcrMetadata(text, confidence, successful)
+}
+
 interface SafetyDocumentDataSource {
     suspend fun listFor(uid: String): List<SafetyDocument>
-    // Watches for for changes.
+    // Streams every document the account may open and reports storage-listener failures separately.
     fun observeFor(
         uid: String,
         onUpdate: (List<SafetyDocument>) -> Unit,
         onError: (String) -> Unit
     ): ChatSubscription
 
-    // Gets for.
     suspend fun getFor(uid: String, id: String): SafetyDocument
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
     suspend fun delete(document: SafetyDocument, ownerUid: String)
     suspend fun download(context: Context, document: SafetyDocument): File
 }
 
-// Groups the data and actions for safety document repository.
 class SafetyDocumentRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
-    private val media: MediaTicketDataSource = MediaRepository(),
+    private val media: MediaTicketDataSource,
 ) : SafetyDocumentDataSource {
     override suspend fun listFor(uid: String): List<SafetyDocument> = firestore.collection("files")
         .whereArrayContains("allowed_users", uid).get().await().documents.mapNotNull { documentFrom(it, uid) }
         .sortedByDescending { it.createdAt }
 
-    // Watches for for changes.
+    // Converts live Firestore file updates into the user's readable document list.
     override fun observeFor(
         uid: String,
         onUpdate: (List<SafetyDocument>) -> Unit,
@@ -82,7 +88,6 @@ class SafetyDocumentRepository(
         return ChatSubscription { listener.remove() }
     }
 
-    // Gets for.
     override suspend fun getFor(uid: String, id: String): SafetyDocument {
         val document = documentFrom(firestore.collection("files").document(id).get().await(), uid)
             ?: error("File is no longer available")
@@ -194,7 +199,7 @@ class SafetyDocumentRepository(
         return target
     }
 
-    // Updates storage access.
+    // Grants or removes encrypted-file access for the selected document recipients.
     private suspend fun updateStorageAccess(
         document: SafetyDocument,
         before: Set<String>,
@@ -244,13 +249,15 @@ class SafetyDocumentRepository(
     private fun documentFrom(row: DocumentSnapshot, viewerUid: String): SafetyDocument? {
         val owner = row.getString("owner_id") ?: return null
         val encryptedMetadata = row.getString("encrypted_metadata").orEmpty()
+        val encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0
         @Suppress("UNCHECKED_CAST")
         val wrapped = (row.get("wrapped_keys") as? Map<String, String>).orEmpty()
         val metadata = if (encryptedMetadata.isBlank()) null else runCatching {
-            val key = wrapped[viewerUid]?.let(KeyManager::unwrapKey)
+            val key = wrapped[viewerUid]?.let { KeyManager.unwrapKey(it, encryptionVersion) }
                 ?: error("Encryption key is unavailable")
             JSONObject(EncryptionUtils.decryptText(encryptedMetadata, key))
         }.getOrNull()
+        val ocr = documentOcrMetadataFrom(metadata)
         return SafetyDocument(
             id = row.id,
             ownerUid = owner,
@@ -261,17 +268,15 @@ class SafetyDocumentRepository(
                 ?: row.getString("file_type").orEmpty().ifBlank { "application/octet-stream" },
             allowedUsers = (row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty(),
             createdAt = row.getTimestamp("created_at")?.toDate()?.time ?: 0,
-            ocrText = metadata?.optString("ocrText")?.takeIf(String::isNotBlank) ?: row.getString("ocr_text"),
-            ocrConfidence = metadata?.takeIf { it.has("ocrConfidence") }?.optDouble("ocrConfidence")?.toFloat()
-                ?: row.getDouble("ocr_confidence")?.toFloat(),
-            ocrSuccessful = metadata?.takeIf { it.has("ocrSuccessful") }?.optBoolean("ocrSuccessful")
-                ?: row.getBoolean("ocr_successful"),
+            ocrText = ocr?.text,
+            ocrConfidence = ocr?.confidence,
+            ocrSuccessful = ocr?.successful,
             objectKey = row.getString("object_key").orEmpty(),
             encryptedMetadata = encryptedMetadata,
             wrappedKeys = wrapped,
             ciphertextSize = row.getLong("ciphertext_size") ?: 0,
             ciphertextSha256 = row.getString("ciphertext_sha256").orEmpty(),
-            encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0,
+            encryptionVersion = encryptionVersion,
         )
     }
 
@@ -280,3 +285,5 @@ class SafetyDocumentRepository(
         fun accessKey(uid: String) = "access_$uid"
     }
 }
+
+private const val MAX_OCR_TEXT_LENGTH = 50_000
