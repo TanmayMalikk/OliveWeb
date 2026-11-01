@@ -17,7 +17,7 @@ export function createServerApp({ development = false } = {}) {
     if (!development)
       res.set(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com; frame-src https://*.firebaseapp.com https://www.google.com https://www.openstreetmap.org; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+        "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com; frame-src https://*.firebaseapp.com https://www.google.com https://www.openstreetmap.org; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
       );
     next();
   });
@@ -26,9 +26,30 @@ export function createServerApp({ development = false } = {}) {
     next();
   });
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
-  app.get("/download/android", (_req, res) =>
-    res.status(410).type("text/plain").send("Android downloads are unavailable. Install from Android Studio."),
-  );
+  app.get("/download/android", (_req, res) => {
+    let destination;
+    try {
+      destination = new URL(
+        process.env.ANDROID_APK_URL ||
+          "https://firebasestorage.googleapis.com/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2Folive-branch.apk?alt=media",
+      );
+    } catch {
+      return res
+        .status(503)
+        .type("text/plain")
+        .send("APK download is not configured.");
+    }
+    if (
+      destination.protocol !== "https:" ||
+      destination.hostname !== "firebasestorage.googleapis.com"
+    )
+      return res
+        .status(503)
+        .type("text/plain")
+        .send("APK download is not configured.");
+    res.setHeader("Cache-Control", "no-store");
+    return res.redirect(302, destination.href);
+  });
   app.get(
     [
       "/manifest.webmanifest",

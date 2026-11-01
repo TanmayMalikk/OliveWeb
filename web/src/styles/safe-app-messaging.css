@@ -160,8 +160,12 @@
 }
 
 @media (max-width: 70rem) {
-  .messages-layout { grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr); }
-  .chat-bubble { max-width: 86%; }
+  .messages-layout {
+    grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
+  }
+  .chat-bubble {
+    max-width: 86%;
+  }
 }
 .chat-compose > .button {
   border-radius: 50%;
@@ -172,4 +176,161 @@
 }
 .message-feedback {
   grid-column: 1/-1;
+}
+
+/* Staff and admin: keep tickets and secure messages readable on a wide screen. */
+.organization-inbox {
+  display: grid;
+  grid-template-columns: minmax(17rem, 24rem) minmax(0, 1fr);
+  min-height: 36rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--white);
+}
+.organization-ticket-list {
+  min-width: 0;
+  padding: 1.25rem;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.organization-inbox-heading,
+.organization-chat-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.organization-inbox-heading h2,
+.organization-chat-heading h2 {
+  margin: 0.25rem 0 0;
+}
+.organization-ticket-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1.2rem 0;
+}
+.organization-ticket-tabs button {
+  min-height: 2.4rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+.organization-ticket-tabs button[aria-selected="true"] {
+  background: var(--soft);
+  border-color: var(--olive);
+  font-weight: 650;
+}
+.organization-ticket {
+  display: flex;
+  width: 100%;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.9rem;
+  margin: 0.5rem 0;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  text-align: left;
+}
+.organization-ticket.selected,
+.organization-ticket:hover {
+  background: var(--soft);
+}
+.organization-ticket-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--soft);
+}
+.organization-ticket > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+.organization-ticket small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.organization-ticket strong,
+.organization-ticket > span:last-child > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.organization-ticket > span:last-child > span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.organization-ticket-chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 36rem;
+}
+.organization-ticket-chat > .empty {
+  margin: auto;
+}
+.organization-chat-heading {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.organization-chat-heading > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.organization-ticket-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+.organization-ticket-chat .chat-messages {
+  flex: 1;
+  max-height: 30rem;
+}
+.organization-overview h2,
+.organization-plans h2 {
+  margin-top: 0;
+}
+.organization-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.organization-counts article {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--soft);
+}
+.organization-counts strong {
+  font-size: 1.7rem;
+  color: var(--olive);
+}
+.organization-counts span {
+  color: var(--muted);
+}
+.organization-plan-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+@media (max-width: 52rem) {
+  .organization-inbox {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .organization-ticket-list {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    max-height: 24rem;
+  }
+  .organization-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

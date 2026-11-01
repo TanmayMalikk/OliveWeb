@@ -11,6 +11,7 @@ import {
 import { createRoot } from "react-dom/client";
 import { LogOut, Delete, ArrowLeft, Leaf } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
+import { cloudMode } from "./services/AccountService";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
 import { Button, Field, Form } from "./components/SharedComponents";
 import Game from "./public/covers/OliveGamesCover";
@@ -251,24 +252,47 @@ class ErrorBoundary extends Component<
   }
 }
 const mode = siteMode();
-// mode checks whether crypto subtle is false before continuing.
-if (!crypto.subtle) {
+const hostedFirebaseReady =
+  cloudMode &&
+  Boolean(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY) &&
+  import.meta.env.VITE_USE_FIREBASE_EMULATORS !== "true";
+// Hosted private sites must use shared Firebase accounts; local browser accounts cannot sync to phones.
+if (import.meta.env.PROD && mode !== "download" && !hostedFirebaseReady) {
   createRoot(document.getElementById("root")!).render(
-    <main className="error-page">
-      <h1>A secure connection is needed.</h1>
+    <main className="error-page" id="main">
+      <h1>Account service needs setup.</h1>
       <p>
-        Open this app over HTTPS, or use localhost on this computer. Browser
-        encryption is unavailable on an ordinary LAN HTTP address.
+        This site is not connected to shared accounts yet. Add the Firebase web
+        settings and the App Check site key in Hostinger, then redeploy so this
+        website and the phone app use the same accounts.
+      </p>
+      <p className="help-note">
+        Required: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN,
+        VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_STORAGE_BUCKET,
+        VITE_FIREBASE_APP_ID, and VITE_FIREBASE_APPCHECK_SITE_KEY. Set
+        VITE_USE_FIREBASE_EMULATORS to false.
       </p>
     </main>,
   );
 } else
-  createRoot(document.getElementById("root")!).render(
-    <ErrorBoundary>
-      <SessionProvider mode={mode}>
-        <Routes mode={mode} />
-      </SessionProvider>
-    </ErrorBoundary>,
-  );
+  // mode checks whether crypto subtle is false before continuing.
+  if (!crypto.subtle) {
+    createRoot(document.getElementById("root")!).render(
+      <main className="error-page">
+        <h1>A secure connection is needed.</h1>
+        <p>
+          Open this app over HTTPS, or use localhost on this computer. Browser
+          encryption is unavailable on an ordinary LAN HTTP address.
+        </p>
+      </main>,
+    );
+  } else
+    createRoot(document.getElementById("root")!).render(
+      <ErrorBoundary>
+        <SessionProvider mode={mode}>
+          <Routes mode={mode} />
+        </SessionProvider>
+      </ErrorBoundary>,
+    );
 if ("serviceWorker" in navigator && import.meta.env.PROD)
   void navigator.serviceWorker.register("/sw.js").catch(() => {});

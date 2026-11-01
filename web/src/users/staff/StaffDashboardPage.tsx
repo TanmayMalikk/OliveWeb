@@ -10,6 +10,7 @@ import {
   type SafetyPlan,
 } from "../../services/SafetyPlanService";
 import SafetyPlanEditor from "./StaffSafetyPlanEditor";
+import OrganizationSupportInbox from "../shared/OrganizationSupportInbox";
 
 export default function StaffPortal() {
   const session = useSession();
@@ -52,7 +53,11 @@ export default function StaffPortal() {
         <section className="panel safety-plan-summary">
           <div>
             <h2>Availability</h2>
-            <p>{available ? "Available for new requests" : "Not accepting new requests"}</p>
+            <p>
+              {available
+                ? "Available for new requests"
+                : "Not accepting new requests"}
+            </p>
           </div>
           <Button
             variant="outline"
@@ -78,7 +83,9 @@ export default function StaffPortal() {
                 className="panel text-link"
                 key={item.ownerUid}
                 onClick={() =>
-                  void session.perform(async () => setPlan(await loadPlan(item.ownerUid)))
+                  void session.perform(async () =>
+                    setPlan(await loadPlan(item.ownerUid)),
+                  )
                 }
               >
                 Open {item.ownerName || "shared plan"}
@@ -87,7 +94,11 @@ export default function StaffPortal() {
           </div>
         )}
         {plan && <SafetyPlanEditor plan={plan} onChange={setPlan} />}
-        <Button variant="quiet" onClick={() => void session.perform(session.signOut)}>
+        <OrganizationSupportInbox />
+        <Button
+          variant="quiet"
+          onClick={() => void session.perform(session.signOut)}
+        >
           Sign out
         </Button>
       </main>

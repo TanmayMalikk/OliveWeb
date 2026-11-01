@@ -191,6 +191,33 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 23rem), 1fr));
   gap: 1.5rem;
 }
+.download-web {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  margin-block: 1.5rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+.download-web .install-icon {
+  margin: 0;
+}
+.download-web h2 {
+  margin-block: 0.45rem;
+}
+.download-web p {
+  margin: 0;
+  max-width: 48rem;
+}
+@media (max-width: 42rem) {
+  .download-web {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .download-web > .button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
 .install-card {
   padding: clamp(1.5rem, 4vw, 3rem);
   border: 1px solid var(--line);
