@@ -3,6 +3,7 @@
     <string name="overview">Aperçu</string>
     <string name="activity">Activité</string>
     <string name="nutrition">Nutrition</string>
+    <string name="nutrition_work_in_progress">Nutrition (EN COURS DE DÉVELOPPEMENT)</string>
     <string name="fitness_home_message">Votre activité et votre nutrition quotidiennes réunies au même endroit.</string>
     <string name="today_summary">Résumé du jour</string>
     <string name="edit_fitness_goals">Modifier les objectifs d’activité et de nutrition</string>
@@ -82,4 +83,21 @@
     <string name="fitness_vitals_graph_description">Graphique de fréquence cardiaque avec %1$d jours de données, de %2$d à %3$d battements par minute.</string>
     <string name="fitness_vitals_range">%1$d–%2$d bpm</string>
     <string name="fitness_vitals_average">Fréquence cardiaque moyenne %1$d bpm</string>
+    <string name="fitness_outdoor_workout">Entraînement extérieur</string>
+    <string name="fitness_outdoor_workout_description">Suivez en privé votre trajet GPS, la distance, le temps et l’allure.</string>
+    <string name="fitness_start_outdoor_workout">Commencer l’entraînement</string>
+    <string name="fitness_precise_location_required">La position précise est requise pour enregistrer un trajet exact.</string>
+    <string name="fitness_duration">Durée</string>
+    <string name="fitness_pace">Allure</string>
+    <string name="fitness_pause">Pause</string>
+    <string name="fitness_resume">Reprendre</string>
+    <string name="fitness_finish">Terminer</string>
+    <string name="fitness_route_points">Trajet avec %1$d points GPS.</string>
+    <string name="fitness_waiting_for_gps">En attente d’une position GPS précise…</string>
+    <string name="fitness_last_outdoor_workout">Dernier entraînement extérieur</string>
+    <string name="fitness_recent_outdoor_workouts">Entraînements extérieurs récents</string>
+    <string name="fitness_walking">Marche</string>
+    <string name="fitness_running">Course</string>
+    <string name="fitness_cycling">Vélo</string>
+    <string name="fitness_hiking">Randonnée</string>
 </resources>

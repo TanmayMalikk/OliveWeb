@@ -3,6 +3,7 @@
     <string name="overview">Overview</string>
     <string name="activity">Activity</string>
     <string name="nutrition">Nutrition</string>
+    <string name="nutrition_work_in_progress">Nutrition (WORK IN PROGRESS)</string>
     <string name="fitness_home_message">Your daily activity and nutrition, together in one place.</string>
     <string name="today_summary">Today’s summary</string>
     <string name="edit_fitness_goals">Update activity and nutrition goals</string>
@@ -82,4 +83,21 @@
     <string name="fitness_vitals_graph_description">Heart-rate graph with %1$d days of data, from %2$d to %3$d beats per minute.</string>
     <string name="fitness_vitals_range">%1$d–%2$d bpm</string>
     <string name="fitness_vitals_average">Average heart rate %1$d bpm</string>
+    <string name="fitness_outdoor_workout">Outdoor workout</string>
+    <string name="fitness_outdoor_workout_description">Track your private GPS route, distance, time, and pace.</string>
+    <string name="fitness_start_outdoor_workout">Start outdoor workout</string>
+    <string name="fitness_precise_location_required">Precise location is required to record an accurate workout route.</string>
+    <string name="fitness_duration">Duration</string>
+    <string name="fitness_pace">Pace</string>
+    <string name="fitness_pause">Pause</string>
+    <string name="fitness_resume">Resume</string>
+    <string name="fitness_finish">Finish</string>
+    <string name="fitness_route_points">Workout route with %1$d GPS points.</string>
+    <string name="fitness_waiting_for_gps">Waiting for an accurate GPS location…</string>
+    <string name="fitness_last_outdoor_workout">Last outdoor workout</string>
+    <string name="fitness_recent_outdoor_workouts">Recent outdoor workouts</string>
+    <string name="fitness_walking">Walking</string>
+    <string name="fitness_running">Running</string>
+    <string name="fitness_cycling">Cycling</string>
+    <string name="fitness_hiking">Hiking</string>
 </resources>

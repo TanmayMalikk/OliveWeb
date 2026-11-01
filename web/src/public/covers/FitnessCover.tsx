@@ -141,7 +141,7 @@ export default function FitnessCover() {
           <section className="fitness-card">
             <div className="fitness-card-title">
               <div>
-                <span>Nutrition</span>
+                <span>Nutrition (WORK IN PROGRESS)</span>
                 <strong>Today</strong>
               </div>
             </div>

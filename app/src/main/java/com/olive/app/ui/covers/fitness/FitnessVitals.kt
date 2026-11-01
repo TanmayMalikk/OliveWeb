@@ -3,6 +3,7 @@ package com.olive.app.ui.covers.fitness
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,23 +14,32 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.ui.shared.Ink
@@ -46,11 +56,20 @@ import java.time.format.FormatStyle
 import java.util.Date
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 @Composable
 internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val vitals = snapshot.heartRateVitals
+    val history = snapshot.heartRateHistory
+    var selectedDate by remember { mutableStateOf(history.lastOrNull()?.date ?: LocalDate.now()) }
+    var userSelectedDate by remember { mutableStateOf(false) }
+    LaunchedEffect(history) {
+        if (!userSelectedDate && history.isNotEmpty()) {
+            selectedDate = history.last().date
+        }
+    }
+    val selectedVitals = history.firstOrNull { it.date == selectedDate }
     LazyColumn(
         modifier = Modifier.fillMaxSize().oliveScrollbar(listState).testTag("fitness_vitals"),
         state = listState,
@@ -72,14 +91,23 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
             }
         }
 
-        item { HeartRateGraphCard(snapshot.heartRateHistory) }
+        item {
+            HeartRateGraphCard(
+                history = history,
+                selectedDate = selectedDate,
+                onDateSelected = { date ->
+                    userSelectedDate = true
+                    selectedDate = date
+                },
+            )
+        }
 
-        if (vitals != null) {
+        if (selectedVitals != null) {
             item {
-                WatchStatusCard(vitals, snapshot.watchConnected)
+                WatchStatusCard(selectedVitals, snapshot.watchConnected)
             }
             item {
-                VitalsGrid(vitals)
+                VitalsGrid(selectedVitals)
             }
             item {
                 Text(
@@ -92,6 +120,7 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
             item {
                 WatchMessageCard(
                     message = when {
+                        history.isNotEmpty() -> stringResource(R.string.fitness_vitals_no_data)
                         snapshot.watchConnected -> stringResource(
                             R.string.fitness_vitals_waiting_for_reading
                         )
@@ -107,24 +136,15 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
 }
 
 @Composable
-private fun HeartRateGraphCard(history: List<HeartRateVitals>) {
+private fun HeartRateGraphCard(
+    history: List<HeartRateVitals>,
+    selectedDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+) {
     val noData = stringResource(R.string.fitness_vitals_no_data)
     val overallLowest = history.minOfOrNull(HeartRateVitals::lowestBpm) ?: 0
     val overallPeak = history.maxOfOrNull(HeartRateVitals::peakBpm) ?: 0
-    val totalSamples = history.sumOf(HeartRateVitals::sampleCount)
-    val overallAverage = if (totalSamples == 0) 0 else {
-        history.sumOf { it.averageBpm * it.sampleCount } / totalSamples
-    }
-    val graphDescription = if (history.isEmpty()) {
-        noData
-    } else {
-        stringResource(
-            R.string.fitness_vitals_graph_description,
-            history.size,
-            overallLowest,
-            overallPeak,
-        )
-    }
+    val selectedVitals = history.firstOrNull { it.date == selectedDate }
     val minimum = if (history.isEmpty()) 50f else {
         (floor(overallLowest / 25f) * 25f).coerceAtLeast(0f)
     }
@@ -137,7 +157,26 @@ private fun HeartRateGraphCard(history: List<HeartRateVitals>) {
     val endDate = LocalDate.now()
     val startDate = endDate.minusDays(13)
     val locale = LocalConfiguration.current.locales[0]
-    val shortDate = DateTimeFormatter.ofPattern("MMM d", locale)
+    val selectedDateText = selectedDate.format(
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    )
+    val graphDescription = if (selectedVitals == null) {
+        "$selectedDateText. $noData"
+    } else {
+        buildString {
+            append(selectedDateText)
+            append(". ")
+            append(
+                stringResource(
+                    R.string.fitness_vitals_range,
+                    selectedVitals.lowestBpm,
+                    selectedVitals.peakBpm,
+                )
+            )
+            append(". ")
+            append(stringResource(R.string.fitness_vitals_average, selectedVitals.averageBpm))
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
@@ -157,25 +196,44 @@ private fun HeartRateGraphCard(history: List<HeartRateVitals>) {
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
             )
-            if (history.isNotEmpty()) {
+            Text(
+                text = selectedDateText,
+                color = Muted,
+                style = MaterialTheme.typography.labelLarge,
+            )
+            if (selectedVitals != null) {
                 Text(
                     text = stringResource(
                         R.string.fitness_vitals_range,
-                        overallLowest,
-                        overallPeak,
+                        selectedVitals.lowestBpm,
+                        selectedVitals.peakBpm,
                     ),
                     color = OliveGreen,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = stringResource(R.string.fitness_vitals_average, overallAverage),
+                    text = stringResource(
+                        R.string.fitness_vitals_average,
+                        selectedVitals.averageBpm,
+                    ),
                     color = Muted,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
             Box(Modifier.fillMaxWidth().height(170.dp), contentAlignment = Alignment.Center) {
-                Canvas(Modifier.fillMaxSize()) {
+                Canvas(
+                    Modifier.fillMaxSize().pointerInput(startDate, endDate) {
+                        detectTapGestures { tap ->
+                            val left = 42.dp.toPx()
+                            val right = size.width - 6.dp.toPx()
+                            val dayIndex = (
+                                ((tap.x - left) / (right - left).coerceAtLeast(1f)) * 13f
+                            ).roundToInt().coerceIn(0, 13)
+                            onDateSelected(startDate.plusDays(dayIndex.toLong()))
+                        }
+                    }
+                ) {
                     val left = 42.dp.toPx()
                     val right = size.width - 6.dp.toPx()
                     val top = 8.dp.toPx()
@@ -192,6 +250,21 @@ private fun HeartRateGraphCard(history: List<HeartRateVitals>) {
                             strokeWidth = 1.dp.toPx(),
                         )
                     }
+                    val selectedDayIndex = java.time.temporal.ChronoUnit.DAYS
+                        .between(startDate, selectedDate).toInt().coerceIn(0, 13)
+                    val selectedX = left + width * selectedDayIndex / 13f
+                    val dayWidth = width / 14f
+                    drawRect(
+                        color = LightSage.copy(alpha = 0.58f),
+                        topLeft = Offset(selectedX - dayWidth / 2f, top),
+                        size = androidx.compose.ui.geometry.Size(dayWidth, height),
+                    )
+                    drawLine(
+                        color = OliveGreen,
+                        start = Offset(selectedX - dayWidth / 2f, bottom + 8.dp.toPx()),
+                        end = Offset(selectedX + dayWidth / 2f, bottom + 8.dp.toPx()),
+                        strokeWidth = 3.dp.toPx(),
+                    )
                     if (history.isNotEmpty()) {
                         history.forEach { day ->
                             val dayIndex = java.time.temporal.ChronoUnit.DAYS
@@ -199,17 +272,17 @@ private fun HeartRateGraphCard(history: List<HeartRateVitals>) {
                             val x = left + width * dayIndex / 13f
                             val lowFraction = (day.lowestBpm - minimum) / (maximum - minimum)
                             val peakFraction = (day.peakBpm - minimum) / (maximum - minimum)
-                            val isLatest = day == history.last()
+                            val isSelected = day.date == selectedDate
                             drawCircle(
-                                color = if (isLatest) OliveGreen else OliveGreen.copy(alpha = 0.55f),
-                                radius = if (isLatest) 6.dp.toPx() else 4.dp.toPx(),
+                                color = if (isSelected) OliveGreen else OliveGreen.copy(alpha = 0.38f),
+                                radius = if (isSelected) 6.dp.toPx() else 4.dp.toPx(),
                                 center = Offset(x, bottom - height * peakFraction),
                             )
                             drawLine(
-                                color = if (isLatest) OliveGreen else OliveGreen.copy(alpha = 0.55f),
+                                color = if (isSelected) OliveGreen else OliveGreen.copy(alpha = 0.38f),
                                 start = Offset(x, bottom - height * lowFraction),
                                 end = Offset(x, bottom - height * peakFraction),
-                                strokeWidth = if (isLatest) 12.dp.toPx() else 8.dp.toPx(),
+                                strokeWidth = if (isSelected) 12.dp.toPx() else 8.dp.toPx(),
                                 cap = StrokeCap.Round,
                             )
                         }
@@ -234,10 +307,29 @@ private fun HeartRateGraphCard(history: List<HeartRateVitals>) {
                     )
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(start = 42.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(startDate.format(shortDate), color = Muted, style = MaterialTheme.typography.labelSmall)
-                Text(endDate.minusDays(6).format(shortDate), color = Muted, style = MaterialTheme.typography.labelSmall)
-                Text(endDate.format(shortDate), color = Muted, style = MaterialTheme.typography.labelSmall)
+            Row(Modifier.fillMaxWidth().padding(start = 42.dp, end = 6.dp)) {
+                (0L..13L).forEach { offset ->
+                    val date = startDate.plusDays(offset)
+                    val selected = date == selectedDate
+                    Box(
+                        modifier = Modifier.weight(1f).height(48.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { onDateSelected(date) },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = date.dayOfMonth.toString(),
+                            color = if (selected) OliveGreen else Muted,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    }
+                }
             }
         }
     }
