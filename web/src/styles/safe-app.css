@@ -3,7 +3,7 @@
 @import "./safe-app-security.css";
 .safe-shell {
   display: grid;
-  grid-template-columns: 16rem minmax(0, 1fr);
+  grid-template-columns: clamp(13.5rem, 15vw, 15rem) minmax(0, 1fr);
   min-height: 100svh;
   background: #f5f6ef;
 }
@@ -100,8 +100,8 @@
   margin-top: 0.3rem;
 }
 .safe-main {
-  width: min(100%, 74rem);
-  max-width: 74rem;
+  width: min(100%, 68rem);
+  max-width: 68rem;
   margin-inline: auto;
   min-width: 0;
   padding-inline: clamp(1rem, 3vw, 3rem);
@@ -135,6 +135,26 @@
   display: grid;
   gap: 1rem;
 }
+.safety-plan-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #edf0e4;
+}
+.safety-plan-tabs > button {
+  min-height: 2.9rem;
+  border-radius: 999px;
+  color: var(--olive);
+  font-weight: 650;
+}
+.safety-plan-tabs > button[aria-selected="true"] {
+  color: white;
+  background: var(--olive);
+  box-shadow: 0 0.25rem 0.8rem #31452a20;
+}
 .safety-plan-summary {
   display: flex;
   align-items: center;
@@ -147,6 +167,7 @@
   font-size: clamp(1.8rem, 2.5vw, 2.6rem);
   margin-bottom: 1.25rem;
 }
+.safety-plan-group > [role="tabpanel"] { min-width: 0; }
 .safety-checklist {
   min-width: 0;
   border: 1px solid var(--line);

@@ -83,7 +83,7 @@ html { font-size: 100%; }
 }
 
 .safe-shell {
-  grid-template-columns: clamp(13rem, 16vi, 15.5rem) minmax(0, 1fr);
+  grid-template-columns: clamp(13.5rem, 15vi, 15rem) minmax(0, 1fr);
 }
 
 .account-layout {
@@ -91,7 +91,7 @@ html { font-size: 100%; }
 }
 
 .messages-layout {
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr);
+  grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
 }
 
 .safe-welcome {
