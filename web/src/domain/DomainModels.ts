@@ -1,6 +1,6 @@
 // All app roles: defines web app account, cover, contact, and message data.
 import { coverSite } from "../sites/SiteRouting";
-export type Cover = "FOOD" | "NEWS" | "CALCULATOR" | "GAME";
+export type Cover = "FOOD" | "NEWS" | "FITNESS" | "GAME";
 export type Role = "USER" | "SAFE_CONTACT" | "STAFF" | "ADMIN";
 export type Page =
   | "Home"
@@ -133,11 +133,11 @@ export const covers: {
     caption: "Your world, thoughtfully put together.",
   },
   {
-    id: "CALCULATOR",
-    slug: "calculator",
-    name: "Better Calculator",
-    description: "Make room for clarity.",
-    caption: "Everyday numbers. A few more possibilities.",
+    id: "FITNESS",
+    slug: "fitness",
+    name: "Fitness Tracker",
+    description: "Move with purpose.",
+    caption: "Activity, nutrition, and progress in one place.",
   },
   {
     id: "GAME",

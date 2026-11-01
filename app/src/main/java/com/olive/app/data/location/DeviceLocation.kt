@@ -14,6 +14,10 @@ import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
 import com.google.android.gms.location.CurrentLocationRequest
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -34,8 +38,63 @@ internal data class DeviceCoordinates(
     val timestamp: Long
 )
 
-// A cancellable, one-off lookup for nearby resources. Coordinates and the result never update the account.
+// Stops a shared device-location listener when a feature no longer needs GPS updates.
+internal class DeviceLocationUpdates internal constructor(
+    private val fusedLocation: FusedLocationProviderClient,
+    private val callback: LocationCallback,
+) {
+    fun stop() {
+        fusedLocation.removeLocationUpdates(callback)
+    }
+}
+
+// Safe App and cover features: provides private one-off or continuous device GPS readings.
 internal object DeviceLocation {
+    // Uses the same high-accuracy GPS source for safe-app maps and private fitness routes.
+    @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
+    fun startUpdates(
+        context: Context,
+        intervalMillis: Long = 5_000L,
+        minimumDistanceMeters: Float = 5f,
+        onLocation: (DeviceCoordinates) -> Unit,
+    ): DeviceLocationUpdates? {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!fineGranted && !coarseGranted) return null
+        val manager = context.getSystemService(LocationManager::class.java)
+        if (!LocationManagerCompat.isLocationEnabled(manager)) return null
+
+        val fusedLocation = LocationServices.getFusedLocationProviderClient(context.applicationContext)
+        val callback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                result.locations.forEach { location ->
+                    onLocation(
+                        DeviceCoordinates(
+                            latitude = location.latitude,
+                            longitude = location.longitude,
+                            accuracy = location.accuracy.takeIf { location.hasAccuracy() },
+                            timestamp = location.time,
+                        )
+                    )
+                }
+            }
+        }
+        val priority = if (fineGranted) Priority.PRIORITY_HIGH_ACCURACY
+        else Priority.PRIORITY_BALANCED_POWER_ACCURACY
+        val request = LocationRequest.Builder(priority, intervalMillis)
+            .setMinUpdateIntervalMillis((intervalMillis / 2L).coerceAtLeast(1_000L))
+            .setMinUpdateDistanceMeters(minimumDistanceMeters)
+            .build()
+        fusedLocation.requestLocationUpdates(request, callback, context.mainLooper)
+        return DeviceLocationUpdates(fusedLocation, callback)
+    }
+
     suspend fun currentCoordinates(context: Context): DeviceCoordinates? {
         if (ContextCompat.checkSelfPermission(
                 context,

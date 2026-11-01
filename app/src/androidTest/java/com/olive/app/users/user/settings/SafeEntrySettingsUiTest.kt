@@ -118,44 +118,6 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     }
 
     @Test
-    fun calculatorCoverAddsBackupPinWithoutChangingPreferredDeviceLock() {
-        val model = setup(deviceLock = true)
-        assertFalse(model.account.hasAppPin)
-        trigger(model)
-        driver.confirmPhonePin()
-        waitFor("safe_settings")
-        settings(model)
-
-        activate("cover_choice_calculator")
-        waitFor("calculator_pin_required")
-        assertNotEquals(CoverType.CALCULATOR, model.coverType)
-        fill("calculator_new_pin", "123456")
-        fill("calculator_confirm_pin", "123456")
-        compose.onNodeWithTag("calculator_pin_continue")
-            .performSemanticsAction(SemanticsActions.OnClick) { it() }
-        driver.confirmPhonePin()
-
-        compose.waitUntil(20_000) {
-            !model.busy && model.account.hasAppPin && model.coverType == CoverType.CALCULATOR
-        }
-        assertTrue(model.account.hasAppPin)
-        assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
-        compose.onNodeWithTag("calculator_pin_required").assertDoesNotExist()
-
-        compose.runOnIdle { model.navigation.quickExit() }
-        waitFor("calculator_cover")
-        "1234".forEach { digit ->
-            compose.onNodeWithTag("calc_key_$digit").performClick()
-        }
-        compose.onNodeWithTag("calc_key_equals").performClick()
-        compose.onNodeWithTag("calc_key_equals").performClick()
-        compose.waitUntil(20_000) { !model.busy }
-        assertEquals(SessionScreen.Cover, model.screen)
-        compose.onNodeWithTag("calculator_cover").assertExists()
-        compose.onNodeWithTag("unlock_pin").assertDoesNotExist()
-    }
-
-    @Test
     fun switchingAndBackupSetupRequireProofAndNeverExposePinDuringDeviceLock() {
         val model = setup(deviceLock = true)
         assertFalse(model.account.hasAppPin)

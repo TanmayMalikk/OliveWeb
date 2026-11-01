@@ -4,6 +4,7 @@ package com.olive.app.ui.users.user.location
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -157,7 +158,21 @@ internal fun InteractiveLocationMap(
         key(attempt) {
             AndroidView(
                 factory = { context ->
-                    WebView(context).apply {
+                    object : WebView(context) {
+                        override fun onTouchEvent(event: MotionEvent): Boolean {
+                            // Keep map drags and zoom gestures from scrolling the page behind it.
+                            when (event.actionMasked) {
+                                MotionEvent.ACTION_DOWN,
+                                MotionEvent.ACTION_POINTER_DOWN ->
+                                    parent?.requestDisallowInterceptTouchEvent(true)
+
+                                MotionEvent.ACTION_UP,
+                                MotionEvent.ACTION_CANCEL ->
+                                    parent?.requestDisallowInterceptTouchEvent(false)
+                            }
+                            return super.onTouchEvent(event)
+                        }
+                    }.apply {
                         webView[0] = this
                         // The native Compose controls provide the map actions. Hiding the WebView's
                         // virtual nodes prevents touch exploration from bouncing between two layers.

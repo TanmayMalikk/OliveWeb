@@ -54,21 +54,19 @@
     <string name="province_state_optional">Province / state (optional)</string>
     <string name="postal_zip_code_optional">Postal / ZIP code (optional)</string>
     <string name="country_optional">Country (optional)</string>
-<string name="better_calculator">Better Calculator</string>
-    <string name="polynomial">Polynomial</string>
-    <string name="quadratic">Quadratic</string>
-    <string name="graphing_calculator">Graphing Calculator</string>
-    <string name="graph">Graph</string>
-    <string name="reset">Reset</string>
-    <string name="angle_mode">Angle mode</string>
-    <string name="trigonometric_functions_use_radians">Trigonometric functions use radians.</string>
-    <string name="trigonometric_functions_use_degrees">Trigonometric functions use degrees.</string>
-<string name="polynomial_calculation">Polynomial calculation</string>
-    <string name="quadratic_equation">Quadratic equation</string>
-<string name="example_x_2_5x_6_0">Example: x^2 - 5x + 6 = 0</string>
-    <string name="example_x_2_1_x_1">Example: (x^2 - 1) / (x - 1)</string>
-    <string name="equation">Equation</string>
-    <string name="solve">Solve</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="close">Close</string>
 <string name="city">City</string>
 <string name="password">Password</string>
@@ -254,7 +252,6 @@
     <string name="choose_your_cover_app">Choose your cover app</string>
     <string name="food_delivery_app_olive">Food Delivery App · Olive</string>
     <string name="news_app_daily_digest">News App · Daily Digest</string>
-    <string name="calculator_better_calculator">Calculator · Better Calculator</string>
     <string name="olive_branch">Olive Branch</string>
 <string name="sign_out">Sign out?</string>
 <string name="cancel">Cancel</string>
@@ -368,7 +365,7 @@
     <string name="unable_to_open_secure_conversation">Unable to open this secure conversation. The other person may need to open the updated app first.</string>
     <string name="secure_message">Secure message</string><string name="encrypted_message_unavailable">Encrypted message unavailable</string>
 <string name="news_near_location">News near %1$s</string>
-<string name="accounts">Accounts</string><string name="add_another_contact">Add another contact</string><string name="calculation">Calculation</string><string name="change_local_news_location">Change local news location</string><string name="city_or_region">City or region</string><string name="create">Create</string><string name="deg">DEG</string><string name="data_values">Data values</string><string name="delete_account">Delete account</string><string name="generate_table">Generate table</string><string name="graph_table_analysis">Graph table &amp; analysis</string><string name="input">Input</string><string name="plot">Plot</string><string name="rad">RAD</string><string name="reconnect">Reconnect</string><string name="refresh">Refresh</string><string name="save">Save</string><string name="save_profile">Save profile</string><string name="stat_plots">Stat plots</string><string name="statistical_plots">Statistical plots</string><string name="table_analysis">Table &amp; analysis</string><string name="use_device_location">Use device location</string><string name="x_values">X values</string><string name="y_values">Y values</string><string name="delete_managed_account_warning">This permanently removes the %1$s account from Firebase Authentication and deletes its account data.</string><string name="y_one_function_per_line">Y = (one function per line)</string>
+<string name="accounts">Accounts</string><string name="add_another_contact">Add another contact</string><string name="change_local_news_location">Change local news location</string><string name="city_or_region">City or region</string><string name="create">Create</string><string name="delete_account">Delete account</string><string name="reconnect">Reconnect</string><string name="refresh">Refresh</string><string name="save">Save</string><string name="save_profile">Save profile</string><string name="use_device_location">Use device location</string><string name="delete_managed_account_warning">This permanently removes the %1$s account from Firebase Authentication and deletes its account data.</string>
     <string name="camera_permission_required">Camera permission is required to take photos in Olive Branch.</string>
     <string name="grant_camera_permission">Grant Camera Permission</string>
 <string name="captured_photo_review">Captured photo review</string>
@@ -389,36 +386,38 @@
     <string name="staff_safety_plans_description">Review and update safety plans from users assigned to you.</string>
     <string name="admin_safety_plans_description">Review and edit safety plans across the organization.</string>
     <string name="admin_accounts_description">Create accounts and review staff assignment counts.</string>
-    <string name="fitness_calculator">Fitness calculator</string>
-    <string name="fitness_tracking">Fitness tracking</string>
+
     <string name="steps_today">Steps today</string>
-    <string name="steps_goal_value">Goal: %1$d steps</string>
-    <string name="distance">Distance</string>
+    <plurals name="steps_goal_value">
+        <item quantity="one">Goal: %1$d step</item>
+        <item quantity="other">Goal: %1$d steps</item>
+    </plurals>
+
     <string name="calories">Calories</string>
-    <string name="active_minutes">Active min</string>
-    <string name="distance_value_km">%1$.2f km</string>
-    <string name="calories_value">%1$.0f kcal</string>
-    <string name="activity_permission_needed">Allow physical activity access to count steps on this phone.</string>
-    <string name="grant_activity_access">Allow activity access</string>
-    <string name="step_sensor_unavailable">This phone does not provide a step counter sensor.</string>
-    <string name="fitness_settings">Fitness settings</string>
+
+
+
+
+
+
+
     <string name="weight_kg">Weight (kg)</string>
     <string name="height_cm">Height (cm)</string>
     <string name="daily_step_goal">Daily step goal</string>
-    <string name="fitness_settings_saved">Fitness settings saved.</string>
-    <string name="walk_tracker">Walk tracker</string>
-    <string name="walk_tracking_active">Walk tracking active</string>
-    <string name="walk_tracking_notification">Tracking distance, speed, and pace.</string>
-    <string name="walk_distance_value">Distance: %1$.2f km</string>
-    <string name="walk_time_value">Time: %1$s</string>
-    <string name="walk_speed_value">Average speed: %1$.1f km/h</string>
-    <string name="walk_pace_value">Pace: %1$.1f min/km</string>
-    <string name="start_walk">Start walk</string>
-    <string name="stop_walk">Stop walk</string>
-    <string name="walk_tracker_description">Track GPS distance, time, speed, and pace. Tracking can continue while the screen is off.</string>
-    <string name="location_needed_for_walk">Location access is needed to track a walk.</string>
-    <string name="seven_day_history">Seven-day history</string>
-    <string name="calories_estimate_notice">Distance, active minutes, and calories are estimates based on your steps, height, and weight.</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="private_contact_note">Private contact note</string>
     <string name="private_contact_note_explanation">Only you can read this encrypted note on this device. New text is added on a new line.</string>
     <string name="choose_person">Choose a person</string>

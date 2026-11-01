@@ -26,8 +26,22 @@
         <provider android:name="ai.onnxruntime.TelemetryInitializer" tools:node="remove" />
         <service android:name=".location.LiveLocationService" android:exported="false"
             android:foregroundServiceType="location" android:stopWithTask="false" />
-        <service android:name=".ui.covers.calculator.FitnessWalkService" android:exported="false"
-            android:foregroundServiceType="location" android:stopWithTask="false" />
+        <service
+            android:name=".ui.covers.fitness.FitnessWorkoutService"
+            android:exported="false"
+            android:foregroundServiceType="location"
+            android:stopWithTask="false" />
+        <service
+            android:name=".ui.covers.fitness.FitnessWatchListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/olive/fitness/watch-activity" />
+            </intent-filter>
+        </service>
         <provider android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.documents" android:exported="false"
             android:grantUriPermissions="true">
@@ -56,9 +70,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
-        <activity-alias android:name=".CalculatorLauncher" android:targetActivity=".OliveActivity"
-            android:exported="true" android:enabled="false" android:label="Better Calculator"
-            android:icon="@mipmap/ic_launcher_calculator" android:roundIcon="@mipmap/ic_launcher_calculator">
+        <activity-alias android:name=".FitnessLauncher" android:targetActivity=".OliveActivity"
+            android:exported="true" android:enabled="false" android:label="Fitness Tracker"
+            android:icon="@mipmap/ic_launcher_fitness" android:roundIcon="@mipmap/ic_launcher_fitness">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

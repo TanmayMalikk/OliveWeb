@@ -7,3 +7,4 @@ dependencyResolutionManagement {
 rootProject.name = "Olive Branch"
 include(":app")
 include(":ppocr-sdk")
+include(":wear")
