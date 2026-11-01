@@ -3,9 +3,9 @@ import {
   Activity, ArrowLeft, CalendarDays, Flame, Footprints, Gauge, HeartPulse,
   Home, Plus, Salad, Search, Settings, Sparkles, Utensils,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button, Field, Form } from "../../components/SharedComponents";
-import { useSession } from "../../session/SessionProvider";
+import { accounts, observeAccountChanges } from "../../services/AccountService";
 import {
   loadFitness, logFood, searchFoods, type FitnessDay, type FitnessSummary, type Food,
 } from "../../services/FitnessService";
@@ -59,7 +59,6 @@ const manualFood = (data: FormData): Food => ({
 });
 
 export default function FitnessCover() {
-  const session = useSession();
   const foodSearchReady = Boolean(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY);
   const [tab, setTab] = useState<FitnessTab>("home");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -67,10 +66,31 @@ export default function FitnessCover() {
   const [feedback, setFeedback] = useState("");
   const [results, setResults] = useState<Food[]>([]);
   const [searching, setSearching] = useState(false);
-  const lastOliveTap = useRef(0);
 
   useEffect(() => {
-    void loadFitness().then(setSummary).catch(() => setFeedback("Activity could not be loaded."));
+    let active = true;
+    let stop: (() => void) | undefined;
+    const refresh = () => {
+      void loadFitness()
+        .then((value) => active && setSummary(value))
+        .catch(() => active && setFeedback("Activity could not be loaded."));
+    };
+    refresh();
+    const uid = accounts.identity?.uid;
+    if (uid) {
+      void observeAccountChanges(uid, refresh, (error) => {
+        if (active) setFeedback(error.message);
+      }).then((unsubscribe) => {
+        if (active) stop = unsubscribe;
+        else unsubscribe();
+      }).catch((error) => {
+        if (active) setFeedback(error instanceof Error ? error.message : "Live activity sync is unavailable.");
+      });
+    }
+    return () => {
+      active = false;
+      stop?.();
+    };
   }, []);
 
   const today = useMemo(() => {
@@ -92,18 +112,6 @@ export default function FitnessCover() {
   const add = async (food: Food, servings = 1) => {
     setSummary(await logFood(summary, food, servings));
     setFeedback(`${food.name} added to today.`);
-  };
-  // returns the tap olive for web fitness cover cover.
-  const tapOlive = () => {
-    const now = Date.now();
-    if (now - lastOliveTap.current <= 1500) {
-      lastOliveTap.current = 0;
-      setFeedback("");
-      void session.perform(session.beginEntry);
-      return;
-    }
-    lastOliveTap.current = now;
-    setFeedback("Tap the olive once more to continue.");
   };
   // Starts tab for web fitness cover cover.
   const showTab = (next: FitnessTab) => {
@@ -158,8 +166,6 @@ export default function FitnessCover() {
             <span className="fitness-sync-state">{summary.updatedAt ? "Synced" : "Waiting"}</span></div>
           <div className="fitness-setting-row"><div><strong>Theme</strong><span>Olive light</span></div>
             <span className="fitness-colour-dot" aria-hidden="true" /></div>
-          <div className="fitness-entry-setting"><button type="button" className="fitness-private-entry"
-            aria-label="olive icon" onClick={tapOlive}><span className="fitness-olive-mark" aria-hidden="true" /></button></div>
         </section> : <>
 
         {tab === "home" && <>

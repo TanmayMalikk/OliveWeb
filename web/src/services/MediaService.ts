@@ -4,8 +4,10 @@ import {
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
   query,
   where,
+  type DocumentData,
 } from "firebase/firestore";
 import { firebase } from "./AccountService";
 import {
@@ -134,14 +136,22 @@ async function uploadCiphertext(
         headers?: Record<string, string>;
       };
       const start = index * partSize;
-      const response = await fetch(ticket.url, {
-        method: "PUT",
-        headers: ticket.headers,
-        body: ciphertext.slice(
-          start,
-          Math.min(start + partSize, ciphertext.byteLength),
-        ),
-      });
+      let response: Response;
+      try {
+        response = await fetch(ticket.url, {
+          method: "PUT",
+          headers: ticket.headers,
+          body: ciphertext.slice(
+            start,
+            Math.min(start + partSize, ciphertext.byteLength),
+          ),
+        });
+      } catch (error) {
+        const detail = error instanceof Error ? ` (${error.message})` : "";
+        throw new Error(
+          `The encrypted storage upload could not be reached${detail}. Check the R2 bucket CORS policy for this website origin, PUT requests, and the signed upload headers.`,
+        );
+      }
       if (!response.ok)
         throw new Error(`Encrypted upload failed (HTTP ${response.status}).`);
       if (created.mode === "MULTIPART") {
@@ -258,17 +268,47 @@ export async function listBrowserDocuments(
   identity: Identity,
 ): Promise<BrowserDocument[]> {
   const { db, functions } = await firebase();
-  const { httpsCallable } = await import("firebase/functions");
-  const device = await messageDevice(identity.uid);
-  const deviceKey = `${identity.uid}--${device.deviceId}`;
   const snapshot = await getDocs(
     query(
       collection(db, "files"),
       where("allowed_users", "array-contains", identity.uid),
     ),
   );
+  return resolveBrowserDocuments(identity, snapshot.docs);
+}
+
+// Web safe-app documents: keeps phone and browser uploads visible as soon as Firestore records them.
+export async function observeBrowserDocuments(
+  identity: Identity,
+  onUpdate: (documents: BrowserDocument[]) => void,
+  onError: (error: Error) => void,
+) {
+  const { db } = await firebase();
+  const documentsQuery = query(
+    collection(db, "files"),
+    where("allowed_users", "array-contains", identity.uid),
+  );
+  return onSnapshot(
+    documentsQuery,
+    (snapshot) => {
+      void resolveBrowserDocuments(identity, snapshot.docs)
+        .then(onUpdate)
+        .catch((error) => onError(error instanceof Error ? error : new Error(String(error))));
+    },
+    onError,
+  );
+}
+
+async function resolveBrowserDocuments(
+  identity: Identity,
+  rows: Array<{ id: string; data: () => DocumentData }>,
+): Promise<BrowserDocument[]> {
+  const { functions } = await firebase();
+  const { httpsCallable } = await import("firebase/functions");
+  const device = await messageDevice(identity.uid);
+  const deviceKey = `${identity.uid}--${device.deviceId}`;
   return Promise.all(
-    snapshot.docs.map(async (row) => {
+    rows.map(async (row) => {
       const value = row.data() as StoredMedia;
       const deviceKeys = value.device_wrapped_keys as
         Record<string, unknown> | undefined;

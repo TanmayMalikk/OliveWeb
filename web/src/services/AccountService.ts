@@ -38,6 +38,30 @@ export async function firebase() {
   await cloud.authReady;
   return cloud;
 }
+// Tells other signed-in devices to reload account files after a profile or history write.
+export async function notifyAccountChanged(uid: string) {
+  const { db } = await firebase();
+  const { doc, setDoc, increment, serverTimestamp } = await import("firebase/firestore");
+  await setDoc(
+    doc(db, "accountSync", uid),
+    { revision: increment(1), updatedAt: serverTimestamp() },
+    { merge: true },
+  );
+}
+// Watches a private, content-free marker so changes in Storage appear on other devices.
+export async function observeAccountChanges(
+  uid: string,
+  onChange: () => void,
+  onError: (error: Error) => void,
+) {
+  const { db } = await firebase();
+  const { doc, onSnapshot } = await import("firebase/firestore");
+  return onSnapshot(
+    doc(db, "accountSync", uid),
+    () => onChange(),
+    (error) => onError(error),
+  );
+}
 export class Accounts {
   identity: Identity | null = null;
   private raw: Uint8Array | null = null;
@@ -313,6 +337,7 @@ export class Accounts {
             customMetadata: { schemaVersion: "2", format: "pretty-json" },
           },
         );
+        await notifyAccountChanged(identity.uid);
       }
       const cache = await readLocal(identity.uid, raw);
       await writeLocal(identity.uid, raw, { ...cache, profile });
@@ -348,6 +373,7 @@ export class Accounts {
           new TextEncoder().encode(JSON.stringify(record, null, 2)),
           { contentType: "application/json" },
         );
+        await notifyAccountChanged(identity.uid);
       }
       const cache = await readLocal(identity.uid, raw);
       const records = cache.history[category] as (Event | Entry)[];

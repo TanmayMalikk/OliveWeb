@@ -34,6 +34,35 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
+    // Safety-plan listeners may read only the same owner, shared-contact, or assigned support plan as the callable API.
+    match /safetyPlans/{ownerUid} {
+      allow get: if signedIn() && (
+        (request.auth.uid == ownerUid && request.auth.token.role == 'USER')
+        || (request.auth.token.role == 'SAFE_CONTACT'
+          && resource.data.safeContactUids is list
+          && request.auth.uid in resource.data.safeContactUids)
+        || (request.auth.token.role == 'STAFF'
+          && resource.data.staffUid == request.auth.uid
+          && resource.data.consultationRequested == true)
+        || request.auth.token.role == 'ADMIN'
+      );
+      allow list: if false;
+      // All plan edits still pass through the callable that validates field revisions and role access.
+      allow create, update, delete: if false;
+    }
+
+    // Account sync markers contain no profile or note text; they only tell signed-in clients to reload Storage data.
+    match /accountSync/{uid} {
+      allow get: if owner(uid);
+      allow list: if false;
+      allow create, update: if owner(uid)
+        && request.resource.data.keys().hasOnly(['revision','updatedAt'])
+        && request.resource.data.revision is int
+        && request.resource.data.revision >= 1
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     function validMessageUsername(username) {
       return username is string && username.matches('[a-z0-9_]{4,24}');
     }
