@@ -14,10 +14,17 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
-    "mediaDownloadTicket", "mediaUpdateAccess", "mediaDelete", "staffSupportRequest",
+    "mediaDownloadTicket", "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaDelete", "staffSupportRequest",
     "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+// Inputs: one device key for the caller and one forged key for another UID. Expected: only caller-owned device IDs pass.
+test("encrypted media device keys stay scoped to the signed-in account", () => {
+  assert.deepEqual(mediaTest.validateDeviceWrappedKeys({"owner--phone":"wrapped"}, "owner"),
+    {"owner--phone":"wrapped"});
+  assert.throws(() => mediaTest.validateDeviceWrappedKeys({"other--phone":"wrapped"}, "owner"));
 });
 
 // Inputs: the values in this case. Expected: encrypted media access keeps the owner and exact wrapped-key recipients.

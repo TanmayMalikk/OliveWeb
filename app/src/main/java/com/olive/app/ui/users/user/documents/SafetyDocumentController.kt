@@ -45,7 +45,7 @@ internal class SafetyDocumentsController(
         state = SafetyDocumentsState(ownerUid = ownerUid)
     }
 
-    fun load(ownerUid: String, localMode: Boolean) {
+    fun load(ownerUid: String, username: String, localMode: Boolean) {
         if (state.ownerUid != ownerUid) {
             subscription?.close()
             subscription = null
@@ -61,6 +61,11 @@ internal class SafetyDocumentsController(
             if (token == generation && state.ownerUid == ownerUid) {
                 state = state.copy(files = files, loading = false, error = null)
                 media?.acknowledgePublished(files.mapTo(mutableSetOf()) { it.id })
+                files.forEach { document ->
+                    scope.launch {
+                        runCatching { repository.approveCurrentAccountDevices(document, ownerUid, username) }
+                    }
+                }
             }
         }, { error ->
             if (token == generation && state.ownerUid == ownerUid) {
@@ -76,7 +81,7 @@ internal class SafetyDocumentsController(
         state = state.copy(loading = true, error = null)
         transfers.queueDocument(uri, identity, ocrReview, onQueued = {
             state = state.copy(loading = false, error = null)
-            if (subscription == null) load(identity.uid, false)
+            if (subscription == null) load(identity.uid, identity.username, false)
         }, onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
     }
 
@@ -102,7 +107,7 @@ internal class SafetyDocumentsController(
             onQueued = {
                 file.delete()
                 state = state.copy(loading = false, error = null)
-                if (subscription == null) load(identity.uid, false)
+                if (subscription == null) load(identity.uid, identity.username, false)
                 onComplete()
             },
             onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })

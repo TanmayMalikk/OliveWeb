@@ -138,6 +138,11 @@ function uploadRequest(data, uid) {
   ) {
     throw new HttpsError("invalid-argument", "Invalid encryptionVersion");
   }
+  // Older Android builds did not send device-specific copies. Keep those uploads working; an
+  // updated authorized device can add its per-device copies after the record is published.
+  const deviceWrappedKeys = data?.deviceWrappedKeys == null
+    ? {}
+    : validateDeviceWrappedKeys(data.deviceWrappedKeys, uid);
   return {
     jobId,
     size,
@@ -146,7 +151,22 @@ function uploadRequest(data, uid) {
     allowedUsers,
     wrappedKeys,
     encryptionVersion,
+    deviceWrappedKeys,
   };
+}
+
+/** Validates wrapped AES keys whose private halves stay on one account's devices. */
+function validateDeviceWrappedKeys(value, uid) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  const entries = Object.entries(value);
+  if (entries.length < 1 || entries.length > 50 || entries.some(([id, wrapped]) =>
+    !id.startsWith(`${uid}--`) || id.length > 300 || typeof wrapped !== "string" ||
+    wrapped.length < 1 || wrapped.length > 2048)) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  return Object.fromEntries(entries);
 }
 
 /** Validates a complete replacement access list for an already-published encrypted object. */
@@ -219,6 +239,7 @@ function publicRecord(snapshot) {
     objectKey: value.object_key,
     encryptedMetadata: value.encrypted_metadata,
     wrappedKeys: value.wrapped_keys,
+    deviceWrappedKeys: value.device_wrapped_keys || {},
     allowedUsers: value.allowed_users,
     ciphertextSize: value.ciphertext_size,
     ciphertextSha256: value.ciphertext_sha256,
@@ -280,6 +301,7 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
     ciphertextSha256: value.checksum,
     encryptedMetadata: value.encryptedMetadata,
     wrappedKeys: value.wrappedKeys,
+    deviceWrappedKeys: value.deviceWrappedKeys,
     allowedUsers: value.allowedUsers,
     encryptionVersion: value.encryptionVersion,
     status: "pending",
@@ -390,6 +412,7 @@ exports.mediaCompleteUpload = onCall(options, async (request) => {
     object_key: value.objectKey,
     encrypted_metadata: value.encryptedMetadata,
     wrapped_keys: value.wrappedKeys,
+    device_wrapped_keys: value.deviceWrappedKeys,
     allowed_users: value.allowedUsers,
     ciphertext_size: value.ciphertextSize,
     ciphertext_sha256: value.ciphertextSha256,
@@ -484,6 +507,29 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   return publicRecord(await reference.get());
 });
 
+/** Adds key copies for new phones or browsers without changing who may access the document. */
+exports.mediaUpdateDeviceKeys = onCall(options, async (request) => {
+  const uid = caller(request);
+  const mediaId = string(request.data?.mediaId, "mediaId", 64);
+  const additions = validateDeviceWrappedKeys(request.data?.deviceWrappedKeys, uid);
+  const reference = mediaRef(mediaId);
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
+    const value = snapshot.data();
+    if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
+      throw new HttpsError("permission-denied", "Media access was denied");
+    }
+    const current = value.device_wrapped_keys || {};
+    const merged = {...current, ...additions};
+    if (Object.keys(merged).length > 250) {
+      throw new HttpsError("failed-precondition", "Too many approved devices");
+    }
+    transaction.update(reference, {device_wrapped_keys: merged});
+  });
+  return publicRecord(await reference.get());
+});
+
 /** Owner-only deletion that removes the R2 object before deleting its Firestore metadata. */
 exports.mediaDelete = onCall(options, async (request) => {
   const uid = caller(request);
@@ -512,6 +558,6 @@ exports.mediaDelete = onCall(options, async (request) => {
 
 // Keep validation helpers available to Node tests without exporting another deployed endpoint.
 Object.defineProperty(exports, "_test", {
-  value: { accessRequest },
+  value: { accessRequest, validateDeviceWrappedKeys },
   enumerable: false,
 });
