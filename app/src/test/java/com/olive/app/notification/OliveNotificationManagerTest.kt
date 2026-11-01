@@ -39,14 +39,14 @@ class OliveNotificationManagerTest {
         )
         assertEquals(
             CoverNotificationContent(
-                "olive_calc_channel",
-                "Better Calculator",
-                "A calculator reminder is available."
+                "olive_fitness_channel",
+                "Fitness Tracker",
+                "Your fitness summary is ready."
             ),
             OliveNotificationManager.contentFor(
                 null,
                 null,
-                CoverType.CALCULATOR,
+                CoverType.FITNESS,
                 com.olive.app.ui.testResourceText()
             )
         )
@@ -87,8 +87,8 @@ class OliveNotificationManagerTest {
             OliveNotificationManager.iconFor(CoverType.NEWS)
         )
         assertEquals(
-            R.drawable.ic_notification_calculator,
-            OliveNotificationManager.iconFor(CoverType.CALCULATOR)
+            R.drawable.ic_notification_fitness,
+            OliveNotificationManager.iconFor(CoverType.FITNESS)
         )
         assertEquals(
             R.drawable.ic_notification_olive,

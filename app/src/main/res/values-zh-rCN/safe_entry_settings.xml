@@ -13,9 +13,6 @@
     <string name="entry_confirm_settings">请通过 Android 验证身份以更改安全进入设置。</string>
     <string name="entry_settings_cancelled">身份验证已取消。安全进入设置未更改。</string>
     <string name="entry_settings_failed">无法完成更改。请检查所选的进入方式并重试。</string>
-    <string name="calculator_pin_required_title">请先创建应用 PIN</string>
-    <string name="calculator_pin_required_description">计算器需要一个 4 至 6 位备用应用 PIN，避免普通计算打开 Android 身份验证。设备锁定仍将是首选进入方式。</string>
-    <string name="calculator_create_pin">创建备用 PIN 并选择计算器</string>
     <string name="entry_use_backup_pin">改用备用应用 PIN</string>
     <string name="entry_missing_backup_pin">手机屏幕锁定似乎已停用，并且尚未添加备用应用 PIN。请恢复屏幕锁定，打开安全区域，然后在设置中添加备用 PIN。</string>
 </resources>

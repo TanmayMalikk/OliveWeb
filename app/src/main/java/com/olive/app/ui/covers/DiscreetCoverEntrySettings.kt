@@ -82,7 +82,7 @@ internal fun DiscreetCoverEntry(
     }
 }
 
-// Calculator and Game use this page for cover-account settings and the discreet entry olive.
+// Fitness and Game use this page for cover-account settings and the discreet entry olive.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
@@ -171,7 +171,7 @@ internal object CoverLauncher {
         val aliases = listOf(
             "FoodLauncher",
             "NewsLauncher",
-            "CalculatorLauncher",
+            "FitnessLauncher",
             "BranchLauncher",
             "TreeLauncher"
         )
@@ -180,7 +180,7 @@ internal object CoverLauncher {
             AccountRole.STAFF, AccountRole.ADMIN -> "TreeLauncher"
             AccountRole.USER -> when (selected) {
                 CoverType.NEWS -> "NewsLauncher"
-                CoverType.CALCULATOR -> "CalculatorLauncher"
+                CoverType.FITNESS -> "FitnessLauncher"
                 else -> "FoodLauncher"
             }
         }

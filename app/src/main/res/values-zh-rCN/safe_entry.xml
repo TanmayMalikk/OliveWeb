@@ -22,5 +22,4 @@
     <string name="entry_auth_cancelled">身份认证已取消或不可用。访问仍被锁定。</string>
 <string name="entry_verify_trigger">通过设备锁确认身份以更改触发词。</string>
     <string name="entry_invalid_trigger">请选择 3 至 64 个字符的触发词或短语。</string>
-    <string name="entry_calculator_help">计算器需要备用应用 PIN。输入该 PIN 并点按两次等号即可安全进入。设备锁定仍可作为首选进入方式。</string>
 </resources>

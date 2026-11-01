@@ -54,21 +54,19 @@
     <string name="province_state_optional">省/州（可选）</string>
     <string name="postal_zip_code_optional">邮政编码（可选）</string>
     <string name="country_optional">国家（可选）</string>
-<string name="better_calculator">更好的计算器</string>
-    <string name="polynomial">多项式</string>
-    <string name="quadratic">二次</string>
-    <string name="graphing_calculator">绘图计算器</string>
-    <string name="graph">图</string>
-    <string name="reset">重置</string>
-    <string name="angle_mode">角度模式</string>
-    <string name="trigonometric_functions_use_radians">三角函数使用弧度。</string>
-    <string name="trigonometric_functions_use_degrees">三角函数使用度数。</string>
-<string name="polynomial_calculation">多项式计算</string>
-    <string name="quadratic_equation">二次方程</string>
-<string name="example_x_2_5x_6_0">示例：x^2 – 5x + 6 = 0</string>
-    <string name="example_x_2_1_x_1">示例：(x^2 – 1) / (x - 1)</string>
-    <string name="equation">方程</string>
-    <string name="solve">解决</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="close">关闭</string>
 <string name="city">城市</string>
 <string name="password">密码</string>
@@ -255,7 +253,6 @@
     <string name="choose_your_cover_app">选择您的封面应用</string>
     <string name="food_delivery_app_olive">送餐应用·橄榄</string>
     <string name="news_app_daily_digest">新闻应用·每日文摘</string>
-    <string name="calculator_better_calculator">计算器·更好的计算器</string>
     <string name="olive_branch">橄榄枝</string>
 <string name="sign_out">登出？</string>
 <string name="cancel">取消</string>
@@ -359,30 +356,30 @@
 <string name="news_near_location">%1$s 附近的新闻</string>
 <string name="accounts">账户</string>
     <string name="add_another_contact">添加另一个联系人</string>
-    <string name="calculation">计算</string>
+
     <string name="change_local_news_location">更改本地新闻位置</string>
     <string name="city_or_region">城市或地区</string>
     <string name="create">创建</string>
-    <string name="deg">二甘醇</string>
-    <string name="data_values">数据值</string>
+
+
     <string name="delete_account">删除帐户</string>
-    <string name="generate_table">生成表</string>
-    <string name="graph_table_analysis">图表及分析</string>
-    <string name="input">输入</string>
-    <string name="plot">情节</string>
-    <string name="rad">RAD</string>
+
+
+
+
+
     <string name="reconnect">重新连接</string>
     <string name="refresh">刷新</string>
     <string name="save">保存</string>
     <string name="save_profile">保存个人资料</string>
-    <string name="stat_plots">统计图</string>
-    <string name="statistical_plots">统计图</string>
-    <string name="table_analysis">表格与分析</string>
+
+
+
     <string name="use_device_location">使用设备位置</string>
-    <string name="x_values">X 值</string>
-    <string name="y_values">Y 值</string>
+
+
     <string name="delete_managed_account_warning">这将从 Firebase 身份验证中永久删除 %1$s 帐户并删除其帐户数据。</string>
-    <string name="y_one_function_per_line">Y =（每行一个函数）</string>
+
     <string name="camera_permission_required">在橄榄枝拍照需获得相机许可。</string>
     <string name="grant_camera_permission">授予相机权限</string>
 <string name="captured_photo_review">拍摄的照片评论</string>
@@ -403,36 +400,37 @@
     <string name="staff_safety_plans_description">查看并更新分配给你的用户安全计划。</string>
     <string name="admin_safety_plans_description">查看并编辑整个组织的安全计划。</string>
     <string name="admin_accounts_description">创建账号并查看工作人员的用户分配数量。</string>
-    <string name="fitness_calculator">健身计算器</string>
-    <string name="fitness_tracking">健身追踪</string>
+
     <string name="steps_today">今日步数</string>
-    <string name="steps_goal_value">目标：%1$d 步</string>
-    <string name="distance">距离</string>
+    <plurals name="steps_goal_value">
+        <item quantity="other">目标：%1$d 步</item>
+    </plurals>
+
     <string name="calories">卡路里</string>
-    <string name="active_minutes">活动分钟</string>
-    <string name="distance_value_km">%1$.2f 公里</string>
-    <string name="calories_value">%1$.0f 千卡</string>
-    <string name="activity_permission_needed">允许访问身体活动，以便在此手机上计算步数。</string>
-    <string name="grant_activity_access">允许身体活动</string>
-    <string name="step_sensor_unavailable">此手机没有步数传感器。</string>
-    <string name="fitness_settings">健身设置</string>
+
+
+
+
+
+
+
     <string name="weight_kg">体重（公斤）</string>
     <string name="height_cm">身高（厘米）</string>
     <string name="daily_step_goal">每日步数目标</string>
-    <string name="fitness_settings_saved">健身设置已保存。</string>
-    <string name="walk_tracker">步行追踪</string>
-    <string name="walk_tracking_active">正在追踪步行</string>
-    <string name="walk_tracking_notification">正在追踪距离、速度和配速。</string>
-    <string name="walk_distance_value">距离：%1$.2f 公里</string>
-    <string name="walk_time_value">时间：%1$s</string>
-    <string name="walk_speed_value">平均速度：%1$.1f 公里/小时</string>
-    <string name="walk_pace_value">配速：%1$.1f 分钟/公里</string>
-    <string name="start_walk">开始步行</string>
-    <string name="stop_walk">停止步行</string>
-    <string name="walk_tracker_description">追踪 GPS 距离、时间、速度和配速。屏幕关闭后仍可继续追踪。</string>
-    <string name="location_needed_for_walk">追踪步行需要位置权限。</string>
-    <string name="seven_day_history">七天记录</string>
-    <string name="calories_estimate_notice">距离、活动分钟和卡路里根据步数、身高和体重估算。</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="private_contact_note">私人联系人备注</string>
     <string name="private_contact_note_explanation">只有您能在此设备上阅读这条加密备注。新内容会另起一行添加。</string>
     <string name="choose_person">选择联系人</string>

@@ -107,76 +107,76 @@
     <string name="ui_olive_value">Oliva · %1$s</string>
     <string name="ui_value_seconds_remaining">%1$s segundos restantes</string>
     <string name="ui_value_days_remaining">%1$s días restantes</string>
-    <string name="ui_x_2_1_x_1">(x^2 - 1) / (x - 1)</string>
-    <string name="ui_value">Valor</string>
-    <string name="ui_x_value">valor x</string>
-    <string name="ui_example_2">Ejemplo: 2</string>
-    <string name="ui_zero">Cero</string>
-    <string name="ui_search_range">rango de búsqueda</string>
-    <string name="ui_example_10_10">Ejemplo: -10; 10</string>
-    <string name="ui_minimum">Mínimo</string>
-    <string name="ui_maximum">Máximo</string>
-    <string name="ui_derivative">Derivado</string>
-    <string name="ui_integral">Integrales</string>
-    <string name="ui_lower_and_upper_bounds">Límites inferior y superior</string>
-    <string name="ui_example_0_5">Ejemplo: 0 ; 5</string>
-    <string name="ui_intersection">Intersección</string>
-    <string name="ui_scatter">dispersión</string>
-    <string name="ui_xy_line">línea XY</string>
-    <string name="ui_histogram">histograma</string>
-    <string name="ui_box_plot">Diagrama de caja</string>
-    <string name="ui_modified_box">Caja modificada</string>
-    <string name="ui_normal_probability">probabilidad normal</string>
-    <string name="ui_evaluate_expression">Evaluar expresión</string>
-    <string name="ui_sqrt_81_5_or_ncr_10_3">raíz cuadrada (81) + 5! o nCr(10,3)</string>
-    <string name="ui_function_value">Valor de la función</string>
-    <string name="ui_x_2_2x_3">x^2 + 2x ; 3</string>
-    <string name="ui_system_of_equations">Sistema de ecuaciones</string>
-    <string name="ui_1_1_5_2_1_1">1,1,5;2,-1,1</string>
-    <string name="ui_fraction_decimal">Fracción / decimal</string>
-    <string name="ui_1_25_or_7_4">1,25 o 7/4</string>
-    <string name="ui_mixed_improper_fraction">Fracción mixta/impropia</string>
-    <string name="ui_2_1_3_or_7_3" tools:ignore="TypographyFractions">2 1/3 o 7/3</string>
-    <string name="ui_scientific_notation">Notación científica</string>
-    <string name="ui_1_2e5_or_1_2_10_5">1.2E5 o 1.2×10^5</string>
-    <string name="ui_numerical_derivative">Derivada numérica</string>
-    <string name="ui_x_3_2x_2">x^3 - 2x ; 2</string>
-    <string name="ui_definite_integral">Integral definida</string>
-    <string name="ui_sin_x_0_pi">pecado(x); 0; pi</string>
-    <string name="ui_find_zero">encontrar cero</string>
-    <string name="ui_x_2_4_0_5">x^2 - 4 ; 0 ; 5</string>
-    <string name="ui_find_minimum">encontrar mínimo</string>
-    <string name="ui_x_2_4x_10_10">x^2 - 4x ; -10 ; 10</string>
-    <string name="ui_find_maximum">encontrar máximo</string>
-    <string name="ui_x_2_4x_10_10_be0ef3">-x^2 + 4x ; -10 ; 10</string>
-    <string name="ui_find_intersection">encontrar intersección</string>
-    <string name="ui_x_2_2x_3_10_10">x^2 ; 2x + 3 ; -10 ; 10</string>
-    <string name="ui_investigate_limit">Investigar límite</string>
-    <string name="ui_sin_x_x_0">pecado(x)/x ; 0</string>
-    <string name="ui_complex_arithmetic">Aritmética compleja</string>
-    <string name="ui_2_3_4_1">(2,3) * (4,-1)</string>
-    <string name="ui_complex_details">Detalles complejos</string>
-    <string name="ui_3_4">3,4</string>
-    <string name="ui_complex_power_roots">Poder complejo / raíces</string>
-    <string name="ui_3_4_2">3,4 ; 2</string>
-    <string name="ui_matrix_add_subtract">Matriz de suma/resta</string>
-    <string name="ui_1_2_3_4_5_6_7_8">1,2;3,4 | 5,6;7,8 | +</string>
-    <string name="ui_matrix_multiply">Matriz multiplicada</string>
-    <string name="ui_1_2_3_4_5_6_7_8_9ad55f">1,2;3,4 | 5,6;7,8</string>
-    <string name="ui_scalar_multiplication">multiplicación escalar</string>
-    <string name="ui_1_2_3_4_3">1,2;3,4 | 3</string>
-    <string name="ui_matrix_power">poder de la matriz</string>
-    <string name="ui_inverse">Inverso</string>
-    <string name="ui_1_2_3_4">1,2;3,4</string>
-    <string name="ui_determinant">Determinante</string>
-    <string name="ui_transpose">Transponer</string>
-    <string name="ui_1_2_3_4_5_6">1,2,3;4,5,6</string>
-    <string name="ui_identity_matrix">Matriz de identidad</string>
-    <string name="ui_3">3</string>
-    <string name="ui_rref_augmented_matrix">RREF / matriz aumentada</string>
-    <string name="ui_1_2_5_3_4_11">1,2,5;3,4,11</string>
-    <string name="ui_row_operation">operación de fila</string>
-    <string name="ui_1_2_3_4_swap_1_2">1,2;3,4 | intercambiar 1 2</string>
-    <string name="ui_one_variable_statistics">Estadísticas de una variable</string>
-    <string name="ui_1_2_2_4_8">1,2,2,4,8</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 </resources>

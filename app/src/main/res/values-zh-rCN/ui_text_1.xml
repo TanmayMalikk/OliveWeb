@@ -93,34 +93,34 @@
     <string name="ui_no_activity_locking_olive_branch_in_value_seconds">没有活动。在 %1$s 秒内锁定橄榄枝。</string>
     <string name="ui_hide_value">隐藏 %1$s</string>
     <string name="ui_show_value">显示%1$s</string>
-    <string name="ui_tools">工具</string>
-    <string name="ui_hide_scientific_operators">隐藏科学运算符</string>
-    <string name="ui_show_scientific_operators">显示科学运算符</string>
-    <string name="ui_history">历史</string>
-    <string name="ui_x_2_5x_6_0">x^2 - 5x + 6 = 0</string>
-    <string name="ui_unable_to_solve_this_equation">无法解这个方程。</string>
-    <string name="ui_enter_one_to_six_functions">输入一到六个函数。</string>
-    <string name="ui_unable_to_graph_this_equation">无法绘制该方程的图表。</string>
-    <string name="ui_table">表</string>
-    <string name="ui_analyze">分析</string>
-    <string name="ui_check_the_table_range">检查表范围。</string>
-    <string name="ui_yvalue_value_value">Y%1$s(%2$s) = %3$s</string>
-    <string name="ui_choose_two_different_equations">选择两个不同的方程。</string>
-    <string name="ui_check_the_analysis_values">检查分析值。</string>
-    <string name="ui_x_range">X范围</string>
-    <string name="ui_choose_the_first_x_value_last_x_value_and_distance_between_rows">选择第一个 X 值、最后一个 X 值以及行之间的距离。</string>
-    <string name="ui_start_x">开始X</string>
-    <string name="ui_end_x">结束 X</string>
-    <string name="ui_values">价值观</string>
-    <string name="ui_starts_at_x_value">从 X = %1$s 开始</string>
-    <string name="ui_use_the_right_and_bottom_scrollbars_to_move_through_rows_and_colu">使用右侧和底部滚动条在行和列之间移动。</string>
-    <string name="ui_1_choose_a_function">1. 选择功能</string>
-    <string name="ui_2_choose_an_analysis">2. 选择分析</string>
-    <string name="ui_compare_with">与比较</string>
-    <string name="ui_calculate_value">计算 %1$s</string>
-    <string name="ui_result">结果</string>
-    <string name="ui_x_and_y_need_the_same_number_of_values">X 和 Y 需要相同数量的值。</string>
-    <string name="ui_check_the_data_values">检查数据值。</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="ui_game">游戏</string>
     <string name="ui_daily_digest">Daily Digest</string>
     <string name="ui_paywall">付费专区</string>
@@ -165,11 +165,11 @@
     <string name="ui_unable_to_update_this_private_entry_please_retry">无法更新此私人条目。请重试。</string>
     <string name="ui_cover_app_changed_to_value">封面应用程序更改为 %1$s。</string>
     <string name="ui_unable_to_change_the_cover_app">无法更改封面应用程序。</string>
-    <string name="ui_math_tools">数学工具</string>
-    <string name="ui_angle">角度</string>
-    <string name="ui_example_value">示例：%1$s</string>
-    <string name="ui_check_the_values_and_try_again">检查这些值并重试。</string>
-    <string name="ui_calculate">计算</string>
+
+
+
+
+
     <string name="ui_garden_harvest_bowl">花园收获碗</string>
     <string name="ui_quinoa_roasted_vegetables_and_lemon_tahini">藜麦、烤蔬菜和柠檬芝麻酱。</string>
     <string name="ui_olive_kitchen">Olive Kitchen</string>

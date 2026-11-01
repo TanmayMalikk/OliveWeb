@@ -54,21 +54,19 @@
     <string name="province_state_optional">Provincia/estado (opcional)</string>
     <string name="postal_zip_code_optional">Código postal/ZIP (opcional)</string>
     <string name="country_optional">País (opcional)</string>
-<string name="better_calculator">Mejor calculadora</string>
-    <string name="polynomial">polinomio</string>
-    <string name="quadratic">cuadrático</string>
-    <string name="graphing_calculator">Calculadora gráfica</string>
-    <string name="graph">Gráfico</string>
-    <string name="reset">Reiniciar</string>
-    <string name="angle_mode">Modo de ángulo</string>
-    <string name="trigonometric_functions_use_radians">Las funciones trigonométricas utilizan radianes.</string>
-    <string name="trigonometric_functions_use_degrees">Las funciones trigonométricas utilizan grados.</string>
-<string name="polynomial_calculation">Cálculo polinómico</string>
-    <string name="quadratic_equation">ecuación cuadrática</string>
-<string name="example_x_2_5x_6_0">Ejemplo: x^2 - 5x + 6 = 0</string>
-    <string name="example_x_2_1_x_1">Ejemplo: (x^2 - 1) / (x - 1)</string>
-    <string name="equation">Ecuación</string>
-    <string name="solve">resolver</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="close">Cerrar</string>
 <string name="city">ciudad</string>
 <string name="password">Contraseña</string>
@@ -255,7 +253,6 @@ Buen humor.</string>
     <string name="choose_your_cover_app">Elige tu aplicación de portada</string>
     <string name="food_delivery_app_olive">Aplicación de entrega de comida · Oliva</string>
     <string name="news_app_daily_digest">Aplicación de noticias · Resumen diario</string>
-    <string name="calculator_better_calculator">Calculadora · Mejor calculadora</string>
     <string name="olive_branch">rama de olivo</string>
 <string name="sign_out">¿Desconectar?</string>
 <string name="cancel">Cancelar</string>
@@ -359,30 +356,30 @@ Buen humor.</string>
 <string name="news_near_location">Noticias cerca de %1$s</string>
 <string name="accounts">Cuentas</string>
     <string name="add_another_contact">Agregar otro contacto</string>
-    <string name="calculation">Cálculo</string>
+
     <string name="change_local_news_location">Cambiar la ubicación de las noticias locales</string>
     <string name="city_or_region">Ciudad o región</string>
     <string name="create">crear</string>
-    <string name="deg">grados</string>
-    <string name="data_values">Valores de datos</string>
+
+
     <string name="delete_account">Eliminar cuenta</string>
-    <string name="generate_table">generar tabla</string>
-    <string name="graph_table_analysis">Tabla de gráficos y análisis</string>
-    <string name="input">Entrada</string>
-    <string name="plot">Trama</string>
-    <string name="rad">RAD</string>
+
+
+
+
+
     <string name="reconnect">Reconectar</string>
     <string name="refresh">Actualizar</string>
     <string name="save">Guardar</string>
     <string name="save_profile">Guardar perfil</string>
-    <string name="stat_plots">Gráficos de estadísticas</string>
-    <string name="statistical_plots">Gráficos estadísticos</string>
-    <string name="table_analysis">Tabla y análisis</string>
+
+
+
     <string name="use_device_location">Usar la ubicación del dispositivo</string>
-    <string name="x_values">valores x</string>
-    <string name="y_values">valores Y</string>
+
+
     <string name="delete_managed_account_warning">Esto elimina permanentemente la cuenta %1$s de Firebase Authentication y elimina los datos de su cuenta.</string>
-    <string name="y_one_function_per_line">Y = (una función por línea)</string>
+
     <string name="camera_permission_required">Se requiere permiso de la cámara para tomar fotografías en Olive Branch.</string>
     <string name="grant_camera_permission">Conceder permiso a la cámara</string>
 <string name="captured_photo_review">Revisión de fotos capturadas</string>
@@ -403,36 +400,38 @@ Buen humor.</string>
     <string name="staff_safety_plans_description">Revisa y actualiza los planes de los usuarios que tienes asignados.</string>
     <string name="admin_safety_plans_description">Revisa y edita los planes de seguridad de la organización.</string>
     <string name="admin_accounts_description">Crea cuentas y revisa cuántos usuarios tiene asignado cada empleado.</string>
-    <string name="fitness_calculator">Calculadora de actividad</string>
-    <string name="fitness_tracking">Seguimiento de actividad</string>
+
     <string name="steps_today">Pasos de hoy</string>
-    <string name="steps_goal_value">Objetivo: %1$d pasos</string>
-    <string name="distance">Distancia</string>
+    <plurals name="steps_goal_value">
+        <item quantity="one">Objetivo: %1$d paso</item>
+        <item quantity="other">Objetivo: %1$d pasos</item>
+    </plurals>
+
     <string name="calories">Calorías</string>
-    <string name="active_minutes">Min activos</string>
-    <string name="distance_value_km">%1$.2f km</string>
-    <string name="calories_value">%1$.0f kcal</string>
-    <string name="activity_permission_needed">Permite el acceso a la actividad física para contar los pasos en este teléfono.</string>
-    <string name="grant_activity_access">Permitir actividad</string>
-    <string name="step_sensor_unavailable">Este teléfono no tiene un sensor contador de pasos.</string>
-    <string name="fitness_settings">Ajustes de actividad</string>
+
+
+
+
+
+
+
     <string name="weight_kg">Peso (kg)</string>
     <string name="height_cm">Altura (cm)</string>
     <string name="daily_step_goal">Objetivo diario de pasos</string>
-    <string name="fitness_settings_saved">Ajustes de actividad guardados.</string>
-    <string name="walk_tracker">Seguimiento de caminata</string>
-    <string name="walk_tracking_active">Seguimiento de caminata activo</string>
-    <string name="walk_tracking_notification">Registrando distancia, velocidad y ritmo.</string>
-    <string name="walk_distance_value">Distancia: %1$.2f km</string>
-    <string name="walk_time_value">Tiempo: %1$s</string>
-    <string name="walk_speed_value">Velocidad media: %1$.1f km/h</string>
-    <string name="walk_pace_value">Ritmo: %1$.1f min/km</string>
-    <string name="start_walk">Iniciar caminata</string>
-    <string name="stop_walk">Detener caminata</string>
-    <string name="walk_tracker_description">Registra distancia GPS, tiempo, velocidad y ritmo. Puede continuar con la pantalla apagada.</string>
-    <string name="location_needed_for_walk">Se necesita ubicación para registrar una caminata.</string>
-    <string name="seven_day_history">Historial de siete días</string>
-    <string name="calories_estimate_notice">La distancia, los minutos activos y las calorías son estimaciones basadas en tus pasos, altura y peso.</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="private_contact_note">Nota privada del contacto</string>
     <string name="private_contact_note_explanation">Solo tú puedes leer esta nota cifrada en este dispositivo. El texto nuevo se agrega en una línea nueva.</string>
     <string name="choose_person">Elegir una persona</string>

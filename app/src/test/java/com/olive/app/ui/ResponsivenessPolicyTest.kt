@@ -1,4 +1,4 @@
-// Tests startup, TalkBack order, chat registration, and calculator responsiveness.
+// Tests startup, TalkBack order, and chat registration.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -6,9 +6,6 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.messagingIdentityMarker
 import com.olive.app.ui.users.shared.navigation.shouldRegisterMessagingIdentity
 import com.olive.app.ui.users.shared.navigation.shouldComposeCover
-
-import com.olive.app.ui.covers.calculator.CalculatorHistoryEntry
-import com.olive.app.ui.covers.calculator.CalculatorInput
 
 import com.olive.app.data.AccountIdentity
 import org.junit.Assert.assertEquals
@@ -54,23 +51,5 @@ class ResponsivenessPolicyTest {
                 publicKey
             )
         )
-    }
-
-    // Inputs: the values shown below. Expected: calculator history can arrive after the input is already interactive.
-    @Test
-    fun calculatorHistoryCanArriveAfterTheInputIsAlreadyInteractive() {
-        val input = CalculatorInput()
-        input.press("7")
-        input.press("+")
-        input.press("2")
-        input.press("=")
-        val current = input.history.first()
-
-        val saved = CalculatorHistoryEntry("3+4", "7")
-        input.restoreHistory(listOf(saved, current))
-
-        assertEquals(current, input.history.first())
-        assertEquals(2, input.history.size)
-        assertTrue(saved in input.history)
     }
 }
