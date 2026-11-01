@@ -128,6 +128,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     }
     LaunchedEffect(snapshot) {
         FitnessWatchSync.publish(context, accountId, snapshot)
+        FitnessCloudSync.upload(accountId, snapshot, history)
     }
     LaunchedEffect(session.coverReset) {
         snapshot = store.snapshot()

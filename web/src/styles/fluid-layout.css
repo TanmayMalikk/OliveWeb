@@ -1,0 +1,134 @@
+/* All web users: scales complete layouts with the available screen instead of fixed desktop canvases. */
+:root {
+  --fluid-page-gutter: clamp(1rem, 4vi, 5rem);
+  --fluid-page-width: calc(100% - (2 * var(--fluid-page-gutter)));
+  --fluid-section-gap: clamp(1rem, 2.5vi, 3.5rem);
+}
+
+/* Keep text at a familiar desktop size. Layouts grow through their grids and gaps, not font zoom. */
+html { font-size: 100%; }
+
+.page-width,
+.cover-container,
+.landing > .site-header {
+  width: var(--fluid-page-width);
+  max-width: none;
+}
+
+.landing-hero,
+.grove-main,
+.food-hero,
+.account-layout,
+.messages-layout {
+  column-gap: var(--fluid-section-gap);
+}
+
+.landing-hero,
+.food-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+/* Cover game users: game artwork fills its panel but never widens the page. */
+.grove-game,
+.flight-arena,
+.crossing-arena,
+.memory-arena,
+.flight-stage,
+.crossing-stage,
+.memory-grid {
+  inline-size: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-x: clip;
+}
+
+@media (min-width: 48.01rem) {
+  .grove-main {
+    width: 100%;
+    max-width: none;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .grove-intro {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .grove-intro > .grove-games,
+  .grove-intro > .memory-options {
+    width: 100%;
+    margin-top: clamp(0.75rem, 1.5svh, 1.25rem);
+  }
+
+  .grove-game {
+    width: 100%;
+    height: 100%;
+    justify-self: stretch;
+  }
+}
+
+.news-page {
+  max-width: none;
+}
+
+.fitness-tabs,
+.fitness-content {
+  width: min(100%, 72vi);
+  max-width: none;
+}
+
+.safe-shell {
+  grid-template-columns: clamp(13rem, 16vi, 15.5rem) minmax(0, 1fr);
+}
+
+.account-layout {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.messages-layout {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.5fr);
+}
+
+.safe-welcome {
+  min-height: clamp(18rem, 32svh, 28rem);
+}
+
+.chat-panel {
+  min-height: clamp(28rem, calc(100svh - 16rem), 48rem);
+}
+
+.chat-messages {
+  height: auto;
+  min-height: clamp(18rem, calc(100svh - 28rem), 34rem);
+  flex: 1;
+}
+
+@media (max-width: 60rem) {
+  :root {
+    --fluid-page-gutter: clamp(1rem, 3vi, 2rem);
+  }
+
+  .fitness-tabs,
+  .fitness-content {
+    width: 100%;
+  }
+
+  .safe-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 48rem) {
+  .landing-hero,
+  .grove-main,
+  .food-hero,
+  .account-layout,
+  .messages-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

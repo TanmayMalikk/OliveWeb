@@ -318,11 +318,11 @@ test("fitness cover opens activity, vitals, and nutrition summaries", async ({
   await page.goto("/cover/fitness");
   await expect(page.getByRole("heading", { name: "Fitness Tracker" })).toBeVisible();
   await page.getByRole("tab", { name: /Activity/ }).click();
-  await expect(page.getByRole("img", { name: "Seven-day steps chart" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Steps, last 14 days" })).toBeVisible();
   await page.getByRole("tab", { name: /Vitals/ }).click();
   await expect(page.getByText("— No data —")).toBeVisible();
   await page.getByRole("tab", { name: /Nutrition/ }).click();
-  await expect(page.getByText("1,420")).toBeVisible();
+  await expect(page.getByText("0 / 2000 kcal")).toBeVisible();
 });
 // Inputs: the values in this case. Expected: news reader sanitizes publisher HTML and bookmarks stay available.
 test("news reader sanitizes publisher HTML and bookmarks stay available", async ({

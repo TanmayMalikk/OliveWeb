@@ -94,12 +94,13 @@ test("protected account detection is exact and claim aware", () => {
   assert.equal(_test.protectedAccount({}, "staff"), false);
 });
 
-// Inputs: conflicting role claim, profile role, and email aliases. Expected: trusted claims win, then profile, then legacy email.
-test("role resolution follows claim profile and legacy email precedence", () => {
+// Inputs: conflicting claims, profiles, and aliases. Expected: only trusted claims grant staff or admin authority.
+test("role resolution grants privileged roles only from trusted claims", () => {
   assert.equal(_test.roleFromUser({customClaims:{role:"ADMIN"},email:"x@users.olive.invalid"},{role:"USER"}),"ADMIN");
-  assert.equal(_test.roleFromUser({customClaims:{},email:"x@users.olive.invalid"},{role:"STAFF"}),"STAFF");
+  assert.equal(_test.roleFromUser({customClaims:{},email:"x@users.olive.invalid"},{role:"STAFF"}),"USER");
   assert.equal(_test.roleFromUser({customClaims:{},email:"x@safe.olive.invalid"},{}),"SAFE_CONTACT");
-  assert.equal(_test.roleFromUser({customClaims:{role:"ROOT"},email:"x@admin.olive.invalid"},{role:"ROOT"}),"ADMIN");
+  assert.equal(_test.roleFromUser({customClaims:{role:"ROOT"},email:"x@admin.olive.invalid"},{role:"ADMIN"}),"USER");
+  assert.equal(_test.roleFromUser({customClaims:{},email:"x@staff.olive.invalid"},{role:"STAFF"}),"USER");
   assert.equal(_test.roleFromUser({customClaims:{},email:"person@example.ca"},{}),"USER");
 });
 

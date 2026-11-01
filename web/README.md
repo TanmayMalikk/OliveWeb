@@ -1,8 +1,7 @@
 # Olive Branch web portal
 
-React + TypeScript, alongside the existing Android project. No Android source or
-build configuration is changed. All domains below are planned; this implementation
-runs locally and does not register or deploy a domain.
+React + TypeScript alongside the Android project. Android publishes an owner-only
+14-day fitness summary so the signed-in web cover can display real activity.
 
 ## Run locally
 
@@ -37,11 +36,28 @@ Firebase rule checks remain in `../firebase` (`npm test` there starts demo emula
 | `get.yourolivebranch.ca`   | `npm run build:download` | Download and installation instructions at `/`.                                                                                                                                                                     |
 | `admin.yourolivebranch.ca` | `npm run build:admin`    | Staff and administrator sign-in and workspace at `/`. Personal and safe-contact roles are rejected here.                                                                                                           |
 
-The production setup uses three Vercel projects from this same `web` directory,
-one build command and domain per row. All three use the same Firebase project and
-the same web environment variables. Each deployment needs SPA fallback to
-`index.html`; API, manifest, news proxy, and APK endpoints still need the Express
-server or equivalent serverless functions.
+The production setup uses three Hostinger Node.js Web Apps from this repository,
+one build command and domain per row. Hostinger supports this monorepo layout: set
+the **Root directory** to `web`, **Output directory** to `dist`, **Entry file** to
+`server/productionServer.mjs`, and Node.js to version 22 or 24. Use the matching
+build command from the table. The Express entry file supplies SPA fallback,
+security headers, dynamic manifests, and the same-origin news API.
+
+All three deployments use the same Firebase project and public web configuration.
+Add the values from `.env.example` in each Hostinger Web App's **Environment
+variables** screen. Variables beginning with `VITE_` are intentionally compiled
+into browser JavaScript and must never contain service-account JSON, private keys,
+FatSecret credentials, signing keys, passwords, or other server authorization.
+FatSecret remains in Firebase Functions secrets. `npm run security:check` runs
+before every production build and rejects common private credential formats from
+the public web source.
+
+Hostinger Business/Unlimited or Cloud hosting is required for this Node.js setup.
+A static-only plan can display the built React pages, but the News cover API and
+dynamic manifests will not work. Add `yourolivebranch.ca`,
+`get.yourolivebranch.ca`, and `admin.yourolivebranch.ca` as separate Web Apps;
+each counts as one Hostinger Node.js website. Enable automatic GitHub deployment
+only after the production branch and environment variables are confirmed.
 
 The four user covers are states of the first SPA, rather than pages or subdomains.
 The chosen cover is saved in the browser enrollment/profile. Two people can open
@@ -60,7 +76,7 @@ replaced with `/` as soon as the app reads them.
 
 `site.config.json` is the address map shared by the three builds, Quick Exit,
 personal links, and PWA manifests. `VITE_SITE_MODE` is committed through
-`.env.user`, `.env.download`, and `.env.admin`; Vercel may also set it explicitly.
+`.env.user`, `.env.download`, and `.env.admin`; Hostinger may also set it explicitly.
 Configure all three domains as Firebase authorized domains and configure Storage
 CORS before enabling them. Browser storage stays origin-specific, so account
 enrollment lives on the main domain while the public download and admin sites keep
@@ -71,7 +87,8 @@ There are no duplicated React applications or separate cover repositories.
 
 ## Shared Firebase accounts
 
-Register a **Web app in the same Firebase project** as Android, then copy
+The `Olive Branch Web` Firebase app is registered in the same project as Android.
+Copy
 `.env.example` to `.env.local` and supply that web app's public Firebase config.
 Do not copy service-account JSON, Android signing credentials, or server secrets.
 Partial Firebase configuration must be completed before enabling shared mode.
@@ -83,8 +100,10 @@ The web adapter preserves mobile contracts:
 - Profiles: Storage `accounts/{uid}/profile.json`, with the same profile fields.
 - History: Storage `accounts/{uid}/history/{settings,triggers,checkouts,private_entries}/{id}.json`.
 - Messages/friends: existing Firestore directory, request, friendship, friend-list,
-  conversation, and message collections. Message bodies use the same RSA-wrapped
-  AES-GCM room-key format as Android; Firestore disk persistence is disabled.
+  conversation, and message collections. Firestore disk persistence is disabled.
+  The web client never replaces a different device's public encryption key; until
+  multi-device key linking is complete, an account already linked to Android opens
+  secure messages on Android instead of weakening or silently rotating its keys.
 - Safety plans: the user, safe-contact, and staff web views call the same
   `safetyPlan*` callable Functions as Android, including field revisions,
   consultation assignment, shared read access, and staff availability.
@@ -94,9 +113,8 @@ The web adapter preserves mobile contracts:
   hash and server timestamp. The owner can get/rotate/delete only their own record;
   anonymous reads and collection listing are denied.
 
-The additional entry-registry rules in `../firebase/firestore.rules` must be
-reviewed and deployed to the intended project before cloud link creation works.
-No Firebase configuration or rules were deployed by this work. Authorize the web
+The owner-only fitness Storage rule was tested and deployed to `olive-21239`.
+Review and deploy later Firestore or Storage changes separately. Authorize the web
 origins in Firebase Authentication and configure Storage CORS for authenticated
 browser downloads. `storage.cors.example.json` is a local-origin example, not an
 access-control policy or a production deployment command.
@@ -163,15 +181,18 @@ page. This intentionally does not provide a fully offline application shell.
   article will open in-page or bypass a subscription.
 - Food checkout is a demonstration, matching the mobile cover: no order is placed
   and no payment is charged. Card fields are transient and never stored or sent.
+- The Fitness cover logs calories/macros in a browser and displays the Android app's
+  owner-only 14-day steps, distance, calories, and Wear OS heart-rate summary. A
+  browser does not claim to count background steps.
+- Browser camera preview and current-location lookup are available while their page
+  is open. Android remains the source for OCR, background location sharing,
+  navigation, and encrypted media upload/viewing because their keys and background
+  services are device-held.
 
 Do not describe this as a deployed production site or complete native parity until
 the remaining platform/translation differences and real Firebase integration have
 been evaluated with the project team.
 
-Before enabling organization accounts in production, review the existing
-`functions/index.js` authorization: `roleFromUser` falls back to the role inside
-an owner-writable profile when custom claims are absent. Administrative authority
-must come from trusted server-managed claims. This pre-existing backend behavior
-was left unchanged to avoid silently breaking legacy mobile organization accounts;
-the web client requires matching custom claims for staff/admin sign-in, which is
-not a substitute for fixing server authorization.
+Staff and administrator authority is accepted only from server-managed Firebase
+Auth custom claims. A role written in a profile or inferred from an organization
+email alias cannot grant privileged backend access.

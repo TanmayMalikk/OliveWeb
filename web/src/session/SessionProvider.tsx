@@ -32,6 +32,7 @@ import {
   emptyHistory,
   friendlyError,
   newEvent,
+  normalizeCover,
   type Cover,
   type Enrollment,
   type History,
@@ -87,7 +88,9 @@ export function SessionProvider({
   const working = useRef(false);
   const routeCover = coverForRoute(path, location.origin)?.id as
     Cover | undefined;
-  const cover = routeCover ?? enrollment?.cover ?? profile?.coverType ?? "GAME";
+  const cover = normalizeCover(
+    routeCover ?? enrollment?.cover ?? profile?.coverType ?? "GAME",
+  );
   const go = useCallback(
     (to: string) => {
       pendingEntry.current = null;
@@ -120,13 +123,18 @@ export function SessionProvider({
       .then((db) => db.get("device", "current"))
       .then(async (value) => {
         if (!live) return;
-        setEnrollment(value ?? null);
+        const savedEnrollment = value
+          ? { ...value, cover: normalizeCover(value.cover) }
+          : null;
+        setEnrollment(savedEnrollment);
+        if (savedEnrollment && savedEnrollment.cover !== value?.cover)
+          await (await database).put("device", savedEnrollment, "current");
         if (value && pendingEntry.current) {
           let authenticated = true;
           if (cloudMode) {
             const { auth } = await firebase();
             await auth.authStateReady();
-            authenticated = auth.currentUser?.uid === value.uid;
+          authenticated = auth.currentUser?.uid === savedEnrollment?.uid;
           }
           const entryToken = pendingEntry.current;
           if (
@@ -135,7 +143,7 @@ export function SessionProvider({
             live &&
             pendingEntry.current === entryToken
           ) {
-            entryOwner.current = value.uid;
+            entryOwner.current = savedEnrollment.uid;
             setPhase("pin");
           }
         }
@@ -198,7 +206,7 @@ export function SessionProvider({
         ? "Olive Branch Workspace"
         : mode === "download"
           ? "Olive Branch"
-          : covers.find((c) => c.id === cover)!.name;
+        : covers.find((candidate) => candidate.id === cover)?.name ?? "Game";
   }, [cover, mode]);
   async function perform(work: () => Promise<void>) {
     if (working.current) return;

@@ -22,6 +22,12 @@ test("all games and controls fit the available laptop and desktop viewport", asy
         const game = document
           .querySelector(".grove-game")!
           .getBoundingClientRect();
+        const main = document
+          .querySelector(".grove-main")!
+          .getBoundingClientRect();
+        const intro = document
+          .querySelector(".grove-intro")!
+          .getBoundingClientRect();
         const play = document
           .querySelector(".flight-stage, .memory-grid, .crossing-stage")!
           .getBoundingClientRect();
@@ -48,12 +54,21 @@ test("all games and controls fit the available laptop and desktop viewport", asy
           scrollWidth: document.documentElement.scrollWidth,
           height: innerHeight,
           width: innerWidth,
+          gameWidth: game.width,
+          mainWidth: main.width,
+          gameLeft: game.left,
+          gameRight: game.right,
+          mainRight: main.right,
+          introRight: intro.right,
           top: game.top,
           bottom: game.bottom,
           controlsBottom: controls.bottom,
           playHeight: play.height,
           playBottom: play.bottom,
           controlsTop: controls.top,
+          panelScrolls:
+            document.querySelector<HTMLElement>(".grove-game")!.scrollWidth >
+            document.querySelector<HTMLElement>(".grove-game")!.clientWidth + 1,
         };
       });
       expect(
@@ -61,6 +76,16 @@ test("all games and controls fit the available laptop and desktop viewport", asy
         `${name} at ${width}x${height}`,
       ).toBeLessThanOrEqual(height + 1);
       expect(layout.scrollWidth).toBeLessThanOrEqual(width);
+      expect(
+        layout.panelScrolls,
+        `${name} panel should not scroll horizontally at ${width}x${height}`,
+      ).toBe(false);
+      expect(
+        layout.gameWidth / layout.mainWidth,
+        `${name} should fill the right game column at ${width}x${height}`,
+      ).toBeGreaterThan(0.5);
+      expect(layout.gameLeft).toBeGreaterThanOrEqual(layout.introRight - 2);
+      expect(Math.abs(layout.gameRight - layout.mainRight)).toBeLessThan(2);
       expect(layout.fullWidth).toBe(true);
       expect(layout.top).toBeGreaterThanOrEqual(0);
       expect(layout.bottom).toBeLessThanOrEqual(height);

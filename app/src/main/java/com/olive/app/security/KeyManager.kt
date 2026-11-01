@@ -16,6 +16,7 @@ import java.security.KeyFactory
 import java.security.GeneralSecurityException
 import java.security.spec.X509EncodedKeySpec
 import java.security.spec.MGF1ParameterSpec
+import java.security.MessageDigest
 import javax.crypto.spec.OAEPParameterSpec
 import javax.crypto.spec.PSource
 
@@ -66,6 +67,15 @@ object KeyManager {
 
     fun getOrCreatePublicKey(): PublicKey = getPublicKey() ?: generateUserKeyPair().public
 
+    // Secure messaging: identifies this installation without exposing its private key.
+    fun deviceId(publicKey: PublicKey = getOrCreatePublicKey()): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(publicKey.encoded)
+        return android.util.Base64.encodeToString(
+            digest.copyOfRange(0, 18),
+            android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP or android.util.Base64.NO_PADDING
+        )
+    }
+
     /**
      * Retrieves the user's Private Key to decrypt AES keys pulled from Firestore.
      */
@@ -81,8 +91,13 @@ object KeyManager {
      * Returns a Base64 string safe for Firestore.
      */
     fun wrapKey(secretKey: SecretKey, publicKey: PublicKey): String {
+        return wrapKey(secretKey, publicKey, MGF1ParameterSpec.SHA1)
+    }
+
+    // Secure messaging: uses the mask digest declared by the receiving device.
+    fun wrapKey(secretKey: SecretKey, publicKey: PublicKey, mgf1Digest: MGF1ParameterSpec): String {
         val cipher = Cipher.getInstance(RSA_MODE)
-        val spec = oaepSpec(MGF1ParameterSpec.SHA1)
+        val spec = oaepSpec(mgf1Digest)
         // Bypass WRAP_MODE entirely
         cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
         val wrappedBytes = cipher.doFinal(secretKey.encoded)

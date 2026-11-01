@@ -11,6 +11,7 @@ import { unwrapKey, wrapKey, triggerHash } from "./EncryptionService";
 import {
   emptyHistory,
   emptyProfile,
+  normalizeCover,
   signInEmail,
   purgeEntry,
   type Profile,
@@ -63,16 +64,19 @@ export class Accounts {
           throw new Error(
             "Organization accounts must be provisioned by an administrator.",
           );
+        const normalized = username.trim().toLowerCase();
+        await httpsCallable(functions, "createPublicAccount")({
+          username: normalized,
+          password,
+          role,
+        });
         user = (
-          await sdk.createUserWithEmailAndPassword(
+          await sdk.signInWithEmailAndPassword(
             auth,
-            signInEmail(username, role),
+            signInEmail(normalized, role),
             password,
           )
         ).user;
-        await sdk.updateProfile(user, {
-          displayName: username.trim().toLowerCase(),
-        });
       } else {
         try {
           user = (
@@ -164,7 +168,11 @@ export class Accounts {
         65536,
       );
       const saved = JSON.parse(new TextDecoder().decode(bytes));
-      profile = { ...emptyProfile(identity.username, identity.role), ...saved };
+      profile = {
+        ...emptyProfile(identity.username, identity.role),
+        ...saved,
+        coverType: normalizeCover(saved.coverType),
+      };
       if (
         profile!.username !== identity.username ||
         profile!.role !== identity.role
