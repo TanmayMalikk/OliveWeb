@@ -2,6 +2,11 @@
 import express from "express";
 import { news, article } from "./newsProxy.mjs";
 import siteConfig from "../site.config.json" with { type: "json" };
+
+const ANDROID_APK_STORAGE_PATH =
+  "/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2Folive-branch.apk";
+const ANDROID_APK_STORAGE_URL = `https://firebasestorage.googleapis.com${ANDROID_APK_STORAGE_PATH}?alt=media`;
+
 export function createServerApp({ development = false } = {}) {
   const app = express();
   app.disable("x-powered-by");
@@ -30,8 +35,7 @@ export function createServerApp({ development = false } = {}) {
     let destination;
     try {
       destination = new URL(
-        process.env.ANDROID_APK_URL ||
-          "https://firebasestorage.googleapis.com/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2Folive-branch.apk?alt=media",
+        process.env.ANDROID_APK_URL || ANDROID_APK_STORAGE_URL,
       );
     } catch {
       return res
@@ -41,7 +45,8 @@ export function createServerApp({ development = false } = {}) {
     }
     if (
       destination.protocol !== "https:" ||
-      destination.hostname !== "firebasestorage.googleapis.com"
+      destination.hostname !== "firebasestorage.googleapis.com" ||
+      destination.pathname !== ANDROID_APK_STORAGE_PATH
     )
       return res
         .status(503)
