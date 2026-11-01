@@ -93,34 +93,34 @@
     <string name="ui_no_activity_locking_olive_branch_in_value_seconds">لا يوجد نشاط. قفل غصن الزيتون خلال %1$s ثانية.</string>
     <string name="ui_hide_value">إخفاء %1$s</string>
     <string name="ui_show_value">إظهار %1$s</string>
-    <string name="ui_tools">أدوات</string>
-    <string name="ui_hide_scientific_operators">إخفاء العوامل العلمية</string>
-    <string name="ui_show_scientific_operators">عرض العوامل العلمية</string>
-    <string name="ui_history">التاريخ</string>
-    <string name="ui_x_2_5x_6_0">x^2 - 5x + 6 = 0</string>
-    <string name="ui_unable_to_solve_this_equation">غير قادر على حل هذه المعادلة.</string>
-    <string name="ui_enter_one_to_six_functions">أدخل واحدة إلى ست وظائف.</string>
-    <string name="ui_unable_to_graph_this_equation">غير قادر على رسم هذه المعادلة.</string>
-    <string name="ui_table">الجدول</string>
-    <string name="ui_analyze">تحليل</string>
-    <string name="ui_check_the_table_range">تحقق من نطاق الجدول.</string>
-    <string name="ui_yvalue_value_value">Y%1$s(%2$s) = %3$s</string>
-    <string name="ui_choose_two_different_equations">اختر معادلتين مختلفتين.</string>
-    <string name="ui_check_the_analysis_values">التحقق من قيم التحليل.</string>
-    <string name="ui_x_range">نطاق X</string>
-    <string name="ui_choose_the_first_x_value_last_x_value_and_distance_between_rows">اختر قيمة X الأولى، وقيمة X الأخيرة، والمسافة بين الصفوف.</string>
-    <string name="ui_start_x">ابدأ X</string>
-    <string name="ui_end_x">نهاية العاشر</string>
-    <string name="ui_values">القيم</string>
-    <string name="ui_starts_at_x_value">يبدأ عند X = %1$s</string>
-    <string name="ui_use_the_right_and_bottom_scrollbars_to_move_through_rows_and_colu">استخدم أشرطة التمرير اليمنى والسفلية للتنقل عبر الصفوف والأعمدة.</string>
-    <string name="ui_1_choose_a_function">1. اختر وظيفة</string>
-    <string name="ui_2_choose_an_analysis">2. اختر التحليل</string>
-    <string name="ui_compare_with">قارن مع</string>
-    <string name="ui_calculate_value">احسب %1$s</string>
-    <string name="ui_result">النتيجة</string>
-    <string name="ui_x_and_y_need_the_same_number_of_values">يحتاج X وY إلى نفس عدد القيم.</string>
-    <string name="ui_check_the_data_values">التحقق من قيم البيانات.</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="ui_game">لعبة</string>
     <string name="ui_daily_digest">Daily Digest</string>
     <string name="ui_paywall">نظام حظر الاشتراك غير المدفوع</string>
@@ -170,11 +170,11 @@
     <string name="ui_unable_to_update_this_private_entry_please_retry">غير قادر على تحديث هذا الإدخال الخاص. يرجى إعادة المحاولة.</string>
     <string name="ui_cover_app_changed_to_value">تم تغيير تطبيق الغلاف إلى %1$s.</string>
     <string name="ui_unable_to_change_the_cover_app">غير قادر على تغيير تطبيق الغلاف.</string>
-    <string name="ui_math_tools">أدوات الرياضيات</string>
-    <string name="ui_angle">زاوية</string>
-    <string name="ui_example_value">مثال: %1$s</string>
-    <string name="ui_check_the_values_and_try_again">تحقق من القيم وحاول مرة أخرى.</string>
-    <string name="ui_calculate">احسب</string>
+
+
+
+
+
     <string name="ui_garden_harvest_bowl">وعاء حصاد الحديقة</string>
     <string name="ui_quinoa_roasted_vegetables_and_lemon_tahini">كينوا، خضروات مشوية وطحينة بالليمون.</string>
     <string name="ui_olive_kitchen">Olive Kitchen</string>

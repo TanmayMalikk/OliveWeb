@@ -93,34 +93,34 @@
     <string name="ui_no_activity_locking_olive_branch_in_value_seconds">Ninguna actividad. Bloqueando Olive Branch en %1$s segundos.</string>
     <string name="ui_hide_value">Ocultar %1$s</string>
     <string name="ui_show_value">Mostrar %1$s</string>
-    <string name="ui_tools">Herramientas</string>
-    <string name="ui_hide_scientific_operators">Ocultar operadores científicos</string>
-    <string name="ui_show_scientific_operators">Mostrar operadores científicos</string>
-    <string name="ui_history">Historia</string>
-    <string name="ui_x_2_5x_6_0">x^2 - 5x + 6 = 0</string>
-    <string name="ui_unable_to_solve_this_equation">No se puede resolver esta ecuación.</string>
-    <string name="ui_enter_one_to_six_functions">Introduzca de una a seis funciones.</string>
-    <string name="ui_unable_to_graph_this_equation">No se puede graficar esta ecuación.</string>
-    <string name="ui_table">mesa</string>
-    <string name="ui_analyze">analizar</string>
-    <string name="ui_check_the_table_range">Consulte el rango de la tabla.</string>
-    <string name="ui_yvalue_value_value">Y%1$s(%2$s) = %3$s</string>
-    <string name="ui_choose_two_different_equations">Elige dos ecuaciones diferentes.</string>
-    <string name="ui_check_the_analysis_values">Verifique los valores de análisis.</string>
-    <string name="ui_x_range">rango X</string>
-    <string name="ui_choose_the_first_x_value_last_x_value_and_distance_between_rows">Elija el primer valor de X, el último valor de X y la distancia entre filas.</string>
-    <string name="ui_start_x">Iniciar X</string>
-    <string name="ui_end_x">Fin X</string>
-    <string name="ui_values">Valores</string>
-    <string name="ui_starts_at_x_value">Comienza en X = %1$s</string>
-    <string name="ui_use_the_right_and_bottom_scrollbars_to_move_through_rows_and_colu">Utilice las barras de desplazamiento derecha e inferior para moverse por filas y columnas.</string>
-    <string name="ui_1_choose_a_function">1. Elige una función</string>
-    <string name="ui_2_choose_an_analysis">2. Elija un análisis</string>
-    <string name="ui_compare_with">Comparar con</string>
-    <string name="ui_calculate_value">Calcular %1$s</string>
-    <string name="ui_result">Resultado</string>
-    <string name="ui_x_and_y_need_the_same_number_of_values">X e Y necesitan la misma cantidad de valores.</string>
-    <string name="ui_check_the_data_values">Verifique los valores de los datos.</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="ui_game">juego</string>
     <string name="ui_daily_digest">Daily Digest</string>
     <string name="ui_paywall">Muro de pago</string>
@@ -167,11 +167,11 @@
     <string name="ui_unable_to_update_this_private_entry_please_retry">No se puede actualizar esta entrada privada. Vuelva a intentarlo.</string>
     <string name="ui_cover_app_changed_to_value">La aplicación de portada cambió a %1$s.</string>
     <string name="ui_unable_to_change_the_cover_app">No se puede cambiar la aplicación de portada.</string>
-    <string name="ui_math_tools">herramientas matemáticas</string>
-    <string name="ui_angle">ángulo</string>
-    <string name="ui_example_value">Ejemplo: %1$s</string>
-    <string name="ui_check_the_values_and_try_again">Verifique los valores y vuelva a intentarlo.</string>
-    <string name="ui_calculate">calcular</string>
+
+
+
+
+
     <string name="ui_garden_harvest_bowl">Cuenco de cosecha de jardín</string>
     <string name="ui_quinoa_roasted_vegetables_and_lemon_tahini">Quinoa, verduras asadas y tahini de limón.</string>
     <string name="ui_olive_kitchen">Olive Kitchen</string>

@@ -24,11 +24,11 @@ class CoverAccountFlowTest : OliveUiTestBase() {
     }
 
     @Test
-    fun coverChoiceSwitchesNewsAndCalculatorAndBothReachSafeArea() {
+    fun coverChoiceSwitchesNewsAndFitnessAndBothReachSafeArea() {
         register(username = "cover_switch_tester")
         unlock()
         click("safe_settings")
-        listOf("food", "news", "calculator", "game").forEach {
+        listOf("food", "news", "fitness", "game").forEach {
             compose.onNodeWithTag("cover_choice_icon_$it", useUnmergedTree = true).assertExists()
         }
         click("cover_choice_news")
@@ -45,14 +45,12 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         enterPin("123456")
         waitFor("safe_settings")
         click("safe_settings")
-        click("cover_choice_calculator")
+        click("cover_choice_fitness")
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
-        waitFor("calculator_cover")
-        compose.onNodeWithTag("cover_brand_calculator").assertIsDisplayed()
-        "123456".forEach { compose.onNodeWithTag("calc_key_$it").performClick() }
-        compose.onNodeWithTag("calc_key_equals").performClick()
-        compose.onNodeWithTag("calc_key_equals").performClick()
+        waitFor("fitness_home")
+        click("fitness_account_settings")
+        compose.onNodeWithTag("discreet_cover_olive").performClick()
         waitFor("safe_settings")
         click("sign_out")
         openOnboarding()

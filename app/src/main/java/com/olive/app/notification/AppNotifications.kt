@@ -21,8 +21,8 @@ object AppNotifications {
     private val OLIVE_DEFAULT_BODY = R.string.ui_your_order_is_being_prepared
     private val NEWS_DEFAULT_TITLE = R.string.ui_daily_digest
     private val NEWS_DEFAULT_BODY = R.string.ui_new_headlines_are_available
-    private val CALCULATOR_DEFAULT_TITLE = R.string.better_calculator
-    private val CALCULATOR_DEFAULT_BODY = R.string.ui_a_calculator_reminder_is_available
+    private val FITNESS_DEFAULT_TITLE = R.string.fitness_tracker
+    private val FITNESS_DEFAULT_BODY = R.string.fitness_reminder
     private val GAME_DEFAULT_TITLE = R.string.app_name
     private val GAME_DEFAULT_BODY = R.string.ui_a_new_update_is_available
     private val BRANCH_DEFAULT_TITLE = R.string.olive_branch
@@ -41,11 +41,7 @@ object AppNotifications {
         R.string.ui_your_latest_digest_is_ready,
         R.string.ui_there_are_new_stories_to_browse,
     )
-    private val CALCULATOR_SAFE_UPDATES = listOf(
-        R.string.ui_a_calculator_update_is_available,
-        R.string.ui_your_calculation_tools_are_ready,
-        R.string.ui_open_better_calculator_for_an_update,
-    )
+    private val FITNESS_SAFE_UPDATES = listOf(R.string.fitness_reminder)
     private val GAME_SAFE_UPDATES = listOf(
         R.string.ui_a_new_update_is_available,
         R.string.ui_open_the_app_to_see_what_s_new,
@@ -59,7 +55,7 @@ object AppNotifications {
     ) {
         val choices = when (coverType) {
             CoverType.NEWS -> NEWS_SAFE_UPDATES
-            CoverType.CALCULATOR -> CALCULATOR_SAFE_UPDATES
+            CoverType.FITNESS -> FITNESS_SAFE_UPDATES
             CoverType.GAME -> GAME_SAFE_UPDATES
             CoverType.FOOD -> OLIVE_SAFE_UPDATES
         }
@@ -102,10 +98,10 @@ object AppNotifications {
             body.orDefault(text(NEWS_DEFAULT_BODY)),
         )
 
-        coverType == CoverType.CALCULATOR -> CoverNotificationContent(
-            OliveNotificationManager.CHANNEL_CALCULATOR,
-            title.orDefault(text(CALCULATOR_DEFAULT_TITLE)),
-            body.orDefault(text(CALCULATOR_DEFAULT_BODY)),
+        coverType == CoverType.FITNESS -> CoverNotificationContent(
+            OliveNotificationManager.CHANNEL_FITNESS,
+            title.orDefault(text(FITNESS_DEFAULT_TITLE)),
+            body.orDefault(text(FITNESS_DEFAULT_BODY)),
         )
 
         coverType == CoverType.GAME -> CoverNotificationContent(

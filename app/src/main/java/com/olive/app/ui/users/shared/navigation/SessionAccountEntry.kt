@@ -59,5 +59,4 @@ internal class SessionAccountEntry(private val runtime: SessionRuntime) {
     fun submitPin(pin: String, challenge: Int = runtime.state.pinChallengeVersion) =
         runtime.access.submitPin(pin, challenge)
 
-    fun submitCalculatorPin(pin: String) = runtime.access.submitCalculatorPin(pin)
 }

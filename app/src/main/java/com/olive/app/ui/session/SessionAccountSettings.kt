@@ -136,12 +136,6 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 val before = profile ?: return
                 if (type == before.coverType) return
                 val device = enrollment ?: return
-                if (type == CoverType.CALCULATOR && !device.hasAppPin) {
-                    message = runtime.application.getString(
-                        R.string.calculator_pin_required_description
-                    )
-                    return
-                }
                 val updated = before.copy(coverType = type)
                 // Show the chosen cover right away; saving keeps going even if Quick exit is tapped immediately.
                 val token = epoch

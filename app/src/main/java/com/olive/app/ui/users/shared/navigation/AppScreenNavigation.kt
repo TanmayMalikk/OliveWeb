@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.data.*
 import com.olive.app.data.AccountIdentity
 import com.olive.app.R
-import com.olive.app.ui.covers.calculator.CalculatorCover
+import com.olive.app.ui.covers.fitness.FitnessCover
 import com.olive.app.ui.covers.GameCover
 import com.olive.app.ui.covers.news.NewsCover
 import com.olive.app.ui.covers.food.OliveCover
@@ -137,7 +137,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                             isCover && !session.privacyBlackout
                         )
 
-                        CoverType.CALCULATOR -> CalculatorCover(session, isCover)
+                        CoverType.FITNESS -> FitnessCover(session, isCover)
                         CoverType.GAME -> GameCover(
                             sessionViewModel = session,
                             interactive = isCover,

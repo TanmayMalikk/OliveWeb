@@ -54,21 +54,19 @@
     <string name="province_state_optional">المقاطعة/الولاية (اختياري)</string>
     <string name="postal_zip_code_optional">الرمز البريدي/الرمز البريدي (اختياري)</string>
     <string name="country_optional">البلد (اختياري)</string>
-<string name="better_calculator">آلة حاسبة أفضل</string>
-    <string name="polynomial">كثير الحدود</string>
-    <string name="quadratic">تربيعي</string>
-    <string name="graphing_calculator">حاسبة الرسوم البيانية</string>
-    <string name="graph">رسم بياني</string>
-    <string name="reset">إعادة تعيين</string>
-    <string name="angle_mode">وضع الزاوية</string>
-    <string name="trigonometric_functions_use_radians">تستخدم الدوال المثلثية الراديان.</string>
-    <string name="trigonometric_functions_use_degrees">تستخدم الدوال المثلثية الدرجات.</string>
-<string name="polynomial_calculation">حساب كثير الحدود</string>
-    <string name="quadratic_equation">المعادلة التربيعية</string>
-<string name="example_x_2_5x_6_0" tools:ignore="TypographyDashes">مثال: x^2 - 5x + 6 = 0</string>
-    <string name="example_x_2_1_x_1" tools:ignore="TypographyDashes">مثال: (س^2 - 1) / (س - 1)</string>
-    <string name="equation">المعادلة</string>
-    <string name="solve">حل</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="close">إغلاق</string>
 <string name="city">المدينة</string>
 <string name="password">كلمة المرور</string>
@@ -255,7 +253,6 @@
     <string name="choose_your_cover_app">اختر تطبيق الغلاف الخاص بك</string>
     <string name="food_delivery_app_olive">تطبيق توصيل الطعام · زيتون</string>
     <string name="news_app_daily_digest">تطبيق الأخبار · الملخص اليومي</string>
-    <string name="calculator_better_calculator">الحاسبة · آلة حاسبة أفضل</string>
     <string name="olive_branch">غصن الزيتون</string>
 <string name="sign_out">تسجيل الخروج؟</string>
 <string name="cancel">إلغاء</string>
@@ -359,30 +356,30 @@
 <string name="news_near_location">أخبار بالقرب من %1$s</string>
 <string name="accounts">الحسابات</string>
     <string name="add_another_contact">أضف جهة اتصال أخرى</string>
-    <string name="calculation">الحساب</string>
+
     <string name="change_local_news_location">تغيير موقع الأخبار المحلية</string>
     <string name="city_or_region">المدينة أو المنطقة</string>
     <string name="create">إنشاء</string>
-    <string name="deg">درجة</string>
-    <string name="data_values">قيم البيانات</string>
+
+
     <string name="delete_account">حذف الحساب</string>
-    <string name="generate_table">توليد الجدول</string>
-    <string name="graph_table_analysis">جدول الرسم البياني والتحليل</string>
-    <string name="input">الإدخال</string>
-    <string name="plot">مؤامرة</string>
-    <string name="rad">راد</string>
+
+
+
+
+
     <string name="reconnect">أعد الاتصال</string>
     <string name="refresh">تحديث</string>
     <string name="save">حفظ</string>
     <string name="save_profile">حفظ الملف الشخصي</string>
-    <string name="stat_plots">المؤامرات الإحصائية</string>
-    <string name="statistical_plots">المؤامرات الإحصائية</string>
-    <string name="table_analysis">الجدول والتحليل</string>
+
+
+
     <string name="use_device_location">استخدام موقع الجهاز</string>
-    <string name="x_values">قيم X</string>
-    <string name="y_values">قيم Y</string>
+
+
     <string name="delete_managed_account_warning">يؤدي هذا إلى إزالة حساب %1$s نهائيًا من مصادقة Firebase وحذف بيانات الحساب الخاصة به.</string>
-    <string name="y_one_function_per_line">Y = (وظيفة واحدة لكل سطر)</string>
+
     <string name="camera_permission_required">مطلوب إذن الكاميرا لالتقاط الصور في غصن الزيتون.</string>
     <string name="grant_camera_permission">منح إذن الكاميرا</string>
 <string name="captured_photo_review">مراجعة الصور الملتقطة</string>
@@ -403,36 +400,42 @@
     <string name="staff_safety_plans_description">راجع وحدّث خطط الأمان للمستخدمين المعيّنين لك.</string>
     <string name="admin_safety_plans_description">راجع وعدّل خطط الأمان في المؤسسة.</string>
     <string name="admin_accounts_description">أنشئ الحسابات وراجع عدد المستخدمين المعيّنين لكل موظف.</string>
-    <string name="fitness_calculator">حاسبة اللياقة</string>
-    <string name="fitness_tracking">تتبع اللياقة</string>
+
     <string name="steps_today">خطوات اليوم</string>
-    <string name="steps_goal_value">الهدف: %1$d خطوة</string>
-    <string name="distance">المسافة</string>
+    <plurals name="steps_goal_value">
+        <item quantity="zero">الهدف: %1$d خطوة</item>
+        <item quantity="one">الهدف: خطوة واحدة</item>
+        <item quantity="two">الهدف: خطوتان</item>
+        <item quantity="few">الهدف: %1$d خطوات</item>
+        <item quantity="many">الهدف: %1$d خطوة</item>
+        <item quantity="other">الهدف: %1$d خطوة</item>
+    </plurals>
+
     <string name="calories">السعرات</string>
-    <string name="active_minutes">دقائق النشاط</string>
-    <string name="distance_value_km">%1$.2f كم</string>
-    <string name="calories_value">%1$.0f سعرة</string>
-    <string name="activity_permission_needed">اسمح بالوصول إلى النشاط البدني لحساب الخطوات على هذا الهاتف.</string>
-    <string name="grant_activity_access">السماح بالنشاط</string>
-    <string name="step_sensor_unavailable">لا يوفر هذا الهاتف مستشعرًا لعد الخطوات.</string>
-    <string name="fitness_settings">إعدادات اللياقة</string>
+
+
+
+
+
+
+
     <string name="weight_kg">الوزن (كجم)</string>
     <string name="height_cm">الطول (سم)</string>
     <string name="daily_step_goal">هدف الخطوات اليومي</string>
-    <string name="fitness_settings_saved">تم حفظ إعدادات اللياقة.</string>
-    <string name="walk_tracker">متتبع المشي</string>
-    <string name="walk_tracking_active">تتبع المشي نشط</string>
-    <string name="walk_tracking_notification">يتم تتبع المسافة والسرعة والوتيرة.</string>
-    <string name="walk_distance_value">المسافة: %1$.2f كم</string>
-    <string name="walk_time_value">الوقت: %1$s</string>
-    <string name="walk_speed_value">متوسط السرعة: %1$.1f كم/س</string>
-    <string name="walk_pace_value">الوتيرة: %1$.1f دقيقة/كم</string>
-    <string name="start_walk">بدء المشي</string>
-    <string name="stop_walk">إيقاف المشي</string>
-    <string name="walk_tracker_description">تتبع مسافة GPS والوقت والسرعة والوتيرة. يمكن أن يستمر التتبع عند إطفاء الشاشة.</string>
-    <string name="location_needed_for_walk">يلزم الوصول إلى الموقع لتتبع المشي.</string>
-    <string name="seven_day_history">سجل سبعة أيام</string>
-    <string name="calories_estimate_notice">المسافة ودقائق النشاط والسعرات تقديرات تعتمد على خطواتك وطولك ووزنك.</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="private_contact_note">ملاحظة خاصة لجهة الاتصال</string>
     <string name="private_contact_note_explanation">أنت وحدك تستطيع قراءة هذه الملاحظة المشفرة على هذا الجهاز. يضاف النص الجديد في سطر جديد.</string>
     <string name="choose_person">اختر شخصًا</string>
