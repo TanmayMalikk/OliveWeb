@@ -8,6 +8,7 @@ import android.util.Log
 
 import androidx.core.content.edit
 import com.olive.app.data.*
+import com.olive.app.security.EncryptionUtils
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -24,8 +25,13 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 val uid = enrollment?.uid ?: return
                 if (uid !in conversation.participantIds) return
                 messageSubscription?.close()
+                messageOutboxObservation?.cancel()
+                messageOutboxObservation = null
                 val sameConversation = activeConversation?.id == conversation.id
-                if (!preserveMessages || !sameConversation) chatMessages = emptyList()
+                if (!preserveMessages || !sameConversation) {
+                    chatMessages = emptyList()
+                    remoteChatMessages = emptyList()
+                }
                 activeConversation =
                     conversation
                 message = null
@@ -39,10 +45,20 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     try {
                         val key = secureSharing.roomKey(conversation)
                         if (epoch != token || activeConversation?.id != conversation.id) return@launch
+                        MessageSendWorker.enqueuePending(application, uid)
+                        messageOutboxObservation = scope.launch {
+                            messageOutbox.observe(uid).collect { outgoing ->
+                                publishMessages(conversation.id, uid, key, outgoing, token)
+                            }
+                        }
                         messageSubscription =
                             secureChatRepository?.observeMessages(conversation.id, key, { rows ->
-                                if (epoch == token && activeConversation?.id == conversation.id) chatMessages =
-                                    rows
+                                if (epoch == token && activeConversation?.id == conversation.id) {
+                                    remoteChatMessages = rows
+                                    scope.launch {
+                                        publishMessages(conversation.id, uid, key, null, token)
+                                    }
+                                }
                             }, { error ->
                                 if (epoch == token) message = runtime.application.getString(
                                     R.string.ui_unable_to_load_this_conversation_value, error
@@ -73,8 +89,11 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
             with(state) {
                 messageSubscription?.close()
                 messageSubscription = null
+                messageOutboxObservation?.cancel()
+                messageOutboxObservation = null
                 activeConversation = null
                 chatMessages = emptyList()
+                remoteChatMessages = emptyList()
                 message = null
             }
         }
@@ -83,7 +102,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     // Sending a message: check the active chat, encrypt for its room, then report success to the composer.
     fun sendMessage(text: String, onSent: () -> Unit = {}) {
         val state = runtime.state
-        val repository = runtime.secureChatRepository ?: return
+        runtime.secureChatRepository ?: return
         val device = runtime.enrollment ?: return
         val conversation = state.activeConversation ?: return
         if (state.messagingBusy) return
@@ -94,12 +113,16 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         runtime.scope.launch {
             try {
                 val roomKey = runtime.secureSharing.roomKey(conversation)
-                repository.send(
-                    conversation.id,
-                    AccountIdentity(device.uid, state.coverUsername),
-                    text,
-                    roomKey,
-                )
+                val outgoing = withContext(Dispatchers.Default) {
+                    prepareOutgoingMessage(
+                        conversation.id,
+                        AccountIdentity(device.uid, state.coverUsername),
+                        text,
+                        roomKey,
+                    )
+                }
+                withContext(Dispatchers.IO) { runtime.messageOutbox.write(outgoing) }
+                MessageSendWorker.enqueue(runtime.application, outgoing)
                 if (runtime.epoch == sessionVersion && state.activeConversation?.id == conversation.id) {
                     onSent()
                 }
@@ -121,10 +144,34 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
             failure.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
         ) R.string.messaging_send_denied else R.string.ui_unable_to_send_the_message
 
+    fun retryMessage(chat: ChatMessage) {
+        if (chat.deliveryStatus !in setOf(
+                MessageDeliveryStatus.FAILED_RETRYABLE,
+                MessageDeliveryStatus.FAILED_PERMANENT,
+            )
+        ) return
+        val uid = runtime.enrollment?.uid ?: return
+        runtime.scope.launch {
+            val outgoing = withContext(Dispatchers.IO) {
+                runtime.messageOutbox.get(chat.id)?.takeIf { it.ownerUid == uid }?.let {
+                    runtime.messageOutbox.update(it.id) { current ->
+                        current.copy(
+                            status = MessageDeliveryStatus.QUEUED,
+                            attemptCount = 0,
+                            failureCode = null,
+                        )
+                    }
+                }
+            } ?: return@launch
+            MessageSendWorker.enqueue(runtime.application, outgoing, replaceDelayedWork = true)
+        }
+    }
+
     fun unsendMessage(chat: ChatMessage) {
         with(runtime) {
             with(state) {
                 val conversation = activeConversation ?: return
+                if (chat.deliveryStatus != MessageDeliveryStatus.SENT) return
                 messaging.runMessagingAction("Unable to unsend this message.") { _, device, _ ->
                     secureSharing.revokeIfShared(chat, conversation, device.uid)
                     checkNotNull(secureChatRepository) { "Secure messaging unavailable" }
@@ -139,6 +186,47 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
             with(state) {
                 chatQuickExitHintVisible = false
             }
+        }
+    }
+
+    private suspend fun publishMessages(
+        conversationId: String,
+        ownerUid: String,
+        roomKey: javax.crypto.SecretKey,
+        suppliedOutgoing: List<OutgoingMessage>?,
+        token: Long,
+    ) {
+        val outgoing = suppliedOutgoing ?: withContext(Dispatchers.IO) {
+            runtime.messageOutbox.all(ownerUid)
+        }
+        if (runtime.epoch != token || runtime.state.activeConversation?.id != conversationId) return
+        val remote = runtime.remoteChatMessages
+        val remoteIds = remote.mapTo(mutableSetOf(), ChatMessage::id)
+        withContext(Dispatchers.IO) {
+            outgoing.filter { it.status == MessageDeliveryStatus.SENT && it.id in remoteIds }
+                .forEach { runtime.messageOutbox.remove(ownerUid, it.id) }
+        }
+        val local = withContext(Dispatchers.Default) {
+            outgoing.asSequence().filter {
+                it.conversationId == conversationId && it.id !in remoteIds
+            }.mapNotNull { pending ->
+                runCatching {
+                    ChatMessage(
+                        id = pending.id,
+                        senderUid = pending.ownerUid,
+                        senderUsername = pending.senderUsername,
+                        body = EncryptionUtils.decryptText(pending.ciphertext, roomKey),
+                        sentAt = pending.clientSentAt,
+                        deliveryStatus = pending.status,
+                        deliveryFailureCode = pending.failureCode,
+                    )
+                }.getOrNull()
+            }.toList()
+        }
+        if (runtime.epoch == token && runtime.state.activeConversation?.id == conversationId) {
+            runtime.state.chatMessages = (remote + local)
+                .distinctBy(ChatMessage::id)
+                .sortedWith(compareBy(ChatMessage::sentAt, ChatMessage::id))
         }
     }
 

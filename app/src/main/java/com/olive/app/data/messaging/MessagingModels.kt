@@ -92,6 +92,8 @@ data class ChatMessage(
     val body: String,
     val sentAt: Long,
     val unsent: Boolean = false,
+    val deliveryStatus: MessageDeliveryStatus = MessageDeliveryStatus.SENT,
+    val deliveryFailureCode: String? = null,
 )
 
 fun interface ChatSubscription {

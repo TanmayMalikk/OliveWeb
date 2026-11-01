@@ -77,29 +77,34 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         text: String,
         roomKey: SecretKey
     ) {
-        val body = text.trim().filter { it == '\n' || it == '\t' || it >= ' ' }
-        require(body.isNotEmpty())
-        require(body.length <= 2_000)
-        val conversation = firestore.collection("conversations").document(conversationId)
-        val message = conversation.collection("messages").document()
-        val batch = firestore.batch()
-        batch.set(
-            message, mapOf(
-                "senderUid" to sender.uid,
-                "senderUsername" to sender.username.lowercase(),
-                "ciphertext" to EncryptionUtils.encryptText(body, roomKey),
+        deliver(prepareOutgoingMessage(conversationId, sender, text, roomKey))
+    }
+
+    /** Sends a previously encrypted outbox record using its deterministic idempotency key. */
+    suspend fun deliver(outgoing: OutgoingMessage) {
+        val conversation = firestore.collection("conversations").document(outgoing.conversationId)
+        val message = conversation.collection("messages").document(outgoing.id)
+        firestore.runTransaction { transaction ->
+            val saved = transaction.get(message)
+            if (saved.exists()) {
+                check(saved.getString("senderUid") == outgoing.ownerUid)
+                check(saved.getString("ciphertext") == outgoing.ciphertext)
+                check(saved.getLong("clientSentAt") == outgoing.clientSentAt)
+                return@runTransaction
+            }
+            transaction.set(message, mapOf(
+                "senderUid" to outgoing.ownerUid,
+                "senderUsername" to outgoing.senderUsername,
+                "ciphertext" to outgoing.ciphertext,
                 "deleted" to false,
                 "sentAt" to FieldValue.serverTimestamp(),
-                "clientSentAt" to System.currentTimeMillis()
-            )
-        )
-        batch.update(
-            conversation, mapOf(
+                "clientSentAt" to outgoing.clientSentAt,
+            ))
+            transaction.update(conversation, mapOf(
                 "lastMessage" to "Secure message", "lastMessageId" to message.id,
-                "lastSenderUid" to sender.uid, "updatedAt" to FieldValue.serverTimestamp()
-            )
-        )
-        batch.commit().await()
+                "lastSenderUid" to outgoing.ownerUid, "updatedAt" to FieldValue.serverTimestamp()
+            ))
+        }.await()
     }
 
     // Streams encrypted chat records and decrypts each message with the active room key.
