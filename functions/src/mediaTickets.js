@@ -19,10 +19,9 @@ const crypto = require("node:crypto");
 /**
  * Encrypted-media control plane.
  *
- * The Android app sends only ciphertext facts, encrypted metadata, and public-key-wrapped AES keys
- * to these callables. The large encrypted body moves directly between OkHttp and Cloudflare R2 by
- * means of short-lived signed URLs. Consequently Firebase authorizes and records the transfer but
- * never proxies or decrypts user content.
+ * The Android app sends ciphertext facts, encrypted metadata, public-key-wrapped AES keys, and one
+ * callable-only account recovery copy. The large encrypted body moves directly between clients and
+ * Cloudflare R2. Firebase authorizes recovery but never receives or stores plaintext file content.
  *
  * Architectural relationships:
  *   Android MediaRepository -> Firebase callable in this module -> Firestore + R2 signing API
@@ -72,6 +71,15 @@ function client() {
 function string(value, name, max) {
   if (typeof value !== "string" || value.length === 0 || value.length > max) {
     throw new HttpsError("invalid-argument", `Invalid ${name}`);
+  }
+  return value;
+}
+/** Validates the 256-bit recovery copy used by authenticated account devices. */
+function accountAccessKey(value, required = false) {
+  if ((value == null || value === "") && !required) return "";
+  if (typeof value !== "string" || value.length > 64 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(value) || Buffer.from(value, "base64").length !== 32) {
+    throw new HttpsError("invalid-argument", "Invalid accountAccessKey");
   }
   return value;
 }
@@ -143,6 +151,7 @@ function uploadRequest(data, uid) {
   const deviceWrappedKeys = data?.deviceWrappedKeys == null
     ? {}
     : validateDeviceWrappedKeys(data.deviceWrappedKeys, uid);
+  const recoveryKey = accountAccessKey(data?.accountAccessKey);
   return {
     jobId,
     size,
@@ -152,6 +161,7 @@ function uploadRequest(data, uid) {
     wrappedKeys,
     encryptionVersion,
     deviceWrappedKeys,
+    accountAccessKey: recoveryKey,
   };
 }
 
@@ -204,6 +214,10 @@ function pendingRef(jobId) {
 /** Published encrypted-media metadata record keyed by the server-generated media id. */
 function mediaRef(mediaId) {
   return db.collection("files").doc(mediaId);
+}
+/** Callable-only account recovery key. Firestore clients have no rule granting this collection. */
+function mediaAccessKeyRef(mediaId) {
+  return db.collection("mediaAccessKeys").doc(mediaId);
 }
 function sessionResponse(value) {
   return {
@@ -267,6 +281,9 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
       found.ciphertextSize !== value.size
     )
       throw new HttpsError("already-exists", "jobId is already in use");
+    if (!found.accountAccessKey && value.accountAccessKey) {
+      await reference.update({accountAccessKey: value.accountAccessKey});
+    }
     return sessionResponse(found);
   }
   const mediaId = crypto.randomUUID();
@@ -302,6 +319,7 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
     encryptedMetadata: value.encryptedMetadata,
     wrappedKeys: value.wrappedKeys,
     deviceWrappedKeys: value.deviceWrappedKeys,
+    accountAccessKey: value.accountAccessKey,
     allowedUsers: value.allowedUsers,
     encryptionVersion: value.encryptionVersion,
     status: "pending",
@@ -425,6 +443,13 @@ exports.mediaCompleteUpload = onCall(options, async (request) => {
     status: "complete",
     completedAt: FieldValue.serverTimestamp(),
   });
+  if (value.accountAccessKey) {
+    batch.create(mediaAccessKeyRef(value.mediaId), {
+      owner_id: uid,
+      key: value.accountAccessKey,
+      created_at: FieldValue.serverTimestamp(),
+    });
+  }
   await batch.commit();
   return publicRecord(await mediaRef(value.mediaId).get());
 });
@@ -472,6 +497,45 @@ exports.mediaDownloadTicket = onCall(options, async (request) => {
     { expiresIn: ticketSeconds },
   );
   return { url, headers: {}, expiresAt: Date.now() + ticketSeconds * 1000 };
+});
+
+/** Returns the account recovery copy only after checking the current file access list. */
+exports.mediaAccountAccessKey = onCall(options, async (request) => {
+  const uid = caller(request);
+  const mediaId = string(request.data?.mediaId, "mediaId", 64);
+  const [media, recovery] = await Promise.all([
+    mediaRef(mediaId).get(),
+    mediaAccessKeyRef(mediaId).get(),
+  ]);
+  if (!media.exists) throw new HttpsError("not-found", "Media was not found");
+  const value = media.data();
+  if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
+    throw new HttpsError("permission-denied", "Media access was denied");
+  }
+  if (!recovery.exists) {
+    throw new HttpsError("failed-precondition", "This older document has not been upgraded for account access");
+  }
+  return {accountAccessKey: accountAccessKey(recovery.data().key, true)};
+});
+
+/** Lets an owner upgrade a legacy document after decrypting it on any previously authorized device. */
+exports.mediaStoreAccountAccessKey = onCall(options, async (request) => {
+  const uid = caller(request);
+  const mediaId = string(request.data?.mediaId, "mediaId", 64);
+  const key = accountAccessKey(request.data?.accountAccessKey, true);
+  const media = await mediaRef(mediaId).get();
+  if (!media.exists) throw new HttpsError("not-found", "Media was not found");
+  if (media.data().owner_id !== uid) {
+    throw new HttpsError("permission-denied", "Only the owner can upgrade document access");
+  }
+  await mediaAccessKeyRef(mediaId).create({
+    owner_id: uid,
+    key,
+    created_at: FieldValue.serverTimestamp(),
+  }).catch((error) => {
+    if (error?.code !== 6 && error?.code !== "already-exists") throw error;
+  });
+  return {stored: true};
 });
 
 /** Owner-only recipient update; ciphertext and encrypted display metadata remain unchanged. */
@@ -552,12 +616,15 @@ exports.mediaDelete = onCall(options, async (request) => {
       Key: value.object_key,
     }),
   );
-  await reference.delete();
+  const batch = db.batch();
+  batch.delete(reference);
+  batch.delete(mediaAccessKeyRef(mediaId));
+  await batch.commit();
   return { deleted: true };
 });
 
 // Keep validation helpers available to Node tests without exporting another deployed endpoint.
 Object.defineProperty(exports, "_test", {
-  value: { accessRequest, validateDeviceWrappedKeys },
+  value: { accessRequest, validateDeviceWrappedKeys, accountAccessKey },
   enumerable: false,
 });

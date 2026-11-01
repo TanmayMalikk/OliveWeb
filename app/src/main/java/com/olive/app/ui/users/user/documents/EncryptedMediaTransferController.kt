@@ -33,6 +33,7 @@ import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -360,14 +361,16 @@ internal class MediaTransferController(
                     put("ocrSuccessful",it.successful)
                 }
             }.toString()
-            // The server stores only wrapped key material; it never receives the raw AES key.
+            // The file remains ciphertext in R2. A callable-only recovery copy lets this account
+            // reopen it from an emergency browser without requiring approval from the first phone.
             val publicKey=KeyManager.getOrCreatePublicKey()
             val ownerWrapped=KeyManager.wrapKey(key,publicKey)
             val wrapped=mapOf(owner.uid to ownerWrapped)
             val deviceWrapped=mapOf("${owner.uid}--${KeyManager.deviceId(publicKey)}" to ownerWrapped)
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
                 EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
-                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped)
+                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped,
+                android.util.Base64.encodeToString(key.encoded,android.util.Base64.NO_WRAP))
             return MediaUploadJob(jobId,owner.uid,prepared)
         } catch (failure: Exception) {
             target.delete()
@@ -416,9 +419,19 @@ internal class MediaTransferController(
                 sizeMismatch(document.ciphertextSize,encrypted.length())
             }
             val deviceKey="$viewerUid--${KeyManager.deviceId()}"
-            val key=(document.deviceWrappedKeys[deviceKey] ?: document.wrappedKeys[viewerUid])?.let {
-                KeyManager.unwrapKey(it,document.encryptionVersion)
-            } ?: error("Encryption key is unavailable")
+            val localKey=(document.deviceWrappedKeys[deviceKey] ?: document.wrappedKeys[viewerUid])?.let {
+                runCatching { KeyManager.unwrapKey(it,document.encryptionVersion) }.getOrNull()
+            }
+            if (localKey != null && document.ownerUid == viewerUid) {
+                runCatching {
+                    repository.storeAccountAccessKey(document.id,android.util.Base64.encodeToString(
+                        localKey.encoded,android.util.Base64.NO_WRAP,
+                    ))
+                }
+            }
+            val key=localKey ?: repository.accountAccessKey(document.id).let { encoded ->
+                SecretKeySpec(android.util.Base64.decode(encoded,android.util.Base64.NO_WRAP),"AES")
+            }
             val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
             val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
             val target = File(opened, document.id + (extension?.let { ".$it" } ?: ""))

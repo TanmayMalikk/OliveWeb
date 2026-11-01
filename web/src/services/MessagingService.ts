@@ -122,13 +122,16 @@ async function wrapRoomKey(raw: Uint8Array, publicKey: string) {
     ),
   );
 }
-export async function unwrapRoomKey(uid: string, value: string) {
+export async function unwrapRoomKeyBytes(uid: string, value: string) {
   const pair = await messagingKeys(uid);
-  const raw = await crypto.subtle.decrypt(
+  return new Uint8Array(await crypto.subtle.decrypt(
     { name: "RSA-OAEP" },
     pair.privateKey,
     base64ToBytes(value),
-  );
+  ));
+}
+export async function unwrapRoomKey(uid: string, value: string) {
+  const raw = await unwrapRoomKeyBytes(uid, value);
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, [
     "encrypt",
     "decrypt",
