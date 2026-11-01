@@ -144,7 +144,7 @@ function Cover() {
   return (
     <main
       id="main"
-      className={`cover-container${s.cover === "GAME" ? " game-cover" : ""}`}
+      className={`cover-container ${s.cover.toLowerCase()}-cover`}
     >
       {s.cover === "FOOD" ? (
         <Food />
