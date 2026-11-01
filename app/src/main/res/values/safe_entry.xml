@@ -22,5 +22,4 @@
     <string name="entry_auth_cancelled">Authentication was cancelled or unavailable. Access remains locked.</string>
 <string name="entry_verify_trigger">Confirm with device lock to change your trigger word.</string>
     <string name="entry_invalid_trigger">Choose a trigger word or phrase of 3–64 characters.</string>
-    <string name="entry_calculator_help">Calculator needs a backup app PIN. Enter it and tap equals twice for safe entry. Device lock can remain your preferred entry method.</string>
 </resources>

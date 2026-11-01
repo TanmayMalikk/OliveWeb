@@ -115,49 +115,6 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
         }
     }
 
-    // Checks a PIN typed through calculator keys and opens the private app only when it matches.
-    fun submitCalculatorPin(pin: String) {
-        with(runtime) {
-            with(state) {
-                if (busy || privacyBlackout || accountRole != AccountRole.USER ||
-                    screen != SessionScreen.Cover || coverType != CoverType.CALCULATOR
-                ) return
-                val device = enrollment ?: return
-                if (!device.allowsCalculatorPinAttempt(pin)) return
-                val newTrigger =
-                    if (activeTriggerId == null) TriggerEvent(source = "Better Calculator").also {
-                        activeTriggerId = it.id
-                    } else null
-                val triggerId = activeTriggerId ?: return
-                operations.runOperation(runtime.application.getString(R.string.unable_to_check_the_pin_or_record_this_attempt_access_remains_locked)) { token ->
-                    val result = withContext(Dispatchers.IO) {
-                        // Reuse one calculator trigger session so a later success can follow its earlier wrong attempts.
-                        newTrigger?.let { store.recordTrigger(device.uid, it) }
-                        store.verify(device.uid, pin).also { outcome ->
-                            store.recordTriggerAttempt(
-                                device.uid,
-                                triggerId,
-                                outcome is PinResult.Accepted
-                            )
-                            history.queueHistorySync()
-                        }
-                    }
-                    if (epoch != token || screen != SessionScreen.Cover || coverType != CoverType.CALCULATOR) return@runOperation
-                    when (result) {
-                        PinResult.Accepted -> unlockVerifiedDevice(
-                            device,
-                            token,
-                            SessionScreen.Cover,
-                            usingAppPin = true
-                        )
-
-                        is PinResult.Rejected -> if (result.failures >= 5) navigation.quickExit()
-                    }
-                }
-            }
-        }
-    }
-
     // Recheck identity, screen and cancellation epoch after loading private data; exit invalidates pending unlocks.
     internal suspend fun unlockVerifiedDevice(
         device: DeviceEnrollment,

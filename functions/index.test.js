@@ -1,4 +1,4 @@
-// Tests that cloud endpoints for accounts, support, and media keep their public names.
+// Tests that cloud endpoints for accounts, support, media, and nutrition keep their public names.
 const test = require("node:test");
 const assert = require("node:assert/strict");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId: "olive-test", storageBucket: "olive-test.appspot.com"});
@@ -15,7 +15,7 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
     "mediaDownloadTicket", "mediaUpdateAccess", "mediaDelete", "staffSupportRequest",
-    "safetySupportContact", "safetySupportAdmin", "staffSupportClose"];
+    "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
 });

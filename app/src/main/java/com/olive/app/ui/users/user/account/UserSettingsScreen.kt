@@ -3,27 +3,22 @@ package com.olive.app.ui.users.user.account
 
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Calculate
+import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material.icons.outlined.SportsEsports
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,9 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -71,18 +64,6 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var calculatorPinPrompt by remember { mutableStateOf(false) }
-    var selectCalculatorAfterPin by remember { mutableStateOf(false) }
-
-    // Finish the cover change only after the new app PIN is ready to accept calculator input.
-    LaunchedEffect(session.account.hasAppPin, session.busy, selectCalculatorAfterPin) {
-        if (selectCalculatorAfterPin && session.account.hasAppPin && !session.busy) {
-            selectCalculatorAfterPin = false
-            calculatorPinPrompt = false
-            session.recordSettingsInteraction("Olive Branch", "Selected cover app")
-            session.changeCover(CoverType.CALCULATOR)
-        }
-    }
 
     FormColumn {
         SafeBack(session)
@@ -93,22 +74,12 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                 profile.coverType,
                 !session.busy
             ) { type ->
-                if (type == CoverType.CALCULATOR && !session.account.hasAppPin) {
-                    selectCalculatorAfterPin = true
-                    calculatorPinPrompt = true
-                } else {
-                    session.recordSettingsInteraction(
-                        "Olive Branch",
-                        "Selected cover app"
-                    )
-                    session.changeCover(type)
-                }
+                session.recordSettingsInteraction(
+                    "Olive Branch",
+                    "Selected cover app"
+                )
+                session.changeCover(type)
             }
-            Text(
-                stringResource(R.string.entry_calculator_help),
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted
-            )
         }
         Field(
             uiText(R.string.full_name_required),
@@ -296,104 +267,6 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
         Status(session)
     }
 
-    if (calculatorPinPrompt) {
-        CalculatorPinRequiredDialog(
-            session = session,
-            onDismiss = {
-                if (!session.busy) {
-                    calculatorPinPrompt = false
-                    selectCalculatorAfterPin = false
-                }
-            },
-        )
-    }
-}
-
-// The calculator needs an app PIN because ordinary calculations can also contain 4–6 digits.
-@Composable
-private fun CalculatorPinRequiredDialog(
-    session: SessionViewModel,
-    onDismiss: () -> Unit,
-) {
-    var pin by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
-    var showErrors by remember { mutableStateOf(false) }
-    val pinValid = InputPolicy.validPin(pin)
-    val confirmationValid = confirmation.isNotEmpty() && confirmation == pin
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(stringResource(R.string.calculator_pin_required_title))
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.calculator_pin_required_description))
-                Field(
-                    stringResource(R.string.str_4_6_digit_pin),
-                    pin,
-                    "calculator_new_pin",
-                    secret = true,
-                    numeric = true,
-                    showSecretToggle = true,
-                    enabled = !session.busy,
-                    error = if (showErrors && !pinValid) {
-                        stringResource(R.string.ui_invalid_pin)
-                    } else null,
-                ) {
-                    pin = it.filter(Char::isDigit).take(6)
-                    showErrors = false
-                }
-                Field(
-                    stringResource(R.string.confirm_pin),
-                    confirmation,
-                    "calculator_confirm_pin",
-                    secret = true,
-                    numeric = true,
-                    showSecretToggle = true,
-                    enabled = !session.busy,
-                    error = if (showErrors && !confirmationValid) {
-                        stringResource(R.string.ui_pins_differ)
-                    } else null,
-                ) {
-                    confirmation = it.filter(Char::isDigit).take(6)
-                    showErrors = false
-                }
-                session.message?.let { message ->
-                    Text(
-                        message,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.semantics {
-                            liveRegion = LiveRegionMode.Polite
-                        },
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (pinValid && confirmationValid) {
-                        session.account.saveSafeEntryPin("", pin, confirmation, usePin = false)
-                    } else {
-                        showErrors = true
-                    }
-                },
-                enabled = !session.busy,
-                modifier = Modifier.testTag("calculator_pin_continue"),
-            ) {
-                Text(stringResource(R.string.calculator_create_pin))
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !session.busy,
-            ) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-        modifier = Modifier.testTag("calculator_pin_required"),
-    )
 }
 
 // UI sizing/text: cover choices fill the form width and use Material button text so longer translated names can wrap.
@@ -415,7 +288,7 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
             CoverType.FOOD -> uiText(R.string.food_delivery_app_olive)
             CoverType.GAME -> uiText(R.string.game_cover_app_olive_tap)
             CoverType.NEWS -> uiText(R.string.news_app_daily_digest)
-            CoverType.CALCULATOR -> uiText(R.string.calculator_better_calculator)
+            CoverType.FITNESS -> uiText(R.string.fitness_cover_choice)
         }
         OutlinedButton(
             onClick = { onSelect(type) },
@@ -440,7 +313,7 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
                 when (type) {
                     CoverType.FOOD -> Icons.Outlined.LocalDining
                     CoverType.NEWS -> Icons.Outlined.Newspaper
-                    CoverType.CALCULATOR -> Icons.Outlined.Calculate
+                    CoverType.FITNESS -> Icons.Outlined.FitnessCenter
                     CoverType.GAME -> Icons.Outlined.SportsEsports
                 }, null, Modifier.size(20.dp).testTag("cover_choice_icon_${type.name.lowercase()}")
             )

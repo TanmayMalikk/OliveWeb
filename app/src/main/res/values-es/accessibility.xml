@@ -7,24 +7,24 @@
     <string name="a11y_unlock">Desbloquear</string>
     <string name="a11y_step">Paso</string>
     <string name="a11y_completed_requirements">Requisitos completados</string>
-    <string name="a11y_equals">Igual</string>
-    <string name="a11y_clear_all">Borrar todo</string>
-    <string name="a11y_minus">Menos</string>
-    <string name="a11y_multiply">Multiplicar</string>
-    <string name="a11y_divide">Dividir</string>
-    <string name="a11y_parentheses">Paréntesis</string>
-    <string name="a11y_percent">Por ciento</string>
-    <string name="a11y_decimal_point">Separador decimal</string>
-    <string name="a11y_graph">Gráfico</string>
-    <string name="a11y_zoom">Zoom</string>
+
+
+
+
+
+
+
+
+
+
     <string name="a11y_zoom_in">Acercar</string>
     <string name="a11y_zoom_out">Alejar</string>
     <string name="a11y_reset_zoom">Restablecer zoom</string>
     <string name="a11y_zoom_percent">Zoom: %1$d%%</string>
-    <string name="a11y_pan_left">Desplazar a la izquierda</string>
-    <string name="a11y_pan_right">Desplazar a la derecha</string>
-    <string name="a11y_pan_up">Desplazar hacia arriba</string>
-    <string name="a11y_pan_down">Desplazar hacia abajo</string>
+
+
+
+
 <string name="a11y_password">contraseña</string>
     <string name="a11y_trigger_word">palabra de activación</string>
     <string name="a11y_quick_exit">Salida rápida</string>
@@ -32,20 +32,20 @@
 <string name="a11y_save_article">Guardar artículo</string>
     <string name="a11y_remove_bookmark">Eliminar marcador</string>
     <string name="a11y_message_actions">Acciones del mensaje</string>
-<string name="a11y_square_root">Raíz cuadrada</string>
-    <string name="a11y_pi">Pi</string>
-    <string name="a11y_power">Potencia</string>
-    <string name="a11y_factorial">Factorial</string>
-    <string name="a11y_inverse_functions">Funciones inversas</string>
-    <string name="a11y_sine">Seno</string>
-    <string name="a11y_cosine">Coseno</string>
-    <string name="a11y_tangent">Tangente</string>
-    <string name="a11y_inverse_sine">Arcoseno</string>
-    <string name="a11y_inverse_cosine">Arcocoseno</string>
-    <string name="a11y_inverse_tangent">Arcotangente</string>
-    <string name="a11y_squared">Al cuadrado</string>
-    <string name="a11y_exponential">Exponencial</string>
-    <string name="a11y_ten_to_the_power">Diez elevado a</string>
-    <string name="a11y_natural_logarithm">Logaritmo natural</string>
-    <string name="a11y_logarithm">Logaritmo</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 </resources>

@@ -13,8 +13,6 @@ import com.olive.app.data.NewsScope
 import com.olive.app.data.UserProfile
 import com.olive.app.security.DeviceStore
 import com.olive.app.security.EncryptedVault
-import com.olive.app.ui.covers.calculator.CalculatorHistoryEntry
-import com.olive.app.ui.covers.calculator.CalculatorHistoryStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -130,18 +128,4 @@ class ResponsivePersistenceTest {
         assertNull(NewsFeedCacheStore(context).load("English", NewsScope.GLOBAL))
     }
 
-    @Test
-    fun calculatorHistorySurvivesAStoreRecreationAndClearRemovesIt() {
-        val accountId = "calculator-${UUID.randomUUID()}"
-        val entries =
-            listOf(CalculatorHistoryEntry("2+3", "5"), CalculatorHistoryEntry("1e10", "1E10"))
-        CalculatorHistoryStore(context, accountId).save(entries)
-
-        assertEquals(entries, CalculatorHistoryStore(context, accountId).load())
-        CalculatorHistoryStore(context, accountId).save(emptyList())
-        assertEquals(
-            emptyList<CalculatorHistoryEntry>(),
-            CalculatorHistoryStore(context, accountId).load()
-        )
-    }
 }

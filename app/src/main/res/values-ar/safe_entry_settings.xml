@@ -13,9 +13,6 @@
     <string name="entry_confirm_settings">أكد هويتك عبر Android لتغيير إعدادات الدخول الآمن.</string>
     <string name="entry_settings_cancelled">تم إلغاء المصادقة. لم تتغير إعدادات الدخول الآمن.</string>
     <string name="entry_settings_failed">تعذر إكمال التغيير. تحقق من طريقة الدخول المحددة وحاول مجددًا.</string>
-    <string name="calculator_pin_required_title">أنشئ رمز تطبيق أولاً</string>
-    <string name="calculator_pin_required_description">تحتاج الحاسبة إلى رمز تطبيق احتياطي من 4 إلى 6 أرقام حتى لا تفتح العمليات العادية مصادقة Android. سيظل قفل الجهاز طريقة الدخول المفضلة.</string>
-    <string name="calculator_create_pin">إنشاء رمز احتياطي واختيار الحاسبة</string>
     <string name="entry_use_backup_pin">استخدام رمز التطبيق الاحتياطي</string>
     <string name="entry_missing_backup_pin">يبدو أن قفل شاشة الهاتف معطل ولم تتم إضافة رمز تطبيق احتياطي. أعد قفل الشاشة، وافتح المنطقة الآمنة، ثم أضف رمزًا احتياطيًا من الإعدادات.</string>
 </resources>
