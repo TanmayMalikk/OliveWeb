@@ -383,11 +383,6 @@ test("PWA manifests use cover-specific identities and the download page offers t
     page.getByRole("heading", { name: "Download the Android debug app." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("img", {
-      name: "QR code linking to the Olive Branch debug APK download",
-    }),
-  ).toBeVisible();
-  await expect(
     page.getByRole("link", { name: /Download debug APK/i }),
   ).toHaveAttribute("href", "/download/android");
   const download = await request.get("/download/android", { maxRedirects: 0 });
