@@ -49,6 +49,7 @@ internal class WatchFitnessRepository(
     private var lastPublishedSteps = -1
     private var lastTileUpdateAt = 0L
     private val publishHeartbeat = object : Runnable {
+        // Publishes a heartbeat so the phone receives fresh watch data even when steps do not change.
         override fun run() {
             if (!running) return
             publishWatchActivity(force = true)
@@ -57,6 +58,7 @@ internal class WatchFitnessRepository(
     }
 
     private val heartRateCallback = object : MeasureCallback {
+        // Updates the watch UI when continuous heart-rate measurement becomes available or unavailable.
         override fun onAvailabilityChanged(
             dataType: DeltaDataType<*, *>,
             availability: Availability,
@@ -64,8 +66,10 @@ internal class WatchFitnessRepository(
             update(state.copy(heartRateStatus = availability.toString()))
         }
 
+        // Adds a valid heart-rate sample to today's current, minimum, maximum, and average values.
         override fun onDataReceived(data: DataPointContainer) {
             val latest = data.getData(DataType.HEART_RATE_BPM).lastOrNull()?.value
+            // Ignores missing and non-finite samples before saving health values.
             if (latest != null && latest.isFinite()) {
                 val bpm = latest.roundToInt()
                 val today = LocalDate.now().toString()
@@ -91,11 +95,13 @@ internal class WatchFitnessRepository(
             }
         }
 
+        // Tells the watch UI that heart-rate tracking could not be registered.
         override fun onRegistrationFailed(throwable: Throwable) {
             update(state.copy(heartRateStatus = "Heart rate unavailable"))
         }
     }
 
+    // Registers step, heart-rate, and phone-sync listeners while the watch app is active.
     fun start() {
         if (running) return
         running = true
@@ -115,6 +121,7 @@ internal class WatchFitnessRepository(
         onStateChanged(state)
     }
 
+    // Unregisters every fitness listener and scheduled heartbeat owned by this repository.
     fun stop() {
         if (!running) return
         running = false
@@ -124,6 +131,7 @@ internal class WatchFitnessRepository(
         heartbeatHandler.removeCallbacks(publishHeartbeat)
     }
 
+    // Converts the step sensor's since-boot total into a persistent daily step count.
     override fun onSensorChanged(event: SensorEvent) {
         val totalSinceBoot = event.values.firstOrNull()?.roundToInt() ?: return
         val lastTotal = preferences.getInt("sensor_total", -1)
@@ -140,8 +148,10 @@ internal class WatchFitnessRepository(
         update(state.copy(watchSteps = newTotal))
     }
 
+    // Leaves step values unchanged because this sensor does not provide useful accuracy updates.
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
+    // Applies new daily fitness totals received from the connected Android phone.
     override fun onDataChanged(events: DataEventBuffer) {
         events.forEach { event ->
             if (event.type == DataEvent.TYPE_CHANGED && event.dataItem.uri.path == DAILY_DATA_PATH) {
@@ -150,8 +160,10 @@ internal class WatchFitnessRepository(
         }
     }
 
+    // Loads the most recent phone snapshot when the watch repository starts.
     private fun loadPhoneData() {
         dataClient.dataItems.addOnSuccessListener { items ->
+            // Always releases the wearable data buffer after reading its newest snapshot.
             try {
                 items.firstOrNull { it.uri.path == DAILY_DATA_PATH }?.let {
                     applyPhoneData(DataMapItem.fromDataItem(it).dataMap)
@@ -162,6 +174,7 @@ internal class WatchFitnessRepository(
         }
     }
 
+    // Saves phone metrics and combines them with watch measurements for the current display.
     private fun applyPhoneData(data: DataMap) {
         preferences.edit {
             putInt("phone_steps", data.getInt("phoneSteps").coerceAtLeast(0))
@@ -190,12 +203,14 @@ internal class WatchFitnessRepository(
         )
     }
 
+    // Returns saved steps only when they belong to the current calendar day.
     private fun savedSteps(): Int = if (preferences.getString("step_date", null) == LocalDate.now().toString()) {
         preferences.getInt("steps_today", 0)
     } else {
         0
     }
 
+    // Restores today's heart-rate summary without carrying old readings into a new day.
     private fun savedHeartRateSummary(): WatchHeartRateSummary {
         val today = LocalDate.now().toString()
         if (preferences.getString(HEART_RATE_DATE_KEY, null) != today) {
@@ -211,6 +226,7 @@ internal class WatchFitnessRepository(
         )
     }
 
+    // Persists today's heart-rate measurements so they survive watch app restarts.
     private fun saveHeartRateSummary(date: String, summary: WatchHeartRateSummary) {
         preferences.edit {
             putString(HEART_RATE_DATE_KEY, date)
@@ -223,11 +239,13 @@ internal class WatchFitnessRepository(
         }
     }
 
+    // Checks whether the watch may read physical-activity sensor data.
     private fun hasActivityPermission() = ContextCompat.checkSelfPermission(
         context,
         Manifest.permission.ACTIVITY_RECOGNITION,
     ) == PackageManager.PERMISSION_GRANTED
 
+    // Uses the permission name required by this watch's Wear OS version.
     private fun hasHeartRatePermission(): Boolean {
         val permission = if (Build.VERSION.SDK_INT >= 36) {
             "android.permission.health.READ_HEART_RATE"
@@ -237,6 +255,7 @@ internal class WatchFitnessRepository(
         return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
     }
 
+    // Publishes new watch fitness state and synchronizes meaningful changes with the phone and tiles.
     private fun update(newState: WatchFitnessState) {
         state = newState
         onStateChanged(newState)
@@ -244,6 +263,7 @@ internal class WatchFitnessRepository(
         requestTileUpdates()
     }
 
+    // Refreshes watch tiles at a limited rate to protect battery life.
     private fun requestTileUpdates() {
         val now = System.currentTimeMillis()
         if (now - lastTileUpdateAt < TILE_UPDATE_INTERVAL_MS) return

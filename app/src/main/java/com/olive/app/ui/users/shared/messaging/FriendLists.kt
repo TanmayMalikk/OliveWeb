@@ -65,6 +65,7 @@ internal fun LazyListScope.friendLists(
         }
     }
 
+    // Only continue with friend lists when session messages incoming friend requests is empty is false.
     if (session.messages.incomingFriendRequests.isNotEmpty()) {
         item {
             val description = stringResource(
@@ -123,6 +124,7 @@ internal fun LazyListScope.friendLists(
             )
         }
     }
+    // outgoing expanded is handled here by friend lists.
     if (outgoingExpanded) {
         if (session.messages.outgoingFriendRequests.isEmpty()) {
             item { Text(stringResource(R.string.no_outgoing_requests), color = Muted) }
@@ -165,6 +167,7 @@ internal fun LazyListScope.friendLists(
             }
         }
     }
+    // friends expanded is handled here by friend lists.
     if (friendsExpanded) {
         if (session.messages.friends.isEmpty()) {
             item { Text(stringResource(R.string.no_friends_yet), color = Muted) }
@@ -174,7 +177,7 @@ internal fun LazyListScope.friendLists(
         }
     }
 }
-
+// Shows search result row for shared safe app friend lists.
 @Composable
 private fun LazyItemScope.SearchResultRow(
     session: SessionViewModel,
@@ -198,6 +201,7 @@ private fun LazyItemScope.SearchResultRow(
                     Text(stringResource(R.string.private_note))
                 }
             }
+            // Choose what search result row should do for the current value.
             when (relationship) {
                 FriendRelationship.AddFriend -> Button(
                     onClick = { session.messages.sendFriendRequest(user) },
@@ -223,6 +227,7 @@ private fun LazyItemScope.SearchResultRow(
     }
 }
 
+// The incoming request row view is part of shared safe app friend lists. It gives the user the details and choices needed here.
 @Composable
 private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(
@@ -247,7 +252,7 @@ private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request:
         }
     }
 }
-
+// Shows outgoing request row for shared safe app friend lists.
 @Composable
 private fun LazyItemScope.OutgoingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(
@@ -274,6 +279,7 @@ private fun LazyItemScope.OutgoingRequestRow(session: SessionViewModel, request:
     }
 }
 
+// shared safe app friend lists shows this friend row view so the user can view its details and use its actions.
 @Composable
 private fun LazyItemScope.FriendRow(
     session: SessionViewModel,

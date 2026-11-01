@@ -62,6 +62,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
     var deliveryArea by mutableStateOf("")
         private set
 
+    // Food cover: Finds delivery area. It uses the current cover data to update what the user sees.
     fun chooseDeliveryArea(value: String) {
         deliveryArea = value.trim().take(60)
     }
@@ -90,16 +91,19 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         query = value
     }
 
+    // Food cover: returns the filter.
     fun filter(value: String) {
         category = value
     }
 
+    // Opens the requested screen for food cover.
     fun navigate(value: CoverTab) {
         if (value != tab) tabHistory += tab
         tab = value
         selectedDish = null
     }
 
+    // Food cover: returns the select.
     fun select(dish: Dish?) {
         selectedDish = dish
     }
@@ -121,6 +125,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         return false
     }
 
+    // returns the favorite for food cover. It uses the current cover data to update what the user sees.
     fun favorite(id: String) {
         favorites = if (id in favorites) favorites - id else favorites + id
         persistCover?.invoke(cart, favorites, customizations)
@@ -146,6 +151,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         persistCover?.invoke(cart, favorites, customizations)
     }
 
+    // Food cover: returns the return to cover. It uses the current cover data to update what the user sees.
     fun returnToCover() {
         selectedDish = null
         query = ""

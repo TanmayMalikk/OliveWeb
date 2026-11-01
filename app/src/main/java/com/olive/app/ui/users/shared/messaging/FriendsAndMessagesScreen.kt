@@ -49,6 +49,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
+        // wide row modifier fill max size padding bottom = 96 dp is handled here by messages screen.
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
             MessagingSidebar(
                 session, currentUid, portalExit(session, exit), showingArchived,
@@ -77,6 +78,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
     }
 }
 
+// returns the portal exit for shared safe app friends and messages screen.
 private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
     if (session.screen == SessionScreen.Portal) exit else null
 
@@ -171,6 +173,7 @@ private fun MessagingSidebar(
                 }
             }
         }
+        // Only continue with messaging sidebar when organization account.
         if (organizationAccount) item {
             Surface(
                 shape = MaterialTheme.shapes.medium,
@@ -244,6 +247,7 @@ private fun MessagingSidebar(
             Text(stringResource(R.string.support_conversations), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() })
         }
+        // messaging sidebar checks whether support conversations is empty before continuing.
         if (supportConversations.isEmpty()) item {
             Text(stringResource(when {
                 showingArchived -> R.string.no_archived_chats
@@ -259,6 +263,7 @@ private fun MessagingSidebar(
                 onActions = { conversationActions = conversation },
             )
         }
+        // messaging sidebar checks whether organization account is false before continuing.
         if (!organizationAccount) {
             item {
                 Text(stringResource(R.string.direct_messages), style = MaterialTheme.typography.titleMedium,
@@ -316,6 +321,7 @@ private fun MessagingSidebar(
     }
 }
 
+// shared safe app friends and messages screen shows this conversation row view so the user can view its details and use its actions.
 @Composable
 private fun ConversationRow(
     conversation: ChatConversation,
@@ -372,6 +378,7 @@ private fun ConversationRow(
     }
 }
 
+// returns the support tag label for shared safe app friends and messages screen. It uses the latest values so the user sees the right text and choices.
 @Composable
 private fun supportTagLabel(tag: String) = stringResource(
     when (tag) {

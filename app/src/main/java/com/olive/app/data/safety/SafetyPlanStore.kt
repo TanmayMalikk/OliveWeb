@@ -8,9 +8,11 @@ import com.olive.app.security.child
 // Separate encrypted vaults isolate local university accounts from Firebase accounts and each signed-in actor's cache.
 internal class SafetyPlanStore(context: Context, localMode: Boolean) {
     private val vault = EncryptedVault(context, if (localMode) "safety-demo" else "safety-firebase")
+    // Reads the saved value for safety.
     fun read(actorUid: String, ownerUid: String) =
         vault.read().optJSONObject(actorUid)?.optJSONObject(ownerUid)?.let(SafetyPlan::fromJson)
 
+    // returns the ensure for safety.
     fun ensure(
         actorUid: String,
         ownerUid: String,
@@ -33,6 +35,7 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         return checkNotNull(read(actorUid, ownerUid))
     }
 
+    // Safety: Updates the feature state.
     fun update(actorUid: String, ownerUid: String, change: (SafetyPlan) -> SafetyPlan): SafetyPlan {
         var updated: SafetyPlan? = null
         vault.update { root ->
@@ -45,17 +48,20 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         return checkNotNull(updated)
     }
 
+    // Safety: Writes the new value. It writes the value to the correct Firebase path.
     fun write(actorUid: String, ownerUid: String, value: SafetyPlan) {
         require(value.ownerUid == ownerUid)
         vault.update { root -> root.child(actorUid).put(ownerUid, value.toJson()) }
     }
 
+    // Safety: returns the all.
     fun all(actorUid: String): List<SafetyPlan> {
         val actor = vault.read().optJSONObject(actorUid) ?: return emptyList()
         return actor.keys().asSequence()
             .mapNotNull { actor.optJSONObject(it)?.let(SafetyPlan::fromJson) }.toList()
     }
 
+    // Removes the selected item for safety.
     fun remove(actorUid: String, ownerUid: String) {
         vault.update { it.optJSONObject(actorUid)?.remove(ownerUid) }
     }

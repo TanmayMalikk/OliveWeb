@@ -170,11 +170,13 @@ internal fun SafeEntrySetup(session: SessionViewModel) {
     }
 }
 
+// This shows the device lock prompt view for user app security settings. It fills the view with the latest details and actions.
 @Composable
 internal fun DeviceLockPrompt(
     session: SessionViewModel,
     onUseBackupPin: (() -> Unit)? = null,
 ) {
+    // Update device lock prompt when information used by this screen changes.
     LaunchedEffect(Unit) { session.account.authenticateDeviceLock() }
     FormColumn {
         Heading(
@@ -318,12 +320,14 @@ internal fun SafeEntrySettings(session: SessionViewModel) {
         showSecretToggle = true,
         enabled = !session.busy
     ) { confirmation = it.filter(Char::isDigit).take(6) }
+    // Saves the new value for user app security settings. It uses the account key so private data stays locked.
     fun save(usePin: Boolean) {
         session.account.saveSafeEntryPin(currentPin, newPin, confirmation, usePin)
         currentPin = ""
         newPin = ""
         confirmation = ""
     }
+    // save checks whether session account preferred entry method is safe entry method device lock before continuing.
     if (session.account.preferredEntryMethod == SafeEntryMethod.DEVICE_LOCK) {
         OutlinedButton(
             onClick = { save(false) },

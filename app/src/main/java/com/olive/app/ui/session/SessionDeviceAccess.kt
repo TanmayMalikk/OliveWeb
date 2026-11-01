@@ -18,6 +18,7 @@ internal class DeviceLockRequest internal constructor(
     val settingsChange: Boolean = false
 ) {
     internal val result = CompletableDeferred<Cipher?>()
+    // Session device access: Finishes the active task.
     fun complete(cipher: Cipher?) {
         result.complete(cipher)
     }
@@ -27,6 +28,7 @@ internal class DeviceLockRequest internal constructor(
 internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
     private val keys = DeviceLockKey(if (runtime.localMode) "demo" else "firebase")
 
+    // Authenticates the account for session device access.
     fun authenticate(enroll: Boolean, trigger: String? = null): Unit = with(runtime) {
         with(state) {
             if (busy || privacyBlackout) return
@@ -61,6 +63,7 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
                 }
                 val request = DeviceLockRequest(challenge, settingsChange = trigger != null)
                 deviceLockRequest = request
+                // A authenticate error is handled here instead of closing the app.
                 try {
                     val cipher = request.result.await()
                     if (!current(token, expectedScreen, uid, enroll)) return@runOperation
@@ -72,6 +75,7 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
                     // The callback alone grants no access: Android Keystore must complete the protected operation.
                     val grant = withContext(Dispatchers.IO) { challenge.finish(cipher) }
                     if (!current(token, expectedScreen, uid, enroll)) return@runOperation
+                    // authenticate checks whether enroll before continuing.
                     if (enroll) {
                         val saved = withContext(Dispatchers.IO) {
                             store.enrollDeviceLock(identity!!, value!!, checkNotNull(grant))
@@ -106,6 +110,7 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session device access: returns the current.
     private fun current(token: Long, expected: SessionScreen, uid: String, enroll: Boolean) =
         with(runtime) {
             epoch == token && state.screen == expected && !state.privacyBlackout && state.accountRole == AccountRole.USER &&

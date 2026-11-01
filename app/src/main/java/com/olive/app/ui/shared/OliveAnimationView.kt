@@ -83,6 +83,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
         Shader.TileMode.CLAMP,
     )
 
+    // Starts animation for olive animation view.
     fun startAnimation(durationMs: Long = 2600L) {
         animator?.cancel()
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -98,6 +99,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
         animator?.start()
     }
 
+    // Responds when size changed for olive animation view.
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         branchPath.reset()
@@ -110,6 +112,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
         pathMeasure.setPath(branchPath, false)
     }
 
+    // Olive animation view: Responds when draw. It draws the needed shapes and text on the screen.
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (progress <= 0f || progress >= 1f) return
@@ -144,8 +147,10 @@ internal class OliveAnimationView @JvmOverloads constructor(
             // 2. Draw Leaves
             for (i in leafFractions.indices) {
                 val frac = leafFractions[i]
+                // on draw checks whether branch growth is at least frac * 0 82f before continuing.
                 if (branchGrowth >= frac * 0.82f) {
                     val leafProgress = ((branchGrowth - frac * 0.82f) / 0.22f).coerceIn(0f, 1f)
+                    // Only continue with on draw when path measure get pos tan total len * frac, pos, tan.
                     if (pathMeasure.getPosTan(totalLen * frac, pos, tan)) {
                         val baseAngle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
                         val side = if (i % 2 == 0) -1f else 1f
@@ -168,6 +173,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
             val oliveY: Float
             var rot = 12f
 
+            // olive drop is 0f is handled here by on draw.
             if (oliveDrop == 0f) {
                 oliveX = anchorX + 4f
                 oliveY = anchorY + (40f * budScale)
@@ -212,6 +218,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
         }
     }
 
+    // returns the draw leaf for olive animation view. It draws the needed shapes and text on the screen.
     private fun drawLeaf(canvas: Canvas, x: Float, y: Float, scale: Float) {
         leafPath.reset()
         val len = 65f * scale

@@ -7,6 +7,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CoverAccountFlowTest : OliveUiTestBase() {
+    // returns the guest delivery area opens address editor without starting onboarding for cover account flow test cover. The test gives the code a clear input and checks the expected result.
     @Test
     fun guestDeliveryAreaOpensAddressEditorWithoutStartingOnboarding() {
         waitCover()
@@ -23,6 +24,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Edmonton", substring = true).assertExists()
     }
 
+    // Cover account flow test cover: returns the cover choice switches news and fitness and both reach safe area. The test gives the code a clear input and checks the expected result.
     @Test
     fun coverChoiceSwitchesNewsAndFitnessAndBothReachSafeArea() {
         register(username = "cover_switch_tester")
@@ -57,6 +59,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         waitFor("returning_user")
     }
 
+    // returns the cover account saves birthday and location without exposing private details for cover account flow test cover. The test gives the code a clear input and checks the expected result.
     @Test
     fun coverAccountSavesBirthdayAndLocationWithoutExposingPrivateDetails() {
         register(username = "cover_account_tester")
@@ -82,6 +85,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         val originalLanguage = session.language
         compose.onNodeWithTag("cover_save_settings").performScrollTo().assertIsEnabled()
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+        // A cover account saves birthday and location without exposing private details error is handled here instead of closing the app.
         try {
             compose.waitUntil(30_000) { !session.busy && session.coverFullName == "Delivery Customer" }
         } catch (error: Throwable) {

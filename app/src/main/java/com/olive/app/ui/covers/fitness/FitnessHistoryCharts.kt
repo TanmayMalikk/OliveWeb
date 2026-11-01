@@ -73,6 +73,7 @@ private data class ChartAxisScale(
         }
 }
 
+// This shows the fitness history charts view for fitness cover. It fills the view with the latest details and actions.
 @Composable
 internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
     val stepsUnit = stringResource(R.string.fitness_steps_unit)
@@ -168,6 +169,7 @@ internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
     }
 }
 
+// Groups a graph, its legend, and the latest values for one fitness measure.
 @Composable
 private fun HistoryLineChartCard(
     title: String,
@@ -257,6 +259,7 @@ private fun HistoryLineChartCard(
     }
 }
 
+// Names one line in the graph and shows its latest recorded value.
 @Composable
 private fun HistoryLegendItem(
     series: HistorySeries,
@@ -283,6 +286,7 @@ private fun HistoryLegendItem(
     }
 }
 
+// Draws the graph lines or bars and labels its vertical scale.
 @Composable
 private fun HistoryChart(
     series: List<HistorySeries>,
@@ -297,6 +301,7 @@ private fun HistoryChart(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.End,
         ) {
+            // Put the largest scale label at the top of the graph.
             axisScale.labelsDescending.forEach { axisValue ->
                 Text(
                     text = valueText(axisValue),
@@ -317,6 +322,7 @@ private fun HistoryChart(
             val chartHeight = size.height - verticalPadding * 2f
 
             val axisLabels = axisScale.labelsDescending
+            // Draw a guide line beside every vertical-axis label.
             axisLabels.forEachIndexed { index, _ ->
                 val y = verticalPadding + chartHeight * index / (axisLabels.size - 1).coerceAtLeast(1).toFloat()
                 drawLine(
@@ -327,6 +333,7 @@ private fun HistoryChart(
                 )
             }
 
+            // Distance and calorie charts use bars to compare each day.
             if (useBars) {
                 drawHistoryBars(
                     series,
@@ -339,9 +346,11 @@ private fun HistoryChart(
                 return@Canvas
             }
 
+            // Draw one colored line for each measure in the chart.
             series.forEach { line ->
                 if (line.values.isEmpty()) return@forEach
                 val path = Path()
+                // Place each reading at its matching day on the graph.
                 line.values.forEachIndexed { index, value ->
                     val fraction = if (line.values.size == 1) 0.5f else {
                         index.toFloat() / (line.values.size - 1).toFloat()
@@ -360,6 +369,7 @@ private fun HistoryChart(
                         join = StrokeJoin.Round,
                     ),
                 )
+                // Mark the daily readings so they are easy to pick out.
                 line.values.forEachIndexed { index, value ->
                     val fraction = if (line.values.size == 1) 0.5f else {
                         index.toFloat() / (line.values.size - 1).toFloat()
@@ -392,6 +402,7 @@ private fun calculateChartAxisScale(highestValue: Float): ChartAxisScale {
     return ChartAxisScale(maximum = maximum, increment = increment)
 }
 
+// Draws separate bars for each daily measure in the fitness history chart.
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHistoryBars(
     series: List<HistorySeries>,
     highestValue: Float,
@@ -406,7 +417,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHistoryBars(
     val barCount = series.size.coerceAtLeast(1)
     val barWidth = (groupWidth * 0.58f / barCount).coerceAtLeast(2.dp.toPx())
 
+    // Give each measure its own position inside the day's bar group.
     series.forEachIndexed { seriesIndex, line ->
+        // Skip empty readings and draw the rest from the chart baseline.
         line.values.forEachIndexed { dayIndex, rawValue ->
             val value = rawValue.takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f
             if (value == 0f) return@forEachIndexed
@@ -425,6 +438,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHistoryBars(
     }
 }
 
+// Labels the first, middle, and last day shown in the graph.
 @Composable
 private fun HistoryDateAxis(days: List<FitnessHistoryDay>) {
     if (days.isEmpty()) return

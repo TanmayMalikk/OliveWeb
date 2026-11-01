@@ -55,6 +55,7 @@ export async function createLocal(
   });
   return { identity, raw };
 }
+// returns the login local for web local data store.
 export async function loginLocal(
   username: string,
   password: string,
@@ -63,6 +64,7 @@ export async function loginLocal(
   const record: LocalAccount | undefined = await (
     await database
   ).get("accounts", `${role}:${normalizeUsername(username)}`);
+  // If record fails, catch the error so the app can keep running and explain the problem.
   try {
     if (!record) {
       await wrapKey(password, crypto.getRandomValues(new Uint8Array(32)));
@@ -88,6 +90,7 @@ export async function readLocal(
     ? decrypt<LocalVault>(await importKey(raw), box)
     : { profile: null, history: emptyHistory() };
 }
+// Saves local for web local data store.
 export async function writeLocal(
   uid: string,
   raw: Uint8Array,
@@ -97,6 +100,7 @@ export async function writeLocal(
     await database
   ).put("vaults", await encrypt(await importKey(raw), value), uid);
 }
+// Web local data store: Updates local password.
 export async function changeLocalPassword(
   identity: Identity,
   current: string,

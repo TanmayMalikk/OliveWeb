@@ -17,6 +17,7 @@ import kotlinx.coroutines.withContext
 
 // Connects account messaging and manages live subscriptions.
 internal class SessionMessaging(private val runtime: SessionRuntime) {
+    // Session messaging: Reports whether messaging screen active.
     private fun messagingScreenActive() = with(runtime.state) {
         screen == SessionScreen.Safe ||
                 (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN))
@@ -31,6 +32,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
+    // Starts messaging for session messaging. It waits for the set time and cancels the timer when the feature closes.
     fun startMessaging(showFeedback: Boolean = true) {
         with(runtime) {
             with(state) {
@@ -58,10 +60,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 messagingBusy = true
                 if (showFeedback) message = null
                 scope.launch {
+                    // A start messaging error is handled here instead of closing the app.
                     try {
                         registerMessagingIdentity(identity)
                         if (epoch != token || !messagingScreenActive()) return@launch
                         socialSubscription = repository.observeSocial(device.uid, { social ->
+                            // Only continue with start messaging when epoch is token and messaging screen active.
                             if (epoch == token && messagingScreenActive()) {
                                 friends = social.friends
                                 incomingFriendRequests = social.incoming
@@ -70,6 +74,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                                 messagingBusy = false
                             }
                         }, { error ->
+                            // start messaging checks whether epoch is token before continuing.
                             if (epoch == token) {
                                 messagingBusy = false
                                 if (showFeedback || page == SafePage.Messages) message =
@@ -84,8 +89,10 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {
+                        // Only continue with start messaging when epoch is token.
                         if (epoch == token) {
                             messagingBusy = false
+                            // error is firebase firestore exception and error code is firebase firestore exception code permission denied is handled here by start messaging.
                             if (error is FirebaseFirestoreException && error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                                 messagingNeedsReconnect = true
                                 if (showFeedback || page == SafePage.Messages)
@@ -101,6 +108,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session messaging: returns the reconnect messaging. It checks the chat and uses its secure data before reading or saving a message.
     fun reconnectMessaging(password: String, onConnected: () -> Unit = {}) {
         with(runtime) {
             with(state) {
@@ -111,6 +119,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 message = null
                 scope.launch {
                     var connected = false
+                    // If reconnect messaging fails, catch the error so the app can keep running and explain the problem.
                     try {
                         val identity = accounts.authenticate(coverUsername, password, accountRole)
                         check(identity.uid == device.uid) { "This device is linked to an older account. Sign out, then sign in again." }
@@ -147,6 +156,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 conversationSubscription?.close()
                 conversationSubscription =
                     messagingRepository?.observeConversations(deviceUid(), { rows ->
+                        // epoch is token and messaging screen active is handled here by observe friend conversations.
                         if (epoch == token && messagingScreenActive()) {
                             if (conversationLoadFailed) message = null
                             conversationLoadFailed = false
@@ -184,6 +194,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session messaging: Runs messaging action. It reads or saves the matching protected record in Firebase.
     fun runMessagingAction(
         failure: String,
         block: suspend (MessagingRepository, DeviceEnrollment, Long) -> Unit
@@ -201,11 +212,13 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 messagingBusy = true
                 message = null
                 scope.launch {
+                    // A run messaging action error is handled here instead of closing the app.
                     try {
                         block(repository, device, token)
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {
+                        // epoch is token is handled here by run messaging action.
                         if (epoch == token) {
                             message =
                                 if (error is FirebaseFirestoreException && error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED)
@@ -220,6 +233,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
+    // Stops messaging for session messaging. It checks the chat and uses its secure data before reading or saving a message.
     fun stopMessaging(clearRows: Boolean = true) {
         with(runtime) {
             with(state) {
@@ -247,8 +261,10 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session messaging: returns the device uid.
     private fun deviceUid() = runtime.enrollment?.uid ?: error("No active account")
 
+    // Registers messaging identity for session messaging.
     suspend fun registerMessagingIdentity(identity: AccountIdentity) {
         with(runtime) {
             val publicKey = withContext(Dispatchers.Default) { KeyManager.getOrCreatePublicKey() }

@@ -34,6 +34,7 @@ internal class AndroidDeviceLock(
             }
         }
 
+    // returns the show for android device lock.
     fun show(value: DeviceLockRequest) {
         cancel()
         request = value
@@ -42,7 +43,9 @@ internal class AndroidDeviceLock(
             finish(value, null)
             return
         }
+        // A show error is handled here instead of closing the app.
         try {
+            // the Android version is at least 30 is handled here by show.
             if (Build.VERSION.SDK_INT >= 30) {
                 awaitingCredential = true
                 val signal = CancellationSignal().also { cancellation = it }
@@ -59,10 +62,12 @@ internal class AndroidDeviceLock(
                     activity.mainExecutor,
                     // Unlocks only when Android returns the cipher from a successful device authentication.
                     object : BiometricPrompt.AuthenticationCallback() {
+                        // Responds when authentication succeeded for android device lock.
                         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                             finish(value, result.cryptoObject?.cipher)
                         }
 
+                        // Android device lock: Responds when authentication error.
                         override fun onAuthenticationError(code: Int, error: CharSequence) {
                             finish(value, null)
                         }
@@ -74,6 +79,7 @@ internal class AndroidDeviceLock(
         }
     }
 
+    // Android device lock: returns the subtitle.
     private fun subtitle(value: DeviceLockRequest) = activity.getString(
         when {
             value.settingsChange -> R.string.entry_confirm_settings
@@ -101,10 +107,12 @@ internal class AndroidDeviceLock(
             activity.mainExecutor,
             // Converts the older Android authentication result into the same locked/unlocked result.
             object : BiometricPrompt.AuthenticationCallback() {
+                // Android device lock: Responds when authentication succeeded.
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     finish(value, runCatching { value.challenge.legacyCipher() }.getOrNull())
                 }
 
+                // Android device lock: Responds when authentication error.
                 override fun onAuthenticationError(code: Int, error: CharSequence) {
                     if (code == BiometricPrompt.BIOMETRIC_ERROR_NO_BIOMETRICS || code == BiometricPrompt.BIOMETRIC_ERROR_HW_NOT_PRESENT ||
                         code == BiometricPrompt.BIOMETRIC_ERROR_HW_UNAVAILABLE || code == BiometricPrompt.BIOMETRIC_ERROR_LOCKOUT ||
@@ -115,6 +123,7 @@ internal class AndroidDeviceLock(
             })
     }
 
+    // Android device lock: Starts credential.
     private fun launchCredential(value: DeviceLockRequest) {
         if (request !== value) return
         val intent = createLegacyCredentialIntent(value)
@@ -126,6 +135,7 @@ internal class AndroidDeviceLock(
         credentialLauncher.launch(intent)
     }
 
+    // Android device lock: returns the allow legacy device credential.
     @Suppress("DEPRECATION")
     @RequiresApi(29)
     private fun allowLegacyDeviceCredential(builder: BiometricPrompt.Builder) {
@@ -141,8 +151,10 @@ internal class AndroidDeviceLock(
             activity.getString(R.string.entry_device_lock), subtitle(value)
         )
 
+    // Android device lock: returns the finish.
     private fun finish(value: DeviceLockRequest, cipher: javax.crypto.Cipher?) {
         if (request !== value) return
+        // Only continue with finish when activity lifecycle current state is at least lifecycle state started is false.
         if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             request = null
             cancellation = null
@@ -163,6 +175,7 @@ internal class AndroidDeviceLock(
         value.complete(cipher)
     }
 
+    // Android device lock: returns the resume.
     fun resume() {
         activity.window.decorView.post {
             val value = request
@@ -171,6 +184,7 @@ internal class AndroidDeviceLock(
         }
     }
 
+    // Android device lock: Cancels the active task.
     fun cancel() {
         val previous = request
         request = null

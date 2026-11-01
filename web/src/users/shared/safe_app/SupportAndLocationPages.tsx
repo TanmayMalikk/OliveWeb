@@ -6,6 +6,7 @@ import { accounts, cloudMode, firebase } from "../../../services/AccountService"
 import { useSession } from "../../../session/SessionProvider";
 import { listBrowserDocuments, openBrowserDocument, type BrowserDocument } from "../../../services/MediaService";
 
+// Calls the matching backend serviceable for web safe app. It sends a signed-in request to the protected cloud function and checks the reply.
 async function callable<T>(name: string, data: unknown): Promise<T> {
   if (!cloudMode || !accounts.identity) throw new Error("Sign in to your shared account first.");
   const { functions } = await firebase();
@@ -13,6 +14,7 @@ async function callable<T>(name: string, data: unknown): Promise<T> {
   return (await httpsCallable(functions, name)(data)).data as T;
 }
 
+// Shows the staff help page view for web safe app.
 export function StaffHelpPage() {
   const session = useSession();
   const [ticket, setTicket] = useState<{ requested: boolean; staffName?: string; conversationId?: string } | null>(null);
@@ -37,6 +39,7 @@ const resources = [
   { name: "Government of Canada help directory", description: "Province and territory violence-support services", phone: "Online directory", url: "https://www.canada.ca/en/women-gender-equality/gender-based-violence/get-help-now.html" },
   { name: "ShelterSafe", description: "Find nearby shelters across Canada", phone: "Online directory", url: "https://sheltersafe.ca/" },
 ];
+// Shows the hotlines page view for web safe app.
 export function HotlinesPage() {
   return <section className="safe-feature-page"><div className="panel"><h2>Support hotlines and shelters</h2>
     <p>Calling links open your device dialer and do not place a call automatically.</p></div>
@@ -49,9 +52,11 @@ export function HotlinesPage() {
 }
 
 type Position = { latitude: number; longitude: number; accuracy: number };
+// Web safe app: Shows the location page view.
 export function LocationPage() {
   const [position, setPosition] = useState<Position | null>(null);
   const [error, setError] = useState("");
+  // Web safe app: returns the locate. It asks the device for its location and turns the answer into map data.
   const locate = () => {
     setError("");
     navigator.geolocation.getCurrentPosition(
@@ -71,6 +76,7 @@ export function LocationPage() {
   </section>;
 }
 
+// Web safe app: Shows the camera page view.
 export function CameraPage() {
   const [preview, setPreview] = useState("");
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
@@ -82,11 +88,13 @@ export function CameraPage() {
   </section>;
 }
 
+// Web safe app: Shows the documents page view.
 export function DocumentsPage() {
   const session = useSession();
   const [documents, setDocuments] = useState<BrowserDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Reloads the latest data for web safe app.
   const refresh = async () => {
     const identity = accounts.identity;
     if (!identity) return;
@@ -96,9 +104,11 @@ export function DocumentsPage() {
     finally { setLoading(false); }
   };
   useEffect(() => { void refresh(); }, []);
+  // Web safe app: Opens the requested item. It waits for the set time and cancels the timer when the feature closes.
   const open = (document: BrowserDocument) => void session.perform(async () => {
     const tab = window.open("about:blank", "_blank");
     if (tab) tab.opener = null;
+    // If tab fails, catch the error so the app can keep running and explain the problem.
     try {
       const url = await openBrowserDocument(document);
       if (tab) tab.location.replace(url);

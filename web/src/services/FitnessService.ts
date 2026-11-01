@@ -23,10 +23,12 @@ const emptySummary = (): FitnessSummary => ({
   updatedAt: 0, stepGoal: 8000, calorieGoal: 2000, proteinGoal: 120,
   carbohydrateGoal: 250, fatGoal: 65, watchConnected: false, days: [], vitals: [],
 });
+// Reads a health number safely. Missing, negative, or broken values use the fallback instead.
 function safeNumber(value: unknown, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : fallback;
 }
+// Cleans a fitness summary before the screen uses it. Numbers are checked and history is limited to 14 days.
 function normalize(value: Partial<FitnessSummary>): FitnessSummary {
   return {
     ...emptySummary(), ...value, updatedAt: safeNumber(value.updatedAt),
@@ -45,14 +47,17 @@ function normalize(value: Partial<FitnessSummary>): FitnessSummary {
     })) : [],
   };
 }
+// Keeps each account's saved fitness data under its own browser-storage name.
 function localKey() { return `olive-fitness:${accounts.identity?.uid ?? "guest"}`; }
 
+// Loads the fitness summary from this browser first, then replaces it with newer cloud data when available.
 export async function loadFitness(): Promise<FitnessSummary> {
   const local = localStorage.getItem(localKey());
   let value = local ? normalize(JSON.parse(local)) : emptySummary();
   if (!cloudMode || !accounts.identity) return value;
   const { storage } = await firebase();
   const { getBytes, ref } = await import("firebase/storage");
+  // A new account may not have a cloud summary yet. Ignore only that missing-file case.
   try {
     const bytes = await getBytes(ref(storage, `accounts/${accounts.identity.uid}/fitness/summary.json`), 128 * 1024);
     value = normalize(JSON.parse(new TextDecoder().decode(bytes)));
@@ -62,9 +67,11 @@ export async function loadFitness(): Promise<FitnessSummary> {
   }
   return value;
 }
+// Saves the fitness summary in this browser and in the signed-in account's cloud folder.
 export async function saveFitness(value: FitnessSummary) {
   const normalized = normalize({ ...value, updatedAt: Date.now() });
   localStorage.setItem(localKey(), JSON.stringify(normalized));
+  // Cloud backup is available only when Firebase is active and an account is signed in.
   if (cloudMode && accounts.identity) {
     const { storage } = await firebase();
     const { ref, uploadBytes } = await import("firebase/storage");
@@ -74,6 +81,7 @@ export async function saveFitness(value: FitnessSummary) {
   }
   return normalized;
 }
+// Adds one food to today's totals. Serving size is limited before calories and macros are added.
 export async function logFood(summary: FitnessSummary, food: Food, servings: number) {
   const multiplier = Math.min(20, Math.max(0.1, servings));
   const date = new Date().toISOString().slice(0, 10);
@@ -91,6 +99,7 @@ export async function logFood(summary: FitnessSummary, food: Food, servings: num
   return saveFitness({ ...summary, days: [...summary.days.filter((day) => day.date !== date), updated]
     .sort((a, b) => a.date.localeCompare(b.date)).slice(-14) });
 }
+// Searches the protected nutrition service after checking the account and search text.
 export async function searchFoods(search: string): Promise<Food[]> {
   if (!cloudMode || !accounts.identity) throw new Error("Sign in before searching foods.");
   const query = search.trim().replace(/\s+/g, " ").slice(0, 80);

@@ -22,6 +22,7 @@ import java.util.UUID
 class ResponsivePersistenceTest {
     private val context get() = ApplicationProvider.getApplicationContext<android.content.Context>()
 
+    // returns the startup session restores enrollment and profile together for shared safe app responsive persistence test. The test gives the code a clear input and checks the expected result.
     @Test
     fun startupSessionRestoresEnrollmentAndProfileTogether() {
         val suffix = UUID.randomUUID().toString()
@@ -52,6 +53,7 @@ class ResponsivePersistenceTest {
         assertEquals(profile, restored.profile)
     }
 
+    // returns the archived chats and private contact notes stay separate for each account for shared safe app responsive persistence test. The test gives the code a clear input and checks the expected result.
     @Test
     fun archivedChatsAndPrivateContactNotesStaySeparateForEachAccount() {
         val suffix = UUID.randomUUID().toString()
@@ -75,6 +77,7 @@ class ResponsivePersistenceTest {
         assertEquals(emptySet<String>(), store.archivedConversationIds("viewer-a"))
     }
 
+    // returns the all cover state restores from one snapshot for shared safe app responsive persistence test. The test gives the code a clear input and checks the expected result.
     @Test
     fun allCoverStateRestoresFromOneSnapshot() {
         val store =
@@ -101,6 +104,7 @@ class ResponsivePersistenceTest {
         assertEquals(listOf(article), restored.second)
     }
 
+    // Shared safe app responsive persistence test: returns the news cache survives astore recreation and separates scopes. The test gives the code a clear input and checks the expected result.
     @Test
     fun newsCacheSurvivesAStoreRecreationAndSeparatesScopes() {
         context.getSharedPreferences(

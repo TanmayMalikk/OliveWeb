@@ -81,7 +81,9 @@ class OliveFoodViewModelTest {
         id = "pizza", name = "Olive Pizza", category = "Pizza", priceCents = 1_600,
         diet = "Vegetarian", ingredients = listOf("Tomato", "Cheese"),
     )
+    // Food menu catalog test kt: returns the view model. The test gives the code a clear input and checks the expected result.
     private fun viewModel() = OliveViewModel(object : CatalogRepository {
+        // returns the dishes for food menu catalog test kt. The test gives the code a clear input and checks the expected result.
         override fun dishes() = listOf(bowl, pizza)
     })
 

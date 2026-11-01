@@ -36,6 +36,7 @@ import kotlin.math.roundToInt
 
 private val MacroRingColor = Color(0xFF875E78)
 
+// This is the fitness activity dashboard view for fitness cover. It shows current details and the actions available to the user.
 @Composable
 internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
     val distance = FitnessMath.distanceKm(snapshot.stepsToday, snapshot.profile.heightCm)
@@ -99,6 +100,7 @@ internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
     }
 }
 
+// This shows the dashboard metric view for fitness cover. It fills the view with the latest details and actions.
 @Composable
 private fun DashboardMetric(value: String, label: String, color: Color) {
     Row(
@@ -111,6 +113,7 @@ private fun DashboardMetric(value: String, label: String, color: Color) {
     }
 }
 
+// The activity progress rings view is part of fitness cover. It gives the user the details and choices needed here.
 @Composable
 private fun ActivityProgressRings(progress: Float) {
     Canvas(Modifier.size(142.dp)) {

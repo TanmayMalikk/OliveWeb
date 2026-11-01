@@ -15,6 +15,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Restores enrollment, signs accounts in/out and runs onboarding; stale account-choice callbacks cannot restart setup.
 internal class AccountSessionController(private val runtime: SessionRuntime) {
+    // Account session controller: Loads the saved value.
     fun load() {
         val state = runtime.state
         if (state.busy) return
@@ -25,6 +26,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.safePageHistory.clear()
         state.screen = SessionScreen.Loading
         runtime.scope.launch {
+            // If load fails, catch the error so the app can keep running and explain the problem.
             try {
                 check(BuildConfig.DEBUG || !runtime.localMode)
                 val restoredSession = restoreStoredSession()
@@ -47,12 +49,14 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         return state.screen == SessionScreen.Welcome && runtime.enrollment == null && !state.busy
     }
 
+    // Finds role for account session controller.
     fun selectRole(role: AccountRole) {
         if (!canChooseAccount()) return
         runtime.state.accountRole = role
         runtime.state.message = null
         runtime.state.credentialFieldError = null
     }
+    // Finds new for account session controller.
     fun chooseNew() {
         if (!canChooseAccount()) return
         val state = runtime.state
@@ -67,6 +71,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.NewCredentials)
     }
 
+    // Finds returning for account session controller.
     fun chooseReturning() {
         if (!canChooseAccount()) return
         runtime.state.creatingAccount = false
@@ -74,6 +79,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.ReturningCredentials)
     }
 
+    // Starts account setup for account session controller.
     fun openAccountSetup() {
         val state = runtime.state
         if (state.busy || runtime.enrollment != null || state.screen != SessionScreen.Cover) return
@@ -84,11 +90,13 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.Welcome)
     }
 
+    // Account session controller: Removes credential error.
     fun clearCredentialError() {
         runtime.state.credentialFieldError = null
         runtime.state.message = null
     }
 
+    // Saves setup profile for account session controller.
     fun saveSetupProfile(value: UserProfile) {
         if (runtime.state.screen != SessionScreen.ProfileSetup) return
         with(runtime) {
@@ -164,6 +172,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Account session controller: Stops enrollment.
     internal suspend fun finishEnrollment(
         saved: DeviceEnrollment,
         value: UserProfile,
@@ -187,6 +196,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Account session controller: Saves provisioned trigger.
     fun saveProvisionedTrigger(trigger: String) {
         with(runtime) {
             with(state) {
@@ -210,6 +220,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Account session controller: Signs out the current account. It waits for the set time and cancels the timer when the feature closes.
     fun signOut() {
         with(runtime) {
             with(state) {
@@ -224,6 +235,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 historySyncJob = null
                 busy = true
                 scope.launch {
+                    // If sign out fails, catch the error so the app can keep running and explain the problem.
                     try {
                         withContext(Dispatchers.IO) {
                             store.recordSettings(
@@ -235,6 +247,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             )
                             store.forgetDevice()
                         }
+                        // Only continue with sign out when local mode is false.
                         if (!localMode) runCatching {
                             withTimeoutOrNull(2_000.milliseconds) {
                                 store.pendingHistory(uid).forEach { record ->
@@ -322,6 +335,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Account session controller: Routes restored account.
     private fun routeRestoredAccount() {
         with(runtime) {
             with(state) {

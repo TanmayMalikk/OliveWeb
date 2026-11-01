@@ -18,6 +18,7 @@ const navigation = [
   ["nutrition", "Nutrition", Salad],
 ] as const;
 
+// Shows the metric view for web fitness cover cover. It uses the saved health data to update the fitness screen.
 function Metric({ icon: Icon, value, label, note }: {
   icon: typeof Activity; value: string; label: string; note?: string;
 }) {
@@ -27,6 +28,7 @@ function Metric({ icon: Icon, value, label, note }: {
   </article>;
 }
 
+// Web fitness cover cover: Shows the history chart view. It uses the saved health data to update the fitness screen.
 function HistoryChart({ days, field, label, suffix = "" }: {
   days: FitnessDay[]; field: keyof FitnessDay; label: string; suffix?: string;
 }) {
@@ -86,10 +88,12 @@ export default function FitnessCover() {
   const week = recentDays.slice(-7);
   const weekSteps = week.reduce((total, day) => total + day.steps, 0);
   const weekCalories = week.reduce((total, day) => total + day.caloriesBurned, 0);
+  // Web fitness cover cover: Adds the new item.
   const add = async (food: Food, servings = 1) => {
     setSummary(await logFood(summary, food, servings));
     setFeedback(`${food.name} added to today.`);
   };
+  // returns the tap olive for web fitness cover cover.
   const tapOlive = () => {
     const now = Date.now();
     if (now - lastOliveTap.current <= 1500) {
@@ -101,6 +105,7 @@ export default function FitnessCover() {
     lastOliveTap.current = now;
     setFeedback("Tap the olive once more to continue.");
   };
+  // Starts tab for web fitness cover cover.
   const showTab = (next: FitnessTab) => {
     setTab(next);
     setSettingsOpen(false);
@@ -266,6 +271,7 @@ export default function FitnessCover() {
   </main>;
 }
 
+// Web fitness cover cover: Shows the macro progress view. It uses the saved health data to update the fitness screen.
 function MacroProgress({ summary, day }: { summary: FitnessSummary; day: FitnessDay }) {
   return <div className="fitness-macro-list large">
     {[["Protein", day.proteinGrams, summary.proteinGoal], ["Carbohydrates", day.carbohydrateGrams, summary.carbohydrateGoal],

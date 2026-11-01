@@ -38,6 +38,7 @@ export default function OliveCrossing() {
   const lastFrame = useRef(0);
   const boardRef = useRef<HTMLDivElement>(null);
 
+  // Update board ref when information used by this screen changes.
   useEffect(() => {
     const board = boardRef.current;
     if (!board) return;
@@ -46,6 +47,7 @@ export default function OliveCrossing() {
       const bounds = board.getBoundingClientRect();
       if (!bounds.width || !bounds.height) return;
       const fullWidth = CROSSING.columns * CROSSING.cell;
+      // full width checks whether window match media min-width: 48 01rem matches before continuing.
       if (window.matchMedia("(min-width: 48.01rem)").matches) {
         setCamera((current) =>
           current.x === 0 && current.width === fullWidth
@@ -84,6 +86,7 @@ export default function OliveCrossing() {
     phaseRef.current = phase;
   }, [phase]);
 
+  // Update observer when information used by this screen changes.
   useEffect(() => {
     let live = true;
     void readCover<number>("olive-crossing-best", 0)
@@ -123,6 +126,7 @@ export default function OliveCrossing() {
       frameRef.current = requestAnimationFrame(tick);
   }, []);
 
+  // Update next when information used by this screen changes.
   useEffect(() => {
     if (phase !== "running") return;
     lastFrame.current = 0;
@@ -132,6 +136,7 @@ export default function OliveCrossing() {
     };
   }, [phase, tick]);
 
+  // Update next when information used by this screen changes.
   useEffect(() => {
     // Handles visibility.
     const handleVisibility = () => {
@@ -216,6 +221,7 @@ export default function OliveCrossing() {
           tabIndex={0}
           onKeyDown={(event) => {
             if (handleKey(event.key)) event.preventDefault();
+            // event key is or event key is enter is handled here by status.
             if (event.key === " " || event.key === "Enter") {
               event.preventDefault();
               if (phaseRef.current === "running") setPhase("paused");

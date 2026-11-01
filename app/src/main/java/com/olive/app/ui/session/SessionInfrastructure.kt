@@ -54,6 +54,7 @@ internal class SessionDataSources(
     val locations: LocationSharingRepository?,
 ) {
     companion object {
+        // Session infrastructure: returns the create.
         fun create(application: Application, localMode: Boolean, vault: EncryptedVault): SessionDataSources {
             val media: MediaTicketDataSource? = if (localMode) null else MediaRepository()
             return SessionDataSources(

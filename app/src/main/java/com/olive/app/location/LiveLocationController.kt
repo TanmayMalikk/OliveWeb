@@ -14,6 +14,7 @@ import javax.crypto.SecretKey
 internal object LiveLocationState {
     private val mutable = MutableStateFlow<MapLocationPoint?>(null)
     val current = mutable.asStateFlow()
+    // Updates the feature state for live location controller.
     internal fun update(value: MapLocationPoint?) {
         if (value == null) {
             mutable.value = null
@@ -35,6 +36,7 @@ internal object LiveLocationState {
 internal object LiveLocationController {
     private const val PREFS = "olive_location_sharing"
 
+    // Live location controller: returns the active. It reads the value saved on this device.
     fun active(context: Context): Boolean {
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         return preferences.getBoolean(
@@ -47,9 +49,11 @@ internal object LiveLocationController {
     fun selected(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .getStringSet("live_contacts", emptySet()).orEmpty()
 
+    // Live location controller: returns the expires at. It reads the value saved on this device.
     fun expiresAt(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         .getLong("live_expires_at", 0L)
 
+    // Live location controller: Starts the feature. It reads the value saved on this device.
     fun start(
         context: Context,
         uid: String,
@@ -77,6 +81,7 @@ internal object LiveLocationController {
         ContextCompat.startForegroundService(context, intent)
     }
 
+    // Live location controller: Stops the feature. It reads the value saved on this device.
     fun stop(context: Context) {
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val ownerUid = preferences.getString("live_owner_uid", null)

@@ -48,6 +48,7 @@ internal fun OliveCover(
     session: SessionViewModel? = null,
 ) {
     val uiText = rememberResourceText()
+    // Update olive cover when information used by this screen changes.
     LaunchedEffect(uiText, vm.dishes) {
         vm.updateSearchLabels(vm.dishes.associate { dish ->
             dish.id to listOf(
@@ -60,6 +61,7 @@ internal fun OliveCover(
     var areaDialog by remember { mutableStateOf(false) }
     var guestAddress by remember { mutableStateOf(DeliveryAddress()) }
     val savedAddress = if (configured) session?.deliveryAddress ?: DeliveryAddress() else guestAddress
+    // Update olive cover when information used by this screen changes.
     LaunchedEffect(savedAddress) { vm.updateLocation(savedAddress) }
     LaunchedEffect(session?.coverReset) {
         checkoutNotice = false
@@ -71,7 +73,9 @@ internal fun OliveCover(
         if ((session?.addressSaveVersion ?: 0) > 0) areaDialog = false
     }
     LaunchedEffect(checkoutNotice) { session?.checkoutActive = checkoutNotice }
+    // Update olive cover when information used by this screen changes.
     DisposableEffect(Unit) { onDispose { session?.checkoutActive = false } }
+    // Update olive cover when information used by this screen changes.
     LaunchedEffect(interactive) {
         if (!interactive) {
             checkoutNotice = false
@@ -257,6 +261,7 @@ private fun FoodDiscoverScreen(
                 placeholder = { Text(stringResource(R.string.search_olive_s_menu)) },
                 leadingIcon = { Icon(Icons.Outlined.Search, null) },
                 trailingIcon = {
+                    // Only continue with food discover screen when vm query is not empty icon button on click = vm search.
                     if (vm.query.isNotEmpty()) IconButton(onClick = { vm.search("") }) {
                         Icon(
                             Icons.Outlined.Close,

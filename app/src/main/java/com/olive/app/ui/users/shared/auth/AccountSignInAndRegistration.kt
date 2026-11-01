@@ -72,6 +72,7 @@ internal fun Welcome(session: SessionViewModel) {
                 }
             }
         }
+        // session account role is account role user or session account role is account role safe contact is handled here by welcome.
         if (session.account.role == AccountRole.USER || session.account.role == AccountRole.SAFE_CONTACT) {
             Button(
                 onClick = session.account::chooseNew,
@@ -192,6 +193,7 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
                 false
             session.account.clearCredentialError()
         }
+        // Only continue with credentials when create.
         if (create) {
             // UI spacing: keep related validation bullets close together below their input field.
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
@@ -226,6 +228,7 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
                 false
             session.account.clearCredentialError()
         }
+        // create is handled here by credentials.
         if (create) {
             // UI spacing: password requirements read as one compact list.
             Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {

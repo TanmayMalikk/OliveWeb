@@ -36,11 +36,13 @@ internal fun createOliveComposeRule() = Intent(Intent.ACTION_MAIN).setClass(
 
 // Shared setup keeps every end-to-end UI test isolated and gives feature files the same common actions.
 abstract class OliveUiTestBase {
+    // returns the tap on screen for olive ui test base. The test gives the code a clear input and checks the expected result.
     protected fun tapOnScreen(x: Float, y: Float) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val time = SystemClock.uptimeMillis()
         val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, x, y, 0)
         val up = MotionEvent.obtain(time, time + 32, MotionEvent.ACTION_UP, x, y, 0)
+        // If tap on screen fails, catch the error so the app can keep running and explain the problem.
         try {
             check(automation.injectInputEvent(down, true))
             check(automation.injectInputEvent(up, true))
@@ -52,6 +54,7 @@ abstract class OliveUiTestBase {
 
     protected val compose = createOliveComposeRule()
     private val cleanStore = object : ExternalResource() {
+        // Olive ui test base: returns the before. The test gives the code a clear input and checks the expected result.
         override fun before() {
             check(!BuildConfig.FIREBASE_CONFIGURED) { "These tests only run against local test accounts." }
             val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -88,7 +91,9 @@ abstract class OliveUiTestBase {
         runBlocking { sessionJob.cancelAndJoin() }
     }
 
+    // Olive ui test base: returns the wait for. The test gives the code a clear input and checks the expected result.
     protected fun waitFor(tag: String) {
+        // A wait for error is handled here instead of closing the app.
         try {
             compose.waitUntil(45_000) {
                 compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
@@ -103,16 +108,19 @@ abstract class OliveUiTestBase {
         }
     }
 
+    // returns the visible node for olive ui test base. The test gives the code a clear input and checks the expected result.
     private fun visibleNode(tag: String): SemanticsNodeInteraction {
         val node = compose.onNodeWithTag(tag)
         if (runCatching { node.assertIsDisplayed() }.isFailure) node.performScrollTo()
         return node
     }
 
+    // Olive ui test base: returns the fill. The test gives the code a clear input and checks the expected result.
     protected fun fill(tag: String, text: String) {
         visibleNode(tag).performTextReplacement(text)
     }
 
+    // returns the click for olive ui test base. The test gives the code a clear input and checks the expected result.
     protected fun click(tag: String) {
         visibleNode(tag).performClick()
     }
@@ -138,10 +146,12 @@ abstract class OliveUiTestBase {
         waitFor("new_user")
     }
 
+    // Olive ui test base: Finds the next onboarding. The test gives the code a clear input and checks the expected result.
     protected fun nextOnboarding() {
         click("onboarding_next")
     }
 
+    // Olive ui test base: Finds birthday. The test gives the code a clear input and checks the expected result.
     protected fun chooseBirthday() {
         click("dob_year")
         click("dob_year_2000")
@@ -151,6 +161,7 @@ abstract class OliveUiTestBase {
         click("dob_day_2")
     }
 
+    // returns the register for olive ui test base. The test gives the code a clear input and checks the expected result.
     protected fun register(pin: String = "123456", username: String = "olive_tester") {
         openOnboarding()
         click("new_user")
@@ -194,6 +205,7 @@ abstract class OliveUiTestBase {
         ).forEach { permission ->
             instrumentation.uiAutomation.grantRuntimePermission(packageName, permission)
         }
+        // android os the Android version is at least android os Android 10 is handled here by grant feature permissions.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             instrumentation.uiAutomation.grantRuntimePermission(
                 packageName,
@@ -220,6 +232,7 @@ abstract class OliveUiTestBase {
         waitFor(nextTag)
     }
 
+    // Finds app pin for olive ui test base. The test gives the code a clear input and checks the expected result.
     protected fun chooseAppPin() {
         waitFor("entry_knows_pin_yes")
         click("entry_knows_pin_yes")
@@ -229,7 +242,9 @@ abstract class OliveUiTestBase {
         )
     }
 
+    // Olive ui test base: returns the wait cover. The test gives the code a clear input and checks the expected result.
     protected fun waitCover() {
+        // If wait cover fails, catch the error so the app can keep running and explain the problem.
         try {
             compose.waitUntil(30_000) {
                 compose.onAllNodesWithTag("cover_root").fetchSemanticsNodes().isNotEmpty()
@@ -246,6 +261,7 @@ abstract class OliveUiTestBase {
         }
     }
 
+    // returns the trigger for olive ui test base. The test gives the code a clear input and checks the expected result.
     protected fun trigger() {
         val session =
             androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
@@ -253,11 +269,13 @@ abstract class OliveUiTestBase {
         waitFor("unlock_pin")
     }
 
+    // returns the enter pin for olive ui test base. The test gives the code a clear input and checks the expected result.
     protected fun enterPin(pin: String) {
         pin.forEach { compose.onNodeWithTag("pin_digit_$it").performClick() }
         compose.onNodeWithTag("unlock_submit").performClick()
     }
 
+    // Olive ui test base: Unlocks the private area. The test gives the code a clear input and checks the expected result.
     protected fun unlock(pin: String = "123456") {
         trigger()
         enterPin(pin)

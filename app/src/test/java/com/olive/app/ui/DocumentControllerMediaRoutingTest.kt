@@ -72,6 +72,7 @@ class DocumentControllerMediaRoutingTest {
         assertEquals(null, media.downloadedDocumentId)
     }
 
+    // returns the document for document controller media routing test. The test gives the code a clear input and checks the expected result.
     private fun document(objectKey: String) = SafetyDocument(
         id = "document-id",
         ownerUid = "owner",
@@ -88,19 +89,26 @@ class DocumentControllerMediaRoutingTest {
     ) : SafetyDocumentDataSource {
         var downloadCalled = false
 
+        // Lists for for document controller media routing test. The test gives the code a clear input and checks the expected result.
         override suspend fun listFor(uid: String) = listOf(document)
+        // Document controller media routing test: Observes for. The test gives the code a clear input and checks the expected result.
         override fun observeFor(
             uid: String,
             onUpdate: (List<SafetyDocument>) -> Unit,
             onError: (String) -> Unit,
         ) = ChatSubscription {}
+        // Loads for for document controller media routing test. The test gives the code a clear input and checks the expected result.
         override suspend fun getFor(uid: String, id: String) = document
+        // Document controller media routing test: Shares the selected item. The test gives the code a clear input and checks the expected result.
         override suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>) = Unit
+        // Deletes the selected item for document controller media routing test. The test gives the code a clear input and checks the expected result.
         override suspend fun delete(document: SafetyDocument, ownerUid: String) = Unit
+        // Document controller media routing test: Downloads the selected file. The test gives the code a clear input and checks the expected result.
         override suspend fun download(context: Context, document: SafetyDocument): File {
             downloadCalled = true
             return file
         }
+        // returns the approve current account devices for document controller media routing test. The test gives the code a clear input and checks the expected result.
         override suspend fun approveCurrentAccountDevices(
             document: SafetyDocument,
             currentUid: String,
@@ -112,8 +120,11 @@ class DocumentControllerMediaRoutingTest {
         var downloadedDocumentId: String? = null
         var viewerUid: String? = null
 
+        // Observes uploads for document controller media routing test. The test gives the code a clear input and checks the expected result.
         override fun observeUploads(ownerUid: String) = Unit
+        // Document controller media routing test: returns the acknowledge published. The test gives the code a clear input and checks the expected result.
         override fun acknowledgePublished(mediaIds: Set<String>) = Unit
+        // returns the queue document for document controller media routing test. The test gives the code a clear input and checks the expected result.
         override fun queueDocument(
             uri: Uri,
             owner: AccountIdentity,
@@ -121,6 +132,7 @@ class DocumentControllerMediaRoutingTest {
             onQueued: (String) -> Unit,
             onFailure: (String) -> Unit,
         ) = Unit
+        // returns the queue file for document controller media routing test. The test gives the code a clear input and checks the expected result.
         override fun queueFile(
             file: File,
             name: String,
@@ -132,11 +144,13 @@ class DocumentControllerMediaRoutingTest {
             onQueued: (String) -> Unit,
             onFailure: (String) -> Unit,
         ) = Unit
+        // Downloads file for document controller media routing test. The test gives the code a clear input and checks the expected result.
         override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File {
             downloadedDocumentId = document.id
             this.viewerUid = viewerUid
             return file
         }
+        // Document controller media routing test: Removes state. The test gives the code a clear input and checks the expected result.
         override fun clearState() = Unit
     }
 

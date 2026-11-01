@@ -53,6 +53,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
     private val repository:MediaTicketDataSource=MediaRepository()
     private val client=OkHttpClient.Builder().retryOnConnectionFailure(true).build()
 
+    // Media: Processes the queued background work.
     override suspend fun doWork():Result {
         // WorkManager input contains only the durable job id; sensitive state is loaded from the vault.
         val jobId=inputData.getString(JOB_ID) ?: return Result.failure()
@@ -68,6 +69,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         val file=File(job.source.filePath)
         if(!file.isFile || file.length()!=job.source.ciphertextSize) return permanent(job,"Encrypted upload staging file is missing")
         return try {
+            // job media id is blank is handled here by do work.
             if(job.mediaId.isBlank()) {
                 // Session creation is idempotent by job id. Persist the response before any PUT so a
                 // process death cannot create a second R2 object for the same local job.
@@ -104,6 +106,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         }
     }
 
+    // Media: Uploads the selected file.
     private suspend fun upload(file:File,initial:MediaUploadJob):List<MediaCompletedPart> {
         // The server chooses the strategy: a single PUT uses the whole file as part one; multipart
         // uses the server-returned part size so client and R2 boundaries cannot diverge.
@@ -127,6 +130,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         return job.completedParts.entries.sortedBy { it.key }.map { MediaCompletedPart(it.key,it.value) }
     }
 
+    // returns the put for media.
     private suspend fun put(ticket:MediaUploadTicket,file:File,offset:Long,length:Long,onProgress:(Long)->Unit):String {
         // FileSliceRequestBody prevents loading a large encrypted object or part into memory.
         val body=FileSliceRequestBody(file,offset,length,onProgress)
@@ -139,11 +143,13 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         }
     }
 
+    // returns the permanent for media.
     private fun permanent(job:MediaUploadJob,message:String):Result {
         // A permanent result requires explicit user/app intervention rather than automatic backoff.
         store.write(job.copy(status=MediaTransferStatus.FAILED,error=message.take(240)))
         return Result.failure(workDataOf(ERROR to message.take(240)))
     }
+    // Media: returns the retry. It checks access, protects the file, and then reads or saves it.
     private fun retry(job:MediaUploadJob,error:Exception):Result {
         // WorkManager keeps the same unique work chain and applies the configured exponential delay.
         store.write(job.copy(status=MediaTransferStatus.QUEUED,error=error.localizedMessage?.take(240)))
@@ -180,8 +186,11 @@ private class FileSliceRequestBody(
     private val file:File,private val offset:Long,private val length:Long,
     private val onProgress:(Long)->Unit,
 ):RequestBody() {
+    // returns the content type for media.
     override fun contentType()="application/octet-stream".toMediaType()
+    // Media: returns the content length.
     override fun contentLength()=length
+    // Saves to for media.
     override fun writeTo(sink:BufferedSink) {
         file.inputStream().use { input ->
             // The file is ciphertext, so seeking/re-reading a part cannot expose plaintext.
@@ -194,7 +203,9 @@ private class FileSliceRequestBody(
             val buffer = ByteArray(64 * 1024)
             var remaining = length
             var sent = 0L
+            // If write to fails, catch the error so the app can keep running and explain the problem.
             try {
+                // Media: Keeps write to active while remaining>0.
                 while(remaining>0) {
                     val count=input.read(buffer,0,minOf(buffer.size.toLong(),remaining).toInt())
                     if(count<0) throw IOException("Encrypted upload ended early")
@@ -210,7 +221,9 @@ private class FileSliceRequestBody(
 private suspend fun Call.await():Response=suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { cancel() }
     enqueue(object:Callback {
+        // Media: Responds when failure. It checks access, protects the file, and then reads or saves it.
         override fun onFailure(call:Call,e:IOException) { if(continuation.isActive) continuation.resumeWithException(e) }
+        // Responds when response for media. It checks access, protects the file, and then reads or saves it.
         override fun onResponse(call:Call,response:Response) { if(continuation.isActive) continuation.resume(response) else response.close() }
     })
 }

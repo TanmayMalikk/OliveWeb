@@ -90,6 +90,7 @@ internal fun FoodAccountScreen(
     onAddress: () -> Unit
 ) {
     val uiText = rememberResourceText()
+    // Update food account screen when information used by this screen changes.
     LaunchedEffect(session?.coverUsername) {
         if (configured) session?.recordSettingsInteraction(
             "Olive",
@@ -121,6 +122,7 @@ internal fun FoodAccountScreen(
                 uiText(R.string.a_little_space_of_your_own)
             )
         }
+        // Only continue with food account screen when configured is false.
         if (!configured) {
             item {
                 FoodEmptyState(
@@ -205,6 +207,7 @@ internal fun FoodAccountScreen(
                 }
             }
         }
+        // food account screen checks whether configured before continuing.
         if (configured) {
             item {
                 FoodPageTitle(
@@ -255,6 +258,7 @@ internal fun FoodAccountScreen(
                     }
                 }
             }
+            // food account screen checks whether history size > 5 before continuing.
             if (history.size > 5) item {
                 TextButton(
                     onClick = { showAllOrders = !showAllOrders },

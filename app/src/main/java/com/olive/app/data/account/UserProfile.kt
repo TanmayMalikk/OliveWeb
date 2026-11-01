@@ -21,6 +21,7 @@ enum class AccountRole(val title: String, val description: String) {
     ADMIN("Admin", "An organization leader who oversees staff");
 
     companion object {
+        // Creates a value from stored for account.
         fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: USER
     }
 }
@@ -30,6 +31,7 @@ enum class CoverType(val title: String) {
     FOOD("Olive"), NEWS("Daily Digest"), FITNESS("Fitness Tracker"), GAME("Game");
 
     companion object {
+        // Account: Creates a value from stored.
         fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: FOOD
     }
 }
@@ -52,6 +54,7 @@ data class UserProfile(
     val email: String = "",
     val phone: String = "",
 ) {
+    // Converts the value to map for account.
     fun toMap(): Map<String, Any> = mapOf(
         "address" to address.toMap(),
         "username" to username,
@@ -78,9 +81,11 @@ data class UserProfile(
         "phone" to phone,
     )
 
+    // Converts this record into JSON for account.
     fun toJson() = JSONObject(toMap())
 
     companion object {
+        // Builds this record from JSON for account.
         fun fromJson(j: JSONObject): UserProfile {
             val contacts = j.optJSONArray("contacts") ?: JSONArray()
             return UserProfile(
@@ -145,6 +150,7 @@ data class DeliveryAddress(
     val generalLocation
         get() = listOf(city, province, country).filter { it.isNotBlank() }.joinToString(", ")
 
+    // Converts the value to map for account.
     fun toMap(): Map<String, Any> = buildMap {
         put("line1", line1)
         put("line2", line2)
@@ -160,6 +166,7 @@ data class DeliveryAddress(
     }
 
     companion object {
+        // Builds this record from JSON for account.
         fun fromJson(j: JSONObject?) =
             if (j == null) DeliveryAddress() else DeliveryAddress(
                 j.optString("line1"),

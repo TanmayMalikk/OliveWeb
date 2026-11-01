@@ -10,6 +10,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class LocalizationTest {
 
+    // Localization test: Finds res dir. The test gives the code a clear input and checks the expected result.
     private fun findResDir(): File {
         val candidates = listOf(
             File("src/main/res"),
@@ -20,6 +21,7 @@ class LocalizationTest {
             ?: throw IllegalStateException("Res directory not found in candidate paths: $candidates")
     }
 
+    // Localization test: returns the count strings in xml. The test gives the code a clear input and checks the expected result.
     private fun countStringsInXml(file: File): Int {
         return try {
             val factory = DocumentBuilderFactory.newInstance()
@@ -47,7 +49,6 @@ class LocalizationTest {
             "Default strings.xml should be populated (found $defaultCount strings)",
             defaultCount > 100
         )
-
         for (localeDirName in targetLocales) {
             val localeDir = File(resDir, localeDirName)
             assertTrue("Locale directory '$localeDirName' must exist", localeDir.exists())

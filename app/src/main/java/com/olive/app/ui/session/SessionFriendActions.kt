@@ -9,6 +9,7 @@ import com.olive.app.data.*
 
 // Searches the directory and manages friend requests.
 internal class FriendActions(private val runtime: SessionRuntime) {
+    // Session friend actions: Finds users. It searches through the messaging repository and reports an empty result clearly.
     fun searchUsers(query: String) {
         with(runtime) {
             with(state) {
@@ -24,6 +25,7 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
+    // Finds the relationship with the selected account for session friend actions.
     fun relationshipFor(uid: String): FriendRelationship {
         with(runtime) {
             with(state) {
@@ -48,6 +50,7 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session friend actions: Accepts friend request. It runs the repository request through the shared messaging error handler.
     fun acceptFriendRequest(request: FriendRequest) {
         with(runtime) {
             with(state) {
@@ -58,6 +61,7 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session friend actions: Declines friend request. It runs the repository request through the shared messaging error handler.
     fun declineFriendRequest(request: FriendRequest) {
         with(runtime) {
             return messaging.runMessagingAction("Unable to decline this friend request.") { repository, device, _ ->
@@ -75,6 +79,7 @@ internal class FriendActions(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session friend actions: Starts conversation. It asks the messaging repository for the conversation and reports any error to the screen.
     fun startConversation(friend: Friend) {
         with(runtime) {
             with(state) {

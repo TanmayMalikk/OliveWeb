@@ -30,6 +30,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
   const [moves, setMoves] = useState(0);
   const [best, setBest] = useState<number | null>(null);
   const [storageReady, setStorageReady] = useState(false);
+  // Update pair count when information used by this screen changes.
   useEffect(() => {
     let live = true;
     setStorageReady(false);
@@ -47,6 +48,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       live = false;
     };
   }, [size]);
+  // Update live when information used by this screen changes.
   useEffect(() => {
     if (flipped.length !== 2) return;
     const [a, b] = flipped;
@@ -59,6 +61,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     );
     return () => clearTimeout(timer);
   }, [flipped, cards]);
+  // Update timer when information used by this screen changes.
   useEffect(() => {
     if (
       matched.length === pairCount * 2 &&
@@ -69,6 +72,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       void writeCover(`grove-best-${size}`, moves).catch(() => {});
     }
   }, [matched, moves, best, storageReady, pairCount, size]);
+  // returns the turn for web olive games cover.
   function turn(index: number) {
     if (
       flipped.length >= 2 ||
@@ -79,6 +83,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     setFlipped((old) => [...old, index]);
     if (flipped.length === 1) setMoves((n) => n + 1);
   }
+  // returns the restart for web olive games cover.
   function restart(nextSize = size) {
     setSize(nextSize);
     setCards(createMemoryBoard(nextSize));
@@ -86,6 +91,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     setMatched([]);
     setMoves(0);
   }
+  // returns the tap brand for web olive games cover.
   function tapBrand() {
     const now = Date.now();
     entryTaps.current = [

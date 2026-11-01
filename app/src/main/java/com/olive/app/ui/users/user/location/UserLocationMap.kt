@@ -55,6 +55,7 @@ import kotlin.math.roundToInt
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
+// user location map shows this interactive location map view so the user can view its details and use its actions.
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun InteractiveLocationMap(
@@ -121,6 +122,7 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveSetPoints($encoded,$moveCamera);", null)
     }
 
+    // Updates route for user location map.
     fun updateRoute(view: WebView, fitRoute: Boolean) {
         val encoded = JSONArray().apply {
             route?.coordinates?.forEach { coordinate ->
@@ -130,6 +132,7 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveSetRoute($encoded,$fitRoute);", null)
     }
 
+    // User location map: Resizes the map to its current container.
     fun resizeMap(view: WebView) {
         if (view.height <= 0) return
         val cssHeight =
@@ -137,6 +140,7 @@ internal fun InteractiveLocationMap(
         view.evaluateJavascript("window.oliveResizeTo&&window.oliveResizeTo($cssHeight);", null)
     }
 
+    // Update resize map when information used by this screen changes.
     LaunchedEffect(following, followTargetUid, loadState, attempt) {
         if (loadState == MapLoadState.Ready) webView[0]?.evaluateJavascript(
             "window.oliveSetFollow($following,${JSONObject.quote(followTargetUid.orEmpty())});",
@@ -149,6 +153,7 @@ internal fun InteractiveLocationMap(
         if (!navigationActive) routeWasShown = false
     }
 
+    // Update resize map when information used by this screen changes.
     LaunchedEffect(route, loadState, attempt) {
         if (loadState == MapLoadState.Ready) webView[0]?.let {
             updateRoute(it, route != null && !routeWasShown)
@@ -165,6 +170,7 @@ internal fun InteractiveLocationMap(
                         private var touchDownX = 0f
                         private var touchDownY = 0f
 
+                        // Responds when touch event for user location map.
                         override fun onTouchEvent(event: MotionEvent): Boolean {
                             // Keep map drags and zoom gestures from scrolling the page behind it.
                             when (event.actionMasked) {
@@ -192,6 +198,7 @@ internal fun InteractiveLocationMap(
                             return super.onTouchEvent(event)
                         }
 
+                        // Performs click for user location map.
                         override fun performClick(): Boolean {
                             super.performClick()
                             return true
@@ -208,20 +215,24 @@ internal fun InteractiveLocationMap(
                         settings.allowFileAccess = true
                         settings.setSupportZoom(false)
                         webChromeClient = object : WebChromeClient() {
+                            // User location map: Responds when received title.
                             override fun onReceivedTitle(view: WebView, title: String?) {
                                 if (title == MAP_READY_TITLE) loadState = MapLoadState.Ready
                             }
                         }
                         webViewClient = object : WebViewClient() {
+                            // Responds when page finished for user location map.
                             override fun onPageFinished(view: WebView, url: String) {
                                 view.post { resizeMap(view) }
                             }
 
+                            // Checks whether override url loading for user location map.
                             override fun shouldOverrideUrlLoading(
                                 view: WebView,
                                 request: WebResourceRequest
                             ) = true
 
+                            // User location map: Responds when received error.
                             override fun onReceivedError(
                                 view: WebView,
                                 request: WebResourceRequest,
@@ -252,6 +263,7 @@ internal fun InteractiveLocationMap(
                 modifier = Modifier.fillMaxSize().testTag("location_map_view")
             )
         }
+        // Choose what on received error should do for the current value.
         when (loadState) {
             MapLoadState.Loading -> CircularProgressIndicator(
                 Modifier.align(Alignment.Center).testTag("map_loading")

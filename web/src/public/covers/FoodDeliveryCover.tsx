@@ -35,6 +35,7 @@ type FoodState = {
   ingredients: Record<string, string[]>;
 };
 const empty: FoodState = { cart: {}, favorites: [], ingredients: {} };
+// returns the money for web food delivery cover cover.
 const money = (cents: number) =>
   new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(
     cents / 100,
@@ -50,6 +51,7 @@ export default function Food() {
   const [loaded, setLoaded] = useState(false);
   const [storageError, setStorageError] = useState("");
   const storageId = `${session.enrollment?.uid ?? "preview"}:food`;
+  // Update storage id when information used by this screen changes.
   useEffect(() => {
     let active = true;
     void readCover(storageId, empty)
@@ -69,6 +71,7 @@ export default function Food() {
       active = false;
     };
   }, [storageId]);
+  // Update active when information used by this screen changes.
   useEffect(() => {
     if (loaded)
       void writeCover(storageId, state).catch(() =>
@@ -80,6 +83,7 @@ export default function Food() {
     0,
   );
   const count = Object.values(state.cart).reduce((n, q) => n + q, 0);
+  // returns the quantity for web food delivery cover cover.
   function quantity(id: string, delta: number) {
     setState((old) => {
       const next = Math.min(99, Math.max(0, (old.cart[id] ?? 0) + delta));
@@ -88,6 +92,7 @@ export default function Food() {
       return { ...old, cart };
     });
   }
+  // returns the favorite for web food delivery cover cover.
   function favorite(id: string) {
     setState((old) => ({
       ...old,
@@ -96,6 +101,7 @@ export default function Food() {
         : [...old.favorites, id],
     }));
   }
+  // Web food delivery cover cover: returns the search.
   function search(value: string) {
     setQuery(value);
     void session.searchTrigger(value).then((found) => {
@@ -447,6 +453,7 @@ export default function Food() {
     </div>
   );
 }
+// Web food delivery cover cover: Shows the quantity view. It uses the current cover data to update what the user sees.
 function Quantity({
   dish,
   value,

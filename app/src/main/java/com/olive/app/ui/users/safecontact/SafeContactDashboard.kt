@@ -55,6 +55,7 @@ internal fun SafeContactArea(session: SessionViewModel) {
     AnimatedContent(
         session.page, label = "safe contact page",
         transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(120))) }) { page ->
+        // Choose what safe contact area should do for the current value.
         when (page) {
             SafePage.Home -> SafeContactHome(session)
             SafePage.Messages -> MessagesScreen(session)
@@ -71,6 +72,7 @@ internal fun SafeContactArea(session: SessionViewModel) {
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
+// This is the safe contact home view for safe contact dashboard. It shows current details and the actions available to the user.
 @Composable
 private fun SafeContactHome(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -181,6 +183,7 @@ private fun SafeContactHome(session: SessionViewModel) {
     }
 }
 
+// This is the safe contact profile view for safe contact dashboard. It shows current details and the actions available to the user.
 @Composable
 private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
@@ -234,6 +237,7 @@ private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) 
     }
 }
 
+// safe contact dashboard shows this shared entry viewer view so the user can view its details and use its actions.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SharedEntryViewer(session: SessionViewModel) {
