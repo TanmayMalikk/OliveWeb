@@ -1,5 +1,0 @@
-// Web developers: checks screen overflow and calculator input in a browser.
-import { chromium } from '@playwright/test';
-const browser=await chromium.launch({channel:'chrome'});const page=await browser.newPage();
-for(const width of [390,1280]){await page.setViewportSize({width,height:900});await page.goto('http://127.0.0.1:5173/account');console.log(JSON.stringify({width,overflow:await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(el=>el.getBoundingClientRect().right>innerWidth+1).slice(0,15).map(el=>({tag:el.tagName,class:el.className,right:Math.round(el.getBoundingClientRect().right)})))}));}
-page.on('pageerror',error=>console.log('Browser error:',error.message));page.on('console',message=>{if(message.type()==='error')console.log('Console:',message.text());});await page.goto('http://127.0.0.1:5173/cover/calculator');await page.getByLabel('Expression',{exact:true}).fill('12+30');await page.getByRole('button',{name:'Equals',exact:true}).click();await page.waitForTimeout(5500);console.log('Calculation:',await page.locator('output').textContent(),await page.getByRole('alert').allTextContents());await browser.close();

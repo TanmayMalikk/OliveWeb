@@ -5,7 +5,7 @@ import {
   Check,
   LockKeyhole,
   Newspaper,
-  Calculator,
+  Dumbbell,
   Utensils,
   Gamepad2,
   MoveUpRight,
@@ -17,7 +17,7 @@ import { siteHref } from "../sites/SiteRouting";
 export const coverIcons = {
   FOOD: Utensils,
   NEWS: Newspaper,
-  CALCULATOR: Calculator,
+  FITNESS: Dumbbell,
   GAME: Gamepad2,
 };
 export function CoverPreview({ cover }: { cover: Cover }) {
@@ -56,15 +56,15 @@ export function CoverPreview({ cover }: { cover: Cover }) {
             </div>
           </div>
         </>
-      ) : cover === "CALCULATOR" ? (
+      ) : cover === "FITNESS" ? (
         <>
-          <div className="preview-masthead">Better Calculator</div>
+          <div className="preview-masthead">Fitness Tracker</div>
           <div className="preview-result">
-            128 × 4 <strong>512</strong>
+            Today <strong>8,650 steps</strong>
           </div>
           <div className="preview-keys">
-            {["AC", "±", "%", "÷", "7", "8", "9", "×"].map((k) => (
-              <span key={k}>{k}</span>
+            {["Steps", "Distance", "Calories", "Vitals"].map((item) => (
+              <span key={item}>{item}</span>
             ))}
           </div>
         </>

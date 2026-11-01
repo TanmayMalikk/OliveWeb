@@ -30,11 +30,7 @@ enum class CoverType(val title: String) {
     FOOD("Olive"), NEWS("Daily Digest"), FITNESS("Fitness Tracker"), GAME("Game");
 
     companion object {
-        fun fromStored(value: String) = when (value) {
-            // Existing calculator users move to its fitness replacement without losing their cover choice.
-            "CALCULATOR" -> FITNESS
-            else -> entries.firstOrNull { it.name == value } ?: FOOD
-        }
+        fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: FOOD
     }
 }
 

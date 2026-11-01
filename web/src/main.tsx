@@ -21,7 +21,7 @@ const EntryLink = lazy(() => import("./users/shared/auth/PrivateEntryLink"));
 const SafeApp = lazy(() => import("./users/shared/safe_app/SafeAppLayout"));
 const Food = lazy(() => import("./public/covers/FoodDeliveryCover"));
 const News = lazy(() => import("./public/covers/DailyDigestCover"));
-const Calculator = lazy(() => import("./public/covers/CalculatorCover"));
+const Fitness = lazy(() => import("./public/covers/FitnessCover"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
 const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
 function PinGate() {
@@ -150,8 +150,8 @@ function Cover() {
         <Food />
       ) : s.cover === "NEWS" ? (
         <News />
-      ) : s.cover === "CALCULATOR" ? (
-        <Calculator />
+      ) : s.cover === "FITNESS" ? (
+        <Fitness />
       ) : (
         <Game />
       )}
@@ -185,8 +185,8 @@ function Routes({ mode }: { mode: SiteMode }) {
           ? "Olive"
           : icon === "daily-digest"
             ? "Daily Digest"
-            : icon === "calculator"
-              ? "Better Calculator"
+            : icon === "fitness"
+              ? "Fitness Tracker"
               : "Little Grove";
   }, [s.cover]);
   let content: ReactNode;

@@ -283,7 +283,6 @@ if ($WithDeviceTests) {
         } | Sort-Object
     if ($deviceTestCases.Count -eq 0) { throw "No Android device test methods were found." }
     $deviceLockTestNames = @(
-        'SafeEntrySettingsUiTest#calculatorCoverAddsBackupPinWithoutChangingPreferredDeviceLock',
         'SafeEntrySettingsUiTest#switchingAndBackupSetupRequireProofAndNeverExposePinDuringDeviceLock',
         'SafeEntryUiTest#deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry',
         'SafeEntryUiTest#deviceLockEnrollmentAndEveryReentryRequireAndroidAuthentication'
