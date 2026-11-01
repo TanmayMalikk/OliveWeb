@@ -346,6 +346,11 @@ Buen humor.</string>
     <string name="select_a_friend_or_conversation_to_start_messaging">Seleccione un amigo o una conversación para comenzar a enviar mensajes.</string>
     <string name="unsend_message">Dejar enviar mensaje</string>
     <string name="message_unsent">Mensaje no enviado</string>
+    <string name="message_delivery_queued">En cola — esperando conexión</string>
+    <string name="message_delivery_sending">Enviando…</string>
+    <string name="message_delivery_retrying">Aún no se envió — reintentando automáticamente</string>
+    <string name="message_delivery_failed_retry">No enviado — toca para reintentar</string>
+    <string name="message_delivery_sent">Enviado</string>
 <string name="share_attachment">Compartir archivo adjunto</string><string name="select_attachment_category">Seleccionar %1$s</string>
     <string name="private_notes">Notas privadas</string><string name="incident_reports">Informes de incidentes</string><string name="saved_media">Contenido guardado</string>
     <string name="no_private_notes_found">No se encontraron notas.</string><string name="untitled_note">Nota sin título</string><string name="no_incident_reports_found">No se encontraron informes de incidentes.</string>
