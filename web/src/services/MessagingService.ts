@@ -90,7 +90,7 @@ async function encodedPublicKey(uid: string) {
   const pair = await messagingKeys(uid);
   return bytesToBase64(await crypto.subtle.exportKey("spki", pair.publicKey));
 }
-async function messageDevice(uid: string) {
+export async function messageDevice(uid: string) {
   const publicKey = await encodedPublicKey(uid);
   const digest = new Uint8Array(
     await crypto.subtle.digest("SHA-256", base64ToBytes(publicKey)),
@@ -122,7 +122,7 @@ async function wrapRoomKey(raw: Uint8Array, publicKey: string) {
     ),
   );
 }
-async function unwrapRoomKey(uid: string, value: string) {
+export async function unwrapRoomKey(uid: string, value: string) {
   const pair = await messagingKeys(uid);
   const raw = await crypto.subtle.decrypt(
     { name: "RSA-OAEP" },

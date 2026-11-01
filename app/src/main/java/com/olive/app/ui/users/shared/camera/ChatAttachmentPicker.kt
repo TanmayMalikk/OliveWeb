@@ -68,7 +68,7 @@ internal fun AttachmentPicker(
     }
     LaunchedEffect(selectedCategory, uid) {
         if (selectedCategory != AttachmentCategory.Media || uid == null || session.localMode) return@LaunchedEffect
-        session.documents.load(uid, false)
+        session.documents.load(uid, session.coverUsername, false)
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {

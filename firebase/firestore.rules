@@ -180,13 +180,14 @@ service cloud.firestore {
           && data.created_at is timestamp;
       }
       function validEncryptedMedia(data, id) {
-        return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','allowed_users',
+        return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','device_wrapped_keys','allowed_users',
             'ciphertext_size','ciphertext_sha256','encryption_version','created_at'])
           && data.owner_id is string
           && data.object_key == 'users/' + data.owner_id + '/media/' + id
           && data.encrypted_metadata is string && data.encrypted_metadata.size() > 0
           && data.encrypted_metadata.size() <= 65536
           && data.wrapped_keys is map
+          && (!data.keys().hasAny(['device_wrapped_keys']) || data.device_wrapped_keys is map)
           && data.allowed_users is list
           && data.allowed_users.size() > 0 && data.allowed_users.size() <= 25
           && data.allowed_users.hasAny([data.owner_id])

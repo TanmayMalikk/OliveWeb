@@ -79,7 +79,9 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             )
         }
     }
-    LaunchedEffect(uid, session.localMode) { controller.load(uid, session.localMode) }
+    LaunchedEffect(uid, session.coverUsername, session.localMode) {
+        controller.load(uid, session.coverUsername, session.localMode)
+    }
     opened?.let { (document, localFile) ->
         SafetyDocumentViewer(document, localFile) {
             localFile.delete()

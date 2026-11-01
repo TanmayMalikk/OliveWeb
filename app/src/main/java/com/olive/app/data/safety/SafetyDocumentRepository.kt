@@ -13,6 +13,7 @@ import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 import java.io.File
+import java.security.spec.MGF1ParameterSpec
 
 data class SafetyDocument(
     val id: String,
@@ -31,6 +32,7 @@ data class SafetyDocument(
     val ciphertextSize: Long = 0,
     val ciphertextSha256: String = "",
     val encryptionVersion: Int = 0,
+    val deviceWrappedKeys: Map<String, String> = emptyMap(),
 )
 
 data class DocumentOcrMetadata(val text: String, val confidence: Float, val successful: Boolean)
@@ -58,6 +60,8 @@ interface SafetyDocumentDataSource {
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
     suspend fun delete(document: SafetyDocument, ownerUid: String)
     suspend fun download(context: Context, document: SafetyDocument): File
+    /** Gives this account's registered phones and browsers encrypted copies of the document key. */
+    suspend fun approveCurrentAccountDevices(document: SafetyDocument, currentUid: String, username: String)
 }
 
 class SafetyDocumentRepository(
@@ -199,6 +203,34 @@ class SafetyDocumentRepository(
         return target
     }
 
+    override suspend fun approveCurrentAccountDevices(
+        document: SafetyDocument,
+        currentUid: String,
+        username: String,
+    ) {
+        if (document.objectKey.isBlank() || currentUid !in document.allowedUsers) return
+        val ownDeviceKey = "$currentUid--${KeyManager.deviceId()}"
+        val wrapped = document.deviceWrappedKeys[ownDeviceKey] ?: document.wrappedKeys[currentUid] ?: return
+        val documentKey = runCatching { KeyManager.unwrapKey(wrapped, document.encryptionVersion) }.getOrNull() ?: return
+        val normalized = username.trim().lowercase()
+        if (!normalized.matches(Regex("[a-z0-9_]{4,24}"))) return
+        val directory = firestore.collection("messageDirectory").document(normalized)
+        if (directory.get().await().getString("uid") != currentUid) return
+        val additions = directory.collection("devices").get().await().documents.mapNotNull { device ->
+            if (device.getString("uid") != currentUid) return@mapNotNull null
+            val deviceId = device.getString("deviceId") ?: return@mapNotNull null
+            val mapKey = "$currentUid--$deviceId"
+            if (document.deviceWrappedKeys.containsKey(mapKey)) return@mapNotNull null
+            val publicKey = runCatching {
+                KeyManager.decodePublicKey(device.getString("publicKey").orEmpty())
+            }.getOrNull() ?: return@mapNotNull null
+            val digest = if (device.getString("mgf1Digest") == "SHA-256")
+                MGF1ParameterSpec.SHA256 else MGF1ParameterSpec.SHA1
+            mapKey to KeyManager.wrapKey(documentKey, publicKey, digest)
+        }.toMap()
+        if (additions.isNotEmpty()) media.updateDeviceKeys(document.id, additions)
+    }
+
     // Grants or removes encrypted-file access for the selected document recipients.
     private suspend fun updateStorageAccess(
         document: SafetyDocument,
@@ -252,8 +284,13 @@ class SafetyDocumentRepository(
         val encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0
         @Suppress("UNCHECKED_CAST")
         val wrapped = (row.get("wrapped_keys") as? Map<String, String>).orEmpty()
+        @Suppress("UNCHECKED_CAST")
+        val deviceWrapped = (row.get("device_wrapped_keys") as? Map<String, String>).orEmpty()
         val metadata = if (encryptedMetadata.isBlank()) null else runCatching {
-            val key = wrapped[viewerUid]?.let { KeyManager.unwrapKey(it, encryptionVersion) }
+            val deviceKey = "$viewerUid--${KeyManager.deviceId()}"
+            val key = (deviceWrapped[deviceKey] ?: wrapped[viewerUid])?.let {
+                KeyManager.unwrapKey(it, encryptionVersion)
+            }
                 ?: error("Encryption key is unavailable")
             JSONObject(EncryptionUtils.decryptText(encryptedMetadata, key))
         }.getOrNull()
@@ -277,6 +314,7 @@ class SafetyDocumentRepository(
             ciphertextSize = row.getLong("ciphertext_size") ?: 0,
             ciphertextSha256 = row.getString("ciphertext_sha256").orEmpty(),
             encryptionVersion = encryptionVersion,
+            deviceWrappedKeys = deviceWrapped,
         )
     }
 

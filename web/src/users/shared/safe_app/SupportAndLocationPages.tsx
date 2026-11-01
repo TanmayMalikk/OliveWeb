@@ -1,9 +1,10 @@
 // Safe-app users: provides staff requests, support directories, browser location, and camera capture.
 import { useEffect, useState } from "react";
-import { Camera, ExternalLink, LocateFixed, MapPin, Phone, Upload } from "lucide-react";
+import { Camera, ExternalLink, FileLock2, LocateFixed, MapPin, Phone, RefreshCw, Upload } from "lucide-react";
 import { Button, Empty } from "../../../components/SharedComponents";
 import { accounts, cloudMode, firebase } from "../../../services/AccountService";
 import { useSession } from "../../../session/SessionProvider";
+import { listBrowserDocuments, openBrowserDocument, type BrowserDocument } from "../../../services/MediaService";
 
 async function callable<T>(name: string, data: unknown): Promise<T> {
   if (!cloudMode || !accounts.identity) throw new Error("Sign in to your shared account first.");
@@ -82,8 +83,37 @@ export function CameraPage() {
 }
 
 export function DocumentsPage() {
-  return <section className="panel safe-feature-page"><Upload size={32} /><h2>Encrypted documents</h2>
-    <p>Your Android files remain encrypted with device-held keys. The web app will not weaken that protection by uploading plaintext or pretending it can decrypt another device’s files.</p>
-    <Button onClick={() => location.assign("/download")}>Open Android download instructions</Button>
+  const session = useSession();
+  const [documents, setDocuments] = useState<BrowserDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const refresh = async () => {
+    const identity = accounts.identity;
+    if (!identity) return;
+    setLoading(true); setError("");
+    try { setDocuments(await listBrowserDocuments(identity)); }
+    catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to load encrypted documents."); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void refresh(); }, []);
+  const open = (document: BrowserDocument) => void session.perform(async () => {
+    const url = await openBrowserDocument(document);
+    window.open(url, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  });
+  return <section className="safe-feature-page">
+    <div className="panel documents-heading"><div><Upload size={28} /><h2>Encrypted documents</h2>
+      <p>Files stay encrypted in cloud storage and are decrypted only by a device approved for this account.</p></div>
+      <Button variant="outline" onClick={() => void refresh()} disabled={loading}><RefreshCw size={16} /> Refresh</Button>
+    </div>
+    {error && <p className="form-error" role="alert">{error}</p>}
+    {loading ? <Empty title="Loading documents…">Checking this browser’s encrypted access.</Empty>
+      : documents.length === 0 ? <Empty title="No documents yet.">Upload a document from the Android app and it will appear here.</Empty>
+      : <div className="document-grid">{documents.map((document) => <article className="panel browser-document" key={document.id}>
+          <FileLock2 size={22} /><div><h3>{document.name}</h3>
+            <p>{document.approved ? "Ready to open securely on this device." : document.approvalMessage}</p></div>
+          <Button variant={document.approved ? "primary" : "outline"} disabled={!document.approved || session.busy}
+            onClick={() => open(document)}>{document.approved ? "Open document" : "Awaiting approval"}</Button>
+        </article>)}</div>}
   </section>;
 }
