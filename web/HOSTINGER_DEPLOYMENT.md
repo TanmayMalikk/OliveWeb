@@ -32,13 +32,11 @@ Add these values to each Web App in Hostinger's Environment variables screen:
 - `VITE_USE_FIREBASE_EMULATORS=false`
 - `VITE_SITE_MODE` (`user` on the main site, `download` on `get`, and `admin` on `admin`)
 
-On `get.yourolivebranch.ca`, the QR code and download button use the stable
-`/download/android` address, which redirects only to the public Firebase
-Storage object `public/android/olive-branch.apk`. This object is reserved for
-the Android debug APK. The GitHub Actions workflow builds and replaces it after
-each push to `main`, so the QR stays the same while it downloads the latest
-debug build. `ANDROID_APK_URL` may override the Firebase URL, but it must still
-point to this exact object.
+On `get.yourolivebranch.ca`, the download button uses `/download/android`,
+which redirects to the public Firebase Storage object
+`public/android/olive-branch.apk`. Upload the debug APK to this path when you
+want to publish a new download. `ANDROID_APK_URL` may override the Firebase
+URL, but it must still point to this exact object.
 
 These are browser configuration, not private server credentials. Every variable
 whose name begins with `VITE_` is readable by site visitors after the build.

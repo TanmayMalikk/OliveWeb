@@ -1,6 +1,4 @@
 // Public visitors: download the Android debug app or install the iOS web app.
-import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -24,22 +22,6 @@ const ANDROID_DOWNLOAD_URL = new URL("/download/android", location.origin).href;
 
 export default function DownloadPage() {
   const { go } = useSession();
-  const [androidQr, setAndroidQr] = useState("");
-
-  // Update download page when information used by this screen changes.
-  useEffect(() => {
-    let active = true;
-    void QRCode.toDataURL(ANDROID_DOWNLOAD_URL, {
-      width: 280,
-      margin: 2,
-      color: { dark: "#30432b", light: "#ffffff" },
-    }).then((value) => {
-      if (active) setAndroidQr(value);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   return (
     <div className="page-width download-page">
@@ -78,28 +60,10 @@ export default function DownloadPage() {
             <span className="eyebrow">FOR ANDROID</span>
             <h2>Download the Android debug app.</h2>
             <p>
-              Scan the code with your Android camera to download the current
-              debug APK. Open the downloaded file to install it. Android may ask
-              you to allow installation from your browser.
+              Download the current debug APK on your Android device, then open
+              the file to install it. Android may ask you to allow installation
+              from your browser.
             </p>
-            <div className="qr-area">
-              {androidQr ? (
-                <>
-                  <img
-                    src={androidQr}
-                    width="240"
-                    height="240"
-                    alt="QR code linking to the Olive Branch debug APK download"
-                  />
-                  <small>Scan with your Android phone’s camera.</small>
-                </>
-              ) : (
-                <div className="qr-placeholder" aria-live="polite">
-                  <Smartphone size={40} />
-                  <span>Preparing the Android download code…</span>
-                </div>
-              )}
-            </div>
             <a className="button" href={ANDROID_DOWNLOAD_URL}>
               <Download size={17} /> Download debug APK
             </a>
