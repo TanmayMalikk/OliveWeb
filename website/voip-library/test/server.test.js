@@ -98,7 +98,11 @@ test('POST /api/calls passes the name to the manager', async (context) => {
             authorization: 'Bearer local-test-token',
             'content-type': 'application/json'
         },
-        body: JSON.stringify({ name: '  Support  ' })
+        body: JSON.stringify({
+            name: '  Support  ',
+            callerId: 'caller-1',
+            participantIds: ['user-2']
+        })
     });
 
     assert.equal(response.status, 201);
@@ -107,4 +111,28 @@ test('POST /api/calls passes the name to the manager', async (context) => {
         callId: 'new-call',
         name: 'Support'
     });
+});
+
+test('DELETE /api/calls/:callId closes the call', async (context) => {
+    let closedCallId;
+
+    const callManager = {
+        async closeCall(callId) {
+            closedCallId = callId;
+            return true;
+        }
+    };
+
+    const baseUrl = await startTestServer(context, callManager);
+    const response = await fetch(`${baseUrl}/api/calls/call-123`, {
+        method: 'DELETE',
+        headers: { authorization: 'Bearer local-test-token' }
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+        deleted: true,
+        callId: 'call-123'
+    });
+    assert.equal(closedCallId, 'call-123');
 });

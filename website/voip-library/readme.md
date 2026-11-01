@@ -83,6 +83,42 @@ The generated binding uses the ZeroC Ice version installed by this package.
 The test removes its own channel even if its assertions fail. Stopping the
 container retains its database in `mumble-data/`.
 
+## HTTP API
+
+The server provides these bearer-token-protected routes:
+
+- `GET /api/calls` lists calls held by this process.
+- `POST /api/calls` creates a Mumble channel and invitations. The JSON body
+  requires `name`, `callerId`, and a non-empty `participantIds` array.
+- `GET /api/calls/invitations?userId=...` returns pending invitations for a user.
+- `POST /api/calls/:callId/accept` and `/decline` take a JSON `userId` and
+  record that participant's response.
+- `DELETE /api/calls/:callId` removes the call channel and the call record.
+- `GET /health` checks the HTTP process only; it does not confirm Mumble health.
+
+The API currently stores call and invitation state in memory. Restarting the
+process loses that state, and invitations are discovered by client polling
+rather than push notifications. The app client polls every five seconds by
+default; production notifications require a push delivery service. Call
+acceptance records the response but does not yet map an application account to
+a Mumble session or move that session into the call channel.
+
+The API requires `VOIP_API_TOKEN` for API routes. The Android client does not
+embed a shared server token; its optional bearer-token provider is an
+integration point for user authentication. Do not ship the shared API token in
+the app. Before live integration, the hosted service needs user-scoped
+authentication and authorization for caller and participant IDs.
+
+On Android, `VoipSessionController` composes call signaling with the
+`MumbleAudioSession` interface. This is an integration boundary, not a working
+Mumble client: no concrete audio session is wired into the app yet. The future
+implementation must connect to the voice host using the returned call's
+`channelId`, capture and play audio, handle Mumble's voice protocol and
+reconnection, and implement microphone mute. The API must provide the voice
+endpoint and user-scoped Mumble identity/credentials securely; do not put
+server credentials in the app. Android runtime microphone permission and a
+microphone foreground service are also required for background calling.
+
 ## Run the local HTTP API
 
 Start the Mumble container first, then open a second terminal. These commands
@@ -105,6 +141,6 @@ curl -i -H 'Authorization: Bearer local-test-token' \
 ```
 
 The HTTP server listens on localhost port `3000` by default. Stop it with
-Ctrl+C. Call creation is available through `POST /api/calls`, but the API does
-not yet provide a delete route, so the list-only check above does not leave a
-test channel behind.
+Ctrl+C. For hosting, place it behind an HTTPS reverse proxy and configure the
+proxy to route requests to this service; do not expose the Mumble Ice
+management port publicly.
