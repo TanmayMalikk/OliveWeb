@@ -1,18 +1,17 @@
-package com.olive.app.data
+// Voice chat users: coordinates Mumble audio with the app's VoIP call records.
+package com.olive.app.data.messaging
 
-import com.olive.app.data.messaging.VoipCall
-import com.olive.app.data.messaging.VoipManager
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class MumbleConnectionDetails(
     val host: String,
     val port: Int,
     val username: String,
-    val serverPassword: String? = null
+    val serverPassword: String? = null,
 ) {
     init {
         require(host.isNotBlank()) { "Mumble host must not be blank" }
@@ -37,7 +36,7 @@ sealed interface VoipSessionState {
 
 class VoipSessionController(
     private val voipManager: VoipManager,
-    private val audioSession: MumbleAudioSession
+    private val audioSession: MumbleAudioSession,
 ) {
     private val mutex = Mutex()
     private val mutableState = MutableStateFlow<VoipSessionState>(VoipSessionState.Idle)
@@ -48,9 +47,11 @@ class VoipSessionController(
         name: String,
         callerId: String,
         participantIds: List<String>,
-        connection: MumbleConnectionDetails
+        connection: MumbleConnectionDetails,
     ): VoipCall = mutex.withLock {
-        check(mutableState.value == VoipSessionState.Idle) { "A VoIP session is already in progress" }
+        check(mutableState.value == VoipSessionState.Idle) {
+            "A VoIP session is already in progress"
+        }
         val call = voipManager.startCall(name, callerId, participantIds)
         joinAudio(call, connection)
     }
@@ -58,20 +59,23 @@ class VoipSessionController(
     suspend fun acceptAndJoin(
         callId: String,
         userId: String,
-        connection: MumbleConnectionDetails
+        connection: MumbleConnectionDetails,
     ): VoipCall = mutex.withLock {
-        check(mutableState.value == VoipSessionState.Idle) { "A VoIP session is already in progress" }
+        check(mutableState.value == VoipSessionState.Idle) {
+            "A VoIP session is already in progress"
+        }
         val call = voipManager.acceptCall(callId, userId)
         joinAudio(call, connection)
     }
 
     suspend fun joinCall(
         call: VoipCall,
-        connection: MumbleConnectionDetails
+        connection: MumbleConnectionDetails,
     ): VoipCall = mutex.withLock {
         val current = mutableState.value
-        check(current == VoipSessionState.Idle ||
-            (current is VoipSessionState.Error && current.call?.callId == call.callId)
+        check(
+            current == VoipSessionState.Idle ||
+                (current is VoipSessionState.Error && current.call?.callId == call.callId)
         ) { "A different VoIP session is already in progress" }
         joinAudio(call, connection)
     }
@@ -83,7 +87,10 @@ class VoipSessionController(
             audioSession.setMicrophoneMuted(muted)
             mutableState.value = active.copy(microphoneMuted = muted)
         } catch (error: Exception) {
-            mutableState.value = VoipSessionState.Error(active.call, error.message ?: "Could not change microphone state")
+            mutableState.value = VoipSessionState.Error(
+                active.call,
+                error.message ?: "Could not change microphone state",
+            )
             throw error
         }
     }
@@ -99,7 +106,10 @@ class VoipSessionController(
             audioSession.disconnect()
             mutableState.value = VoipSessionState.Idle
         } catch (error: Exception) {
-            mutableState.value = VoipSessionState.Error(call, error.message ?: "Could not disconnect from Mumble")
+            mutableState.value = VoipSessionState.Error(
+                call,
+                error.message ?: "Could not disconnect from Mumble",
+            )
             throw error
         }
     }
@@ -116,14 +126,17 @@ class VoipSessionController(
             voipManager.endCall(call.callId)
             mutableState.value = VoipSessionState.Idle
         } catch (error: Exception) {
-            mutableState.value = VoipSessionState.Error(call, error.message ?: "Could not end the VoIP call")
+            mutableState.value = VoipSessionState.Error(
+                call,
+                error.message ?: "Could not end the VoIP call",
+            )
             throw error
         }
     }
 
     private suspend fun joinAudio(
         call: VoipCall,
-        connection: MumbleConnectionDetails
+        connection: MumbleConnectionDetails,
     ): VoipCall {
         mutableState.value = VoipSessionState.Connecting(call)
         try {
@@ -133,7 +146,7 @@ class VoipSessionController(
         } catch (error: Exception) {
             mutableState.value = VoipSessionState.Error(
                 call,
-                error.message ?: "Could not connect to the Mumble voice server"
+                error.message ?: "Could not connect to the Mumble voice server",
             )
             throw error
         }

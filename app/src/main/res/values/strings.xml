@@ -388,11 +388,6 @@
     <string name="admin_accounts_description">Create accounts and review staff assignment counts.</string>
 
     <string name="steps_today">Steps today</string>
-    <plurals name="steps_goal_value">
-        <item quantity="one">Goal: %1$d step</item>
-        <item quantity="other">Goal: %1$d steps</item>
-    </plurals>
-
     <string name="calories">Calories</string>
 
 
