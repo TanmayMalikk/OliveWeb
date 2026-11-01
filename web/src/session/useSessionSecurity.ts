@@ -9,7 +9,7 @@ import {
 } from "react";
 import { accounts } from "../services/AccountService";
 import { validEntryToken } from "../services/PrivateEntryLinks";
-import { coverPath, emptyHistory, type Enrollment, type Profile } from "../domain/DomainModels";
+import { coverPath, emptyHistory, type Enrollment, type Profile, type Role } from "../domain/DomainModels";
 import type { SiteMode } from "../sites/SiteRouting";
 import type { SessionPhase } from "./SessionContext";
 
@@ -23,6 +23,7 @@ export function useSessionSecurity({
   mode,
   pendingEntry,
   phase,
+  role,
   quickExit,
   setBusy,
   setEnrollmentAttempt,
@@ -41,6 +42,7 @@ export function useSessionSecurity({
   mode: SiteMode;
   pendingEntry: MutableRefObject<string | null>;
   phase: SessionPhase;
+  role: Role | null;
   quickExit: () => void;
   setBusy: Setter<boolean>;
   setEnrollmentAttempt: Setter<number>;
@@ -54,8 +56,11 @@ export function useSessionSecurity({
   setProfile: Setter<Profile | null>;
 }) {
   const phaseRef = useRef(phase);
+  const roleRef = useRef(role);
   const lastInteraction = useRef(Date.now());
   phaseRef.current = phase;
+  roleRef.current = role;
+  const buttonOnlyExit = role === "SAFE_CONTACT" || role === "STAFF" || role === "ADMIN";
 
   // Web private entry: Installs navigation guards for the private session. The handlers clear account data before browser back or hash changes can expose another screen.
   useEffect(() => {
@@ -76,6 +81,10 @@ export function useSessionSecurity({
     };
     // Web private entry: Handles the browser Back button. It locks the session and replaces the private URL with the correct public cover.
     const onPop = () => {
+      if (buttonOnlyExit) {
+        window.history.pushState({}, "", window.location.pathname);
+        return;
+      }
       resetPrivateSession();
       setPath(
         mode === "admin"
@@ -105,18 +114,19 @@ export function useSessionSecurity({
       removeEventListener("popstate", onPop);
       removeEventListener("hashchange", onHash);
     };
-  }, [enrollment, entryOwner, epoch, mode, pendingEntry]);
+  }, [buttonOnlyExit, enrollment, entryOwner, epoch, mode, pendingEntry]);
 
   // Update candidate when information used by this screen changes.
   useEffect(() => {
     // Web use session security: Responds when hidden.
     const onHidden = () => {
-      if (document.hidden && phaseRef.current === "safe") quickExit();
+      if (document.hidden && phaseRef.current === "safe" && roleRef.current === "USER") quickExit();
     };
     // Web use session security: Responds when key.
     const onKey = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" &&
+        !buttonOnlyExit &&
         ["safe", "pin", "portal"].includes(phaseRef.current)
       ) {
         event.preventDefault();
@@ -125,6 +135,7 @@ export function useSessionSecurity({
     };
     // Responds when page hide for web use session security. It listens for new data and stops listening when the screen closes.
     const onPageHide = () => {
+      if (buttonOnlyExit) return;
       if (phaseRef.current !== "public") quickExit();
       else {
         epoch.current++;
@@ -139,7 +150,7 @@ export function useSessionSecurity({
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("keydown", onKey);
     };
-  }, [epoch, quickExit]);
+  }, [buttonOnlyExit, epoch, quickExit]);
 
   const noteInteraction = useCallback(() => {
     lastInteraction.current = Date.now();
@@ -149,7 +160,10 @@ export function useSessionSecurity({
   // Update note interaction when information used by this screen changes.
   useEffect(() => {
     // Organization workspaces stay open until their user signs out or exits manually.
-    if (phase !== "safe") return;
+    if (phase !== "safe" || buttonOnlyExit) {
+      setIdleSeconds(null);
+      return;
+    }
     noteInteraction();
     const events = ["pointerdown", "keydown", "input"] as const;
     events.forEach((event) => document.addEventListener(event, noteInteraction));
@@ -167,7 +181,7 @@ export function useSessionSecurity({
         document.removeEventListener(event, noteInteraction),
       );
     };
-  }, [phase, noteInteraction, quickExit, setIdleSeconds]);
+  }, [buttonOnlyExit, phase, noteInteraction, quickExit, setIdleSeconds]);
 
   return noteInteraction;
 }
