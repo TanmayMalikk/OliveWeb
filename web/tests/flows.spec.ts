@@ -311,57 +311,18 @@ test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus do
     page.getByRole("button", { name: "Notes", exact: true }),
   ).toHaveCount(0);
 });
-// Inputs: the values in this case. Expected: advanced matrix tools and statistical plots are usable through the calculator UI.
-test("advanced matrix tools and statistical plots are usable through the calculator UI", async ({
+// Inputs: each fitness navigation tab. Expected: every tracker summary opens without exposing private screens.
+test("fitness cover opens activity, vitals, and nutrition summaries", async ({
   page,
 }) => {
-  await page.goto("/cover/calculator");
-  await page.getByRole("tab", { name: "Calculator", exact: true }).click();
-  await page.getByRole("button", { name: "Math tools", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Calculation", exact: true })
-    .selectOption("MatrixDeterminant");
-  await page.getByLabel("Calculation input", { exact: true }).fill("1,2;3,4");
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Calculate", exact: true })
-    .click();
-  await expect(page.getByRole("dialog").getByRole("status")).toHaveText("-2");
-  await page.getByRole("button", { name: "Close dialog" }).click();
-  await page.getByRole("button", { name: "Stat plots", exact: true }).click();
-  await page.getByLabel("Data values", { exact: true }).fill("1,2,2,3,5");
-  await page.getByRole("button", { name: "Draw plot", exact: true }).click();
-  await expect(
-    page.getByRole("img", { name: "Histogram: 1, 2, 2, 3, 5" }),
-  ).toBeVisible();
-  await expect(page.getByRole("table")).toBeVisible();
-});
-// Inputs: the values in this case. Expected: calculator worker, graph navigation, table and quadratic solver work.
-test("calculator worker, graph navigation, table and quadratic solver work", async ({
-  page,
-}) => {
-  await page.goto("/cover/calculator");
-  await expect(page.getByRole("img", { name: /Graph of x\^2/ })).toBeVisible();
-  await page.getByRole("button", { name: "Zoom in", exact: true }).click();
-  await expect(
-    page.getByRole("img", { name: /Zoom 125 percent/ }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Table & analysis" }).click();
-  await expect(page.getByRole("table")).toBeVisible();
-  await page.getByRole("button", { name: "Close dialog" }).click();
-  await page.getByRole("tab", { name: "Calculator", exact: true }).click();
-  await page.getByLabel("Expression", { exact: true }).fill("12+30");
-  await page.getByRole("button", { name: "Equals", exact: true }).click();
-  await expect(page.locator("output")).toHaveText("42");
-  await page.getByRole("button", { name: "Equations", exact: true }).click();
-  await page.getByLabel("Coefficients a, b, c").fill("1,-5,6");
-  await page
-    .getByRole("button", { name: "Calculate", exact: true })
-    .last()
-    .click();
-  await expect(page.getByRole("dialog").getByRole("status")).toContainText(
-    "x = 3, 2",
-  );
+  await page.goto("/cover/fitness");
+  await expect(page.getByRole("heading", { name: "Fitness Tracker" })).toBeVisible();
+  await page.getByRole("tab", { name: /Activity/ }).click();
+  await expect(page.getByRole("img", { name: "Seven-day steps chart" })).toBeVisible();
+  await page.getByRole("tab", { name: /Vitals/ }).click();
+  await expect(page.getByText("— No data —")).toBeVisible();
+  await page.getByRole("tab", { name: /Nutrition/ }).click();
+  await expect(page.getByText("1,420")).toBeVisible();
 });
 // Inputs: the values in this case. Expected: news reader sanitizes publisher HTML and bookmarks stay available.
 test("news reader sanitizes publisher HTML and bookmarks stay available", async ({
@@ -436,7 +397,7 @@ for (const size of [
       "/download",
       "/cover/olive",
       "/cover/daily-digest",
-      "/cover/calculator",
+      "/cover/fitness",
     ]) {
       await page.goto(path);
       await expect(page.locator("h1:visible,h2:visible").first()).toBeVisible();

@@ -184,13 +184,6 @@
   .food-hero h1 {
     font-size: 3.5rem;
   }
-  .calculator-layout {
-    grid-template-columns: 1.4fr 1fr;
-    gap: 2rem;
-  }
-  .graphing-workspace {
-    grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
-  }
   .grove-main {
     gap: 3rem;
   }
@@ -274,53 +267,6 @@
   }
   .newspaper-grid {
     grid-template-columns: 1fr;
-  }
-  .calculator-layout {
-    grid-template-columns: 1fr;
-  }
-  .calculator-heading {
-    padding-block: 1.5rem;
-  }
-  .calculator-mode-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    width: 100%;
-  }
-  .calculator-mode-tabs > button {
-    min-width: 0;
-  }
-  .graphing-workspace {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-  .graph-expression-panel {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-  .graph-expression-details {
-    display: none;
-  }
-  .graph-table-button {
-    align-self: flex-start;
-    margin-top: 0.85rem;
-  }
-  .graph-stage,
-  .graph-stage .graph {
-    min-height: 30rem;
-  }
-  .graph-pan-controls {
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-  }
-  .calculator-note {
-    display: none;
-  }
-  .calculator-keys > button {
-    min-height: 4rem;
-  }
-  .scientific-keys {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .grove-main {
     grid-template-columns: 1fr;

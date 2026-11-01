@@ -429,11 +429,7 @@ export function Setup() {
           >
             {!profile.triggerHash && (
               <Field
-                label={
-                  profile.coverType === "CALCULATOR"
-                    ? "Android calculator trigger phrase"
-                    : "Trigger word or phrase"
-                }
+                label="Trigger word or phrase"
                 value={trigger}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setTrigger(e.target.value)

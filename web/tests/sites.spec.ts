@@ -11,7 +11,7 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
   for (const [slug, title, landmark] of [
     ["olive", "Olive", 'button:has-text("Saved")'],
     ["daily-digest", "Daily Digest", ".news-page"],
-    ["calculator", "Better Calculator", ".graphing-workspace"],
+    ["fitness", "Fitness Tracker", ".fitness-page"],
     ["game", "Game", ".grove-games"],
   ]) {
     for (const prefix of ["", "/cover"]) {
