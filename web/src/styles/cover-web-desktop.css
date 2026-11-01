@@ -1,0 +1,168 @@
+/* Cover users: turns each cover into a responsive website while preserving its mobile layout. */
+.cover-container.food-cover,
+.cover-container.news-cover,
+.cover-container.fitness-cover {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+/* Olive food delivery uses a storefront header, broad hero, and desktop product catalogue. */
+.food-page {
+  width: min(100%, 96rem);
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 4vw, 4rem);
+}
+.food-top {
+  position: sticky;
+  z-index: 30;
+  top: 0;
+  min-height: 6.5rem;
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--line);
+  background: rgb(247 247 239 / 0.94);
+  backdrop-filter: blur(14px);
+}
+.food-page > .cover-tabs {
+  position: sticky;
+  z-index: 29;
+  top: 6.5rem;
+  justify-content: center;
+  border-bottom-color: #d7ddcd;
+  background: rgb(247 247 239 / 0.96);
+  backdrop-filter: blur(14px);
+}
+.food-page > .cover-tabs > button {
+  min-width: 7rem;
+  text-align: center;
+}
+.food-hero {
+  min-height: clamp(32rem, 68svh, 44rem);
+  grid-template-columns: minmax(0, 0.9fr) minmax(24rem, 1.1fr);
+  margin-block: clamp(1.5rem, 3vw, 3rem) clamp(3rem, 6vw, 6rem);
+}
+.food-hero > div:first-child { max-width: 35rem; }
+.food-hero-image { width: min(100%, 35rem); justify-self: end; }
+.menu-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2.5rem 1.25rem; }
+.dish-card { display: flex; flex-direction: column; }
+.dish-card > p { flex: 1; }
+.cart-layout { width: min(100%, 78rem); margin-inline: auto; }
+
+/* Daily Digest uses a publication layout with one clear lead story and supporting columns. */
+.news-page {
+  width: min(100%, 96rem);
+  max-width: none;
+  margin-inline: auto;
+  padding: 1.5rem clamp(1rem, 4vw, 4rem) 5rem;
+}
+.news-masthead { padding-block: clamp(1.6rem, 4vw, 3rem); }
+.news-masthead h1 { font-size: clamp(4rem, 8vw, 8rem); }
+.news-toolbar {
+  position: sticky;
+  z-index: 25;
+  top: 0;
+  background: rgb(247 247 239 / 0.96);
+  backdrop-filter: blur(14px);
+}
+.news-search-row { align-items: center; }
+.newspaper-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.25rem;
+}
+.newspaper-card { grid-column: span 4; }
+.newspaper-card.lead-story {
+  grid-column: span 8;
+  grid-row: span 2;
+  padding: clamp(1.4rem, 2.5vw, 2.25rem);
+  background: #fffef8;
+}
+.lead-story .article-open h2 { max-width: 52rem; font-size: clamp(2.4rem, 4.5vw, 4.8rem); }
+.lead-story .article-open > img { aspect-ratio: 2.15; }
+.lead-story .article-open > p { max-width: 60rem; font-size: 1.1rem; }
+.newspaper-card:not(.lead-story) .article-open h2 { font-size: clamp(1.4rem, 2vw, 2rem); }
+
+/* Little Grove uses a game-library rail and gives the selected game the main workspace. */
+@media (min-width: 72rem) {
+  .grove {
+    height: auto;
+    min-height: 100svh;
+    grid-template-rows: auto minmax(42rem, 1fr) auto;
+    padding-inline: clamp(1.5rem, 4vw, 5rem);
+  }
+  .grove-header,
+  .grove-footer,
+  .grove-main { width: min(100%, 96rem); margin-inline: auto; }
+  .grove-header { min-height: 5.5rem; padding-block: 1rem; border-bottom: 1px solid #dce2cd; }
+  .grove-main {
+    height: auto;
+    min-height: 42rem;
+    grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 1.25rem;
+    padding-block: 1.25rem 2rem;
+  }
+  .grove-intro {
+    min-width: 0;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    border: 1px solid #dce2cc;
+    border-radius: 1.25rem;
+    background: #fdfdf4;
+  }
+  .grove-intro > .eyebrow,
+  .grove-intro h1,
+  .grove-intro p,
+  .grove-intro > .grove-games,
+  .grove-intro > .memory-options {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .grove-intro h1 { margin: 1rem 0; font-size: clamp(2.1rem, 3vw, 3.3rem); }
+  .grove-intro p { max-width: 100%; font-size: 0.82rem; line-height: 1.7; }
+  .grove-games { margin-top: 1.5rem; display: grid; gap: 0.55rem; }
+  .grove-games button { width: 100%; justify-content: flex-start; border-radius: 0.75rem; text-align: left; }
+  .memory-options { margin-top: auto; padding-top: 1.5rem; display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+  .memory-options small { grid-column: auto; }
+  .grove-game { height: auto; min-height: 42rem; max-height: calc(100svh - 8rem); }
+  .flight-arena,
+  .crossing-arena,
+  .memory-arena { min-height: 0; }
+  .game-bottom { min-height: 4rem; }
+}
+
+@media (min-width: 100rem) {
+  .menu-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+@media (max-width: 78rem) {
+  .menu-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .newspaper-card { grid-column: span 6; }
+  .newspaper-card.lead-story { grid-column: 1 / -1; }
+}
+
+@media (max-width: 56rem) {
+  .food-top { position: static; }
+  .food-page > .cover-tabs { top: 0; }
+  .food-hero { min-height: 0; grid-template-columns: 1fr; }
+  .food-hero-image { justify-self: center; }
+  .menu-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .news-toolbar { top: 0; }
+  .newspaper-grid { grid-template-columns: 1fr; }
+  .newspaper-card,
+  .newspaper-card.lead-story { grid-column: auto; }
+  .lead-story .article-open h2 { font-size: clamp(2rem, 8vw, 3.4rem); }
+}
+
+@media (max-width: 36rem) {
+  .food-page,
+  .news-page { padding-inline: 1rem; }
+  .food-page > .cover-tabs { justify-content: flex-start; }
+  .food-page > .cover-tabs > button { min-width: auto; }
+  .menu-grid { grid-template-columns: 1fr; }
+  .news-masthead h1 { font-size: clamp(3.25rem, 18vw, 5rem); }
+}
