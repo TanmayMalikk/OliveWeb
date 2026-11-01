@@ -3,6 +3,7 @@
     <string name="overview">نظرة عامة</string>
     <string name="activity">النشاط</string>
     <string name="nutrition">التغذية</string>
+    <string name="nutrition_work_in_progress">التغذية (قيد التطوير)</string>
     <string name="fitness_home_message">نشاطك وتغذيتك اليومية في مكان واحد.</string>
     <string name="today_summary">ملخص اليوم</string>
     <string name="edit_fitness_goals">تحديث أهداف النشاط والتغذية</string>
@@ -82,4 +83,21 @@
     <string name="fitness_vitals_graph_description">رسم بياني لمعدل نبض القلب يحتوي على بيانات %1$d يوم، من %2$d إلى %3$d نبضة في الدقيقة.</string>
     <string name="fitness_vitals_range">%1$d–%2$d نبضة/دقيقة</string>
     <string name="fitness_vitals_average">متوسط معدل نبض القلب %1$d نبضة/دقيقة</string>
+    <string name="fitness_outdoor_workout">تمرين خارجي</string>
+    <string name="fitness_outdoor_workout_description">تتبّع مسار GPS والمسافة والوقت والوتيرة بشكل خاص.</string>
+    <string name="fitness_start_outdoor_workout">بدء تمرين خارجي</string>
+    <string name="fitness_precise_location_required">الموقع الدقيق مطلوب لتسجيل مسار تمرين دقيق.</string>
+    <string name="fitness_duration">المدة</string>
+    <string name="fitness_pace">الوتيرة</string>
+    <string name="fitness_pause">إيقاف مؤقت</string>
+    <string name="fitness_resume">متابعة</string>
+    <string name="fitness_finish">إنهاء</string>
+    <string name="fitness_route_points">مسار تمرين يحتوي على %1$d نقطة GPS.</string>
+    <string name="fitness_waiting_for_gps">بانتظار موقع GPS دقيق…</string>
+    <string name="fitness_last_outdoor_workout">آخر تمرين خارجي</string>
+    <string name="fitness_recent_outdoor_workouts">التمارين الخارجية الأخيرة</string>
+    <string name="fitness_walking">مشي</string>
+    <string name="fitness_running">جري</string>
+    <string name="fitness_cycling">ركوب الدراجة</string>
+    <string name="fitness_hiking">تنزّه</string>
 </resources>

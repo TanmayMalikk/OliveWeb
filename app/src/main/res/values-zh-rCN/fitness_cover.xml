@@ -3,6 +3,7 @@
     <string name="overview">概览</string>
     <string name="activity">活动</string>
     <string name="nutrition">营养</string>
+    <string name="nutrition_work_in_progress">营养（开发中）</string>
     <string name="fitness_home_message">在一个页面查看每日活动和营养情况。</string>
     <string name="today_summary">今日摘要</string>
     <string name="edit_fitness_goals">更新活动和营养目标</string>
@@ -82,4 +83,21 @@
     <string name="fitness_vitals_graph_description">心率图包含 %1$d 天的数据，范围为每分钟 %2$d 到 %3$d 次。</string>
     <string name="fitness_vitals_range">每分钟 %1$d–%2$d 次</string>
     <string name="fitness_vitals_average">平均心率每分钟 %1$d 次</string>
+    <string name="fitness_outdoor_workout">户外锻炼</string>
+    <string name="fitness_outdoor_workout_description">私密记录 GPS 路线、距离、时间和配速。</string>
+    <string name="fitness_start_outdoor_workout">开始户外锻炼</string>
+    <string name="fitness_precise_location_required">需要精确位置才能准确记录锻炼路线。</string>
+    <string name="fitness_duration">时长</string>
+    <string name="fitness_pace">配速</string>
+    <string name="fitness_pause">暂停</string>
+    <string name="fitness_resume">继续</string>
+    <string name="fitness_finish">结束</string>
+    <string name="fitness_route_points">锻炼路线包含 %1$d 个 GPS 点。</string>
+    <string name="fitness_waiting_for_gps">正在等待精确的 GPS 位置…</string>
+    <string name="fitness_last_outdoor_workout">上次户外锻炼</string>
+    <string name="fitness_recent_outdoor_workouts">最近的户外锻炼</string>
+    <string name="fitness_walking">步行</string>
+    <string name="fitness_running">跑步</string>
+    <string name="fitness_cycling">骑行</string>
+    <string name="fitness_hiking">徒步</string>
 </resources>
