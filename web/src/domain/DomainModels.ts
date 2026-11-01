@@ -10,7 +10,12 @@ export type Page =
   | "Contacts"
   | "Profile"
   | "Settings"
-  | "Activity";
+  | "Activity"
+  | "Hotlines"
+  | "StaffHelp"
+  | "Documents"
+  | "Camera"
+  | "Location";
 export interface Address {
   line1: string;
   line2: string;
@@ -147,8 +152,14 @@ export const covers: {
     caption: "A quieter corner. Find a matching pair.",
   },
 ];
-export const coverInfo = (id: Cover) => covers.find((c) => c.id === id)!;
-export const coverPath = (id: Cover) => coverSite(id).path;
+// Cover apps: converts removed or damaged saved cover values to a supported cover.
+export function normalizeCover(value: unknown): Cover {
+  if (value === "CALCULATOR") return "FITNESS";
+  return covers.some((cover) => cover.id === value) ? (value as Cover) : "GAME";
+}
+export const coverInfo = (id: Cover) =>
+  covers.find((cover) => cover.id === normalizeCover(id)) ?? covers[3];
+export const coverPath = (id: Cover) => coverSite(normalizeCover(id)).path;
 export const normalizeUsername = (v: string) => v.trim().toLowerCase();
 export const validUsername = (v: string) =>
   /^(?=.*[a-z])[a-z0-9_]{8,24}$/.test(normalizeUsername(v));

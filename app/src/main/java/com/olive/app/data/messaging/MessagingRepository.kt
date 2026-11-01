@@ -27,14 +27,23 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         val encodedKey = Base64.getEncoder().encodeToString(publicKey.encoded)
         val reference = firestore.collection("messageDirectory").document(username)
         val current = reference.get().await()
-        if (current.getString("uid") == identity.uid && current.getString("username") == username &&
-            current.getString("publicKey") == encodedKey
-        ) return
+        check(!current.exists() || current.getString("uid") == identity.uid) {
+            "That username belongs to another account."
+        }
         reference.set(
             mapOf(
+                "uid" to identity.uid, "username" to username, "publicKey" to encodedKey,
+                "updatedAt" to FieldValue.serverTimestamp(),
+            ), SetOptions.merge()
+        ).await()
+        val deviceId = KeyManager.deviceId(publicKey)
+        reference.collection("devices").document(deviceId).set(
+            mapOf(
                 "uid" to identity.uid,
-                "username" to username,
+                "deviceId" to deviceId,
                 "publicKey" to encodedKey,
+                "platform" to "ANDROID",
+                "mgf1Digest" to "SHA-1",
                 "updatedAt" to FieldValue.serverTimestamp(),
             ), SetOptions.merge()
         ).await()

@@ -46,6 +46,14 @@ export default function OliveCrossing() {
       const bounds = board.getBoundingClientRect();
       if (!bounds.width || !bounds.height) return;
       const fullWidth = CROSSING.columns * CROSSING.cell;
+      if (window.matchMedia("(min-width: 48.01rem)").matches) {
+        setCamera((current) =>
+          current.x === 0 && current.width === fullWidth
+            ? current
+            : { x: 0, width: fullWidth },
+        );
+        return;
+      }
       const worldHeight = CROSSING.rows * CROSSING.cell;
       const width = Math.min(
         fullWidth,

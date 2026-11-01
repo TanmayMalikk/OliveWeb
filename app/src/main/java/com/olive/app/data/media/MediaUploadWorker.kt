@@ -87,6 +87,10 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             file.delete()
             Result.success(workDataOf(MEDIA_ID to record.id))
         } catch(cancelled:CancellationException) { throw cancelled }
+        catch(error:MediaDeviceVerificationException) {
+            Log.e("OliveMediaUpload", "App Check rejected encrypted upload ${job.id}", error)
+            permanent(job,error.message ?: "This app installation is not authorized for encrypted uploads")
+        }
         catch(error:FirebaseFunctionsException) {
             Log.e("OliveMediaUpload", "Firebase rejected encrypted upload ${job.id}", error)
             if(error.code in setOf(FirebaseFunctionsException.Code.INVALID_ARGUMENT,FirebaseFunctionsException.Code.PERMISSION_DENIED,

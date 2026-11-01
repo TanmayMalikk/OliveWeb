@@ -11,13 +11,18 @@ export function createServerApp({ development = false } = {}) {
       "Referrer-Policy": "no-referrer",
       "X-Frame-Options": "DENY",
       "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
-      "Cache-Control": "no-store",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     });
     if (!development)
       res.set(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com; frame-src https://*.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com; frame-src https://*.firebaseapp.com https://www.google.com https://www.openstreetmap.org; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
       );
+    next();
+  });
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
     next();
   });
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
@@ -31,6 +36,7 @@ export function createServerApp({ development = false } = {}) {
       "/cover/:slug/manifest.webmanifest",
     ],
     (req, res) => {
+      res.setHeader("Cache-Control", "no-cache");
       const hostSite = siteConfig.covers.find(
         (site) => site.origin && new URL(site.origin).hostname === req.hostname,
       );

@@ -3,12 +3,16 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.12 <25"
+  },
   "scripts": {
     "dev": "node server/developmentServer.mjs",
-    "build": "tsc -b && vite build",
-    "build:user": "tsc -b && vite build --mode user",
-    "build:download": "tsc -b && vite build --mode download",
-    "build:admin": "tsc -b && vite build --mode admin",
+    "security:check": "node scripts/check-public-secrets.mjs",
+    "build": "npm run security:check && tsc -b && vite build",
+    "build:user": "npm run security:check && tsc -b && vite build --mode user",
+    "build:download": "npm run security:check && tsc -b && vite build --mode download",
+    "build:admin": "npm run security:check && tsc -b && vite build --mode admin",
     "start": "node server/productionServer.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test"

@@ -102,24 +102,17 @@ function organizationEmailKey(email) {
     .digest("hex");
 }
 
-function roleFromUser(user, profile) {
+function roleFromUser(user) {
   const claim = user.customClaims?.role;
   if (ROLES.has(claim)) {
     return claim;
-  }
-  if (ROLES.has(profile?.role)) {
-    return profile.role;
   }
   const domain = (user.email || "").split("@")[1] || "";
   if (domain === "safe.olive.invalid") {
     return "SAFE_CONTACT";
   }
-  if (domain === "staff.olive.invalid") {
-    return "STAFF";
-  }
-  if (domain === "admin.olive.invalid") {
-    return "ADMIN";
-  }
+  // Privileged roles must always come from server-managed Firebase Auth claims.
+  // A profile or email alias is not authorization because a user may edit it.
   return "USER";
 }
 
