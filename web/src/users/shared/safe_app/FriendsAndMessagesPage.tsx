@@ -27,6 +27,7 @@ export default function Messages() {
   const [draft, setDraft] = useState("");
   const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
   const identity = accounts.identity;
+  // Update identity when information used by this screen changes.
   useEffect(() => {
     if (!cloudMode || !identity) return;
     let active = true;
@@ -66,6 +67,7 @@ export default function Messages() {
       stops.forEach((stop) => stop());
     };
   }, [identity?.uid]);
+  // Update stops when information used by this screen changes.
   useEffect(() => {
     setRows([]);
     setDraft("");
@@ -118,6 +120,7 @@ export default function Messages() {
       </Empty>
     );
   if (!identity) return null;
+  // Web safe app: returns the action.
   const action = (work: () => Promise<void>) => session.perform(work);
   return (
     <div className={`messages-layout ${conversation ? "chat-open" : ""}`}>

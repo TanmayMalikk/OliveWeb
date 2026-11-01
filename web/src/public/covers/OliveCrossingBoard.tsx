@@ -1,6 +1,7 @@
 // Cover users: draws roads, rails, water, and the moving olive.
 import { CROSSING, railSignal, type CrossingWorld } from "./olive-crossing";
 
+// returns the lane y for web olive crossing board cover.
 const laneY = (row: number) => row * CROSSING.cell;
 
 export default function CrossingBoard({

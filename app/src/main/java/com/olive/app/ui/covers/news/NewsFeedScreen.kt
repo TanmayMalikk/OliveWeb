@@ -61,7 +61,7 @@ internal data class NewsFeedActions(
     val refresh: () -> Unit,
     val openArticle: (NewsArticle) -> Unit,
 )
-
+// Shows news feed for news cover.
 @Composable
 internal fun NewsFeed(
     session: SessionViewModel,
@@ -84,6 +84,7 @@ internal fun NewsFeed(
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Choose what news feed should do for the current value.
                 when (tab) {
                     "Account" -> {
                         item {
@@ -141,6 +142,7 @@ internal fun NewsFeed(
                                 modifier = Modifier.fillMaxWidth().testTag("news_search")
                                     .keepVisibleWhileTyping())
                         }
+                        // news feed checks whether tab is today before continuing.
                         if (tab == "Today") item {
                             Row(
                                 Modifier.fillMaxWidth(),
@@ -160,6 +162,7 @@ internal fun NewsFeed(
                                 ) { actions.changeScope(NewsScope.GLOBAL) }
                             }
                         }
+                        // news feed checks whether tab is today and scope is news scope local before continuing.
                         if (tab == "Today" && scope == NewsScope.LOCAL) item {
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -217,6 +220,7 @@ internal fun NewsFeed(
                             }
                         }
                         if (tab == "Today") {
+                            // Only continue with news feed when loading and articles is empty item news loading state.
                             if (loading && articles.isEmpty()) item { NewsLoadingState() }
                             if (newsError) item {
                                 Card(
@@ -240,6 +244,7 @@ internal fun NewsFeed(
                             }
                         }
                         val visible = visibleArticles
+                        // news feed checks whether visible is empty and loading and not news error is false before continuing.
                         if (visible.isEmpty() && !loading && !newsError) item {
                             NewsEmptyState(
                                 if (tab == "Saved") uiText(

@@ -8,6 +8,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ProfileSetupValidationTest {
+    // returns the validation for profile setup validation test. The test gives the code a clear input and checks the expected result.
     private fun validation(
         safeContact: Boolean = false,
         trigger: String = "moon garden",

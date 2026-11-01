@@ -88,6 +88,7 @@ class EncryptedDownloadIntegrityTest {
         assertEquals(1,maximum.get())
     }
 
+    // returns the sha256 for encrypted download integrity test. The test gives the code a clear input and checks the expected result.
     private fun sha256(value:ByteArray)=MessageDigest.getInstance("SHA-256").digest(value)
         .joinToString("") { "%02x".format(it) }
 }

@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SafeContactTest {
+    // Safe contact test kt: returns the profile. The test gives the code a clear input and checks the expected result.
     private fun profile(contact: SafeContact) = UserProfile(
         username = "trusted_contact_test",
         fullName = "Test User",

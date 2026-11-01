@@ -15,6 +15,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Handles reported captures and User inactivity; Android's accessibility timeout can extend the idle warning.
 internal class SessionPrivacy(private val runtime: SessionRuntime) {
+    // Session privacy: Returns the note interaction. It reads the Android monotonic clock so clock changes cannot break the timing.
     fun noteInteraction() {
         with(runtime) {
             with(state) {
@@ -25,6 +26,7 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
+    // returns the capture detected for session privacy. It waits for the set time and cancels the timer when the feature closes.
     fun captureDetected(kind: String) {
         with(runtime) {
             with(state) {
@@ -50,6 +52,7 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session privacy: returns the recording stopped.
     fun recordingStopped() {
         with(runtime) {
             with(state) {
@@ -69,6 +72,7 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
                 }
                 noteInteraction()
                 idleJob = scope.launch {
+                    // Session privacy: Keeps start idle timer active while screen equals session screen safe.
                     while (screen == SessionScreen.Safe) {
                         delay(250.milliseconds)
                         val accessibility =

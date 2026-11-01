@@ -59,15 +59,19 @@ export interface Conversation {
   supportTag: "" | "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
   closedAt: number;
 }
+// Makes one chat ID from two account IDs. Sorting them means both users get the same ID.
 export const pairId = (a: string, b: string) => [a, b].sort().join("--");
+// Turns encrypted bytes into text so Firebase can store them safely.
 const bytesToBase64 = (value: ArrayBuffer | Uint8Array) => {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
   let binary = "";
   bytes.forEach((byte) => (binary += String.fromCharCode(byte)));
   return btoa(binary);
 };
+// Turns saved Base64 text back into bytes so the browser can decrypt it.
 const base64ToBytes = (value: string) =>
   Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+// Loads this browser's chat keys. A new key pair is made and saved on this device when none exists.
 async function messagingKeys(uid: string): Promise<CryptoKeyPair> {
   const db = await database;
   const id = `message-keys:${uid}`;
@@ -86,10 +90,12 @@ async function messagingKeys(uid: string): Promise<CryptoKeyPair> {
   await db.put("device", pair, id);
   return pair;
 }
+// Exports the public chat key as text so other devices can use it to share a room key.
 async function encodedPublicKey(uid: string) {
   const pair = await messagingKeys(uid);
   return bytesToBase64(await crypto.subtle.exportKey("spki", pair.publicKey));
 }
+// Builds a safe ID for this browser from its public key, without exposing the private key.
 export async function messageDevice(uid: string) {
   const publicKey = await encodedPublicKey(uid);
   const digest = new Uint8Array(
@@ -101,6 +107,7 @@ export async function messageDevice(uid: string) {
     .replaceAll("=", "");
   return { deviceId, publicKey };
 }
+// Reads another device's public key so this browser can encrypt a room key for it.
 async function importPublicKey(value: string) {
   return crypto.subtle.importKey(
     "spki",
@@ -110,6 +117,7 @@ async function importPublicKey(value: string) {
     ["encrypt"],
   );
 }
+// Locks a chat room key with one device's public key so only that device can open it.
 async function wrapRoomKey(raw: Uint8Array, publicKey: string) {
   return bytesToBase64(
     await crypto.subtle.encrypt(
@@ -122,6 +130,7 @@ async function wrapRoomKey(raw: Uint8Array, publicKey: string) {
     ),
   );
 }
+// Opens a saved room key with this browser's private key and returns its raw bytes.
 export async function unwrapRoomKeyBytes(uid: string, value: string) {
   const pair = await messagingKeys(uid);
   return new Uint8Array(await crypto.subtle.decrypt(
@@ -130,6 +139,7 @@ export async function unwrapRoomKeyBytes(uid: string, value: string) {
     base64ToBytes(value),
   ));
 }
+// Turns the opened room-key bytes into the AES key used to read and send chat messages.
 export async function unwrapRoomKey(uid: string, value: string) {
   const raw = await unwrapRoomKeyBytes(uid, value);
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, [
@@ -137,6 +147,7 @@ export async function unwrapRoomKey(uid: string, value: string) {
     "decrypt",
   ]);
 }
+// Registers this account and browser for secure chat. It saves only the public key in Firebase.
 export async function register(identity: Identity) {
   const { db } = await firebase();
   const { deviceId, publicKey } = await messageDevice(identity.uid);
@@ -160,6 +171,7 @@ export async function register(identity: Identity) {
     updatedAt: serverTimestamp(),
   }, { merge: true });
 }
+// Finds an exact username for the friend search. Invalid names and the current account are not returned.
 export async function searchUser(
   username: string,
   currentUid: string,
@@ -173,6 +185,7 @@ export async function searchUser(
   const value = row.data() as DirectoryUser | undefined;
   return value && value.uid !== currentUid ? value : null;
 }
+// Keeps the friends and request lists up to date. Three Firebase listeners are closed when the page leaves.
 export async function subscribeSocial(
   uid: string,
   callback: (value: {
@@ -209,7 +222,7 @@ export async function subscribeSocial(
   ];
   return () => cleanups.forEach((stop) => stop());
 }
-// Sends request.
+// Sends a friend request by saving both account names and their shared friendship ID.
 export async function sendRequest(current: Identity, peer: DirectoryUser) {
   const { db } = await firebase();
   const id = `${current.uid}--${peer.uid}`;
@@ -222,6 +235,7 @@ export async function sendRequest(current: Identity, peer: DirectoryUser) {
     createdAt: serverTimestamp(),
   });
 }
+// Accepts a friend request and starts a blank direct chat. One batch keeps both friend lists in sync.
 export async function acceptRequest(current: Identity, request: Request) {
   if (request.recipientUid !== current.uid)
     throw new Error("Only the recipient can accept.");
@@ -264,10 +278,12 @@ export async function acceptRequest(current: Identity, request: Request) {
   batch.delete(doc(db, "friendRequests", request.id));
   await batch.commit();
 }
+// Removes a friend request that was declined or cancelled.
 export async function dismissRequest(request: Request) {
   const { db } = await firebase();
   await deleteDoc(doc(db, "friendRequests", request.id));
 }
+// Watches the newest chat messages and decrypts each one with the room key before showing it.
 export async function subscribeMessages(
   id: string,
   roomKey: CryptoKey,
@@ -286,7 +302,9 @@ export async function subscribeMessages(
         snapshot.docs.map(async (row) => {
           const value = row.data() as Omit<Message, "id" | "body">;
           let body = "";
+          // Deleted messages stay blank. All other saved messages are decrypted before they are shown.
           if (!value.deleted && value.ciphertext) {
+            // A bad or missing key should not crash the chat, so show a clear message when decryption fails.
             try {
               const combined = base64ToBytes(value.ciphertext);
               const plain = await crypto.subtle.decrypt(
@@ -307,6 +325,7 @@ export async function subscribeMessages(
     onError,
   );
 }
+// Watches every chat that includes this account and keeps the newest chats at the top.
 export async function subscribeConversations(
   uid: string,
   callback: (conversations: Conversation[]) => void,
@@ -336,7 +355,9 @@ export async function subscribeConversations(
     onError,
   );
 }
+// Chooses the chat title. Users see an anonymous Olive Staff label, while staff see the user's name.
 export function conversationName(conversation: Conversation, current: Identity) {
+  // Hide staff and admin usernames from users in support chats.
   if (conversation.type === "SUPPORT" && current.role !== "STAFF" && current.role !== "ADMIN") {
     const label = conversation.supportTag === "NEEDS_ADMIN"
       ? "Escalation"
@@ -350,6 +371,7 @@ export function conversationName(conversation: Conversation, current: Identity) 
   return Object.entries(conversation.participantUsernames)
     .find(([uid]) => uid !== current.uid)?.[1] ?? "Conversation";
 }
+// Gets the secure key for a chat. It reuses this browser's key or creates one key for every approved participant.
 export async function roomKey(id: string, current: Identity, conversationData: Conversation) {
   const { db } = await firebase();
   const device = await messageDevice(current.uid);
@@ -393,6 +415,7 @@ export async function roomKey(id: string, current: Identity, conversationData: C
       Record<string, string> | undefined;
     const roomKeys = snapshot.data().roomKeys as
       Record<string, string> | undefined;
+    // Existing room keys may be used only when this browser's public key was already approved.
     if (savedKeys && roomKeys) {
       if (savedKeys[current.uid] === device.publicKey && roomKeys[current.uid])
         return roomKeys[current.uid];
@@ -417,7 +440,7 @@ export async function roomKey(id: string, current: Identity, conversationData: C
   raw.fill(0);
   return unwrapRoomKey(current.uid, selected);
 }
-// Sends message.
+// Encrypts a message on this browser, then saves only the locked text in Firebase.
 export async function sendMessage(
   id: string,
   current: Identity,
@@ -458,6 +481,7 @@ export async function sendMessage(
   });
   await batch.commit();
 }
+// Un-sends the account's own message. The locked text is replaced and the chat preview is updated.
 export async function unsendMessage(
   id: string,
   message: Message,

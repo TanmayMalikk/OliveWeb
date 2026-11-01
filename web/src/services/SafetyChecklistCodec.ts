@@ -6,6 +6,7 @@ export type SafetyChecklistItem = {
 
 // Web safety plans: decodes the checklist format shared with the Android app.
 export function readSafetyChecklist(value: string): SafetyChecklistItem[] {
+  // If read safety checklist fails, catch the error so the app can keep running and explain the problem.
   try {
     const parsed = JSON.parse(value) as {
       oliveSafetyChecklist?: unknown;
@@ -42,6 +43,7 @@ export function writeSafetyChecklist(items: SafetyChecklistItem[]) {
 // Web safety plans: makes linked contact rows readable without exposing their JSON storage format.
 export function safetyChecklistText(item: SafetyChecklistItem) {
   if (!item.id.startsWith("trusted-contact:")) return item.text;
+  // A safety checklist text error is handled here instead of closing the app.
   try {
     const contact = JSON.parse(item.text) as { name?: unknown; details?: unknown };
     if (typeof contact.name !== "string" || typeof contact.details !== "string")

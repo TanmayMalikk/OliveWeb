@@ -23,22 +23,26 @@ class WatchFitnessActivity : ComponentActivity() {
         fitnessViewModel.restartSensors()
     }
 
+    // Starts the watch fitness screen and requests access to its health sensors.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { OliveWatchFitnessApp(fitnessViewModel.state.value) }
         requestMissingHealthPermissions()
     }
 
+    // Restarts watch sensor collection when the fitness app returns to the foreground.
     override fun onResume() {
         super.onResume()
         fitnessViewModel.startSensors()
     }
 
+    // Stops watch sensor collection while the fitness app is no longer visible.
     override fun onPause() {
         fitnessViewModel.stopSensors()
         super.onPause()
     }
 
+    // Requests only the activity and heart-rate permissions not already granted on this watch.
     private fun requestMissingHealthPermissions() {
         val permissions = buildList {
             add(Manifest.permission.ACTIVITY_RECOGNITION)
@@ -64,15 +68,19 @@ internal class WatchFitnessViewModel(application: android.app.Application) : And
         mainHandler.post { state.value = updated }
     }
 
+    // Starts the repository that combines watch steps, heart rate, and phone fitness data.
     fun startSensors() = repository.start()
 
+    // Stops active watch listeners so the fitness cover does not drain battery in the background.
     fun stopSensors() = repository.stop()
 
+    // Recreates sensor listeners after the user changes a health permission.
     fun restartSensors() {
         repository.stop()
         repository.start()
     }
 
+    // Releases sensor callbacks when Android permanently removes this fitness view model.
     override fun onCleared() {
         repository.stop()
         mainHandler.removeCallbacksAndMessages(null)

@@ -36,6 +36,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
     private var pendingDocumentFile: File? = null
     private var documentGeneration = 0
 
+    // returns the bind for shared safe app camera view model.
     fun bind(owner: LifecycleOwner, preview: PreviewView) {
         viewModelScope.launch {
             _ready.value = false
@@ -50,6 +51,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // returns the flip for shared safe app camera view model.
     fun flip(owner: LifecycleOwner, preview: PreviewView) {
         if (_busy.value || _recording.value) return
         viewModelScope.launch {
@@ -70,6 +72,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // returns the capture photo for shared safe app camera view model.
     fun capturePhoto(file: File, onCaptured: (File) -> Unit) {
         viewModelScope.launch {
             _busy.value = true
@@ -80,6 +83,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // returns the capture document for shared safe app camera view model. It prepares the picture before the app reads or saves it.
     fun captureDocument(file: File, onCaptured: (File, OcrResult) -> Unit) {
         if (documentJob?.isActive == true) return
         val generation = ++documentGeneration
@@ -87,6 +91,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         documentJob = viewModelScope.launch {
             _busy.value = true
             _error.value = null
+            // A capture document error is handled here instead of closing the app.
             try {
                 val captured = camera.capturePhoto(file)
                 val result = ocr.recognizeDocument(captured.readBytes())
@@ -115,6 +120,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // Starts video for shared safe app camera view model.
     fun startVideo(file: File, includeAudio: Boolean, onCaptured: (File) -> Unit) {
         _error.value = null
         runCatching {
@@ -134,12 +140,14 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // Stops video for shared safe app camera view model.
     fun stopVideo() = camera.stopVideo()
     // Dismisses the current camera error after the user acknowledges or retries it.
     fun clearError() {
         _error.value = null
     }
 
+    // returns the leave camera for shared safe app camera view model.
     fun leaveCamera() {
         documentGeneration++
         documentJob?.cancel()
@@ -152,6 +160,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         _busy.value = false
     }
 
+    // Responds when cleared for shared safe app camera view model.
     override fun onCleared() {
         leaveCamera()
         camera.release()

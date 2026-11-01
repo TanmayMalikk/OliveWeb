@@ -37,6 +37,7 @@ class CameraManager(private val context: Context) {
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
 
+    // returns the bind camera for safety.
     suspend fun bindCamera(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
@@ -77,6 +78,7 @@ class CameraManager(private val context: Context) {
         provider = cameraProvider
     }
 
+    // Safety: returns the capture photo.
     suspend fun capturePhoto(file: File): File = suspendCancellableCoroutine { continuation ->
         val capture = imageCapture
         if (capture == null) {
@@ -87,10 +89,12 @@ class CameraManager(private val context: Context) {
             ImageCapture.OutputFileOptions.Builder(file).build(), cameraExecutor,
             // Returns the saved photo or deletes the partial file when CameraX reports an error.
             object : ImageCapture.OnImageSavedCallback {
+                // Safety: Responds when image saved. It returns the asynchronous result to the waiting task.
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                     if (continuation.isActive) continuation.resume(file)
                 }
 
+                // Safety: Responds when error.
                 override fun onError(error: ImageCaptureException) {
                     file.delete()
                     if (continuation.isActive) continuation.resumeWithException(error)
@@ -99,6 +103,7 @@ class CameraManager(private val context: Context) {
         continuation.invokeOnCancellation { file.delete() }
     }
 
+    // Safety: Starts video.
     @SuppressLint("MissingPermission")
     fun startVideo(
         file: File,
@@ -128,6 +133,7 @@ class CameraManager(private val context: Context) {
             }
     }
 
+    // Safety: Stops video.
     fun stopVideo() {
         recording?.stop()
     }
@@ -138,6 +144,7 @@ class CameraManager(private val context: Context) {
         recording = null
     }
 
+    // returns the unbind for safety.
     fun unbind() {
         cancelVideo()
         provider?.unbindAll()
@@ -147,6 +154,7 @@ class CameraManager(private val context: Context) {
             null
     }
 
+    // Safety: Releases the resources used by the feature.
     fun release() {
         unbind()
         cameraExecutor.shutdown()

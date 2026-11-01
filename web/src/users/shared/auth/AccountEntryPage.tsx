@@ -23,6 +23,7 @@ import {
 import { useSession } from "../../../session/SessionProvider";
 import { accounts, triggerHash } from "../../../services/AccountService";
 import { CoverPreview } from "../../../public/GameLandingPage";
+// Web account entry page: Shows the auth page view.
 export function AuthPage({
   organizationOnly = false,
 }: {
@@ -204,6 +205,7 @@ export function AuthPage({
     </div>
   );
 }
+// Shows the setup view for web account entry page.
 export function Setup() {
   const session = useSession();
   const identity = accounts.identity!;
@@ -223,6 +225,7 @@ export function Setup() {
   const steps = personal
     ? ["Your cover", "About you", "Private entry"]
     : ["Your profile", "Ready"];
+  // Updates the feature state for web account entry page.
   function update(key: keyof Profile, value: string) {
     setProfile((p) => ({ ...p, [key]: value }));
   }

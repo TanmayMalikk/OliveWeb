@@ -22,6 +22,7 @@ export default function DownloadPage() {
   const { go } = useSession();
   const [androidQr, setAndroidQr] = useState("");
 
+  // Update download page when information used by this screen changes.
   useEffect(() => {
     let active = true;
     void QRCode.toDataURL(ANDROID_DOWNLOAD_URL, {

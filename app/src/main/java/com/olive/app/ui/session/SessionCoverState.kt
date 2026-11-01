@@ -27,6 +27,7 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session cover state: Saves food cover.
     fun saveFoodCover(
         cart: Map<String, Int>,
         favorites: Set<String>,
@@ -72,6 +73,7 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
+    // Records checkout for session cover state.
     suspend fun recordCheckout(foods: List<OrderLine>, totalCents: Int, error: String) {
         with(runtime) {
             with(state) {
@@ -88,6 +90,7 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
+    // Stops address prompt for session cover state.
     fun dismissAddressPrompt() {
         with(runtime) {
             with(state) {
@@ -96,6 +99,7 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session cover state: Saves address. It records the settings change and uses a readable message if saving fails.
     fun saveAddress(address: DeliveryAddress) {
         with(runtime) {
             with(state) {

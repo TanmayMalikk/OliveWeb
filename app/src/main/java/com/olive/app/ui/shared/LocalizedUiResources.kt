@@ -19,10 +19,12 @@ internal class ResourceText(private val resolve: (Int, Array<out Any?>) -> Strin
         if (arguments.isEmpty()) resources.getString(id) else resources.getString(id, *arguments)
     })
 
+    // Localized ui resources: returns the invoke.
     operator fun invoke(@StringRes id: Int, vararg arguments: Any?): String =
         resolve(id, arguments)
 }
 
+// returns the remember resource text for localized ui resources. It uses the latest values so the user sees the right text and choices.
 @Composable
 internal fun rememberResourceText(): ResourceText {
     val resources = LocalResources.current
@@ -33,14 +35,18 @@ internal fun rememberResourceText(): ResourceText {
 internal class ResourceFailure(@StringRes val textId: Int, vararg val arguments: Any?) :
     IllegalArgumentException()
 
+// Localized ui resources: returns the require text.
 internal inline fun requireText(condition: Boolean, message: () -> ResourceFailure) {
     if (!condition) throw message()
 }
 
+// returns the failure for localized ui resources.
 internal fun ResourceText.failure(error: Throwable, @StringRes fallback: Int): String =
     if (error is ResourceFailure) this(error.textId, *error.arguments) else this(fallback)
 
+// returns the localized title for localized ui resources.
 internal fun AccountRole.localizedTitle(text: ResourceText) = text(
+    // Choose what localized title should do for the current value.
     when (this) {
         AccountRole.USER -> R.string.user
         AccountRole.SAFE_CONTACT -> R.string.safe_contact
@@ -49,7 +55,9 @@ internal fun AccountRole.localizedTitle(text: ResourceText) = text(
     }
 )
 
+// Localized ui resources: returns the localized description.
 internal fun AccountRole.localizedDescription(text: ResourceText) = text(
+    // Choose what localized description should do for the current value.
     when (this) {
         AccountRole.USER -> R.string.the_person_using_the_private_cover_and_safe_app
         AccountRole.SAFE_CONTACT -> R.string.a_trusted_person_helping_someone
@@ -58,7 +66,9 @@ internal fun AccountRole.localizedDescription(text: ResourceText) = text(
     }
 )
 
+// Localized ui resources: returns the localized title.
 internal fun CoverType.localizedTitle(text: ResourceText) = text(
+    // Choose what localized title should do for the current value.
     when (this) {
         CoverType.FOOD -> R.string.ui_olive_8f62f4
         CoverType.NEWS -> R.string.ui_daily_digest
@@ -71,6 +81,7 @@ internal object AppLocaleManager {
 
     val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Chinese")
 
+    // Loads language tag for localized ui resources.
     fun getLanguageTag(language: String): String {
         return when (language.trim().lowercase()) {
             "french", "fr", "français" -> "fr"
@@ -81,6 +92,7 @@ internal object AppLocaleManager {
         }
     }
 
+    // Loads display language for localized ui resources.
     fun getDisplayLanguage(language: String): String {
         return when (getLanguageTag(language)) {
             "fr" -> "Français"
@@ -123,6 +135,7 @@ internal object AppLocaleManager {
         AppCompatDelegate.setApplicationLocales(locales)
     }
 
+    // Localized ui resources: returns the init system default locale.
     fun initSystemDefaultLocale() {
         if (AppCompatDelegate.getApplicationLocales().isEmpty) {
             val defaultTag = resolveSystemDefaultLanguageTag()

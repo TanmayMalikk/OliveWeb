@@ -56,6 +56,7 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.shared.oliveScrollbar
 import kotlinx.coroutines.launch
 
+// The today page view is part of fitness cover. It gives the user the details and choices needed here.
 @Composable
 internal fun TodayPage(
     snapshot: FitnessSnapshot,
@@ -100,6 +101,7 @@ internal fun TodayPage(
         MealType.entries.forEach { meal ->
             val entries = snapshot.foodsToday.filter { it.meal == meal }
             item { Text(meal.displayName, fontWeight = FontWeight.SemiBold) }
+            // Only continue with today page when entries is empty.
             if (entries.isEmpty()) {
                 item { Text(stringResource(R.string.no_food_logged), color = FitnessSubtle) }
             } else {
@@ -112,6 +114,7 @@ internal fun TodayPage(
     }
 }
 
+// fitness cover shows this daily nutrition card view so the user can view its details and use its actions.
 @Composable
 private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
     val totals = snapshot.nutrition
@@ -161,6 +164,7 @@ private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
     }
 }
 
+// This is the nutrition amount row view for fitness cover. It shows current details and the actions available to the user.
 @Composable
 private fun NutritionAmountRow(label: String, value: Float, unit: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -168,7 +172,7 @@ private fun NutritionAmountRow(label: String, value: Float, unit: String) {
         Text("${value.displayAmount()} $unit")
     }
 }
-
+// Shows nutrition progress for fitness cover.
 @Composable
 private fun NutritionProgress(label: String, value: Float, goal: Float, unit: String) {
     val progress = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
@@ -186,6 +190,7 @@ private fun NutritionProgress(label: String, value: Float, goal: Float, unit: St
     }
 }
 
+// This is the logged food row view for fitness cover. It shows current details and the actions available to the user.
 @Composable
 private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onRemove: () -> Unit) {
     Card(
@@ -210,7 +215,7 @@ private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onRemove: () ->
         }
     }
 }
-
+// Shows food search page for fitness cover.
 @Composable
 internal fun FoodSearchPage(
     enabled: Boolean,
@@ -286,6 +291,7 @@ internal fun FoodSearchPage(
     }
 }
 
+// fitness cover shows this food search result card view so the user can view its details and use its actions.
 @Composable
 private fun FoodSearchResultCard(food: NutritionFood, enabled: Boolean, onAdd: () -> Unit) {
     Card(
@@ -325,6 +331,7 @@ private fun FoodSearchResultCard(food: NutritionFood, enabled: Boolean, onAdd: (
     }
 }
 
+// fitness cover shows this add food dialog view so the user can view its details and use its actions.
 @Composable
 private fun AddFoodDialog(
     food: NutritionFood,
@@ -369,7 +376,7 @@ private fun AddFoodDialog(
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
-
+// Shows provider attribution for fitness cover.
 @Composable
 private fun ProviderAttribution() {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

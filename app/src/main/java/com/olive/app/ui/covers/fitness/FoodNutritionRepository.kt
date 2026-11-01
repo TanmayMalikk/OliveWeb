@@ -51,6 +51,7 @@ internal class FoodNutritionRepository(
         )
     }
 
+    // Fitness cover: Finds fat secret. It calls the protected Firebase Cloud Function for this feature.
     private suspend fun searchFatSecret(query: String): List<NutritionFood> {
         val response = functions.getHttpsCallable("nutritionFoodSearch")
             .call(mapOf("query" to query))
@@ -60,6 +61,7 @@ internal class FoodNutritionRepository(
         return foods.mapNotNull { raw -> parseFatSecretFood(raw as? Map<*, *> ?: return@mapNotNull null) }
     }
 
+    // Fitness cover: Finds open food facts.
     private suspend fun searchOpenFoodFacts(query: String): List<NutritionFood> =
         withContext(Dispatchers.IO) {
             val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
@@ -88,6 +90,7 @@ internal data class FoodSearchResult(
     val providerFailures: Int = 0,
 )
 
+// Converts fat secret food for fitness cover. It uses the saved health data to update the fitness screen.
 private fun parseFatSecretFood(value: Map<*, *>): NutritionFood? {
     val name = value["name"]?.toString()?.trim().orEmpty()
     if (name.isBlank()) return null
@@ -113,9 +116,11 @@ private fun parseFatSecretFood(value: Map<*, *>): NutritionFood? {
     )
 }
 
+// Fitness nutrition: Reads a nutrient number from an API map and prevents negative or missing values.
 private fun Map<*, *>.number(key: String) =
     (this[key] as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f
 
+// Fitness cover: Converts open food facts product.
 private fun parseOpenFoodFactsProduct(product: JSONObject?): NutritionFood? {
     product ?: return null
     val name = product.optString("product_name").trim()
@@ -144,9 +149,11 @@ private fun parseOpenFoodFactsProduct(product: JSONObject?): NutritionFood? {
     )
 }
 
+// Fitness cover: Checks whether core nutrition.
 private fun JSONObject.hasCoreNutrition() =
     has("energy-kcal_100g") && has("proteins_100g") &&
             has("carbohydrates_100g") && has("fat_100g")
 
+// returns the nutrient for fitness cover.
 private fun JSONObject.nutrient(name: String) =
     optDouble(name, 0.0).toFloat().takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f

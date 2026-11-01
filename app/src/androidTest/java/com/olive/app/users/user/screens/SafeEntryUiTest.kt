@@ -15,6 +15,7 @@ import com.olive.app.data.UserProfile
 import com.olive.app.data.DeliveryAddress
 
 class SafeEntryUiTest : OliveUiTestBase() {
+    // User safe entry ui test: returns the entry setup. The test gives the code a clear input and checks the expected result.
     private fun entrySetup() {
         openOnboarding()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
@@ -47,6 +48,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         waitFor("entry_knows_pin_yes")
     }
 
+    // User safe entry ui test: returns the correct pin runs olive animation before safe area becomes interactive. The test gives the code a clear input and checks the expected result.
     @Test
     fun correctPinRunsOliveAnimationBeforeSafeAreaBecomesInteractive() {
         entrySetup()
@@ -59,6 +61,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         val unlockVersion = session.unlockAnimationVersion
         compose.mainClock.autoAdvance = false
+        // A correct pin runs olive animation before safe area becomes interactive error is handled here instead of closing the app.
         try {
             enterPin("123456")
             compose.waitUntil(30_000) { session.unlockAnimationVersion > unlockVersion }
@@ -77,6 +80,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safe_settings").assertIsDisplayed()
     }
 
+    // User safe entry ui test: returns the safety answer changes recommendation and separate pin still unlocks. The test gives the code a clear input and checks the expected result.
     @Test
     fun safetyAnswerChangesRecommendationAndSeparatePinStillUnlocks() {
         entrySetup()
@@ -124,6 +128,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         }
     }
 
+    // User safe entry ui test: returns the device lock cancellation does not enroll or unlock. The test gives the code a clear input and checks the expected result.
     @Test
     fun deviceLockCancellationDoesNotEnrollOrUnlock() {
         entrySetup()
@@ -146,6 +151,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("new_pin").assertDoesNotExist()
     }
 
+    // User safe entry ui test: returns the device lock cancellation returns actual talk back focus and allows retry. The test gives the code a clear input and checks the expected result.
     @Test
     fun deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -155,6 +161,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         TalkBackTestSession(compose.activity).use { talkBack ->
             compose.waitUntil(10_000) { context.getSystemService(android.view.accessibility.AccessibilityManager::class.java).isTouchExplorationEnabled }
+            // returns the activate for user safe entry ui test. The test gives the code a clear input and checks the expected result.
             fun activate(tag: String) {
                 compose.onNodeWithTag(tag).performScrollTo()
                     .performSemanticsAction(SemanticsActions.OnClick) { it() }
@@ -191,11 +198,13 @@ class SafeEntryUiTest : OliveUiTestBase() {
         }
     }
 
+    // returns the android keystore refuses unauthenticated operation for user safe entry ui test. The test gives the code a clear input and checks the expected result.
     @Test
     fun androidKeystoreRefusesUnauthenticatedOperation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         if (!context.getSystemService(KeyguardManager::class.java).isDeviceSecure) return
         val challenge = DeviceLockKey("instrumented").prepare("unauthenticated-key-test", null)
+        // If android keystore refuses unauthenticated operation fails, catch the error so the app can keep running and explain the problem.
         try {
             val cipher = challenge.promptCipher ?: challenge.legacyCipher()
             try {
@@ -208,6 +217,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         }
     }
 
+    // returns the device lock enrollment and every reentry require android authentication for user safe entry ui test. The test gives the code a clear input and checks the expected result.
     @Test
     fun deviceLockEnrollmentAndEveryReentryRequireAndroidAuthentication() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -252,7 +262,10 @@ class SafeEntryUiTest : OliveUiTestBase() {
         assertEquals(SessionScreen.Cover, session.screen)
     }
 
+    // returns the confirm phone pin for user safe entry ui test. The test gives the code a clear input and checks the expected result.
     private fun confirmPhonePin() = DeviceCredentialTestDriver(compose).confirmPhonePin()
+    // User safe entry ui test: returns the wait for phone pin. The test gives the code a clear input and checks the expected result.
     private fun waitForPhonePin() = DeviceCredentialTestDriver(compose).waitForPhonePin()
+    // returns the shell for user safe entry ui test. The test gives the code a clear input and checks the expected result.
     private fun shell(command: String) = DeviceCredentialTestDriver(compose).shell(command)
 }

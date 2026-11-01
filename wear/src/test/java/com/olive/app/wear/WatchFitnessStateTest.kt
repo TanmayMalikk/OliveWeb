@@ -5,12 +5,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class WatchFitnessStateTest {
+    // Confirms that a higher watch step total wins when phone and watch overlap.
     @Test
     fun displayedStepsUsesWatchWhenWatchHasHigherTotal() {
         val state = WatchFitnessState(watchSteps = 6_000, phoneSteps = 5_000)
         assertEquals(6_000, state.displayedSteps)
     }
 
+    // Confirms that a higher phone step total wins when it contains the more complete count.
     @Test
     fun displayedStepsUsesPhoneWhenPhoneHasHigherTotal() {
         val state = WatchFitnessState(watchSteps = 4_000, phoneSteps = 7_000)

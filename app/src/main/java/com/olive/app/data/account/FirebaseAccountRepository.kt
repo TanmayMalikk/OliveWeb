@@ -21,6 +21,7 @@ class FirebaseAccountRepository : AccountRepository {
 
     // Change this path together with firebase/storage.rules and its tests.
     private fun profileObject(uid: String) = storage.reference.child("accounts/$uid/profile.json")
+    // returns the history folder for account.
     private fun historyFolder(uid: String, category: String) =
         storage.reference.child("accounts/$uid/history/$category")
 
@@ -47,6 +48,7 @@ class FirebaseAccountRepository : AccountRepository {
         return AccountIdentity(user.uid, normalized)
     }
 
+    // Account: Authenticates the account.
     override suspend fun authenticate(
         username: String,
         password: String,
@@ -56,6 +58,7 @@ class FirebaseAccountRepository : AccountRepository {
         val user = try {
             auth.signInWithEmailAndPassword(primary, password).await().user
         } catch (primaryError: Exception) {
+            // Only continue with authenticate when role in set of account role staff, account role admin and @ in username.
             if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN) && '@' in username) {
                 val result = functions.getHttpsCallable("resolveOrganizationLogin")
                     .call(mapOf("email" to username.trim().lowercase(), "role" to role.name))
@@ -82,10 +85,12 @@ class FirebaseAccountRepository : AccountRepository {
         return AccountIdentity(user.uid, accountName)
     }
 
+    // returns the profile for account.
     override suspend fun profile(identity: AccountIdentity): UserProfile? {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         return try {
             val bytes = profileObject(identity.uid).getBytes(MAX_PROFILE_BYTES).await()
+            // If profile fails, catch the error so the app can keep running and explain the problem.
             try {
                 val current = String(bytes, Charsets.UTF_8)
                 val profile = UserProfile.fromJson(JSONObject(current))
@@ -107,6 +112,7 @@ class FirebaseAccountRepository : AccountRepository {
         }
     }
 
+    // Account: Saves profile.
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         check(profile.username == identity.username) { "Profile account mismatch" }
@@ -127,6 +133,7 @@ class FirebaseAccountRepository : AccountRepository {
         require(record.id.matches(Regex("[A-Za-z0-9-]{8,64}")))
         val bytes = JSONObject(record.json).toString(2).toByteArray(Charsets.UTF_8)
         require(bytes.size <= MAX_EVENT_BYTES)
+        // A save history record error is handled here instead of closing the app.
         try {
             historyFolder(identity.uid, record.category).child("${record.id}.json")
                 .putBytes(bytes, jsonMetadata()).await()
@@ -135,11 +142,13 @@ class FirebaseAccountRepository : AccountRepository {
         }
     }
 
+    // returns the history records for account.
     override suspend fun historyRecords(identity: AccountIdentity): List<HistoryRecord> {
         check(auth.currentUser?.uid == identity.uid)
         return listOf("settings", "triggers", "checkouts", "private_entries").flatMap { category ->
             historyFolder(identity.uid, category).listAll().await().items.map { item ->
                 val bytes = item.getBytes(MAX_EVENT_BYTES.toLong()).await()
+                // If history records fails, catch the error so the app can keep running and explain the problem.
                 try {
                     val current = String(bytes, Charsets.UTF_8)
                     val readable = readableHistory(category, current)
@@ -152,6 +161,7 @@ class FirebaseAccountRepository : AccountRepository {
         }
     }
 
+    // Updates password for account.
     override suspend fun changePassword(
         identity: AccountIdentity,
         currentPassword: String,
@@ -170,11 +180,14 @@ class FirebaseAccountRepository : AccountRepository {
         user.updatePassword(newPassword).await()
     }
 
+    // Account: Authenticates the accountd uid.
     override fun authenticatedUid(): String? = auth.currentUser?.uid
+    // Authenticates the accountd username for account.
     override fun authenticatedUsername(): String? =
         auth.currentUser?.displayName?.takeIf(InputPolicy::validExistingUsername)
             ?: auth.currentUser?.email?.substringBefore('@')?.let(InputPolicy::username)
 
+    // Account: Signs out the current account.
     override fun signOut() = auth.signOut()
 
     // Converts a stored activity JSON record into short text suitable for the history screen.
@@ -189,9 +202,11 @@ class FirebaseAccountRepository : AccountRepository {
         }.toString(2)
     }
 
+    // returns the json metadata for account.
     private fun jsonMetadata() = StorageMetadata.Builder().setContentType("application/json")
         .setCustomMetadata("schemaVersion", "2").setCustomMetadata("format", "pretty-json").build()
 
+    // returns the rewrite if needed for account.
     private suspend fun rewriteIfNeeded(
         reference: StorageReference,
         current: String,

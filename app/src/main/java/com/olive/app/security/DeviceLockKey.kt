@@ -16,6 +16,7 @@ import javax.crypto.spec.GCMParameterSpec
 
 // A separate authentication-bound key guards device-lock entry. Cover storage stays usable while locked.
 internal class DeviceLockKey(private val namespace: String) {
+    // Device lock key: Prepares the feature data.
     fun prepare(uid: String, saved: JSONObject?): DeviceLockChallenge {
         val keyId = saved?.getString("keyId") ?: UUID.randomUUID().toString()
         require(keyId.matches(Regex("[a-f0-9-]{36}")))
@@ -33,6 +34,7 @@ internal class DeviceLockKey(private val namespace: String) {
                     .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                     .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                     .setKeySize(256).setUserAuthenticationRequired(true)
+                // Only continue with prepare when the Android version is at least 30.
                 if (Build.VERSION.SDK_INT >= 30) {
                     spec.setUserAuthenticationParameters(
                         0,
@@ -53,6 +55,7 @@ internal class DeviceLockKey(private val namespace: String) {
         }
     }
 
+    // Device lock key: returns the configure legacy authentication.
     @Suppress("DEPRECATION")
     private fun configureLegacyAuthentication(spec: KeyGenParameterSpec.Builder) {
         // Android 9/10 require this API; setUserAuthenticationParameters starts at Android 11.
@@ -65,11 +68,14 @@ class DeviceLockChallenge internal constructor(
     private val keyId: String, private val alias: String,
 ) {
     private var committed = false
+    // Device lock key: returns the mark enrolled.
     internal fun markEnrolled() {
         committed = true
     }
 
+    // Closes the active feature for device lock key. It uses the account key so private data stays locked.
     internal fun close() {
+        // close checks whether enrolling and committed is false before continuing.
         if (enrolling && !committed) runCatching {
             KeyStore.getInstance("AndroidKeyStore").apply {
                 load(null)
@@ -84,7 +90,9 @@ class DeviceLockChallenge internal constructor(
     // API 30+ binds this exact operation to BiometricPrompt. Legacy devices initialize only after credentials succeed.
     internal val promptCipher: Cipher? = if (Build.VERSION.SDK_INT >= 30) newCipher() else null
     private var credentialCipher: Cipher? = null
+    // returns the legacy cipher for device lock key.
     internal fun legacyCipher(): Cipher = newCipher().also { credentialCipher = it }
+    // Device lock key: returns the new cipher.
     private fun newCipher(): Cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
         if (saved == null) init(Cipher.ENCRYPT_MODE, key)
         else init(
@@ -94,6 +102,7 @@ class DeviceLockChallenge internal constructor(
         )
     }
 
+    // returns the finish for device lock key.
     internal fun finish(cipher: Cipher): JSONObject? {
         check(cipher === (promptCipher ?: credentialCipher))
         if (saved == null) {

@@ -3,6 +3,7 @@ import { database } from "./LocalDataStore";
 import { encrypt, decrypt } from "./EncryptionService";
 import type { Envelope, Event } from "../domain/DomainModels";
 let keyPromise: Promise<CryptoKey> | undefined;
+// returns the device key for web cover state store.
 async function deviceKey() {
   keyPromise ??= (async () => {
     const db = await database;
@@ -25,11 +26,13 @@ export async function readCover<T>(id: string, fallback: T): Promise<T> {
   ).get("device", `cover:${id}`);
   return box ? decrypt<T>(await deviceKey(), box) : fallback;
 }
+// Web cover state store: Saves cover.
 export async function writeCover(id: string, value: unknown) {
   await (
     await database
   ).put("device", await encrypt(await deviceKey(), value), `cover:${id}`);
 }
+// returns the pending checkout for web cover state store. It uses the current cover data to update what the user sees.
 export async function pendingCheckout(uid: string, event: Event) {
   const rows = await readCover<Event[]>(`${uid}:checkouts`, []);
   await writeCover(`${uid}:checkouts`, [event, ...rows].slice(0, 100));

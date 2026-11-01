@@ -22,6 +22,7 @@ import kotlin.time.Duration.Companion.seconds
 
 // Grab a one-off coarse location for cover content; nothing from here is saved to the account.
 object CoverLocation {
+    // returns the city for location sharing.
     suspend fun city(context: Context, fallback: String): String {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -39,12 +40,14 @@ object CoverLocation {
         return reverseGeocode(context, location) ?: fallback
     }
 
+    // Location sharing: returns the newest cached location.
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private fun newestCachedLocation(manager: LocationManager): Location? =
         manager.getProviders(true)
             .mapNotNull { runCatching { manager.getLastKnownLocation(it) }.getOrNull() }
             .maxByOrNull(Location::getTime)
 
+    // returns the current for location sharing.
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private suspend fun current(context: Context, manager: LocationManager): Location? =
         suspendCancellableCoroutine { continuation ->
@@ -64,6 +67,7 @@ object CoverLocation {
             }.onFailure { if (continuation.isActive) continuation.resume(null) }
         }
 
+    // returns the reverse geocode for location sharing.
     private suspend fun reverseGeocode(context: Context, location: Location): String? {
         if (Build.VERSION.SDK_INT < 33 || !Geocoder.isPresent()) return null
         val address = withTimeoutOrNull(6.seconds) {
@@ -72,10 +76,12 @@ object CoverLocation {
                     location.latitude, location.longitude, 1,
                     // Converts the cover's coordinates into the first local address returned by Android.
                     object : Geocoder.GeocodeListener {
+                        // Location sharing: Responds when geocode. It returns the asynchronous result to the waiting task.
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                         }
 
+                        // Location sharing: Responds when error.
                         override fun onError(errorMessage: String?) {
                             if (continuation.isActive) continuation.resume(null)
                         }

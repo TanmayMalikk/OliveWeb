@@ -26,11 +26,13 @@ data class LocationRoute(
     val durationSeconds: Double,
     val directions: List<RouteDirection>,
 ) {
+    // Finds the next direction for location sharing.
     fun nextDirection(latitude: Double, longitude: Double): RouteDirection? {
         val currentIndex = nearestCoordinateIndex(latitude, longitude)
         return directions.firstOrNull { it.toIndex >= currentIndex } ?: directions.lastOrNull()
     }
 
+    // Location sharing: returns the progress.
     fun progress(latitude: Double, longitude: Double): RouteProgress {
         val index = nearestCoordinateIndex(latitude, longitude)
         val segmentLengths = coordinates.zipWithNext { first, second ->
@@ -43,6 +45,7 @@ data class LocationRoute(
         return RouteProgress(distanceMeters * remainingRatio, durationSeconds * remainingRatio)
     }
 
+    // Location sharing: returns the nearest coordinate index.
     private fun nearestCoordinateIndex(latitude: Double, longitude: Double): Int =
         coordinates.indices.minByOrNull { index ->
             val point = coordinates[index]
@@ -54,6 +57,7 @@ data class LocationRoute(
 internal object MapboxDirectionsClient {
     val configured get() = BuildConfig.MAPBOX_ACCESS_TOKEN.isNotBlank()
 
+    // Location sharing: returns the driving route.
     suspend fun drivingRoute(
         startLatitude: Double,
         startLongitude: Double,
@@ -79,6 +83,7 @@ internal object MapboxDirectionsClient {
                 requestMethod = "GET"
                 setRequestProperty("Accept", "application/json")
             }
+        // A driving route error is handled here instead of closing the app.
         try {
             if (connection.responseCode !in 200..299) return@withContext null
             parseResponse(connection.inputStream.bufferedReader().use { it.readText() })
@@ -87,6 +92,7 @@ internal object MapboxDirectionsClient {
         }
     }
 
+    // Location sharing: Converts response.
     internal fun parseResponse(json: String): LocationRoute? {
         val root = JSONObject(json)
         if (root.optString("code") != "Ok") return null
@@ -105,6 +111,7 @@ internal object MapboxDirectionsClient {
         )
     }
 
+    // Converts coordinates for location sharing.
     private fun parseCoordinates(rows: JSONArray) = buildList {
         for (index in 0 until rows.length()) {
             val row = rows.optJSONArray(index) ?: continue
@@ -115,6 +122,7 @@ internal object MapboxDirectionsClient {
         }
     }
 
+    // Converts directions for location sharing.
     private fun parseDirections(
         legs: JSONArray?,
         routeCoordinates: List<RouteCoordinate>,
@@ -138,9 +146,11 @@ internal object MapboxDirectionsClient {
         }
     }
 
+    // Location sharing: returns the encode.
     private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name())
 }
 
+// Location sharing: returns the distance from route meters.
 internal fun distanceFromRouteMeters(
     latitude: Double,
     longitude: Double,
@@ -148,6 +158,7 @@ internal fun distanceFromRouteMeters(
 ): Double {
     if (route.coordinates.isEmpty()) return Double.POSITIVE_INFINITY
     val originLatitudeRadians = Math.toRadians(latitude)
+    // Location sharing: returns the projected.
     fun projected(point: RouteCoordinate): Pair<Double, Double> {
         val x = Math.toRadians(point.longitude - longitude) * cos(originLatitudeRadians) * EARTH_RADIUS_METERS
         val y = Math.toRadians(point.latitude - latitude) * EARTH_RADIUS_METERS
@@ -164,6 +175,7 @@ internal fun distanceFromRouteMeters(
     } ?: 0.0
 }
 
+// returns the squared distance for location sharing.
 private fun squaredDistance(
     firstLatitude: Double,
     firstLongitude: Double,
@@ -176,6 +188,7 @@ private fun squaredDistance(
     return latitudeDelta * latitudeDelta + longitudeDelta * longitudeDelta
 }
 
+// returns the coordinate distance meters for location sharing.
 private fun coordinateDistanceMeters(first: RouteCoordinate, second: RouteCoordinate): Double {
     val latitudeDelta = Math.toRadians(second.latitude - first.latitude)
     val longitudeDelta = Math.toRadians(second.longitude - first.longitude)

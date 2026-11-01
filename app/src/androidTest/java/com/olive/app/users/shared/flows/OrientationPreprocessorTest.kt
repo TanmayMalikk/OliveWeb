@@ -21,6 +21,7 @@ class OrientationPreprocessorTest {
     private lateinit var preprocessor: OrientationPreprocessor
     private lateinit var testDocBytes: ByteArray
 
+    // Shared safe app orientation preprocessor test: Updates up. The test gives the code a clear input and checks the expected result.
     @Before
     fun setUp() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -32,11 +33,13 @@ class OrientationPreprocessorTest {
         assertTrue("test_doc.png should not be empty", testDocBytes.isNotEmpty())
     }
 
+    // Shared safe app orientation preprocessor test: returns the tear down. The test gives the code a clear input and checks the expected result.
     @After
     fun tearDown() {
         preprocessor.close()
     }
 
+    // returns the test process upright document for shared safe app orientation preprocessor test. The test gives the code a clear input and checks the expected result.
     @Test
     fun testProcessUprightDocument() {
         val processedBytes = preprocessor.process(testDocBytes)
@@ -48,6 +51,7 @@ class OrientationPreprocessorTest {
         resultBitmap.recycle()
     }
 
+    // returns the test process rotated documents for shared safe app orientation preprocessor test. The test gives the code a clear input and checks the expected result.
     @Test
     fun testProcessRotatedDocuments() {
         val originalBitmap = BitmapFactory.decodeByteArray(testDocBytes, 0, testDocBytes.size)
@@ -116,6 +120,7 @@ class OrientationPreprocessorTest {
         originalBitmap.recycle()
     }
 
+    // Shared safe app orientation preprocessor test: returns the mean pixel difference. The test gives the code a clear input and checks the expected result.
     private fun meanPixelDifference(first: Bitmap, second: Bitmap): Double {
         val width = 64
         val height = 64

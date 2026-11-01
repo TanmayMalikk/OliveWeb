@@ -24,6 +24,7 @@ const News = lazy(() => import("./public/covers/DailyDigestCover"));
 const Fitness = lazy(() => import("./public/covers/FitnessCover"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
 const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
+// Web main: Shows the pin gate view.
 function PinGate() {
   const s = useSession();
   const [pin, setPin] = useState("");
@@ -139,6 +140,7 @@ function PinGate() {
     </main>
   );
 }
+// Web main: Shows the cover view.
 function Cover() {
   const s = useSession();
   return (
@@ -158,8 +160,10 @@ function Cover() {
     </main>
   );
 }
+// Web main: Shows the routes view.
 function Routes({ mode }: { mode: SiteMode }) {
   const s = useSession();
+  // Update s when information used by this screen changes.
   useEffect(() => {
     const cover = coverSite(s.cover).slug;
     let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
@@ -247,6 +251,7 @@ class ErrorBoundary extends Component<
   }
 }
 const mode = siteMode();
+// mode checks whether crypto subtle is false before continuing.
 if (!crypto.subtle) {
   createRoot(document.getElementById("root")!).render(
     <main className="error-page">

@@ -6,6 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MediaTransferModelsEdgeCaseTest {
+    // returns the source for media transfer models edge case test kt. The test gives the code a clear input and checks the expected result.
     private fun source() = PreparedEncryptedMedia(
         filePath = "/private/ciphertext.bin",
         ciphertextSize = 4096L,
@@ -57,6 +58,7 @@ class MediaTransferModelsEdgeCaseTest {
     // Inputs: the values shown below. Expected: upload progress is null for unknown totals and clamped for bad counters.
     @Test
     fun uploadProgressIsNullForUnknownTotalsAndClampedForBadCounters() {
+        // returns the progress for media transfer models edge case test kt. The test gives the code a clear input and checks the expected result.
         fun progress(transferred: Long, total: Long) = MediaUploadPresentation(
             jobId = "job",
             ownerUid = "owner",
@@ -143,6 +145,7 @@ class MediaTransferModelsEdgeCaseTest {
     // Inputs: transferred-byte counters near Long boundaries. Expected: progress remains bounded and finite.
     @Test
     fun progressHandlesLongBoundariesWithoutOverflow() {
+        // returns the progress for media transfer models edge case test kt. The test gives the code a clear input and checks the expected result.
         fun progress(done: Long, total: Long) = MediaUploadPresentation(
             "job", "owner", "File", "application/octet-stream",
             MediaTransferStatus.UPLOADING, done, total, "", null, 1L,

@@ -26,6 +26,7 @@ export default function News() {
   const [refresh, setRefresh] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const storageId = `${session.enrollment?.uid ?? "preview"}:news`;
+  // Update storage id when information used by this screen changes.
   useEffect(() => {
     let live = true;
     void readCover<NewsArticle[]>(storageId, [])
@@ -40,12 +41,14 @@ export default function News() {
       live = false;
     };
   }, [storageId]);
+  // Update live when information used by this screen changes.
   useEffect(() => {
     if (loaded)
       void writeCover(storageId, saved).catch(() =>
         setError("Unable to save bookmarks in this browser."),
       );
   }, [saved, loaded, storageId]);
+  // Update live when information used by this screen changes.
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -68,6 +71,7 @@ export default function News() {
       });
     return () => controller.abort();
   }, [scope, place, refresh]);
+  // returns the bookmark for web daily digest cover cover.
   function bookmark(article: NewsArticle) {
     setSaved((old) =>
       old.some((a) => a.id === article.id)
@@ -293,6 +297,7 @@ function Reader({
     isPaywalled?: boolean;
   } | null>(null);
   const [error, setError] = useState("");
+  // Update reader when information used by this screen changes.
   useEffect(() => {
     const controller = new AbortController();
     void fetch(`/api/articles/${article.id}`, { signal: controller.signal })

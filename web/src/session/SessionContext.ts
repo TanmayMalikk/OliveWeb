@@ -60,6 +60,7 @@ export type SessionValue = {
 
 export const SessionContext = createContext<SessionValue | null>(null);
 
+// Web session context: returns the use session.
 export const useSession = () => {
   const value = useContext(SessionContext);
   if (!value) throw new Error("Missing session");

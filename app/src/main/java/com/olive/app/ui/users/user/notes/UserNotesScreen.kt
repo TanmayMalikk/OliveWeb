@@ -91,6 +91,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         ).withZone(ZoneId.systemDefault())
     }
 
+    // Starts editor for user notes screen. It waits for the set time and cancels the timer when the feature closes.
     fun openEditor(entry: PrivateEntry?) {
         session.clearPrivateEntryStatus()
         editingId = entry?.id
@@ -112,6 +113,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         PrivateEntryEditLog(logEntry, formatter) { logEntryId = null }
         return
     }
+    // editor open is handled here by open editor.
     if (editorOpen) {
         val entry = session.privateEntries.firstOrNull { it.id == editingId }
         val editorListState = rememberLazyListState()
@@ -203,6 +205,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     Text(if (editingId == null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry))
                 }
             }
+            // Only continue with open editor when entry edits is empty is true is false.
             if (entry?.edits?.isNotEmpty() == true) item {
                 TextButton(
                     onClick = { logEntryId = entry.id },
@@ -217,6 +220,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     }
     val trashed =
         session.privateEntries.filter { it.deletedAt != null }.sortedByDescending { it.deletedAt }
+    // trash open is handled here by open editor.
     if (trashOpen) {
         Trash(trashed, formatter, { id ->
             session.restorePrivateEntry(id)
@@ -297,6 +301,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 session
             )
         }
+        // Only continue with open editor when filtered is empty item span = grid item span max line span.
         if (filtered.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
                 if (search.isBlank()) uiText(
@@ -304,6 +309,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 ) else uiText(R.string.no_notes_found), color = Muted
             )
         }
+        // Only continue with open editor when pinned is not empty item span = grid item span max line span.
         if (pinned.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
                 stringResource(R.string.pinned),

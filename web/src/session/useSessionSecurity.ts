@@ -15,6 +15,7 @@ import type { SessionPhase } from "./SessionContext";
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
+// Web private entry: Keeps the safe session locked when it is not in use. It watches navigation, entry links, and idle time, then clears private data before returning to a cover.
 export function useSessionSecurity({
   enrollment,
   entryOwner,
@@ -56,7 +57,9 @@ export function useSessionSecurity({
   const lastInteraction = useRef(Date.now());
   phaseRef.current = phase;
 
+  // Web private entry: Installs navigation guards for the private session. The handlers clear account data before browser back or hash changes can expose another screen.
   useEffect(() => {
+    // Web private entry: Locks the safe session. It clears account data, history, setup state, messages, and the current private route.
     const resetPrivateSession = () => {
       epoch.current++;
       entryOwner.current = null;
@@ -71,6 +74,7 @@ export function useSessionSecurity({
       setPhase("public");
       setMessage("");
     };
+    // Web private entry: Handles the browser Back button. It locks the session and replaces the private URL with the correct public cover.
     const onPop = () => {
       resetPrivateSession();
       setPath(
@@ -82,6 +86,7 @@ export function useSessionSecurity({
       );
       window.history.replaceState({}, "", "/");
     };
+    // Web private entry: Handles a changed URL entry token. It checks the new hash and starts private entry only when the token is valid.
     const onHash = () => {
       const candidate = location.hash.slice(1);
       if (!validEntryToken(candidate)) return;
@@ -102,10 +107,13 @@ export function useSessionSecurity({
     };
   }, [enrollment, entryOwner, epoch, mode, pendingEntry]);
 
+  // Update candidate when information used by this screen changes.
   useEffect(() => {
+    // Web use session security: Responds when hidden.
     const onHidden = () => {
       if (document.hidden && phaseRef.current !== "public") quickExit();
     };
+    // Web use session security: Responds when key.
     const onKey = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" &&
@@ -115,6 +123,7 @@ export function useSessionSecurity({
         quickExit();
       }
     };
+    // Responds when page hide for web use session security. It listens for new data and stops listening when the screen closes.
     const onPageHide = () => {
       if (phaseRef.current !== "public") quickExit();
       else {
@@ -137,6 +146,7 @@ export function useSessionSecurity({
     setIdleSeconds(null);
   }, [setIdleSeconds]);
 
+  // Update note interaction when information used by this screen changes.
   useEffect(() => {
     if (phase !== "safe" && phase !== "portal") return;
     noteInteraction();

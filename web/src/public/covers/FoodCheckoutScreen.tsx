@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button, Field, Form, Modal } from "../../components/SharedComponents";
 
+// Web food checkout screen cover: returns the money.
 const money = (cents: number) =>
   new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(
     cents / 100,
@@ -27,6 +28,7 @@ export default function Checkout({
       <Form
         onSubmit={async () => {
           setSubmitting(true);
+          // If checkout fails, catch the error so the app can keep running and explain the problem.
           try {
             await onDeclined();
             setMessage(
