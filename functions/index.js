@@ -13,6 +13,7 @@ exports.safetySupportContact = supportGroups.safetySupportContact;
 exports.safetySupportAdmin = supportGroups.safetySupportAdmin;
 exports.staffSupportClose = supportGroups.staffSupportClose;
 Object.assign(exports, require("./src/mediaTickets"));
+Object.assign(exports, require("./src/nutritionFoods"));
 
 const {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,
   organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text,

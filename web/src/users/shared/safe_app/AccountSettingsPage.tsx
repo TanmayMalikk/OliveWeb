@@ -47,7 +47,7 @@ export default function Settings() {
             <select name="cover" defaultValue={p.coverType}>
               <option value="FOOD">Olive</option>
               <option value="NEWS">Daily Digest</option>
-              <option value="CALCULATOR">Better Calculator</option>
+              <option value="FITNESS">Fitness Tracker</option>
               <option value="GAME">Little Grove</option>
             </select>
           </label>

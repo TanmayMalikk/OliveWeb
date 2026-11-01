@@ -13,9 +13,6 @@
     <string name="entry_confirm_settings">Confirmez votre identité avec Android pour modifier les paramètres d’accès sécurisé.</string>
     <string name="entry_settings_cancelled">Authentification annulée. Vos paramètres d’accès sécurisé restent inchangés.</string>
     <string name="entry_settings_failed">Impossible de terminer la modification. Vérifiez la méthode sélectionnée et réessayez.</string>
-    <string name="calculator_pin_required_title">Créez d’abord un code PIN</string>
-    <string name="calculator_pin_required_description">La calculatrice exige un code PIN de secours de 4 à 6 chiffres afin que les calculs ordinaires n’ouvrent pas l’authentification Android. Le verrouillage de l’appareil restera votre méthode préférée.</string>
-    <string name="calculator_create_pin">Créer un code PIN de secours et choisir la calculatrice</string>
     <string name="entry_use_backup_pin">Utiliser plutôt le code PIN de secours</string>
     <string name="entry_missing_backup_pin">Le verrouillage de l’écran du téléphone semble désactivé et aucun code PIN de secours n’a été ajouté. Rétablissez le verrouillage, ouvrez l’espace sécurisé, puis ajoutez un code PIN de secours dans les paramètres.</string>
 </resources>

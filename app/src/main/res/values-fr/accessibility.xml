@@ -7,24 +7,24 @@
     <string name="a11y_unlock">Déverrouiller</string>
     <string name="a11y_step">Étape</string>
     <string name="a11y_completed_requirements">Conditions remplies</string>
-    <string name="a11y_equals">Égal</string>
-    <string name="a11y_clear_all">Tout effacer</string>
-    <string name="a11y_minus">Moins</string>
-    <string name="a11y_multiply">Multiplier</string>
-    <string name="a11y_divide">Diviser</string>
-    <string name="a11y_parentheses">Parenthèses</string>
-    <string name="a11y_percent">Pour cent</string>
-    <string name="a11y_decimal_point">Virgule décimale</string>
-    <string name="a11y_graph">Graphique</string>
-    <string name="a11y_zoom">Zoom</string>
+
+
+
+
+
+
+
+
+
+
     <string name="a11y_zoom_in">Agrandir</string>
     <string name="a11y_zoom_out">Réduire</string>
     <string name="a11y_reset_zoom">Réinitialiser le zoom</string>
     <string name="a11y_zoom_percent">Zoom : %1$d%%</string>
-    <string name="a11y_pan_left">Déplacer à gauche</string>
-    <string name="a11y_pan_right">Déplacer à droite</string>
-    <string name="a11y_pan_up">Déplacer vers le haut</string>
-    <string name="a11y_pan_down">Déplacer vers le bas</string>
+
+
+
+
 <string name="a11y_password">mot de passe</string>
     <string name="a11y_trigger_word">mot déclencheur</string>
     <string name="a11y_quick_exit">Sortie rapide</string>
@@ -32,20 +32,20 @@
 <string name="a11y_save_article">Enregistrer l’article</string>
     <string name="a11y_remove_bookmark">Retirer le favori</string>
     <string name="a11y_message_actions">Actions du message</string>
-<string name="a11y_square_root">Racine carrée</string>
-    <string name="a11y_pi">Pi</string>
-    <string name="a11y_power">Puissance</string>
-    <string name="a11y_factorial">Factorielle</string>
-    <string name="a11y_inverse_functions">Fonctions inverses</string>
-    <string name="a11y_sine">Sinus</string>
-    <string name="a11y_cosine">Cosinus</string>
-    <string name="a11y_tangent">Tangente</string>
-    <string name="a11y_inverse_sine">Arc sinus</string>
-    <string name="a11y_inverse_cosine">Arc cosinus</string>
-    <string name="a11y_inverse_tangent">Arc tangente</string>
-    <string name="a11y_squared">Au carré</string>
-    <string name="a11y_exponential">Exponentielle</string>
-    <string name="a11y_ten_to_the_power">Dix à la puissance</string>
-    <string name="a11y_natural_logarithm">Logarithme naturel</string>
-    <string name="a11y_logarithm">Logarithme</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 </resources>

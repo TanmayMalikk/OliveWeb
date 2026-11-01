@@ -1,71 +1,70 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="ui_two_variable_statistics">二变量统计</string>
-    <string name="ui_1_2_3_2_4_5">1,2,3 | 2,4,5</string>
-    <string name="ui_polynomial_regression">多项式回归</string>
-    <string name="ui_degree_2_1_2_3_2_5_10">2 度 | 1,2,3 | 2,5,10</string>
-    <string name="ui_other_regression">其他回归</string>
-    <string name="ui_exponential_1_2_3_2_4_8">exponential | 1,2,3 | 2,4,8</string>
-    <string name="ui_basic">基础</string>
-    <string name="ui_algebra">代数</string>
-    <string name="ui_calculus">微积分</string>
-    <string name="ui_complex">综合体</string>
-    <string name="ui_matrices">矩阵</string>
-    <string name="ui_statistics">统计数据</string>
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="ui_username_taken_c04650">用户名已被占用。</string>
     <string name="ui_incorrect_password_b68db3">密码不正确。</string>
     <string name="ui_unable_to_send_the_message">无法发送消息。</string>
     <string name="ui_unable_to_start_messaging">无法开始消息传送。</string>
     <string name="ui_could_not_reconnect_check_your_password_and_try_again">无法重新连接。检查您的密码并重试。</string>
-    <string name="ui_no_zero_was_found_in_that_interval">在此区间内未发现零。</string>
-    <string name="ui_use_semicolons_exactly_like_the_example">像示例一样使用分号。</string>
-    <string name="ui_the_result_is_not_a_finite_number">结果不是有限数。</string>
-    <string name="ui_enter_a_quadratic_equation_with_an_x_term">输入带有 x² 项的二次方程。</string>
-    <string name="ui_enter_a_polynomial_calculation_first">首先输入多项式计算。</string>
-    <string name="ui_enter_a_calculation_without_an_equals_sign">输入不带等号的计算。</string>
-    <string name="ui_enter_an_equation_first">首先输入一个方程。</string>
-    <string name="ui_use_one_equals_sign_with_an_expression_on_each_side">使用一个等号，两边各有一个表达式。</string>
-    <string name="ui_the_equation_must_contain_x">方程必须包含 x。</string>
-    <string name="ui_use_a_polynomial_with_degree_value_or_lower">使用次数为 %1$s 或更低的多项式。</string>
-    <string name="ui_enter_terms_such_as_x_2_x_3">输入诸如 (x - 2)(x - 3) 之类的术语。</string>
-    <string name="ui_check_the_equation_near_value">检查“%1$s”附近的方程。</string>
-    <string name="ui_use_exponents_from_0_to_value">使用从 0 到 %1$s 的指数。</string>
-    <string name="ui_the_equation_ends_too_early">等式结束得太早了。</string>
-    <string name="ui_close_every_parenthesis">关闭每个括号。</string>
-    <string name="ui_use_finite_numbers_only">仅使用有限的数字。</string>
-    <string name="ui_cannot_divide_by_zero">不能除以零。</string>
-    <string name="ui_this_division_does_not_simplify_to_a_polynomial">此除法不会简化为多项式。</string>
-    <string name="ui_this_division_leaves_a_remainder_and_does_not_simplify_to_a_polyn">该除法留下余数并且不会简化为多项式。</string>
-    <string name="ui_use_a_whole_number_exponent_after">在 ^ 之后使用整数指数。</string>
-    <string name="ui_check_the_number_near_value">检查“%1$s”附近的数字。</string>
-    <string name="ui_unexpected_value">意外的“%1$s”。</string>
-    <string name="ui_enter_an_equation_after_y">在 y = 之后输入方程。</string>
-    <string name="ui_write_value_with_parentheses_like_value_x">用括号写入 %1$s，如 %2$s(x)。</string>
-    <string name="ui_value_needs_one_value">%1$s 需要一个值。</string>
-    <string name="ui_value_needs_two_values">%1$s 需要两个值。</string>
-    <string name="ui_random_needs_no_values">随机不需要值。</string>
-    <string name="ui_randint_needs_a_valid_range">randint 需要一个有效的范围。</string>
-    <string name="ui_factorial_needs_a_whole_number_from_0_to_170">阶乘需要 0 到 170 之间的整数。</string>
-    <string name="ui_npr_needs_whole_numbers_with_0_r_n">nPr 需要 0 ≤ r ≤ n 的整数。</string>
-    <string name="ui_ncr_needs_whole_numbers_with_0_r_n">nCr 需要 0 ≤ r ≤ n 的整数。</string>
-    <string name="ui_function_value_is_not_supported">不支持函数“%1$s”。</string>
-    <string name="ui_graph_at_least_one_equation_first">首先画出至少一个方程。</string>
-    <string name="ui_use_valid_numbers_for_the_range">使用有效数字作为范围。</string>
-    <string name="ui_end_x_must_be_greater_than_or_equal_to_start_x">结束 X 必须大于或等于开始 X。</string>
-    <string name="ui_step_must_be_greater_than_zero">步骤必须大于零。</string>
-    <string name="ui_choose_a_range_that_creates_500_rows_or_fewer">选择创建 500 行或更少的范围。</string>
-    <string name="ui_graph_at_least_two_equations_first">首先画出至少两个方程。</string>
-    <string name="ui_none">没有任何</string>
-    <string name="ui_value_value_0c813d">值 = %1$s</string>
-    <string name="ui_h_value_left_value_right_value">h=%1$s：左%2$s，右%3$s</string>
-    <string name="ui_z_value_real_value_imaginary_value_conjugate_value_magnitude_valu">z = %1$s真实 = %2$s虚数 = %3$s共轭= %4$s幅度= %5$s角度= %6$s 拉德\n极性 = %7$s ∠ %8$s</string>
-    <string name="ui_power_value_roots_value">功率 = %1$s\nroots:\n%2$s</string>
-    <string name="ui_n_value_sum_value_sum_of_squares_value_mean_value_median_value_mo">n = %1$s\nsum = %2$s\n 平方和 = %3$s\nmean = %4$s\nmedian = %5$s\nmode = %6$s\nmin = %7$s\nQ1 = %8$s\nQ3 = %9$s\nmax = %10$s\nsample SD = %11$s\nvariance = %12$s</string>
-    <string name="ui_correlation_value_y_value_valuex_r_value">相关性 = %1$s\ny = %2$s + %3$sx\nR² = %4$s</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <string name="ui_olive_order_update">橄榄订单更新</string>
     <string name="ui_your_order_is_being_prepared">您的订单正在准备中。</string>
     <string name="ui_new_headlines_are_available">新的头条新闻可用。</string>
-    <string name="ui_a_calculator_reminder_is_available">可以使用计算器提醒。</string>
     <string name="ui_a_new_update_is_available">有新的更新可用。</string>
     <string name="ui_an_account_update_is_available">帐户更新可用。</string>
     <string name="ui_fresh_menu_updates_are_available">提供新鲜的菜单更新。</string>
@@ -73,17 +72,14 @@
     <string name="ui_new_kitchen_picks_are_ready_to_browse">新的厨房精选可供浏览。</string>
     <string name="ui_your_latest_digest_is_ready">您的最新摘要已准备就绪。</string>
     <string name="ui_there_are_new_stories_to_browse">有新的故事可供浏览。</string>
-    <string name="ui_a_calculator_update_is_available">计算器有更新。</string>
-    <string name="ui_your_calculation_tools_are_ready">您的计算工具已准备就绪。</string>
-    <string name="ui_open_better_calculator_for_an_update">打开更好的计算器进行更新。</string>
+
     <string name="ui_open_the_app_to_see_what_s_new">打开应用程序查看新内容。</string>
     <string name="ui_new_activity_is_waiting">新活动正在等待。</string>
     <string name="ui_olive_order_updates">橄榄订单更新</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">Olive 的订单状态和交货通知</string>
     <string name="ui_daily_digest_briefings">每日摘要简报</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">每日头条新闻和新闻摘要通知</string>
-    <string name="ui_better_calculator_reminders">更好的计算器提醒</string>
-    <string name="ui_utility_and_calculation_reminders">实用和计算提醒</string>
+
     <string name="ui_app_updates">应用程序更新</string>
     <string name="ui_general_app_activity_notifications">一般应用程序活动通知</string>
     <string name="ui_olive_branch_updates">橄榄枝更新</string>
@@ -96,9 +92,9 @@
     <string name="ui_health">健康</string>
     <string name="ui_science">科学</string>
     <string name="ui_environment">环境</string>
-    <string name="ui_x_2_4_2x_3">x^2 - 4\n2x + 3</string>
-    <string name="ui_error">错误</string>
-    <string name="ui_undefined">未定义</string>
+
+
+
     <string name="ui_update_your_profile_details">更新你的个人资料。</string>
     <string name="ui_profile_required_fields">请填写全名、有效的出生日期和城市。</string>
     <string name="password_excludes_username">密码不能包含用户名。</string>

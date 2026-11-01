@@ -8,7 +8,7 @@ import java.io.File
 import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 
-// Exercise the actual XML copy and placeholders without an Android device in pure calculator tests.
+// Exercise the actual XML copy and placeholders without an Android device.
 internal fun testResourceText(locale: String = "values"): ResourceText {
     val root = listOf(File("src/main/res"), File("app/src/main/res")).first { it.isDirectory }
     val names = R.string::class.java.fields.associate { it.getInt(null) to it.name }

@@ -14,7 +14,7 @@ The project uses feature-first folders. Put new code with the feature that owns 
 - `ui/users/admin` contains the administrator dashboard and account management.
 - `ui/users/shared/organization` contains setup and settings screens used by both organization roles.
 - `ui/users/shared` contains features used by multiple signed-in roles: `auth`, `camera`, `messaging`, `onboarding`, `safetyplan`, and `navigation`.
-- `ui/covers` contains the calculator, game, news, food, and shared cover UI. Food cover screens live in `ui/covers/food`.
+- `ui/covers` contains the fitness tracker, game, news, food, and shared cover UI.
 - `ui/session` owns authenticated workflow orchestration; it is application infrastructure rather than a user interface feature.
 - `ui/shared` contains presentation primitives used across roles.
 - `ocr`, `security`, `notification`, and top-level `location` contain platform integrations that are shared across UI features.

@@ -109,7 +109,7 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
     }
 }
 
-// USER ONLY: a search trigger opens this local PIN challenge; calculator entry verifies through SessionAccess separately.
+// USER ONLY: a cover trigger opens this local PIN challenge before private content is available.
 // UI sizing/color: this screen owns the compact breakpoint, keypad dimensions, PIN-dot size, OliveGreen accents, and responsive text sizes.
 @Composable
 internal fun PinPrompt(session: SessionViewModel) {
