@@ -7,15 +7,8 @@ const paths = {
     '<path d="M65 191C100 136 151 102 199 68M104 145C76 146 64 119 71 100C94 105 112 121 104 145ZM142 111C121 94 131 66 146 58C161 78 159 98 142 111ZM127 126C148 116 171 126 178 145C154 152 136 146 127 126Z"/> <ellipse cx="108" cy="172" rx="13" ry="18"/>',
   "daily-digest":
     '<rect x="61" y="62" width="135" height="132" rx="7" fill="none" stroke="currentColor" stroke-width="7"/><path d="M83 87H174M83 107H174M83 167H174M83 183H154" fill="none" stroke="currentColor" stroke-width="5"/><rect x="83" y="125" width="36" height="28" rx="2"/><path d="M132 128H174M132 141H174M132 153H164" fill="none" stroke="currentColor" stroke-width="4"/>',
-  calculator:
-    '<rect x="76" y="51" width="106" height="154" rx="15" fill="none" stroke="currentColor" stroke-width="7"/><rect x="91" y="69" width="76" height="32" rx="5" fill="none" stroke="currentColor" stroke-width="5"/>' +
-    [115, 144, 173]
-      .map((y) =>
-        [93, 122, 151]
-          .map((x) => `<rect x="${x}" y="${y}" width="15" height="15" rx="4"/>`)
-          .join(""),
-      )
-      .join(""),
+  fitness:
+    '<path d="M55 128h30l13-28 25 58 18-40 10 10h50" fill="none" stroke="currentColor" stroke-width="9"/><path d="M128 207C71 174 55 140 55 101c0-29 20-49 46-49 15 0 25 7 27 16 5-9 15-16 29-16 26 0 45 20 45 49 0 39-17 73-74 106Z" fill="none" stroke="currentColor" stroke-width="7"/>',
   game: '<path d="M127 202V118M127 149C83 152 67 115 68 88C105 84 129 111 127 149ZM127 123C126 85 149 62 184 58C190 93 164 125 127 123Z"/>',
 };
 await mkdir(new URL("../public/icons/", import.meta.url), { recursive: true });

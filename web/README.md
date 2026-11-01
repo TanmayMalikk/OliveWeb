@@ -33,7 +33,7 @@ Firebase rule checks remain in `../firebase` (`npm test` there starts demo emula
 
 | Address                    | Build command            | Behavior                                                                                                                                                                                                           |
 | -------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `yourolivebranch.ca`       | `npm run build:user`     | A pathless user SPA. `/` shows the cover saved for this browser: Game, News, Food, or Calculator. Game is the default. Login, onboarding, PIN entry, and Safe App are in-memory screens and the address stays `/`. |
+| `yourolivebranch.ca`       | `npm run build:user`     | A pathless user SPA. `/` shows the cover saved for this browser: Game, News, Food, or Fitness. Game is the default. Login, onboarding, PIN entry, and Safe App are in-memory screens and the address stays `/`. |
 | `get.yourolivebranch.ca`   | `npm run build:download` | Download and installation instructions at `/`.                                                                                                                                                                     |
 | `admin.yourolivebranch.ca` | `npm run build:admin`    | Staff and administrator sign-in and workspace at `/`. Personal and safe-contact roles are rejected here.                                                                                                           |
 
@@ -47,10 +47,10 @@ The four user covers are states of the first SPA, rather than pages or subdomain
 The chosen cover is saved in the browser enrollment/profile. Two people can open
 the same `https://yourolivebranch.ca/` address and see different covers. The Game
 cover exposes no login or download links. Five quick taps on its Little Grove
-brand starts private entry. Food, News, and Calculator retain their configured
+brand starts private entry. Food, News, and Fitness retain their configured
 trigger input. Quick Exit returns to the saved cover at `/`.
 
-Legacy local routes such as `/olive`, `/daily-digest`, `/calculator`, `/game`, and
+Local routes such as `/olive`, `/daily-digest`, `/fitness`, `/game`, and
 `/account/sign-in` are accepted as migration/development inputs, then immediately
 removed from the address bar. Personal entry links arrive as
 `https://yourolivebranch.ca/entry#<random-token>`; both the path and fragment are
@@ -156,9 +156,7 @@ page. This intentionally does not provide a fully offline application shell.
 - Messaging requires Firebase; local accounts cannot communicate with other users.
   Speech/video calling is not implemented in either version by this work.
 - The profile language preference syncs; this web UI currently uses English.
-  Native translation coverage has not been ported one-for-one. The 30 advanced
-  calculator tools reuse the mobile tool names/examples, and plotting includes
-  histogram, box, dot, scatter, and XY line views with accessible data tables.
+  Native translation coverage has not been ported one-for-one.
 - Publisher restrictions remain in place. The web reader sanitizes available
   article HTML and links to the original when Google News resolution, paywalls,
   or publisher restrictions prevent reading. It does not promise that every
