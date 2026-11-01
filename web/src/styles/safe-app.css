@@ -510,3 +510,19 @@
   border-radius: 1rem;
   border: 1px solid var(--line);
 }
+.documents-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.documents-heading > div { display: grid; gap: 0.6rem; }
+.documents-heading h2, .documents-heading p, .browser-document h3, .browser-document p { margin: 0; }
+.document-grid { display: grid; gap: 0.8rem; }
+.browser-document {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+}
+.browser-document p { color: var(--muted); font-size: 0.78rem; margin-top: 0.35rem; }
+@media (max-width: 42rem) {
+  .documents-heading { align-items: flex-start; flex-direction: column; }
+  .browser-document { grid-template-columns: auto minmax(0, 1fr); }
+  .browser-document .button { grid-column: 1 / -1; width: 100%; }
+}

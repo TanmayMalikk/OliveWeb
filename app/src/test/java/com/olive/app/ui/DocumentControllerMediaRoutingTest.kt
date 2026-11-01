@@ -101,6 +101,11 @@ class DocumentControllerMediaRoutingTest {
             downloadCalled = true
             return file
         }
+        override suspend fun approveCurrentAccountDevices(
+            document: SafetyDocument,
+            currentUid: String,
+            username: String,
+        ) = Unit
     }
 
     private class FakeMediaTransfers(private val file: File) : MediaTransferOperations {

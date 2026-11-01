@@ -361,10 +361,13 @@ internal class MediaTransferController(
                 }
             }.toString()
             // The server stores only wrapped key material; it never receives the raw AES key.
-            val wrapped=mapOf(owner.uid to KeyManager.wrapKey(key,KeyManager.getOrCreatePublicKey()))
+            val publicKey=KeyManager.getOrCreatePublicKey()
+            val ownerWrapped=KeyManager.wrapKey(key,publicKey)
+            val wrapped=mapOf(owner.uid to ownerWrapped)
+            val deviceWrapped=mapOf("${owner.uid}--${KeyManager.deviceId(publicKey)}" to ownerWrapped)
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
                 EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
-                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview)
+                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped)
             return MediaUploadJob(jobId,owner.uid,prepared)
         } catch (failure: Exception) {
             target.delete()
@@ -412,7 +415,8 @@ internal class MediaTransferController(
             require(encrypted.length()==document.ciphertextSize) {
                 sizeMismatch(document.ciphertextSize,encrypted.length())
             }
-            val key=document.wrappedKeys[viewerUid]?.let {
+            val deviceKey="$viewerUid--${KeyManager.deviceId()}"
+            val key=(document.deviceWrappedKeys[deviceKey] ?: document.wrappedKeys[viewerUid])?.let {
                 KeyManager.unwrapKey(it,document.encryptionVersion)
             } ?: error("Encryption key is unavailable")
             val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }

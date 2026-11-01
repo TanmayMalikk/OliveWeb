@@ -28,6 +28,8 @@ interface MediaTicketDataSource {
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
     /** Replaces the owner-controlled recipient list and wrapped AES keys without exposing plaintext. */
     suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord
+    /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
+    suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
     /** Deletes both the owner's R2 object and its Firestore metadata through trusted code. */
     suspend fun deleteMedia(mediaId:String)
 }
@@ -59,6 +61,7 @@ class MediaRepository(
             "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
             "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
             "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
+            "deviceWrappedKeys" to source.deviceWrappedKeys,
             "encryptionVersion" to source.encryptionVersion,
         ))
         return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
@@ -89,6 +92,12 @@ class MediaRepository(
     override suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         return call("mediaUpdateAccess",mapOf("mediaId" to mediaId,"wrappedKeys" to wrappedKeys)).record()
+    }
+
+    override suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord {
+        require(deviceWrappedKeys.isNotEmpty() && deviceWrappedKeys.size<=50)
+        return call("mediaUpdateDeviceKeys",mapOf("mediaId" to mediaId,
+            "deviceWrappedKeys" to deviceWrappedKeys)).record()
     }
 
     override suspend fun deleteMedia(mediaId:String) { call("mediaDelete",mapOf("mediaId" to mediaId)) }
@@ -131,4 +140,5 @@ private fun Map<*,*>.stringMap(name:String):Map<String,String> = (get(name) as? 
 private fun Map<*,*>.stringList(name:String)=(get(name) as? List<*>)?.filterIsInstance<String>() ?: error("Missing $name")
 private fun Map<*,*>.record()=CloudMediaRecord(string("mediaId"),string("ownerUid"),string("objectKey"),
     string("encryptedMetadata"),stringMap("wrappedKeys"),stringList("allowedUsers"),long("ciphertextSize"),
-    string("ciphertextSha256"),(get("encryptionVersion") as? Number)?.toInt() ?: 1,long("createdAt"))
+    string("ciphertextSha256"),(get("encryptionVersion") as? Number)?.toInt() ?: 1,long("createdAt"),
+    stringMap("deviceWrappedKeys"))
