@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -58,6 +59,7 @@ private val WatchRed = Color(0xFF9A4D45)
 private enum class WatchPage(val label: String) {
     HOME("Home"),
     MOVE("Move"),
+    VITALS("Vitals"),
     FOOD("Food"),
 }
 
@@ -172,6 +174,10 @@ private fun WatchDashboard(state: WatchFitnessState) {
             }
         }
 
+        if (selectedPage == WatchPage.VITALS) {
+            WatchVitalsSummary(state)
+        }
+
         if (selectedPage == WatchPage.FOOD) {
             WatchSummaryCard(title = "Nutrition") {
             Row(
@@ -196,6 +202,47 @@ private fun WatchDashboard(state: WatchFitnessState) {
                 fontSize = 9.sp,
                 modifier = Modifier.align(Alignment.End),
             )
+            }
+        }
+    }
+}
+
+// Watch vitals: shows today's live, peak, lowest, resting, and average heart rates.
+@Composable
+private fun WatchVitalsSummary(state: WatchFitnessState) {
+    val summary = state.heartRateSummary
+    val current = state.heartRate?.toString() ?: "--"
+    val average = summary.averageBpm?.toString() ?: "--"
+    val resting = summary.restingBpm?.toString() ?: "--"
+    val description = buildString {
+        append("Current heart rate $current beats per minute. ")
+        append("Peak ${summary.peakBpm.takeIf { it > 0 } ?: "no data"}. ")
+        append("Lowest ${summary.lowestBpm.takeIf { it > 0 } ?: "no data"}. ")
+        append("Resting $resting. Average $average.")
+    }
+    Column(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = description }) {
+        WatchSummaryCard(title = "Heart rate") {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Text(
+                    current,
+                    color = WatchAccent,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text("bpm now", color = WatchSubtle, fontSize = 10.sp)
+                Text(state.heartRateStatus, color = WatchSubtle, fontSize = 9.sp)
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                TinyMetric(summary.peakBpm.takeIf { it > 0 }?.toString() ?: "--", "peak")
+                TinyMetric(summary.lowestBpm.takeIf { it > 0 }?.toString() ?: "--", "lowest")
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                TinyMetric(resting, "resting")
+                TinyMetric(average, "average")
             }
         }
     }

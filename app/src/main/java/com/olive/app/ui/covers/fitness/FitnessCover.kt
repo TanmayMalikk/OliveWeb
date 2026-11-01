@@ -155,7 +155,12 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                     snapshot = snapshot,
                     onGoals = { page = FitnessPage.GOALS },
                 )
-                FitnessPage.ACTIVITY -> FitnessActivityPage(snapshot, history)
+                FitnessPage.ACTIVITY -> FitnessActivityPage(
+                    snapshot = snapshot,
+                    history = history,
+                    accountId = accountId,
+                    enabled = interactive,
+                )
                 FitnessPage.VITALS -> FitnessVitalsPage(snapshot)
                 FitnessPage.NUTRITION -> TodayPage(
                     snapshot = snapshot,
@@ -410,6 +415,8 @@ private fun RowScope.HeroMetric(value: String, label: String) {
 private fun FitnessActivityPage(
     snapshot: FitnessSnapshot,
     history: List<FitnessHistoryDay>,
+    accountId: String,
+    enabled: Boolean,
 ) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     LazyColumn(
@@ -433,6 +440,7 @@ private fun FitnessActivityPage(
             }
         }
         item { FitnessActivityDashboard(snapshot) }
+        item { FitnessOutdoorWorkoutCard(accountId, enabled) }
         item { FitnessHistoryCharts(history) }
     }
 }
@@ -456,7 +464,7 @@ private fun TodayPage(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    stringResource(R.string.nutrition),
+                    stringResource(R.string.nutrition_work_in_progress),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )

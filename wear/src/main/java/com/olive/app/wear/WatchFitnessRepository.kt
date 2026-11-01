@@ -19,6 +19,7 @@ import androidx.health.services.client.data.Availability
 import androidx.health.services.client.data.DataPointContainer
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.DeltaDataType
+import androidx.wear.tiles.TileService
 import com.google.android.gms.wearable.DataClient
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -38,10 +39,15 @@ internal class WatchFitnessRepository(
     private val dataClient = Wearable.getDataClient(context)
     private val measureClient = HealthServices.getClient(context).measureClient
     private val heartbeatHandler = Handler(Looper.getMainLooper())
-    private var state = WatchFitnessState(watchSteps = savedSteps())
+    private var state = WatchFitnessState(
+        watchSteps = savedSteps(),
+        heartRateSummary = savedHeartRateSummary(),
+    )
+    private var stepsAtLastHeartRate = state.watchSteps
     private var running = false
     private var lastPublishedAt = 0L
     private var lastPublishedSteps = -1
+    private var lastTileUpdateAt = 0L
     private val publishHeartbeat = object : Runnable {
         override fun run() {
             if (!running) return
@@ -61,7 +67,27 @@ internal class WatchFitnessRepository(
         override fun onDataReceived(data: DataPointContainer) {
             val latest = data.getData(DataType.HEART_RATE_BPM).lastOrNull()?.value
             if (latest != null && latest.isFinite()) {
-                update(state.copy(heartRate = latest.roundToInt(), heartRateStatus = "Live"))
+                val bpm = latest.roundToInt()
+                val today = LocalDate.now().toString()
+                val currentSummary = if (preferences.getString(HEART_RATE_DATE_KEY, null) == today) {
+                    state.heartRateSummary
+                } else {
+                    WatchHeartRateSummary()
+                }
+                val summary = currentSummary.record(
+                    bpm = bpm,
+                    resting = state.watchSteps == stepsAtLastHeartRate,
+                )
+                stepsAtLastHeartRate = state.watchSteps
+                saveHeartRateSummary(today, summary)
+                preferences.edit { putInt("heart_rate_latest", bpm) }
+                update(
+                    state.copy(
+                        heartRate = bpm.takeIf { it in 30..240 },
+                        heartRateStatus = "Live",
+                        heartRateSummary = summary,
+                    )
+                )
             }
         }
 
@@ -137,6 +163,12 @@ internal class WatchFitnessRepository(
     }
 
     private fun applyPhoneData(data: DataMap) {
+        preferences.edit {
+            putInt("phone_steps", data.getInt("phoneSteps").coerceAtLeast(0))
+            putInt("step_goal", data.getInt("stepGoal", 8_000).coerceAtLeast(1))
+            putFloat("calories", data.getFloat("calories").coerceAtLeast(0f))
+            putInt("calorie_goal", data.getInt("calorieGoal", 2_000).coerceAtLeast(1))
+        }
         update(
             state.copy(
                 phoneSteps = data.getInt("phoneSteps").coerceAtLeast(0),
@@ -164,6 +196,33 @@ internal class WatchFitnessRepository(
         0
     }
 
+    private fun savedHeartRateSummary(): WatchHeartRateSummary {
+        val today = LocalDate.now().toString()
+        if (preferences.getString(HEART_RATE_DATE_KEY, null) != today) {
+            return WatchHeartRateSummary()
+        }
+        return WatchHeartRateSummary(
+            peakBpm = preferences.getInt("heart_rate_peak", 0),
+            lowestBpm = preferences.getInt("heart_rate_lowest", 0),
+            totalBpm = preferences.getLong("heart_rate_total", 0L),
+            sampleCount = preferences.getInt("heart_rate_samples", 0),
+            restingTotalBpm = preferences.getLong("heart_rate_resting_total", 0L),
+            restingSampleCount = preferences.getInt("heart_rate_resting_samples", 0),
+        )
+    }
+
+    private fun saveHeartRateSummary(date: String, summary: WatchHeartRateSummary) {
+        preferences.edit {
+            putString(HEART_RATE_DATE_KEY, date)
+            putInt("heart_rate_peak", summary.peakBpm)
+            putInt("heart_rate_lowest", summary.lowestBpm)
+            putLong("heart_rate_total", summary.totalBpm)
+            putInt("heart_rate_samples", summary.sampleCount)
+            putLong("heart_rate_resting_total", summary.restingTotalBpm)
+            putInt("heart_rate_resting_samples", summary.restingSampleCount)
+        }
+    }
+
     private fun hasActivityPermission() = ContextCompat.checkSelfPermission(
         context,
         Manifest.permission.ACTIVITY_RECOGNITION,
@@ -182,6 +241,16 @@ internal class WatchFitnessRepository(
         state = newState
         onStateChanged(newState)
         publishWatchActivity(force = false)
+        requestTileUpdates()
+    }
+
+    private fun requestTileUpdates() {
+        val now = System.currentTimeMillis()
+        if (now - lastTileUpdateAt < TILE_UPDATE_INTERVAL_MS) return
+        val updater = TileService.getUpdater(context)
+        updater.requestUpdate(OliveActivityTileService::class.java)
+        updater.requestUpdate(OliveVitalsTileService::class.java)
+        lastTileUpdateAt = now
     }
 
     // Watch fitness users: sends a heartbeat even when BPM and steps stay unchanged.
@@ -203,5 +272,7 @@ internal class WatchFitnessRepository(
         const val DAILY_DATA_PATH = "/olive/fitness/daily"
         const val WATCH_ACTIVITY_PATH = "/olive/fitness/watch-activity"
         const val WATCH_HEARTBEAT_MS = 15_000L
+        const val HEART_RATE_DATE_KEY = "heart_rate_date"
+        const val TILE_UPDATE_INTERVAL_MS = 15_000L
     }
 }

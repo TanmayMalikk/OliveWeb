@@ -5,7 +5,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,8 +22,6 @@ class WatchFitnessActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Keep the dashboard active long enough for the watch sensor to return a heart-rate sample.
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         repository = WatchFitnessRepository(applicationContext) { state ->
             runOnUiThread { WatchFitnessStateHolder.state.value = state }
         }

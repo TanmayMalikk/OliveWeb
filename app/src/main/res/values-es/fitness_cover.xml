@@ -3,6 +3,7 @@
     <string name="overview">Resumen</string>
     <string name="activity">Actividad</string>
     <string name="nutrition">Nutrición</string>
+    <string name="nutrition_work_in_progress">Nutrición (EN DESARROLLO)</string>
     <string name="fitness_home_message">Tu actividad y nutrición diarias, juntas en un solo lugar.</string>
     <string name="today_summary">Resumen de hoy</string>
     <string name="edit_fitness_goals">Actualizar objetivos de actividad y nutrición</string>
@@ -82,4 +83,21 @@
     <string name="fitness_vitals_graph_description">Gráfico de frecuencia cardíaca con %1$d días de datos, de %2$d a %3$d latidos por minuto.</string>
     <string name="fitness_vitals_range">%1$d–%2$d lpm</string>
     <string name="fitness_vitals_average">Frecuencia cardíaca media %1$d lpm</string>
+    <string name="fitness_outdoor_workout">Entrenamiento al aire libre</string>
+    <string name="fitness_outdoor_workout_description">Registra en privado tu ruta GPS, distancia, tiempo y ritmo.</string>
+    <string name="fitness_start_outdoor_workout">Iniciar entrenamiento</string>
+    <string name="fitness_precise_location_required">Se necesita la ubicación precisa para registrar una ruta exacta.</string>
+    <string name="fitness_duration">Duración</string>
+    <string name="fitness_pace">Ritmo</string>
+    <string name="fitness_pause">Pausar</string>
+    <string name="fitness_resume">Reanudar</string>
+    <string name="fitness_finish">Finalizar</string>
+    <string name="fitness_route_points">Ruta con %1$d puntos GPS.</string>
+    <string name="fitness_waiting_for_gps">Esperando una ubicación GPS precisa…</string>
+    <string name="fitness_last_outdoor_workout">Último entrenamiento al aire libre</string>
+    <string name="fitness_recent_outdoor_workouts">Entrenamientos recientes al aire libre</string>
+    <string name="fitness_walking">Caminata</string>
+    <string name="fitness_running">Carrera</string>
+    <string name="fitness_cycling">Ciclismo</string>
+    <string name="fitness_hiking">Senderismo</string>
 </resources>
