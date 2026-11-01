@@ -1,6 +1,7 @@
 // All safe-app roles: loads and saves shared safety plans.
 import { firebase } from "./AccountService";
 import { doc, onSnapshot } from "firebase/firestore";
+import { writeSafetyChecklist } from "./SafetyChecklistCodec";
 export {
   readSafetyChecklist,
   safetyChecklistText,
