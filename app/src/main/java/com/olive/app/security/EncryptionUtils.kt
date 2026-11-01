@@ -1,4 +1,4 @@
-// Contains the encryption utils code for this part of Olive.
+// All signed-in roles: encrypts and decrypts private app values.
 package com.olive.app.security
 
 import java.security.SecureRandom
@@ -9,7 +9,6 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-// Groups the data and actions for encryption utils.
 object EncryptionUtils {
     private const val ALGORITHM = "AES"
     private const val TRANSFORMATION = "AES/GCM/NoPadding"

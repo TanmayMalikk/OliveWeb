@@ -1,9 +1,5 @@
-// Tests the safe entry UI test behavior.
+// Tests PIN and device-lock entry into the user safe app.
 package com.olive.app
-
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
 
 import android.app.KeyguardManager
 import androidx.compose.ui.test.*
@@ -18,15 +14,14 @@ import org.junit.Test
 import com.olive.app.data.UserProfile
 import com.olive.app.data.DeliveryAddress
 
-// Groups the data and actions for safe entry UI test.
 class SafeEntryUiTest : OliveUiTestBase() {
     private fun entrySetup() {
         openOnboarding()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         // Exercise real account/profile persistence while keeping these tests focused on the entry-method screens.
         compose.runOnIdle {
-            session.chooseNew()
-            session.authenticate(
+            session.account.chooseNew()
+            session.account.authenticate(
                 "entry_tester",
                 "test-password-123",
                 true
@@ -34,7 +29,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         }
         waitFor("full_name")
         compose.runOnIdle {
-            session.saveSetupProfile(
+            session.account.saveSetupProfile(
                 UserProfile(
                     "entry_tester",
                     "Entry Tester",
@@ -122,7 +117,11 @@ class SafeEntryUiTest : OliveUiTestBase() {
         click("pin_setup_submit")
         waitCover()
         unlock()
-        compose.runOnIdle { assertFalse(ViewModelProvider(compose.activity)[SessionViewModel::class.java].usesDeviceLock) }
+        compose.runOnIdle {
+            assertFalse(
+                ViewModelProvider(compose.activity)[SessionViewModel::class.java].account.usesDeviceLock
+            )
+        }
     }
 
     @Test
@@ -143,7 +142,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         shell("input keyevent 4")
         compose.waitUntil(15_000) { !session.busy }
         assertEquals(SessionScreen.DevicePin, session.screen)
-        assertFalse(session.configured)
+        assertFalse(session.account.configured)
         compose.onNodeWithTag("new_pin").assertDoesNotExist()
     }
 
@@ -184,7 +183,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
                     "Cancellation must be announced without moving TalkBack focus",
                     talkBack.focused.none { it == cancellation })
                 assertEquals(SessionScreen.DevicePin, session.screen)
-                assertFalse(session.configured)
+                assertFalse(session.account.configured)
             }
             // A cancelled OS prompt must leave both onboarding choices accessible.
             compose.onNodeWithTag("entry_choose_pin").assertIsEnabled()
@@ -222,7 +221,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         waitCover()
         compose.activityRule.scenario.recreate()
         waitCover()
-        assertTrue(session.usesDeviceLock)
+        assertTrue(session.account.usesDeviceLock)
         val saved = EncryptedVault(context, "demo").read().getJSONObject("enrollments")
             .getJSONObject(session.coverAccountId!!)
         assertFalse(saved.has("pinVerifier"))
@@ -239,7 +238,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         assertEquals(SessionScreen.Pin, session.screen)
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Device lock"))
             .assertExists()
-        compose.runOnIdle { session.submitPin("123456") }
+        compose.runOnIdle { session.account.submitPin("123456") }
         assertEquals(SessionScreen.Pin, session.screen)
         compose.onNodeWithTag("pin_digit_1").assertDoesNotExist()
         click("device_lock_unlock")

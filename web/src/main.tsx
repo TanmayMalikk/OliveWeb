@@ -1,4 +1,4 @@
-// Contains the main code for this part of Olive.
+// All app roles: starts the web app and chooses the page for this domain.
 import {
   Component,
   lazy,
@@ -10,20 +10,20 @@ import {
 } from "react";
 import { createRoot } from "react-dom/client";
 import { LogOut, Delete, ArrowLeft, Leaf } from "lucide-react";
-import { SessionProvider, useSession } from "./session";
-import { AuthPage, Setup } from "./users/shared/auth/Account";
-import { Button, Field, Form } from "./components";
-import Game from "./public/covers/Game";
-import { coverSite, siteMode, type SiteMode } from "./sites";
+import { SessionProvider, useSession } from "./session/SessionProvider";
+import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
+import { Button, Field, Form } from "./components/SharedComponents";
+import Game from "./public/covers/OliveGamesCover";
+import { coverSite, siteMode, type SiteMode } from "./sites/SiteRouting";
 import "./styles.css";
-const Download = lazy(() => import("./public/Download"));
-const EntryLink = lazy(() => import("./users/shared/auth/EntryLink"));
-const SafeApp = lazy(() => import("./users/shared/safe_app/SafeApp"));
-const Food = lazy(() => import("./public/covers/Food"));
-const News = lazy(() => import("./public/covers/News"));
-const Calculator = lazy(() => import("./public/covers/Calculator"));
-const AdminPortal = lazy(() => import("./users/admin/AdminPortal"));
-const StaffPortal = lazy(() => import("./users/staff/StaffPortal"));
+const Download = lazy(() => import("./public/AppDownloadInstructions"));
+const EntryLink = lazy(() => import("./users/shared/auth/PrivateEntryLink"));
+const SafeApp = lazy(() => import("./users/shared/safe_app/SafeAppLayout"));
+const Food = lazy(() => import("./public/covers/FoodDeliveryCover"));
+const News = lazy(() => import("./public/covers/DailyDigestCover"));
+const Calculator = lazy(() => import("./public/covers/CalculatorCover"));
+const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
+const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
 function PinGate() {
   const s = useSession();
   const [pin, setPin] = useState("");
@@ -221,7 +221,6 @@ function Routes({ mode }: { mode: SiteMode }) {
     </>
   );
 }
-// Groups the data and actions for error boundary.
 class ErrorBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }

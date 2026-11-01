@@ -1,9 +1,5 @@
-// Tests the device credential test driver behavior.
+// Drives real Android PIN prompts during safe-app security tests.
 package com.olive.app
-
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
 
 import android.app.UiAutomation
 import android.app.KeyguardManager
@@ -13,17 +9,25 @@ import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
 
-// Drive the actual Android prompt and Keystore operation on the disposable emulator.
+// Drive the actual Android prompt and Keystore operation on a prepared disposable emulator.
 internal class DeviceCredentialTestDriver(
     private val compose: ComposeTestRule,
     private val automation: UiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
 ) {
+    // Prepares only an Android emulator with the known UI-test PIN; physical devices are rejected.
     fun ensurePhonePin() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val keyguard = context.getSystemService(KeyguardManager::class.java)
-        if (keyguard.isDeviceSecure) return
-        shell("locksettings set-pin 246810")
-        compose.waitUntil(10_000) { keyguard.isDeviceSecure }
+        val emulator = shellOutput("getprop ro.kernel.qemu").trim() == "1"
+        assertTrue("Device-lock tests may only run on a disposable emulator.", emulator)
+        if (!keyguard.isDeviceSecure) {
+            val result = shellOutput("locksettings set-pin 246810")
+            assertTrue(
+                "Could not configure the disposable emulator PIN: $result",
+                result.contains("Pin set to '246810'")
+            )
+            compose.waitUntil(10_000) { keyguard.isDeviceSecure }
+        }
     }
 
     fun confirmPhonePin() {
@@ -76,7 +80,6 @@ internal class DeviceCredentialTestDriver(
     }
 
 
-    // Finds node.
     private fun findNode(
         node: AccessibilityNodeInfo?,
         predicate: (AccessibilityNodeInfo) -> Boolean
@@ -91,7 +94,13 @@ internal class DeviceCredentialTestDriver(
     }
 
     fun shell(command: String) {
+        shellOutput(command)
+    }
+
+    private fun shellOutput(command: String): String {
         val fd = automation.executeShellCommand(command)
-        ParcelFileDescriptor.AutoCloseInputStream(fd).use { it.readBytes() }
+        return ParcelFileDescriptor.AutoCloseInputStream(fd).use {
+            it.readBytes().toString(Charsets.UTF_8)
+        }
     }
 }

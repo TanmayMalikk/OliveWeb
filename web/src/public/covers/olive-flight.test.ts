@@ -1,4 +1,4 @@
-// Tests the test behavior.
+// Tests flight movement and collision rules for cover users.
 import { describe, expect, it } from "vitest";
 import {
   advanceFlight,
@@ -10,6 +10,7 @@ import {
 } from "./olive-flight";
 
 describe("Olive Flight physics", () => {
+  // Inputs: the values in this case. Expected: caps speed at 7.5x starting at 130 points.
   it("caps speed at 7.5x starting at 130 points", () => {
     expect(flightSpeedMultiplier(129)).toBe(7.4);
     for (const score of [130, 132, 10000]) {
@@ -21,6 +22,7 @@ describe("Olive Flight physics", () => {
       );
     }
   });
+  // Inputs: the values in this case. Expected: narrows the opening every ten points and stops at two olive bodies.
   it("narrows the opening every ten points and stops at two olive bodies", () => {
     expect(flightGap(0)).toBe(174);
     expect(flightGap(9)).toBe(174);
@@ -30,6 +32,7 @@ describe("Olive Flight physics", () => {
     expect(flightGap(110)).toBe(flightGap(10000));
     expect(flightGap(10000) - FLIGHT.branchStroke).toBe(FLIGHT.radiusY * 4);
   });
+  // Inputs: the values in this case. Expected: only applies smaller gaps to newly arriving branches and resets on restart.
   it("only applies smaller gaps to newly arriving branches and resets on restart", () => {
     const world = {
       ...newFlight(),
@@ -46,6 +49,7 @@ describe("Olive Flight physics", () => {
       true,
     );
   });
+  // Inputs: the values in this case. Expected: uses each branch's own gap for collision detection.
   it("uses each branch's own gap for collision detection", () => {
     const world = {
       ...newFlight(),
@@ -63,6 +67,7 @@ describe("Olive Flight physics", () => {
       ).over,
     ).toBe(true);
   });
+  // Inputs: the values in this case. Expected: increases horizontal speed by 0.1x at each two-point milestone.
   it("increases horizontal speed by 0.1x at each two-point milestone", () => {
     for (const [score, multiplier] of [
       [0, 1],
@@ -82,6 +87,7 @@ describe("Olive Flight physics", () => {
       expect(advanced.y).toBeCloseTo(advanceFlight(newFlight(), 0.02).y);
     }
   });
+  // Inputs: the values in this case. Expected: applies a newly earned milestone on the next frame and resets on a new round.
   it("applies a newly earned milestone on the next frame and resets on a new round", () => {
     const milestone = advanceFlight(
       {
@@ -101,6 +107,7 @@ describe("Olive Flight physics", () => {
     );
     expect(flightSpeedMultiplier(newFlight().score)).toBe(1);
   });
+  // Inputs: the values in this case. Expected: fills wider play areas with regularly spaced branches.
   it("fills wider play areas with regularly spaced branches", () => {
     const wide = newFlight(1000);
     expect(wide.branches).toHaveLength(4);
@@ -111,18 +118,21 @@ describe("Olive Flight physics", () => {
     expect(resized.branches).toHaveLength(4);
     expect(resized.branches[3].x - resized.branches[2].x).toBeCloseTo(250);
   });
+  // Inputs: the values in this case. Expected: does not collide with empty space beside the narrow branch tip.
   it("does not collide with empty space beside the narrow branch tip", () => {
     expect(hitsLeafyBranch(95, 230, false, 230, 0)).toBe(false);
     expect(hitsLeafyBranch(95, 230, true, 230, 0)).toBe(false);
     expect(hitsLeafyBranch(80, 230, false, 230, 0)).toBe(true);
     expect(hitsLeafyBranch(80, 230, true, 230, 0)).toBe(true);
   });
+  // Inputs: the values in this case. Expected: detects visible leaves without filling the empty space between them.
   it("detects visible leaves without filling the empty space between them", () => {
     expect(hitsLeafyBranch(50, 200, false, 245, 0)).toBe(true);
     expect(hitsLeafyBranch(50, 200, false, 210, 0)).toBe(false);
     expect(hitsLeafyBranch(50, 280, true, 235, 0)).toBe(true);
     expect(hitsLeafyBranch(50, 280, true, 270, 0)).toBe(false);
   });
+  // Inputs: the values in this case. Expected: flaps upward then falls under gravity.
   it("flaps upward then falls under gravity", () => {
     let world = { ...newFlight(), velocity: FLIGHT.lift };
     world = advanceFlight(world, 0.02);
@@ -130,6 +140,7 @@ describe("Olive Flight physics", () => {
     for (let frame = 0; frame < 25; frame++) world = advanceFlight(world, 0.02);
     expect(world.velocity).toBeGreaterThan(0);
   });
+  // Inputs: the values in this case. Expected: allows the olive through a gap but ends on a branch.
   it("allows the olive through a gap but ends on a branch", () => {
     const open = {
       ...newFlight(),
@@ -139,6 +150,7 @@ describe("Olive Flight physics", () => {
     expect(advanceFlight(open, 0.01).over).toBe(false);
     expect(advanceFlight({ ...open, y: 90 }, 0.01).over).toBe(true);
   });
+  // Inputs: the values in this case. Expected: scores each cleared branch once and replenishes obstacles.
   it("scores each cleared branch once and replenishes obstacles", () => {
     const world = advanceFlight(
       {
@@ -152,15 +164,30 @@ describe("Olive Flight physics", () => {
     expect(world.branches).toHaveLength(2);
     expect(advanceFlight(world, 0.01).score).toBe(1);
   });
+  // Inputs: the values in this case. Expected: stops at the floor or ceiling and keeps finished rounds frozen.
   it("stops at the floor or ceiling and keeps finished rounds frozen", () => {
     const floor = advanceFlight({ ...newFlight(), y: 470 }, 0.02);
     expect(floor.over).toBe(true);
     expect(advanceFlight(floor, 0.02)).toBe(floor);
     expect(advanceFlight({ ...newFlight(), y: 10 }, 0.02).over).toBe(true);
   });
+  // Inputs: the values in this case. Expected: caps frame jumps so switching back to the tab cannot skip obstacles.
   it("caps frame jumps so switching back to the tab cannot skip obstacles", () => {
     expect(advanceFlight(newFlight(), 30)).toEqual(
       advanceFlight(newFlight(), 0.032),
     );
+  });
+  // Inputs: NaN, infinity, negative scores, invalid time values, and wrong runtime types. Expected: safe defaults keep every number finite.
+  it("keeps invalid and overflowing runtime values out of flight state", () => {
+    expect(flightSpeedMultiplier(Number.NaN)).toBe(1);
+    expect(flightSpeedMultiplier(Number.POSITIVE_INFINITY)).toBe(1);
+    expect(flightSpeedMultiplier(-50)).toBe(1);
+    expect(flightGap(Number.NaN)).toBe(FLIGHT.gap);
+    expect(newFlight(Number.POSITIVE_INFINITY).branches).toHaveLength(2);
+    for (const seconds of [Number.NaN, Number.POSITIVE_INFINITY, "fast"] as unknown[]) {
+      const result = advanceFlight(newFlight(), seconds as number);
+      expect(Number.isFinite(result.y)).toBe(true);
+      expect(Number.isFinite(result.velocity)).toBe(true);
+    }
   });
 });

@@ -1,7 +1,5 @@
-// Contains the session secure sharing code for this part of Olive.
+// Signed-in users: controls who can receive shared safety items.
 package com.olive.app.ui.session
-
-import com.olive.app.ui.shared.*
 
 import com.olive.app.R
 import com.olive.app.data.AccountIdentity
@@ -26,22 +24,29 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             val device = enrollment ?: error("No active account")
             val repository = messagingRepository ?: error("Messaging unavailable")
             val secure = secureChatRepository ?: error("Secure messaging unavailable")
-            val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
-                val username = conversation.participantUsernames[uid]
-                    ?: error("Conversation participant unavailable")
-                repository.searchUsers(username, device.uid).firstOrNull()
-                    ?: error("Every participant needs to open the updated app before secure messages can be sent.")
-            }
-            require(peers.all { it.publicKey.isNotBlank() }) {
-                "Every participant needs to open the updated app before secure messages can be sent."
-            }
-            val keys: Map<String, PublicKey> = withContext(Dispatchers.Default) {
-                buildMap {
-                    put(device.uid, KeyManager.getOrCreatePublicKey())
-                    peers.forEach { put(it.uid, KeyManager.decodePublicKey(it.publicKey)) }
+            try {
+                val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
+                    val username = conversation.participantUsernames[uid]
+                        ?: error("Conversation participant unavailable")
+                    repository.searchUsers(username, device.uid).firstOrNull()
+                        ?: error("Every participant needs to open the updated app before secure messages can be sent.")
                 }
+                require(peers.all { it.publicKey.isNotBlank() }) {
+                    "Every participant needs to open the updated app before secure messages can be sent."
+                }
+                val keys: Map<String, PublicKey> = withContext(Dispatchers.Default) {
+                    buildMap {
+                        put(device.uid, KeyManager.getOrCreatePublicKey())
+                        peers.forEach { put(it.uid, KeyManager.decodePublicKey(it.publicKey)) }
+                    }
+                }
+                return secure.ensureRoomKey(conversation, device.uid, keys)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (keySharingFailure: Exception) {
+                // Existing members can still read history while a newly added member finishes key setup.
+                return secure.existingRoomKey(conversation.id, device.uid) ?: throw keySharingFailure
             }
-            return secure.ensureRoomKey(conversation, device.uid, keys)
         }
     }
 
@@ -96,7 +101,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                             runtime.application.getString(R.string.private_entry_shared)
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Hide encryption details and report only that the private entry could not be shared.
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_share_private_entry)
                     } finally {
@@ -140,7 +145,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                             }
                         }
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Revoke any access granted before a later recipient or chat update failed.
                         newlyGrantedRecipients.forEach { recipient ->
                             runCatching {
                                 documents.revokeAccess(document.id, device.uid, recipient)
@@ -178,7 +183,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         if (epoch == token) message = runtime.application.getString(R.string.safety_plan_shared_in_chat)
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Leave the safety plan unchanged and show the shared sync error.
                         if (epoch == token) message = runtime.application.getString(R.string.safety_sync_error)
                     } finally {
                         if (epoch == token) messagingBusy = false
@@ -237,7 +242,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         if (epoch == token) viewedSharedEntry = entry
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Keep the encrypted entry closed and display a safe opening error.
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_shared_entry)
                     } finally {

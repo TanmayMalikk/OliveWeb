@@ -26,7 +26,7 @@ object OpenCVUtils {
     fun init(context: Context): Boolean {
         if (initialized) return true
         try {
-            initialized = OpenCVLoader.initDebug()
+            initialized = OpenCVLoader.initLocal()
             if (!initialized) {
                 System.loadLibrary("opencv_java")
                 initialized = true

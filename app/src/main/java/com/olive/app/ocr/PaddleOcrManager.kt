@@ -1,4 +1,4 @@
-// Contains the paddle OCR manager code for this part of Olive.
+// Users scanning documents: reads text from scanned document images.
 package com.olive.app.ocr
 
 import android.content.Context
@@ -15,7 +15,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-// Groups the data and actions for OCR result.
 data class OcrResult(
     val success: Boolean,
     val extractedText: String,
@@ -36,7 +35,7 @@ class PaddleOcrManager(private val context: Context) {
     private val mutex = Mutex()
     private var released = false
 
-    // Makes sure initialized is ready.
+    // Starts the OCR engine once and reuses that initialized instance for later scans.
     private suspend fun ensureInitialized(): PaddleOCR {
         check(!released) { "OCR engine has been released" }
         if (paddleOcr == null) {

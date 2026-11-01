@@ -1,3 +1,4 @@
+// Safe-app users: draws the PIN-to-safe-app olive animation with an Android View.
 package com.olive.app.ui.shared
 
 import android.animation.ValueAnimator

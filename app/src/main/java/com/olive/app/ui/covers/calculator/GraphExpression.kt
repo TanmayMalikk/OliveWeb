@@ -1,4 +1,4 @@
-// Contains the graph expression code for this part of Olive.
+// Calculator cover users: parses equations for the graph.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*
@@ -8,7 +8,6 @@ import com.olive.app.R
 
 import kotlin.math.*
 
-// Groups the data and actions for calculator angle mode.
 internal enum class CalculatorAngleMode { RADIANS, DEGREES }
 
 // Graph equations are parsed and evaluated locally; add supported functions in FunctionNode when needed.
@@ -32,7 +31,6 @@ internal class GraphExpression private constructor(private val root: Node) {
         fun value(x: Double): Double
     }
 
-    // Groups the data and actions for parser.
     private class Parser(private val source: String, private val angleMode: CalculatorAngleMode) {
         private var index = 0
 
@@ -48,7 +46,7 @@ internal class GraphExpression private constructor(private val root: Node) {
             return result
         }
 
-        // Adds ition.
+        // Parses addition and subtraction after higher-priority multiplication terms.
         private fun addition(): Node {
             var left = multiplication()
             while (true) {
@@ -157,7 +155,6 @@ internal class GraphExpression private constructor(private val root: Node) {
                 } while (take(','))
                 requireText(take(')')) { ResourceFailure(R.string.ui_close_every_parenthesis) }
             }
-            // Runs when e happens.
             fun one(): Node {
                 requireText(arguments.size == 1) {
                     ResourceFailure(
@@ -288,7 +285,6 @@ internal class GraphExpression private constructor(private val root: Node) {
         private fun binary(left: Node, right: Node, operation: (Double, Double) -> Double) =
             Node { x -> operation(left.value(x), right.value(x)) }
 
-        // Starts s primary.
         private fun startsPrimary(): Boolean {
             skipSpaces()
             return index < source.length && (source[index] == '(' || source[index] == '.' || source[index].isDigit() || source[index].isLetter())

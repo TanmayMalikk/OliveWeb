@@ -1,7 +1,5 @@
-// Tests the profile setup validation test behavior.
+// Tests required profile fields for users and safe contacts.
 package com.olive.app.ui
-
-import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.onboarding.ProfileSetupValidation
 
@@ -9,7 +7,6 @@ import com.olive.app.data.DeliveryAddress
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for profile setup validation test.
 class ProfileSetupValidationTest {
     private fun validation(
         safeContact: Boolean = false,
@@ -27,6 +24,7 @@ class ProfileSetupValidationTest {
             details
         )
 
+    // Inputs: the values shown below. Expected: optional contacts must be complete before finishing user setup.
     @Test
     fun optionalContactsMustBeCompleteBeforeFinishingUserSetup() {
         assertTrue(validation().isPageValid(2))
@@ -40,6 +38,7 @@ class ProfileSetupValidationTest {
         )
     }
 
+    // Inputs: the values shown below. Expected: safe contact progress does not require private entry credentials.
     @Test
     fun safeContactProgressDoesNotRequirePrivateEntryCredentials() {
         val contact = validation(safeContact = true, trigger = "")
@@ -50,11 +49,49 @@ class ProfileSetupValidationTest {
         assertFalse(validation(trigger = "").requiredFields.all { it })
     }
 
+    // Inputs: the values shown below. Expected: incomplete identity and location cannot advance.
     @Test
     fun incompleteIdentityAndLocationCannotAdvance() {
         val incomplete =
             ProfileSetupValidation(false, "", "invalid", DeliveryAddress(), "moon garden", "", "")
         assertFalse(incomplete.isPageValid(0))
         assertFalse(incomplete.isPageValid(1))
+    }
+
+    // Inputs: the values shown below. Expected: whitespace overlong fields and impossible dates cannot complete setup.
+    @Test
+    fun whitespaceOverlongFieldsAndImpossibleDatesCannotCompleteSetup() {
+        val whitespace = ProfileSetupValidation(
+            false,
+            "   ",
+            "2000-01-02",
+            DeliveryAddress(city = "Edmonton"),
+            "moon garden",
+            "",
+            "",
+        )
+        assertFalse(whitespace.isPageValid(0))
+
+        val impossibleDate = ProfileSetupValidation(
+            false,
+            "Test Person",
+            "2024-02-30",
+            DeliveryAddress(city = "Edmonton"),
+            "moon garden",
+            "",
+            "",
+        )
+        assertFalse(impossibleDate.isPageValid(0))
+
+        val overlongCity = ProfileSetupValidation(
+            false,
+            "Test Person",
+            "2000-01-02",
+            DeliveryAddress(city = "x".repeat(161)),
+            "moon garden",
+            "",
+            "",
+        )
+        assertFalse(overlongCity.isPageValid(1))
     }
 }

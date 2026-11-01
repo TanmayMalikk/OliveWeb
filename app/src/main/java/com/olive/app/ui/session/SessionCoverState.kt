@@ -1,7 +1,5 @@
-// Contains the session cover state code for this part of Olive.
+// Signed-in users: stores the selected discreet cover.
 package com.olive.app.ui.session
-
-import com.olive.app.ui.shared.*
 
 import com.olive.app.R
 
@@ -13,7 +11,7 @@ import kotlinx.coroutines.sync.withLock
 
 // Owns account-scoped cover persistence and checkout records.
 internal class SessionCoverState(private val runtime: SessionRuntime) {
-    // Restores cover data.
+    // Loads the signed-in account's cart, favourites, customizations, and saved news state.
     suspend fun restoreCoverData(uid: String) {
         with(runtime) {
             with(state) {
@@ -29,7 +27,6 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
-    // Saves food cover.
     fun saveFoodCover(
         cart: Map<String, Int>,
         favorites: Set<String>,
@@ -75,7 +72,6 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
-    // Records checkout.
     suspend fun recordCheckout(foods: List<OrderLine>, totalCents: Int, error: String) {
         with(runtime) {
             with(state) {
@@ -100,7 +96,6 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
-    // Saves address.
     fun saveAddress(address: DeliveryAddress) {
         with(runtime) {
             with(state) {

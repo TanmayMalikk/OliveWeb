@@ -1,7 +1,5 @@
-// Contains the session messaging code for this part of Olive.
+// Signed-in users: loads and sends chat messages.
 package com.olive.app.ui.session
-
-import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
 
@@ -23,7 +21,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         screen == SessionScreen.Safe ||
                 (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN))
     }
-    // Makes sure messaging observation is ready.
+    // Starts the account's friend and conversation listeners once the current screen may show messages.
     fun ensureMessagingObservation(showFeedback: Boolean = false) {
         with(runtime) {
             with(state) {
@@ -33,7 +31,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Starts messaging.
     fun startMessaging(showFeedback: Boolean = true) {
         with(runtime) {
             with(state) {
@@ -121,7 +118,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                         messagingNeedsReconnect = false
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Keep the social screen open and offer account reconnection when messaging setup fails.
                         if (epoch == token) {
                             messagingNeedsReconnect = true
                             message =
@@ -156,14 +153,20 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                             conversations = rows
                             activeConversation?.let { active ->
                                 rows.firstOrNull { it.id == active.id }?.let { updated ->
-                                    if (active.participantIds != updated.participantIds) {
+                                    if (active.closedAt == 0L && updated.closedAt > 0L) {
+                                        conversationActions.closeConversation()
+                                    } else if (active.participantIds != updated.participantIds) {
                                         messageSubscription?.close()
                                         messageSubscription = null
-                                        activeConversation = null
-                                        conversationActions.openConversation(updated)
+                                        activeConversation = updated
+                                        conversationActions.openConversation(updated, preserveMessages = true)
                                     } else {
                                         activeConversation = updated
                                         conversationActions.markConversationRead(updated)
+                                        if (messageSubscription == null && !messagingBusy &&
+                                            active.updatedAt != updated.updatedAt) {
+                                            conversationActions.openConversation(updated)
+                                        }
                                     }
                                 }
                             }
@@ -181,7 +184,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Runs messaging action.
     fun runMessagingAction(
         failure: String,
         block: suspend (MessagingRepository, DeviceEnrollment, Long) -> Unit
@@ -218,7 +220,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Stops messaging.
     fun stopMessaging(clearRows: Boolean = true) {
         with(runtime) {
             with(state) {
@@ -262,7 +263,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Syncs local notification handler.
+    // Reconnects device notifications to the conversations visible to the current account.
     fun syncLocalNotificationHandler() {
         with(runtime) {
             with(state) {

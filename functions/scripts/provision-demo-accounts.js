@@ -1,55 +1,123 @@
-// Run this trusted deployment script to create or repair the protected demo organization accounts.
-const {initializeApp, refreshToken} = require("firebase-admin/app");
+// Creates or repairs the four school-demo accounts without storing their password in source control.
+const path = require("node:path");
+const fs = require("node:fs");
+const os = require("node:os");
+const {initializeApp} = require("firebase-admin/app");
 const {getAuth} = require("firebase-admin/auth");
-const cliAuth = require("../../firebase/node_modules/firebase-tools/lib/auth");
-const cliApi = require("../../firebase/node_modules/firebase-tools/lib/api");
-const {defaultProfile, signInEmail} = require("../src/accountPolicy");
+const {defaultProfile, organizationEmailKey, signInEmail} = require("../src/accountPolicy");
 
-const cliAccount = cliAuth.getProjectDefaultAccount(require("node:path").resolve(__dirname, "../.."));
-if (!cliAccount?.tokens?.refresh_token) throw new Error("Sign in with Firebase CLI before provisioning demo accounts.");
-const credential = refreshToken({
-  client_id: cliApi.clientId(),
-  client_secret: cliApi.clientSecret(),
-  refresh_token: cliAccount.tokens.refresh_token,
-  type: "authorized_user",
-});
-const app = initializeApp({credential, projectId: "olive-21239", storageBucket: "olive-21239.firebasestorage.app"}, "demo-provisioning");
+const PROJECT_ID = "olive-21239";
+const APP_ROOT = path.resolve(__dirname, "../..");
+const cliConfigPaths = [
+  path.join(os.homedir(), ".config", "configstore", "firebase-tools.json"),
+  process.env.APPDATA && path.join(process.env.APPDATA, "configstore", "firebase-tools.json"),
+].filter(Boolean);
+
+function cliToken() {
+  const configPath = cliConfigPaths.find((candidate) => fs.existsSync(candidate));
+  const tokens = configPath && JSON.parse(fs.readFileSync(configPath, "utf8")).tokens;
+  if (!tokens?.access_token || Number(tokens.expires_at || 0) <= Date.now() + 60_000) {
+    throw new Error(`Firebase CLI login is missing or expired for ${APP_ROOT}. Run: npx firebase-tools projects:list`);
+  }
+  return tokens;
+}
+
+const credential = {
+  getAccessToken: async () => {
+    const tokens = cliToken();
+    return {
+      access_token: tokens.access_token,
+      expires_in: Math.max(60, Math.floor((Number(tokens.expires_at) - Date.now()) / 1000)),
+    };
+  },
+};
+const app = initializeApp({
+  credential,
+  projectId: PROJECT_ID,
+  storageBucket: `${PROJECT_ID}.firebasestorage.app`,
+}, "demo-provisioning");
 const auth = getAuth(app);
 
 async function accessToken() {
-  return (await cliAuth.getAccessToken(cliAccount.tokens.refresh_token, [])).access_token;
+  return cliToken().access_token;
 }
 
 async function writeProfile(uid, profile) {
-  const name = encodeURIComponent(`accounts/${uid}/profile.json`);
-  const response = await fetch(`https://storage.googleapis.com/upload/storage/v1/b/olive-21239.firebasestorage.app/o?uploadType=media&name=${name}`, {
-    method: "POST",
-    headers: {Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json"},
-    body: JSON.stringify(profile, null, 2),
-  });
-  if (!response.ok) throw new Error(`Profile upload failed: ${response.status} ${await response.text()}`);
+  const objectName = encodeURIComponent(`accounts/${uid}/profile.json`);
+  const response = await fetch(
+      `https://storage.googleapis.com/upload/storage/v1/b/${PROJECT_ID}.firebasestorage.app/o?uploadType=media&name=${objectName}`,
+      {
+        method: "POST",
+        headers: {Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json"},
+        body: JSON.stringify(profile, null, 2),
+      },
+  );
+  if (!response.ok) {
+    throw new Error(`Profile upload failed: ${response.status} ${await response.text()}`);
+  }
 }
 
-async function writeDirectory(user, account) {
-  const url = `https://firestore.googleapis.com/v1/projects/olive-21239/databases/(default)/documents/accountDirectory/${account.username}`;
+async function writeFirestoreDocument(collection, documentId, fields) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${documentId}`;
   const response = await fetch(url, {
     method: "PATCH",
     headers: {Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json"},
-    body: JSON.stringify({fields: {
-      uid: {stringValue: user.uid}, username: {stringValue: account.username},
-      role: {stringValue: account.role}, protected: {booleanValue: true},
-      createdAt: {timestampValue: new Date().toISOString()},
-    }}),
+    body: JSON.stringify({fields}),
   });
-  if (!response.ok) throw new Error(`Directory update failed: ${response.status} ${await response.text()}`);
+  if (!response.ok) {
+    throw new Error(`${collection} update failed: ${response.status} ${await response.text()}`);
+  }
 }
 
+const password = process.env.OLIVE_DEMO_PASSWORD;
+if (!password) throw new Error("Set OLIVE_DEMO_PASSWORD before provisioning demo accounts.");
+
 const accounts = [
-  {username: "olivestaff", password: process.env.OLIVE_DEMO_STAFF_PASSWORD, role: "STAFF", fullName: "Olive Staff", email: "staff@yourolivebranch.ca"},
-  {username: "oliveadmin", password: process.env.OLIVE_DEMO_ADMIN_PASSWORD, role: "ADMIN", fullName: "Olive Admin", email: "admin@yourolivebranch.ca"},
+  {
+    username: "demostaff", role: "STAFF", fullName: "Demo Staff",
+    email: "demostaff@yourolivebranch.ca", protected: true,
+  },
+  {
+    username: "demoadmin", role: "ADMIN", fullName: "Demo Admin",
+    email: "demoadmin@yourolivebranch.ca", protected: true,
+  },
+  {
+    username: "demotrusted", role: "SAFE_CONTACT", fullName: "Demo Trusted",
+    email: "", protected: false,
+  },
+  {
+    username: "demouser", role: "USER", fullName: "Demo User",
+    email: "", protected: false,
+  },
 ];
-if (accounts.some((account) => !account.password)) {
-  throw new Error("Set OLIVE_DEMO_STAFF_PASSWORD and OLIVE_DEMO_ADMIN_PASSWORD before provisioning.");
+
+async function writeAccountDirectory(user, account) {
+  await writeFirestoreDocument("accountDirectory", account.username, {
+    uid: {stringValue: user.uid},
+    username: {stringValue: account.username},
+    role: {stringValue: account.role},
+    protected: {booleanValue: account.protected},
+    createdAt: {timestampValue: new Date().toISOString()},
+  });
+}
+
+async function writeOrganizationLogin(user, account, authEmail) {
+  if (!account.email) return;
+  await writeFirestoreDocument("organizationLoginAliases", organizationEmailKey(account.email), {
+    uid: {stringValue: user.uid},
+    username: {stringValue: account.username},
+    role: {stringValue: account.role},
+    authEmail: {stringValue: authEmail},
+    updatedAt: {timestampValue: new Date().toISOString()},
+  });
+}
+
+async function writeStaffSettings(user, account) {
+  if (account.role !== "STAFF") return;
+  await writeFirestoreDocument("safetyStaff", user.uid, {
+    available: {booleanValue: true},
+    activeCount: {integerValue: "0"},
+  });
 }
 
 async function provision(account) {
@@ -58,7 +126,7 @@ async function provision(account) {
   try {
     user = await auth.getUserByEmail(authEmail);
     user = await auth.updateUser(user.uid, {
-      password: account.password,
+      password,
       displayName: account.username,
       disabled: false,
       emailVerified: true,
@@ -67,21 +135,30 @@ async function provision(account) {
     if (error.code !== "auth/user-not-found") throw error;
     user = await auth.createUser({
       email: authEmail,
-      password: account.password,
+      password,
       displayName: account.username,
       disabled: false,
       emailVerified: true,
     });
   }
-  await auth.setCustomUserClaims(user.uid, {role: account.role, protected: true});
+
+  const claims = {...user.customClaims, role: account.role};
+  if (account.protected) claims.protected = true;
+  else delete claims.protected;
+  await auth.setCustomUserClaims(user.uid, claims);
+
   const profile = defaultProfile(account.username, account.role, {
     fullName: account.fullName,
     dob: "2000-01-01",
-    email: account.email,
+    language: "English",
+    region: "Edmonton, Alberta",
+    address: {city: "Edmonton", province: "Alberta", country: "Canada"},
     phone: "",
-  }, account.email);
+  }, account.email || authEmail);
   await writeProfile(user.uid, profile);
-  await writeDirectory(user, account);
+  await writeAccountDirectory(user, account);
+  await writeOrganizationLogin(user, account, authEmail);
+  await writeStaffSettings(user, account);
   console.log(`Ready: ${account.username} (${account.role})`);
 }
 

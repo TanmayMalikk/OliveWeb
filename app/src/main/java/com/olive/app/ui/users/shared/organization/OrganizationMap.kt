@@ -1,3 +1,4 @@
+// Staff and admins: shows permitted user locations on the organization map.
 package com.olive.app.ui.users.shared.organization
 
 import androidx.activity.compose.BackHandler

@@ -1,0 +1,72 @@
+// Tests profile defaults, invalid stored values, addresses, and contact compatibility for users.
+package com.olive.app.data
+
+import org.json.JSONObject
+import org.junit.Assert.*
+import org.junit.Test
+
+class UserProfileEdgeCaseTest {
+    // Inputs: the values shown below. Expected: unknown stored role and cover use safe personal account defaults.
+    @Test
+    fun unknownStoredRoleAndCoverUseSafePersonalAccountDefaults() {
+        assertEquals(AccountRole.USER, AccountRole.fromStored("SUPER_ADMIN"))
+        assertEquals(AccountRole.USER, AccountRole.fromStored(""))
+        assertEquals(CoverType.FOOD, CoverType.fromStored("VIDEO"))
+        assertEquals(CoverType.FOOD, CoverType.fromStored("food"))
+    }
+
+    // Inputs: the values shown below. Expected: incomplete and overlong addresses are not accepted.
+    @Test
+    fun incompleteAndOverlongAddressesAreNotAccepted() {
+        assertFalse(DeliveryAddress().locationValid)
+        assertFalse(DeliveryAddress(city = "Edmonton").valid)
+        assertTrue(DeliveryAddress(city = "Edmonton").locationValid)
+
+        val complete = DeliveryAddress(
+            line1 = "1 Olive Street",
+            city = "Edmonton",
+            province = "Alberta",
+            postalCode = "T5J 0N3",
+            country = "Canada",
+        )
+        assertTrue(complete.valid)
+        assertEquals("1 Olive Street, Edmonton", complete.label)
+
+        val overlong = complete.copy(line1 = "x".repeat(161))
+        assertFalse(overlong.valid)
+        assertEquals("", overlong.label)
+    }
+
+    // Inputs: the values shown below. Expected: address json handles missing and incorrect coordinate types.
+    @Test
+    fun addressJsonHandlesMissingAndIncorrectCoordinateTypes() {
+        assertEquals(DeliveryAddress(), DeliveryAddress.fromJson(null))
+
+        val restored = DeliveryAddress.fromJson(
+            JSONObject()
+                .put("city", "Edmonton")
+                .put("latitude", "not a number")
+                .put("longitude", JSONObject.NULL)
+        )
+        assertEquals("Edmonton", restored.city)
+        assertNull(restored.latitude)
+        assertNull(restored.longitude)
+    }
+
+    // Inputs: the values shown below. Expected: older profiles without contact arrays or enums still load.
+    @Test
+    fun olderProfilesWithoutContactArraysOrEnumsStillLoad() {
+        val restored = UserProfile.fromJson(
+            JSONObject()
+                .put("username", "old_user")
+                .put("contacts", "wrong type")
+                .put("coverType", "REMOVED_COVER")
+                .put("role", "REMOVED_ROLE")
+        )
+
+        assertEquals("old_user", restored.username)
+        assertTrue(restored.contacts.isEmpty())
+        assertEquals(CoverType.FOOD, restored.coverType)
+        assertEquals(AccountRole.USER, restored.role)
+    }
+}

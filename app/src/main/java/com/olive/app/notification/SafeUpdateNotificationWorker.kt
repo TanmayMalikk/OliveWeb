@@ -1,4 +1,4 @@
-// Contains the safe update notification worker code for this part of Olive.
+// Signed-in users: handles background safe update notification work.
 package com.olive.app.notification
 
 import android.content.Context
@@ -25,7 +25,6 @@ class SafeUpdateNotificationWorker(context: Context, parameters: WorkerParameter
     }
 }
 
-// Groups the data and actions for safe update notification scheduler.
 object SafeUpdateNotificationScheduler {
     private const val WORK_NAME = "olive_pending_safe_update_notification"
 

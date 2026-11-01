@@ -1,4 +1,4 @@
-// Contains the resource text fixture code for this part of Olive.
+// All app roles: loads localized text for Android tests.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*

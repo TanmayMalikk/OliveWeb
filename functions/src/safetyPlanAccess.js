@@ -1,6 +1,6 @@
-// Contains the safety plan access code for this part of Olive.
+// Users and support staff: checks who can read or edit a safety plan.
 const {HttpsError} = require("firebase-functions/v2/https");
-const {auth, db} = require("./firebase");
+const {auth, db} = require("./firebaseAdminClient");
 const {text, roleFromUser} = require("./accountPolicy");
 async function safetyCaller(request) {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in first.");

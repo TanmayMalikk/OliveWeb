@@ -1,4 +1,4 @@
-// Contains the live location key store code for this part of Olive.
+// Users and approved supporters: stores live location key state.
 package com.olive.app.location
 
 import android.content.Context

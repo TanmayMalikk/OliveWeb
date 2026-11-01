@@ -1,16 +1,11 @@
-// Tests the cover account flow test behavior.
+// Tests cover account setup without opening safe-app onboarding.
 package com.olive.app
-
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.ui.test.*
 
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for cover account flow test.
 class CoverAccountFlowTest : OliveUiTestBase() {
     @Test
     fun guestDeliveryAreaOpensAddressEditorWithoutStartingOnboarding() {

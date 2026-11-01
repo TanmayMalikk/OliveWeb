@@ -7,6 +7,20 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $completedChecks = [System.Collections.Generic.List[string]]::new()
+$testReportDirectory = Join-Path $projectRoot "build\reports"
+New-Item -ItemType Directory -Force -Path $testReportDirectory | Out-Null
+Remove-Item -LiteralPath (Join-Path $projectRoot "app\build\test-results\testDebugUnitTest") -Recurse -Force -ErrorAction SilentlyContinue
+@(
+    "current-test-check.txt",
+    "failed-test-check.txt",
+    "failed-test-output.txt",
+    "completed-test-checks.txt",
+    "web-unit-tests.xml",
+    "web-browser-tests.xml",
+    "functions-tests.xml",
+    "firebase-rules-tests.xml"
+) | ForEach-Object { Remove-Item -LiteralPath (Join-Path $testReportDirectory $_) -Force -ErrorAction SilentlyContinue }
+Remove-Item -LiteralPath (Join-Path $testReportDirectory "device-ui-tests") -Recurse -Force -ErrorAction SilentlyContinue
 $androidJava = "C:\Program Files\Android\Android Studio\jbr"
 if (Test-Path -LiteralPath $androidJava) {
     $env:JAVA_HOME = $androidJava
@@ -31,9 +45,68 @@ if ($firebaseJava -and -not (Test-Path -LiteralPath (Join-Path $firebaseJava "bi
 function Invoke-Checked {
     param([string]$Label,[scriptblock]$Command)
     Write-Host "`n== $Label ==" -ForegroundColor Green
+    Set-Content -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Value $Label
     & $Command
-    if ($LASTEXITCODE -ne 0) { throw "$Label failed with exit code $LASTEXITCODE." }
+    if ($LASTEXITCODE -ne 0) {
+        Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value "$Label|$LASTEXITCODE"
+        throw "$Label failed with exit code $LASTEXITCODE."
+    }
     $completedChecks.Add($Label)
+}
+
+function Wait-ForAndroidPackageManager {
+    param(
+        [string]$Adb,
+        [string]$Serial,
+        [int]$TimeoutSeconds = 60
+    )
+    & $Adb -s $Serial wait-for-device | Out-Null
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $booted = ((& $Adb -s $Serial shell getprop sys.boot_completed 2>&1) -join "`n").Trim()
+        $packageManager = ((& $Adb -s $Serial shell pm path android 2>&1) -join "`n").Trim()
+        if ($booted -eq "1" -and $packageManager -match '^package:') { return }
+        Start-Sleep -Seconds 2
+    } while ((Get-Date) -lt $deadline)
+    throw "Android's package manager did not become ready on $Serial within $TimeoutSeconds seconds."
+}
+
+function Install-AndroidTestApk {
+    param(
+        [string]$Label,
+        [string]$Adb,
+        [string]$Serial,
+        [string]$Apk,
+        [switch]$TestOnly
+    )
+    $attemptDetails = [System.Collections.Generic.List[string]]::new()
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Wait-ForAndroidPackageManager -Adb $Adb -Serial $Serial
+        $arguments = @('-s', $Serial, 'install', '--no-streaming', '-r')
+        if ($TestOnly) { $arguments += '-t' }
+        $arguments += $Apk
+        # ADB writes normal push progress to stderr even when installation succeeds. PowerShell 5
+        # turns that text into NativeCommandError when the script-wide error mode is Stop, so this
+        # call temporarily collects native stderr without treating the progress line as an exception.
+        $previousErrorPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            $rawOutput = & $Adb @arguments 2>&1
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorPreference
+        }
+        $output = ($rawOutput | ForEach-Object { $_.ToString() }) -join "`n"
+        Write-Host $output
+        if ($exitCode -eq 0 -and $output -match '(?m)^Success\s*$') { return }
+        $attemptDetails.Add("Attempt $attempt (exit code $exitCode):`n$output")
+        if ($attempt -lt 3) {
+            Write-Warning "$Label failed on attempt $attempt; waiting for the emulator package manager and retrying."
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    }
+    Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-output.txt") -Value $attemptDetails -Encoding utf8
+    throw "$Label failed after 3 attempts."
 }
 
 Set-Location -LiteralPath $projectRoot
@@ -94,30 +167,42 @@ if ($WithDeviceTests) {
         $selectedDevice = $DeviceSerial
     } else {
         $selectedDevice = @($readyDevices | Where-Object { $_ -like 'emulator-*' } | Select-Object -First 1)[0]
-        if (-not $selectedDevice) { $selectedDevice = $readyDevices[0] }
+        if (-not $selectedDevice) {
+            throw "Android device tests require a disposable emulator. No running emulator was found."
+        }
+    }
+    $isEmulator = ((& $adb -s $selectedDevice shell getprop ro.kernel.qemu 2>&1) -join "`n").Trim()
+    if ($isEmulator -ne '1') {
+        throw "Android device tests are blocked on physical phones. Select a disposable emulator."
     }
     Write-Host "Using Android device: $selectedDevice" -ForegroundColor Cyan
     Invoke-Checked "Build Android UI tests" { & ".\gradlew.bat" -PoliveLocalTest=true assembleDebug assembleDebugAndroidTest }
+    Wait-ForAndroidPackageManager -Adb $adb -Serial $selectedDevice
     # Remove saved Android tasks as well as app data. Otherwise a previous isolated Compose
     # test can be restored as the starting activity for the next instrumentation run.
     & $adb -s $selectedDevice uninstall com.olive.app.test 2>&1 | Out-Null
     & $adb -s $selectedDevice uninstall com.olive.app 2>&1 | Out-Null
-    Invoke-Checked "Install Olive test build" { & $adb -s $selectedDevice install -r "$projectRoot\app\build\outputs\apk\debug\app-debug.apk" }
-    Invoke-Checked "Install Olive UI tests" { & $adb -s $selectedDevice install -r -t "$projectRoot\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk" }
+    Invoke-Checked "Install Olive test build" {
+        Install-AndroidTestApk -Label "Install Olive test build" -Adb $adb -Serial $selectedDevice -Apk "$projectRoot\app\build\outputs\apk\debug\app-debug.apk"
+    }
+    Invoke-Checked "Install Olive UI tests" {
+        Install-AndroidTestApk -Label "Install Olive UI tests" -Adb $adb -Serial $selectedDevice -Apk "$projectRoot\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk" -TestOnly
+    }
     & $adb -s $selectedDevice shell input keyevent KEYCODE_WAKEUP | Out-Null
     & $adb -s $selectedDevice shell wm dismiss-keyguard | Out-Null
     $userState = (& $adb -s $selectedDevice shell dumpsys user 2>&1) -join "`n"
     if ($userState -notmatch 'State: RUNNING_UNLOCKED') {
         throw "The Android test user is locked. Unlock the emulator once with PIN 246810, then rerun the command."
     }
-    function Assert-DeviceTestPin {
-        $verification = (& $adb -s $selectedDevice shell locksettings verify --old 246810 2>&1) -join "`n"
-        if ($verification -match 'user has no password') {
-            $setResult = (& $adb -s $selectedDevice shell locksettings set-pin 246810 2>&1) -join "`n"
-            if ($setResult -notmatch "Pin set to '246810'") { throw "Could not configure the disposable emulator PIN: $setResult" }
-        } elseif ($verification -notmatch 'Lock credential verified successfully') {
-            throw "The Android device must use the disposable test PIN 246810: $verification"
+    $pinVerification = (& $adb -s $selectedDevice shell locksettings verify --old 246810 2>&1) -join "`n"
+    if ($pinVerification -match 'user has no password') {
+        $setPinResult = (& $adb -s $selectedDevice shell locksettings set-pin 246810 2>&1) -join "`n"
+        if ($setPinResult -notmatch "Pin set to '246810'") {
+            throw "Could not configure test PIN 246810 on disposable emulator ${selectedDevice}: $setPinResult"
         }
+        $devicePinReady = $true
+    } else {
+        $devicePinReady = $pinVerification -match 'Lock credential verified successfully'
     }
     function Ensure-DeviceAwake {
         # Every UI method gets its own instrumentation process. A long suite can let the emulator
@@ -128,17 +213,60 @@ if ($WithDeviceTests) {
         $policy = (& $adb -s $selectedDevice shell dumpsys window policy 2>&1) -join "`n"
         if ($policy -match 'showing=true') {
             & $adb -s $selectedDevice shell input swipe 540 1900 540 500 250 | Out-Null
-            & $adb -s $selectedDevice shell input text 246810 | Out-Null
-            & $adb -s $selectedDevice shell input keyevent KEYCODE_ENTER | Out-Null
+            if ($devicePinReady) {
+                & $adb -s $selectedDevice shell input text 246810 | Out-Null
+                & $adb -s $selectedDevice shell input keyevent KEYCODE_ENTER | Out-Null
+            }
             & $adb -s $selectedDevice shell wm dismiss-keyguard | Out-Null
         }
         $power = (& $adb -s $selectedDevice shell dumpsys power 2>&1) -join "`n"
         $policy = (& $adb -s $selectedDevice shell dumpsys window policy 2>&1) -join "`n"
         if ($power -notmatch 'mWakefulness=Awake' -or $policy -match 'showing=true') {
-            throw "The Android test device could not be woken and unlocked with PIN 246810."
+            $preparation = if ($devicePinReady) { "with test PIN 246810" } else { "without changing its lock settings" }
+            throw "The Android test device could not be woken and unlocked $preparation."
         }
     }
+    try {
     Write-Host "`n== Android device UI tests ==" -ForegroundColor Green
+    $deviceReportDirectory = Join-Path $testReportDirectory "device-ui-tests"
+    New-Item -ItemType Directory -Force -Path $deviceReportDirectory | Out-Null
+
+    function Save-DeviceTestResult {
+        param(
+            [string]$TestCase,
+            [ValidateSet("PASSED", "FAILED", "SKIPPED")][string]$Status,
+            [string]$Output = "",
+            [double]$DurationSeconds = 0
+        )
+        $separator = $TestCase.LastIndexOf('#')
+        $className = if ($separator -ge 0) { $TestCase.Substring(0, $separator) } else { $TestCase }
+        $testName = if ($separator -ge 0) { $TestCase.Substring($separator + 1) } else { $TestCase }
+        $document = [System.Xml.XmlDocument]::new()
+        $suite = $document.CreateElement("testsuite")
+        $suite.SetAttribute("name", "Android device UI")
+        $suite.SetAttribute("tests", "1")
+        $suite.SetAttribute("failures", $(if ($Status -eq "FAILED") { "1" } else { "0" }))
+        $suite.SetAttribute("skipped", $(if ($Status -eq "SKIPPED") { "1" } else { "0" }))
+        [void]$document.AppendChild($suite)
+        $case = $document.CreateElement("testcase")
+        $case.SetAttribute("classname", $className)
+        $case.SetAttribute("name", $testName)
+        $case.SetAttribute("time", $DurationSeconds.ToString("0.000", [Globalization.CultureInfo]::InvariantCulture))
+        [void]$suite.AppendChild($case)
+        if ($Status -eq "FAILED") {
+            $failure = $document.CreateElement("failure")
+            $failure.SetAttribute("message", "Android device UI test failed or its instrumentation process crashed.")
+            $failure.InnerText = $Output -replace '[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD]', ''
+            [void]$case.AppendChild($failure)
+        } elseif ($Status -eq "SKIPPED") {
+            $skipped = $document.CreateElement("skipped")
+            $skipped.SetAttribute("message", $Output)
+            [void]$case.AppendChild($skipped)
+        }
+        $fileName = ($TestCase -replace '[^A-Za-z0-9_.-]', '_') + ".xml"
+        $document.Save((Join-Path $deviceReportDirectory $fileName))
+    }
+
     # Android 17 can crash its activity transaction handler after several Compose activity
     # replacements in one instrumentation process. Isolating methods removes shared activity
     # state and tells developers exactly which workflow needs attention.
@@ -154,15 +282,30 @@ if ($WithDeviceTests) {
             }
         } | Sort-Object
     if ($deviceTestCases.Count -eq 0) { throw "No Android device test methods were found." }
+    $deviceLockTestNames = @(
+        'SafeEntrySettingsUiTest#calculatorCoverAddsBackupPinWithoutChangingPreferredDeviceLock',
+        'SafeEntrySettingsUiTest#switchingAndBackupSetupRequireProofAndNeverExposePinDuringDeviceLock',
+        'SafeEntryUiTest#deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry',
+        'SafeEntryUiTest#deviceLockEnrollmentAndEveryReentryRequireAndroidAuthentication'
+    )
     $deviceTestCount = 0
+    $skippedDeviceLockTests = 0
     foreach ($testCase in $deviceTestCases) {
+        $requiresPreparedPin = $deviceLockTestNames | Where-Object { $testCase.EndsWith($_) }
+        if ($requiresPreparedPin -and -not $devicePinReady) {
+            Write-Warning "SKIP  $testCase (requires a disposable emulator already secured with test PIN 246810)"
+            Save-DeviceTestResult -TestCase $testCase -Status "SKIPPED" -Output "Requires a disposable emulator secured with test PIN 246810."
+            $skippedDeviceLockTests++
+            continue
+        }
         Write-Host "  RUN   $testCase" -ForegroundColor Cyan
+        Set-Content -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Value "Android device UI test $testCase"
+        $testStarted = Get-Date
         $attempt = 0
         do {
             $attempt++
             & $adb -s $selectedDevice shell am force-stop com.olive.app | Out-Null
             & $adb -s $selectedDevice shell am force-stop com.olive.app.test | Out-Null
-            Assert-DeviceTestPin
             Ensure-DeviceAwake
             $instrumentationOutput = & $adb -s $selectedDevice shell am instrument -w -r -e clearPackageData true -e class $testCase com.olive.app.test/androidx.test.runner.AndroidJUnitRunner 2>&1
             $instrumentationOutput | ForEach-Object { Write-Host $_ }
@@ -174,13 +317,39 @@ if ($WithDeviceTests) {
                 Write-Warning "Android framework crashed during $testCase; retrying once in a clean process."
             }
         } while (-not $passed -and $attempt -lt 2 -and $frameworkCrash)
+        $testDuration = ((Get-Date) - $testStarted).TotalSeconds
         if (-not $passed) {
+            Save-DeviceTestResult -TestCase $testCase -Status "FAILED" -Output $deviceResult -DurationSeconds $testDuration
+            Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value "Android device UI test $testCase|1"
             throw "Android device UI test $testCase failed on $selectedDevice."
         }
+        Save-DeviceTestResult -TestCase $testCase -Status "PASSED" -Output $deviceResult -DurationSeconds $testDuration
         $deviceTestCount += [int]$countMatch.Groups[1].Value
     }
-    $completedChecks.Add("Android device UI tests on $selectedDevice ($deviceTestCount tests)")
+    $completedChecks.Add("Android device UI tests on $selectedDevice ($deviceTestCount passed, $skippedDeviceLockTests device-lock tests skipped)")
+    } finally {
+        # Device-lock tests use a known PIN only on a disposable emulator. Always remove it when
+        # the suite ends, including after a failed test, so the emulator is not left secured.
+        $previousErrorPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            & $adb -s $selectedDevice shell am force-stop com.olive.app 2>&1 | Out-Null
+            & $adb -s $selectedDevice shell am force-stop com.olive.app.test 2>&1 | Out-Null
+            $clearPinResult = ((& $adb -s $selectedDevice shell locksettings clear --old 246810 2>&1) -join "`n").Trim()
+            $clearedVerification = ((& $adb -s $selectedDevice shell locksettings verify --old 246810 2>&1) -join "`n").Trim()
+            if ($clearedVerification -notmatch 'user has no password') {
+                Write-Warning "Could not remove the disposable emulator PIN from ${selectedDevice}: $clearPinResult $clearedVerification"
+            } else {
+                Write-Host "Removed the test device lock from $selectedDevice." -ForegroundColor Cyan
+            }
+            & $adb -s $selectedDevice shell svc power stayon false 2>&1 | Out-Null
+        } finally {
+            $ErrorActionPreference = $previousErrorPreference
+        }
+    }
 }
 
 Write-Host "`nAll requested Olive tests passed ($($completedChecks.Count) checks):" -ForegroundColor Green
 $completedChecks | ForEach-Object { Write-Host "  PASS  $_" -ForegroundColor Green }
+Set-Content -LiteralPath (Join-Path $testReportDirectory "completed-test-checks.txt") -Value $completedChecks
+Remove-Item -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Force -ErrorAction SilentlyContinue

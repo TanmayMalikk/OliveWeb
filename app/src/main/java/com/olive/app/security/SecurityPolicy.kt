@@ -1,4 +1,4 @@
-// Contains the security policy code for this part of Olive.
+// All signed-in roles: checks security rules.
 package com.olive.app.security
 
 import java.security.MessageDigest

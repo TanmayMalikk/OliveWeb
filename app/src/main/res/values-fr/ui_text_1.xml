@@ -19,7 +19,6 @@
     <string name="ui_passwords_match">Les mots de passe correspondent</string>
     <string name="ui_delete_value">Supprimer %1$s ?</string>
     <string name="ui_signed_in_as_value">Connecté en tant que %1$s</string>
-    <string name="ui_active_chats_with_staff_and_users">Chats actifs avec le personnel et les utilisateurs</string>
     <string name="ui_back">Retour</string>
     <string name="ui_no_accounts_found">Aucun compte trouvé.</string>
     <string name="ui_profile_information">Informations sur le profil</string>
@@ -45,7 +44,6 @@
     <string name="ui_reconnect_your_account">Reconnectez votre compte</string>
     <string name="ui_your_local_olive_branch_account_is_locked_safely_but_firebase_nee">Votre compte Olive Branch local est verrouillé en toute sécurité, mais Firebase a à nouveau besoin de votre mot de passe avant que les amis et les messages puissent se charger.</string>
     <string name="ui_account_password">Mot de passe du compte</string>
-    <string name="ui_requirement_met">Exigence satisfaite</string>
     <string name="ui_finish">Terminer</string>
     <string name="ui_step_value_of_value">Étape %1$s sur %2$s</string>
     <string name="ui_value_of_value_required">%1$s sur %2$s requis</string>

@@ -1,14 +1,12 @@
-// Tests the news reader policy test behavior.
+// Tests which article links the news reader may open safely.
 package com.olive.app.ui.covers.news
-
-import com.olive.app.ui.shared.*
 
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for news reader policy test.
 class NewsReaderPolicyTest {
+    // Inputs: the values shown below. Expected: keeps secure google and publisher links in the reader.
     @Test
     fun keepsSecureGoogleAndPublisherLinksInTheReader() {
         assertTrue(isNewsReaderUrlAllowed("https://news.google.com/rss/articles/example?hl=en-CA"))
@@ -16,6 +14,7 @@ class NewsReaderPolicyTest {
         assertTrue(isNewsReaderUrlAllowed("HTTPS://publisher.example/story"))
     }
 
+    // Inputs: the values shown below. Expected: rejects device access app intents and malformed links.
     @Test
     fun rejectsDeviceAccessAppIntentsAndMalformedLinks() {
         listOf(

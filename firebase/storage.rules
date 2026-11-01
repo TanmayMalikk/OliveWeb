@@ -7,8 +7,7 @@ service firebase.storage {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // GitHub Actions replaces this signed APK after each successful main build.
-    // Public clients may download it, but only the deployment service account can upload it.
+    // GitHub Actions replaces this debug APK; website visitors can only download it.
     match /public/android/olive-branch.apk {
       allow read: if true;
       allow write: if false;

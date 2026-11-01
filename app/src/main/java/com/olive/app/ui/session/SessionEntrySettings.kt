@@ -1,9 +1,5 @@
-// Contains the session entry settings code for this part of Olive.
+// Signed-in users: changes the private entry method.
 package com.olive.app.ui.session
-
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
 
 import com.olive.app.R
 import com.olive.app.data.AccountRole
@@ -34,7 +30,6 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
         change(currentPin, null, method)
     }
 
-    // Saves PIN.
     fun savePin(currentPin: String, pin: String, confirmation: String, usePin: Boolean) {
         if (!editable()) return
         if (!InputPolicy.validPin(pin)) {

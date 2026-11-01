@@ -1,4 +1,4 @@
-// Tests the test behavior.
+// Tests traffic and collision rules for cover users.
 import { describe, expect, it } from "vitest";
 import {
   CROSSING,
@@ -12,12 +12,14 @@ import {
 } from "./olive-crossing";
 
 describe("Olive Crossing", () => {
+  // Inputs: the values in this case. Expected: starts the olive on a safe lane.
   it("starts the olive on a safe lane", () => {
     const world = newCrossing(() => 0);
     expect(world.lanes[world.playerRow].type).toBe("grass");
     expect(world.score).toBe(0);
   });
 
+  // Inputs: the values in this case. Expected: chooses road, grass, water, and rail lanes with 6:4:3:2 weights.
   it("chooses road, grass, water, and rail lanes with 6:4:3:2 weights", () => {
     const laneType = (roll: number) => createCrossingLane(12, () => roll).type;
     expect(laneType(0)).toBe("road");
@@ -30,6 +32,7 @@ describe("Olive Crossing", () => {
     expect(laneType(0.999)).toBe("rail");
   });
 
+  // Inputs: the values in this case. Expected: keeps side-to-side movement within the grove.
   it("keeps side-to-side movement within the grove", () => {
     let world = newCrossing(() => 0);
     for (let count = 0; count < CROSSING.columns * 2; count++)
@@ -40,6 +43,7 @@ describe("Olive Crossing", () => {
     expect(world.playerColumn).toBe(CROSSING.columns - 1);
   });
 
+  // Inputs: the values in this case. Expected: scores only new forward progress and grows the road.
   it("scores only new forward progress and grows the road", () => {
     let world = newCrossing(() => 0);
     world = {
@@ -61,6 +65,7 @@ describe("Olive Crossing", () => {
     expect(world.lanes).toHaveLength(CROSSING.rows);
   });
 
+  // Inputs: the values in this case. Expected: moves farm traffic and detects a collision.
   it("moves farm traffic and detects a collision", () => {
     const base = newCrossing(() => 0);
     const road = createCrossingLane(30, () => 0.9, false, "road");
@@ -90,6 +95,7 @@ describe("Olive Crossing", () => {
     expect(next.over).toBe(true);
   });
 
+  // Inputs: the values in this case. Expected: uses the visible edges of the olive and cart as hitboxes.
   it("uses the visible edges of the olive and cart as hitboxes", () => {
     const base = newCrossing(() => 0);
     const playerLeft = base.playerColumn + 0.5 - CROSSING.playerHalfWidth;
@@ -115,6 +121,7 @@ describe("Olive Crossing", () => {
     ).toBe(true);
   });
 
+  // Inputs: the values in this case. Expected: gives traffic varied gaps, speeds and arrival times.
   it("gives traffic varied gaps, speeds and arrival times", () => {
     const values = [
       0.9, 0.2, 0.8, 0.1, 0.1, 0.2, 0.3, 0.8, 0.4, 0.6, 0.7, 0.2, 0.9, 0.5, 0.4,
@@ -144,6 +151,7 @@ describe("Olive Crossing", () => {
     expect(lane.spawnIn).toBeLessThanOrEqual(3.25);
   });
 
+  // Inputs: the values in this case. Expected: spawns new carts individually after each lane's wait.
   it("spawns new carts individually after each lane's wait", () => {
     const base = newCrossing(() => 0);
     const road = {
@@ -162,6 +170,7 @@ describe("Olive Crossing", () => {
     expect(next.lanes[0].spawnCount).toBe(5);
   });
 
+  // Inputs: the values in this case. Expected: keeps the olive safe only when it lands on a lily pad.
   it("keeps the olive safe only when it lands on a lily pad", () => {
     const base = newCrossing(() => 0);
     const water = {
@@ -178,6 +187,7 @@ describe("Olive Crossing", () => {
     expect(moveCrossing(world, "right").over).toBe(true);
   });
 
+  // Inputs: the values in this case. Expected: keeps two aligned lily-pad routes through every water lane.
   it("keeps two aligned lily-pad routes through every water lane", () => {
     const leftRoute = Math.floor(CROSSING.columns / 3);
     const rightRoute = Math.floor((CROSSING.columns * 2) / 3);
@@ -189,6 +199,7 @@ describe("Olive Crossing", () => {
     }
   });
 
+  // Inputs: the values in this case. Expected: releases fast trains onto railway lanes.
   it("releases fast trains onto railway lanes", () => {
     const base = newCrossing(() => 0);
     const rail = {
@@ -206,6 +217,7 @@ describe("Olive Crossing", () => {
     expect(next.lanes[0].spawnIn).toBeGreaterThan(2);
   });
 
+  // Inputs: the values in this case. Expected: changes rail signals from green to yellow to red before a train.
   it("changes rail signals from green to yellow to red before a train", () => {
     const rail = createCrossingLane(75, () => 0.5, false, "rail");
     expect(railSignal({ ...rail, spawnIn: 3 })).toBe("green");
@@ -220,9 +232,19 @@ describe("Olive Crossing", () => {
     ).toBe("red");
   });
 
+  // Inputs: the values in this case. Expected: freezes the world after the round ends.
   it("freezes the world after the round ends", () => {
     const world = { ...newCrossing(() => 0), over: true };
     expect(moveCrossing(world, "up")).toBe(world);
     expect(advanceCrossing(world, 1)).toBe(world);
+  });
+  // Inputs: NaN, infinity, strings, and an unknown direction at the JavaScript boundary. Expected: the crossing state stays valid and unchanged.
+  it("ignores wrong runtime types and non-finite frame times", () => {
+    const world = newCrossing(() => Number.NaN);
+    expect(world.lanes.every((lane) => Number.isFinite(lane.id))).toBe(true);
+    expect(moveCrossing(world, "sideways" as never)).toBe(world);
+    for (const seconds of [Number.NaN, Number.POSITIVE_INFINITY, "fast"] as unknown[]) {
+      expect(advanceCrossing(world, seconds as number)).toBe(world);
+    }
   });
 });

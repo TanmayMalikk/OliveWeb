@@ -3,11 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore,database,storage --project demo-olive-rules --config emulator.json \"node --test rules.test.mjs storage.rules.test.mjs safety-plans.test.mjs\""
+    "test": "firebase emulators:exec --only firestore,database,storage --project demo-olive-rules --config emulator.json \"node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/firebase-rules-tests.xml rules.test.mjs storage.rules.test.mjs safety-plans.test.mjs\""
   },
   "devDependencies": {
-    "@firebase/rules-unit-testing": "5.0.2",
-    "firebase": "12.19.0",
-    "firebase-tools": "15.31.0"
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.1.0",
+    "firebase-tools": "15.34.1"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.6",
+    "uuid": "11.1.1"
   }
 }

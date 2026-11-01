@@ -1,4 +1,4 @@
-// Contains the orientation preprocessor code for this part of Olive.
+// Users scanning documents: straightens camera images before OCR.
 package com.olive.app.ocr
 
 import android.content.Context

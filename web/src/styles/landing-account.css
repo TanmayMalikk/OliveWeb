@@ -217,28 +217,29 @@
   margin-block: 2rem;
 }
 .qr-area > img {
+  display: block;
   margin: auto;
   max-width: 100%;
   border-radius: 0.75rem;
 }
 .qr-area > small {
   display: block;
-  text-align: center;
   margin-top: 0.7rem;
   color: var(--muted);
+  text-align: center;
 }
 .qr-placeholder {
-  background: var(--soft);
   min-height: 14rem;
   display: grid;
-  justify-items: center;
   align-content: center;
+  justify-items: center;
   gap: 1rem;
-  border-radius: 1rem;
   padding: 2rem;
-  text-align: center;
-  font-size: 0.85rem;
+  border-radius: 1rem;
+  background: var(--soft);
   color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
 }
 .install-card > .button {
   width: 100%;

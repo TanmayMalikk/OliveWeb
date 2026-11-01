@@ -1,4 +1,4 @@
-// Contains the device store code for this part of Olive.
+// All signed-in roles: stores device state.
 package com.olive.app.security
 
 import com.olive.app.data.*
@@ -152,7 +152,7 @@ class DeviceStore(
         return DeviceEnrollment(identity.uid, "", profile.role, hasAppPin = false)
     }
 
-    // Removes PIN.
+    // Deletes the account's backup PIN while leaving its device-lock enrollment unchanged.
     fun removePin(uid: String) {
         vault.update { root ->
             root.optJSONObject("enrollments")?.optJSONObject(uid)?.apply {
@@ -218,7 +218,7 @@ class DeviceStore(
         audit?.let { recordSettings(uid, it) }
     }
 
-    // Updates trigger.
+    // Saves the discreet trigger phrase and whether matching should ignore letter case.
     fun updateTrigger(
         uid: String,
         profile: UserProfile,
@@ -302,20 +302,14 @@ class DeviceStore(
 
     // Delegate activity storage so PIN/account state remains isolated from history merging.
     fun recordSettings(uid: String, event: SettingsEvent) = histories.recordSettings(uid, event)
-    // Sets tings history.
     fun settingsHistory(uid: String) = histories.settingsHistory(uid)
-    // Records trigger.
     fun recordTrigger(uid: String, event: TriggerEvent) = histories.recordTrigger(uid, event)
     fun triggerHistory(uid: String) = histories.triggerHistory(uid)
-    // Records trigger attempt.
     fun recordTriggerAttempt(uid: String, id: String, accepted: Boolean) =
         histories.recordTriggerAttempt(uid, id, accepted)
 
-    // Records checkout.
     fun recordCheckout(uid: String, event: CheckoutEvent) = histories.recordCheckout(uid, event)
-    // Checks out history.
     fun checkoutHistory(uid: String) = histories.checkoutHistory(uid)
-    // Saves private entry.
     fun savePrivateEntry(uid: String, entry: PrivateEntry) = histories.savePrivateEntry(uid, entry)
     fun privateEntries(uid: String) = histories.privateEntries(uid)
     fun purgeExpiredPrivateEntries(uid: String, now: Long = System.currentTimeMillis()) =

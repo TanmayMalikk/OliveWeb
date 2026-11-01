@@ -1,3 +1,4 @@
+// All safe-app roles: shows private notes linked to friends or assigned users.
 package com.olive.app.ui.users.shared.messaging
 
 import androidx.compose.foundation.layout.*
@@ -36,6 +37,7 @@ internal fun ChatConversation.privateNoteTargets(
 internal fun ConversationActionsDialog(
     conversation: ChatConversation,
     archived: Boolean,
+    closed: Boolean = false,
     currentUid: String,
     role: AccountRole,
     friendUids: Set<String>,
@@ -46,10 +48,24 @@ internal fun ConversationActionsDialog(
     val targets = conversation.privateNoteTargets(currentUid, role, friendUids)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(conversation.displayName(currentUid, stringResource(R.string.support_chat_name))) },
+        title = {
+            Text(
+                conversation.displayName(
+                    currentUid,
+                    role,
+                    conversation.anonymousStaffDisplayName(
+                        stringResource(R.string.support_chat_name),
+                        stringResource(R.string.support_ticket_consultation),
+                        stringResource(R.string.support_ticket_support),
+                        stringResource(R.string.support_ticket_escalation),
+                    ),
+                )
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {
+                if (closed) Text(stringResource(R.string.support_chat_closed))
+                else Button(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(if (archived) R.string.unarchive_chat else R.string.archive_chat))
                 }
                 if (targets.isNotEmpty()) OutlinedButton(
@@ -93,7 +109,7 @@ internal fun PrivateContactNoteDialog(
                     }
                 } else {
                     Text(target.username, style = MaterialTheme.typography.titleMedium)
-                    session.privateContactNotes[target.uid]?.body?.let { existing ->
+                    session.messages.privateContactNotes[target.uid]?.body?.let { existing ->
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             shape = MaterialTheme.shapes.medium,
@@ -113,8 +129,8 @@ internal fun PrivateContactNoteDialog(
         },
         confirmButton = {
             if (target != null) Button(
-                onClick = { session.appendPrivateContactNote(target, addition, onDismiss) },
-                enabled = addition.isNotBlank() && !session.messagingBusy,
+                onClick = { session.messages.appendPrivateContactNote(target, addition, onDismiss) },
+                enabled = addition.isNotBlank() && !session.messages.busy,
                 modifier = Modifier.testTag("save_private_contact_note"),
             ) { Text(stringResource(R.string.append_note)) }
         },

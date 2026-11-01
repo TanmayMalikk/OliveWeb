@@ -106,8 +106,17 @@ test('file metadata is owned, shareable for reads, and cannot be reshaped', asyn
   await assertFails(setDoc(doc(alice,'files/wrong-path'),metadata));
   await assertFails(updateDoc(doc(bob,'files/file-metadata-1'),{allowed_users:['file-alice','file-bob','file-charlie']}));
   await assertFails(updateDoc(target,{unexpected:'not allowed'}));
-  await assertSucceeds(updateDoc(target,{ocr_text:'Recognized document text',ocr_confidence:0.82,ocr_successful:true}));
+  await assertFails(updateDoc(target,{ocr_text:'Recognized document text',ocr_confidence:0.82,ocr_successful:true}));
   await assertFails(updateDoc(target,{ocr_confidence:1.2}));
+  await assertFails(updateDoc(target,{ocr_text:'x'.repeat(50001)}));
+  await assertFails(setDoc(doc(alice,'files/file-metadata-plaintext-ocr'),{...metadata,
+    storage_path:'users/file-alice/media/file-metadata-plaintext-ocr',
+    ocr_text:'Server-readable OCR must never be accepted',ocr_confidence:0.82,ocr_successful:true}));
+  await assertFails(setDoc(doc(alice,'files/client-injected-encrypted-metadata'),{
+    owner_id:'file-alice',object_key:'users/file-alice/media/client-injected-encrypted-metadata',
+    encrypted_metadata:'untrusted-client-ciphertext',wrapped_keys:{'file-alice':'wrapped-key'},
+    allowed_users:['file-alice'],ciphertext_size:1024,ciphertext_sha256:'a'.repeat(64),
+    encryption_version:1,created_at:serverTimestamp()}));
   await assertFails(setDoc(doc(alice,'files/file-metadata-2'),{...metadata,
     storage_path:'users/file-alice/media/file-metadata-2',ocr_text:'Incomplete OCR metadata'}));
   await assertSucceeds(updateDoc(target,{allowed_users:['file-alice','file-charlie']}));
@@ -264,9 +273,9 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
 
 test('support conversations allow one user, safe contact, staff member, and admin', async () => {
   const owner=env.authenticatedContext('support-owner',{email:'support_owner@users.olive.invalid'}).firestore();
-  const staff=env.authenticatedContext('support-staff',{email:'support_staff@staff.olive.invalid'}).firestore();
+  const staff=env.authenticatedContext('support-staff',{email:'staff@example.ca',role:'STAFF'}).firestore();
   const contact=env.authenticatedContext('support-contact',{email:'support_contact@safe.olive.invalid'}).firestore();
-  const admin=env.authenticatedContext('support-admin',{email:'support_admin@admin.olive.invalid'}).firestore();
+  const admin=env.authenticatedContext('support-admin',{email:'admin@example.ca',role:'ADMIN'}).firestore();
   const stranger=env.authenticatedContext('support-stranger',{email:'support_stranger@users.olive.invalid'}).firestore();
   const directory=[
     [owner,'support_owner','support-owner','owner-key'],
@@ -282,7 +291,7 @@ test('support conversations allow one user, safe contact, staff member, and admi
     senderUid:'support-staff',senderUsername:'support_staff',recipientUid:'support-owner',
     recipientUsername:'support_owner',friendshipId:'support-staff--support-owner',createdAt:serverTimestamp(),
   }));
-  const conversationId='support-support-owner';
+  const conversationId='support-support-owner-ticket-1';
   const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',adminUid:'support-admin',
     supportOrigin:'SUPPORT',supportTag:'NEEDS_ADMIN',
     friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-admin'],
@@ -308,6 +317,18 @@ test('support conversations allow one user, safe contact, staff member, and admi
   await assertSucceeds(setDoc(doc(staff,`conversations/${conversationId}/messages/staff-message`),
     {senderUid:'support-staff',senderUsername:'support_staff',ciphertext:'encrypted-support-message',
       deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+  for (const [client,uid,username] of [[staff,'support-staff','support_staff'],
+    [owner,'support-owner','support_owner'],[admin,'support-admin','support_admin']]) {
+    const batch=writeBatch(client);
+    const messageId=`batch-${uid}`;
+    batch.set(doc(client,`conversations/${conversationId}/messages/${messageId}`),
+      {senderUid:uid,senderUsername:username,ciphertext:'encrypted-support-message',
+        deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()});
+    batch.update(doc(client,`conversations/${conversationId}`),
+      {lastMessage:'Secure message',lastMessageId:messageId,lastSenderUid:uid,
+        updatedAt:serverTimestamp()});
+    await assertSucceeds(batch.commit());
+  }
   await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}/messages/staff-message`)));
 });
 
@@ -374,4 +395,55 @@ test('web entry hashes are owner-only, cannot be listed, and never accept raw to
   await assertFails(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,tokenHash:'invalid'}));
   await assertSucceeds(setDoc(doc(alice,'webEntryLinks/entry-alice'),{...value,tokenHash:'b'.repeat(64)}));
   await assertSucceeds(deleteDoc(doc(alice,'webEntryLinks/entry-alice')));
+});
+
+test('profile field types lengths and coordinate boundaries are enforced', async () => {
+  const owner=env.authenticatedContext('profile-boundary',{email:'profile_bound@users.olive.invalid'}).firestore();
+  const target=doc(owner,'users/profile-boundary');
+  const base={...profile,username:'profile_bound',address:{line1:'',line2:'',city:'Edmonton',province:'AB',postalCode:'',country:'Canada'}};
+  await assertSucceeds(setDoc(target,{...base,address:{...base.address,latitude:90,longitude:180}}));
+  await assertFails(setDoc(target,{...base,address:{...base.address,latitude:90.0001,longitude:0}}));
+  await assertFails(setDoc(target,{...base,address:{...base.address,latitude:0,longitude:-180.0001}}));
+  await assertFails(setDoc(target,{...base,fullName:'x'.repeat(121)}));
+  await assertFails(setDoc(target,{...base,language:7}));
+  await assertFails(setDoc(target,{...base,situation:'x'.repeat(2001)}));
+});
+
+test('directory owners cannot rename or transfer an existing identity', async () => {
+  const alice=env.authenticatedContext('directory-a',{email:'directory_a@users.olive.invalid'}).firestore();
+  const bob=env.authenticatedContext('directory-b',{email:'directory_b@users.olive.invalid'}).firestore();
+  const target=doc(alice,'messageDirectory/directory_a');
+  const row={uid:'directory-a',username:'directory_a',publicKey:'public-key',updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(target,row));
+  await assertFails(updateDoc(target,{uid:'directory-b'}));
+  await assertFails(updateDoc(target,{username:'directory_b'}));
+  await assertFails(updateDoc(target,{publicKey:''}));
+  await assertFails(updateDoc(doc(bob,'messageDirectory/directory_a'),{publicKey:'stolen'}));
+  await assertSucceeds(updateDoc(target,{publicKey:'rotated-key',updatedAt:serverTimestamp()}));
+});
+
+test('entry link hashes rotate only with exact lowercase sha256 data', async () => {
+  const owner=env.authenticatedContext('entry-owner').firestore();
+  const other=env.authenticatedContext('entry-other').firestore();
+  const target=doc(owner,'webEntryLinks/entry-owner');
+  await assertSucceeds(setDoc(target,{tokenHash:'a'.repeat(64),updatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(target,{tokenHash:'b'.repeat(64),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(target,{tokenHash:'B'.repeat(64),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(target,{tokenHash:'b'.repeat(63),updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(target,{tokenHash:'b'.repeat(64),rawToken:'secret',updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(other,'webEntryLinks/entry-owner'),{tokenHash:'c'.repeat(64),updatedAt:serverTimestamp()}));
+});
+
+test('private entry recipients and wrapped keys must match exactly', async () => {
+  const owner=env.authenticatedContext('private-owner').firestore();
+  const target=doc(owner,'privateEntries/private-entry-boundary');
+  const base={id:'private-entry-boundary',ownerUid:'private-owner',ciphertext:'encrypted',
+    wrappedKeys:{'private-owner':'owner-key'},allowedUsers:['private-owner'],createdAt:1,updatedAt:1};
+  await assertSucceeds(setDoc(target,base));
+  await assertFails(setDoc(doc(owner,'privateEntries/missing-owner'),{...base,id:'missing-owner',allowedUsers:['other'],wrappedKeys:{other:'key'}}));
+  await assertFails(setDoc(doc(owner,'privateEntries/missing-key'),{...base,id:'missing-key',allowedUsers:['private-owner','other']}));
+  await assertFails(setDoc(doc(owner,'privateEntries/extra-key'),{...base,id:'extra-key',wrappedKeys:{'private-owner':'key',other:'extra'}}));
+  const recipients=Array.from({length:26},(_,index)=>`recipient-${index}`);
+  await assertFails(setDoc(doc(owner,'privateEntries/too-many'),{...base,id:'too-many',allowedUsers:['private-owner',...recipients],
+    wrappedKeys:Object.fromEntries(['private-owner',...recipients].map(uid=>[uid,'key']))}));
 });
