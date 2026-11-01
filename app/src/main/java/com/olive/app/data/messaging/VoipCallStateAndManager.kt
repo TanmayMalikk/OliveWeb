@@ -1,4 +1,4 @@
-package com.olive.app.data
+package com.olive.app.data.messaging
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -22,6 +22,7 @@ import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 enum class VoipParticipantStatus {
     PENDING,
@@ -51,11 +52,15 @@ data class VoipInvitation(
     val status: VoipParticipantStatus
 )
 
-// A interface that measures the status of the voip call.
+// An interface that measures the status of the voip call.
 sealed interface VoipState {
     data object Idle : VoipState
     data class Ringing(val callId: String, val callName: String, val callerId: String = "") : VoipState
+    @Suppress("unused") // Connecting and Active are currently not in use, but will be used
+    // when server goes live.
     data class Connecting(val callId: String) : VoipState
+    @Suppress("unused") // Connecting and Active are currently not in use, but will be used
+    // when server goes live.
     data class Active(val callId: String, val participantCount: Int) : VoipState
     data class Error(val message: String) : VoipState
 }
@@ -66,7 +71,11 @@ class VoipApiException(
     message: String
 ) : IOException(message)
 
+@Suppress("unused")
+// Again this is under construction so it is not currently being used.
 class VoipManager(
+    @Suppress("unused")
+    // API authentication is also not built yet, needs server side hosting to finalize implementation.
     private val apiBaseUrl: String = DEFAULT_API_BASE_URL,
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val bearerTokenProvider: () -> String? = { null }
@@ -77,7 +86,7 @@ class VoipManager(
 
     val state: StateFlow<VoipState> = mutableState.asStateFlow()
 
-    //double check this code when Live, might need to be changed to connnect to actual server.
+    //double check this code when Live, might need to be changed to connect to actual server.
     init {
         val apiUri = runCatching { URI(baseUrl) }.getOrNull()
         val isHttps = apiUri?.scheme.equals("https", ignoreCase = true)
@@ -121,7 +130,9 @@ class VoipManager(
 
     suspend fun getIncomingCalls(userId: String): List<VoipInvitation> {
         require(userId.isNotBlank()) { "User ID must not be blank" }
-        val encodedUserId = URLEncoder.encode(userId, StandardCharsets.UTF_8.name())
+        val encodedUserId = withContext(Dispatchers.IO) {
+            URLEncoder.encode(userId, StandardCharsets.UTF_8.name())
+        }
         val response = request("GET", "/api/calls/invitations?userId=$encodedUserId")
         return response.getJSONArray("invitations").toInvitationList()
     }
@@ -140,7 +151,7 @@ class VoipManager(
                     VoipState.Ringing(it.callId, it.name, it.callerId)
                 } ?: VoipState.Idle
                 emit(invitations)
-                delay(pollingIntervalMillis)
+                delay(pollingIntervalMillis.milliseconds)
             }
         }.distinctUntilChanged()
     }
