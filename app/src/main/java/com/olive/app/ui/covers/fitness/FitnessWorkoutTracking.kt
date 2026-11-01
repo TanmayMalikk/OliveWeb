@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -311,7 +312,7 @@ internal object FitnessWorkoutController {
             .putExtra(FitnessWorkoutService.EXTRA_ACCOUNT_ID, accountId)
 }
 
-class FitnessWorkoutService : Service() {
+internal class FitnessWorkoutService : Service() {
     private var store: FitnessWorkoutStore? = null
     private var locationUpdates: DeviceLocationUpdates? = null
 
@@ -399,7 +400,11 @@ class FitnessWorkoutService : Service() {
             this,
             NOTIFICATION_ID,
             workoutNotification(),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else {
+                0
+            },
         )
     }
 

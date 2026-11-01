@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -70,112 +71,6 @@ private data class ChartAxisScale(
             val intervalCount = (maximum / increment).roundToInt().coerceAtLeast(1)
             return (intervalCount downTo 0).map { interval -> increment * interval }
         }
-}
-
-@Composable
-internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
-    val distance = FitnessMath.distanceKm(snapshot.stepsToday, snapshot.profile.heightCm)
-    val burned = FitnessMath.walkingCalories(snapshot.stepsToday, snapshot.profile)
-    val progress = (
-        snapshot.stepsToday.toFloat() / snapshot.profile.stepGoal.coerceAtLeast(1).toFloat()
-    ).coerceIn(0f, 1f)
-    val dashboardDescription = stringResource(
-        R.string.fitness_activity_dashboard_description,
-        snapshot.stepsToday,
-        distance,
-        burned,
-    )
-
-    Card(
-        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-            contentDescription = dashboardDescription
-        },
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF263722)),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                stringResource(R.string.daily_activity),
-                color = Paper,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(13.dp),
-                ) {
-                    DashboardMetric(
-                        value = snapshot.stepsToday.toString(),
-                        label = stringResource(R.string.fitness_steps_unit),
-                        color = Color(0xFFA7CA65),
-                    )
-                    DashboardMetric(
-                        value = String.format(Locale.ROOT, "%.2f", distance),
-                        label = stringResource(R.string.fitness_kilometres_unit),
-                        color = Color(0xFF53BBD8),
-                    )
-                    DashboardMetric(
-                        value = burned.roundToInt().toString(),
-                        label = stringResource(R.string.fitness_kilocalories_unit),
-                        color = FatPlum,
-                    )
-                }
-                ActivityProgressRings(progress)
-            }
-        }
-    }
-}
-
-@Composable
-private fun DashboardMetric(value: String, label: String, color: Color) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Spacer(Modifier.size(13.dp).background(color, CircleShape))
-        Text(
-            value,
-            color = Paper,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(label, color = Paper.copy(alpha = 0.72f))
-    }
-}
-
-@Composable
-private fun ActivityProgressRings(progress: Float) {
-    Canvas(Modifier.size(142.dp)) {
-        val centre = Offset(size.width / 2f, size.height / 2f)
-        val widths = listOf(11.dp.toPx(), 10.dp.toPx(), 9.dp.toPx())
-        val radii = listOf(size.minDimension * 0.43f, size.minDimension * 0.32f, size.minDimension * 0.21f)
-        val colours = listOf(Color(0xFFA7CA65), Color(0xFF53BBD8), FatPlum)
-        radii.indices.forEach { index ->
-            drawCircle(
-                color = Paper.copy(alpha = 0.12f),
-                radius = radii[index],
-                center = centre,
-                style = Stroke(widths[index]),
-            )
-            drawArc(
-                color = colours[index],
-                startAngle = -90f,
-                sweepAngle = 360f * progress,
-                useCenter = false,
-                topLeft = Offset(centre.x - radii[index], centre.y - radii[index]),
-                size = androidx.compose.ui.geometry.Size(radii[index] * 2f, radii[index] * 2f),
-                style = Stroke(widths[index], cap = StrokeCap.Round),
-            )
-        }
-    }
 }
 
 @Composable
@@ -285,7 +180,12 @@ private fun HistoryLineChartCard(
     val highestValue = series.maxOfOrNull { line -> line.values.maxOrNull() ?: 0f }
         ?.coerceAtLeast(1f) ?: 1f
     val axisScale = calculateChartAxisScale(highestValue)
-    val chartDescription = stringResource(R.string.fitness_chart_description, title, days.size)
+    val chartDescription = pluralStringResource(
+        R.plurals.fitness_chart_description,
+        days.size,
+        title,
+        days.size,
+    )
     val latestDescriptions = series.map { line ->
         val latest = line.values.lastOrNull() ?: 0f
         stringResource(

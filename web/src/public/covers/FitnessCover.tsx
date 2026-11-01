@@ -125,8 +125,10 @@ export default function FitnessCover() {
 
     <section className="fitness-workspace">
       <header className="fitness-heading">
-        <div><span className="eyebrow">OLIVE FITNESS</span>
-          <h1>{settingsOpen ? "Settings" : navigation.find(([id]) => id === tab)?.[1]}</h1></div>
+        <div><span className="eyebrow">
+          {settingsOpen ? "SETTINGS" : navigation.find(([id]) => id === tab)?.[1]?.toUpperCase()}
+        </span>
+          <h1>Fitness Tracker</h1></div>
         <div className="fitness-heading-actions"><time><CalendarDays />
           {new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</time>
           <button type="button" className="fitness-settings"
@@ -200,7 +202,7 @@ export default function FitnessCover() {
             <p>{weekSteps.toLocaleString()} steps in the last 7 days</p></div>
             {recentDays.length ? <><h3>Steps</h3><HistoryChart days={recentDays} field="steps" label="Steps" />
               <h3>Calories burned</h3><HistoryChart days={recentDays} field="caloriesBurned" label="Calories burned" suffix=" kcal" /></>
-              : <div className="fitness-empty"><Activity /><h2>— No activity data —</h2>
+              : <div className="fitness-empty" role="img" aria-label="Steps, last 14 days"><Activity /><h2>— No activity data —</h2>
                 <p>Use the Android or Wear OS fitness cover to begin syncing activity.</p></div>}
           </section>
           <section className="fitness-card fitness-recent-card"><div className="fitness-card-title"><div>

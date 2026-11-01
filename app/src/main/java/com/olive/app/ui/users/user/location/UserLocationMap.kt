@@ -6,6 +6,7 @@ import android.annotation.SuppressLint
 import android.graphics.Color
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -51,6 +52,7 @@ import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.roundToInt
+import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -159,18 +161,40 @@ internal fun InteractiveLocationMap(
             AndroidView(
                 factory = { context ->
                     object : WebView(context) {
+                        private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+                        private var touchDownX = 0f
+                        private var touchDownY = 0f
+
                         override fun onTouchEvent(event: MotionEvent): Boolean {
                             // Keep map drags and zoom gestures from scrolling the page behind it.
                             when (event.actionMasked) {
-                                MotionEvent.ACTION_DOWN,
+                                MotionEvent.ACTION_DOWN -> {
+                                    touchDownX = event.x
+                                    touchDownY = event.y
+                                    parent?.requestDisallowInterceptTouchEvent(true)
+                                }
+
                                 MotionEvent.ACTION_POINTER_DOWN ->
                                     parent?.requestDisallowInterceptTouchEvent(true)
 
-                                MotionEvent.ACTION_UP,
+                                MotionEvent.ACTION_UP -> {
+                                    parent?.requestDisallowInterceptTouchEvent(false)
+                                    if (abs(event.x - touchDownX) <= touchSlop &&
+                                        abs(event.y - touchDownY) <= touchSlop
+                                    ) {
+                                        performClick()
+                                    }
+                                }
+
                                 MotionEvent.ACTION_CANCEL ->
                                     parent?.requestDisallowInterceptTouchEvent(false)
                             }
                             return super.onTouchEvent(event)
+                        }
+
+                        override fun performClick(): Boolean {
+                            super.performClick()
+                            return true
                         }
                     }.apply {
                         webView[0] = this

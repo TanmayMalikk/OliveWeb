@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,14 +30,21 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -45,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private val WatchBackground = Color(0xFFFAF9F5)
@@ -96,11 +106,12 @@ internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
 
 @Composable
 private fun WatchDashboard(state: WatchFitnessState) {
-    var selectedPage by remember { mutableStateOf(WatchPage.HOME) }
-    var workoutRunning by remember { mutableStateOf(false) }
-    var workoutStartMillis by remember { mutableStateOf(0L) }
-    var workoutStartSteps by remember { mutableStateOf(state.displayedSteps) }
-    var elapsedSeconds by remember { mutableStateOf(0L) }
+    var selectedPageName by rememberSaveable { mutableStateOf(WatchPage.HOME.name) }
+    val selectedPage = WatchPage.entries.firstOrNull { it.name == selectedPageName } ?: WatchPage.HOME
+    var workoutRunning by rememberSaveable { mutableStateOf(false) }
+    var workoutStartMillis by rememberSaveable { mutableLongStateOf(0L) }
+    var workoutStartSteps by rememberSaveable { mutableIntStateOf(state.displayedSteps) }
+    var elapsedSeconds by rememberSaveable { mutableLongStateOf(0L) }
 
     LaunchedEffect(workoutRunning, workoutStartMillis) {
         while (workoutRunning) {
@@ -120,7 +131,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
     ).coerceIn(0f, 1f)
     val totalCaloriesBurned = (state.displayedSteps * 0.04f).roundToInt()
 
-    WatchTabs(selectedPage = selectedPage, onSelected = { selectedPage = it })
+    WatchTabs(selectedPage = selectedPage, onSelected = { selectedPageName = it.name })
     Spacer(Modifier.height(5.dp))
 
     ScrollableWatchPage {
@@ -191,7 +202,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
                     fontSize = 23.sp,
                     fontWeight = FontWeight.Bold,
                 )
-                Text("Goal ${state.calorieGoal}", color = WatchSubtle, fontSize = 10.sp)
+                Text("Goal ${state.calorieGoal}", color = WatchSubtle, fontSize = 11.sp)
             }
             MacroProgressRow("Protein", state.protein, state.proteinGoal)
             MacroProgressRow("Carbs", state.carbohydrates, state.carbohydrateGoal)
@@ -199,7 +210,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
             Text(
                 if (state.phoneConnected) "Synced" else "Not synced",
                 color = WatchSubtle,
-                fontSize = 9.sp,
+                fontSize = 11.sp,
                 modifier = Modifier.align(Alignment.End),
             )
             }
@@ -233,8 +244,8 @@ private fun WatchVitalsSummary(state: WatchFitnessState) {
                     fontSize = 34.sp,
                     fontWeight = FontWeight.Bold,
                 )
-                Text("bpm now", color = WatchSubtle, fontSize = 10.sp)
-                Text(state.heartRateStatus, color = WatchSubtle, fontSize = 9.sp)
+                Text("bpm now", color = WatchSubtle, fontSize = 11.sp)
+                Text(state.heartRateStatus, color = WatchSubtle, fontSize = 11.sp)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 TinyMetric(summary.peakBpm.takeIf { it > 0 }?.toString() ?: "--", "peak")
@@ -327,8 +338,17 @@ private fun WatchTabs(
 
 @Composable
 private fun ScrollableWatchPage(content: @Composable ColumnScope.() -> Unit) {
+    val scrollState = rememberScrollState()
+    val focusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
     Column(
-        modifier = Modifier.fillMaxSize().clipToBounds().verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxSize().clipToBounds()
+            .onRotaryScrollEvent {
+                scope.launch { scrollState.scrollBy(it.verticalScrollPixels) }
+                true
+            }
+            .focusRequester(focusRequester).focusable().verticalScroll(scrollState)
             .padding(top = 6.dp, bottom = 30.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,
@@ -368,7 +388,7 @@ private fun MacroProgressRow(label: String, value: Float, goal: Int) {
             Text(
                 "${value.roundToInt()} / $goal g",
                 color = WatchSubtle,
-                fontSize = 10.sp,
+                fontSize = 11.sp,
             )
         }
         Box(
@@ -385,6 +405,6 @@ private fun MacroProgressRow(label: String, value: Float, goal: Int) {
 private fun TinyMetric(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(value, color = WatchText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = WatchSubtle, fontSize = 10.sp)
+        Text(label, color = WatchSubtle, fontSize = 11.sp)
     }
 }

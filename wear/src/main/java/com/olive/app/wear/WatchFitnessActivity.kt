@@ -5,37 +5,37 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 
 class WatchFitnessActivity : ComponentActivity() {
-    private lateinit var repository: WatchFitnessRepository
+    private val fitnessViewModel by viewModels<WatchFitnessViewModel>()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        repository.stop()
-        repository.start()
+        fitnessViewModel.restartSensors()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        repository = WatchFitnessRepository(applicationContext) { state ->
-            runOnUiThread { WatchFitnessStateHolder.state.value = state }
-        }
-        setContent { OliveWatchFitnessApp(WatchFitnessStateHolder.state.value) }
+        setContent { OliveWatchFitnessApp(fitnessViewModel.state.value) }
         requestMissingHealthPermissions()
     }
 
     override fun onResume() {
         super.onResume()
-        repository.start()
+        fitnessViewModel.startSensors()
     }
 
     override fun onPause() {
-        repository.stop()
+        fitnessViewModel.stopSensors()
         super.onPause()
     }
 
@@ -56,6 +56,25 @@ class WatchFitnessActivity : ComponentActivity() {
     }
 }
 
-private object WatchFitnessStateHolder {
+// Watch fitness users: retains sensor state when Android recreates the watch activity.
+internal class WatchFitnessViewModel(application: android.app.Application) : AndroidViewModel(application) {
+    private val mainHandler = Handler(Looper.getMainLooper())
     val state = androidx.compose.runtime.mutableStateOf(WatchFitnessState())
+    private val repository = WatchFitnessRepository(application.applicationContext) { updated ->
+        mainHandler.post { state.value = updated }
+    }
+
+    fun startSensors() = repository.start()
+
+    fun stopSensors() = repository.stop()
+
+    fun restartSensors() {
+        repository.stop()
+        repository.start()
+    }
+
+    override fun onCleared() {
+        repository.stop()
+        mainHandler.removeCallbacksAndMessages(null)
+    }
 }

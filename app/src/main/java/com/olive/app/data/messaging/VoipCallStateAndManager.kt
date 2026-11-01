@@ -191,7 +191,7 @@ class VoipManager(
             }
 
             httpClient.newCall(requestBuilder.build()).execute().use { response ->
-                val responseBody = response.body?.string().orEmpty()
+                val responseBody = response.body.string()
                 if (!response.isSuccessful) {
                     val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
                     throw VoipApiException(
