@@ -7,24 +7,24 @@
     <string name="a11y_unlock">Unlock</string>
     <string name="a11y_step">Step</string>
     <string name="a11y_completed_requirements">Completed requirements</string>
-    <string name="a11y_equals">Equals</string>
-    <string name="a11y_clear_all">Clear all</string>
-    <string name="a11y_minus">Minus</string>
-    <string name="a11y_multiply">Multiply</string>
-    <string name="a11y_divide">Divide</string>
-    <string name="a11y_parentheses">Parentheses</string>
-    <string name="a11y_percent">Percent</string>
-    <string name="a11y_decimal_point">Decimal point</string>
-    <string name="a11y_graph">Graph</string>
-    <string name="a11y_zoom">Zoom</string>
+
+
+
+
+
+
+
+
+
+
     <string name="a11y_zoom_in">Zoom in</string>
     <string name="a11y_zoom_out">Zoom out</string>
     <string name="a11y_reset_zoom">Reset zoom</string>
     <string name="a11y_zoom_percent">Zoom: %1$d%%</string>
-    <string name="a11y_pan_left">Pan left</string>
-    <string name="a11y_pan_right">Pan right</string>
-    <string name="a11y_pan_up">Pan up</string>
-    <string name="a11y_pan_down">Pan down</string>
+
+
+
+
 <string name="a11y_password">password</string>
     <string name="a11y_trigger_word">trigger word</string>
     <string name="a11y_quick_exit">Quick exit</string>
@@ -32,20 +32,20 @@
 <string name="a11y_save_article">Save article</string>
     <string name="a11y_remove_bookmark">Remove bookmark</string>
     <string name="a11y_message_actions">Message actions</string>
-<string name="a11y_square_root">Square root</string>
-    <string name="a11y_pi">Pi</string>
-    <string name="a11y_power">Power</string>
-    <string name="a11y_factorial">Factorial</string>
-    <string name="a11y_inverse_functions">Inverse functions</string>
-    <string name="a11y_sine">Sine</string>
-    <string name="a11y_cosine">Cosine</string>
-    <string name="a11y_tangent">Tangent</string>
-    <string name="a11y_inverse_sine">Inverse sine</string>
-    <string name="a11y_inverse_cosine">Inverse cosine</string>
-    <string name="a11y_inverse_tangent">Inverse tangent</string>
-    <string name="a11y_squared">Squared</string>
-    <string name="a11y_exponential">Exponential</string>
-    <string name="a11y_ten_to_the_power">Ten to the power</string>
-    <string name="a11y_natural_logarithm">Natural logarithm</string>
-    <string name="a11y_logarithm">Logarithm</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 </resources>

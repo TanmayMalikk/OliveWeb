@@ -20,7 +20,7 @@ import com.olive.app.data.CoverType
 object OliveNotificationManager {
     const val CHANNEL_FOOD = "olive_food_channel"
     const val CHANNEL_NEWS = "olive_news_channel"
-    const val CHANNEL_CALCULATOR = "olive_calc_channel"
+    const val CHANNEL_FITNESS = "olive_fitness_channel"
     const val CHANNEL_GAME = "olive_game_channel"
     const val CHANNEL_BRANCH = "olive_branch_channel"
     const val CHANNEL_TREE = "olive_tree_channel"
@@ -47,11 +47,11 @@ object OliveNotificationManager {
                         context.getString(R.string.ui_daily_headlines_and_news_digest_notifications)
                 },
                 NotificationChannel(
-                    CHANNEL_CALCULATOR,
-                    context.getString(R.string.ui_better_calculator_reminders),
+                    CHANNEL_FITNESS,
+                    context.getString(R.string.fitness_updates),
                     NotificationManager.IMPORTANCE_DEFAULT
                 ).apply {
-                    description = context.getString(R.string.ui_utility_and_calculation_reminders)
+                    description = context.getString(R.string.fitness_reminder)
                 },
                 NotificationChannel(
                     CHANNEL_GAME,
@@ -129,7 +129,7 @@ object OliveNotificationManager {
         role == AccountRole.SAFE_CONTACT -> R.drawable.ic_notification_olive_branch
         role == AccountRole.STAFF || role == AccountRole.ADMIN -> R.drawable.ic_notification_olive_tree
         coverType == CoverType.NEWS -> R.drawable.ic_notification_daily_digest
-        coverType == CoverType.CALCULATOR -> R.drawable.ic_notification_calculator
+        coverType == CoverType.FITNESS -> R.drawable.ic_notification_fitness
         // Game branding is still in development, so it temporarily uses the generic Olive status icon.
         coverType == CoverType.GAME -> R.drawable.ic_notification_olive
         else -> R.drawable.ic_notification_olive

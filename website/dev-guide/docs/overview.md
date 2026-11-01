@@ -33,8 +33,8 @@ flowchart TB
         n11["Account view"]
         n12["Read article"]
   end
- subgraph s3["Better Calculator"]
-        n8["Calculator Screen"]
+ subgraph s3["Fitness Tracker"]
+        n8["Fitness Dashboard"]
   end
  subgraph s4["Game Disguise"]
         n9["Play game"]

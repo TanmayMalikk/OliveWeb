@@ -29,7 +29,7 @@ internal fun rememberResourceText(): ResourceText {
     return remember(resources) { ResourceText(resources) }
 }
 
-// Pure calculators carry a message ID; the UI resolves it using its own Android resource locale.
+// Pure text helpers carry a message ID; the UI resolves it using Android's current locale.
 internal class ResourceFailure(@StringRes val textId: Int, vararg val arguments: Any?) :
     IllegalArgumentException()
 
@@ -62,7 +62,7 @@ internal fun CoverType.localizedTitle(text: ResourceText) = text(
     when (this) {
         CoverType.FOOD -> R.string.ui_olive_8f62f4
         CoverType.NEWS -> R.string.ui_daily_digest
-        CoverType.CALCULATOR -> R.string.better_calculator
+        CoverType.FITNESS -> R.string.fitness_tracker
         CoverType.GAME -> R.string.ui_game
     }
 )

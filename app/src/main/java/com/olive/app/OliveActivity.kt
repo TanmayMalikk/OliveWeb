@@ -275,7 +275,7 @@ class OliveActivity : ComponentActivity() {
             role == AccountRole.STAFF || role == AccountRole.ADMIN -> R.mipmap.ic_launcher_tree
             role == AccountRole.SAFE_CONTACT -> R.mipmap.ic_launcher_branch
             type == CoverType.NEWS -> R.mipmap.ic_launcher_news
-            type == CoverType.CALCULATOR -> R.mipmap.ic_launcher_calculator
+            type == CoverType.FITNESS -> R.mipmap.ic_launcher_fitness
             else -> R.mipmap.ic_launcher_food
         }
         val appTitle = when (role) {
@@ -285,7 +285,7 @@ class OliveActivity : ComponentActivity() {
                 when (type) {
                     CoverType.FOOD -> R.string.ui_olive_8f62f4
                     CoverType.NEWS -> R.string.ui_daily_digest
-                    CoverType.CALCULATOR -> R.string.better_calculator
+                    CoverType.FITNESS -> R.string.fitness_tracker
                     CoverType.GAME -> R.string.ui_game
                 }
             )

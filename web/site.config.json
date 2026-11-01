@@ -18,10 +18,10 @@
       "origin": ""
     },
     {
-      "id": "CALCULATOR",
-      "slug": "calculator",
-      "name": "Better Calculator",
-      "path": "/calculator",
+      "id": "FITNESS",
+      "slug": "fitness",
+      "name": "Fitness Tracker",
+      "path": "/fitness",
       "origin": ""
     },
     {
