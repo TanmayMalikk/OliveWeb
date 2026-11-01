@@ -1,5 +1,11 @@
 // All safe-app roles: loads and saves shared safety plans.
 import { firebase } from "./AccountService";
+export {
+  readSafetyChecklist,
+  safetyChecklistText,
+  writeSafetyChecklist,
+} from "./SafetyChecklistCodec";
+export type { SafetyChecklistItem } from "./SafetyChecklistCodec";
 
 export const safetySections = [
   "destination",
@@ -27,6 +33,7 @@ export type SafetyPlan = {
   safeContactNames: Record<string, string>;
   updatedAt?: number;
 };
+
 async function call<T>(name: string, data: unknown = {}): Promise<T> {
   const { functions } = await firebase();
   const { httpsCallable } = await import("firebase/functions");

@@ -44,6 +44,21 @@ export interface Message {
   deleted: boolean;
   clientSentAt: number;
 }
+export interface Conversation {
+  id: string;
+  friendshipId: string;
+  participantIds: string[];
+  participantUsernames: Record<string, string>;
+  lastMessage: string;
+  updatedAt: number;
+  type: "DIRECT" | "SUPPORT";
+  ownerUid: string;
+  staffUid: string;
+  adminUid: string;
+  supportOrigin: "" | "PLAN_CONSULT" | "SUPPORT";
+  supportTag: "" | "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
+  closedAt: number;
+}
 export const pairId = (a: string, b: string) => [a, b].sort().join("--");
 const bytesToBase64 = (value: ArrayBuffer | Uint8Array) => {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
@@ -74,6 +89,17 @@ async function messagingKeys(uid: string): Promise<CryptoKeyPair> {
 async function encodedPublicKey(uid: string) {
   const pair = await messagingKeys(uid);
   return bytesToBase64(await crypto.subtle.exportKey("spki", pair.publicKey));
+}
+async function messageDevice(uid: string) {
+  const publicKey = await encodedPublicKey(uid);
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", base64ToBytes(publicKey)),
+  );
+  const deviceId = bytesToBase64(digest.slice(0, 18))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+  return { deviceId, publicKey };
 }
 async function importPublicKey(value: string) {
   return crypto.subtle.importKey(
@@ -110,17 +136,26 @@ async function unwrapRoomKey(uid: string, value: string) {
 }
 export async function register(identity: Identity) {
   const { db } = await firebase();
-  const publicKey = await encodedPublicKey(identity.uid);
-  await setDoc(
-    doc(db, "messageDirectory", identity.username.toLowerCase()),
-    {
-      uid: identity.uid,
-      username: identity.username.toLowerCase(),
-      publicKey,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+  const { deviceId, publicKey } = await messageDevice(identity.uid);
+  const reference = doc(db, "messageDirectory", identity.username.toLowerCase());
+  const existing = await getDoc(reference);
+  if (existing.exists() && existing.data().uid !== identity.uid)
+    throw new Error("That username belongs to another account.");
+  if (!existing.exists())
+    await setDoc(reference, {
+        uid: identity.uid,
+        username: identity.username.toLowerCase(),
+        publicKey,
+        updatedAt: serverTimestamp(),
+      });
+  await setDoc(doc(reference, "devices", deviceId), {
+    uid: identity.uid,
+    deviceId,
+    publicKey,
+    platform: "WEB",
+    mgf1Digest: "SHA-256",
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 export async function searchUser(
   username: string,
@@ -269,16 +304,69 @@ export async function subscribeMessages(
     onError,
   );
 }
-export async function roomKey(id: string, current: Identity, peer: Friend) {
+export async function subscribeConversations(
+  uid: string,
+  callback: (conversations: Conversation[]) => void,
+  onError: (error: Error) => void,
+) {
   const { db } = await firebase();
-  const [own, other] = await Promise.all([
-    getDoc(doc(db, "messageDirectory", current.username.toLowerCase())),
-    getDoc(doc(db, "messageDirectory", peer.friendUsername.toLowerCase())),
-  ]);
-  const publicKeys: Record<string, string> = {
-    [current.uid]: String(own.data()?.publicKey ?? ""),
-    [peer.friendUid]: String(other.data()?.publicKey ?? ""),
-  };
+  return onSnapshot(
+    query(collection(db, "conversations"), where("participantIds", "array-contains", uid)),
+    (snapshot) => callback(snapshot.docs.map((row) => {
+      const data = row.data();
+      return {
+        id: row.id,
+        friendshipId: String(data.friendshipId ?? row.id),
+        participantIds: Array.isArray(data.participantIds) ? data.participantIds : [],
+        participantUsernames: data.participantUsernames ?? {},
+        lastMessage: String(data.lastMessage ?? ""),
+        updatedAt: data.updatedAt?.toMillis?.() ?? 0,
+        type: data.type === "SUPPORT" ? "SUPPORT" : "DIRECT",
+        ownerUid: String(data.ownerUid ?? ""),
+        staffUid: String(data.staffUid ?? ""),
+        adminUid: String(data.adminUid ?? ""),
+        supportOrigin: data.supportOrigin ?? "",
+        supportTag: data.supportTag ?? "",
+        closedAt: data.closedAt?.toMillis?.() ?? 0,
+      } as Conversation;
+    }).sort((a, b) => b.updatedAt - a.updatedAt)),
+    onError,
+  );
+}
+export function conversationName(conversation: Conversation, current: Identity) {
+  if (conversation.type === "SUPPORT" && current.role !== "STAFF" && current.role !== "ADMIN") {
+    const label = conversation.supportTag === "NEEDS_ADMIN"
+      ? "Escalation"
+      : conversation.supportOrigin === "PLAN_CONSULT"
+        ? "Plan Consult"
+        : "Support";
+    return `Olive Staff • ${label}`;
+  }
+  if (conversation.type === "SUPPORT")
+    return conversation.participantUsernames[conversation.ownerUid] || "User";
+  return Object.entries(conversation.participantUsernames)
+    .find(([uid]) => uid !== current.uid)?.[1] ?? "Conversation";
+}
+export async function roomKey(id: string, current: Identity, conversationData: Conversation) {
+  const { db } = await firebase();
+  const device = await messageDevice(current.uid);
+  const deviceKeyReference = doc(
+    db,
+    "conversations",
+    id,
+    "deviceKeys",
+    `${current.uid}--${device.deviceId}`,
+  );
+  const savedDeviceKey = await getDoc(deviceKeyReference);
+  if (savedDeviceKey.exists())
+    return unwrapRoomKey(current.uid, String(savedDeviceKey.data().wrappedKey));
+  const directory = await Promise.all(conversationData.participantIds.map(async (uid) => {
+    const username = conversationData.participantUsernames[uid];
+    if (!username) return [uid, ""] as const;
+    const row = await getDoc(doc(db, "messageDirectory", username.toLowerCase()));
+    return [uid, String(row.data()?.publicKey ?? "")] as const;
+  }));
+  const publicKeys: Record<string, string> = Object.fromEntries(directory);
   if (Object.values(publicKeys).some((key) => !key))
     throw new Error(
       "Both people must open the updated app before secure messages can be sent.",
@@ -292,6 +380,7 @@ export async function roomKey(id: string, current: Identity, peer: Friend) {
       ]),
     ),
   );
+  const ownDeviceWrapped = await wrapRoomKey(raw, device.publicKey);
   const conversation = doc(db, "conversations", id);
   const selected = await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(conversation);
@@ -301,18 +390,26 @@ export async function roomKey(id: string, current: Identity, peer: Friend) {
       Record<string, string> | undefined;
     const roomKeys = snapshot.data().roomKeys as
       Record<string, string> | undefined;
-    if (
-      savedKeys &&
-      roomKeys?.[current.uid] &&
-      Object.entries(publicKeys).every(([uid, key]) => savedKeys[uid] === key)
-    )
-      return roomKeys[current.uid];
+    if (savedKeys && roomKeys) {
+      if (savedKeys[current.uid] === device.publicKey && roomKeys[current.uid])
+        return roomKeys[current.uid];
+      throw new Error(
+        "Open this chat once on Android to securely approve this browser.",
+      );
+    }
     transaction.update(conversation, {
       roomKeys: wrapped,
       participantPublicKeys: publicKeys,
       updatedAt: serverTimestamp(),
     });
-    return wrapped[current.uid];
+    return ownDeviceWrapped;
+  });
+  await setDoc(deviceKeyReference, {
+    uid: current.uid,
+    deviceId: device.deviceId,
+    publicKey: device.publicKey,
+    wrappedKey: selected,
+    updatedAt: serverTimestamp(),
   });
   raw.fill(0);
   return unwrapRoomKey(current.uid, selected);

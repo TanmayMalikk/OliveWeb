@@ -263,6 +263,26 @@ service cloud.firestore {
         && request.resource.data.uid == resource.data.uid
         && validDirectoryEntry();
       allow delete: if owner(resource.data.uid);
+
+      // Each phone or browser keeps its own private key and publishes only its wrapping key.
+      match /devices/{deviceId} {
+        function validMessagingDevice(data) {
+          return data.keys().hasOnly(['uid','deviceId','publicKey','platform','mgf1Digest','updatedAt'])
+            && data.uid == get(/databases/$(database)/documents/messageDirectory/$(username)).data.uid
+            && data.deviceId == deviceId
+            && data.deviceId.matches('^[A-Za-z0-9_-]{16,64}$')
+            && data.publicKey is string && data.publicKey.size() > 0 && data.publicKey.size() <= 1000
+            && data.platform in ['ANDROID','WEB']
+            && data.mgf1Digest in ['SHA-1','SHA-256'];
+        }
+        allow get, list: if signedIn();
+        allow create: if owner(request.resource.data.uid) && validMessagingDevice(request.resource.data);
+        allow update: if owner(resource.data.uid)
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.deviceId == resource.data.deviceId
+          && validMessagingDevice(request.resource.data);
+        allow delete: if owner(resource.data.uid);
+      }
     }
 
     function directoryMatches(uid, username) {
@@ -495,6 +515,27 @@ service cloud.firestore {
           && request.resource.data.sentAt == resource.data.sentAt
           && request.resource.data.clientSentAt == resource.data.clientSentAt
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body','ciphertext','deleted','deletedAt']);
+        allow delete: if false;
+      }
+
+      // Conversation participants may wrap the same room key for another registered device.
+      match /deviceKeys/{deviceKeyId} {
+        function parentConversation() {
+          return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        }
+        function validDeviceRoomKey(data) {
+          return data.keys().hasOnly(['uid','deviceId','publicKey','wrappedKey','updatedAt'])
+            && data.uid in parentConversation().participantIds
+            && deviceKeyId == data.uid + '--' + data.deviceId
+            && data.wrappedKey is string && data.wrappedKey.size() > 0 && data.wrappedKey.size() <= 1000;
+        }
+        function registeredDeviceMatches(data) {
+          return data.publicKey == get(/databases/$(database)/documents/messageDirectory/$(parentConversation().participantUsernames[data.uid])/devices/$(data.deviceId)).data.publicKey;
+        }
+        allow read: if conversationParticipant(parentConversation());
+        allow create, update: if conversationParticipant(parentConversation())
+          && validDeviceRoomKey(request.resource.data)
+          && registeredDeviceMatches(request.resource.data);
         allow delete: if false;
       }
     }

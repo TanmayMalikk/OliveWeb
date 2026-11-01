@@ -19,6 +19,12 @@ web/playwright-report/
 test-reports/
 *-debug.log
 .firebase/
+.vercel/
+web/.vercel/
+functions/.env
+functions/.env.*
+!functions/.env.example
+functions/.secret.local
 
 distribution/
 web/*.tsbuildinfo

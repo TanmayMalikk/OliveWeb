@@ -1,6 +1,7 @@
 // Users and approved viewers: requests encrypted media upload and download access.
 package com.olive.app.data.media
 
+import com.olive.app.BuildConfig
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
@@ -30,6 +31,9 @@ interface MediaTicketDataSource {
     /** Deletes both the owner's R2 object and its Firestore metadata through trusted code. */
     suspend fun deleteMedia(mediaId:String)
 }
+
+/** The installed app could not obtain the App Check proof required by encrypted-media functions. */
+class MediaDeviceVerificationException(message:String,cause:Exception):Exception(message,cause)
 
 /**
  * Firebase Functions implementation of [MediaTicketDataSource].
@@ -94,7 +98,16 @@ class MediaRepository(
         // sure the callable receives both the signed-in account and the required App Check proof.
         val user=auth.currentUser ?: error("Sign in again before uploading files")
         user.getIdToken(false).await()
-        appCheck.getAppCheckToken(false).await()
+        try {
+            appCheck.getAppCheckToken(false).await()
+        } catch(error:Exception) {
+            // Media functions enforce App Check. Keep that protection, but replace Firebase's vague
+            // retry-limit message with the exact action needed for an unregistered debug device.
+            val message=if(BuildConfig.DEBUG)
+                "This debug installation is not authorized for encrypted uploads. Register this device's Firebase App Check debug token, reopen the app, then tap Retry."
+            else "This app installation could not be verified. Reinstall the official app, then tap Retry."
+            throw MediaDeviceVerificationException(message,error)
+        }
         return functions.getHttpsCallable(name).call(data).await().data as? Map<*,*>
             ?: error("Invalid $name response")
     }
