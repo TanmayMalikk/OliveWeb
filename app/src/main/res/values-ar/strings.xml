@@ -402,15 +402,6 @@
     <string name="admin_accounts_description">أنشئ الحسابات وراجع عدد المستخدمين المعيّنين لكل موظف.</string>
 
     <string name="steps_today">خطوات اليوم</string>
-    <plurals name="steps_goal_value">
-        <item quantity="zero">الهدف: %1$d خطوة</item>
-        <item quantity="one">الهدف: خطوة واحدة</item>
-        <item quantity="two">الهدف: خطوتان</item>
-        <item quantity="few">الهدف: %1$d خطوات</item>
-        <item quantity="many">الهدف: %1$d خطوة</item>
-        <item quantity="other">الهدف: %1$d خطوة</item>
-    </plurals>
-
     <string name="calories">السعرات</string>
 
 

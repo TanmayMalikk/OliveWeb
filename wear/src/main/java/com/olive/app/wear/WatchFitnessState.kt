@@ -20,6 +20,10 @@ internal data class WatchHeartRateSummary(
     // Watch vitals: adds one safe sensor reading to today's summary.
     fun record(bpm: Int, resting: Boolean): WatchHeartRateSummary {
         if (bpm !in 30..240) return this
+        if (sampleCount == Int.MAX_VALUE || totalBpm > Long.MAX_VALUE - bpm) return this
+        if (resting && (restingSampleCount == Int.MAX_VALUE || restingTotalBpm > Long.MAX_VALUE - bpm)) {
+            return this
+        }
         return copy(
             peakBpm = maxOf(peakBpm, bpm),
             lowestBpm = if (lowestBpm == 0) bpm else minOf(lowestBpm, bpm),
@@ -53,5 +57,5 @@ internal data class WatchFitnessState(
     val updatedAt: Long = 0L,
 ) {
     // The larger total avoids adding the same steps reported by both the watch and phone.
-    val displayedSteps: Int get() = maxOf(watchSteps, phoneSteps)
+    val displayedSteps: Int get() = maxOf(watchSteps, phoneSteps).coerceAtLeast(0)
 }

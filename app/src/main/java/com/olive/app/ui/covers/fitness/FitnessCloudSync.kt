@@ -7,19 +7,27 @@ import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 
 internal object FitnessCloudSync {
     private const val MIN_SYNC_INTERVAL_MS = 30_000L
-    private var lastUploadAt = 0L
-    private var lastPayload = ""
+    private val lastUploadAtByAccount = ConcurrentHashMap<String, Long>()
+    private val lastPayloadByAccount = ConcurrentHashMap<String, String>()
 
     // Uploads only changed summaries and never more than once every 30 seconds.
     suspend fun upload(accountId: String, snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         if (accountId != user.uid) return
-        val payload = summaryJson(snapshot, history).toString()
+        val summary = summaryJson(snapshot, history)
+        val payloadSignature = summary.toString()
         val now = System.currentTimeMillis()
-        if (payload == lastPayload || now - lastUploadAt < MIN_SYNC_INTERVAL_MS) return
+        val lastUploadAt = lastUploadAtByAccount[accountId] ?: 0L
+        if (
+            payloadSignature == lastPayloadByAccount[accountId] ||
+            now - lastUploadAt < MIN_SYNC_INTERVAL_MS
+        ) return
+        summary.put("updatedAt", now)
+        val payload = summary.toString()
         val bytes = payload.toByteArray(Charsets.UTF_8)
         try {
             FirebaseStorage.getInstance().reference
@@ -29,15 +37,16 @@ internal object FitnessCloudSync {
                     StorageMetadata.Builder().setContentType("application/json")
                         .setCustomMetadata("schemaVersion", "1").build(),
                 ).await()
-            lastPayload = payload
-            lastUploadAt = now
+            lastPayloadByAccount[accountId] = payloadSignature
+            lastUploadAtByAccount[accountId] = now
+        } catch (_: Exception) {
+            // Fitness sync: a temporary network or Firebase failure must not close the cover app.
         } finally {
             bytes.fill(0)
         }
     }
 
     private fun summaryJson(snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) = JSONObject().apply {
-        put("updatedAt", System.currentTimeMillis())
         put("stepGoal", snapshot.profile.stepGoal)
         put("calorieGoal", snapshot.profile.calorieGoal)
         put("proteinGoal", snapshot.profile.proteinGoal)

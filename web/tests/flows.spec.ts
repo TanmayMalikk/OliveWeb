@@ -322,7 +322,9 @@ test("fitness cover opens activity, vitals, and nutrition summaries", async ({
   await page.getByRole("tab", { name: /Vitals/ }).click();
   await expect(page.getByText("— No data —")).toBeVisible();
   await page.getByRole("tab", { name: /Nutrition/ }).click();
-  await expect(page.getByText("0 / 2000 kcal")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "0 of 2000 kcal" }),
+  ).toBeVisible();
 });
 // Inputs: the values in this case. Expected: news reader sanitizes publisher HTML and bookmarks stay available.
 test("news reader sanitizes publisher HTML and bookmarks stay available", async ({
