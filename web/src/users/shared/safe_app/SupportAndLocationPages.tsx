@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Upload,
 } from "lucide-react";
-import { Button, Empty } from "../../../components/SharedComponents";
+import { Button, Empty, Modal } from "../../../components/SharedComponents";
 import {
   accounts,
   cloudMode,
@@ -19,6 +19,7 @@ import {
 import { useSession } from "../../../session/SessionProvider";
 import {
   listBrowserDocuments,
+  observeBrowserDocuments,
   openBrowserDocument,
   uploadBrowserDocument,
   type BrowserDocument,
@@ -302,6 +303,12 @@ export function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [viewerDocument, setViewerDocument] = useState<BrowserDocument | null>(null);
+  const [viewerUrl, setViewerUrl] = useState("");
+  useEffect(() => {
+    if (!viewerUrl) return;
+    return () => URL.revokeObjectURL(viewerUrl);
+  }, [viewerUrl]);
   // Reloads the latest data for web safe app.
   const refresh = async () => {
     const identity = accounts.identity;
@@ -321,23 +328,43 @@ export function DocumentsPage() {
     }
   };
   useEffect(() => {
+    const identity = accounts.identity;
+    if (!identity) return;
+    let active = true;
+    let stop: (() => void) | undefined;
     void refresh();
+    void observeBrowserDocuments(
+      identity,
+      (value) => {
+        if (!active) return;
+        setDocuments(value);
+        setLoading(false);
+      },
+      (failure) => {
+        if (!active) return;
+        setError(failure.message);
+        setLoading(false);
+      },
+    ).then((cleanup) => {
+      if (active) stop = cleanup;
+      else cleanup();
+    }).catch((failure) => {
+      if (active) {
+        setError(failure instanceof Error ? failure.message : "Unable to watch encrypted documents.");
+        setLoading(false);
+      }
+    });
+    return () => {
+      active = false;
+      stop?.();
+    };
   }, []);
-  // Web safe app: Opens the requested item. It waits for the set time and cancels the timer when the feature closes.
+  // Opens a decrypted file inside this safe-app page, keeping the user in the account.
   const open = (document: BrowserDocument) =>
     void session.perform(async () => {
-      const tab = window.open("about:blank", "_blank");
-      if (tab) tab.opener = null;
-      // If tab fails, catch the error so the app can keep running and explain the problem.
-      try {
-        const url = await openBrowserDocument(document);
-        if (tab) tab.location.replace(url);
-        else window.location.assign(url);
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      } catch (failure) {
-        tab?.close();
-        throw failure;
-      }
+      const url = await openBrowserDocument(document);
+      setViewerDocument(document);
+      setViewerUrl(url);
     });
   return (
     <section className="safe-feature-page">
@@ -436,6 +463,36 @@ export function DocumentsPage() {
             </article>
           ))}
         </div>
+      )}
+      {viewerDocument && viewerUrl && (
+        <Modal
+          title={viewerDocument.name}
+          wide
+          onClose={() => {
+            setViewerDocument(null);
+            setViewerUrl("");
+          }}
+        >
+          <div className="safe-document-viewer">
+            {viewerDocument.mimeType.startsWith("image/") ? (
+              <img src={viewerUrl} alt={viewerDocument.name} />
+            ) : viewerDocument.mimeType.startsWith("video/") ? (
+              <video src={viewerUrl} controls aria-label={viewerDocument.name} />
+            ) : viewerDocument.mimeType.startsWith("audio/") ? (
+              <audio src={viewerUrl} controls aria-label={viewerDocument.name} />
+            ) : viewerDocument.mimeType === "application/pdf" ||
+              viewerDocument.mimeType.startsWith("text/") ? (
+              <iframe src={viewerUrl} title={viewerDocument.name} />
+            ) : (
+              <div className="panel">
+                <p>This file type cannot be previewed in the browser.</p>
+                <a className="button" href={viewerUrl} download={viewerDocument.name}>
+                  Download decrypted file
+                </a>
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </section>
   );

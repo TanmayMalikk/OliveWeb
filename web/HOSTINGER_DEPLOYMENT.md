@@ -56,10 +56,12 @@ Before opening the sites to users:
    then use the public site key as `VITE_FIREBASE_APPCHECK_SITE_KEY`.
 4. Restrict the Firebase API key in Google Cloud to the Firebase APIs the app uses.
 5. Deploy the reviewed Firestore and Firebase Storage rules. Configure Cloudflare R2
-   bucket CORS for all three HTTPS origins (`yourolivebranch.ca`, `get.yourolivebranch.ca`,
-   and `admin.yourolivebranch.ca`): allow `PUT` and `GET`, allow the signed upload headers,
-   and expose the `ETag` response header for multipart uploads. The web document uploader
-   sends ciphertext directly to R2 using short-lived tickets from Firebase Functions.
+   bucket CORS for every site origin that uploads documents, including each production
+   subdomain and any preview URL you use. Allow `PUT`, `GET`, and `HEAD`; allow the
+   `Content-Type` and signed `x-amz-*` headers (or `*`); expose `ETag` for multipart uploads.
+   The web document uploader sends ciphertext directly to R2 using short-lived tickets
+   from Firebase Functions. A missing origin or header here causes the browser's generic
+   “Failed to fetch” message even when the ticket was created successfully.
 6. Deploy the Firebase Functions update that requires trusted custom claims for
    staff and administrator authority.
 7. Confirm `https://yourolivebranch.ca/api/health` returns `{ "ok": true }`, then

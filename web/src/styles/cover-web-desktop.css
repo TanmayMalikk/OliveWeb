@@ -1,4 +1,65 @@
 /* Cover users: turns each cover into a responsive website while preserving its mobile layout. */
+.cover-container [hidden] {
+  display: none !important;
+}
+
+.cover-account-tabs {
+  width: min(100%, 96rem);
+  margin-inline: auto;
+  padding: 0.35rem clamp(1rem, 4vw, 4rem);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper, #f7f7ef);
+}
+.cover-account-tabs button {
+  min-height: 2.7rem;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 2rem;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.85rem;
+}
+.cover-account-tabs button[aria-selected="true"] {
+  color: var(--olive);
+  background: #e8eddf;
+}
+.cover-account-panel {
+  width: min(100% - 2rem, 58rem);
+  min-height: min(68svh, 40rem);
+  margin: clamp(2rem, 8svh, 6rem) auto;
+  padding: clamp(1.5rem, 5vw, 4rem);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 1.5rem;
+  background: #fffef9;
+  color: var(--ink);
+  text-align: center;
+}
+.cover-account-panel h1 {
+  margin: 0.7rem 0;
+  font: 500 clamp(2.5rem, 6vw, 4.5rem)/1.05 var(--serif);
+}
+.cover-account-panel p { color: var(--muted); }
+.cover-hidden-olive {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-top: 2rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--olive);
+  background: #edf1e5;
+}
+.cover-hidden-olive svg { width: 1.35rem; height: 1.35rem; }
+.cover-hidden-olive:focus-visible { outline: 2px solid var(--olive); outline-offset: 3px; }
+
 .cover-container.food-cover,
 .cover-container.news-cover,
 .cover-container.fitness-cover {

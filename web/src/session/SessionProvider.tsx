@@ -11,6 +11,7 @@ import {
   cloudMode,
   triggerHash,
   firebase,
+  observeAccountChanges,
 } from "../services/AccountService";
 import { database } from "../services/LocalDataStore";
 import {
@@ -92,6 +93,43 @@ export function SessionProvider({
   const cover = normalizeCover(
     routeCover ?? enrollment?.cover ?? profile?.coverType ?? "GAME",
   );
+  // Reloads account files when another phone or browser changes this account.
+  useEffect(() => {
+    const identity = accounts.identity;
+    if (!cloudMode || !identity || (phase !== "safe" && phase !== "portal"))
+      return;
+    let active = true;
+    let timer = 0;
+    let stop: (() => void) | undefined;
+    void observeAccountChanges(
+      identity.uid,
+      () => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          void accounts.load().then((loaded) => {
+            if (!active || accounts.identity?.uid !== identity.uid) return;
+            setProfile(loaded.profile);
+            setHistory(loaded.history);
+          }).catch((error) => {
+            if (active) setMessage(error instanceof Error ? error.message : "Account sync failed.");
+          });
+        }, 150);
+      },
+      (error) => {
+        if (active) setMessage(error.message);
+      },
+    ).then((cleanup) => {
+      if (active) stop = cleanup;
+      else cleanup();
+    }).catch((error) => {
+      if (active) setMessage(error instanceof Error ? error.message : "Account sync could not start.");
+    });
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      stop?.();
+    };
+  }, [phase, accounts.identity?.uid]);
   const go = useCallback(
     (to: string) => {
       pendingEntry.current = null;
@@ -161,6 +199,13 @@ export function SessionProvider({
     };
   }, [entryAttempt]);
   const quickExit = useCallback(() => {
+    const returnPath = profile?.role === "SAFE_CONTACT"
+      ? "/account/sign-in"
+      : mode === "admin"
+        ? "/account/sign-in"
+        : mode === "download"
+          ? "/download"
+          : coverPath(profile?.coverType ?? cover);
     epoch.current++;
     entryOwner.current = null;
     pendingEntry.current = null;
@@ -175,15 +220,9 @@ export function SessionProvider({
     setBusy(false);
     setPhase("public");
     window.history.replaceState({}, "", "/");
-    setPath(
-      mode === "admin"
-        ? "/account/sign-in"
-        : mode === "download"
-          ? "/download"
-          : coverPath(profile?.coverType ?? cover),
-    );
+    setPath(returnPath);
     window.scrollTo({ top: 0 });
-  }, [cover, mode, profile?.coverType]);
+  }, [cover, mode, profile?.coverType, profile?.role]);
   const noteInteraction = useSessionSecurity({
     enrollment,
     entryOwner,
@@ -279,20 +318,11 @@ export function SessionProvider({
       setPhase("portal");
       return;
     }
-    if (
-      role === "SAFE_CONTACT" &&
-      entryOwner.current === accounts.identity?.uid
-    ) {
+    if (role === "SAFE_CONTACT") {
       setProfile(p);
       setHistory(loaded.history);
       setPhase("safe");
-      return;
-    }
-    // role is safe contact and path is not /account/link is handled here by p.
-    if (role === "SAFE_CONTACT" && path !== "/account/link") {
-      accounts.lock();
-      setPhase("public");
-      go(coverPath(p.coverType));
+      setPage("Home");
       return;
     }
     const current: Enrollment | undefined = await (
@@ -363,8 +393,10 @@ export function SessionProvider({
       return;
     }
     if (p.role === "SAFE_CONTACT") {
-      setPersonalLink(await issueEntryLink(accounts.identity!.uid));
-      setPhase("link");
+      setProfile(p);
+      setHistory(emptyHistory());
+      setPage("Home");
+      setPhase("safe");
       return;
     }
     const device = await accounts.enroll(p, pin);
@@ -479,6 +511,11 @@ export function SessionProvider({
   }
   // Signs out the current account for web session provider.
   async function signOut() {
+    const returnPath = profile?.role === "SAFE_CONTACT" || mode === "admin"
+      ? "/account/sign-in"
+      : mode === "download"
+        ? "/download"
+        : "/";
     await accounts.signOut();
     epoch.current++;
     setProfile(null);
@@ -486,7 +523,7 @@ export function SessionProvider({
     setEnrollment(null);
     await (await database).delete("device", "current");
     setPhase("public");
-    go(mode === "admin" ? "/account/sign-in" : "/");
+    go(returnPath);
   }
   return (
     <SessionContext.Provider

@@ -33,6 +33,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 runtime.enrollment = restoredSession?.enrollment
                 restoredSession?.let { restorePresentation(it) }
                 routeRestoredAccount()
+                runtime.enrollment?.let { watchAccountChanges(AccountIdentity(it.uid, runtime.coverUsername)) }
                 if (runtime.enrollment?.role == AccountRole.ADMIN && !runtime.localMode) {
                     runtime.organization.queueAdminRefresh()
                 }
@@ -138,6 +139,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             screen = SessionScreen.Safe
                             history.refreshHistory(saved.uid)
                             if (!localMode) history.loadCloudHistory(saved.uid, value.username)
+                            watchAccountChanges(identity)
                         }
                     } else {
                         withContext(Dispatchers.IO) { store.cacheProfile(identity.uid, value) }
@@ -193,6 +195,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
             covers.restoreCoverData(saved.uid)
             navigation.quickExit()
             if (!localMode) history.loadCloudHistory(saved.uid, value.username)
+            watchAccountChanges(AccountIdentity(saved.uid, value.username))
         }
     }
 
@@ -226,6 +229,8 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
             with(state) {
                 if ((screen != SessionScreen.Safe && screen != SessionScreen.Portal) || busy || enrollment == null) return
                 val uid = enrollment!!.uid
+                accountSyncSubscription?.close()
+                accountSyncSubscription = null
                 LocalNotificationEventHandler.cancel(application)
                 if (LiveLocationController.active(application)) LiveLocationController.stop(
                     application
@@ -333,6 +338,42 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 }
             }
         }
+    }
+
+    // Reloads Storage data when the same account changes on another phone or browser.
+    private fun watchAccountChanges(identity: AccountIdentity) = with(runtime) {
+        accountSyncSubscription?.close()
+        accountSyncSubscription = null
+        if (localMode) return@with
+        accountSyncSubscription = AccountSyncRepository().observe(
+            identity.uid,
+            onChange = {
+                scope.launch {
+                    if (enrollment?.uid != identity.uid) return@launch
+                    // A failed refresh leaves the last readable profile and notes on screen.
+                    try {
+                        val updatedProfile = accounts.profile(identity) ?: return@launch
+                        val records = accounts.historyRecords(identity)
+                        withContext(Dispatchers.IO) { store.mergeHistory(identity.uid, records) }
+                        if (enrollment?.uid != identity.uid) return@launch
+                        profile = updatedProfile
+                        deliveryAddress = updatedProfile.address
+                        language = updatedProfile.language
+                        coverDob = updatedProfile.dob
+                        coverFullName = updatedProfile.fullName
+                        coverType = updatedProfile.coverType
+                        enrollment = enrollment?.copy(
+                            triggerHash = updatedProfile.triggerHash,
+                            role = updatedProfile.role,
+                        )
+                        history.refreshHistory(identity.uid)
+                    } catch (failure: Exception) {
+                        state.message = failure.localizedMessage
+                    }
+                }
+            },
+            onError = { failure -> state.message = failure.localizedMessage },
+        )
     }
 
     // Account session controller: Routes restored account.

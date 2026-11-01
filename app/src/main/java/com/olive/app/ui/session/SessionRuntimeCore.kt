@@ -60,6 +60,7 @@ internal class SessionRuntime(
     var historySyncJob: Job? = null
     var idleJob: Job? = null
     var socialSubscription: ChatSubscription? = null
+    var accountSyncSubscription: ChatSubscription? = null
     var conversationSubscription: ChatSubscription? = null
     var messageSubscription: ChatSubscription? = null
     var observedFriendshipIds = emptySet<String>()

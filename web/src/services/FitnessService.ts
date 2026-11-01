@@ -1,5 +1,5 @@
 // Fitness cover users: loads Android activity summaries and saves browser meal logs to the same account.
-import { accounts, cloudMode, firebase } from "./AccountService";
+import { accounts, cloudMode, firebase, notifyAccountChanged } from "./AccountService";
 
 export type FitnessDay = {
   date: string; steps: number; distanceKm: number; caloriesBurned: number;
@@ -78,6 +78,7 @@ export async function saveFitness(value: FitnessSummary) {
     await uploadBytes(ref(storage, `accounts/${accounts.identity.uid}/fitness/summary.json`),
       new TextEncoder().encode(JSON.stringify(normalized)),
       { contentType: "application/json", customMetadata: { schemaVersion: "1" } });
+    await notifyAccountChanged(accounts.identity.uid);
   }
   return normalized;
 }

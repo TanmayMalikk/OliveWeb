@@ -394,7 +394,7 @@ export async function roomKey(id: string, current: Identity, conversationData: C
   const publicKeys: Record<string, string> = Object.fromEntries(directory);
   if (Object.values(publicKeys).some((key) => !key))
     throw new Error(
-      "Both people must open the updated app before secure messages can be sent.",
+      "Every person in this chat must open the updated app before secure messages can be sent.",
     );
   const raw = crypto.getRandomValues(new Uint8Array(32));
   const wrapped = Object.fromEntries(

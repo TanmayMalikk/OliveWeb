@@ -18,6 +18,7 @@ class FirebaseAccountRepository : AccountRepository {
     private val auth = FirebaseAuth.getInstance()
     private val storage = FirebaseStorage.getInstance()
     private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
+    private val accountSync = AccountSyncRepository()
 
     // Change this path together with firebase/storage.rules and its tests.
     private fun profileObject(uid: String) = storage.reference.child("accounts/$uid/profile.json")
@@ -121,6 +122,7 @@ class FirebaseAccountRepository : AccountRepository {
         check(bytes.size <= MAX_PROFILE_BYTES) { "Profile is too large" }
         try {
             profileObject(identity.uid).putBytes(bytes, jsonMetadata()).await()
+            accountSync.notifyChanged(identity.uid)
         } finally {
             bytes.fill(0)
         }
@@ -137,6 +139,7 @@ class FirebaseAccountRepository : AccountRepository {
         try {
             historyFolder(identity.uid, record.category).child("${record.id}.json")
                 .putBytes(bytes, jsonMetadata()).await()
+            accountSync.notifyChanged(identity.uid)
         } finally {
             bytes.fill(0)
         }

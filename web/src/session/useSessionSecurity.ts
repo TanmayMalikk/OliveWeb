@@ -111,7 +111,7 @@ export function useSessionSecurity({
   useEffect(() => {
     // Web use session security: Responds when hidden.
     const onHidden = () => {
-      if (document.hidden && phaseRef.current !== "public") quickExit();
+      if (document.hidden && phaseRef.current === "safe") quickExit();
     };
     // Web use session security: Responds when key.
     const onKey = (event: KeyboardEvent) => {
@@ -148,7 +148,8 @@ export function useSessionSecurity({
 
   // Update note interaction when information used by this screen changes.
   useEffect(() => {
-    if (phase !== "safe" && phase !== "portal") return;
+    // Organization workspaces stay open until their user signs out or exits manually.
+    if (phase !== "safe") return;
     noteInteraction();
     const events = ["pointerdown", "keydown", "input"] as const;
     events.forEach((event) => document.addEventListener(event, noteInteraction));

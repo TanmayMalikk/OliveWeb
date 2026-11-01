@@ -542,6 +542,18 @@
   gap: 1rem;
 }
 .browser-document p { color: var(--muted); font-size: 0.78rem; margin-top: 0.35rem; }
+.safe-document-viewer { display: grid; place-items: center; min-height: min(72vh, 48rem); }
+.safe-document-viewer img, .safe-document-viewer video, .safe-document-viewer iframe {
+  display: block;
+  width: 100%;
+  max-height: min(72vh, 48rem);
+  border: 0;
+  border-radius: 0.8rem;
+  object-fit: contain;
+  background: #151713;
+}
+.safe-document-viewer iframe { height: min(72vh, 48rem); background: white; }
+.safe-document-viewer audio { width: min(100%, 40rem); }
 @media (max-width: 42rem) {
   .documents-heading { align-items: flex-start; flex-direction: column; }
   .browser-document { grid-template-columns: auto minmax(0, 1fr); }
