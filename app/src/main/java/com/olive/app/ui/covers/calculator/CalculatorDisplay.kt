@@ -1,4 +1,4 @@
-// Contains the calculator display code for this part of Olive.
+// Calculator cover users: draws the calculator input and result area.
 package com.olive.app.ui.covers.calculator
 
 import com.olive.app.ui.shared.*

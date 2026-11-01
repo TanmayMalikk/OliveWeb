@@ -1,15 +1,13 @@
-// Tests the calculator input test behavior.
+// Tests calculator input, history, angle mode, and PIN trigger behavior.
 package com.olive.app.ui.covers.calculator
-
-import com.olive.app.ui.shared.*
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for calculator input test.
 class CalculatorInputTest {
+    // Inputs: the values shown below. Expected: history retains only five newest calculations including restored entries.
     @Test
     fun historyRetainsOnlyFiveNewestCalculationsIncludingRestoredEntries() {
         var saved = emptyList<CalculatorHistoryEntry>()
@@ -25,6 +23,7 @@ class CalculatorInputTest {
         assertEquals(input.history, saved)
     }
 
+    // Inputs: the values shown below. Expected: entered pin requires two consecutive equals taps.
     @Test
     fun enteredPinRequiresTwoConsecutiveEqualsTaps() {
         val input = CalculatorInput()
@@ -39,6 +38,7 @@ class CalculatorInputTest {
         assertEquals("0012", input.press("="))
     }
 
+    // Inputs: the values shown below. Expected: arithmetic and intervening keys do not become pin trigger.
     @Test
     fun arithmeticAndInterveningKeysDoNotBecomePinTrigger() {
         val input = CalculatorInput()
@@ -70,6 +70,7 @@ class CalculatorInputTest {
         assertEquals("1E18", input.display)
     }
 
+    // Inputs: the values shown below. Expected: trigonometry uses the selected angle mode and disarms pin entry.
     @Test
     fun trigonometryUsesTheSelectedAngleModeAndDisarmsPinEntry() {
         val input = CalculatorInput()
@@ -94,6 +95,7 @@ class CalculatorInputTest {
         assertEquals("sin⁻¹(0.5) =", input.expression)
     }
 
+    // Inputs: the values shown below. Expected: parentheses and percent stay visible until equals.
     @Test
     fun parenthesesAndPercentStayVisibleUntilEquals() {
         val input = CalculatorInput()
@@ -110,6 +112,7 @@ class CalculatorInputTest {
         assertEquals("0.05", input.display)
     }
 
+    // Inputs: the values shown below. Expected: smart parentheses and scientific keys build visible expressions.
     @Test
     fun smartParenthesesAndScientificKeysBuildVisibleExpressions() {
         val input = CalculatorInput()
@@ -126,8 +129,8 @@ class CalculatorInputTest {
         assertEquals("120", input.display)
     }
 
+    // Inputs: the values shown below. Expected: formats large and small answers and reuses history.
     @Test
-    // Formats s large and small answers and reuses history.
     fun formatsLargeAndSmallAnswersAndReusesHistory() {
         val input = CalculatorInput()
         listOf("1", "e", "1", "0", "=").forEach { input.press(it) }
@@ -143,6 +146,7 @@ class CalculatorInputTest {
         assertEquals("2+3", input.display)
     }
 
+    // Inputs: the values shown below. Expected: history changes are persisted and can be cleared.
     @Test
     fun historyChangesArePersistedAndCanBeCleared() {
         var persisted = emptyList<CalculatorHistoryEntry>()
@@ -154,5 +158,48 @@ class CalculatorInputTest {
         input.clearHistory()
         assertTrue(input.history.isEmpty())
         assertTrue(persisted.isEmpty())
+    }
+
+    // Inputs: boundary, middle, and leading-zero PINs followed by equals twice. Expected: one equals only calculates; the second returns the exact PIN.
+    @Test
+    fun representativeCalculatorPinsRequireTwoEqualsPresses() {
+        val input = CalculatorInput()
+        val representativePins = listOf(
+            "0000", "0001", "0123", "4999", "5000", "9998", "9999",
+            "00000", "50000", "99999", "000000", "500000", "999999",
+        )
+        for (pin in representativePins) {
+            input.reset()
+            pin.forEach { assertNull("PIN returned before equals: $pin", input.press(it.toString())) }
+            assertNull("PIN returned after only one equals: $pin", input.press("="))
+            assertEquals("Wrong PIN returned for input=$pin", pin, input.press("="))
+        }
+    }
+
+    // Inputs: 1,000 seeded random key sequences including operators, functions, equals, and unknown keys. Expected: any returned PIN is always 4-6 ASCII digits.
+    @Test
+    fun randomCalculatorKeySequencesNeverReturnMalformedPins() {
+        val seed = 0x51A7E
+        val random = kotlin.random.Random(seed)
+        val keys = listOf(
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+            "+", "−", "×", "÷", "^", ".", "(", ")", "%", "!", "=", "AC", "⌫", "DROP TABLE",
+        )
+        val input = CalculatorInput()
+        repeat(1_000) { case ->
+            if (random.nextInt(20) == 0) input.reset()
+            val key = keys[random.nextInt(keys.size)]
+            val returned = input.press(key)
+            if (returned != null) {
+                assertTrue(
+                    "seed=$seed case=$case key=$key returned=$returned expression=${input.expression}",
+                    returned.matches(Regex("[0-9]{4,6}")),
+                )
+            }
+            assertTrue(
+                "seed=$seed case=$case expression exceeded limit: ${input.expression.length}",
+                input.expression.length <= 122,
+            )
+        }
     }
 }

@@ -1,9 +1,5 @@
-// Tests the location map motion UI test behavior.
+// Tests moving map markers and trails without rebuilding the map.
 package com.olive.app
-
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.users.shared.navigation.*
 
 import android.view.View
 import android.view.ViewGroup
@@ -27,7 +23,6 @@ import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-// Groups the data and actions for location map motion UI test.
 class LocationMapMotionUiTest {
     @get:Rule
     val compose = createOliveComposeRule()
@@ -105,7 +100,6 @@ class LocationMapMotionUiTest {
 
     private fun webView(): WebView? = findWebView(compose.activity.window.decorView)
 
-    // Finds web view.
     private fun findWebView(view: View): WebView? {
         if (view is WebView) return view
         if (view is ViewGroup) for (index in 0 until view.childCount) findWebView(

@@ -1,4 +1,4 @@
-// Contains the user profile code for this part of Olive.
+// Users and safe contacts: defines their profile details.
 package com.olive.app.data
 
 import org.json.JSONArray
@@ -93,10 +93,10 @@ data class UserProfile(
                 j.optString("situation"),
                 j.optString("region"),
                 j.optString("triggerHash"),
-                (0 until contacts.length()).map {
-                    val c = contacts.getJSONObject(it)
+                (0 until contacts.length()).mapNotNull {
+                    val c = contacts.optJSONObject(it) ?: return@mapNotNull null
                     SafeContact(
-                        c.getString("id"), c.getString("name"), c.getString("details"),
+                        c.optString("id"), c.optString("name"), c.optString("details"),
                         c.optBoolean("safeToStay"), c.optString("linkedUid")
                     )
                 },
@@ -168,7 +168,7 @@ data class DeliveryAddress(
                 j.optString("province"),
                 j.optString("postalCode"),
                 j.optString("country", "Canada"),
-                j.optDouble("latitude").takeUnless { it.isNaN() },
-                j.optDouble("longitude").takeUnless { it.isNaN() })
+                j.optDouble("latitude").takeIf { it.isFinite() && it in -90.0..90.0 },
+                j.optDouble("longitude").takeIf { it.isFinite() && it in -180.0..180.0 })
     }
 }

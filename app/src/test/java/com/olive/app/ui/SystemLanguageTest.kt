@@ -1,4 +1,4 @@
-// Tests the system language test behavior.
+// Tests supported language names and English fallback in the app.
 package com.olive.app.ui
 
 import com.olive.app.ui.shared.*
@@ -7,8 +7,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Locale
 
-// Groups the data and actions for system language test.
 class SystemLanguageTest {
+    // Inputs: the values shown below. Expected: supported system languages select their display names.
     @Test
     fun supportedSystemLanguagesSelectTheirDisplayNames() {
         val original = Locale.getDefault()
@@ -25,6 +25,7 @@ class SystemLanguageTest {
         }
     }
 
+    // Inputs: the values shown below. Expected: unsupported system and legacy account languages fall back to english.
     @Test
     fun unsupportedSystemAndLegacyAccountLanguagesFallBackToEnglish() {
         val original = Locale.getDefault()

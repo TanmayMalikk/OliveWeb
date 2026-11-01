@@ -1,7 +1,5 @@
-// Contains the session safety plans code for this part of Olive.
+// Signed-in users: controls safety-plan access, editing, sharing, and sync.
 package com.olive.app.ui.session
-
-import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
 
@@ -36,7 +34,6 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     var available by mutableStateOf(true)
         private set
 
-    // Runs the authorized code.
     // Allows plan work only while the signed-in role is on a screen that may use safety plans.
     private fun authorized() = runtime.enrollment != null &&
             ((runtime.state.accountRole in setOf(
@@ -46,12 +43,10 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                     (runtime.state.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
                             runtime.state.screen == SessionScreen.Portal))
 
-    // Runs the current code.
     // Rejects old background results after the account, plan owner, or screen session changes.
     private fun current(actor: String, owner: String, token: Int) =
         authorized() && runtime.coverAccountId == actor && activeOwner == owner && generation == token
 
-    // Runs the close code.
     // Clears private plan data when its screen closes; a different screen cannot clear the active one.
     fun close(screenLease: Any? = null) {
         if (screenLease != null && lease !== screenLease) return
@@ -66,7 +61,6 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (screenLease == null) consultations = emptyList()
     }
 
-    // Runs the open code.
     // Checks access, loads or creates the selected plan, queues cloud sync, and ignores stale results.
     suspend fun open(
         ownerUid: String,
@@ -95,12 +89,11 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             refresh()
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (_: Exception) { // Keep locally available plan data on screen and report that cloud storage could not be loaded.
             if (current(actor, ownerUid, token)) error = R.string.safety_storage_error
         }
     }
 
-    // Runs the edit code.
     // Applies an allowed field change locally and saves it for background sync.
     fun edit(key: String, value: String) {
         val old = plan ?: return
@@ -112,7 +105,6 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         persist { saved -> saved.copy(fields = saved.fields + (key to edited)) }
     }
 
-    // Runs the resolve code.
     // Resolves a sync conflict by keeping either the local text or the newer server text.
     fun resolve(key: String, keepMine: Boolean) {
         val old = plan ?: return
@@ -129,7 +121,6 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         persist { saved -> saved.copy(fields = saved.fields + (key to edited)) }
     }
 
-    // Runs the consult code.
     // Requests or ends staff help for the account owner's safety plan.
     fun consult(stop: Boolean = false) {
         if (runtime.localMode) {
@@ -170,7 +161,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // The edit is already local, so queue an encrypted retry instead of losing the user's change.
                 SafetyPlanSyncWorker.enqueue(runtime.application, actor, actor)
                 if (current(actor, actor, token)) error = R.string.safety_sync_error
             } finally {
@@ -179,7 +170,6 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
-    // Runs the share with contacts code.
     // Verifies the selected friends, syncs pending edits, and shares the plan with up to ten contacts.
     fun shareWithContacts(friends: List<Friend>) {
         if (!authorized() || runtime.state.accountRole != AccountRole.USER || runtime.localMode || friends.size > 10) return
@@ -199,7 +189,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Preserve the local conflict resolution and tell the user that cloud sync must be retried.
                 if (current(actor, actor, token)) error = R.string.safety_sync_error
             } finally {
                 if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
@@ -226,7 +216,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Contact sharing stays unchanged when the server rejects or cannot receive the update.
                 if (current(actor, actor, token)) error = R.string.safety_sync_error
             } finally {
                 if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
@@ -248,14 +238,13 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Keep the current consultation state and show a storage error when the request fails.
                 if (actor != null && runtime.coverAccountId == actor && authorized()) error =
                     R.string.safety_sync_error
             }
         }
     }
 
-    // Runs the persist code.
     // Writes one plan change in order, then asks the durable worker to sync it when online.
     private fun persist(change: (SafetyPlan) -> SafetyPlan) {
         if (!authorized()) return
@@ -282,7 +271,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Keep the local draft and show a storage error when saving fails.
                 if (current(actor, owner, token)) error = R.string.safety_storage_error
             } finally {
                 if (current(actor, owner, token)) saving = (saving - 1).coerceAtLeast(0)
@@ -290,14 +279,12 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
-    // Runs the retry save code.
     // Saves the current draft again after a local storage failure.
     fun retrySave() {
         val draft = plan ?: return
         persist { saved -> saved.copy(fields = draft.fields, shareAction = draft.shareAction) }
     }
 
-    // Runs the refresh code.
     // Syncs queued changes, reloads the saved plan, and removes a shared copy when access is revoked.
     suspend fun refresh() {
         if (error == R.string.safety_storage_error) return
@@ -340,7 +327,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                     error = R.string.safety_access_revoked
                 }
             }
-        } catch (_: Exception) { /* Like Notes, connection failures leave saved edits queued without a warning banner. */
+        } catch (_: Exception) { // Connection failures leave already-saved edits queued for the next background sync.
         } finally {
             sync.unlock()
         }
@@ -367,12 +354,11 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
+        } catch (_: Exception) { // Retain the last plan snapshot and tell the signed-in account that refresh failed.
             if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
         }
     }
 
-    // Runs the change availability code.
     // Updates whether this staff member can receive new consultation requests.
     fun changeAvailability(value: Boolean) {
         if (!authorized() || runtime.state.accountRole != AccountRole.STAFF || runtime.localMode) return
@@ -384,7 +370,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                     value
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: Exception) { // Keep the current availability value when the staff setting cannot be updated.
                 if (authorized() && actor == runtime.coverAccountId) error =
                     R.string.safety_sync_error
             }

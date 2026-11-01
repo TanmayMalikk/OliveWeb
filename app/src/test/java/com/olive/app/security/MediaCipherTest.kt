@@ -1,3 +1,4 @@
+// Tests media encryption and decryption for users and approved viewers.
 package com.olive.app.security
 
 import java.io.ByteArrayInputStream

@@ -1,4 +1,4 @@
-// Contains the organization settings code for this part of Olive.
+// All safe-app roles: shows staff and admin account settings.
 package com.olive.app.ui.users.shared.organization
 
 import com.olive.app.ui.shared.*
@@ -59,24 +59,24 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
             uiText(R.string.full_name),
             fullName,
             "organization_settings_name",
-            enabled = !session.busy,
+            enabled = !session.account.busy,
         ) { fullName = it.take(120) }
-        BirthdayPicker(dob, "organization_settings_dob", !session.busy) { dob = it }
+        BirthdayPicker(dob, "organization_settings_dob", !session.account.busy) { dob = it }
         Field(
             uiText(R.string.ui_email),
             email,
             "organization_settings_email",
-            enabled = !session.busy,
+            enabled = !session.account.busy,
         ) { email = it.take(254) }
         Field(
             uiText(R.string.ui_phone_optional),
             phone,
             "organization_settings_phone",
-            enabled = !session.busy,
+            enabled = !session.account.busy,
         ) { phone = it.take(40) }
         Button(
             onClick = { session.updateOrganizationProfile(fullName, dob, email, phone) },
-            enabled = !session.busy,
+            enabled = !session.account.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.save_profile)) }
         HorizontalDivider()
@@ -91,7 +91,7 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
             "organization_current_password",
             secret = true,
             showSecretToggle = true,
-            enabled = !session.busy,
+            enabled = !session.account.busy,
         ) { currentPassword = it.take(128) }
         Field(
             uiText(R.string.new_password),
@@ -99,7 +99,7 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
             "organization_new_password",
             secret = true,
             showSecretToggle = true,
-            enabled = !session.busy,
+            enabled = !session.account.busy,
         ) { newPassword = it.take(24) }
         Field(
             uiText(R.string.confirm_new_password),
@@ -107,11 +107,11 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
             "organization_confirm_password",
             secret = true,
             showSecretToggle = true,
-            enabled = !session.busy,
+            enabled = !session.account.busy,
         ) { confirmation = it.take(24) }
         Button(
             onClick = { session.changePassword(currentPassword, newPassword, confirmation) },
-            enabled = !session.busy,
+            enabled = !session.account.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.change_password)) }
         Status(session)

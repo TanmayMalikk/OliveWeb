@@ -18,8 +18,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import com.paddle.ocr.engine.OCREngine
 import com.paddle.ocr.engine.OCREngineResult
-import com.paddle.ocr.model.OCRRunResult
 import com.paddle.ocr.model.OCRError
+import com.paddle.ocr.model.OCRRunResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

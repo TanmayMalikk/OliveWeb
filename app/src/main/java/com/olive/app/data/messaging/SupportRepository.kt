@@ -1,4 +1,4 @@
-// Keeps regular support tickets separate from safety-plan consultations.
+// Users and staff: saves support tickets separately from plan consultations.
 package com.olive.app.data
 
 import com.google.firebase.functions.FirebaseFunctions
@@ -14,7 +14,11 @@ internal class SupportRepository(
         return JSONObject(result)
     }
 
-    suspend fun request(action: String): StaffSupportTicket {
+    suspend fun requestHelp(): StaffSupportTicket = updateRequest("request")
+
+    suspend fun cancelRequest(): StaffSupportTicket = updateRequest("stop")
+
+    private suspend fun updateRequest(action: String): StaffSupportTicket {
         val ticket = call("staffSupportRequest", mapOf("action" to action)).getJSONObject("ticket")
         return StaffSupportTicket(
             requested = ticket.optBoolean("requested"),
@@ -25,6 +29,10 @@ internal class SupportRepository(
 
     suspend fun requestAdmin(conversationId: String) {
         call("safetySupportAdmin", mapOf("conversationId" to conversationId))
+    }
+
+    suspend fun close(conversationId: String) {
+        call("staffSupportClose", mapOf("conversationId" to conversationId))
     }
 }
 

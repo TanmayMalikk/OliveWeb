@@ -1,25 +1,23 @@
-// Tests the private entry retention test behavior.
+// Tests how long deleted private entries stay in a user's trash.
 package com.olive.app.data
-
-import com.olive.app.ui.shared.*
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for private entry retention test.
 class PrivateEntryRetentionTest {
     private val deletedAt = 1_000_000L
     private val entry = PrivateEntry(title = "Private", body = "Details", deletedAt = deletedAt)
 
+    // Inputs: the values shown below. Expected: deleted entry expires at configured test delay.
     @Test
-    // Deletes d entry expires at configured test delay.
     fun deletedEntryExpiresAtConfiguredTestDelay() {
         assertFalse(entry.trashExpired(deletedAt + PRIVATE_ENTRY_TRASH_RETENTION_MS - 1L))
         assertTrue(entry.trashExpired(deletedAt + PRIVATE_ENTRY_TRASH_RETENTION_MS))
     }
 
+    // Inputs: the values shown below. Expected: remaining seconds round up for the trash label.
     @Test
     fun remainingSecondsRoundUpForTheTrashLabel() {
         assertEquals(10, entry.trashSecondsRemaining(deletedAt))

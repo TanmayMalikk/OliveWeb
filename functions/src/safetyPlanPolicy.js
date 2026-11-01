@@ -1,4 +1,4 @@
-// Contains the safety plan policy code for this part of Olive.
+// Users and support staff: checks safety plan rules.
 const {HttpsError} = require("firebase-functions/v2/https");
 const SECTIONS = ["destination", "travel", "contacts", "essentials", "dependants", "aftercare", "documents", "grab"];
 const FIELD_KEYS = ["primary", "backup"].flatMap((plan) => SECTIONS.map((section) => `${plan}_${section}`));

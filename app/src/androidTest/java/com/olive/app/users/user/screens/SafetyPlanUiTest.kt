@@ -1,7 +1,5 @@
-// Tests the safety plan UI test behavior.
+// Tests plan edits, quick exit, and trusted-contact sharing for users.
 package com.olive.app
-
-import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
 
@@ -12,19 +10,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.*
 import com.olive.app.security.InputPolicy
-import com.olive.app.ui.*
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for safety plan UI test.
 class SafetyPlanUiTest : OliveUiTestBase() {
-    // Sets up.
     private fun setup(): SessionViewModel {
         openOnboarding()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         compose.runOnIdle {
-            session.chooseNew()
-            session.authenticate(
+            session.account.chooseNew()
+            session.account.authenticate(
                 "safety_tester",
                 "test-password-123",
                 true
@@ -32,7 +27,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         }
         waitFor("full_name")
         compose.runOnIdle {
-            session.saveSetupProfile(
+            session.account.saveSetupProfile(
                 UserProfile(
                     "safety_tester", "Safety Tester", "", "", "2000-01-02",
                     "English", "", "Edmonton", InputPolicy.triggerHash("moon garden"),
@@ -74,7 +69,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         waitFor("safety_backup_documents")
         fill("safety_backup_documents", "Backup safe place")
         compose.waitUntil(10_000) { session.safetyPlans.saving == 0 }
-        compose.runOnIdle { session.quickExit() }
+        compose.runOnIdle { session.navigation.quickExit() }
         waitCover()
         unlock()
         click("safe_safety_plan")
@@ -107,7 +102,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
                 "primary_aftercare",
                 "After leaving note"
             )
-            session.quickExit()
+            session.navigation.quickExit()
         }
         waitCover()
         assertNull(session.safetyPlans.plan)
@@ -156,7 +151,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
                 .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
 
-        compose.runOnIdle { session.quickExit() }
+        compose.runOnIdle { session.navigation.quickExit() }
         waitCover()
         unlock()
         click("safe_safety_plan")
@@ -185,7 +180,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         click("safety_jump_destination")
         fill("safety_backup_destination", "Stay with a friend")
         compose.waitUntil(10_000) { session.safetyPlans.saving == 0 }
-        compose.runOnIdle { session.quickExit() }
+        compose.runOnIdle { session.navigation.quickExit() }
         waitCover()
         unlock()
         click("safe_safety_plan")
@@ -225,7 +220,6 @@ class SafetyPlanUiTest : OliveUiTestBase() {
     }
 
     @Test
-    // Checks list ticks persist and document items are visible.
     fun checklistTicksPersistAndDocumentItemsAreVisible() {
         val session = setup()
         compose.onNodeWithTag("safety_save_status").assertTextEquals("Saved.")
@@ -252,7 +246,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
                 .compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
         compose.waitUntil(10_000) { session.safetyPlans.saving == 0 }
-        compose.runOnIdle { session.quickExit() }
+        compose.runOnIdle { session.navigation.quickExit() }
         waitCover()
         unlock()
         click("safe_safety_plan")

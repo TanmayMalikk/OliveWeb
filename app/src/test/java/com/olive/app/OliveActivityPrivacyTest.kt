@@ -1,7 +1,5 @@
-// Tests the olive activity privacy test behavior.
+// Tests private-screen previews and task identity for safe-app users.
 package com.olive.app
-
-import com.olive.app.ui.shared.*
 
 import com.olive.app.data.AccountRole
 import com.olive.app.data.CoverType
@@ -9,8 +7,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-// Groups the data and actions for olive activity privacy test.
 class OliveActivityPrivacyTest {
+    // Inputs: the values shown below. Expected: recent preview only blanks when protection and private content are both active.
     @Test
     fun recentPreviewOnlyBlanksWhenProtectionAndPrivateContentAreBothActive() {
         assertTrue(shouldBlankRecentPreview(protectionEnabled = true, sensitive = true))
@@ -18,6 +16,7 @@ class OliveActivityPrivacyTest {
         assertFalse(shouldBlankRecentPreview(protectionEnabled = true, sensitive = false))
     }
 
+    // Inputs: the values shown below. Expected: task identity only updates when cover or role changes.
     @Test
     fun taskIdentityOnlyUpdatesWhenCoverOrRoleChanges() {
         val applied = CoverType.FOOD to AccountRole.USER

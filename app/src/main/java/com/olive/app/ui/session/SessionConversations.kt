@@ -1,14 +1,14 @@
-// Contains the session conversations code for this part of Olive.
+// Signed-in users: opens and closes direct and support chats.
 package com.olive.app.ui.session
-
-import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
 
 import com.olive.app.R
+import android.util.Log
 
 import androidx.core.content.edit
 import com.olive.app.data.*
+import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,8 +16,7 @@ import kotlinx.coroutines.CancellationException
 
 // Owns conversation selection, messages and read markers.
 internal class SessionConversations(private val runtime: SessionRuntime) {
-    // Opens conversation.
-    fun openConversation(conversation: ChatConversation) {
+    fun openConversation(conversation: ChatConversation, preserveMessages: Boolean = false) {
         with(runtime) {
             with(state) {
                 if (!((screen == SessionScreen.Safe && page == SafePage.Messages) ||
@@ -25,7 +24,8 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 val uid = enrollment?.uid ?: return
                 if (uid !in conversation.participantIds) return
                 messageSubscription?.close()
-                chatMessages = emptyList()
+                val sameConversation = activeConversation?.id == conversation.id
+                if (!preserveMessages || !sameConversation) chatMessages = emptyList()
                 activeConversation =
                     conversation
                 message = null
@@ -50,18 +50,24 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             })
                     } catch (error: CancellationException) {
                         throw error
-                    } catch (_: Exception) {
+                    } catch (_: Exception) { // Do not expose key details; show the safe conversation error when encrypted room setup fails.
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_secure_conversation)
                     } finally {
-                        if (epoch == token) messagingBusy = false
+                        if (epoch == token) {
+                            messagingBusy = false
+                            val updated = activeConversation
+                            if (messageSubscription == null && updated?.id == conversation.id &&
+                                updated.updatedAt != conversation.updatedAt) {
+                                openConversation(updated)
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    // Closes conversation.
     fun closeConversation() {
         with(runtime) {
             with(state) {
@@ -74,39 +80,46 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
-    // Sends message.
+    // Sending a message: check the active chat, encrypt for its room, then report success to the composer.
     fun sendMessage(text: String, onSent: () -> Unit = {}) {
-        with(runtime) {
-            with(state) {
-                val repository = secureChatRepository ?: return
-                val device = enrollment ?: return
-                val conversation = activeConversation ?: return
-                if (messagingBusy) return
-                val token = epoch
-                messagingBusy = true
-                message = null
-                scope.launch {
-                    try {
-                        val key = secureSharing.roomKey(conversation)
-                        repository.send(
-                            conversation.id,
-                            AccountIdentity(device.uid, coverUsername),
-                            text,
-                            key
-                        )
-                        if (epoch == token && activeConversation?.id == conversation.id) onSent()
-                    } catch (error: CancellationException) {
-                        throw error
-                    } catch (_: Exception) {
-                        if (epoch == token) message =
-                            runtime.application.getString(R.string.ui_unable_to_send_the_message)
-                    } finally {
-                        if (epoch == token) messagingBusy = false
-                    }
+        val state = runtime.state
+        val repository = runtime.secureChatRepository ?: return
+        val device = runtime.enrollment ?: return
+        val conversation = state.activeConversation ?: return
+        if (state.messagingBusy) return
+
+        val sessionVersion = runtime.epoch
+        state.messagingBusy = true
+        state.message = null
+        runtime.scope.launch {
+            try {
+                val roomKey = runtime.secureSharing.roomKey(conversation)
+                repository.send(
+                    conversation.id,
+                    AccountIdentity(device.uid, state.coverUsername),
+                    text,
+                    roomKey,
+                )
+                if (runtime.epoch == sessionVersion && state.activeConversation?.id == conversation.id) {
+                    onSent()
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                Log.e("OliveMessaging", "Encrypted message send failed", failure)
+                if (runtime.epoch == sessionVersion) {
+                    state.message = runtime.application.getString(sendFailureMessage(failure))
+                }
+            } finally {
+                if (runtime.epoch == sessionVersion) state.messagingBusy = false
             }
         }
     }
+
+    private fun sendFailureMessage(failure: Exception): Int =
+        if (failure is FirebaseFirestoreException &&
+            failure.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+        ) R.string.messaging_send_denied else R.string.ui_unable_to_send_the_message
 
     fun unsendMessage(chat: ChatMessage) {
         with(runtime) {
@@ -144,7 +157,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     withContext(Dispatchers.IO) {
                         store.setConversationArchived(uid, conversation.id, archived)
                     }
-                } catch (_: Exception) {
+                } catch (_: Exception) { // Restore the local archive state because the device could not persist the requested change.
                     state.archivedConversationIds = previous
                     state.message = runtime.application.getString(R.string.unable_to_update_archived_chat)
                 }
@@ -179,7 +192,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
-    // Reads message key.
+    // Builds the device-storage key that tracks the last message read in one conversation.
     fun readMessageKey(uid: String, conversationId: String) = "read_message_${uid}_$conversationId"
 
     fun markConversationRead(conversation: ChatConversation) {

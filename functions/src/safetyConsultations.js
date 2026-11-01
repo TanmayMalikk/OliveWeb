@@ -1,10 +1,10 @@
-// Contains the safety consultations code for this part of Olive.
+// Users and support staff: opens and updates safety-plan consultations.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {db} = require("./firebase");
+const {db} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");
-const {closeSupportConversation, saveSupportConversation, PLAN_CONSULT} = require("./supportGroups");
+const {closeSupportConversation, saveSupportConversation, supportConversationId, PLAN_CONSULT} = require("./supportGroups");
 exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   const action = request.data?.action;
@@ -12,6 +12,7 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
     throw new HttpsError("permission-denied", "Owner only.");
   }
   const reference = planReference(caller.uid);
+  const newConversationId = supportConversationId(caller.uid, PLAN_CONSULT);
   const candidates = [];
   if (action === "request") {
     for (const user of await listEveryUser()) {
@@ -24,6 +25,7 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) throw new HttpsError("failed-precondition", "Sync the plan before sharing.");
     const plan = snapshot.data();
+    const wasRequested = plan.consultationRequested === true;
     const consultationRequested = action === "request";
     const assignmentNeeded = consultationRequested;
     const references = new Map(candidates.map((staff) => [staff.uid, db.collection("safetyStaff").doc(staff.uid)]));
@@ -36,15 +38,19 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
       transaction.set(references.get(plan.staffUid), {activeCount: Math.max(0, (settings.get(plan.staffUid)?.activeCount || 0) - 1)}, {merge: true});
     }
     if (selected && selected.uid !== plan.staffUid) transaction.set(references.get(selected.uid), {activeCount: (selected.activeCount || 0) + 1}, {merge: true});
+    const consultationConversationId = consultationRequested ?
+      (wasRequested && plan.consultationConversationId ? plan.consultationConversationId : newConversationId) :
+      (plan.consultationConversationId || "");
     const updated = {...plan, staffUid: selected?.uid || "", staffName: selected?.name || "",
       adminUid: assignmentNeeded ? plan.adminUid || "" : "",
       adminName: assignmentNeeded ? plan.adminName || "" : "",
-      consultationRequested, updatedAt: Date.now()};
+      consultationRequested, consultationConversationId, updatedAt: Date.now()};
     transaction.set(reference, updated);
-    return {plan: updated};
+    return {plan: updated, closedConversationId: action === "stop" ? consultationConversationId : ""};
   });
   if (result.plan.staffUid) await saveSupportConversation(
-      {...result.plan, supportOrigin: PLAN_CONSULT}, result.plan.supportSafeContactUid || "");
-  else if (action === "stop") await closeSupportConversation(caller.uid, PLAN_CONSULT);
-  return result;
+      {...result.plan, conversationId: result.plan.consultationConversationId, supportOrigin: PLAN_CONSULT},
+      result.plan.supportSafeContactUid || "", false);
+  else if (action === "stop") await closeSupportConversation(result.closedConversationId);
+  return {plan: result.plan};
 });

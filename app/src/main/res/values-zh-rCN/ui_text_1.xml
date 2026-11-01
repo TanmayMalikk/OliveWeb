@@ -19,7 +19,6 @@
     <string name="ui_passwords_match">密码匹配</string>
     <string name="ui_delete_value">删除%1$s？</string>
     <string name="ui_signed_in_as_value">以 %1$s 身份登录</string>
-    <string name="ui_active_chats_with_staff_and_users">与员工和用户积极聊天</string>
     <string name="ui_back">返回</string>
     <string name="ui_no_accounts_found">未找到帐户。</string>
     <string name="ui_profile_information">简介信息</string>
@@ -45,7 +44,6 @@
     <string name="ui_reconnect_your_account">重新连接您的帐户</string>
     <string name="ui_your_local_olive_branch_account_is_locked_safely_but_firebase_nee">您的本地 Olive Branch 帐户已安全锁定，但 Firebase 需要再次输入您的密码才能加载好友和消息。</string>
     <string name="ui_account_password">账户密码</string>
-    <string name="ui_requirement_met">满足要求</string>
     <string name="ui_finish">完成</string>
     <string name="ui_step_value_of_value">%2$s 的步骤 %1$s</string>
     <string name="ui_value_of_value_required">需要 %2$s 中的 %1$s</string>

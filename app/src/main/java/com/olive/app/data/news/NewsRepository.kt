@@ -1,4 +1,4 @@
-// Contains the news repository code for this part of Olive.
+// News cover users: loads articles for the Daily Digest cover.
 package com.olive.app.data
 
 import android.text.Html
@@ -17,7 +17,6 @@ import java.time.format.FormatStyle
 import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 
-// Groups the data and actions for news article.
 data class NewsArticle(
     val title: String,
     val summary: String,
@@ -50,7 +49,6 @@ data class NewsArticle(
     }
 }
 
-// Groups the data and actions for news scope.
 enum class NewsScope { LOCAL, GLOBAL }
 
 // Daily Digest uses Google's live RSS feeds and keeps the original story links.

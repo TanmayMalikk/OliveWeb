@@ -1,15 +1,9 @@
-// Contains the advanced statistics code for this part of Olive.
+// Calculator cover users: calculates statistics and distributions.
 package com.olive.app.ui.covers.calculator
 
-import com.olive.app.ui.shared.*
-
-import com.olive.app.ui.shared.ResourceFailure
 import com.olive.app.R
 
-import org.apache.commons.math3.complex.Complex
 import org.apache.commons.math3.linear.Array2DRowRealMatrix
-import org.apache.commons.math3.linear.LUDecomposition
-import org.apache.commons.math3.linear.MatrixUtils
 import org.apache.commons.math3.stat.StatUtils
 import org.apache.commons.math3.stat.correlation.PearsonsCorrelation
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
@@ -19,7 +13,6 @@ import org.apache.commons.math3.fitting.WeightedObservedPoint
 import kotlin.math.*
 
 
-// Runs when e variable happens.
 internal fun oneVariable(raw: String, text: com.olive.app.ui.shared.ResourceText): String {
     val v = list(raw)
     val d = DescriptiveStatistics(v.toDoubleArray())

@@ -1,10 +1,10 @@
-// Tests the safe support UI test behavior.
+// Tests support actions and quick exit while the menu is open.
 package com.olive.app
 
 import com.olive.app.ui.shared.*
 
 import com.olive.app.ui.users.shared.navigation.*
-import com.olive.app.ui.users.user.home.*
+import com.olive.app.ui.users.user.dashboard.*
 
 import android.graphics.Bitmap
 import androidx.activity.compose.setContent
@@ -26,21 +26,42 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.*
 import com.olive.app.security.InputPolicy
-import com.olive.app.ui.*
 import java.io.File
 import org.junit.Assert.*
 import org.junit.Test
 
-// Groups the data and actions for safe support UI test.
 class SafeSupportUiTest : OliveUiTestBase() {
-    // Sets up.
+    @Test
+    fun supportOverlayUsesTheSharedTalkBackTraversalOrder() {
+        setup()
+        compose.onNodeWithTag("session_screen_content").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.TraversalIndex,
+                AccessibilityTraversalOrder.ScreenContent.index
+            )
+        )
+        compose.onNodeWithTag("support_menu_toggle").performClick()
+        compose.onNodeWithTag("support_action_list").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.TraversalIndex,
+                AccessibilityTraversalOrder.OverlayContent.index
+            )
+        )
+        compose.onNodeWithTag("support_persistent_actions").assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.TraversalIndex,
+                AccessibilityTraversalOrder.PersistentActions.index
+            )
+        )
+    }
+
     private fun setup(): SessionViewModel {
         openOnboarding()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         compose.runOnIdle {
-            session.chooseNew()
-            session.authenticate(
+            session.account.chooseNew()
+            session.account.authenticate(
                 "support_tester",
                 "test-password-123",
                 true
@@ -48,7 +69,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         }
         waitFor("full_name")
         compose.runOnIdle {
-            session.saveSetupProfile(
+            session.account.saveSetupProfile(
                 UserProfile(
                     "support_tester",
                     "Support Tester",
@@ -174,7 +195,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
                 }
             }
         }
-        compose.runOnIdle { session.navigate(SafePage.Hotlines) }
+        compose.runOnIdle { session.navigation.openSafePage(SafePage.Hotlines) }
         waitFor("hotline_use_device_location")
         compose.onNodeWithTag("hotline_use_device_location").performScrollTo().performClick()
         compose.waitUntil(10_000) {

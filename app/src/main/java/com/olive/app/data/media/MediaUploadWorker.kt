@@ -1,6 +1,8 @@
-package com.olive.app.data
+// Safe-app users: resumes encrypted uploads in the background.
+package com.olive.app.data.media
 
 import android.content.Context
+import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -58,7 +60,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         if(job.status in setOf(MediaTransferStatus.COMPLETE,MediaTransferStatus.CANCELLED)) return Result.success()
 
         // Never continue another signed-in user's queued transfer after an account switch.
-        if(FirebaseAuth.getInstance().currentUser?.uid!=job.ownerUid) return Result.retry()
+        if(FirebaseAuth.getInstance().currentUser?.uid!=job.ownerUid) {
+            store.write(job.copy(status=MediaTransferStatus.QUEUED,
+                error="Waiting for the account that queued this upload"))
+            return Result.retry()
+        }
         val file=File(job.source.filePath)
         if(!file.isFile || file.length()!=job.source.ciphertextSize) return permanent(job,"Encrypted upload staging file is missing")
         return try {
@@ -82,11 +88,16 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             Result.success(workDataOf(MEDIA_ID to record.id))
         } catch(cancelled:CancellationException) { throw cancelled }
         catch(error:FirebaseFunctionsException) {
+            Log.e("OliveMediaUpload", "Firebase rejected encrypted upload ${job.id}", error)
             if(error.code in setOf(FirebaseFunctionsException.Code.INVALID_ARGUMENT,FirebaseFunctionsException.Code.PERMISSION_DENIED,
+                    FirebaseFunctionsException.Code.UNAUTHENTICATED,
                     FirebaseFunctionsException.Code.NOT_FOUND, FirebaseFunctionsException.Code.FAILED_PRECONDITION))
                 permanent(job,error.localizedMessage ?: "Media upload was rejected")
             else retry(job,error)
-        } catch(error:Exception) { retry(job,error) }
+        } catch(error:Exception) {
+            Log.e("OliveMediaUpload", "Encrypted upload ${job.id} will retry", error)
+            retry(job,error)
+        }
     }
 
     private suspend fun upload(file:File,initial:MediaUploadJob):List<MediaCompletedPart> {
@@ -136,21 +147,26 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
     }
 
     companion object {
-        private const val JOB_ID="jobId"
-        const val MEDIA_ID="mediaId";const val ERROR="error"
-        const val BYTES_SENT="bytesSent";const val TOTAL_BYTES="totalBytes"
+        private const val JOB_ID = "jobId"
+        const val MEDIA_ID = "mediaId"
+        const val ERROR = "error"
+        const val BYTES_SENT = "bytesSent"
+        const val TOTAL_BYTES = "totalBytes"
         /** Stable unique-work name shared with the controller's observer. */
-        fun workName(jobId:String)="olive_media_$jobId"
+        fun workName(jobId: String): String {
+            return "olive_media_$jobId"
+        }
 
         /**
          * Schedules one network-constrained worker per job. KEEP prevents repeated UI taps from
          * creating concurrent writers for the same multipart session.
          */
-        fun enqueue(context:Context,jobId:String) {
+        fun enqueue(context:Context,jobId:String,replaceDelayedWork:Boolean=false) {
             val request=OneTimeWorkRequestBuilder<MediaUploadWorker>().setInputData(workDataOf(JOB_ID to jobId))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).build()
-            WorkManager.getInstance(context).enqueueUniqueWork(workName(jobId),ExistingWorkPolicy.KEEP,request)
+            val policy=if(replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
+            WorkManager.getInstance(context).enqueueUniqueWork(workName(jobId),policy,request)
         }
     }
 }
@@ -171,7 +187,9 @@ private class FileSliceRequestBody(
                 if(count<=0) throw IOException("Unable to seek encrypted upload")
                 skipped+=count
             }
-            val buffer=ByteArray(64*1024);var remaining=length;var sent=0L
+            val buffer = ByteArray(64 * 1024)
+            var remaining = length
+            var sent = 0L
             try {
                 while(remaining>0) {
                     val count=input.read(buffer,0,minOf(buffer.size.toLong(),remaining).toInt())

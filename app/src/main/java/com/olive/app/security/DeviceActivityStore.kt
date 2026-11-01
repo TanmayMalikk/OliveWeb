@@ -1,4 +1,4 @@
-// Contains the device activity store code for this part of Olive.
+// All signed-in roles: stores device activity state.
 package com.olive.app.security
 
 import com.olive.app.data.*
@@ -12,11 +12,9 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         activityVault.update { append(it, uid, "settingsHistory", event.toJson()) }
     }
 
-    // Sets tings history.
     fun settingsHistory(uid: String): List<SettingsEvent> =
         rows(uid, "settingsHistory").map(SettingsEvent::fromJson)
 
-    // Records trigger.
     fun recordTrigger(uid: String, event: TriggerEvent) {
         activityVault.update { append(it, uid, "triggerHistory", event.toJson()) }
     }
@@ -30,7 +28,6 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
             ) else event
         }
 
-    // Records trigger attempt.
     fun recordTriggerAttempt(uid: String, id: String, accepted: Boolean) {
         activityVault.update { root ->
             val events = root.optJSONObject("triggerHistory")?.optJSONArray(uid) ?: return@update
@@ -48,16 +45,13 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         }
     }
 
-    // Records checkout.
     fun recordCheckout(uid: String, event: CheckoutEvent) {
         activityVault.update { append(it, uid, "checkoutHistory", event.toJson()) }
     }
 
-    // Checks out history.
     fun checkoutHistory(uid: String): List<CheckoutEvent> =
         rows(uid, "checkoutHistory").map(CheckoutEvent::fromJson)
 
-    // Saves private entry.
     fun savePrivateEntry(uid: String, entry: PrivateEntry) {
         activityVault.update { root ->
             val byAccount = root.child("privateEntries")

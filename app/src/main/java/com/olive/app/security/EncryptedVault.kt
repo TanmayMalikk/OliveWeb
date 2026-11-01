@@ -1,4 +1,4 @@
-// Contains the encrypted vault code for this part of Olive.
+// All signed-in roles: keeps private app data encrypted on the device.
 package com.olive.app.security
 
 import android.content.Context
@@ -38,7 +38,7 @@ class EncryptedVault(context: Context, mode: String) {
     }
 
     fun read(): JSONObject = synchronized(fileLock) { readUnlocked() }
-    // Reads unlocked.
+    // Reads and parses the encrypted vault file while the caller holds the shared file lock.
     private fun readUnlocked(): JSONObject {
         if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) return JSONObject()
         val bytes = file.openRead().use { it.readBytes() }
