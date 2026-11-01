@@ -3,7 +3,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { MumbleHandler } = require ('../src/calls');
-const { channel } = require('node:diagnostics_channel');
 
 test ('createCall creates and tracks a call', async () => {
     let requestedChannel;
@@ -79,33 +78,27 @@ test ('closeCall drops calls',async () =>{
     assert.equal(handler.getCall(call.callId),undefined);
 });
 
-test ('ConnectUser moves users from one call to another.', async () => {
-    let i=0;
+test('connectUser moves a user into the call channel', async () => {
+    const users = new Map([
+        [7, { session: 7, channel: 0, name: 'Ada' }]
+    ]);
     const fakeMumbleProxy = {
-        async addChannel(){
-            i += 1;
-            return i;
+        async addChannel() {
+            return 42;
         },
-        async getState(channelId){
-            class user {
-                constructor(){
-                    this.channelId = 'test';
-                }
-            }
-            const x = new user();
-            return x;
+        async getState(sessionId) {
+            return { ...users.get(sessionId) };
         },
-        async setState(user){
-            const y = user.channelId;
-            return y;
+        async setState(user) {
+            users.set(user.session, { ...user });
         }
     };
     const handler = new MumbleHandler(fakeMumbleProxy);
-    const call = await handler.createCall('1');
-    const dude = await handler.mumbleServer.getState('1','1');
-    assert.equal(await handler.mumbleServer.setState(dude),'test');
-    await handler.connectUser(call.callId, channel);
-    assert.equal(await handler.mumbleServer.setState(dude),'test');
+    const call = await handler.createCall('Support');
+
+    assert.equal(await handler.connectUser(call.callId, 7), true);
+    assert.equal(users.get(7).channel, 42);
+    assert.equal(await handler.connectUser('missing-call', 7), false);
 });
 
 test('disconnectUser returns a user to the call channel parent', async () => {
