@@ -6,6 +6,7 @@ import { accounts, cloudMode } from "../../../services/AccountService";
 import {
   consultation,
   loadPlan,
+  observePlan,
   readSafetyChecklist,
   safetyChecklistText,
   safetySections,
@@ -35,6 +36,7 @@ export default function SafetyPlan() {
   useEffect(() => {
     if (!cloudMode || !identity) return;
     let live = true;
+    let stop: (() => void) | undefined;
     const owner =
       identity.role === "SAFE_CONTACT"
         ? sharedPlans().then((plans) => plans[0]?.ownerUid ?? "")
@@ -45,7 +47,7 @@ export default function SafetyPlan() {
           throw new Error("No safety plan is currently shared with you.");
         return loadPlan(uid);
       })
-      .then((value) => {
+      .then(async (value) => {
         if (!live) return;
         setPlan(value);
         setDrafts(
@@ -56,6 +58,28 @@ export default function SafetyPlan() {
             ]),
           ),
         );
+        let latest = value;
+        const cleanup = await observePlan(
+          value.ownerUid,
+          (remote) => {
+            if (!live) return;
+            const previous = latest;
+            latest = remote;
+            setPlan(remote);
+            setDrafts((current) => {
+              const next = { ...current };
+              for (const [key, field] of Object.entries(remote.fields)) {
+                const oldValue = previous.fields[key]?.value ?? "";
+                if ((current[key] ?? oldValue) === oldValue)
+                  next[key] = field.value;
+              }
+              return next;
+            });
+          },
+          (error) => live && setFeedback(error.message),
+        );
+        if (live) stop = cleanup;
+        else cleanup();
       })
       .catch((error) => {
         if (live)
@@ -65,6 +89,7 @@ export default function SafetyPlan() {
       });
     return () => {
       live = false;
+      stop?.();
     };
   }, [identity?.uid]);
   if (!cloudMode)

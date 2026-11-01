@@ -4,6 +4,7 @@ package com.olive.app.ui.covers.fitness
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.olive.app.data.AccountSyncRepository
 import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
@@ -38,6 +39,7 @@ internal object FitnessCloudSync {
                     StorageMetadata.Builder().setContentType("application/json")
                         .setCustomMetadata("schemaVersion", "1").build(),
                 ).await()
+            AccountSyncRepository().notifyChanged(accountId)
             lastPayloadByAccount[accountId] = payloadSignature
             lastUploadAtByAccount[accountId] = now
         } catch (_: Exception) {

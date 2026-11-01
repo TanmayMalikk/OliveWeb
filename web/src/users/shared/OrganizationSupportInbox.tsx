@@ -43,15 +43,19 @@ export default function OrganizationSupportInbox() {
     if (!cloudMode || !identity) return;
     let active = true;
     let stop: (() => void) | undefined;
-    void messaging
-      .subscribeConversations(
-        identity.uid,
-        (value) =>
-          active &&
-          setConversations(value.filter((item) => item.type === "SUPPORT")),
-        (error) => active && setFeedback(error.message),
-      )
+    void messaging.register(identity)
+      .then(() => {
+        if (!active) return undefined;
+        return messaging.subscribeConversations(
+          identity.uid,
+          (value) =>
+            active &&
+            setConversations(value.filter((item) => item.type === "SUPPORT")),
+          (error) => active && setFeedback(error.message),
+        );
+      })
       .then((cleanup) => {
+        if (!cleanup) return;
         if (active) stop = cleanup;
         else cleanup();
       })

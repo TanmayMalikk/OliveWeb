@@ -4,6 +4,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useRef,
   useState,
   type ErrorInfo,
   type ReactNode,
@@ -143,20 +144,56 @@ function PinGate() {
 // Web main: Shows the cover view.
 function Cover() {
   const s = useSession();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const lastOliveTap = useRef(0);
+  const coverLabel = s.cover === "FOOD"
+    ? "Olive"
+    : s.cover === "NEWS"
+      ? "Daily Digest"
+      : s.cover === "FITNESS"
+        ? "Fitness"
+        : "Game";
+  const tapOlive = () => {
+    const now = Date.now();
+    if (now - lastOliveTap.current > 1500) {
+      lastOliveTap.current = now;
+      return;
+    }
+    lastOliveTap.current = 0;
+    void s.perform(s.beginEntry);
+  };
   return (
     <main
       id="main"
       className={`cover-container ${s.cover.toLowerCase()}-cover`}
     >
-      {s.cover === "FOOD" ? (
-        <Food />
-      ) : s.cover === "NEWS" ? (
-        <News />
-      ) : s.cover === "FITNESS" ? (
-        <Fitness />
-      ) : (
-        <Game />
-      )}
+      <nav className="cover-account-tabs" role="tablist" aria-label={`${coverLabel} app pages`}>
+        <button type="button" role="tab" aria-selected={!accountOpen} aria-controls="cover-display-panel" onClick={() => setAccountOpen(false)}>
+          {coverLabel}
+        </button>
+        <button type="button" role="tab" aria-selected={accountOpen} aria-controls="cover-account-panel" onClick={() => setAccountOpen(true)}>
+          Account
+        </button>
+      </nav>
+      <div id="cover-display-panel" className="cover-tab-panel" role="tabpanel" hidden={accountOpen}>
+        {s.cover === "FOOD" ? (
+          <Food />
+        ) : s.cover === "NEWS" ? (
+          <News />
+        ) : s.cover === "FITNESS" ? (
+          <Fitness />
+        ) : (
+          <Game />
+        )}
+      </div>
+      <section id="cover-account-panel" className="cover-account-panel" role="tabpanel" aria-label="Account" hidden={!accountOpen}>
+          <span className="eyebrow">ACCOUNT</span>
+          <h1>Your account.</h1>
+          <p>Account access and private settings.</p>
+          <button type="button" className="cover-hidden-olive" aria-label="olive icon" onClick={tapOlive}>
+            <Leaf aria-hidden="true" />
+          </button>
+      </section>
     </main>
   );
 }

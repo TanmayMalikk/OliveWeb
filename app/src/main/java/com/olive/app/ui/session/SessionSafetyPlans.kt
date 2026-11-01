@@ -4,6 +4,7 @@ package com.olive.app.ui.session
 import com.olive.app.ui.users.shared.navigation.*
 
 import androidx.compose.runtime.*
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
 import com.olive.app.data.*
@@ -20,6 +21,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     private val sync = Mutex()
     private var activeOwner: String? = null
     private var lease: Any? = null
+    private var planListener: ListenerRegistration? = null
     private var generation = 0
     var plan by mutableStateOf<SafetyPlan?>(null)
         private set
@@ -50,6 +52,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     // Clears private plan data when its screen closes; a different screen cannot clear the active one.
     fun close(screenLease: Any? = null) {
         if (screenLease != null && lease !== screenLease) return
+        planListener?.remove()
+        planListener = null
         lease =
             null
         generation++
@@ -71,6 +75,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (!authorized() || (runtime.state.accountRole == AccountRole.USER && ownerUid != runtime.coverAccountId)) return
         val actor = runtime.coverAccountId ?: return
         lease = screenLease
+        planListener?.remove()
+        planListener = null
         generation++
         val token = generation
         activeOwner = ownerUid
@@ -88,6 +94,33 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             )
             if (current(actor, ownerUid, token)) plan = value
             refresh()
+            if (!runtime.localMode && current(actor, ownerUid, token)) {
+                planListener = repository.observe(
+                    ownerUid,
+                    onUpdate = { remote ->
+                        runtime.scope.launch {
+                            // Keep unsent local edits while refreshing every section changed on another device.
+                            val updated = withContext(Dispatchers.IO) {
+                                store.update(actor, ownerUid) { local ->
+                                    val combined = local.copy(fields = remote.fields + local.fields)
+                                    mergeSafetyPlan(combined, combined, remote)
+                                }
+                            }
+                            if (current(actor, ownerUid, token)) {
+                                plan = updated
+                                if (updated.pending) SafetyPlanSyncWorker.enqueue(
+                                    runtime.application,
+                                    actor,
+                                    ownerUid
+                                )
+                            }
+                        }
+                    },
+                    onError = { failure ->
+                        if (current(actor, ownerUid, token)) error = R.string.safety_sync_error
+                    },
+                )
+            }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) { // Keep locally available plan data on screen and report that cloud storage could not be loaded.

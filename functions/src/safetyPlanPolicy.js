@@ -29,9 +29,16 @@ function mergeFields(existing, defaults, changes) {
     if ((old?.revision || 0) !== change.revision) { conflicts.push(change.key); continue; }
     fields[change.key] = {value: change.value, revision: (old?.revision || 0) + 1, mutationId: change.mutationId};
   }
-  // Adds initial sections that are missing from an older safety plan.
+  // Adds starter content to new plans and to untouched blank plans created by older app versions.
   for (const [key, value] of Object.entries(defaults)) {
-    if (!fields[key]) fields[key] = {value, revision: 1, mutationId: "initial"};
+    if (!fields[key]) {
+      fields[key] = {value, revision: 1, mutationId: "initial"};
+      continue;
+    }
+    const old = fields[key];
+    if (old?.revision === 1 && old?.mutationId === "initial" && old?.value === "" && value !== "") {
+      fields[key] = {value, revision: 1, mutationId: "initial"};
+    }
   }
   return {fields, conflicts};
 }

@@ -2,12 +2,15 @@
 package com.olive.app.data
 
 import com.google.firebase.functions.FirebaseFunctions
-import kotlinx.coroutines.tasks.await
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import org.json.JSONObject
+import kotlinx.coroutines.tasks.await
 
 // Callable Functions verify current Auth roles and sharing on every read and write; no plaintext Firestore disk cache.
 internal class SafetyPlanRepository(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) {
     // Calls the matching backend service for safety.
     private suspend fun call(name: String, data: Map<String, Any> = emptyMap()): JSONObject {
@@ -15,6 +18,25 @@ internal class SafetyPlanRepository(
             ?: error("Invalid response")
         return JSONObject(result)
     }
+
+    // Watches a plan that Firestore rules have already approved for this signed-in account.
+    fun observe(
+        ownerUid: String,
+        onUpdate: (SafetyPlan) -> Unit,
+        onError: (Exception) -> Unit,
+    ): ListenerRegistration = firestore.collection("safetyPlans").document(ownerUid)
+        .addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                onError(error)
+                return@addSnapshotListener
+            }
+            val data = snapshot?.data ?: return@addSnapshotListener
+            try {
+                onUpdate(SafetyPlan.fromJson(JSONObject(data)))
+            } catch (failure: Exception) {
+                onError(failure)
+            }
+        }
 
     // Syncs the latest data for safety.
     suspend fun sync(plan: SafetyPlan): SafetyPlan {
