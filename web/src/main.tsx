@@ -11,7 +11,6 @@ import {
 import { createRoot } from "react-dom/client";
 import { LogOut, Delete, ArrowLeft, Leaf } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
-import { cloudMode } from "./services/AccountService";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
 import { Button, Field, Form } from "./components/SharedComponents";
 import Game from "./public/covers/OliveGamesCover";
@@ -252,12 +251,20 @@ class ErrorBoundary extends Component<
   }
 }
 const mode = siteMode();
-const hostedFirebaseReady =
-  cloudMode &&
-  Boolean(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY) &&
-  import.meta.env.VITE_USE_FIREBASE_EMULATORS !== "true";
+const hostedSetupProblems = [
+  !import.meta.env.VITE_FIREBASE_API_KEY && "VITE_FIREBASE_API_KEY",
+  !import.meta.env.VITE_FIREBASE_AUTH_DOMAIN && "VITE_FIREBASE_AUTH_DOMAIN",
+  !import.meta.env.VITE_FIREBASE_PROJECT_ID && "VITE_FIREBASE_PROJECT_ID",
+  !import.meta.env.VITE_FIREBASE_STORAGE_BUCKET &&
+    "VITE_FIREBASE_STORAGE_BUCKET",
+  !import.meta.env.VITE_FIREBASE_APP_ID && "VITE_FIREBASE_APP_ID",
+  !import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY &&
+    "VITE_FIREBASE_APPCHECK_SITE_KEY",
+  import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true" &&
+    "VITE_USE_FIREBASE_EMULATORS must be false",
+].filter(Boolean);
 // Hosted private sites must use shared Firebase accounts; local browser accounts cannot sync to phones.
-if (import.meta.env.PROD && mode !== "download" && !hostedFirebaseReady) {
+if (import.meta.env.PROD && mode !== "download" && hostedSetupProblems.length > 0) {
   createRoot(document.getElementById("root")!).render(
     <main className="error-page" id="main">
       <h1>Account service needs setup.</h1>
@@ -267,10 +274,9 @@ if (import.meta.env.PROD && mode !== "download" && !hostedFirebaseReady) {
         website and the phone app use the same accounts.
       </p>
       <p className="help-note">
-        Required: VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN,
-        VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_STORAGE_BUCKET,
-        VITE_FIREBASE_APP_ID, and VITE_FIREBASE_APPCHECK_SITE_KEY. Set
-        VITE_USE_FIREBASE_EMULATORS to false.
+        This build cannot see: {hostedSetupProblems.join(", ")}. Set these in
+        this Hostinger app and rebuild it. VITE settings are read during the
+        build.
       </p>
     </main>,
   );
