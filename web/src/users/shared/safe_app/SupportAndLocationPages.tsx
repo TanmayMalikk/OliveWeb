@@ -97,23 +97,31 @@ export function DocumentsPage() {
   };
   useEffect(() => { void refresh(); }, []);
   const open = (document: BrowserDocument) => void session.perform(async () => {
-    const url = await openBrowserDocument(document);
-    window.open(url, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    const tab = window.open("about:blank", "_blank");
+    if (tab) tab.opener = null;
+    try {
+      const url = await openBrowserDocument(document);
+      if (tab) tab.location.replace(url);
+      else window.location.assign(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (failure) {
+      tab?.close();
+      throw failure;
+    }
   });
   return <section className="safe-feature-page">
     <div className="panel documents-heading"><div><Upload size={28} /><h2>Encrypted documents</h2>
-      <p>Files stay encrypted in cloud storage and are decrypted only by a device approved for this account.</p></div>
+      <p>Files stay encrypted in cloud storage and open for the signed-in account on phone or web.</p></div>
       <Button variant="outline" onClick={() => void refresh()} disabled={loading}><RefreshCw size={16} /> Refresh</Button>
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
-    {loading ? <Empty title="Loading documents…">Checking this browser’s encrypted access.</Empty>
+    {loading ? <Empty title="Loading documents…">Checking your account’s encrypted files.</Empty>
       : documents.length === 0 ? <Empty title="No documents yet.">Upload a document from the Android app and it will appear here.</Empty>
       : <div className="document-grid">{documents.map((document) => <article className="panel browser-document" key={document.id}>
           <FileLock2 size={22} /><div><h3>{document.name}</h3>
             <p>{document.approved ? "Ready to open securely on this device." : document.approvalMessage}</p></div>
           <Button variant={document.approved ? "primary" : "outline"} disabled={!document.approved || session.busy}
-            onClick={() => open(document)}>{document.approved ? "Open document" : "Awaiting approval"}</Button>
+            onClick={() => open(document)}>{document.approved ? "Open document" : "Upgrade required"}</Button>
         </article>)}</div>}
   </section>;
 }

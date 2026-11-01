@@ -1,4 +1,4 @@
-// Users and approved viewers: requests encrypted media upload and download access.
+// Users and authorized viewers: requests encrypted media upload and download access.
 package com.olive.app.data.media
 
 import com.olive.app.BuildConfig
@@ -26,6 +26,10 @@ interface MediaTicketDataSource {
     suspend fun abortUpload(jobId:String)
     /** Returns a short-lived GET capability after the callable checks `allowed_users`. */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
+    /** Returns the callable-only account recovery key after the server checks file access. */
+    suspend fun accountAccessKey(mediaId:String):String
+    /** Saves a recovery key for an older owner document after this device decrypts it. */
+    suspend fun storeAccountAccessKey(mediaId:String,accountAccessKey:String) = Unit
     /** Replaces the owner-controlled recipient list and wrapped AES keys without exposing plaintext. */
     suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord
     /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
@@ -44,7 +48,7 @@ class MediaDeviceVerificationException(message:String,cause:Exception):Exception
  * - called by [MediaUploadWorker] for upload session/ticket/finalization operations;
  * - called by `MediaTransferController` for download tickets;
  * - delegates authorization and R2 signing to `functions/src/mediaTickets.js`;
- * - never accepts an `InputStream`, `ByteArray`, or plaintext payload.
+ * - never accepts plaintext file content; only transfer facts and the account recovery key cross it.
  *
  * Every returned URL is locally constrained to HTTPS on Cloudflare's R2 hostname before OkHttp sees
  * it. This limits the impact of a malformed or compromised callable response.
@@ -62,6 +66,7 @@ class MediaRepository(
             "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
             "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
             "deviceWrappedKeys" to source.deviceWrappedKeys,
+            "accountAccessKey" to source.accountAccessKey,
             "encryptionVersion" to source.encryptionVersion,
         ))
         return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
@@ -87,6 +92,16 @@ class MediaRepository(
     override suspend fun downloadTicket(mediaId:String):MediaDownloadTicket {
         val result=call("mediaDownloadTicket",mapOf("mediaId" to mediaId))
         return MediaDownloadTicket(mediaId,validateUrl(result.string("url")),result.stringMap("headers"),result.long("expiresAt"))
+    }
+
+    override suspend fun accountAccessKey(mediaId:String):String =
+        call("mediaAccountAccessKey",mapOf("mediaId" to mediaId)).string("accountAccessKey")
+
+    override suspend fun storeAccountAccessKey(mediaId:String,accountAccessKey:String) {
+        call("mediaStoreAccountAccessKey",mapOf(
+            "mediaId" to mediaId,
+            "accountAccessKey" to accountAccessKey,
+        ))
     }
 
     override suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord {

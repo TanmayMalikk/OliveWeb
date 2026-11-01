@@ -1,7 +1,8 @@
-// Web safe-app users: lists and decrypts documents approved for this browser.
+// Web safe-app users: lists and decrypts documents authorized for the signed-in account.
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { firebase } from "./AccountService";
-import { messageDevice, unwrapRoomKey } from "./MessagingService";
+import { messageDevice, unwrapRoomKeyBytes } from "./MessagingService";
+import { importKey, toBase64 } from "./EncryptionService";
 import type { Identity } from "../domain/DomainModels";
 
 type StoredMedia = {
@@ -45,7 +46,8 @@ async function decryptMetadata(value: string, key: CryptoKey) {
 }
 
 export async function listBrowserDocuments(identity: Identity): Promise<BrowserDocument[]> {
-  const { db } = await firebase();
+  const { db, functions } = await firebase();
+  const { httpsCallable } = await import("firebase/functions");
   const device = await messageDevice(identity.uid);
   const deviceKey = `${identity.uid}--${device.deviceId}`;
   const snapshot = await getDocs(query(collection(db, "files"),
@@ -57,9 +59,27 @@ export async function listBrowserDocuments(identity: Identity): Promise<BrowserD
     let key: CryptoKey | undefined;
     let name = "Encrypted document";
     let mimeType = "application/octet-stream";
-    if (wrapped && typeof value.encrypted_metadata === "string") {
+    if (typeof value.encrypted_metadata === "string") {
       try {
-        key = await unwrapRoomKey(identity.uid, wrapped);
+        let raw: Uint8Array;
+        if (wrapped) {
+          raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
+          if (value.owner_id === identity.uid) {
+            void httpsCallable(functions, "mediaStoreAccountAccessKey")({
+              mediaId: row.id,
+              accountAccessKey: toBase64(raw),
+            }).catch(() => undefined);
+          }
+        } else {
+          const recovered = (await httpsCallable(functions, "mediaAccountAccessKey")({
+            mediaId: row.id,
+          })).data as { accountAccessKey?: unknown };
+          if (typeof recovered.accountAccessKey !== "string")
+            throw new Error("Account document key is unavailable.");
+          raw = fromBase64(recovered.accountAccessKey);
+        }
+        key = await importKey(raw);
+        raw.fill(0);
         const metadata = await decryptMetadata(value.encrypted_metadata, key);
         if (typeof metadata.name === "string" && metadata.name.trim()) name = metadata.name;
         if (typeof metadata.mimeType === "string" && metadata.mimeType.trim()) mimeType = metadata.mimeType;
@@ -74,7 +94,7 @@ export async function listBrowserDocuments(identity: Identity): Promise<BrowserD
       ownerUid: typeof value.owner_id === "string" ? value.owner_id : "",
       createdAt: value.created_at?.toMillis?.() ?? 0,
       approved: Boolean(key),
-      approvalMessage: key ? "" : "Open Documents on an already approved Android device once to approve this browser.",
+      approvalMessage: key ? "" : "This older document has not yet been upgraded for account-wide access.",
       ciphertextSize: typeof value.ciphertext_size === "number" ? value.ciphertext_size : 0,
       ciphertextSha256: typeof value.ciphertext_sha256 === "string" ? value.ciphertext_sha256 : "",
       key,

@@ -14,7 +14,8 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
-    "mediaDownloadTicket", "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaDelete", "staffSupportRequest",
+    "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
+    "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaDelete", "staffSupportRequest",
     "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
@@ -25,6 +26,15 @@ test("encrypted media device keys stay scoped to the signed-in account", () => {
   assert.deepEqual(mediaTest.validateDeviceWrappedKeys({"owner--phone":"wrapped"}, "owner"),
     {"owner--phone":"wrapped"});
   assert.throws(() => mediaTest.validateDeviceWrappedKeys({"other--phone":"wrapped"}, "owner"));
+});
+
+// Inputs: a valid 32-byte Base64 key plus malformed and wrong-length values. Expected: only AES-256 material passes.
+test("account document recovery accepts only a 256-bit key", () => {
+  const valid = Buffer.alloc(32, 7).toString("base64");
+  assert.equal(mediaTest.accountAccessKey(valid, true), valid);
+  assert.equal(mediaTest.accountAccessKey(undefined), "");
+  assert.throws(() => mediaTest.accountAccessKey("not base64", true));
+  assert.throws(() => mediaTest.accountAccessKey(Buffer.alloc(16).toString("base64"), true));
 });
 
 // Inputs: the values in this case. Expected: encrypted media access keeps the owner and exact wrapped-key recipients.

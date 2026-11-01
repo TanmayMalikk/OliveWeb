@@ -223,6 +223,12 @@ service cloud.firestore {
         && resource.data.keys().hasAll(['storage_path']);
     }
 
+    // Account recovery copies are callable-only. Browser and Android clients can obtain one only
+    // after the Function checks the signed-in UID against the file's current allowed_users list.
+    match /mediaAccessKeys/{fileId} {
+      allow read, write: if false;
+    }
+
     // Upload sessions contain internal R2 identifiers and are callable-only.
     match /mediaUploads/{jobId} { allow read, write: if false; }
 

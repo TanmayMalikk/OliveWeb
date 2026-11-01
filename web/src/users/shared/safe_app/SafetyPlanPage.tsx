@@ -28,6 +28,7 @@ export default function SafetyPlan() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState("");
+  const [activeKind, setActiveKind] = useState<"primary" | "backup">("primary");
   const editable = identity?.role === "USER";
   useEffect(() => {
     if (!cloudMode || !identity) return;
@@ -128,8 +129,23 @@ export default function SafetyPlan() {
           </Button>
         )}
       </section>
-      {(["primary", "backup"] as const).map((kind) => (
+      <div className="safety-plan-tabs" role="tablist" aria-label="Safety plans">
+        {(["primary", "backup"] as const).map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            role="tab"
+            aria-selected={activeKind === kind}
+            aria-controls={`${kind}-plan-panel`}
+            onClick={() => setActiveKind(kind)}
+          >
+            {label(kind)} plan
+          </button>
+        ))}
+      </div>
+      {([activeKind] as const).map((kind) => (
         <section key={kind} className="panel safety-plan-group">
+          <div id={`${kind}-plan-panel`} role="tabpanel">
           <h2>{label(kind)} plan</h2>
           <div className="form-grid">
             {safetySections.map((section) => {
@@ -237,6 +253,7 @@ export default function SafetyPlan() {
                 </fieldset>
               );
             })}
+          </div>
           </div>
         </section>
       ))}
