@@ -121,8 +121,8 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         roomKey,
                     )
                 }
-                withContext(Dispatchers.IO) { runtime.messageOutbox.write(outgoing) }
-                MessageSendWorker.enqueue(runtime.application, outgoing)
+                val queued = withContext(Dispatchers.IO) { runtime.messageOutbox.write(outgoing) }
+                MessageSendWorker.enqueue(runtime.application, queued)
                 if (runtime.epoch == sessionVersion && state.activeConversation?.id == conversation.id) {
                     onSent()
                 }
@@ -153,7 +153,10 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         val uid = runtime.enrollment?.uid ?: return
         runtime.scope.launch {
             val outgoing = withContext(Dispatchers.IO) {
-                runtime.messageOutbox.get(chat.id)?.takeIf { it.ownerUid == uid }?.let {
+                runtime.messageOutbox.get(chat.id)?.takeIf { candidate ->
+                    candidate.ownerUid == uid &&
+                            runtime.messageOutbox.head(uid, candidate.conversationId)?.id == candidate.id
+                }?.let {
                     runtime.messageOutbox.update(it.id) { current ->
                         current.copy(
                             status = MessageDeliveryStatus.QUEUED,
@@ -163,7 +166,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     }
                 }
             } ?: return@launch
-            MessageSendWorker.enqueue(runtime.application, outgoing, replaceDelayedWork = true)
+            MessageSendWorker.enqueue(runtime.application, outgoing)
         }
     }
 

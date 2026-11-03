@@ -63,12 +63,56 @@ class MessageOutboxStoreTest {
         val snapshot = store.observe("alice").first()
         assertEquals(150, snapshot.size)
         assertEquals((0L until 150L).toList(), snapshot.map(OutgoingMessage::clientSentAt))
+        assertEquals((1L..150L).toList(), snapshot.map(OutgoingMessage::clientSequence))
     }
 
-    private fun message(id: String, owner: String, sentAt: Long = 1L) = OutgoingMessage(
+    @Test
+    fun `sequences increase independently for each conversation`() {
+        val store = MessageOutboxStore(InMemoryOutboxVault())
+        val firstA = store.write(message("a-1", "alice", conversation = "a"))
+        val firstB = store.write(message("b-1", "alice", conversation = "b"))
+        val secondA = store.write(message("a-2", "alice", conversation = "a"))
+
+        assertEquals(1L, firstA.clientSequence)
+        assertEquals(1L, firstB.clientSequence)
+        assertEquals(2L, secondA.clientSequence)
+    }
+
+    @Test
+    fun `legacy records receive deterministic sequences before a new message`() {
+        val vault = InMemoryOutboxVault()
+        vault.update { root ->
+            val messages = JSONObject()
+                .put("later", message("later", "alice", 20L).toJson().apply { remove("clientSequence") })
+                .put("earlier", message("earlier", "alice", 10L).toJson().apply { remove("clientSequence") })
+            root.put(
+                "accounts",
+                JSONObject().put(
+                    "alice",
+                    JSONObject().put("messages", messages),
+                ),
+            )
+        }
+        val store = MessageOutboxStore(vault)
+
+        val newest = store.write(message("new", "alice", 30L))
+
+        assertEquals(
+            listOf("earlier" to 1L, "later" to 2L, "new" to 3L),
+            store.all("alice").map { it.id to it.clientSequence },
+        )
+        assertEquals(3L, newest.clientSequence)
+    }
+
+    private fun message(
+        id: String,
+        owner: String,
+        sentAt: Long = 1L,
+        conversation: String = "conversation",
+    ) = OutgoingMessage(
         id = id,
         ownerUid = owner,
-        conversationId = "conversation",
+        conversationId = conversation,
         senderUsername = owner,
         ciphertext = "encrypted-$id",
         clientSentAt = sentAt,

@@ -27,6 +27,7 @@ data class OutgoingMessage(
     val senderUsername: String,
     val ciphertext: String,
     val clientSentAt: Long,
+    val clientSequence: Long = 0,
     val status: MessageDeliveryStatus = MessageDeliveryStatus.QUEUED,
     val attemptCount: Int = 0,
     val failureCode: String? = null,
@@ -34,7 +35,7 @@ data class OutgoingMessage(
     init {
         require(id.isNotBlank() && ownerUid.isNotBlank() && conversationId.isNotBlank())
         require(senderUsername.isNotBlank() && ciphertext.isNotBlank())
-        require(clientSentAt >= 0 && attemptCount >= 0)
+        require(clientSentAt >= 0 && clientSequence >= 0 && attemptCount >= 0)
     }
 
     fun toJson() = JSONObject().apply {
@@ -44,6 +45,7 @@ data class OutgoingMessage(
         put("senderUsername", senderUsername)
         put("ciphertext", ciphertext)
         put("clientSentAt", clientSentAt)
+        put("clientSequence", clientSequence)
         put("status", status.name)
         put("attemptCount", attemptCount)
         failureCode?.let { put("failureCode", it) }
@@ -57,6 +59,7 @@ data class OutgoingMessage(
             senderUsername = value.getString("senderUsername"),
             ciphertext = value.getString("ciphertext"),
             clientSentAt = value.getLong("clientSentAt"),
+            clientSequence = value.optLong("clientSequence", 0),
             status = MessageDeliveryStatus.valueOf(value.getString("status")),
             attemptCount = value.optInt("attemptCount", 0),
             failureCode = value.optString("failureCode").takeIf(String::isNotBlank),
