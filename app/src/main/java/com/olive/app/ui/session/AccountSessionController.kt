@@ -264,6 +264,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             )
                             store.forgetDevice()
                             messageOutbox.purge(uid)
+                            chatCache.purge(uid)
                             documentIndex.purge(uid)
                             offlineMediaCache.purge(uid)
                         }

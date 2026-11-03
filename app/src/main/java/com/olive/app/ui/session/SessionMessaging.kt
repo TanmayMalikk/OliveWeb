@@ -44,6 +44,13 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                         runtime.application.getString(R.string.messaging_needs_a_firebase_connected_build)
                     return
                 }
+                val cacheToken = epoch
+                scope.launch {
+                    val cached = withContext(Dispatchers.IO) { chatCache.conversations(device.uid) }
+                    if (epoch == cacheToken && enrollment?.uid == device.uid && conversations.isEmpty()) {
+                        conversations = cached
+                    }
+                }
                 // A saved local account can outlive Firebase's login; reconnect it before touching private friend data.
                 val expectedUsername = InputPolicy.username(coverUsername)
                 if (accounts.authenticatedUid() != device.uid || accounts.authenticatedUsername() != expectedUsername) {
@@ -149,13 +156,14 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
     fun observeFriendConversations(currentFriends: List<Friend>, token: Long) {
         with(runtime) {
             with(state) {
+                val ownerUid = enrollment?.uid ?: return
                 // The marker keeps support conversations observable even when this account has no friends.
                 val ids = currentFriends.map { it.friendshipId }.toSet() + "__support__"
                 if (ids == observedFriendshipIds) return
                 observedFriendshipIds = ids
                 conversationSubscription?.close()
                 conversationSubscription =
-                    messagingRepository?.observeConversations(deviceUid(), { rows ->
+                    messagingRepository?.observeConversations(ownerUid, { rows ->
                         // Update the list only while the same messaging screen is still open.
                         if (epoch == token && messagingScreenActive()) {
                             if (conversationLoadFailed) message = null
@@ -188,6 +196,17 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                                 R.string.ui_unable_to_load_messages_value,
                                 error
                             )
+                        }
+                    }, { serverRows ->
+                        scope.launch {
+                            withContext(Dispatchers.IO) {
+                                chatCache.replaceIndex(ownerUid, serverRows, System.currentTimeMillis())
+                            }
+                            if (epoch == token) {
+                                activeConversation?.takeIf { active ->
+                                    serverRows.none { it.id == active.id }
+                                }?.let { conversationActions.closeConversation() }
+                            }
                         }
                     })
             }
@@ -246,6 +265,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 messageSubscription?.close()
                 messageSubscription = null
                 activeConversation = null
+                activeRoomKey = null
                 chatMessages = emptyList()
                 messagingBusy = false
                 messagingNeedsReconnect = false

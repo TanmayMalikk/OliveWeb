@@ -3,6 +3,7 @@ package com.olive.app.data
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.MetadataChanges
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
@@ -14,12 +15,16 @@ import javax.crypto.SecretKey
 class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
     // Opens the copy of an existing room key that was encrypted for this account.
     suspend fun existingRoomKey(conversationId: String, currentUid: String): SecretKey? {
+        return wrappedRoomKey(conversationId, currentUid)?.let(KeyManager::unwrapKey)
+    }
+
+    // Returns only this device's encrypted key envelope for protected offline retention.
+    suspend fun wrappedRoomKey(conversationId: String, currentUid: String): String? {
         val snapshot = firestore.collection("conversations").document(conversationId).get().await()
         val deviceId = KeyManager.deviceId()
         val deviceKey = snapshot.reference.collection("deviceKeys")
             .document("$currentUid--$deviceId").get().await().getString("wrappedKey")
-        val wrappedKey = deviceKey ?: snapshot.roomKeys().orEmpty()[currentUid] ?: return null
-        return KeyManager.unwrapKey(wrappedKey)
+        return deviceKey ?: snapshot.roomKeys().orEmpty()[currentUid]
     }
 
     // Creates or unwraps the encrypted room key required before this participant can read messages.
@@ -152,38 +157,51 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     // Streams encrypted chat records and decrypts each message with the active room key.
     fun observeMessages(
         conversationId: String, roomKey: SecretKey, onUpdate: (List<ChatMessage>) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        onServerCiphertext: ((List<EncryptedChatMessage>) -> Unit)? = null,
     ): ChatSubscription {
         val listener = firestore.collection("conversations").document(conversationId)
             .collection("messages").orderBy("sentAt").limitToLast(250)
-            .addSnapshotListener { snapshot, error ->
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
                     onError(error.localizedMessage.orEmpty())
                     return@addSnapshotListener
                 }
-                onUpdate(snapshot?.documents.orEmpty().mapNotNull { row ->
+                val encrypted = snapshot?.documents.orEmpty().mapNotNull { row ->
                     val sender = row.getString("senderUid") ?: return@mapNotNull null
-                    val deleted = row.getBoolean("deleted") ?: false
-                    val body = when {
-                        deleted -> ""
-                        row.getString("ciphertext") != null -> runCatching {
-                            EncryptionUtils.decryptText(
-                                row.getString("ciphertext").orEmpty(),
-                                roomKey
-                            )
-                        }.getOrDefault("")
-
-                        else -> ""
-                    }
-                    ChatMessage(
-                        row.id, sender, row.getString("senderUsername").orEmpty(), body,
-                        row.getTimestamp("sentAt")?.toDate()?.time ?: row.getLong("clientSentAt")
-                        ?: 0L, deleted
+                    EncryptedChatMessage(
+                        id = row.id,
+                        senderUid = sender,
+                        senderUsername = row.getString("senderUsername").orEmpty(),
+                        ciphertext = row.getString("ciphertext").orEmpty(),
+                        sentAt = row.getTimestamp("sentAt")?.toDate()?.time
+                            ?: row.getLong("clientSentAt") ?: 0L,
+                        deleted = row.getBoolean("deleted") ?: false,
                     )
-                })
+                }
+                val decrypted = runCatching { decryptMessages(encrypted, roomKey) }.getOrElse {
+                    onError("Encrypted message authentication failed.")
+                    return@addSnapshotListener
+                }
+                if (snapshot?.metadata?.isFromCache != true || encrypted.isNotEmpty()) onUpdate(decrypted)
+                if (snapshot != null && !snapshot.metadata.isFromCache) onServerCiphertext?.invoke(encrypted)
             }
         return ChatSubscription { listener.remove() }
     }
+
+    // Authenticates ciphertext before any message is exposed to the UI.
+    fun decryptMessages(messages: List<EncryptedChatMessage>, roomKey: SecretKey): List<ChatMessage> =
+        messages.map { message ->
+            require(message.deleted || message.ciphertext.isNotBlank()) { "Missing encrypted message body" }
+            ChatMessage(
+                id = message.id,
+                senderUid = message.senderUid,
+                senderUsername = message.senderUsername,
+                body = if (message.deleted) "" else EncryptionUtils.decryptText(message.ciphertext, roomKey),
+                sentAt = message.sentAt,
+                unsent = message.deleted,
+            )
+        }
 
     // Removes  from secure messaging.
     suspend fun unsend(conversationId: String, message: ChatMessage, currentUid: String) {

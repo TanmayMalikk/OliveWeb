@@ -12,6 +12,7 @@ import com.olive.app.data.LocalAccountRepository
 import com.olive.app.data.LocationSharingRepository
 import com.olive.app.data.MessagingRepository
 import com.olive.app.data.MessageOutboxStore
+import com.olive.app.data.ChatCacheStore
 import com.olive.app.data.SafetyDocumentRepository
 import com.olive.app.data.SafetyDocumentDataSource
 import com.olive.app.data.DocumentIndexStore
@@ -47,6 +48,7 @@ internal class SessionLocalStorage(application: Application, localMode: Boolean)
         Context.MODE_PRIVATE,
     )
     val messageOutbox = MessageOutboxStore(application)
+    val chatCache = ChatCacheStore(application)
     val documentIndex = DocumentIndexStore(application)
     val offlineMediaCache = OfflineMediaCache(application)
 }

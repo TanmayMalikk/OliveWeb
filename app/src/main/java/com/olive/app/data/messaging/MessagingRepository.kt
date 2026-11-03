@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MemoryCacheSettings
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import com.olive.app.security.KeyManager
@@ -220,19 +221,26 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     fun observeConversations(
         currentUid: String,
         onUpdate: (List<ChatConversation>) -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        onServerUpdate: ((List<ChatConversation>) -> Unit)? = null,
     ): ChatSubscription {
         val listener =
             firestore.collection("conversations").whereArrayContains("participantIds", currentUid)
-                .addSnapshotListener { snapshot, error ->
+                .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
                     if (error != null) {
                         onError(
                             error.localizedMessage ?: "Unable to load conversations."
                         )
                         return@addSnapshotListener
                     }
-                    onUpdate(snapshot?.documents.orEmpty().mapNotNull(::conversationFrom)
-                        .sortedByDescending { it.updatedAt })
+                    val conversations = snapshot?.documents.orEmpty().mapNotNull(::conversationFrom)
+                        .sortedByDescending { it.updatedAt }
+                    if (snapshot?.metadata?.isFromCache != true || conversations.isNotEmpty()) {
+                        onUpdate(conversations)
+                    }
+                    if (snapshot != null && !snapshot.metadata.isFromCache) {
+                        onServerUpdate?.invoke(conversations)
+                    }
                 }
         return listener.asSubscription()
     }
