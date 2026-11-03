@@ -65,7 +65,7 @@ internal fun LazyListScope.friendLists(
         }
     }
 
-    // Only continue with friend lists when session messages incoming friend requests is empty is false.
+    // Show incoming requests only when someone is waiting for an answer.
     if (session.messages.incomingFriendRequests.isNotEmpty()) {
         item {
             val description = stringResource(
@@ -124,7 +124,7 @@ internal fun LazyListScope.friendLists(
             )
         }
     }
-    // outgoing expanded is handled here by friend lists.
+    // Expand or collapse the list of sent friend requests.
     if (outgoingExpanded) {
         if (session.messages.outgoingFriendRequests.isEmpty()) {
             item { Text(stringResource(R.string.no_outgoing_requests), color = Muted) }
@@ -167,7 +167,7 @@ internal fun LazyListScope.friendLists(
             }
         }
     }
-    // friends expanded is handled here by friend lists.
+    // Expand or collapse the accepted-friends list.
     if (friendsExpanded) {
         if (session.messages.friends.isEmpty()) {
             item { Text(stringResource(R.string.no_friends_yet), color = Muted) }
@@ -177,7 +177,7 @@ internal fun LazyListScope.friendLists(
         }
     }
 }
-// Shows search result row for shared safe app friend lists.
+// Shows one username result and the friend action currently allowed.
 @Composable
 private fun LazyItemScope.SearchResultRow(
     session: SessionViewModel,
@@ -201,7 +201,7 @@ private fun LazyItemScope.SearchResultRow(
                     Text(stringResource(R.string.private_note))
                 }
             }
-            // Choose what search result row should do for the current value.
+            // Shows the friend action allowed for this search result.
             when (relationship) {
                 FriendRelationship.AddFriend -> Button(
                     onClick = { session.messages.sendFriendRequest(user) },
@@ -227,7 +227,7 @@ private fun LazyItemScope.SearchResultRow(
     }
 }
 
-// The incoming request row view is part of shared safe app friend lists. It gives the user the details and choices needed here.
+// Shows who sent a request and lets the user accept or decline it.
 @Composable
 private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(
@@ -252,7 +252,7 @@ private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request:
         }
     }
 }
-// Shows outgoing request row for shared safe app friend lists.
+// Shows a sent friend request and lets the user cancel it.
 @Composable
 private fun LazyItemScope.OutgoingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(

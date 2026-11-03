@@ -39,13 +39,13 @@ class LiveLocationService : Service() {
     private var lastMotionAt = 0L
     private var lastTrailPruneAt = 0L
     private val callback = object : LocationCallback() {
-        // Responds when location result for live location service.
+        // Publishes each fresh GPS point while live sharing is active.
         override fun onLocationResult(result: LocationResult) {
             result.lastLocation?.let(::handleLocation)
         }
     }
 
-    // Live location service: Responds when create. It asks the device for its location and turns the answer into map data.
+    // Prepares the foreground notification and GPS client for live sharing.
     override fun onCreate() {
         super.onCreate()
         fused =
@@ -53,11 +53,11 @@ class LiveLocationService : Service() {
         createChannel()
     }
 
-    // Live location service: Responds when bind. It waits for the set time and cancels the timer when the feature closes.
+    // This foreground location service is command-based, so screens do not bind to it.
     override fun onBind(intent: Intent?): IBinder? = null
-    // Responds when start command for live location service. It waits for the set time and cancels the timer when the feature closes.
+    // Starts or stops GPS updates from the action sent to the foreground service.
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // intent action is stop is handled here by on start command.
+        // Stop location sharing immediately when the notification action asks for it.
         if (intent?.action == STOP) {
             intent.getStringExtra(OWNER_UID)?.let { ownerUid = it }
             intent.getStringArrayExtra(CONTACT_UIDS)?.let { authorized = it.toSet() }
@@ -112,7 +112,7 @@ class LiveLocationService : Service() {
             .setMinUpdateDistanceMeters(1f)
             .setWaitForAccurateLocation(true).build()
         fused.removeLocationUpdates(callback)
-        // A on start command error is handled here instead of closing the app.
+        // Use the fallback when on start command is unavailable.
         try {
             fused.requestLocationUpdates(request, callback, mainLooper)
         } catch (_: SecurityException) {
@@ -173,7 +173,7 @@ class LiveLocationService : Service() {
         pruneExpiredTrail(now)
     }
 
-    // Live location service: returns the prune expired trail.
+    // Removes expired trail from location sharing.
     private fun pruneExpiredTrail(now: Long) {
         if (now - lastTrailPruneAt < TRAIL_PRUNE_INTERVAL_MILLIS) return
         lastTrailPruneAt = now
@@ -184,7 +184,7 @@ class LiveLocationService : Service() {
             }
     }
 
-    // Live location service: Stops sharing. It waits for the set time and cancels the timer when the feature closes.
+    // Stops GPS uploads when live sharing ends or expires.
     private fun stopSharing() {
         expiryHandler.removeCallbacks(expireSharing)
         if (::fused.isInitialized) fused.removeLocationUpdates(callback)
@@ -217,14 +217,14 @@ class LiveLocationService : Service() {
         }
     }
 
-    // Responds when destroy for live location service. It waits for the set time and cancels the timer when the feature closes.
+    // Stops GPS callbacks when Android destroys the live-location service.
     override fun onDestroy() {
         expiryHandler.removeCallbacks(expireSharing)
         if (::fused.isInitialized) fused.removeLocationUpdates(callback)
         super.onDestroy()
     }
 
-    // Live location service: Checks whether permission. It asks Android whether the required permission is granted.
+    // Checks whether Android still allows this service to read location.
     private fun hasPermission() = ContextCompat.checkSelfPermission(
         this,
         Manifest.permission.ACCESS_FINE_LOCATION
@@ -245,7 +245,7 @@ class LiveLocationService : Service() {
         )
     }
 
-    // returns the notification for live location service.
+    // Builds the notification shown while location sharing is running.
     private fun notification(): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_app_info_blank)

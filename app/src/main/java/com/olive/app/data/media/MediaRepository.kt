@@ -58,7 +58,7 @@ class MediaRepository(
     private val auth:FirebaseAuth=FirebaseAuth.getInstance(),
     private val appCheck:FirebaseAppCheck=FirebaseAppCheck.getInstance(),
 ):MediaTicketDataSource {
-    // Media: Builds upload.
+    // Requests short-lived upload URLs for one encrypted file.
     override suspend fun createUpload(job:MediaUploadJob):MediaUploadSession {
         // Only ciphertext facts and already-encrypted metadata cross the Firebase boundary.
         val source=job.source
@@ -74,7 +74,7 @@ class MediaRepository(
             MediaUploadMode.valueOf(result.string("mode")),result.optionalString("uploadId"),result.long("partSize"))
     }
 
-    // Media: Sends ticket. It checks access, protects the file, and then reads or saves it.
+    // Requests a protected upload ticket for an encrypted media file.
     override suspend fun uploadTicket(jobId:String,partNumber:Int):MediaUploadTicket {
         require(partNumber>0)
         val result=call("mediaUploadPartTicket",mapOf("jobId" to jobId,"partNumber" to partNumber))
@@ -82,7 +82,7 @@ class MediaRepository(
             result.long("expiresAt"),partNumber)
     }
 
-    // Media: returns the complete upload.
+    // Saves a pending media upload so WorkManager can resume it later.
     override suspend fun completeUpload(jobId:String,parts:List<MediaCompletedPart>):CloudMediaRecord {
         val result=call("mediaCompleteUpload",mapOf("jobId" to jobId,"parts" to parts.map {
             mapOf("partNumber" to it.partNumber,"etag" to it.etag)
@@ -90,20 +90,20 @@ class MediaRepository(
         return result.record()
     }
 
-    // Media: returns the abort upload. It checks access, protects the file, and then reads or saves it.
+    // Deletes a completed or cancelled upload from the local queue.
     override suspend fun abortUpload(jobId:String) { call("mediaAbortUpload",mapOf("jobId" to jobId)) }
 
-    // Media: Downloads ticket. It checks access, protects the file, and then reads or saves it.
+    // Requests a protected download ticket for an encrypted media file.
     override suspend fun downloadTicket(mediaId:String):MediaDownloadTicket {
         val result=call("mediaDownloadTicket",mapOf("mediaId" to mediaId))
         return MediaDownloadTicket(mediaId,validateUrl(result.string("url")),result.stringMap("headers"),result.long("expiresAt"))
     }
 
-    // returns the account access key for media. It checks access, protects the file, and then reads or saves it.
+    // Uses one protected-storage key for this account's encrypted-media access data.
     override suspend fun accountAccessKey(mediaId:String):String =
         call("mediaAccountAccessKey",mapOf("mediaId" to mediaId)).string("accountAccessKey")
 
-    // Saves account access key for media. It checks access, protects the file, and then reads or saves it.
+    // Saves this account's wrapped document keys in protected local storage.
     override suspend fun storeAccountAccessKey(mediaId:String,accountAccessKey:String) {
         call("mediaStoreAccountAccessKey",mapOf(
             "mediaId" to mediaId,
@@ -111,13 +111,13 @@ class MediaRepository(
         ))
     }
 
-    // Updates access for media.
+    // Saves the latest encrypted-media access keys for this account.
     override suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         return call("mediaUpdateAccess",mapOf("mediaId" to mediaId,"wrappedKeys" to wrappedKeys)).record()
     }
 
-    // Media: Updates device keys.
+    // Adds the wrapped file keys needed by newly authorized devices.
     override suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord {
         require(deviceWrappedKeys.isNotEmpty() && deviceWrappedKeys.size<=50)
         return call("mediaUpdateDeviceKeys",mapOf("mediaId" to mediaId,
@@ -127,13 +127,13 @@ class MediaRepository(
     // Removes media for media.
     override suspend fun deleteMedia(mediaId:String) { call("mediaDelete",mapOf("mediaId" to mediaId)) }
 
-    // Calls the matching backend service for media.
+    // Calls the protected media function and checks its response.
     private suspend fun call(name:String,data:Map<String,Any>):Map<*,*> {
         // WorkManager can start before the SDK has restored its cached tokens. Waiting here makes
         // sure the callable receives both the signed-in account and the required App Check proof.
         val user=auth.currentUser ?: error("Sign in again before uploading files")
         user.getIdToken(false).await()
-        // A call error is handled here instead of closing the app.
+        // Use the fallback when call is unavailable.
         try {
             appCheck.getAppCheckToken(false).await()
         } catch(error:Exception) {
@@ -148,7 +148,7 @@ class MediaRepository(
             ?: error("Invalid $name response")
     }
 
-    // Checks whether url for media. It checks access, protects the file, and then reads or saves it.
+    // Accepts only secure signed R2 links without embedded usernames or passwords.
     private fun validateUrl(value:String):String {
         // Signed URLs are bearer capabilities. Reject credentials, plaintext HTTP, and foreign hosts.
         val uri=URI(value)
@@ -165,7 +165,7 @@ private fun Map<*,*>.string(name:String)=get(name) as? String ?: error("Missing 
 private fun Map<*,*>.optionalString(name:String)=get(name) as? String ?: ""
 // Encrypted media: Reads a required whole number from a downloaded media record.
 private fun Map<*,*>.long(name:String)=(get(name) as? Number)?.toLong() ?: error("Missing $name")
-// Encrypted media: Builds a text map by checking every downloaded key and value before use.
+// Keeps only valid text fields from downloaded encrypted metadata.
 private fun Map<*,*>.stringMap(name:String):Map<String,String> = (get(name) as? Map<*,*>)?.entries?.associate { entry ->
     (entry.key as? String ?: error("Invalid $name key")) to (entry.value as? String ?: error("Invalid $name value"))
 }.orEmpty()

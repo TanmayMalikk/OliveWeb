@@ -16,7 +16,7 @@ import org.junit.Test
 // This class sorts before tests that deliberately grant permissions for unrelated feature flows.
 class FirstRunLocationPermissionUiTest : OliveUiTestBase() {
     private val automation get() = InstrumentationRegistry.getInstrumentation().uiAutomation
-    // returns the find for user first run location permission ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the find step with the test's sample data.
     private fun find(node: AccessibilityNodeInfo?, suffix: String): AccessibilityNodeInfo? {
         if (node == null) return null
         if (node.viewIdResourceName?.endsWith(suffix) == true) return node
@@ -24,7 +24,7 @@ class FirstRunLocationPermissionUiTest : OliveUiTestBase() {
         return null
     }
 
-    // returns the permission button for user first run location permission ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the permission button step with the test's sample data.
     private fun permissionButton(suffix: String) {
         compose.waitUntil(20_000) {
             find(automation.rootInActiveWindow, suffix)

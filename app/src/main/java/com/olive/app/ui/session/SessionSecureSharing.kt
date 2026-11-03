@@ -19,13 +19,13 @@ import java.security.PublicKey
 
 /** Coordinates encrypted conversations and private-entry sharing without exposing keys to UI code. */
 internal class SessionSecureSharing(private val runtime: SessionRuntime) {
-    // Session secure sharing: returns the room key.
+    // Keeps the saved room key name in one place for the signed-in session.
     suspend fun roomKey(conversation: ChatConversation): javax.crypto.SecretKey {
         with(runtime) {
             val device = enrollment ?: error("No active account")
             val repository = messagingRepository ?: error("Messaging unavailable")
             val secure = secureChatRepository ?: error("Secure messaging unavailable")
-            // A room key error is handled here instead of closing the app.
+            // Use the fallback when room key is unavailable.
             try {
                 val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
                     val username = conversation.participantUsernames[uid]
@@ -66,7 +66,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 messagingBusy = true
                 message = null
                 scope.launch {
-                    // If share fails, catch the error so the app can keep running and explain the problem.
+                    // Turn an unexpected share failure into a readable message.
                     try {
                         val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
                             val name = conversation.participantUsernames[uid]
@@ -130,7 +130,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 message = null
                 scope.launch {
                     val newlyGrantedRecipients = mutableListOf<String>()
-                    // If share fails, catch the error so the app can keep running and explain the problem.
+                    // Turn an unexpected share failure into a readable message.
                     try {
                         conversation.participantIds.filter { it != device.uid }.forEach { recipient ->
                             if (recipient !in document.allowedUsers) newlyGrantedRecipients += recipient
@@ -180,7 +180,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 messagingBusy = true
                 message = null
                 scope.launch {
-                    // A share safety plan error is handled here instead of closing the app.
+                    // Use the fallback when share safety plan is unavailable.
                     try {
                         chat.send(
                             conversation.id,
@@ -247,7 +247,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 message = null
                 viewedSharedEntry = null
                 scope.launch {
-                    // If open fails, catch the error so the app can keep running and explain the problem.
+                    // Turn an unexpected open failure into a readable message.
                     try {
                         val entry = repository.loadAndDecryptEntry(entryId, uid)
                         if (epoch == token) viewedSharedEntry = entry
@@ -264,7 +264,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
         }
     }
 
-    // returns the revoke if shared for session secure sharing.
+    // Removes if shared from the signed-in session.
     suspend fun revokeIfShared(
         message: ChatMessage,
         conversation: ChatConversation,

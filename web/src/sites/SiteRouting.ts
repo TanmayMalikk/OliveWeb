@@ -32,7 +32,7 @@ export function siteMode(
     return "admin";
   return "user";
 }
-// Finds the saved site settings for one cover app.
+// Finds the website settings for the selected cover app.
 export function coverSite(id: Cover) {
   return sites.find((site) => site.id === id)!;
 }

@@ -15,13 +15,13 @@ import kotlinx.coroutines.withContext
 internal class SessionEntrySettings(private val runtime: SessionRuntime) {
     private val keys = DeviceLockKey(if (runtime.localMode) "demo" else "firebase")
 
-    // Session entry settings: Checks whether these entry settings can be edited.
+    // Allows entry settings only for a user who has an active device enrollment.
     private fun editable() = with(runtime) {
         !state.busy && state.screen == SessionScreen.Safe &&
                 state.page == SafePage.Settings && !state.privacyBlackout && state.accountRole == AccountRole.USER
     }
 
-    // returns the select for session entry settings.
+    // Validates and saves the selected private-entry method.
     fun select(method: SafeEntryMethod, currentPin: String) {
         if (!editable()) return
         val device = runtime.enrollment ?: return
@@ -32,7 +32,7 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
         change(currentPin, null, method)
     }
 
-    // Saves pin for session entry settings.
+    // Checks both PIN fields and saves the new backup app PIN.
     fun savePin(currentPin: String, pin: String, confirmation: String, usePin: Boolean) {
         if (!editable()) return
         if (!InputPolicy.validPin(pin)) {
@@ -48,7 +48,7 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
         change(currentPin, pin, if (usePin) SafeEntryMethod.APP_PIN else null)
     }
 
-    // returns the change for session entry settings.
+    // Checks the current PIN, then changes the private entry PIN or method.
     private fun change(currentPin: String, pin: String?, method: SafeEntryMethod?): Unit =
         with(runtime) {
             val device = enrollment ?: return
@@ -77,16 +77,16 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
                 application.getString(R.string.entry_settings_failed),
                 timeoutMillis = 120_000
             ) { token ->
-                // returns the current for session entry settings.
+                // Reads the current private-entry settings before changing them.
                 fun current(expected: DeviceEnrollment = device) =
                     epoch == token && enrollment == expected && state.screen == SessionScreen.Safe &&
                             state.page == SafePage.Settings && !state.privacyBlackout
-                // verify pin is handled here by current.
+                // Check the current app PIN before allowing entry settings to change.
                 if (verifyPin) {
                     val result =
                         withContext(Dispatchers.IO) { store.verify(device.uid, currentPin) }
                     if (!current()) return@runOperation
-                    // Only continue with current when result is pin result rejected.
+                    // Shows the rejection message when the entered PIN does not match.
                     if (result is PinResult.Rejected) {
                         if (result.failures >= 5) navigation.quickExit()
                         else state.message = application.resources.getQuantityString(
@@ -104,14 +104,14 @@ internal class SessionEntrySettings(private val runtime: SessionRuntime) {
                         if (enableDevice) null else store.deviceLockGrant(device.uid)
                     )
                 } else null
-                // If current fails, catch the error so the app can keep running and explain the problem.
+                // Turn an unexpected current failure into a readable message.
                 try {
                     if (!current()) return@runOperation
                     var grant: org.json.JSONObject? = null
                     if (challenge != null) {
                         val request = DeviceLockRequest(challenge, settingsChange = true)
                         state.deviceLockRequest = request
-                        // If current fails, catch the error so the app can keep running and explain the problem.
+                        // Turn an unexpected current failure into a readable message.
                         try {
                             val cipher = request.result.await()
                             if (!current()) return@runOperation

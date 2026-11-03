@@ -48,7 +48,7 @@ internal fun OliveCover(
     session: SessionViewModel? = null,
 ) {
     val uiText = rememberResourceText()
-    // Update olive cover when information used by this screen changes.
+    // Rebuild searchable dish text when the menu or language changes.
     LaunchedEffect(uiText, vm.dishes) {
         vm.updateSearchLabels(vm.dishes.associate { dish ->
             dish.id to listOf(
@@ -61,7 +61,7 @@ internal fun OliveCover(
     var areaDialog by remember { mutableStateOf(false) }
     var guestAddress by remember { mutableStateOf(DeliveryAddress()) }
     val savedAddress = if (configured) session?.deliveryAddress ?: DeliveryAddress() else guestAddress
-    // Update olive cover when information used by this screen changes.
+    // Update delivery estimates when the saved address changes.
     LaunchedEffect(savedAddress) { vm.updateLocation(savedAddress) }
     LaunchedEffect(session?.coverReset) {
         checkoutNotice = false
@@ -73,9 +73,9 @@ internal fun OliveCover(
         if ((session?.addressSaveVersion ?: 0) > 0) areaDialog = false
     }
     LaunchedEffect(checkoutNotice) { session?.checkoutActive = checkoutNotice }
-    // Update olive cover when information used by this screen changes.
+    // Clear the checkout-active flag when this cover leaves the screen.
     DisposableEffect(Unit) { onDispose { session?.checkoutActive = false } }
-    // Update olive cover when information used by this screen changes.
+    // Close private food dialogs while the cover is hidden behind Safe App.
     LaunchedEffect(interactive) {
         if (!interactive) {
             checkoutNotice = false
@@ -261,7 +261,7 @@ private fun FoodDiscoverScreen(
                 placeholder = { Text(stringResource(R.string.search_olive_s_menu)) },
                 leadingIcon = { Icon(Icons.Outlined.Search, null) },
                 trailingIcon = {
-                    // Only continue with food discover screen when vm query is not empty icon button on click = vm search.
+                    // Show the clear-search button only while a search phrase is present.
                     if (vm.query.isNotEmpty()) IconButton(onClick = { vm.search("") }) {
                         Icon(
                             Icons.Outlined.Close,

@@ -50,7 +50,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         }
     }
 
-    // Checks whether start for session account sign in.
+    // Stops a second sign-in request while the first request is still running.
     private fun canStart(): Boolean {
         val state = runtime.state
         return !state.busy && runtime.enrollment == null &&
@@ -106,7 +106,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         if (!usernameUnavailable && !incorrectLogin && !(create && failure is FirebaseFunctionsException)) {
             return false
         }
-        // Only continue with show credential failure when runtime epoch is session version.
+        // Ignore a sign-in result after the session has been cancelled or replaced.
         if (runtime.epoch == sessionVersion) {
             runtime.state.credentialFieldError = if (usernameUnavailable) {
                 CredentialFieldError.UsernameTaken
@@ -125,7 +125,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         return true
     }
 
-    // Loads profile for session account sign in.
+    // Loads the signed-in profile before choosing the next screen.
     private suspend fun loadProfile(identity: AccountIdentity): UserProfile? {
         val remote = runtime.accounts.profile(identity)
         return withContext(Dispatchers.IO) {
@@ -155,7 +155,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         return true
     }
 
-    // Starts next screen for session account sign in.
+    // Opens setup, the cover, or the role portal after sign-in succeeds.
     private suspend fun openNextScreen(identity: AccountIdentity, profile: UserProfile?) {
         if (profile != null && profile.role == AccountRole.SAFE_CONTACT &&
             AccountPolicy.personalProfileNeedsSetup(profile)
@@ -201,7 +201,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         state.deliveryAddress = profile.address
         runtime.screenHistory.clear()
         runtime.safePageHistory.clear()
-        // open returning non user checks whether profile role is account role safe contact before continuing.
+        // Safe contacts open their own dashboard instead of a discreet cover.
         if (profile.role == AccountRole.SAFE_CONTACT) {
             state.page = SafePage.Home
             state.screen = SessionScreen.Safe

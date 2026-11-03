@@ -25,7 +25,7 @@ const News = lazy(() => import("./public/covers/DailyDigestCover"));
 const Fitness = lazy(() => import("./public/covers/FitnessCover"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
 const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
-// Web main: Shows the pin gate view.
+// User cover apps: asks for the private PIN before opening the Safe App.
 function PinGate() {
   const s = useSession();
   const [pin, setPin] = useState("");
@@ -141,7 +141,7 @@ function PinGate() {
     </main>
   );
 }
-// Web main: Shows the cover view.
+// User cover apps: displays the cover chosen for this account.
 function Cover() {
   const s = useSession();
   const [accountOpen, setAccountOpen] = useState(false);
@@ -197,10 +197,10 @@ function Cover() {
     </main>
   );
 }
-// Web main: Shows the routes view.
+// Sends each domain and signed-in role to its matching web screen.
 function Routes({ mode }: { mode: SiteMode }) {
   const s = useSession();
-  // Update s when information used by this screen changes.
+  // Read the current session whenever the route changes.
   useEffect(() => {
     const cover = coverSite(s.cover).slug;
     let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
@@ -318,7 +318,7 @@ if (import.meta.env.PROD && mode !== "download" && hostedSetupProblems.length > 
     </main>,
   );
 } else
-  // mode checks whether crypto subtle is false before continuing.
+  // Private entry needs the browser's built-in encryption tools.
   if (!crypto.subtle) {
     createRoot(document.getElementById("root")!).render(
       <main className="error-page">

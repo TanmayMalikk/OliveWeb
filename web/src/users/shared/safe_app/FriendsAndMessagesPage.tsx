@@ -27,7 +27,7 @@ export default function Messages() {
   const [draft, setDraft] = useState("");
   const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
   const identity = accounts.identity;
-  // Update identity when information used by this screen changes.
+  // Restart secure-message listeners when the signed-in account changes.
   useEffect(() => {
     if (!cloudMode || !identity) return;
     let active = true;
@@ -67,7 +67,7 @@ export default function Messages() {
       stops.forEach((stop) => stop());
     };
   }, [identity?.uid]);
-  // Update stops when information used by this screen changes.
+  // Close every Firebase listener when the messaging page leaves.
   useEffect(() => {
     setRows([]);
     setDraft("");
@@ -120,7 +120,7 @@ export default function Messages() {
       </Empty>
     );
   if (!identity) return null;
-  // Web safe app: returns the action.
+  // Runs a messaging request through the shared busy and error handling.
   const action = (work: () => Promise<void>) => session.perform(work);
   return (
     <div className={`messages-layout ${conversation ? "chat-open" : ""}`}>

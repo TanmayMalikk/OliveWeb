@@ -27,7 +27,7 @@ export interface LocalVault {
   profile: Profile | null;
   history: History;
 }
-// Creates local.
+// Creates a local demo account and encrypts its first profile.
 export async function createLocal(
   username: string,
   password: string,
@@ -55,7 +55,7 @@ export async function createLocal(
   });
   return { identity, raw };
 }
-// returns the login local for web local data store.
+// Unlocks a local-only account with its username, password, and expected role.
 export async function loginLocal(
   username: string,
   password: string,
@@ -64,7 +64,7 @@ export async function loginLocal(
   const record: LocalAccount | undefined = await (
     await database
   ).get("accounts", `${role}:${normalizeUsername(username)}`);
-  // If record fails, catch the error so the app can keep running and explain the problem.
+  // Turn an unexpected record failure into a readable message.
   try {
     if (!record) {
       await wrapKey(password, crypto.getRandomValues(new Uint8Array(32)));
@@ -80,7 +80,7 @@ export async function loginLocal(
     );
   }
 }
-// Reads local.
+// Decrypts the local profile that belongs to this signed-in account.
 export async function readLocal(
   uid: string,
   raw: Uint8Array,
@@ -90,7 +90,7 @@ export async function readLocal(
     ? decrypt<LocalVault>(await importKey(raw), box)
     : { profile: null, history: emptyHistory() };
 }
-// Saves local for web local data store.
+// Encrypts the local account vault before saving it in this browser.
 export async function writeLocal(
   uid: string,
   raw: Uint8Array,
@@ -100,7 +100,7 @@ export async function writeLocal(
     await database
   ).put("vaults", await encrypt(await importKey(raw), value), uid);
 }
-// Web local data store: Updates local password.
+// Re-encrypts a local account after its password changes.
 export async function changeLocalPassword(
   identity: Identity,
   current: string,

@@ -171,7 +171,7 @@ export async function register(identity: Identity) {
     updatedAt: serverTimestamp(),
   }, { merge: true });
 }
-// Finds an exact username for the friend search. Invalid names and the current account are not returned.
+// Finds user for the web data service.
 export async function searchUser(
   username: string,
   currentUid: string,

@@ -60,7 +60,7 @@ const initialEntryToken =
     : null;
 if (location.hash || location.pathname === "/entry")
   window.history.replaceState({}, "", "/");
-// Web session provider: Shows the session provider view.
+// Keeps sign-in, private-entry, and account data together for every web screen.
 export function SessionProvider({
   children,
   mode = "user",
@@ -162,7 +162,7 @@ export function SessionProvider({
     if (location.pathname !== "/" || location.search || location.hash)
       window.history.replaceState({}, "", "/");
   }, []);
-  // Update internal download when information used by this screen changes.
+  // Restores this browser's saved enrollment and continues a pending private entry.
   useEffect(() => {
     let live = true;
     void database
@@ -175,7 +175,7 @@ export function SessionProvider({
         setEnrollment(savedEnrollment);
         if (savedEnrollment && savedEnrollment.cover !== value?.cover)
           await (await database).put("device", savedEnrollment, "current");
-        // saved enrollment checks whether value and pending entry current before continuing.
+        // A saved account and a pending link are both needed before showing PIN entry.
         if (value && pendingEntry.current) {
           let authenticated = true;
           if (cloudMode) {
@@ -249,7 +249,7 @@ export function SessionProvider({
     setPhase,
     setProfile,
   });
-  // Update note interaction when information used by this screen changes.
+  // Keeps the browser-tab title matched to the current cover or workspace.
   useEffect(() => {
     document.title =
       mode === "admin"
@@ -258,14 +258,14 @@ export function SessionProvider({
           ? "Olive Branch"
         : covers.find((candidate) => candidate.id === cover)?.name ?? "Game";
   }, [cover, mode]);
-  // Web session provider: returns the perform.
+  // Runs one account task at a time and keeps loading and error messages consistent.
   async function perform(work: () => Promise<void>) {
     if (working.current) return;
     working.current = true;
     setBusy(true);
     setMessage("");
     const token = epoch.current;
-    // A token error is handled here instead of closing the app.
+    // Only show errors from the account task that is still active.
     try {
       await work();
     } catch (error) {
@@ -277,7 +277,7 @@ export function SessionProvider({
       }
     }
   }
-  // Authenticates the account for web session provider.
+  // Signs in or creates an account, then opens the screen allowed for its role.
   async function authenticate(
     username: string,
     password: string,
@@ -318,7 +318,7 @@ export function SessionProvider({
       setPhase("setup");
       return;
     }
-    // role is staff or role is admin is handled here by p.
+    // Staff and administrators go directly to their organization workspace.
     if (role === "STAFF" || role === "ADMIN") {
       setProfile(p);
       setHistory(loaded.history);
@@ -335,7 +335,7 @@ export function SessionProvider({
     const current: Enrollment | undefined = await (
       await database
     ).get("device", "current");
-    // current checks whether path is /account/link before continuing.
+    // The account-link page creates or restores this browser's private entry link.
     if (path === "/account/link") {
       setPersonalLink(await issueEntryLink(accounts.identity!.uid));
       setEnrollment(
@@ -346,7 +346,7 @@ export function SessionProvider({
       setPhase("link");
       return;
     }
-    // Only continue with current when current and current uid is accounts identity uid.
+    // A matching browser enrollment can reuse its saved private entry link.
     if (current && current.uid === accounts.identity?.uid) {
       setEnrollment({
         ...current,
@@ -369,7 +369,7 @@ export function SessionProvider({
       setPhase("setup");
     }
   }
-  // Starts entry for web session provider.
+  // Opens PIN entry only when this browser has a valid saved private link.
   async function beginEntry() {
     setMessage("");
     if (!enrollment) {
@@ -389,7 +389,7 @@ export function SessionProvider({
     setPhase("pin");
     window.history.replaceState({}, "", "/");
   }
-  // returns the complete setup for web session provider.
+  // Saves the new profile and PIN, then creates this browser's private entry link.
   async function completeSetup(p: Profile, pin: string) {
     const token = epoch.current;
     await accounts.saveProfile(p);
@@ -419,12 +419,12 @@ export function SessionProvider({
     setPersonalLink(await issueEntryLink(device.uid));
     setPhase("link");
   }
-  // Finds trigger for web session provider.
+  // Checks cover-app input for the user's private trigger phrase.
   async function searchTrigger(value: string) {
     if (!enrollment || enrollment.cover !== cover || enrollment.role !== "USER")
       return false;
     if ((await triggerHash(value)) !== enrollment.triggerHash) return false;
-    // search trigger checks whether entry owner current is enrollment uid is false before continuing.
+    // Restore the saved link when this entry attempt has not claimed the account yet.
     if (entryOwner.current !== enrollment.uid) {
       const saved = await savedEntryLink(enrollment.uid);
       const token = saved ? new URL(saved).hash.slice(1) : "";
@@ -436,7 +436,7 @@ export function SessionProvider({
     setPhase("pin");
     return true;
   }
-  // Unlocks the private area for web session provider.
+  // Verifies the link and PIN before loading private account data.
   async function unlock(pin: string) {
     const token = epoch.current;
     if (
@@ -476,7 +476,7 @@ export function SessionProvider({
     setPage("Home");
     noteInteraction();
   }
-  // returns the record for web session provider.
+  // Saves a note or history entry, then refreshes the screen with the new record.
   async function record(category: Category, value: Event | Entry) {
     const token = epoch.current;
     await accounts.saveRecord(category, value);
@@ -486,7 +486,7 @@ export function SessionProvider({
       [category]: [value, ...old[category].filter((e) => e.id !== value.id)],
     }));
   }
-  // Web session provider: Saves profile.
+  // Saves account settings and tells the other signed-in devices to refresh.
   async function saveProfile(p: Profile, action = "Saved profile settings") {
     const token = epoch.current;
     await accounts.saveProfile(p);
@@ -501,12 +501,12 @@ export function SessionProvider({
     await record("settings", newEvent(action));
     setMessage("Changes saved.");
   }
-  // Web session provider: Saves entry.
+  // Saves a private note, then reloads the list so it appears immediately.
   async function saveEntry(entry: Entry) {
     await record("private_entries", entry);
     setMessage("Entry saved.");
   }
-  // Web session provider: Reloads the latest data.
+  // Reloads profile, history, and notes changed by another signed-in device.
   async function refresh() {
     const token = epoch.current;
     const loaded = await accounts.load();
@@ -516,7 +516,7 @@ export function SessionProvider({
       setMessage("Account is up to date.");
     }
   }
-  // Signs out the current account for web session provider.
+  // Ends the web session and returns to the public cover.
   async function signOut() {
     const returnPath = profile?.role === "SAFE_CONTACT" || mode === "admin"
       ? "/account/sign-in"

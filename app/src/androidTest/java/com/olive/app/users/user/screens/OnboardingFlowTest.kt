@@ -31,7 +31,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         hideKeyboard()
     }
 
-    // returns the clean install opens onboarding only after the olive is double tapped for user onboarding flow test. The test gives the code a clear input and checks the expected result.
+    // Checks the clean install opens onboarding only after the olive is double tapped step with the test's sample data.
     @Test
     fun cleanInstallOpensOnboardingOnlyAfterTheOliveIsDoubleTapped() {
         waitCover()
@@ -47,7 +47,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("new_user").assertIsDisplayed()
     }
 
-    // returns the credentials use live requirements and inline errors for user onboarding flow test. The test gives the code a clear input and checks the expected result.
+    // Checks the credentials use live requirements and inline errors step with the test's sample data.
     @Test
     fun credentialsUseLiveRequirementsAndInlineErrors() {
         openOnboarding()
@@ -63,7 +63,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 4")
     }
 
-    // returns the safe contact gets shorter onboarding and no cover for user onboarding flow test. The test gives the code a clear input and checks the expected result.
+    // Checks the safe contact gets shorter onboarding and no cover step with the test's sample data.
     @Test
     fun safeContactGetsShorterOnboardingAndNoCover() {
         openOnboarding()
@@ -110,7 +110,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("sign_out").assertExists()
     }
 
-    // User onboarding flow test: returns the onboarding needs city but not afull delivery address. The test gives the code a clear input and checks the expected result.
+    // Checks the onboarding needs city but not afull delivery address step with the test's sample data.
     @Test
     fun onboardingNeedsCityButNotAFullDeliveryAddress() {
         openOnboarding()
@@ -175,7 +175,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         }
     }
 
-    // returns the onboarding contacts quick exit and returning user for user onboarding flow test. The test gives the code a clear input and checks the expected result.
+    // Checks the onboarding contacts quick exit and returning user step with the test's sample data.
     @Test
     fun onboardingContactsQuickExitAndReturningUser() {
         register(username = "returning_user_tester")

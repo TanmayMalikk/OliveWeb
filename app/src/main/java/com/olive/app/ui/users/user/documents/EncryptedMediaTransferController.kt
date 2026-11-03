@@ -45,24 +45,24 @@ import okhttp3.Request
 import org.json.JSONObject
 
 internal interface MediaTransferOperations {
-    // User encrypted media transfer controller: Observes uploads.
+    // Watches pending uploads for this account and reports progress to the screen.
     fun observeUploads(ownerUid:String)
-    // returns the acknowledge published for user encrypted media transfer controller.
+    // Marks an uploaded encrypted file as published after the server accepts it.
     fun acknowledgePublished(mediaIds:Set<String>)
-    // User encrypted media transfer controller: returns the queue document.
+    // Adds document metadata to the user's encrypted document list.
     fun queueDocument(
         uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
         onQueued:(String)->Unit,onFailure:(String)->Unit,
     )
-    // returns the queue file for user encrypted media transfer controller.
+    // Encrypts the selected file and queues its upload.
     fun queueFile(
         file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
         ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
         onQueued:(String)->Unit,onFailure:(String)->Unit,
     )
-    // User encrypted media transfer controller: Downloads file.
+    // Downloads, checks, and decrypts one allowed media file.
     suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File
-    // Removes state for user encrypted media transfer controller. It checks access, protects the file, and then reads or saves it.
+    // Clears upload progress and errors when the document screen closes.
     fun clearState()
 }
 
@@ -164,7 +164,7 @@ internal class MediaTransferController(
         uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
         onQueued:(String)->Unit,onFailure:(String)->Unit,
     ) {
-        // ocr review is ocr review retake recommended is handled here by queue document.
+        // Do not upload a low-confidence scan until the user chooses Retake or Save anyway.
         if(ocrReview==OcrReview.RETAKE_RECOMMENDED) {
             // OCR is advisory: pause for a user decision instead of silently rejecting the document.
             state=MediaTransferState.Failed(null,"Document quality review recommends another capture",false)
@@ -249,7 +249,7 @@ internal class MediaTransferController(
         }
     }
 
-    // Removes state for user encrypted media transfer controller. It checks access, protects the file, and then reads or saves it.
+    // Cancels active upload listeners and removes their visible state.
     override fun clearState() {
         observationJobs.values.forEach(Job::cancel)
         observationJobs.clear()
@@ -295,7 +295,7 @@ internal class MediaTransferController(
         val jobs=withContext(Dispatchers.IO) {
             val owned=store.all().filter { it.ownerUid==ownerUid }
             val retired=owned.filter { it.status==MediaTransferStatus.COMPLETE && it.mediaId in publishedSnapshot }
-            // User encrypted media transfer controller: Updates refresh uploads by processing every item required by this loop.
+            // Refresh each pending upload card with its newest background-worker state.
             retired.forEach { store.remove(it.id) }
             owned.filterNot { it in retired }.sortedByDescending { it.createdAt }.map { job ->
                 val metadata=runCatching {
@@ -350,7 +350,7 @@ internal class MediaTransferController(
         val folder=File(applicationContext.noBackupFilesDir,"media-outbox").apply { mkdirs() }
         val target=File(folder,"$jobId.olive")
         val key=EncryptionUtils.generateSymmetricKey()
-        // If prepare fails, catch the error so the app can keep running and explain the problem.
+        // Turn an unexpected prepare failure into a readable message.
         try {
             var processedMimeType=mimeType
             // The preprocessor owns compression only. Its output is immediately consumed by the
@@ -392,7 +392,7 @@ internal class MediaTransferController(
     private fun sha256(file:File):String {
         val digest = MessageDigest.getInstance("SHA-256")
         val buffer = ByteArray(64 * 1024)
-        // If sha256 fails, catch the error so the app can keep running and explain the problem.
+        // Turn an unexpected sha256 failure into a readable message.
         try { file.inputStream().use { input -> while(true) {
             val count = input.read(buffer)
             if (count < 0) {
@@ -412,7 +412,7 @@ internal class MediaTransferController(
         ticket.headers.forEach(builder::header)
         val encryptedFolder=File(applicationContext.cacheDir,"encrypted-media").apply { mkdirs() }
         val encrypted=File.createTempFile("${document.id}.",".olive.part",encryptedFolder)
-        // If download encrypted fails, catch the error so the app can keep running and explain the problem.
+        // Turn an unexpected download encrypted failure into a readable message.
         try {
             client.newCall(builder.build()).execute().use { response ->
                 if(!response.isSuccessful) error("Cloud download failed with HTTP ${response.code}")
@@ -448,7 +448,7 @@ internal class MediaTransferController(
             val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
             val target = File(opened, document.id + (extension?.let { ".$it" } ?: ""))
             val partial = File(target.path + ".part")
-            // A download encrypted error is handled here instead of closing the app.
+            // Use the fallback when download encrypted is unavailable.
             try {
                 // Decrypt into a non-published file. A bad GCM tag deletes this partial plaintext;
                 // only authenticated completion is atomically renamed to the consumer-visible path.
@@ -468,7 +468,7 @@ internal class MediaTransferController(
     private companion object {
         const val MAX_CIPHERTEXT_BYTES=250L*1024L*1024L
         const val MAX_OCR_TEXT=50_000
-        // returns the size mismatch for user encrypted media transfer controller.
+        // Rejects a download when its encrypted byte count differs from metadata.
         fun sizeMismatch(expected:Long,received:Long)=
             "Encrypted download size does not match (expected $expected bytes, received $received bytes)"
     }

@@ -29,7 +29,7 @@ internal data class SafetyField(
             .put("conflictValue", conflictValue).put("conflictRevision", conflictRevision)
 
     companion object {
-        // Builds this record from JSON for safety.
+        // Rebuilds this safety-plan record from protected JSON data.
         fun fromJson(json: JSONObject) = SafetyField(
             json.getString("value"),
             json.optLong("revision"),
@@ -78,7 +78,7 @@ internal data class SafetyPlan(
         .put("supportSafeContactUid", supportSafeContactUid)
 
     companion object {
-        // Safety: Builds this record from JSON.
+        // Rebuilds a safety plan from its encrypted JSON fields.
         fun fromJson(json: JSONObject): SafetyPlan {
             val fields = json.getJSONObject("fields")
             return SafetyPlan(
@@ -112,7 +112,7 @@ internal fun mergeSafetyPlan(
 ): SafetyPlan {
     val fields = current.fields.mapValues { (key, local) ->
         val cloud = remote.fields[key] ?: return@mapValues local
-        // Choose what merge safety plan should do for the current value.
+        // Chooses the newer safety-plan value when phone and cloud edits differ.
         when {
             cloud.revision < local.revision -> local
             local.mutationId == null -> cloud.copy(mutationId = null)
@@ -141,7 +141,7 @@ internal fun mergeSafetyPlan(
     )
 }
 
-// Safety: returns the edit.
+// Gives the safety plan the safety fields with defaults it needs.
 internal fun SafetyField.edit(value: String) =
     copy(value = value, mutationId = UUID.randomUUID().toString())
 

@@ -58,7 +58,7 @@ private data class CapturedMedia(
     val ocrResult: OcrResult? = null
 )
 
-// Shared safe app camera capture screen: Checks whether low ocr confidence. It prepares the picture before the app reads or saves it.
+// Marks a document scan for review when OCR confidence is below 75 percent.
 internal fun isLowOcrConfidence(result: OcrResult) =
     !result.success || !result.confidence.isFinite() || result.confidence !in .75f..1f
 
@@ -97,9 +97,9 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         }
     val captureFolder = remember { File(context.cacheDir, "captured-media").apply { mkdirs() } }
 
-    // Shared safe app camera capture screen: returns the new capture.
+    // Stores the new camera result so the preview can show it.
     fun newCapture(extension: String) = File(captureFolder, "${UUID.randomUUID()}.$extension")
-    // returns the accept for shared safe app camera capture screen. It prepares the picture before the app reads or saves it.
+    // Accepts the captured photo, video, or document and returns its file.
     fun accept(file: File, mime: String, name: String, kind: MediaKind, ocrResult: OcrResult? = null) {
         pendingFile = null
         viewModel.leaveCamera()
@@ -107,7 +107,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
             CapturedMedia(file, mime, name, kind, ocrResult)
     }
 
-    // returns the discard capture for shared safe app camera capture screen.
+    // Deletes the temporary capture when the user retakes or cancels it.
     fun discardCapture() {
         captured?.file?.delete()
         pendingFile?.delete()
@@ -124,7 +124,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     LaunchedEffect(permissionGranted, captured) {
         if (permissionGranted && captured == null) viewModel.bind(lifecycleOwner, preview)
     }
-    // Update discard capture when information used by this screen changes.
+    // Clear the preview when the user discards the latest capture.
     DisposableEffect(Unit) {
         onDispose {
             viewModel.leaveCamera()
@@ -134,7 +134,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("camera_screen")) {
-        // Choose what discard capture should do for the current value.
+        // Returns to the camera or closes it based on how capture was opened.
         when {
             !permissionGranted -> CameraPermissionPrompt(
                 { permissionLauncher.launch(Manifest.permission.CAMERA) },
@@ -247,7 +247,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
                         .padding(bottom = 52.dp)
                 ) {
-                    // Choose what discard capture should do for the current value.
+                    // Returns to the camera or closes it based on how capture was opened.
                     when {
                         mode == CameraMode.Photo -> {
                             val file = newCapture("jpg")
@@ -321,7 +321,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         }
     }
 }
-// Shows camera permission prompt for shared safe app camera capture screen.
+// Explains why camera access is needed and lets the user request it.
 @Composable
 private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     Column(
@@ -336,7 +336,7 @@ private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     }
 }
 
-// This shows the camera shutter view for shared safe app camera capture screen. It fills the view with the latest details and actions.
+// Draws the shutter button and gives TalkBack its action label.
 @Composable
 private fun CameraShutter(
     mode: CameraMode,
@@ -360,7 +360,7 @@ private fun CameraShutter(
                 CameraMode.Document -> Icons.Outlined.Description
             },
             stringResource(
-                // Choose what camera shutter should do for the current value.
+                // Takes a photo, starts video, or scans a document based on the selected mode.
                 when {
                     recording -> R.string.camera_stop_recording
                     mode == CameraMode.Photo -> R.string.camera_take_photo
@@ -372,7 +372,7 @@ private fun CameraShutter(
         )
     }
 }
-// Shows camera review for shared safe app camera capture screen.
+// Previews the captured file before the user saves or retakes it.
 @Composable
 private fun CameraReview(
     media: CapturedMedia,

@@ -63,7 +63,7 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
                 }
                 val request = DeviceLockRequest(challenge, settingsChange = trigger != null)
                 deviceLockRequest = request
-                // A authenticate error is handled here instead of closing the app.
+                // Use the fallback when authenticate is unavailable.
                 try {
                     val cipher = request.result.await()
                     if (!current(token, expectedScreen, uid, enroll)) return@runOperation
@@ -75,7 +75,7 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
                     // The callback alone grants no access: Android Keystore must complete the protected operation.
                     val grant = withContext(Dispatchers.IO) { challenge.finish(cipher) }
                     if (!current(token, expectedScreen, uid, enroll)) return@runOperation
-                    // authenticate checks whether enroll before continuing.
+                    // Save device-lock enrolment only when this prompt came from setup.
                     if (enroll) {
                         val saved = withContext(Dispatchers.IO) {
                             store.enrollDeviceLock(identity!!, value!!, checkNotNull(grant))
@@ -110,7 +110,7 @@ internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session device access: returns the current.
+    // Reads the current private-entry settings before changing them.
     private fun current(token: Long, expected: SessionScreen, uid: String, enroll: Boolean) =
         with(runtime) {
             epoch == token && state.screen == expected && !state.privacyBlackout && state.accountRole == AccountRole.USER &&

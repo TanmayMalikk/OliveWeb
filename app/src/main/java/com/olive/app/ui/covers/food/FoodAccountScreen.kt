@@ -90,7 +90,7 @@ internal fun FoodAccountScreen(
     onAddress: () -> Unit
 ) {
     val uiText = rememberResourceText()
-    // Update food account screen when information used by this screen changes.
+    // Adds one history entry when a configured user opens the food account page.
     LaunchedEffect(session?.coverUsername) {
         if (configured) session?.recordSettingsInteraction(
             "Olive",
@@ -122,7 +122,7 @@ internal fun FoodAccountScreen(
                 uiText(R.string.a_little_space_of_your_own)
             )
         }
-        // Only continue with food account screen when configured is false.
+        // Ask the user to add a private PIN before choosing this cover.
         if (!configured) {
             item {
                 FoodEmptyState(
@@ -207,7 +207,7 @@ internal fun FoodAccountScreen(
                 }
             }
         }
-        // food account screen checks whether configured before continuing.
+        // Order history is available only after the cover account is configured.
         if (configured) {
             item {
                 FoodPageTitle(
@@ -258,7 +258,7 @@ internal fun FoodAccountScreen(
                     }
                 }
             }
-            // food account screen checks whether history size > 5 before continuing.
+            // Keep only the five newest food-cover orders on this screen.
             if (history.size > 5) item {
                 TextButton(
                     onClick = { showAllOrders = !showAllOrders },

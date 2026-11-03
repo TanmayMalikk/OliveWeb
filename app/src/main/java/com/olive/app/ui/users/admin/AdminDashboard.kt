@@ -48,7 +48,7 @@ internal fun AdminPortal(session: SessionViewModel) {
     var createOpen by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<AdminAccountSummary?>(null) }
     BackHandler(enabled = page != AdminPage.Dashboard) { page = AdminPage.Dashboard }
-    // Choose what admin portal should do for the current value.
+    // Opens the selected admin dashboard section.
     when (page) {
         AdminPage.Dashboard -> AdminDashboard(
             session,
@@ -73,7 +73,7 @@ internal fun AdminPortal(session: SessionViewModel) {
         AdminPage.Messages -> MessagesScreen(session, exit = { page = AdminPage.Dashboard })
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
-    // create open create account dialog session, on dismiss = create open = false is handled here by admin portal.
+    // Open the protected-account form and close it when the admin dismisses it.
     if (createOpen) CreateAccountDialog(session, onDismiss = { createOpen = false })
     deleteTarget?.let { account ->
         AlertDialog(
@@ -97,7 +97,7 @@ internal fun AdminPortal(session: SessionViewModel) {
         )
     }
 }
-// Shows admin dashboard for admin dashboard.
+// Draws the admin workspace navigation and selected section.
 @Composable
 private fun AdminDashboard(
     session: SessionViewModel,

@@ -19,7 +19,7 @@ import org.junit.Test
 import java.io.File
 
 class SafeAppDashboardUiTest : OliveUiTestBase() {
-    // User safe app dashboard ui test: returns the trusted partner can be marked as safe to stay. The test gives the code a clear input and checks the expected result.
+    // Checks the trusted partner can be marked as safe to stay step with the test's sample data.
     @Test
     fun trustedPartnerCanBeMarkedAsSafeToStay() {
         register(username = "safe_stay_toggle")
@@ -44,7 +44,7 @@ class SafeAppDashboardUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safe_to_stay_trusted_friend").assertIsOn()
     }
 
-    // User safe app dashboard ui test: returns the feature cards and news location dialog are usable. The test gives the code a clear input and checks the expected result.
+    // Checks the feature cards and news location dialog are usable step with the test's sample data.
     @Test
     fun featureCardsAndNewsLocationDialogAreUsable() {
         register(username = "safe_home_polish")
@@ -73,7 +73,7 @@ class SafeAppDashboardUiTest : OliveUiTestBase() {
         screenshot("news-location-polish.png")
     }
 
-    // returns the screenshot for user safe app dashboard ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the screenshot step with the test's sample data.
     private fun screenshot(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         File(instrumentation.targetContext.getExternalFilesDir(null), name).outputStream().use {

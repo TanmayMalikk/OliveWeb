@@ -22,59 +22,59 @@ internal class SessionAccountEntry(private val runtime: SessionRuntime) {
     val usesDeviceLock get() = preferredEntryMethod == SafeEntryMethod.DEVICE_LOCK && phoneHasLock
     val canUseAppPin get() = runtime.enrollment?.allowsAppPin() == true
 
-    // Shared safe app session account entry: Loads the saved value.
+    // Restores the account and private-entry state saved on this device.
     fun load() = runtime.accountSession.load()
-    // Finds role for shared safe app session account entry.
+    // Selects whether the person is a user, trusted contact, staff member, or admin.
     fun selectRole(role: AccountRole) = runtime.accountSession.selectRole(role)
-    // Shared safe app session account entry: Finds new.
+    // Opens the new-account path on the account entry screen.
     fun chooseNew() = runtime.accountSession.chooseNew()
-    // Finds returning for shared safe app session account entry.
+    // Opens the returning-account sign-in path.
     fun chooseReturning() = runtime.accountSession.chooseReturning()
-    // Shared safe app session account entry: Starts account setup.
+    // Starts profile setup after a new account signs in successfully.
     fun openAccountSetup() = runtime.accountSession.openAccountSetup()
-    // Removes credential error for shared safe app session account entry.
+    // Clears the username or password error when the user edits the form.
     fun clearCredentialError() = runtime.accountSession.clearCredentialError()
-    // Shared safe app session account entry: Authenticates the account.
+    // Signs in with Firebase, or creates the Firebase account when requested.
     fun authenticate(username: String, password: String, create: Boolean) =
         runtime.accountSignIn.authenticate(username, password, create)
 
-    // Shared safe app session account entry: Saves setup profile.
+    // Saves the profile collected during account setup.
     fun saveSetupProfile(value: UserProfile) = runtime.accountSession.saveSetupProfile(value)
-    // Builds device pin for shared safe app session account entry.
+    // Checks both PIN fields before saving the first private-entry PIN.
     fun createDevicePin(pin: String, confirmation: String) =
         runtime.accountSession.createDevicePin(pin, confirmation)
 
-    // Saves provisioned trigger for shared safe app session account entry.
+    // Saves the hidden phrase chosen during first-time setup.
     fun saveProvisionedTrigger(trigger: String) = runtime.accountSession.saveProvisionedTrigger(trigger)
 
-    // Starts error for shared safe app session account entry.
+    // Shows a specific account-entry error on the current screen.
     fun showError(text: String) {
         runtime.state.message = text
     }
 
-    // Refreshes device security for shared safe app session account entry.
+    // Checks again whether Android currently has a secure device lock.
     fun refreshDeviceSecurity() {
         runtime.deviceSecure = runtime.phoneSecure()
     }
 
-    // Shared safe app session account entry: Updates safe entry method.
+    // Changes whether this user prefers Android lock or the app PIN.
     fun setSafeEntryMethod(method: SafeEntryMethod, currentPin: String) =
         runtime.entrySettings.select(method, currentPin)
 
-    // Shared safe app session account entry: Saves safe entry pin.
+    // Saves or replaces the user's backup app PIN.
     fun saveSafeEntryPin(currentPin: String, pin: String, confirmation: String, usePin: Boolean) =
         runtime.entrySettings.savePin(currentPin, pin, confirmation, usePin)
 
-    // Shared safe app session account entry: Authenticates the account device lock.
+    // Opens Android device authentication for entry or first-time enrolment.
     fun authenticateDeviceLock(enroll: Boolean = false) = runtime.deviceAccess.authenticate(enroll)
-    // Updates device lock trigger for shared safe app session account entry.
+    // Confirms device authentication before changing the hidden trigger phrase.
     fun changeDeviceLockTrigger(trigger: String) = runtime.deviceAccess.authenticate(false, trigger)
 
-    // Shared safe app session account entry: Detects a valid private-entry search.
+    // Checks whether cover-app search text matches the saved hidden phrase.
     fun interceptSearch(value: String): Boolean = runtime.access.interceptSearch(value)
-    // Starts discreet entry for shared safe app session account entry.
+    // Opens private authentication after the hidden olive is double-tapped.
     fun beginDiscreetEntry() = runtime.access.beginDiscreetEntry()
-    // Shared safe app session account entry: returns the submit pin.
+    // Checks the entered app PIN against the current private-entry challenge.
     fun submitPin(pin: String, challenge: Int = runtime.state.pinChallengeVersion) =
         runtime.access.submitPin(pin, challenge)
 

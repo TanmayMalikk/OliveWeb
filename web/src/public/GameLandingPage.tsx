@@ -20,7 +20,7 @@ export const coverIcons = {
   FITNESS: Dumbbell,
   GAME: Gamepad2,
 };
-// Shows the cover preview view for web game landing page. It uses the current cover data to update what the user sees.
+// Shows a playable preview of the selected web game cover.
 export function CoverPreview({ cover }: { cover: Cover }) {
   return (
     <div

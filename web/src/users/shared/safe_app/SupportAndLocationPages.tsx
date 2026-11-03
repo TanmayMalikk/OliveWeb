@@ -25,7 +25,7 @@ import {
   type BrowserDocument,
 } from "../../../services/MediaService";
 
-// Calls the matching backend serviceable for web safe app. It sends a signed-in request to the protected cloud function and checks the reply.
+// Sends a signed-in support request to the protected Cloud Function.
 async function callable<T>(name: string, data: unknown): Promise<T> {
   if (!cloudMode || !accounts.identity)
     throw new Error("Sign in to your shared account first.");
@@ -34,7 +34,7 @@ async function callable<T>(name: string, data: unknown): Promise<T> {
   return (await httpsCallable(functions, name)(data)).data as T;
 }
 
-// Shows the staff help page view for web safe app.
+// Lets a user request, monitor, or cancel a staff support ticket.
 export function StaffHelpPage() {
   const session = useSession();
   const [ticket, setTicket] = useState<{
@@ -119,7 +119,7 @@ const resources = [
     url: "https://sheltersafe.ca/",
   },
 ];
-// Shows the hotlines page view for web safe app.
+// Lists emergency and support hotlines for the user's region.
 export function HotlinesPage() {
   return (
     <section className="safe-feature-page">
@@ -159,11 +159,11 @@ export function HotlinesPage() {
 }
 
 type Position = { latitude: number; longitude: number; accuracy: number };
-// Web safe app: Shows the location page view.
+// Shows the account's saved places and the browser's current location.
 export function LocationPage() {
   const [position, setPosition] = useState<Position | null>(null);
   const [error, setError] = useState("");
-  // Web safe app: returns the locate. It asks the device for its location and turns the answer into map data.
+  // Asks the browser for a fresh GPS reading and displays its accuracy.
   const locate = () => {
     setError("");
     navigator.geolocation.getCurrentPosition(
@@ -218,7 +218,7 @@ export function LocationPage() {
   );
 }
 
-// Web safe app: Shows the camera page view.
+// Lets the user take a photo or choose a file without leaving the safe app.
 export function CameraPage() {
   const session = useSession();
   const [preview, setPreview] = useState("");
@@ -296,7 +296,7 @@ export function CameraPage() {
   );
 }
 
-// Web safe app: Shows the documents page view.
+// Lists encrypted account files and opens them in the safe document viewer.
 export function DocumentsPage() {
   const session = useSession();
   const [documents, setDocuments] = useState<BrowserDocument[]>([]);
@@ -309,7 +309,7 @@ export function DocumentsPage() {
     if (!viewerUrl) return;
     return () => URL.revokeObjectURL(viewerUrl);
   }, [viewerUrl]);
-  // Reloads the latest data for web safe app.
+  // Reloads live-location details while this web map page is open.
   const refresh = async () => {
     const identity = accounts.identity;
     if (!identity) return;
