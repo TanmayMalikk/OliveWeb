@@ -22,18 +22,17 @@ class VoipSessionControllerTest {
     @Test
     fun startJoinMuteAndLeaveKeepsGroupCallOpen() = runBlocking {
         val requests = mutableListOf<Request>()
-        val audio = FakeMumbleAudioSession()
+        val audio = FakeLiveKitAudioSession()
         val controller = VoipSessionController(apiManager(requests), audio)
 
         val call = controller.startAndJoin(
             name = "Support",
             callerId = "caller-1",
-            participantIds = listOf("user-2"),
-            connection = connection
+            participantIds = listOf("user-2")
         )
 
         assertEquals("call-1", call.callId)
-        assertEquals(listOf(call to connection), audio.connections)
+        assertEquals(listOf(connection), audio.connections)
         assertEquals(
             VoipSessionState.Active(call, microphoneMuted = false),
             controller.state.value
@@ -46,22 +45,23 @@ class VoipSessionControllerTest {
         controller.leaveCall()
         assertEquals(1, audio.disconnectCount)
         assertEquals(VoipSessionState.Idle, controller.state.value)
-        assertEquals(listOf("/api/calls"), requests.map { it.url.encodedPath })
+        assertEquals(listOf("/api/calls", "/calls/token"), requests.map { it.url.encodedPath })
     }
 
     @Test
     fun acceptJoinAndEndEndsCallOnApi() = runBlocking {
         val requests = mutableListOf<Request>()
-        val audio = FakeMumbleAudioSession()
+        val audio = FakeLiveKitAudioSession()
         val controller = VoipSessionController(apiManager(requests), audio)
 
-        controller.acceptAndJoin("call-1", "user-2", connection)
+        controller.acceptAndJoin("call-1", "user-2")
         controller.endCall()
 
         assertEquals(
             listOf(
                 "/api/calls/call-1/accept",
-                "/api/calls/call-1"
+                "/calls/token",
+                "/calls/end"
             ),
             requests.map { it.url.encodedPath }
         )
@@ -71,12 +71,12 @@ class VoipSessionControllerTest {
 
     @Test
     fun audioConnectionFailureIsVisibleAndCanBeRetried() = runBlocking {
-        val audio = FakeMumbleAudioSession(connectFailure = IllegalStateException("Audio unavailable"))
+        val audio = FakeLiveKitAudioSession(connectFailure = IllegalStateException("Audio unavailable"))
         val controller = VoipSessionController(apiManager(mutableListOf()), audio)
 
         val failure = assertThrows(IllegalStateException::class.java) {
             runBlocking {
-                controller.startAndJoin("Support", "caller-1", listOf("user-2"), connection)
+                controller.startAndJoin("Support", "caller-1", listOf("user-2"))
             }
         }
 
@@ -90,40 +90,43 @@ class VoipSessionControllerTest {
         )
 
         audio.connectFailure = null
-        controller.joinCall(call, connection)
+        controller.joinCall(call)
         assertEquals(VoipSessionState.Active(call, microphoneMuted = false), controller.state.value)
     }
 
     @Test
-    fun mumbleConnectionDetailsRejectInvalidEndpoint() {
+    fun liveKitConnectionDetailsRejectInvalidEndpoint() {
         assertThrows(IllegalArgumentException::class.java) {
-            MumbleConnectionDetails(host = "", port = 64738, username = "olive-user")
+            LiveKitConnectionDetails("http://insecure.test", "token", "room")
         }
         assertThrows(IllegalArgumentException::class.java) {
-            MumbleConnectionDetails(host = "voice.example.test", port = 0, username = "olive-user")
+            LiveKitConnectionDetails("wss://livekit.test", "", "room")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            LiveKitConnectionDetails("wss://livekit.test", "token", "")
         }
     }
 
     @Test
     fun cannotStartSecondCallWhileOneIsActive() = runBlocking {
         val requests = mutableListOf<Request>()
-        val controller = VoipSessionController(apiManager(requests), FakeMumbleAudioSession())
-        controller.startAndJoin("Support", "caller-1", listOf("user-2"), connection)
+        val controller = VoipSessionController(apiManager(requests), FakeLiveKitAudioSession())
+        controller.startAndJoin("Support", "caller-1", listOf("user-2"))
 
         assertThrows(IllegalStateException::class.java) {
             runBlocking {
-                controller.startAndJoin("Other", "caller-1", listOf("user-3"), connection)
+                controller.startAndJoin("Other", "caller-1", listOf("user-3"))
             }
         }
 
-        assertEquals(listOf("/api/calls"), requests.map { it.url.encodedPath })
+        assertEquals(listOf("/api/calls", "/calls/token"), requests.map { it.url.encodedPath })
     }
 
     @Test
     fun microphoneFailureIsVisibleAndSessionCanStillBeLeft() = runBlocking {
-        val audio = FakeMumbleAudioSession(muteFailure = IllegalStateException("Microphone unavailable"))
+        val audio = FakeLiveKitAudioSession(muteFailure = IllegalStateException("Microphone unavailable"))
         val controller = VoipSessionController(apiManager(mutableListOf()), audio)
-        val call = controller.startAndJoin("Support", "caller-1", listOf("user-2"), connection)
+        val call = controller.startAndJoin("Support", "caller-1", listOf("user-2"))
 
         val failure = assertThrows(IllegalStateException::class.java) {
             runBlocking { controller.setMicrophoneMuted(true) }
@@ -140,9 +143,9 @@ class VoipSessionControllerTest {
 
     @Test
     fun disconnectFailureIsVisibleAndCanBeRetried() = runBlocking {
-        val audio = FakeMumbleAudioSession(disconnectFailure = IllegalStateException("Socket close failed"))
+        val audio = FakeLiveKitAudioSession(disconnectFailure = IllegalStateException("Socket close failed"))
         val controller = VoipSessionController(apiManager(mutableListOf()), audio)
-        val call = controller.startAndJoin("Support", "caller-1", listOf("user-2"), connection)
+        val call = controller.startAndJoin("Support", "caller-1", listOf("user-2"))
 
         val failure = assertThrows(IllegalStateException::class.java) {
             runBlocking { controller.leaveCall() }
@@ -167,13 +170,17 @@ class VoipSessionControllerTest {
             }
             .build()
         val controller = VoipSessionController(
-            VoipManager(apiBaseUrl = "https://voip.test", httpClient = client),
-            FakeMumbleAudioSession()
+            VoipManager(
+                apiBaseUrl = "https://voip.test",
+                httpClient = client,
+                bearerTokenProvider = { "firebase-id-token" }
+            ),
+            FakeLiveKitAudioSession()
         )
 
         val failure = assertThrows(VoipApiException::class.java) {
             runBlocking {
-                controller.startAndJoin("Support", "caller-1", listOf("user-2"), connection)
+                controller.startAndJoin("Support", "caller-1", listOf("user-2"))
             }
         }
 
@@ -184,9 +191,9 @@ class VoipSessionControllerTest {
     @Test
     fun failedEndRequestIsVisibleAndDoesNotReportCallEnded() = runBlocking {
         val requests = mutableListOf<Request>()
-        val audio = FakeMumbleAudioSession()
+        val audio = FakeLiveKitAudioSession()
         val controller = VoipSessionController(apiManager(requests, deleteStatus = 503), audio)
-        val call = controller.startAndJoin("Support", "caller-1", listOf("user-2"), connection)
+        val call = controller.startAndJoin("Support", "caller-1", listOf("user-2"))
 
         val failure = assertThrows(VoipApiException::class.java) {
             runBlocking { controller.endCall() }
@@ -208,13 +215,15 @@ class VoipSessionControllerTest {
             .addInterceptor(Interceptor { chain ->
                 val request = chain.request()
                 requests += request
-                val responseCode = if (request.method == "DELETE") deleteStatus else 200
-                val responseBody = when (request.method) {
-                    "DELETE" if deleteStatus != 200 -> {
+                val isEndRequest = request.method == "POST" && request.url.encodedPath == "/calls/end"
+                val responseCode = if (isEndRequest) deleteStatus else 200
+                val responseBody = when {
+                    request.url.encodedPath == "/calls/token" -> TOKEN_RESPONSE
+                    isEndRequest && deleteStatus != 200 -> {
                         """{"error":{"code":"unavailable","message":"Call service unavailable"}}"""
                     }
-                    "DELETE" -> {
-                        """{"deleted":true,"callId":"call-1"}"""
+                    isEndRequest -> {
+                        """{"callId":"call-1","status":"ended"}"""
                     }
                     else -> {
                         CALLRESPONSE
@@ -229,7 +238,11 @@ class VoipSessionControllerTest {
                     .build()
             })
             .build()
-        return VoipManager(apiBaseUrl = "https://voip.test", httpClient = client)
+        return VoipManager(
+            apiBaseUrl = "https://voip.test",
+            httpClient = client,
+            bearerTokenProvider = { "firebase-id-token" }
+        )
     }
 
     private fun Request.jsonResponse(code: Int, body: String): Response =
@@ -241,18 +254,18 @@ class VoipSessionControllerTest {
             .body(body.toResponseBody("application/json".toMediaType()))
             .build()
 
-    private class FakeMumbleAudioSession(
+    private class FakeLiveKitAudioSession(
         var connectFailure: Exception? = null,
         var muteFailure: Exception? = null,
         var disconnectFailure: Exception? = null
-    ) : MumbleAudioSession {
-        val connections = mutableListOf<Pair<VoipCall, MumbleConnectionDetails>>()
+    ) : VoipAudioSession {
+        val connections = mutableListOf<LiveKitConnectionDetails>()
         val muteChanges = mutableListOf<Boolean>()
         var disconnectCount = 0
 
-        override suspend fun connect(call: VoipCall, details: MumbleConnectionDetails) {
+        override suspend fun connect(details: LiveKitConnectionDetails) {
             connectFailure?.let { throw it }
-            connections += call to details
+            connections += details
         }
 
         override suspend fun setMicrophoneMuted(muted: Boolean) {
@@ -267,14 +280,13 @@ class VoipSessionControllerTest {
     }
 
     companion object {
-        private val connection = MumbleConnectionDetails(
-            host = "voice.example.test",
-            port = 64738,
-            username = "olive-user"
+        private val connection = LiveKitConnectionDetails(
+            serverUrl = "wss://olive-test.livekit.cloud",
+            token = "livekit-token",
+            roomName = "call-call-1"
         )
         private val call = VoipCall(
             callId = "call-1",
-            channelId = 42,
             name = "Support",
             callerId = "caller-1",
             participants = listOf(
@@ -283,6 +295,8 @@ class VoipSessionControllerTest {
             )
         )
         private const val CALLRESPONSE =
-            """{"callId":"call-1","channelId":42,"name":"Support","callerId":"caller-1","participants":[{"userId":"caller-1","status":"accepted"},{"userId":"user-2","status":"pending"}]}"""
+            """{"callId":"call-1","name":"Support","callerId":"caller-1","participants":[{"userId":"caller-1","status":"accepted"},{"userId":"user-2","status":"pending"}]}"""
+        private const val TOKEN_RESPONSE =
+            """{"callId":"call-1","serverUrl":"wss://olive-test.livekit.cloud","token":"livekit-token","roomName":"call-call-1"}"""
     }
 }
