@@ -3,6 +3,9 @@ package com.olive.app.ui.users.user.documents
 
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import com.google.firebase.firestore.FirebaseFirestoreException
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +15,11 @@ import com.olive.app.data.SafetyDocument
 import com.olive.app.data.SafetyDocumentDataSource
 import com.olive.app.data.ChatSubscription
 import com.olive.app.data.DocumentOcrMetadata
+import com.olive.app.data.DocumentListSource
+import com.olive.app.R
+import com.olive.app.data.media.MediaAccessError
+import com.olive.app.data.media.MediaAccessException
+import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.OcrReview
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +31,9 @@ internal data class SafetyDocumentsState(
     val files: List<SafetyDocument> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
+    val source: DocumentListSource? = null,
+    val lastSyncedAt: Long? = null,
+    val attachmentErrors: Map<String, String> = emptyMap(),
 )
 
 /** Owns document-storage workflows so the Compose screen only renders state and dispatches actions. */
@@ -59,12 +70,15 @@ internal class SafetyDocumentsController(
         if (subscription != null) return
         val token = generation
         state = state.copy(loading = true, error = null)
-        subscription = repository.observeFor(ownerUid, { files ->
+        subscription = repository.observeFor(ownerUid, { snapshot ->
             // Apply loaded documents only when the same owner and request are still active.
             if (token == generation && state.ownerUid == ownerUid) {
-                state = state.copy(files = files, loading = false, error = null)
-                media?.acknowledgePublished(files.mapTo(mutableSetOf()) { it.id })
-                files.forEach { document ->
+                state = state.copy(files = snapshot.documents, loading = false, error = null,
+                    source = snapshot.source, lastSyncedAt = snapshot.lastSyncedAt)
+                media?.acknowledgePublished(snapshot.documents.mapTo(mutableSetOf()) { it.id })
+                media?.onDocumentSnapshot(ownerUid, snapshot.documents,
+                    snapshot.source == DocumentListSource.SERVER)
+                if (snapshot.source == DocumentListSource.SERVER) snapshot.documents.forEach { document ->
                     scope.launch {
                         runCatching { repository.approveCurrentAccountDevices(document, ownerUid, username) }
                     }
@@ -74,7 +88,9 @@ internal class SafetyDocumentsController(
             if (token == generation && state.ownerUid == ownerUid) {
                 subscription?.close()
                 subscription = null
-                state = state.copy(loading = false, error = error.ifBlank { "Unable to load documents" })
+                state = state.copy(loading = false,
+                    error = error.ifBlank { applicationContext.getString(R.string.documents_load_failed) }
+                        .takeIf { state.files.isEmpty() })
             }
         })
     }
@@ -130,7 +146,8 @@ internal class SafetyDocumentsController(
                 }
                 .onFailure { failure ->
                     if (token == generation) {
-                        state = state.copy(error = failure.localizedMessage ?: "Unable to open document")
+                        state = state.copy(error = localizedFailure(failure),
+                            attachmentErrors = state.attachmentErrors + (document.id to localizedFailure(failure)))
                     }
                 }
             if (token == generation) state = state.copy(loading = false)
@@ -153,10 +170,20 @@ internal class SafetyDocumentsController(
             state = state.copy(loading = true, error = null)
             runCatching {
                 val source = checkNotNull(repository)
-                val document = source.getFor(viewerUid, documentId)
+                val document = if (hasValidatedNetwork(applicationContext)) {
+                    source.getFor(viewerUid, documentId)
+                } else source.cachedFor(viewerUid, documentId)
+                    ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
                 val file = openDocument(document, viewerUid)
-                if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
-            }.onFailure { if (token == generation) state = state.copy(error = it.localizedMessage) }
+                if (token == generation && state.ownerUid == viewerUid) {
+                    state = state.copy(attachmentErrors = state.attachmentErrors - documentId)
+                    onReady(document, file)
+                }
+            }.onFailure { if (token == generation) {
+                val message = localizedFailure(it)
+                state = state.copy(error = message,
+                    attachmentErrors = state.attachmentErrors + (documentId to message))
+            } }
             if (token == generation) {
                 state = state.copy(loading = false)
                 onFinished()
@@ -167,6 +194,16 @@ internal class SafetyDocumentsController(
     // User safety document controller: Deletes the selected item. It requires the active feature controller before continuing.
     fun delete(document: SafetyDocument, ownerUid: String) = run(refreshAfter = true) {
         checkNotNull(repository).delete(document, ownerUid)
+    }
+
+    fun makeAvailableOffline(document: SafetyDocument) {
+        val viewerUid = state.ownerUid ?: return
+        run { checkNotNull(media).makeAvailableOffline(document, viewerUid) }
+    }
+
+    fun removeOfflineCopy(document: SafetyDocument) {
+        val viewerUid = state.ownerUid ?: return
+        run { checkNotNull(media).removeOfflineCopy(document, viewerUid) }
     }
 
     // User safety document controller: Shares the selected item. It requires the active feature controller before continuing.
@@ -190,6 +227,7 @@ internal class SafetyDocumentsController(
         subscription = null
         generation++
         media?.clearState()
+        File(applicationContext.cacheDir, "opened-documents").listFiles()?.forEach(File::delete)
         state = SafetyDocumentsState()
     }
 
@@ -211,7 +249,8 @@ internal class SafetyDocumentsController(
                 }
                 .onFailure {
                     if (token == generation) state =
-                        state.copy(error = it.localizedMessage ?: fallbackError)
+                        state.copy(error = if (it is MediaAccessException) localizedFailure(it)
+                        else it.localizedMessage ?: fallbackError)
                 }
             if (token == generation) state = state.copy(loading = false)
         }
@@ -219,8 +258,13 @@ internal class SafetyDocumentsController(
 
     // Reloads the owner's document list after a write finishes.
     private suspend fun refresh(ownerUid: String) {
-        val files = checkNotNull(repository).listFor(ownerUid)
-        if (state.ownerUid == ownerUid) state = state.copy(files = files, error = null)
+        val snapshot = checkNotNull(repository).listFor(ownerUid)
+        if (state.ownerUid == ownerUid) {
+            state = state.copy(files = snapshot.documents, source = snapshot.source,
+                lastSyncedAt = snapshot.lastSyncedAt, error = null)
+            media?.onDocumentSnapshot(ownerUid, snapshot.documents,
+                snapshot.source == DocumentListSource.SERVER)
+        }
     }
 
     // Opens a saved document after its encrypted content is ready.
@@ -231,4 +275,41 @@ internal class SafetyDocumentsController(
             checkNotNull(repository).download(applicationContext, document)
         }
 
+    private fun localizedFailure(failure: Throwable): String {
+        return applicationContext.getString(mediaFailureResource(failure))
+    }
+}
+
+internal fun mediaFailureResource(failure: Throwable): Int {
+    if (failure is MediaDeviceVerificationException) {
+        return R.string.documents_device_verification_failed
+    }
+    val reason = (failure as? MediaAccessException)?.reason ?: when (failure) {
+            is FirebaseFirestoreException -> when (failure.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED,
+                FirebaseFirestoreException.Code.NOT_FOUND -> MediaAccessError.ACCESS_REVOKED
+                FirebaseFirestoreException.Code.UNAVAILABLE -> MediaAccessError.NETWORK_REQUIRED
+                else -> null
+            }
+            else -> null
+        }
+    return when (reason) {
+        MediaAccessError.NOT_CACHED -> R.string.documents_not_available_offline
+        MediaAccessError.NETWORK_REQUIRED -> R.string.documents_network_required
+        MediaAccessError.LEASE_EXPIRED -> R.string.documents_offline_revalidation_required
+        MediaAccessError.ACCESS_REVOKED -> R.string.documents_access_revoked
+        MediaAccessError.CORRUPT_CIPHERTEXT -> R.string.documents_offline_copy_corrupt
+        MediaAccessError.KEY_UNAVAILABLE, MediaAccessError.DEVICE_KEY_CHANGED -> R.string.documents_key_unavailable
+        MediaAccessError.ACCOUNT_MISMATCH -> R.string.documents_account_mismatch
+        MediaAccessError.INSUFFICIENT_STORAGE -> R.string.documents_storage_full
+        MediaAccessError.DOWNLOAD_FAILED -> R.string.documents_download_failed
+        null -> R.string.documents_open_failed
+    }
+}
+
+private fun hasValidatedNetwork(context: Context): Boolean {
+    val manager = context.getSystemService(ConnectivityManager::class.java)
+    val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
+    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }

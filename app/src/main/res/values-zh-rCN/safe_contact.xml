@@ -80,4 +80,23 @@
     <string name="documents_share_help">最多选择 10 位已接受好友。只有所选账户才能打开此文件。</string>
     <string name="open">打开</string>
     <string name="share">分享</string>
+    <string name="documents_offline_index">正在显示加密的离线索引。连接网络后将同步更改。</string>
+    <string name="documents_not_available_offline">此文件尚不可离线使用。</string>
+    <string name="documents_make_available_offline">设为可离线使用</string>
+    <string name="documents_remove_offline_copy">移除离线副本</string>
+    <string name="documents_saving_offline">正在保存加密离线副本…</string>
+    <string name="documents_available_offline">可离线使用</string>
+    <string name="documents_recently_cached">最近已缓存，可能会被自动移除</string>
+    <string name="documents_recent_cache_title">最近文件缓存</string>
+    <string name="documents_recent_cache_help">自动离线保留最近打开的加密文件。自动副本共用 250 MB 上限，此设置默认关闭。</string>
+    <string name="documents_offline_revalidation_required">请重新连接以确认访问权限，然后再打开此共享文件。</string>
+    <string name="documents_network_required">请连接互联网以访问此文件。</string>
+    <string name="documents_access_revoked">你已无法访问此文件。其离线副本已被移除。</string>
+    <string name="documents_offline_copy_corrupt">离线副本已损坏并被移除。请重新下载。</string>
+    <string name="documents_key_unavailable">此设备无法解锁文件。请重新连接以恢复设备访问权限。</string>
+    <string name="documents_account_mismatch">此离线副本属于其他账户。</string>
+    <string name="documents_storage_full">设备存储空间不足，无法保存此离线副本。</string>
+    <string name="documents_download_failed">无法下载加密文件。请重试。</string>
+    <string name="documents_device_verification_failed">无法验证此应用安装。请重新打开应用后重试。</string>
+    <string name="documents_open_failed">无法打开加密文件。</string>
 </resources>
