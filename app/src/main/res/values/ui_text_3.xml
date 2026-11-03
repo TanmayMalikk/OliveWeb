@@ -84,6 +84,9 @@
     <string name="ui_general_app_activity_notifications">General app activity notifications</string>
     <string name="ui_olive_branch_updates">Olive Branch Updates</string>
     <string name="ui_olive_tree_updates">Olive Tree Updates</string>
+    <string name="ui_call_invitation_notifications">Call invitations</string>
+    <string name="ui_incoming_call">Incoming call</string>
+    <string name="ui_open_olive_to_respond_to_this_call">Open Olive to respond to this call.</string>
     <string name="ui_news">News</string>
     <string name="ui_politics">Politics</string>
     <string name="ui_sports">Sports</string>
