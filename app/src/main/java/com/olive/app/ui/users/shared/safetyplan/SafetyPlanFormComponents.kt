@@ -78,6 +78,7 @@ internal fun SafetyChecklistSection(
             update,
             onContactsChange
         )
+        // Only continue with safety checklist section when section is documents.
         if (section == "documents") {
             Text(
                 stringResource(R.string.safety_document_hint),
@@ -149,6 +150,7 @@ internal fun SafetyChecklistSection(
     }
 }
 
+// shared safe app safety plan form components shows this checklist row view so the user can view its details and use its actions.
 @Composable
 private fun ChecklistRow(
     item: SafetyChecklistItem, heading: String, sectionKey: String, index: Int, editable: Boolean,
@@ -184,6 +186,7 @@ private fun ChecklistRow(
                         input()
                     }
                 })
+            // section key substring after is documents and editable is handled here by checklist row.
             if (sectionKey.substringAfter('_') == "documents" && editable) {
                 val uploadDescription = stringResource(R.string.safety_upload_for, name)
                 OutlinedButton(
@@ -199,6 +202,7 @@ private fun ChecklistRow(
                 }
             }
         }
+        // editable is handled here by checklist row.
         if (editable) {
             val removeLabel = stringResource(R.string.safety_remove_item, name)
             IconButton(
@@ -211,6 +215,7 @@ private fun ChecklistRow(
     }
 }
 
+// The safety plan contact picker view is part of shared safe app safety plan form components. It gives the user the details and choices needed here.
 @Composable
 private fun SafetyPlanContactPicker(
     items: List<SafetyChecklistItem>,
@@ -229,6 +234,7 @@ private fun SafetyPlanContactPicker(
         style = MaterialTheme.typography.labelMedium,
         color = Muted
     )
+    // editable is handled here by safety plan contact picker.
     if (editable) {
         Text(
             stringResource(R.string.safety_contact_picker_help),

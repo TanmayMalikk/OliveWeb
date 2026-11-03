@@ -13,6 +13,7 @@ export interface ManagedAccount {
   protected: boolean;
 }
 
+// Web admin: Calls the matching backend service admin. It sends a signed-in request to the protected cloud function and checks the reply.
 async function callAdmin(name: string, input: unknown = {}) {
   if (!cloudMode) {
     throw new Error("Organization management requires a Firebase-connected account.");
@@ -22,6 +23,7 @@ async function callAdmin(name: string, input: unknown = {}) {
   return (await httpsCallable(functions, name)(input)).data;
 }
 
+// Lists accounts for web admin.
 export async function listAccounts(): Promise<ManagedAccount[]> {
   const result = (await callAdmin("adminListAccounts")) as { accounts: ManagedAccount[] };
   return result.accounts;

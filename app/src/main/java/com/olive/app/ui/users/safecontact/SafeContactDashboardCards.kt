@@ -26,6 +26,7 @@ import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 
+// The safe contact identity card view is part of safe contact dashboard cards. It gives the user the details and choices needed here.
 @Composable
 internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) {
     Surface(
@@ -78,6 +79,7 @@ internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) 
     }
 }
 
+// safe contact dashboard cards shows this safe contact action card view so the user can view its details and use its actions.
 @Composable
 internal fun SafeContactActionCard(
     label: String, description: String, icon: ImageVector, tag: String, badgeCount: Int,
@@ -125,6 +127,7 @@ internal fun SafeContactActionCard(
     }
 }
 
+// safe contact dashboard cards shows this safe contact profile row view so the user can view its details and use its actions.
 @Composable
 internal fun SafeContactProfileRow(label: String, value: String, icon: ImageVector) {
     Row(

@@ -133,6 +133,7 @@ internal fun BirthdayPicker(
     var month by remember { mutableStateOf(initial?.monthValue) }
     var day by remember { mutableStateOf(initial?.dayOfMonth) }
     val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    // Updates date for shared safe app account onboarding.
     fun setDate(y: Int?, m: Int?, d: Int?) {
         if (y != null && m != null && d != null) onChange(
             "%04d-%02d-%02d".format(
@@ -148,6 +149,7 @@ internal fun BirthdayPicker(
         style = MaterialTheme.typography.labelLarge
     )
     Row(Modifier.fillMaxWidth().testTag(tag), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // shared safe app account onboarding shows this choice view so the user can view its details and use its actions.
         @Composable
         fun Choice(
             label: String,
@@ -371,6 +373,7 @@ private fun DrawScope.drawOnboardingSprig(
 ) {
     val reach = spacing * sprig.reach
     val rise = sprig.rise.dp.toPx()
+    // Shared safe app account onboarding: returns the point. It draws the needed shapes and text on the screen.
     fun point(x: Float, y: Float) = base + Offset(reach * x, rise * y)
     val tip = point(1f, 1f)
     val sprigPath = Path().apply {
@@ -424,6 +427,7 @@ internal data class OnboardingSprig(
 // Seeded geometry stays stable while text fields and progress state recompose.
 internal class OnboardingBranchLayout(pages: Int) {
     val naturalStepOffsets =
+        // Choose what draw onboarding leaf should do for the current value.
         when (pages) {
             2 -> listOf(0f, 90f)
             3 -> listOf(0f, 92f, 178f)

@@ -16,6 +16,7 @@ import kotlinx.coroutines.CancellationException
 
 // Owns conversation selection, messages and read markers.
 internal class SessionConversations(private val runtime: SessionRuntime) {
+    // Starts conversation for session conversations.
     fun openConversation(conversation: ChatConversation, preserveMessages: Boolean = false) {
         with(runtime) {
             with(state) {
@@ -36,6 +37,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 val token = epoch
                 messagingBusy = true
                 scope.launch {
+                    // A open conversation error is handled here instead of closing the app.
                     try {
                         val key = secureSharing.roomKey(conversation)
                         if (epoch != token || activeConversation?.id != conversation.id) return@launch
@@ -68,6 +70,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session conversations: Stops conversation. It closes the active subscription or resource.
     fun closeConversation() {
         with(runtime) {
             with(state) {
@@ -92,6 +95,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         state.messagingBusy = true
         state.message = null
         runtime.scope.launch {
+            // If send message fails, catch the error so the app can keep running and explain the problem.
             try {
                 val roomKey = runtime.secureSharing.roomKey(conversation)
                 repository.send(
@@ -116,11 +120,13 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session conversations: Sends failure message. It reads or saves the matching protected record in Firebase.
     private fun sendFailureMessage(failure: Exception): Int =
         if (failure is FirebaseFirestoreException &&
             failure.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
         ) R.string.messaging_send_denied else R.string.ui_unable_to_send_the_message
 
+    // returns the unsend message for session conversations. It checks the chat and uses its secure data before reading or saving a message.
     fun unsendMessage(chat: ChatMessage) {
         with(runtime) {
             with(state) {
@@ -134,6 +140,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session conversations: Stops chat quick exit hint.
     fun dismissChatQuickExitHint() {
         with(runtime) {
             with(state) {
@@ -142,6 +149,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session conversations: Updates archived.
     fun setArchived(conversation: ChatConversation, archived: Boolean) {
         with(runtime) {
             val uid = enrollment?.uid ?: return
@@ -153,6 +161,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 previous - conversation.id
             }
             scope.launch {
+                // If set archived fails, catch the error so the app can keep running and explain the problem.
                 try {
                     withContext(Dispatchers.IO) {
                         store.setConversationArchived(uid, conversation.id, archived)
@@ -165,6 +174,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
+    // returns the append private note for session conversations.
     fun appendPrivateNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) {
         with(runtime) {
             val uid = enrollment?.uid ?: return
@@ -176,6 +186,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
             }
             state.messagingBusy = true
             scope.launch {
+                // A append private note error is handled here instead of closing the app.
                 try {
                     withContext(Dispatchers.IO) {
                         store.appendPrivateContactNote(uid, target.uid, target.username, text)
@@ -195,6 +206,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     // Builds the device-storage key that tracks the last message read in one conversation.
     fun readMessageKey(uid: String, conversationId: String) = "read_message_${uid}_$conversationId"
 
+    // returns the mark conversation read for session conversations. It checks the chat and uses its secure data before reading or saving a message.
     fun markConversationRead(conversation: ChatConversation) {
         with(runtime) {
             with(state) {

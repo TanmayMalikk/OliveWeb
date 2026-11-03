@@ -11,6 +11,7 @@ import org.junit.runner.RunWith
 /** Verifies the real Android Keystore provider, which host-side JVM tests cannot emulate. */
 @RunWith(AndroidJUnit4::class)
 class KeyManagerInstrumentedTest {
+    // User key manager instrumented test: returns the current oaep contract wraps and unwraps aes key. The test gives the code a clear input and checks the expected result.
     @Test
     fun currentOaepContractWrapsAndUnwrapsAesKey() {
         val original = EncryptionUtils.generateSymmetricKey()

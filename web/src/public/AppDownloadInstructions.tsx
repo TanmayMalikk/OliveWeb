@@ -1,6 +1,4 @@
-// Public web visitors: downloads the Android test app or installs the iOS web app.
-import { useEffect, useState } from "react";
-import QRCode from "qrcode";
+// Public visitors: download the Android debug app or install the iOS web app.
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -10,31 +8,20 @@ import {
   PlusSquare,
   Check,
 } from "lucide-react";
-import { Logo, Button, Forward, External } from "../components/SharedComponents";
+import {
+  Logo,
+  Button,
+  Forward,
+  External,
+} from "../components/SharedComponents";
 import { useSession } from "../session/SessionProvider";
 import { siteHref } from "../sites/SiteRouting";
+import config from "../../site.config.json";
 
-const ANDROID_DOWNLOAD_URL =
-  import.meta.env.VITE_ANDROID_DOWNLOAD_URL?.trim() ||
-  "https://firebasestorage.googleapis.com/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2Folive-branch.apk?alt=media";
+const ANDROID_DOWNLOAD_URL = new URL("/download/android", location.origin).href;
 
 export default function DownloadPage() {
   const { go } = useSession();
-  const [androidQr, setAndroidQr] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    void QRCode.toDataURL(ANDROID_DOWNLOAD_URL, {
-      width: 280,
-      margin: 2,
-      color: { dark: "#30432b", light: "#ffffff" },
-    }).then((value) => {
-      if (active) setAndroidQr(value);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   return (
     <div className="page-width download-page">
@@ -71,35 +58,18 @@ export default function DownloadPage() {
               <Download size={30} />
             </div>
             <span className="eyebrow">FOR ANDROID</span>
-            <h2>Download the Android test app.</h2>
+            <h2>Download the Android debug app.</h2>
             <p>
-              Scan the code with your Android camera to download the newest
-              debug APK, then open the downloaded file to install it. Android
-              may ask you to allow installation from your browser.
+              Download the current debug APK on your Android device, then open
+              the file to install it. Android may ask you to allow installation
+              from your browser.
             </p>
-            <div className="qr-area">
-              {androidQr ? (
-                <>
-                  <img
-                    src={androidQr}
-                    width="240"
-                    height="240"
-                    alt="QR code linking to the Android debug APK download"
-                  />
-                  <small>Scan with your Android phone’s camera.</small>
-                </>
-              ) : (
-                <div className="qr-placeholder" aria-live="polite">
-                  <Smartphone size={40} />
-                  <span>Preparing the Android download code…</span>
-                </div>
-              )}
-            </div>
             <a className="button" href={ANDROID_DOWNLOAD_URL}>
-              <Download size={17} /> Download Android debug APK
+              <Download size={17} /> Download debug APK
             </a>
             <p className="help-note">
-              This is a school-project debug build, not a Play Store release.
+              Android may show a warning because this APK is installed outside
+              the Play Store.
             </p>
           </section>
           <section className="install-card">
@@ -165,6 +135,22 @@ export default function DownloadPage() {
             </External>
           </section>
         </div>
+        <section className="download-web panel">
+          <div className="install-icon">
+            <Smartphone size={30} />
+          </div>
+          <div>
+            <span className="eyebrow">OPEN IN A BROWSER</span>
+            <h2>Your space, on the web.</h2>
+            <p>
+              Sign in with the same account to open the web version of Olive
+              Branch.
+            </p>
+          </div>
+          <a className="button" href={`${config.publicOrigin}/account/sign-in`}>
+            Open the web app <ArrowUpRight size={17} />
+          </a>
+        </section>
         <div className="download-account panel">
           <div>
             <span className="eyebrow">NEW HERE?</span>

@@ -78,6 +78,7 @@ private fun ActivityDateTimePicker(
         }
         if (value != null) TextButton(onClick = { onChange(null) }) { Text(stringResource(R.string.clear)) }
     }
+    // Only continue with activity date time picker when show date key value.
     if (showDate) key(value) {
         val initial = value ?: System.currentTimeMillis()
         val localDate = Instant.ofEpochMilli(initial).atZone(zone).toLocalDate()
@@ -102,6 +103,7 @@ private fun ActivityDateTimePicker(
             DatePicker(state = picker, modifier = Modifier.testTag("${tag}_calendar"))
         }
     }
+    // activity date time picker checks whether show time key pending date, value before continuing.
     if (showTime) key(pendingDate, value) {
         val initial = value?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
             ?: java.time.LocalTime.now(zone)
@@ -149,6 +151,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
     }
     var from by remember { mutableStateOf<Long?>(null) }
     var to by remember { mutableStateOf<Long?>(null) }
+    // returns the in range for user activity history screen.
     fun inRange(time: Long) =
         (from == null || time >= from!!) && (to == null || time <= to!! + 59_999)
 
@@ -179,6 +182,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
         }
         item {
             Heading(
+                // Only continue with in range when selected is null ui text r string account activity else when selected.
                 if (selected == null) uiText(R.string.account_activity) else when (selected) {
                     ActivityCategory.Settings -> uiText(R.string.settings_history)
                     ActivityCategory.Triggers -> uiText(
@@ -235,6 +239,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // Only continue with in range when selected is null and settings size > 5.
             if (selected == null && settings.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(
@@ -243,6 +248,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                 }) { Text(stringResource(R.string.see_more)) }
             }
         }
+        // in range checks whether selected is null or selected is activity category triggers before continuing.
         if (selected == null || selected == ActivityCategory.Triggers) {
             item {
                 HorizontalDivider()
@@ -266,6 +272,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                         )
                         if (event.pinAttempts > 0) Text(
                             "${stringResource(R.string.pin_attempts)}: ${event.pinAttempts} · ${
+                                // Choose what in range should do for the current value.
                                 when (event.lastResult) {
                                     "Accepted" -> uiText(R.string.accepted); "Incorrect PIN" -> uiText(
                                     R.string.incorrect_pin
@@ -278,6 +285,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // selected is null and triggers size > 5 is handled here by in range.
             if (selected == null && triggers.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(
@@ -286,6 +294,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                 }) { Text(stringResource(R.string.see_more)) }
             }
         }
+        // Only continue with in range when selected is null or selected is activity category pin attempts.
         if (selected == null || selected == ActivityCategory.PinAttempts) {
             item {
                 HorizontalDivider()
@@ -294,6 +303,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.semantics { heading() })
             }
+            // in range checks whether attempts is empty item text string resource r string no failed attempts recorded before continuing.
             if (attempts.isEmpty()) item { Text(stringResource(R.string.no_failed_attempts_recorded)) }
             items(visible(ActivityCategory.PinAttempts, attempts), key = { it.id }) { attempt ->
                 Card(Modifier.fillMaxWidth().testTag("attempt_row")) {
@@ -309,6 +319,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // in range checks whether selected is null and attempts size > 5 before continuing.
             if (selected == null && attempts.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(
@@ -325,6 +336,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.semantics { heading() })
             }
+            // checkouts is empty item text string resource r string no checkout attempts yet is handled here by in range.
             if (checkouts.isEmpty()) item { Text(stringResource(R.string.no_checkout_attempts_yet)) }
             items(visible(ActivityCategory.Checkouts, checkouts), key = { it.id }) { event ->
                 Card(Modifier.fillMaxWidth().testTag("safe_checkout_history_row")) {
@@ -342,6 +354,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // in range checks whether selected is null and checkouts size > 5 before continuing.
             if (selected == null && checkouts.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(
@@ -358,6 +371,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.semantics { heading() })
             }
+            // privacy is empty item text string resource r string no capture events reported by android is handled here by in range.
             if (privacy.isEmpty()) item { Text(stringResource(R.string.no_capture_events_reported_by_android)) }
             items(visible(ActivityCategory.Privacy, privacy), key = { it.id }) { event ->
                 Card(Modifier.fillMaxWidth()) {
@@ -371,6 +385,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // in range checks whether selected is null and privacy size > 5 before continuing.
             if (selected == null && privacy.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(

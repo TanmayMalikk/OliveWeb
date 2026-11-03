@@ -6,6 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AccountActivityHistoryEdgeCaseTest {
+    // Account activity history edge case test kt: returns the profile. The test gives the code a clear input and checks the expected result.
     private fun profile() = UserProfile(
         username = "test_user",
         fullName = "Test User",

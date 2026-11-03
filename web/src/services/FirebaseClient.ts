@@ -13,6 +13,10 @@ import {
 } from "firebase/firestore";
 import { getStorage, connectStorageEmulator } from "firebase/storage";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
+import {
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+} from "firebase/app-check";
 const env = import.meta.env;
 export const app = initializeApp({
   apiKey: env.VITE_FIREBASE_API_KEY,
@@ -25,6 +29,19 @@ export const auth = getAuth(app);
 export const db = initializeFirestore(app, { localCache: memoryLocalCache() });
 export const storage = getStorage(app);
 export const functions = getFunctions(app, "northamerica-northeast1");
+if (
+  env.PROD &&
+  env.VITE_FIREBASE_APPCHECK_SITE_KEY &&
+  env.VITE_USE_FIREBASE_EMULATORS !== "true"
+) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(
+      env.VITE_FIREBASE_APPCHECK_SITE_KEY,
+    ),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
+// env vite use firebase emulators is true is handled here by functions.
 if (env.VITE_USE_FIREBASE_EMULATORS === "true") {
   if (!env.VITE_FIREBASE_PROJECT_ID?.startsWith("demo-"))
     throw new Error("Emulators require a demo- project ID.");

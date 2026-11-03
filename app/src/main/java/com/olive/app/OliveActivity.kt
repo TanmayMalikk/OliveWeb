@@ -8,7 +8,6 @@ import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.viewModels
 import androidx.activity.compose.setContent
@@ -24,6 +23,7 @@ import com.olive.app.location.LiveLocationService
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
+import androidx.fragment.app.FragmentActivity
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
 import com.olive.app.notification.OliveNotificationManager
@@ -35,9 +35,11 @@ import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SafePage
 import java.util.function.Consumer
 
+// Prevents Android from showing private content in the recent-apps preview.
 internal fun shouldBlankRecentPreview(protectionEnabled: Boolean, sensitive: Boolean) =
     protectionEnabled && sensitive
 
+// Gives the task a discreet label and colour in Android recents.
 internal fun shouldApplyTaskIdentity(
     applied: Pair<CoverType, AccountRole>?,
     type: CoverType,
@@ -46,7 +48,7 @@ internal fun shouldApplyTaskIdentity(
     applied != (type to role)
 
 // Android launches this activity first; it hosts the Compose UI and protects private content.
-class OliveActivity : ComponentActivity() {
+class OliveActivity : FragmentActivity() {
     private val deviceLock = com.olive.app.security.AndroidDeviceLock(this) { session.navigation.background() }
 
     // The resource toggle avoids hard-coding the privacy mode into this activity's control flow.
@@ -68,6 +70,7 @@ class OliveActivity : ComponentActivity() {
             session.syncLocalNotificationHandler()
         }
 
+    // Starts the root Compose UI and restores the correct cover or account screen.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         OliveNotificationManager.createNotificationChannels(this)
@@ -92,6 +95,7 @@ class OliveActivity : ComponentActivity() {
                 session.screen,
                 session.page
             ) { applySystemBarContrast() }
+            // Keep the current activity available to privacy and permission callbacks.
             LaunchedEffect(notificationAccountId, selectedCover, selectedRole) {
                 // Update the open task now; the Home-screen alias changes after the user leaves the app.
                 updateRecentAppIdentity(selectedCover, selectedRole)
@@ -140,6 +144,7 @@ class OliveActivity : ComponentActivity() {
         }
     }
 
+    // Resets the privacy timer whenever the user touches or types in the app.
     override fun onUserInteraction() {
         super.onUserInteraction()
         session.noteInteraction()
@@ -149,12 +154,14 @@ class OliveActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         if (!screenCaptureProtectionEnabled) return
+        // Skip the next action unless the Android version is at least 34.
         if (Build.VERSION.SDK_INT >= 34) runCatching {
             ScreenCaptureCallback { session.captureDetected("Screenshot") }.also {
                 registerScreenCaptureCallback(mainExecutor, it)
                 screenshotCallback = it
             }
         }
+        // Android 15 and newer need this extra screen-capture protection.
         if (Build.VERSION.SDK_INT >= 35) runCatching {
             Consumer<Int> { state ->
                 if (state == WindowManager.SCREEN_RECORDING_STATE_VISIBLE) session.captureDetected("Screen recording")
@@ -171,6 +178,7 @@ class OliveActivity : ComponentActivity() {
         }
     }
 
+    // Applies the privacy policy when the app is no longer visible.
     override fun onStop() {
         if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen && (session.deviceLockRequest != null ||
                     session.screen in setOf(
@@ -182,6 +190,7 @@ class OliveActivity : ComponentActivity() {
             deviceLock.cancel()
             session.navigation.background()
         }
+        // Skip the next action unless the Android version is at least 34.
         if (Build.VERSION.SDK_INT >= 34) screenshotCallback?.let {
             runCatching {
                 unregisterScreenCaptureCallback(
@@ -189,6 +198,7 @@ class OliveActivity : ComponentActivity() {
                 )
             }
         }
+        // Android 15 and newer require an explicit screen-capture callback registration.
         if (Build.VERSION.SDK_INT >= 35) recordingCallback?.let {
             runCatching {
                 windowManager.removeScreenRecordingCallback(
@@ -240,6 +250,7 @@ class OliveActivity : ComponentActivity() {
         val expectedEpoch = privacyCoverEpoch
         window.decorView.postOnAnimation {
             window.decorView.postOnAnimation {
+                // Restore the cover only when this is still the active privacy event and the app is visible.
                 if (expectedEpoch == privacyCoverEpoch && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
                     val cover = recentPrivacyCover ?: return@postOnAnimation
                     (cover.parent as? ViewGroup)?.removeView(cover)
@@ -282,6 +293,7 @@ class OliveActivity : ComponentActivity() {
             AccountRole.SAFE_CONTACT -> getString(R.string.olive_branch)
             AccountRole.STAFF, AccountRole.ADMIN -> getString(R.string.olive_tree)
             AccountRole.USER -> getString(
+                // Chooses the recent-app title and icon that match the active cover.
                 when (type) {
                     CoverType.FOOD -> R.string.ui_olive_8f62f4
                     CoverType.NEWS -> R.string.ui_daily_digest

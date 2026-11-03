@@ -6,7 +6,8 @@ import com.google.android.gms.wearable.DataEventBuffer
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.WearableListenerService
 
-class FitnessWatchListenerService : WearableListenerService() {
+internal class FitnessWatchListenerService : WearableListenerService() {
+    // Responds when data changed for fitness cover.
     override fun onDataChanged(events: DataEventBuffer) {
         events.forEach { event ->
             if (event.type != DataEvent.TYPE_CHANGED ||

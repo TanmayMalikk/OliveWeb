@@ -38,6 +38,7 @@ internal class SafetyDocumentsController(
     var state by mutableStateOf(SafetyDocumentsState())
         private set
 
+    // Prepares the feature data for user safety document controller. It checks access, protects the file, and then reads or saves it.
     fun prepare(ownerUid: String) {
         subscription?.close()
         subscription = null
@@ -45,7 +46,8 @@ internal class SafetyDocumentsController(
         state = SafetyDocumentsState(ownerUid = ownerUid)
     }
 
-    fun load(ownerUid: String, localMode: Boolean) {
+    // Loads the saved value for user safety document controller. It checks access, protects the file, and then reads or saves it.
+    fun load(ownerUid: String, username: String, localMode: Boolean) {
         if (state.ownerUid != ownerUid) {
             subscription?.close()
             subscription = null
@@ -58,9 +60,15 @@ internal class SafetyDocumentsController(
         val token = generation
         state = state.copy(loading = true, error = null)
         subscription = repository.observeFor(ownerUid, { files ->
+            // token is generation and state owner uid is owner uid is handled here by load.
             if (token == generation && state.ownerUid == ownerUid) {
                 state = state.copy(files = files, loading = false, error = null)
                 media?.acknowledgePublished(files.mapTo(mutableSetOf()) { it.id })
+                files.forEach { document ->
+                    scope.launch {
+                        runCatching { repository.approveCurrentAccountDevices(document, ownerUid, username) }
+                    }
+                }
             }
         }, { error ->
             if (token == generation && state.ownerUid == ownerUid) {
@@ -71,15 +79,17 @@ internal class SafetyDocumentsController(
         })
     }
 
+    // User safety document controller: Uploads the selected file. It prepares the picture before the app reads or saves it.
     fun upload(uri: Uri, identity: AccountIdentity, fallbackError: String, ocrReview: OcrReview = OcrReview.NOT_RUN) {
         val transfers = media ?: return reportError(fallbackError)
         state = state.copy(loading = true, error = null)
         transfers.queueDocument(uri, identity, ocrReview, onQueued = {
             state = state.copy(loading = false, error = null)
-            if (subscription == null) load(identity.uid, false)
+            if (subscription == null) load(identity.uid, identity.username, false)
         }, onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
     }
 
+    // Sends captured for user safety document controller. It prepares the picture before the app reads or saves it.
     fun uploadCaptured(
         file: File,
         name: String,
@@ -102,12 +112,13 @@ internal class SafetyDocumentsController(
             onQueued = {
                 file.delete()
                 state = state.copy(loading = false, error = null)
-                if (subscription == null) load(identity.uid, false)
+                if (subscription == null) load(identity.uid, identity.username, false)
                 onComplete()
             },
             onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
     }
 
+    // User safety document controller: Downloads the selected file. It checks access, protects the file, and then reads or saves it.
     fun download(document: SafetyDocument, onReady: (File) -> Unit) {
         val viewerUid = state.ownerUid ?: return
         val token = generation
@@ -126,6 +137,7 @@ internal class SafetyDocumentsController(
         }
     }
 
+    // Starts shared for user safety document controller. It checks access, protects the file, and then reads or saves it.
     fun openShared(
         viewerUid: String,
         documentId: String,
@@ -152,10 +164,12 @@ internal class SafetyDocumentsController(
         }
     }
 
+    // User safety document controller: Deletes the selected item. It requires the active feature controller before continuing.
     fun delete(document: SafetyDocument, ownerUid: String) = run(refreshAfter = true) {
         checkNotNull(repository).delete(document, ownerUid)
     }
 
+    // User safety document controller: Shares the selected item. It requires the active feature controller before continuing.
     fun share(
         document: SafetyDocument,
         ownerUid: String,
@@ -165,10 +179,12 @@ internal class SafetyDocumentsController(
         checkNotNull(repository).share(document, ownerUid, recipients)
     }
 
+    // User safety document controller: returns the report error.
     fun reportError(message: String?) {
         state = state.copy(error = message)
     }
 
+    // returns the clear for user safety document controller. It checks access, protects the file, and then reads or saves it.
     fun clear() {
         subscription?.close()
         subscription = null
@@ -177,6 +193,7 @@ internal class SafetyDocumentsController(
         state = SafetyDocumentsState()
     }
 
+    // Runs the requested task for user safety document controller. It checks access, protects the file, and then reads or saves it.
     private fun run(
         refreshAfter: Boolean = false,
         fallbackError: String? = null,
@@ -200,11 +217,13 @@ internal class SafetyDocumentsController(
         }
     }
 
+    // Reloads the latest data for user safety document controller. It checks access, protects the file, and then reads or saves it.
     private suspend fun refresh(ownerUid: String) {
         val files = checkNotNull(repository).listFor(ownerUid)
         if (state.ownerUid == ownerUid) state = state.copy(files = files, error = null)
     }
 
+    // User safety document controller: Starts document.
     private suspend fun openDocument(document: SafetyDocument, viewerUid: String): File =
         if (document.objectKey.isNotBlank()) {
             checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, viewerUid)

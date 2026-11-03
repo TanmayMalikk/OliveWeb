@@ -13,6 +13,7 @@ import {
   oliveAngle,
 } from "./olive-flight";
 
+// Shows the leafy branch view for web olive flight cover. It uses the current cover data to update what the user sees.
 function LeafyBranch({
   x,
   end,
@@ -26,6 +27,7 @@ function LeafyBranch({
 }) {
   const height = down ? end : FLIGHT.height - end;
   const variation = seed + (down ? 0.173 : 0.719);
+  // Web olive flight cover: returns the random. It uses the current cover data to update what the user sees.
   const random = (index: number, salt = 0) => {
     const value =
       Math.sin(variation * 8191 + index * 127.1 + salt * 311.7) * 43758.5453;
@@ -113,6 +115,7 @@ export default function OliveFlight() {
   const widthRef = useRef<number>(FLIGHT.width);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+  // Update phase ref when information used by this screen changes.
   useEffect(() => {
     const element = stage.current;
     if (!element) return;
@@ -128,6 +131,7 @@ export default function OliveFlight() {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  // Update width when information used by this screen changes.
   useEffect(() => {
     let live = true;
     void readCover<number | null>("olive-flight-best", null)
@@ -144,10 +148,12 @@ export default function OliveFlight() {
       live = false;
     };
   }, []);
+  // Update live when information used by this screen changes.
   useEffect(() => {
     if (phase !== "playing" || world.over) return;
     let frame = 0,
       previous = 0;
+    // returns the tick for web olive flight cover.
     function tick(time: number) {
       const elapsed = previous ? (time - previous) / 1000 : 0;
       if (elapsed)
@@ -160,7 +166,9 @@ export default function OliveFlight() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [phase, world.over]);
+  // Update elapsed when information used by this screen changes.
   useEffect(() => {
+    // returns the hide for web olive flight cover. It listens for new data and stops listening when the screen closes.
     function hide() {
       if (document.hidden)
         setPhase((current) => (current === "playing" ? "paused" : current));
@@ -168,13 +176,16 @@ export default function OliveFlight() {
     document.addEventListener("visibilitychange", hide);
     return () => document.removeEventListener("visibilitychange", hide);
   }, []);
+  // Update hide when information used by this screen changes.
   useEffect(() => {
     if (loaded && world.over && world.score > (best ?? 0)) {
       setBest(world.score);
       void writeCover("olive-flight-best", world.score).catch(() => {});
     }
   }, [world.over, world.score, best, loaded]);
+  // Web olive flight cover: returns the flap.
   function flap() {
+    // world over or phase is ready is handled here by flap.
     if (world.over || phase === "ready") {
       setWorld({
         ...newFlight(widthRef.current, Math.random),

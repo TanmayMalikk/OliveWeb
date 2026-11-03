@@ -89,14 +89,17 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         runtime.accountSession.load()
     }
 
+    // Starts external file picker for shared safe app session view model.
     fun beginExternalFilePicker() {
         externalFilePickerOpen = true
     }
 
+    // Shared safe app session view model: Stops external file picker.
     fun endExternalFilePicker() {
         externalFilePickerOpen = false
     }
 
+    // Shared safe app session view model: Sends live location in chat.
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 
@@ -107,6 +110,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         runtime.accountSession.signOut()
     }
 
+    // Shared safe app session view model: Responds when cleared.
     override fun onCleared() {
         documents.clear()
         locationMap.clear()

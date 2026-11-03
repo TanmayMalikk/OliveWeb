@@ -61,9 +61,9 @@ Keep closely related composables, helpers, and dialogs in one feature file. Spli
 
 Keep names short and literal. Use the feature shown to the user, such as `dashboard`, `notes`, `account`, and `safetyplan`. Give a source file enough context to identify its contents from its name, such as `UserProfileScreen.kt`. Avoid vague containers such as `workspace`, `shell`, `helpers`, or `misc`. A leaf feature folder must contain at least two source files. If a feature needs only one file, place it beside a closely related feature instead of wrapping it in another directory.
 
-Write Kotlin, TypeScript, and JavaScript for a reader who is still learning: use one statement per line, spaces around operators, braces for control flow, and clear names. Split long conditions and multi-step expressions into named steps. Comments should explain why a rule or workaround exists; the code itself should show what happens.
+Write Kotlin, TypeScript, and JavaScript for a reader who is still learning: use one statement per line, spaces around operators, braces for control flow, and clear names. Split long conditions and multi-step expressions into named steps. Put a short, specific comment before every function, loop, and other code section longer than four lines. The comment must name the feature or user type and explain what that section accomplishes; avoid vague text such as "handles data" or comments that only repeat a symbol name.
 
-Every handwritten source file starts with a short comment naming its feature, who uses it, and what the file does. Add simple comments to important code sections when behavior, timing, access, or security rules are not clear from the code. Do not comment every function or variable just to repeat its name.
+Every handwritten source file starts with a short comment naming its feature, who uses it, and what the file does. Generated files, build output, dependencies, and third-party source are excluded because local comments would be overwritten or would modify code that Olive Branch does not own.
 
 ## Web UI by user type
 

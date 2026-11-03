@@ -168,6 +168,12 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
 
   await assertSucceeds(getDoc(doc(alice,'messageDirectory/social_bob')));
   await assertFails(getDocs(query(collection(alice,'messageDirectory'),where('username','>=','social_b'))));
+  const aliceDevice={uid:'social-a',deviceId:'alice-web-device-1',publicKey:'alice-web-key',
+    platform:'WEB',mgf1Digest:'SHA-256',updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(alice,'messageDirectory/social_alice/devices/alice-web-device-1'),aliceDevice));
+  await assertSucceeds(getDoc(doc(bob,'messageDirectory/social_alice/devices/alice-web-device-1')));
+  await assertFails(setDoc(doc(bob,'messageDirectory/social_alice/devices/stolen-web-device'),
+    {...aliceDevice,deviceId:'stolen-web-device'}));
   const requestId='social-a--social-b';
   const friendshipId='social-a--social-b';
   const request={senderUid:'social-a',senderUsername:'social_alice',recipientUid:'social-b',
@@ -231,6 +237,13 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   await assertFails(getDocs(collection(alice,'conversations')));
   await assertFails(getDocs(query(collection(alice,'conversations'),where('participantIds','array-contains','social-b'))));
   await assertFails(getDoc(doc(charlie,'conversations/'+friendshipId)));
+  const deviceRoomKey={uid:'social-a',deviceId:'alice-web-device-1',publicKey:'alice-web-key',
+    wrappedKey:'wrapped-for-alice-browser',updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(bob,`conversations/${friendshipId}/deviceKeys/social-a--alice-web-device-1`),deviceRoomKey));
+  await assertSucceeds(getDoc(doc(alice,`conversations/${friendshipId}/deviceKeys/social-a--alice-web-device-1`)));
+  await assertFails(getDoc(doc(charlie,`conversations/${friendshipId}/deviceKeys/social-a--alice-web-device-1`)));
+  await assertFails(setDoc(doc(charlie,`conversations/${friendshipId}/deviceKeys/social-c--alice-web-device-1`),
+    {...deviceRoomKey,uid:'social-c'}));
 
   const plaintextRef=doc(alice,'conversations/'+friendshipId+'/messages/plaintext-message');
   await assertFails(setDoc(plaintextRef,{senderUid:'social-a',senderUsername:'social_alice',body:'Private hello',

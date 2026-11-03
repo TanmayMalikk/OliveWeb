@@ -2,6 +2,7 @@
 import { expect, it } from "vitest";
 import { createMemoryBoard } from "./olive-memory-board";
 
+// returns the size for web olive-memory-board test ts cover.
 for (let size = 5; size <= 8; size++) {
   // Inputs: the values in this case. Expected: builds a solvable ${size}x${size} board.
   it(`builds a solvable ${size}x${size} board`, () => {

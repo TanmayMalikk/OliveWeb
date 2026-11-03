@@ -12,6 +12,7 @@ class SystemLanguageTest {
     @Test
     fun supportedSystemLanguagesSelectTheirDisplayNames() {
         val original = Locale.getDefault()
+        // If supported system languages select their display names fails, catch the error so the app can keep running and explain the problem.
         try {
             mapOf(
                 "fr-CA" to "French", "es-MX" to "Spanish", "ar-SA" to "Arabic",
@@ -29,6 +30,7 @@ class SystemLanguageTest {
     @Test
     fun unsupportedSystemAndLegacyAccountLanguagesFallBackToEnglish() {
         val original = Locale.getDefault()
+        // If unsupported system and legacy account languages fall back to english fails, catch the error so the app can keep running and explain the problem.
         try {
             Locale.setDefault(Locale.forLanguageTag("ja-JP"))
             assertEquals("English", AppLocaleManager.resolveSystemDefaultLanguageName())
