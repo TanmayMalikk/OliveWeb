@@ -14,6 +14,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Owns activity records and history synchronization.
 internal class SessionHistory(private val runtime: SessionRuntime) {
+    // Records settings interaction for session activity history.
     fun recordSettingsInteraction(area: String, action: String) {
         with(runtime) {
             with(state) {
@@ -32,6 +33,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session activity history: Refreshes history.
     fun refreshHistory(uid: String) {
         with(runtime) {
             with(state) {
@@ -45,6 +47,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
                         ) to purged
                     }
                     val entries = withContext(Dispatchers.IO) { store.privateEntries(uid) }
+                    // refresh history checks whether enrollment uid is uid before continuing.
                     if (enrollment?.uid == uid) {
                         settingsHistory =
                             histories.first.filter { it.area != "Privacy" && (it.area != "Olive Branch" || it.changes.isNotEmpty()) }
@@ -73,6 +76,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session activity history: returns the activity back.
     fun activityBack() {
         with(runtime) {
             with(state) {
@@ -101,6 +105,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session activity history: returns the queue history sync. It waits for the set time and cancels the timer when the feature closes.
     fun queueHistorySync() {
         with(runtime) {
             with(state) {
@@ -111,10 +116,12 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
                 historySyncJob = scope.launch {
                     delay(750.milliseconds)
                     historySyncMutex.withLock {
+                        // Session activity history: Keeps queue history sync active while enrollment? uid equals uid.
                         while (enrollment?.uid == uid) {
                             val pending = withContext(Dispatchers.IO) { store.pendingHistory(uid) }
                             if (pending.isEmpty()) break
                             for (record in pending) {
+                                // If queue history sync fails, catch the error so the app can keep running and explain the problem.
                                 try {
                                     accounts.saveHistoryRecord(
                                         AccountIdentity(uid, username),

@@ -2,6 +2,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, Eye, EyeOff, Leaf, X } from "lucide-react";
 
+// Web form elements: Shows the button view.
 export function Button({
   children,
   onClick,
@@ -29,6 +30,7 @@ export function Button({
     </button>
   );
 }
+// Web form elements: Shows the field view.
 export function Field({
   label,
   type = "text",
@@ -75,6 +77,7 @@ export function Field({
     </div>
   );
 }
+// Web form elements: Shows the modal view.
 export function Modal({
   title,
   children,
@@ -88,6 +91,7 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
+  // Update title id when information used by this screen changes.
   useEffect(() => {
     const dialog = ref.current;
     const previous = document.activeElement as HTMLElement | null;
@@ -121,6 +125,7 @@ export function Modal({
     </dialog>
   );
 }
+// Web form elements: Shows the empty view.
 export function Empty({
   title,
   children,
@@ -141,6 +146,7 @@ export function Empty({
     </div>
   );
 }
+// Web form elements: Shows the form view.
 export function Form({
   onSubmit,
   children,
@@ -162,6 +168,7 @@ export function Form({
     </form>
   );
 }
+// Shows the step progress view for web form elements.
 export function StepProgress({
   step,
   steps,

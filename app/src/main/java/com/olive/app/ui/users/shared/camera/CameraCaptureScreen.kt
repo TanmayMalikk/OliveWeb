@@ -58,6 +58,7 @@ private data class CapturedMedia(
     val ocrResult: OcrResult? = null
 )
 
+// Shared safe app camera capture screen: Checks whether low ocr confidence. It prepares the picture before the app reads or saves it.
 internal fun isLowOcrConfidence(result: OcrResult) =
     !result.success || !result.confidence.isFinite() || result.confidence !in .75f..1f
 
@@ -96,7 +97,9 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         }
     val captureFolder = remember { File(context.cacheDir, "captured-media").apply { mkdirs() } }
 
+    // Shared safe app camera capture screen: returns the new capture.
     fun newCapture(extension: String) = File(captureFolder, "${UUID.randomUUID()}.$extension")
+    // returns the accept for shared safe app camera capture screen. It prepares the picture before the app reads or saves it.
     fun accept(file: File, mime: String, name: String, kind: MediaKind, ocrResult: OcrResult? = null) {
         pendingFile = null
         viewModel.leaveCamera()
@@ -104,6 +107,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
             CapturedMedia(file, mime, name, kind, ocrResult)
     }
 
+    // returns the discard capture for shared safe app camera capture screen.
     fun discardCapture() {
         captured?.file?.delete()
         pendingFile?.delete()
@@ -120,6 +124,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     LaunchedEffect(permissionGranted, captured) {
         if (permissionGranted && captured == null) viewModel.bind(lifecycleOwner, preview)
     }
+    // Update discard capture when information used by this screen changes.
     DisposableEffect(Unit) {
         onDispose {
             viewModel.leaveCamera()
@@ -129,6 +134,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("camera_screen")) {
+        // Choose what discard capture should do for the current value.
         when {
             !permissionGranted -> CameraPermissionPrompt(
                 { permissionLauncher.launch(Manifest.permission.CAMERA) },
@@ -241,6 +247,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
                         .padding(bottom = 52.dp)
                 ) {
+                    // Choose what discard capture should do for the current value.
                     when {
                         mode == CameraMode.Photo -> {
                             val file = newCapture("jpg")
@@ -314,7 +321,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         }
     }
 }
-
+// Shows camera permission prompt for shared safe app camera capture screen.
 @Composable
 private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     Column(
@@ -329,6 +336,7 @@ private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     }
 }
 
+// This shows the camera shutter view for shared safe app camera capture screen. It fills the view with the latest details and actions.
 @Composable
 private fun CameraShutter(
     mode: CameraMode,
@@ -352,6 +360,7 @@ private fun CameraShutter(
                 CameraMode.Document -> Icons.Outlined.Description
             },
             stringResource(
+                // Choose what camera shutter should do for the current value.
                 when {
                     recording -> R.string.camera_stop_recording
                     mode == CameraMode.Photo -> R.string.camera_take_photo
@@ -363,7 +372,7 @@ private fun CameraShutter(
         )
     }
 }
-
+// Shows camera review for shared safe app camera capture screen.
 @Composable
 private fun CameraReview(
     media: CapturedMedia,

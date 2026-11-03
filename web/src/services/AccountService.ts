@@ -11,6 +11,7 @@ import { unwrapKey, wrapKey, triggerHash } from "./EncryptionService";
 import {
   emptyHistory,
   emptyProfile,
+  normalizeCover,
   signInEmail,
   purgeEntry,
   type Profile,
@@ -24,16 +25,42 @@ import {
 } from "../domain/DomainModels";
 export const cloudMode = Boolean(
   import.meta.env.VITE_FIREBASE_API_KEY &&
+  import.meta.env.VITE_FIREBASE_AUTH_DOMAIN &&
   import.meta.env.VITE_FIREBASE_PROJECT_ID &&
   import.meta.env.VITE_FIREBASE_STORAGE_BUCKET &&
   import.meta.env.VITE_FIREBASE_APP_ID,
 );
 type Cloud = typeof import("./FirebaseClient");
 let cloud: Cloud | null = null;
+// Web account service: returns the firebase.
 export async function firebase() {
   cloud ??= await import("./FirebaseClient");
   await cloud.authReady;
   return cloud;
+}
+// Tells other signed-in devices to reload account files after a profile or history write.
+export async function notifyAccountChanged(uid: string) {
+  const { db } = await firebase();
+  const { doc, setDoc, increment, serverTimestamp } = await import("firebase/firestore");
+  await setDoc(
+    doc(db, "accountSync", uid),
+    { revision: increment(1), updatedAt: serverTimestamp() },
+    { merge: true },
+  );
+}
+// Watches a private, content-free marker so changes in Storage appear on other devices.
+export async function observeAccountChanges(
+  uid: string,
+  onChange: () => void,
+  onError: (error: Error) => void,
+) {
+  const { db } = await firebase();
+  const { doc, onSnapshot } = await import("firebase/firestore");
+  return onSnapshot(
+    doc(db, "accountSync", uid),
+    () => onChange(),
+    (error) => onError(error),
+  );
 }
 export class Accounts {
   identity: Identity | null = null;
@@ -45,6 +72,7 @@ export class Accounts {
     role: Role,
     create = false,
   ) {
+    // firebase checks whether cloud mode is false before continuing.
     if (!cloudMode) {
       const result = await (create ? createLocal : loginLocal)(
         username,
@@ -58,22 +86,30 @@ export class Accounts {
       const sdk = await import("firebase/auth");
       const { httpsCallable } = await import("firebase/functions");
       let user;
+      // create is handled here by sdk.
       if (create) {
         if (role === "STAFF" || role === "ADMIN")
           throw new Error(
             "Organization accounts must be provisioned by an administrator.",
           );
+        const normalized = username.trim().toLowerCase();
+        await httpsCallable(
+          functions,
+          "createPublicAccount",
+        )({
+          username: normalized,
+          password,
+          role,
+        });
         user = (
-          await sdk.createUserWithEmailAndPassword(
+          await sdk.signInWithEmailAndPassword(
             auth,
-            signInEmail(username, role),
+            signInEmail(normalized, role),
             password,
           )
         ).user;
-        await sdk.updateProfile(user, {
-          displayName: username.trim().toLowerCase(),
-        });
       } else {
+        // A normalized error is handled here instead of closing the app.
         try {
           user = (
             await sdk.signInWithEmailAndPassword(
@@ -128,6 +164,7 @@ export class Accounts {
       };
       const db = await database;
       const saved = await db.get("accounts", `CLOUD:${user.uid}`);
+      // If saved fails, catch the error so the app can keep running and explain the problem.
       try {
         this.raw = saved
           ? await unwrapKey(password, saved.passwordKey)
@@ -145,6 +182,7 @@ export class Accounts {
   }
   async load(): Promise<{ profile: Profile | null; history: History }> {
     const { identity, raw } = this.active();
+    // Only continue with saved when cloud mode is false.
     if (!cloudMode) {
       const value = await readLocal(identity.uid, raw);
       value.history.private_entries = value.history.private_entries.map((e) =>
@@ -158,13 +196,18 @@ export class Accounts {
     const { ref, getBytes, listAll } = await import("firebase/storage");
     let profile: Profile | null = null;
     const history = emptyHistory();
+    // If history fails, catch the error so the app can keep running and explain the problem.
     try {
       const bytes = await getBytes(
         ref(storage, `accounts/${identity.uid}/profile.json`),
         65536,
       );
       const saved = JSON.parse(new TextDecoder().decode(bytes));
-      profile = { ...emptyProfile(identity.username, identity.role), ...saved };
+      profile = {
+        ...emptyProfile(identity.username, identity.role),
+        ...saved,
+        coverType: normalizeCover(saved.coverType),
+      };
       if (
         profile!.username !== identity.username ||
         profile!.role !== identity.role
@@ -221,6 +264,7 @@ export class Accounts {
       await database
     ).get("device", "current");
     let raw: Uint8Array;
+    // A enrollment error is handled here instead of closing the app.
     try {
       raw = await unwrapKey(pin, enrollment.pinKey);
     } catch {
@@ -246,6 +290,7 @@ export class Accounts {
       username: enrollment.username,
       role: enrollment.role,
     };
+    // A failures error is handled here instead of closing the app.
     try {
       const value = await readLocal(enrollment.uid, raw);
       if (!value.profile) throw new Error("Sign in again to finish setup.");
@@ -280,6 +325,7 @@ export class Accounts {
       throw new Error("Account mismatch.");
     return this.serialize(async () => {
       const { identity, raw } = this.active();
+      // Only continue with value when cloud mode.
       if (cloudMode) {
         const { storage } = await firebase();
         const { ref, uploadBytes } = await import("firebase/storage");
@@ -291,6 +337,7 @@ export class Accounts {
             customMetadata: { schemaVersion: "2", format: "pretty-json" },
           },
         );
+        await notifyAccountChanged(identity.uid);
       }
       const cache = await readLocal(identity.uid, raw);
       await writeLocal(identity.uid, raw, { ...cache, profile });
@@ -314,6 +361,7 @@ export class Accounts {
   async saveRecord(category: Category, record: Event | Entry) {
     return this.serialize(async () => {
       const { identity, raw } = this.active();
+      // cloud mode is handled here by enrollment.
       if (cloudMode) {
         const { storage } = await firebase();
         const { ref, uploadBytes } = await import("firebase/storage");
@@ -325,6 +373,7 @@ export class Accounts {
           new TextEncoder().encode(JSON.stringify(record, null, 2)),
           { contentType: "application/json" },
         );
+        await notifyAccountChanged(identity.uid);
       }
       const cache = await readLocal(identity.uid, raw);
       const records = cache.history[category] as (Event | Entry)[];

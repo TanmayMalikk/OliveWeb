@@ -174,6 +174,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
         val entries = mutableListOf<PrivateEntry>()
         for (doc in snapshot.documents) {
+            // A fetch my entries error is handled here instead of closing the app.
             try {
                 // We reuse loadAndDecryptEntry but pass the already fetched snapshot ID
                 val decryptedEntry = loadAndDecryptEntry(doc.id, currentUid)

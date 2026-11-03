@@ -17,6 +17,7 @@ import org.junit.Test
 class KeyboardVisibilityUiTest : OliveUiTestBase() {
     private var originalHardwareKeyboardImeSetting = "0"
 
+    // Starts software keyboard with hardware input for shared safe app keyboard visibility ui test. The test gives the code a clear input and checks the expected result.
     @Before
     fun showSoftwareKeyboardWithHardwareInput() {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
@@ -26,6 +27,7 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
         automation.executeShellCommand("settings put secure show_ime_with_hard_keyboard 1").close()
     }
 
+    // Shared safe app keyboard visibility ui test: Restores software keyboard setting. The test gives the code a clear input and checks the expected result.
     @After
     fun restoreSoftwareKeyboardSetting() {
         InstrumentationRegistry.getInstrumentation().uiAutomation
@@ -33,6 +35,7 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
             .close()
     }
 
+    // Shared safe app keyboard visibility ui test: returns the food and news navigation stay at the bottom while typing. The test gives the code a clear input and checks the expected result.
     @Test
     fun foodAndNewsNavigationStayAtTheBottomWhileTyping() {
         register(username = "cover_keyboard")
@@ -59,6 +62,7 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
         org.junit.Assert.assertEquals(newsBar.top, newsWithKeyboard.top, 1f)
     }
 
+    // returns the focus for shared safe app keyboard visibility ui test. The test gives the code a clear input and checks the expected result.
     private fun focus(tag: String) {
         // Request focus through semantics, then click the field so the platform creates an input connection.
         compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
@@ -91,6 +95,7 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithTag(tag).assertIsFocused()
     }
 
+    // Shared safe app keyboard visibility ui test: returns the credentials stay above keyboard when switching fields and reopening it. The test gives the code a clear input and checks the expected result.
     @Test
     fun credentialsStayAboveKeyboardWhenSwitchingFieldsAndReopeningIt() {
         openOnboarding()
@@ -110,6 +115,7 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
         assertTrue(compose.onNodeWithTag("username").fetchSemanticsNode().boundsInWindow.top >= 0)
     }
 
+    // Shared safe app keyboard visibility ui test: returns the settings and chat fields stay above the keyboard. The test gives the code a clear input and checks the expected result.
     @Test
     fun settingsAndChatFieldsStayAboveTheKeyboard() {
         register(username = "keyboard_tester")

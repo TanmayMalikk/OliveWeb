@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
+    // Session account sign in: Authenticates the account.
     fun authenticate(username: String, password: String, create: Boolean) {
         if (!canStart()) return
         if (!credentialsAreValid(username, password, create)) return
@@ -49,6 +50,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         }
     }
 
+    // Checks whether start for session account sign in.
     private fun canStart(): Boolean {
         val state = runtime.state
         return !state.busy && runtime.enrollment == null &&
@@ -104,6 +106,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         if (!usernameUnavailable && !incorrectLogin && !(create && failure is FirebaseFunctionsException)) {
             return false
         }
+        // Only continue with show credential failure when runtime epoch is session version.
         if (runtime.epoch == sessionVersion) {
             runtime.state.credentialFieldError = if (usernameUnavailable) {
                 CredentialFieldError.UsernameTaken
@@ -122,6 +125,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         return true
     }
 
+    // Loads profile for session account sign in.
     private suspend fun loadProfile(identity: AccountIdentity): UserProfile? {
         val remote = runtime.accounts.profile(identity)
         return withContext(Dispatchers.IO) {
@@ -151,6 +155,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         return true
     }
 
+    // Starts next screen for session account sign in.
     private suspend fun openNextScreen(identity: AccountIdentity, profile: UserProfile?) {
         if (profile != null && profile.role == AccountRole.SAFE_CONTACT &&
             AccountPolicy.personalProfileNeedsSetup(profile)
@@ -196,6 +201,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         state.deliveryAddress = profile.address
         runtime.screenHistory.clear()
         runtime.safePageHistory.clear()
+        // open returning non user checks whether profile role is account role safe contact before continuing.
         if (profile.role == AccountRole.SAFE_CONTACT) {
             state.page = SafePage.Home
             state.screen = SessionScreen.Safe

@@ -12,6 +12,7 @@ export default function Settings() {
   const [link, setLink] = useState<string | null>(null);
   const [confirmRotation, setConfirmRotation] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Update p when information used by this screen changes.
   useEffect(() => {
     let live = true;
     void savedEntryLink(accounts.identity!.uid)

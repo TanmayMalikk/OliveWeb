@@ -26,21 +26,26 @@ export interface FlightWorld {
   branches: Branch[];
   over: boolean;
 }
+// Web olive-flight ts cover: Checks whether score. It uses the current cover data to update what the user sees.
 const validScore = (score: number) =>
   Number.isFinite(score) ? Math.max(0, Math.floor(score)) : 0;
+// Web olive-flight ts cover: Checks whether random. It uses the current cover data to update what the user sees.
 const validRandom = (random: () => number) => {
   const value = random();
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
 };
+// Web olive-flight ts cover: returns the flight speed multiplier. It uses the current cover data to update what the user sees.
 export function flightSpeedMultiplier(score: number) {
   return Math.min(7.5, 1 + Math.floor(validScore(score) / 2) / 10);
 }
+// Web olive-flight ts cover: returns the flight gap. It uses the current cover data to update what the user sees.
 export function flightGap(score: number) {
   // The rounded branch tips extend half a stroke into each end of the gap.
   // Keep the visible opening at least two complete olive bodies tall.
   const minimumGap = FLIGHT.radiusY * 4 + FLIGHT.branchStroke;
   return Math.max(minimumGap, FLIGHT.gap - Math.floor(validScore(score) / 10) * 8);
 }
+// Web olive-flight ts cover: returns the new flight. It uses the current cover data to update what the user sees.
 export function newFlight(
   width: number = FLIGHT.width,
   random: () => number = () => 0.5,
@@ -68,12 +73,15 @@ export const leafPaths = [
   "M0 3 Q-24 8 -25 28 Q-5 26 0 3",
   "M0 9 Q24 12 25 33 Q5 29 0 9",
 ];
+// Web olive-flight ts cover: returns the branch path.
 export function branchPath(height: number) {
   return `M27 0 Q17 ${height * 0.36} 29 ${height}`;
 }
+// Web olive-flight ts cover: returns the olive angle. It uses the current cover data to update what the user sees.
 export function oliveAngle(velocity: number) {
   return Math.max(-25, Math.min(55, velocity / 9));
 }
+// Web olive-flight ts cover: returns the quadratic. It uses the current cover data to update what the user sees.
 function quadratic(a: Point, control: Point, b: Point, count = 12): Point[] {
   return Array.from({ length: count + 1 }, (_, index) => {
     const t = index / count,
@@ -106,6 +114,7 @@ function bodyHitsPolygon(points: Point[], oliveY: number, velocity: number) {
     return { x: (x * cos + y * sin) / 13, y: (-x * sin + y * cos) / 17 };
   });
   let inside = false;
+  // Web olive-flight ts cover: returns the i. It uses the current cover data to update what the user sees.
   for (let i = 0, j = local.length - 1; i < local.length; j = i++) {
     const a = local[j],
       b = local[i];
@@ -121,6 +130,7 @@ function bodyHitsPolygon(points: Point[], oliveY: number, velocity: number) {
   }
   return inside;
 }
+// Web olive-flight ts cover: returns the hits leafy branch.
 export function hitsLeafyBranch(
   x: number,
   end: number,
@@ -131,6 +141,7 @@ export function hitsLeafyBranch(
   if (x > FLIGHT.oliveX + 20 || x + 54 < FLIGHT.oliveX - 20) return false;
   const height = down ? end : FLIGHT.height - end;
   const direction = down ? -1 : 1;
+  // Web olive-flight ts cover: returns the hit.
   const hit = (points: Point[]) =>
     bodyHitsPolygon(
       points.map((p) => ({ x: x + p.x, y: end + direction * p.y })),
@@ -144,6 +155,7 @@ export function hitsLeafyBranch(
     { x: 29, y: height },
     24,
   );
+  // returns the i for web olive-flight ts cover.
   for (let i = 0; i < stem.length; i++) {
     const a = stem[i];
     if (
@@ -155,6 +167,7 @@ export function hitsLeafyBranch(
       )
     )
       return true;
+    // a checks whether i before continuing.
     if (i) {
       const b = stem[i - 1],
         length = Math.hypot(a.x - b.x, a.y - b.y);
@@ -178,6 +191,7 @@ export function hitsLeafyBranch(
   }
   return false;
 }
+// returns the advance flight for web olive-flight ts cover.
 export function advanceFlight(
   world: FlightWorld,
   seconds: number,

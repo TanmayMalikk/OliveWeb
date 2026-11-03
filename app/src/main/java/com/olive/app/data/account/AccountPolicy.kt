@@ -7,6 +7,7 @@ enum class AccountSetupStep { PersonalProfile, PrivateTrigger, DevicePin, Organi
 
 // Account rules stay pure here so sign-in aliases and first-login routing can be unit tested without Firebase.
 object AccountPolicy {
+    // Account: Converts a username into its sign-in email.
     fun signInEmail(identifier: String, role: AccountRole): String {
         val value = identifier.trim()
         if (role in setOf(
@@ -23,16 +24,20 @@ object AccountPolicy {
         return "${InputPolicy.username(value)}@$domain"
     }
 
+    // Account: returns the legacy user email.
     fun legacyUserEmail(username: String) = "${InputPolicy.username(username)}@users.olive.invalid"
 
+    // Account: returns the personal profile needs setup.
     fun personalProfileNeedsSetup(value: UserProfile) =
         value.fullName.isBlank() || !InputPolicy.validDob(value.dob) ||
                 value.language.isBlank() || !value.address.locationValid
 
+    // Account: returns the organization profile needs setup.
     fun organizationProfileNeedsSetup(value: UserProfile) =
         value.fullName.isBlank() || !InputPolicy.validDob(value.dob) ||
                 value.email.isBlank() || value.email.endsWith(".olive.invalid", true)
 
+    // Finds the next setup for account.
     fun nextSetup(profile: UserProfile?, role: AccountRole): AccountSetupStep {
         if (profile == null) return if (role in setOf(
                 AccountRole.STAFF,

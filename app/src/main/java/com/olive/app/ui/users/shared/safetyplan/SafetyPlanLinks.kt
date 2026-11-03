@@ -58,9 +58,11 @@ internal fun safetyDefaults(context: Context): Map<String, String> = buildMap {
     }
 }
 
+// returns the safety document suggestions for shared safe app safety plan links. It reads or saves the correct part of the user's protected safety plan.
 private fun safetyDocumentSuggestions(context: Context) =
     context.resources.getStringArray(R.array.safety_document_checklist).toList()
 
+// returns the safety section label for shared safe app safety plan links.
 internal fun safetySectionLabel(section: String) = when (section) {
     "destination" -> R.string.safety_destination
     "travel" -> R.string.safety_travel
@@ -72,6 +74,7 @@ internal fun safetySectionLabel(section: String) = when (section) {
     else -> R.string.safety_aftercare
 }
 
+// returns the safety section hint for shared safe app safety plan links.
 internal fun safetySectionHint(section: String) = when (section) {
     "destination" -> R.string.safety_destination_hint
     "travel" -> R.string.safety_travel_hint
@@ -112,6 +115,7 @@ internal fun TrustedContactLinkPicker(
                 Icon(Icons.Outlined.Link, null)
                 Spacer(Modifier.width(8.dp))
                 Text(
+                    // Choose what trusted contact link picker should do for the current value.
                     when {
                         selected != null -> stringResource(
                             R.string.trusted_link_to,

@@ -49,6 +49,7 @@ import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 
+// This shows the settings editor view for user settings screen. It fills the view with the latest details and actions.
 @Composable
 internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
@@ -68,6 +69,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     FormColumn {
         SafeBack(session)
         Heading(uiText(R.string.settings), uiText(R.string.ui_update_your_profile_details))
+        // user role is handled here by settings editor.
         if (userRole) {
             // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
             CoverPicker(
@@ -91,6 +93,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     "Focused full name"
                 )
             }) { fullName = it.take(120) }
+        // user role is handled here by settings editor.
         if (userRole) {
             Field(
                 uiText(R.string.names_of_people_experiencing_abuse_optional),
@@ -211,6 +214,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                 stringResource(R.string.change_password)
             )
         }
+        // Only continue with settings editor when user role.
         if (userRole) {
             HorizontalDivider()
             SafeEntrySettings(session)
@@ -310,6 +314,7 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
                 .semantics { this.selected = isSelected },
         ) {
             Icon(
+                // Choose what cover picker should do for the current value.
                 when (type) {
                     CoverType.FOOD -> Icons.Outlined.LocalDining
                     CoverType.NEWS -> Icons.Outlined.Newspaper

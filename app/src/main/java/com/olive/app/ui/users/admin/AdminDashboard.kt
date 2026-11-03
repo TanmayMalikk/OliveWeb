@@ -39,6 +39,7 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 private enum class AdminPage { Dashboard, Accounts, Settings, Map, SafetyPlans, Messages }
 
+// admin dashboard shows this admin portal view so the user can view its details and use its actions.
 @Composable
 internal fun AdminPortal(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -47,6 +48,7 @@ internal fun AdminPortal(session: SessionViewModel) {
     var createOpen by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<AdminAccountSummary?>(null) }
     BackHandler(enabled = page != AdminPage.Dashboard) { page = AdminPage.Dashboard }
+    // Choose what admin portal should do for the current value.
     when (page) {
         AdminPage.Dashboard -> AdminDashboard(
             session,
@@ -71,6 +73,7 @@ internal fun AdminPortal(session: SessionViewModel) {
         AdminPage.Messages -> MessagesScreen(session, exit = { page = AdminPage.Dashboard })
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
+    // create open create account dialog session, on dismiss = create open = false is handled here by admin portal.
     if (createOpen) CreateAccountDialog(session, onDismiss = { createOpen = false })
     deleteTarget?.let { account ->
         AlertDialog(
@@ -94,7 +97,7 @@ internal fun AdminPortal(session: SessionViewModel) {
         )
     }
 }
-
+// Shows admin dashboard for admin dashboard.
 @Composable
 private fun AdminDashboard(
     session: SessionViewModel,

@@ -18,6 +18,7 @@ class SafetyDocumentViewerUiTest {
     @get:Rule
     val compose = createOliveComposeRule()
 
+    // returns the image opens inside private viewer for user safety document viewer ui test. The test gives the code a clear input and checks the expected result.
     @Test
     fun imageOpensInsidePrivateViewer() {
         val file = File(compose.activity.cacheDir, "viewer-test.png")
