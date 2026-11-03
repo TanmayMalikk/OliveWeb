@@ -79,6 +79,15 @@ class OutgoingMessageModelsTest {
         assertTrue(retryable.none(::isPermanentMessageFailure))
     }
 
+    @Test
+    fun `drain work names are stable per account conversation pair`() {
+        val expected = MessageSendWorker.workName("owner", "conversation")
+
+        assertEquals(expected, MessageSendWorker.workName("owner", "conversation"))
+        assertFalse(expected == MessageSendWorker.workName("owner", "another-conversation"))
+        assertFalse(expected == MessageSendWorker.workName("another-owner", "conversation"))
+    }
+
     private fun outgoing(id: String, status: MessageDeliveryStatus, attempts: Int) = OutgoingMessage(
         id = id,
         ownerUid = "owner",
@@ -86,6 +95,7 @@ class OutgoingMessageModelsTest {
         senderUsername = "alice",
         ciphertext = "ciphertext-$id",
         clientSentAt = attempts.toLong(),
+        clientSequence = attempts.toLong() + 1,
         status = status,
         attemptCount = attempts,
         failureCode = if (status.name.startsWith("FAILED")) "TEST_FAILURE" else null,

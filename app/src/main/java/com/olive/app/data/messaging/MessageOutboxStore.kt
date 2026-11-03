@@ -27,22 +27,62 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
 
     fun get(id: String): OutgoingMessage? {
         val accounts = vault.read().optJSONObject(ACCOUNTS) ?: return null
-        return accounts.keys().asSequence().mapNotNull { uid ->
-            accounts.optJSONObject(uid)?.optJSONObject(MESSAGES)?.optJSONObject(id)
-        }.mapNotNull(::safeMessage).firstOrNull()
+        val owner = accounts.keys().asSequence().firstOrNull { uid ->
+            accounts.optJSONObject(uid)?.optJSONObject(MESSAGES)?.has(id) == true
+        } ?: return null
+        return all(owner).firstOrNull { it.id == id }
     }
 
     fun all(ownerUid: String): List<OutgoingMessage> {
-        val messages = vault.read().optJSONObject(ACCOUNTS)?.optJSONObject(ownerUid)
-            ?.optJSONObject(MESSAGES) ?: return emptyList()
-        return messages.keys().asSequence().mapNotNull { id ->
-            messages.optJSONObject(id)?.let(::safeMessage)
-        }.sortedWith(compareBy(OutgoingMessage::clientSentAt, OutgoingMessage::id)).toList()
+        var result = readMessages(ownerUid)
+        if (result.any { it.clientSequence == 0L }) {
+            vault.update { root ->
+                root.optJSONObject(ACCOUNTS)?.optJSONObject(ownerUid)?.let(::migrateAccount)
+            }
+            result = readMessages(ownerUid)
+        }
+        return result.sortedWith(
+            compareBy(
+                OutgoingMessage::conversationId,
+                OutgoingMessage::clientSequence,
+                OutgoingMessage::clientSentAt,
+                OutgoingMessage::id,
+            )
+        )
     }
 
-    fun write(message: OutgoingMessage) {
-        vault.update { root -> messages(root, message.ownerUid).put(message.id, message.toJson()) }
+    /** Assigns and persists the next sequence atomically with the ciphertext record. */
+    fun write(message: OutgoingMessage): OutgoingMessage {
+        var persisted: OutgoingMessage? = null
+        vault.update { root ->
+            val account = account(root, message.ownerUid)
+            migrateAccount(account)
+            val collection = messages(account)
+            collection.optJSONObject(message.id)?.let { existingJson ->
+                val existing = OutgoingMessage.fromJson(existingJson)
+                require(
+                    existing.ownerUid == message.ownerUid &&
+                            existing.conversationId == message.conversationId &&
+                            existing.ciphertext == message.ciphertext
+                ) { "A queued message id cannot identify different ciphertext" }
+                persisted = existing
+                return@update
+            }
+            val counters = counters(account)
+            val previous = counters.optLong(message.conversationId, 0)
+            val sequence = if (message.clientSequence > 0) {
+                require(message.clientSequence > previous) { "Message sequence must increase" }
+                message.clientSequence
+            } else {
+                previous + 1
+            }
+            val sequenced = message.copy(clientSequence = sequence)
+            counters.put(message.conversationId, sequence)
+            collection.put(sequenced.id, sequenced.toJson())
+            persisted = sequenced
+        }
         changes.tryEmit(message.ownerUid)
+        return checkNotNull(persisted)
     }
 
     fun update(id: String, change: (OutgoingMessage) -> OutgoingMessage): OutgoingMessage {
@@ -52,16 +92,38 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
             val owner = accounts.keys().asSequence().firstOrNull { uid ->
                 accounts.optJSONObject(uid)?.optJSONObject(MESSAGES)?.has(id) == true
             } ?: error("Outgoing message was not found")
-            val collection = accounts.getJSONObject(owner).getJSONObject(MESSAGES)
+            val account = accounts.getJSONObject(owner)
+            migrateAccount(account)
+            val collection = account.getJSONObject(MESSAGES)
             val current = OutgoingMessage.fromJson(collection.getJSONObject(id))
             val updated = change(current)
-            require(updated.id == current.id && updated.ownerUid == current.ownerUid)
+            require(
+                updated.id == current.id && updated.ownerUid == current.ownerUid &&
+                        updated.conversationId == current.conversationId &&
+                        updated.clientSequence == current.clientSequence
+            )
             result = updated
             collection.put(id, updated.toJson())
         }
         changes.tryEmit(checkNotNull(result).ownerUid)
         return checkNotNull(result)
     }
+
+    /** The first unresolved message is a hard barrier for every later sequence. */
+    fun head(ownerUid: String, conversationId: String): OutgoingMessage? = all(ownerUid)
+        .asSequence()
+        .filter { it.conversationId == conversationId && it.status != MessageDeliveryStatus.SENT }
+        .minByOrNull(OutgoingMessage::clientSequence)
+
+    fun drainableConversationIds(ownerUid: String): Set<String> = all(ownerUid)
+        .asSequence()
+        .filter { it.status != MessageDeliveryStatus.SENT }
+        .groupBy(OutgoingMessage::conversationId)
+        .mapNotNullTo(linkedSetOf()) { (conversationId, messages) ->
+            messages.minByOrNull(OutgoingMessage::clientSequence)
+                ?.takeUnless { it.status == MessageDeliveryStatus.FAILED_PERMANENT }
+                ?.let { conversationId }
+        }
 
     fun remove(ownerUid: String, id: String) {
         vault.update { root ->
@@ -82,10 +144,45 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
         .map { all(ownerUid) }
         .onStart { emit(all(ownerUid)) }
 
-    private fun messages(root: JSONObject, ownerUid: String): JSONObject {
+    private fun account(root: JSONObject, ownerUid: String): JSONObject {
         val accounts = root.optJSONObject(ACCOUNTS) ?: JSONObject().also { root.put(ACCOUNTS, it) }
-        val account = accounts.optJSONObject(ownerUid) ?: JSONObject().also { accounts.put(ownerUid, it) }
-        return account.optJSONObject(MESSAGES) ?: JSONObject().also { account.put(MESSAGES, it) }
+        return accounts.optJSONObject(ownerUid) ?: JSONObject().also { accounts.put(ownerUid, it) }
+    }
+
+    private fun messages(account: JSONObject): JSONObject =
+        account.optJSONObject(MESSAGES) ?: JSONObject().also { account.put(MESSAGES, it) }
+
+    private fun counters(account: JSONObject): JSONObject =
+        account.optJSONObject(SEQUENCES) ?: JSONObject().also { account.put(SEQUENCES, it) }
+
+    private fun readMessages(ownerUid: String): List<OutgoingMessage> {
+        val messages = vault.read().optJSONObject(ACCOUNTS)?.optJSONObject(ownerUid)
+            ?.optJSONObject(MESSAGES) ?: return emptyList()
+        return messages.keys().asSequence().mapNotNull { id ->
+            messages.optJSONObject(id)?.let(::safeMessage)
+        }.toList()
+    }
+
+    /** Gives records written by the previous schema a deterministic order before new sends. */
+    private fun migrateAccount(account: JSONObject) {
+        val messages = messages(account)
+        val counters = counters(account)
+        val records = messages.keys().asSequence().mapNotNull { id ->
+            messages.optJSONObject(id)?.let(::safeMessage)
+        }.groupBy(OutgoingMessage::conversationId)
+        records.forEach { (conversationId, conversationMessages) ->
+            var sequence = maxOf(
+                counters.optLong(conversationId, 0),
+                conversationMessages.maxOfOrNull(OutgoingMessage::clientSequence) ?: 0,
+            )
+            conversationMessages.filter { it.clientSequence == 0L }
+                .sortedWith(compareBy(OutgoingMessage::clientSentAt, OutgoingMessage::id))
+                .forEach { legacy ->
+                    sequence += 1
+                    messages.put(legacy.id, legacy.copy(clientSequence = sequence).toJson())
+                }
+            counters.put(conversationId, sequence)
+        }
     }
 
     private fun safeMessage(value: JSONObject) = runCatching { OutgoingMessage.fromJson(value) }.getOrNull()
@@ -93,6 +190,7 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
     private companion object {
         const val ACCOUNTS = "accounts"
         const val MESSAGES = "messages"
+        const val SEQUENCES = "lastClientSequences"
         val changes = MutableSharedFlow<String>(extraBufferCapacity = 32)
     }
 }
