@@ -27,6 +27,7 @@ class LocationMapMotionUiTest {
     @get:Rule
     val compose = createOliveComposeRule()
 
+    // Checks the marker and trail update without recreating map step with the test's sample data.
     @Test
     fun markerAndTrailUpdateWithoutRecreatingMap() {
         val started = System.currentTimeMillis()
@@ -98,8 +99,10 @@ class LocationMapMotionUiTest {
         assertTrue(lastKnown.contains("\\\"animation\\\":\\\"none\\\""))
     }
 
+    // Checks the web view step with the test's sample data.
     private fun webView(): WebView? = findWebView(compose.activity.window.decorView)
 
+    // Finds the web view needed by this test.
     private fun findWebView(view: View): WebView? {
         if (view is WebView) return view
         if (view is ViewGroup) for (index in 0 until view.childCount) findWebView(
@@ -110,6 +113,7 @@ class LocationMapMotionUiTest {
         return null
     }
 
+    // Checks the evaluate step with the test's sample data.
     private fun evaluate(script: String): String {
         val latch = CountDownLatch(1)
         var result = ""
@@ -124,6 +128,7 @@ class LocationMapMotionUiTest {
         return result
     }
 
+    // Checks the wait for java script step with the test's sample data.
     private fun waitForJavaScript(condition: String) {
         val deadline = System.currentTimeMillis() + 8_000L
         while (System.currentTimeMillis() < deadline) {

@@ -202,6 +202,7 @@ internal fun DishDetailsScreen(dish: Dish, vm: OliveViewModel) {
     }
 }
 
+// Finds a bundled dish photo when the food item has no remote image.
 private fun localDishPhoto(id: String) = when (id) {
     "bowl" -> R.drawable.menu_bowl
     "bowl2" -> R.drawable.menu_bowl2
@@ -265,6 +266,7 @@ private fun FoodArt(kind: String, modifier: Modifier = Modifier) {
         drawCircle(Color(0xFF253322).copy(alpha = .10f), s * .42f, c + Offset(4f, 9f))
         drawCircle(Color(0xFFFFFDF4), s * .42f, c)
         drawCircle(Color(0xFFE6E3D6), s * .36f, c, style = Stroke(s * .007f))
+        // Chooses the matching bundled art for this food item.
         when (kind) {
             "pizza" -> {
                 drawCircle(Color(0xFFDCA252), s * .33f, c)
@@ -279,6 +281,7 @@ private fun FoodArt(kind: String, modifier: Modifier = Modifier) {
 
             "burger" -> {
                 val left = c.x - s * .28f
+                // Draws one visual layer of the bundled food illustration.
                 fun layer(y: Float, h: Float, color: Color) = drawRoundRect(
                     color,
                     Offset(left, c.y + s * y),

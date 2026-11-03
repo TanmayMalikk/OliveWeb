@@ -82,7 +82,7 @@ const accounts = [
     email: "demoadmin@yourolivebranch.ca", protected: true,
   },
   {
-    username: "demotrusted", role: "SAFE_CONTACT", fullName: "Demo Trusted",
+    username: "demosafe", role: "SAFE_CONTACT", fullName: "Demo Safe Contact",
     email: "", protected: false,
   },
   {

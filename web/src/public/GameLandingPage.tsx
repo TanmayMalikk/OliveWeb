@@ -20,6 +20,7 @@ export const coverIcons = {
   FITNESS: Dumbbell,
   GAME: Gamepad2,
 };
+// Shows a playable preview of the selected web game cover.
 export function CoverPreview({ cover }: { cover: Cover }) {
   return (
     <div

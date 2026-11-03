@@ -9,6 +9,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsFlowTest : OliveUiTestBase() {
+    // Checks the settings preserve language without apicker and keep trigger and address working step with the test's sample data.
     @Test
     fun settingsPreserveLanguageWithoutAPickerAndKeepTriggerAndAddressWorking() {
         register("1234", username = "settings_tester")

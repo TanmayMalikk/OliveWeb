@@ -53,6 +53,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
     private val repository:MediaTicketDataSource=MediaRepository()
     private val client=OkHttpClient.Builder().retryOnConnectionFailure(true).build()
 
+    // Uploads one encrypted file in the background and saves its cloud record.
     override suspend fun doWork():Result {
         // WorkManager input contains only the durable job id; sensitive state is loaded from the vault.
         val jobId=inputData.getString(JOB_ID) ?: return Result.failure()
@@ -68,6 +69,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         val file=File(job.source.filePath)
         if(!file.isFile || file.length()!=job.source.ciphertextSize) return permanent(job,"Encrypted upload staging file is missing")
         return try {
+            // Stop a damaged upload job that has no media ID.
             if(job.mediaId.isBlank()) {
                 // Session creation is idempotent by job id. Persist the response before any PUT so a
                 // process death cannot create a second R2 object for the same local job.
@@ -87,6 +89,10 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             file.delete()
             Result.success(workDataOf(MEDIA_ID to record.id))
         } catch(cancelled:CancellationException) { throw cancelled }
+        catch(error:MediaDeviceVerificationException) {
+            Log.e("OliveMediaUpload", "App Check rejected encrypted upload ${job.id}", error)
+            permanent(job,error.message ?: "This app installation is not authorized for encrypted uploads")
+        }
         catch(error:FirebaseFunctionsException) {
             Log.e("OliveMediaUpload", "Firebase rejected encrypted upload ${job.id}", error)
             if(error.code in setOf(FirebaseFunctionsException.Code.INVALID_ARGUMENT,FirebaseFunctionsException.Code.PERMISSION_DENIED,
@@ -100,6 +106,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         }
     }
 
+    // Media: Uploads the selected file.
     private suspend fun upload(file:File,initial:MediaUploadJob):List<MediaCompletedPart> {
         // The server chooses the strategy: a single PUT uses the whole file as part one; multipart
         // uses the server-returned part size so client and R2 boundaries cannot diverge.
@@ -123,6 +130,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         return job.completedParts.entries.sortedBy { it.key }.map { MediaCompletedPart(it.key,it.value) }
     }
 
+    // Uploads one encrypted file section and reports its byte progress.
     private suspend fun put(ticket:MediaUploadTicket,file:File,offset:Long,length:Long,onProgress:(Long)->Unit):String {
         // FileSliceRequestBody prevents loading a large encrypted object or part into memory.
         val body=FileSliceRequestBody(file,offset,length,onProgress)
@@ -135,11 +143,13 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         }
     }
 
+    // Separates upload errors that can be retried from errors that need user action.
     private fun permanent(job:MediaUploadJob,message:String):Result {
         // A permanent result requires explicit user/app intervention rather than automatic backoff.
         store.write(job.copy(status=MediaTransferStatus.FAILED,error=message.take(240)))
         return Result.failure(workDataOf(ERROR to message.take(240)))
     }
+    // Saves the upload error and asks WorkManager to retry after a delay.
     private fun retry(job:MediaUploadJob,error:Exception):Result {
         // WorkManager keeps the same unique work chain and applies the configured exponential delay.
         store.write(job.copy(status=MediaTransferStatus.QUEUED,error=error.localizedMessage?.take(240)))
@@ -176,8 +186,11 @@ private class FileSliceRequestBody(
     private val file:File,private val offset:Long,private val length:Long,
     private val onProgress:(Long)->Unit,
 ):RequestBody() {
+    // Reads the encrypted upload response content type.
     override fun contentType()="application/octet-stream".toMediaType()
+    // Reads the encrypted upload response size.
     override fun contentLength()=length
+    // Streams encrypted upload bytes to the remote request body.
     override fun writeTo(sink:BufferedSink) {
         file.inputStream().use { input ->
             // The file is ciphertext, so seeking/re-reading a part cannot expose plaintext.
@@ -190,7 +203,9 @@ private class FileSliceRequestBody(
             val buffer = ByteArray(64 * 1024)
             var remaining = length
             var sent = 0L
+            // Turn an unexpected write to failure into a readable message.
             try {
+                // Media: Keeps write to active while remaining>0.
                 while(remaining>0) {
                     val count=input.read(buffer,0,minOf(buffer.size.toLong(),remaining).toInt())
                     if(count<0) throw IOException("Encrypted upload ended early")
@@ -206,7 +221,9 @@ private class FileSliceRequestBody(
 private suspend fun Call.await():Response=suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { cancel() }
     enqueue(object:Callback {
+        // Turns an R2 upload failure into a clear media-upload result.
         override fun onFailure(call:Call,e:IOException) { if(continuation.isActive) continuation.resumeWithException(e) }
+        // Reads the R2 upload response and confirms that the encrypted file was accepted.
         override fun onResponse(call:Call,response:Response) { if(continuation.isActive) continuation.resume(response) else response.close() }
     })
 }

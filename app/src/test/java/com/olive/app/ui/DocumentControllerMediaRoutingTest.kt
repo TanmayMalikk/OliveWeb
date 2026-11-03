@@ -72,6 +72,7 @@ class DocumentControllerMediaRoutingTest {
         assertEquals(null, media.downloadedDocumentId)
     }
 
+    // Builds a sample document for this test.
     private fun document(objectKey: String) = SafetyDocument(
         id = "document-id",
         ownerUid = "owner",
@@ -88,27 +89,42 @@ class DocumentControllerMediaRoutingTest {
     ) : SafetyDocumentDataSource {
         var downloadCalled = false
 
+        // Checks the list for step with the test's sample data.
         override suspend fun listFor(uid: String) = listOf(document)
+        // Checks the observe for step with the test's sample data.
         override fun observeFor(
             uid: String,
             onUpdate: (List<SafetyDocument>) -> Unit,
             onError: (String) -> Unit,
         ) = ChatSubscription {}
+        // Checks the get for step with the test's sample data.
         override suspend fun getFor(uid: String, id: String) = document
+        // Checks the share step with the test's sample data.
         override suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>) = Unit
+        // Checks the delete step with the test's sample data.
         override suspend fun delete(document: SafetyDocument, ownerUid: String) = Unit
+        // Checks the download step with the test's sample data.
         override suspend fun download(context: Context, document: SafetyDocument): File {
             downloadCalled = true
             return file
         }
+        // Checks the approve current account devices step with the test's sample data.
+        override suspend fun approveCurrentAccountDevices(
+            document: SafetyDocument,
+            currentUid: String,
+            username: String,
+        ) = Unit
     }
 
     private class FakeMediaTransfers(private val file: File) : MediaTransferOperations {
         var downloadedDocumentId: String? = null
         var viewerUid: String? = null
 
+        // Checks the observe uploads step with the test's sample data.
         override fun observeUploads(ownerUid: String) = Unit
+        // Checks the acknowledge published step with the test's sample data.
         override fun acknowledgePublished(mediaIds: Set<String>) = Unit
+        // Checks the queue document step with the test's sample data.
         override fun queueDocument(
             uri: Uri,
             owner: AccountIdentity,
@@ -116,6 +132,7 @@ class DocumentControllerMediaRoutingTest {
             onQueued: (String) -> Unit,
             onFailure: (String) -> Unit,
         ) = Unit
+        // Checks the queue file step with the test's sample data.
         override fun queueFile(
             file: File,
             name: String,
@@ -127,11 +144,13 @@ class DocumentControllerMediaRoutingTest {
             onQueued: (String) -> Unit,
             onFailure: (String) -> Unit,
         ) = Unit
+        // Checks the download file step with the test's sample data.
         override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File {
             downloadedDocumentId = document.id
             this.viewerUid = viewerUid
             return file
         }
+        // Checks the clear state step with the test's sample data.
         override fun clearState() = Unit
     }
 

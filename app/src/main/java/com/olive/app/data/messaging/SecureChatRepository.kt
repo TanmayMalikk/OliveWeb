@@ -7,6 +7,7 @@ import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
 import java.security.PublicKey
+import java.security.spec.MGF1ParameterSpec
 import javax.crypto.SecretKey
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
@@ -14,7 +15,10 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     // Opens the copy of an existing room key that was encrypted for this account.
     suspend fun existingRoomKey(conversationId: String, currentUid: String): SecretKey? {
         val snapshot = firestore.collection("conversations").document(conversationId).get().await()
-        val wrappedKey = snapshot.roomKeys().orEmpty()[currentUid] ?: return null
+        val deviceId = KeyManager.deviceId()
+        val deviceKey = snapshot.reference.collection("deviceKeys")
+            .document("$currentUid--$deviceId").get().await().getString("wrappedKey")
+        val wrappedKey = deviceKey ?: snapshot.roomKeys().orEmpty()[currentUid] ?: return null
         return KeyManager.unwrapKey(wrappedKey)
     }
 
@@ -68,9 +72,47 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                 }
             }
         }.await()
-        return KeyManager.unwrapKey(selected)
+        val roomKey = KeyManager.unwrapKey(selected)
+        shareWithRegisteredDevices(conversation, roomKey)
+        return roomKey
     }
 
+    // Secure messaging: gives each registered phone or browser its own wrapped copy of the room key.
+    private suspend fun shareWithRegisteredDevices(
+        conversation: ChatConversation,
+        roomKey: SecretKey
+    ) {
+        val conversationRef = firestore.collection("conversations").document(conversation.id)
+        val batch = firestore.batch()
+        var writes = 0
+        conversation.participantIds.forEach { uid ->
+            val username = conversation.participantUsernames[uid] ?: return@forEach
+            val devices = firestore.collection("messageDirectory").document(username)
+                .collection("devices").get().await()
+            devices.documents.forEach { device ->
+                val deviceId = device.getString("deviceId") ?: return@forEach
+                val encoded = device.getString("publicKey") ?: return@forEach
+                val publicKey = runCatching { KeyManager.decodePublicKey(encoded) }.getOrNull()
+                    ?: return@forEach
+                val digest = if (device.getString("mgf1Digest") == "SHA-256")
+                    MGF1ParameterSpec.SHA256 else MGF1ParameterSpec.SHA1
+                batch.set(
+                    conversationRef.collection("deviceKeys").document("$uid--$deviceId"),
+                    mapOf(
+                        "uid" to uid,
+                        "deviceId" to deviceId,
+                        "publicKey" to encoded,
+                        "wrappedKey" to KeyManager.wrapKey(roomKey, publicKey, digest),
+                        "updatedAt" to FieldValue.serverTimestamp(),
+                    )
+                )
+                writes++
+            }
+        }
+        if (writes > 0) batch.commit().await()
+    }
+
+    // Encrypts and sends one chat message to every current participant.
     suspend fun send(
         conversationId: String,
         sender: AccountIdentity,
@@ -138,6 +180,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         return ChatSubscription { listener.remove() }
     }
 
+    // Removes  from secure messaging.
     suspend fun unsend(conversationId: String, message: ChatMessage, currentUid: String) {
         require(message.senderUid == currentUid && !message.unsent)
         val conversation = firestore.collection("conversations").document(conversationId)
@@ -159,10 +202,12 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         }.await()
     }
 
+    // Loads and unwraps the room key used to decrypt this conversation.
     @Suppress("UNCHECKED_CAST")
     private fun com.google.firebase.firestore.DocumentSnapshot.roomKeys() =
         get("roomKeys") as? Map<String, String>
 
+    // Loads each participant's public key before sharing a room key.
     @Suppress("UNCHECKED_CAST")
     private fun com.google.firebase.firestore.DocumentSnapshot.participantPublicKeys() =
         get("participantPublicKeys") as? Map<String, String>

@@ -13,11 +13,13 @@ class CoverFlowTest {
     @get:Rule
     val compose = createOliveComposeRule()
 
+    // Checks the show cover step with the test's sample data.
     @Before
     fun showCover() {
         compose.runOnIdle { compose.activity.setContent { OliveTheme { OliveCover() } } }
     }
 
+    // Checks the search filters and clears step with the test's sample data.
     @Test
     fun searchFiltersAndClears() {
         compose.onNodeWithTag("cover_brand_food").assertIsDisplayed()
@@ -27,6 +29,7 @@ class CoverFlowTest {
         compose.onNodeWithText("Made for your cravings").assertExists()
     }
 
+    // Checks the cart removal works step with the test's sample data.
     @Test
     fun cartRemovalWorks() {
         compose.onNodeWithText("Garden harvest bowl").performClick()
@@ -37,6 +40,7 @@ class CoverFlowTest {
         compose.onNodeWithText("Something delicious belongs here").assertExists()
     }
 
+    // Checks the saved dishes can be removed step with the test's sample data.
     @Test
     fun savedDishesCanBeRemoved() {
         compose.onNodeWithText("Garden harvest bowl").performClick()

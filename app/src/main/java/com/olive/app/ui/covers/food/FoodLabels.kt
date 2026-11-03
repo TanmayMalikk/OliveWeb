@@ -204,21 +204,27 @@ private val ingredientLabels = mapOf(
     "Herbs" to R.string.ui_herbs,
 )
 
+// Returns the translated name for a menu dish.
 internal fun ResourceText.dishName(dish: Dish) =
     dishLabels[dish.id]?.let { this(it.name) } ?: dish.name
 
+// Returns the translated description for a menu dish.
 internal fun ResourceText.dishDescription(dish: Dish) =
     dishLabels[dish.id]?.let { this(it.description) } ?: dish.description
 
+// Returns the translated category for a menu dish.
 internal fun ResourceText.dishCategory(dish: Dish) =
     dishLabels[dish.id]?.let { this(it.category) } ?: dish.category
 
+// Returns the translated restaurant name for a menu dish.
 internal fun ResourceText.dishRestaurant(dish: Dish) =
     dishLabels[dish.id]?.let { this(it.restaurant) } ?: dish.restaurant
 
+// Returns the translated name for one food ingredient.
 internal fun ResourceText.ingredient(value: String) =
     ingredientLabels[value]?.let { this(it) } ?: value
 
+// Returns the translated label for a menu filter.
 internal fun ResourceText.foodFilter(value: String) = when (value) {
     "All" -> this(R.string.all)
     "Vegetarian" -> this(R.string.vegetarian)

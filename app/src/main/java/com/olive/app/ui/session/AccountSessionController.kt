@@ -5,6 +5,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import com.olive.app.BuildConfig
 import com.olive.app.data.*
+import com.olive.app.data.account.AccountSyncRepository
 import com.olive.app.security.*
 import com.olive.app.location.LiveLocationController
 import com.olive.app.notification.LocalNotificationEventHandler
@@ -18,6 +19,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Restores enrollment, signs accounts in/out and runs onboarding; stale account-choice callbacks cannot restart setup.
 internal class AccountSessionController(private val runtime: SessionRuntime) {
+    // Restores the saved account and sends the person to the correct first screen.
     fun load() {
         val state = runtime.state
         if (state.busy) return
@@ -28,12 +30,16 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.safePageHistory.clear()
         state.screen = SessionScreen.Loading
         runtime.scope.launch {
+            // Turn an unexpected load failure into a readable message.
             try {
                 check(BuildConfig.DEBUG || !runtime.localMode)
                 val restoredSession = restoreStoredSession()
                 runtime.enrollment = restoredSession?.enrollment
                 restoredSession?.let { restorePresentation(it) }
                 routeRestoredAccount()
+                runtime.enrollment?.let {
+                    watchAccountChanges(AccountIdentity(it.uid, runtime.state.coverUsername))
+                }
                 if (runtime.enrollment?.role == AccountRole.ADMIN && !runtime.localMode) {
                     runtime.organization.queueAdminRefresh()
                 }
@@ -50,12 +56,14 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         return state.screen == SessionScreen.Welcome && runtime.enrollment == null && !state.busy
     }
 
+    // Saves the account type chosen on the welcome screen.
     fun selectRole(role: AccountRole) {
         if (!canChooseAccount()) return
         runtime.state.accountRole = role
         runtime.state.message = null
         runtime.state.credentialFieldError = null
     }
+    // Starts account creation after blocking staff and admin self-registration.
     fun chooseNew() {
         if (!canChooseAccount()) return
         val state = runtime.state
@@ -70,6 +78,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.NewCredentials)
     }
 
+    // Opens the sign-in form for a person who already has an account.
     fun chooseReturning() {
         if (!canChooseAccount()) return
         runtime.state.creatingAccount = false
@@ -77,6 +86,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.ReturningCredentials)
     }
 
+    // Opens first-time setup when the cover app has not joined an account yet.
     fun openAccountSetup() {
         val state = runtime.state
         if (state.busy || runtime.enrollment != null || state.screen != SessionScreen.Cover) return
@@ -87,11 +97,13 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.Welcome)
     }
 
+    // Clears the old sign-in error before the person tries again.
     fun clearCredentialError() {
         runtime.state.credentialFieldError = null
         runtime.state.message = null
     }
 
+    // Validates and saves the profile entered during account setup.
     fun saveSetupProfile(value: UserProfile) {
         if (runtime.state.screen != SessionScreen.ProfileSetup) return
         with(runtime) {
@@ -133,6 +145,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             screen = SessionScreen.Safe
                             history.refreshHistory(saved.uid)
                             if (!localMode) history.loadCloudHistory(saved.uid, value.username)
+                            watchAccountChanges(identity)
                         }
                     } else {
                         withContext(Dispatchers.IO) { store.cacheProfile(identity.uid, value) }
@@ -167,6 +180,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Finishes enrollment only if this is still the same setup attempt.
     internal suspend fun finishEnrollment(
         saved: DeviceEnrollment,
         value: UserProfile,
@@ -187,9 +201,11 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
             covers.restoreCoverData(saved.uid)
             navigation.quickExit()
             if (!localMode) history.loadCloudHistory(saved.uid, value.username)
+            watchAccountChanges(AccountIdentity(saved.uid, value.username))
         }
     }
 
+    // Saves the private trigger phrase before asking the user to create a PIN.
     fun saveProvisionedTrigger(trigger: String) {
         with(runtime) {
             with(state) {
@@ -213,11 +229,14 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Stops private services, clears the session, and returns to account entry.
     fun signOut() {
         with(runtime) {
             with(state) {
                 if ((screen != SessionScreen.Safe && screen != SessionScreen.Portal) || busy || enrollment == null) return
                 val uid = enrollment!!.uid
+                accountSyncSubscription?.close()
+                accountSyncSubscription = null
                 LocalNotificationEventHandler.cancel(application)
                 if (LiveLocationController.active(application)) LiveLocationController.stop(
                     application
@@ -227,6 +246,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 historySyncJob = null
                 busy = true
                 scope.launch {
+                    // Turn an unexpected sign out failure into a readable message.
                     try {
                         withContext(Dispatchers.IO) {
                             store.recordSettings(
@@ -238,6 +258,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             )
                             store.forgetDevice()
                         }
+                        // Cloud accounts also remove their Firebase sign-in record.
                         if (!localMode) runCatching {
                             withTimeoutOrNull(2_000.milliseconds) {
                                 store.pendingHistory(uid).forEach { record ->
@@ -343,6 +364,43 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Reloads Storage data when the same account changes on another phone or browser.
+    private fun watchAccountChanges(identity: AccountIdentity) = with(runtime) {
+        accountSyncSubscription?.close()
+        accountSyncSubscription = null
+        if (localMode) return@with
+        accountSyncSubscription = AccountSyncRepository().observe(
+            identity.uid,
+            onChange = {
+                scope.launch {
+                    if (enrollment?.uid != identity.uid) return@launch
+                    // A failed refresh leaves the last readable profile and notes on screen.
+                    try {
+                        val updatedProfile = accounts.profile(identity) ?: return@launch
+                        val records = accounts.historyRecords(identity)
+                        withContext(Dispatchers.IO) { store.mergeHistory(identity.uid, records) }
+                        if (enrollment?.uid != identity.uid) return@launch
+                        state.profile = updatedProfile
+                        state.deliveryAddress = updatedProfile.address
+                        state.language = updatedProfile.language
+                        state.coverDob = updatedProfile.dob
+                        state.coverFullName = updatedProfile.fullName
+                        state.coverType = updatedProfile.coverType
+                        enrollment = enrollment?.copy(
+                            triggerHash = updatedProfile.triggerHash,
+                            role = updatedProfile.role,
+                        )
+                        history.refreshHistory(identity.uid)
+                    } catch (failure: Exception) {
+                        state.message = failure.localizedMessage
+                    }
+                }
+            },
+            onError = { failure -> state.message = failure.localizedMessage },
+        )
+    }
+
+    // Account session controller: Routes restored account.
     private fun routeRestoredAccount() {
         with(runtime) {
             with(state) {

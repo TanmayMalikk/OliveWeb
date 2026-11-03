@@ -82,6 +82,7 @@ internal fun NewsCover(
     var locationDraft by remember { mutableStateOf("") }
     // Back closes an article first, then returns through the previous news tabs.
     BackHandler(interactive) {
+        // Opens the selected news section or saved-article view.
         when {
             selected != null -> selected = null
             tabHistory.isNotEmpty() -> {
@@ -114,6 +115,7 @@ internal fun NewsCover(
         newsError = false
         if (scope == NewsScope.LOCAL) currentPlace =
             customPlace.ifBlank { CoverLocation.city(context, fallbackPlace) }
+        // Use the fallback when news cover is unavailable.
         try {
             GoogleNewsRepository().latest(session.language, scope, currentPlace).also {
                 articles = it
@@ -215,6 +217,7 @@ internal fun NewsCover(
                     },
                     label = {
                         Text(
+                            // Opens the selected news section or saved-article view.
                             when (choice) {
                                 "Today" -> uiText(R.string.today)
                                 "Saved" -> uiText(R.string.saved)
@@ -255,6 +258,7 @@ internal fun NewsCover(
     }
 }
 
+// news cover shows this news location dialog view so the user can view its details and use its actions.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NewsLocationDialog(

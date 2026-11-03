@@ -6,6 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AccountActivityHistoryEdgeCaseTest {
+    // Builds a complete sample profile for this test.
     private fun profile() = UserProfile(
         username = "test_user",
         fullName = "Test User",
@@ -68,7 +69,7 @@ class AccountActivityHistoryEdgeCaseTest {
         assertEquals(listOf(FieldChange("Title", "Old", "New")), restored.edits.single().changes)
     }
 
-    // Inputs: the values shown below. Expected: trash retention handles missing future and exact boundary times.
+    // Tries missing, future, boundary, and expired trash dates; only expired items should be removed.
     @Test
     fun trashRetentionHandlesMissingFutureAndExactBoundaryTimes() {
         val active = PrivateEntry(title = "Active", body = "Body")

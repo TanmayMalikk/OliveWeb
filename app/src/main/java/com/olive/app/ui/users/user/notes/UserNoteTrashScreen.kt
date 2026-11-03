@@ -59,6 +59,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 
+// Shows trashed notes with restore and permanent-delete actions.
 @Composable
 internal fun Trash(
     entries: List<PrivateEntry>, formatter: DateTimeFormatter,
@@ -66,6 +67,7 @@ internal fun Trash(
 ) {
     val uiText = rememberResourceText()
     var now by remember(entries) { mutableLongStateOf(System.currentTimeMillis()) }
+    // Reload deleted notes after a restore or permanent delete.
     LaunchedEffect(entries) {
         while (true) {
             delay(1_000.milliseconds)
@@ -99,6 +101,7 @@ internal fun Trash(
                 color = Muted
             )
         }
+        // Tell the user when there are no deleted notes to restore.
         if (entries.isEmpty()) item { Text(uiText(R.string.ui_trash_is_empty), color = Muted) }
         items(entries, key = { it.id }) { entry ->
             Card(

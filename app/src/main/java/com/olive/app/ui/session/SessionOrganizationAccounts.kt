@@ -17,6 +17,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Owns staff and administrator account workflows.
 internal class OrganizationAccounts(private val runtime: SessionRuntime) {
+    // Checks and saves the staff or admin organization profile.
     fun saveOrganizationProfile(fullName: String, dob: String, email: String, phone: String) {
         with(runtime) {
             with(state) {
@@ -88,6 +89,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                         phone.trim()
                     )
                     withContext(Dispatchers.IO) { store.cacheProfile(device.uid, updated) }
+                    // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         profile = updated
                         pendingProfile = updated
@@ -102,6 +104,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session organization accounts: Refreshes admin accounts. It runs the work through shared error handling and uses a readable message if it fails.
     fun refreshAdminAccounts() {
         with(runtime) {
             with(state) {
@@ -118,6 +121,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
         }
     }
 
+    // Stores the newest staff and admin list after an admin refresh.
     fun queueAdminRefresh() {
         with(runtime) {
             with(state) {
@@ -153,6 +157,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_create_the_account_the_username_or_email_may_already_be)) { token ->
                     repository.create(value)
                     val (counts, rows) = repository.accounts()
+                    // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         adminCounts = counts
                         adminAccounts = rows
@@ -176,6 +181,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_delete_this_account)) { token ->
                     repository.delete(value.uid)
                     val (counts, rows) = repository.accounts()
+                    // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         adminCounts = counts
                         adminAccounts = rows
