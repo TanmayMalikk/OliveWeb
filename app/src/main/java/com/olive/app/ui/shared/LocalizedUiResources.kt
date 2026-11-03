@@ -19,12 +19,12 @@ internal class ResourceText(private val resolve: (Int, Array<out Any?>) -> Strin
         if (arguments.isEmpty()) resources.getString(id) else resources.getString(id, *arguments)
     })
 
-    // Localized ui resources: returns the invoke.
+    // Lets screens request translated text by calling this object like a function.
     operator fun invoke(@StringRes id: Int, vararg arguments: Any?): String =
         resolve(id, arguments)
 }
 
-// returns the remember resource text for localized ui resources. It uses the latest values so the user sees the right text and choices.
+// Returns a helper that reads translated Android text inside Compose.
 @Composable
 internal fun rememberResourceText(): ResourceText {
     val resources = LocalResources.current
@@ -35,18 +35,18 @@ internal fun rememberResourceText(): ResourceText {
 internal class ResourceFailure(@StringRes val textId: Int, vararg val arguments: Any?) :
     IllegalArgumentException()
 
-// Localized ui resources: returns the require text.
+// Reads translated Android text outside a composable function.
 internal inline fun requireText(condition: Boolean, message: () -> ResourceFailure) {
     if (!condition) throw message()
 }
 
-// returns the failure for localized ui resources.
+// Returns translated fallback text when an operation fails.
 internal fun ResourceText.failure(error: Throwable, @StringRes fallback: Int): String =
     if (error is ResourceFailure) this(error.textId, *error.arguments) else this(fallback)
 
-// returns the localized title for localized ui resources.
+// Returns the translated title for an account role.
 internal fun AccountRole.localizedTitle(text: ResourceText) = text(
-    // Choose what localized title should do for the current value.
+    // Chooses the translated title for the active screen or cover.
     when (this) {
         AccountRole.USER -> R.string.user
         AccountRole.SAFE_CONTACT -> R.string.safe_contact
@@ -55,9 +55,9 @@ internal fun AccountRole.localizedTitle(text: ResourceText) = text(
     }
 )
 
-// Localized ui resources: returns the localized description.
+// Returns the translated description for an account role.
 internal fun AccountRole.localizedDescription(text: ResourceText) = text(
-    // Choose what localized description should do for the current value.
+    // Chooses the translated description for the active cover.
     when (this) {
         AccountRole.USER -> R.string.the_person_using_the_private_cover_and_safe_app
         AccountRole.SAFE_CONTACT -> R.string.a_trusted_person_helping_someone
@@ -66,9 +66,9 @@ internal fun AccountRole.localizedDescription(text: ResourceText) = text(
     }
 )
 
-// Localized ui resources: returns the localized title.
+// Returns the translated title for a cover app.
 internal fun CoverType.localizedTitle(text: ResourceText) = text(
-    // Choose what localized title should do for the current value.
+    // Chooses the translated title for the active screen or cover.
     when (this) {
         CoverType.FOOD -> R.string.ui_olive_8f62f4
         CoverType.NEWS -> R.string.ui_daily_digest
@@ -81,7 +81,7 @@ internal object AppLocaleManager {
 
     val supportedLanguages = listOf("English", "French", "Spanish", "Arabic", "Chinese")
 
-    // Loads language tag for localized ui resources.
+    // Reads Android's current language tag for app formatting.
     fun getLanguageTag(language: String): String {
         return when (language.trim().lowercase()) {
             "french", "fr", "français" -> "fr"
@@ -92,7 +92,7 @@ internal object AppLocaleManager {
         }
     }
 
-    // Loads display language for localized ui resources.
+    // Returns the readable name of Android's current language.
     fun getDisplayLanguage(language: String): String {
         return when (getLanguageTag(language)) {
             "fr" -> "Français"
@@ -103,7 +103,7 @@ internal object AppLocaleManager {
         }
     }
 
-    // Works out system default language tag.
+    // Reads the phone's language tag, such as en-CA or fr-CA.
     fun resolveSystemDefaultLanguageTag(): String {
         val systemLocale = Locale.getDefault()
         val lang = systemLocale.language.lowercase()
@@ -117,7 +117,7 @@ internal object AppLocaleManager {
         }
     }
 
-    // Works out system default language name.
+    // Reads the phone's language name for the language picker.
     fun resolveSystemDefaultLanguageName(): String {
         return when (resolveSystemDefaultLanguageTag()) {
             "fr" -> "French"
@@ -135,7 +135,7 @@ internal object AppLocaleManager {
         AppCompatDelegate.setApplicationLocales(locales)
     }
 
-    // Localized ui resources: returns the init system default locale.
+    // Uses Android's current language when the app starts.
     fun initSystemDefaultLocale() {
         if (AppCompatDelegate.getApplicationLocales().isEmpty) {
             val defaultTag = resolveSystemDefaultLanguageTag()

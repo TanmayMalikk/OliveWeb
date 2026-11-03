@@ -22,7 +22,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 if (value.isBlank() || (InputPolicy.triggerHash(value) != device.triggerHash &&
                             InputPolicy.legacyTriggerHash(value) != device.triggerHash)
                 ) return false
-                // Only continue with intercept search when screen is session screen cover and busy is false.
+                // Accept a cover trigger only while the cover is visible and no other entry check is running.
                 if (screen == SessionScreen.Cover && !busy) {
                     val event =
                         TriggerEvent(source = if (coverType == CoverType.NEWS) "Daily Digest search" else "Olive search")
@@ -95,7 +95,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                         }
                     }
                     if (epoch != token || screen != SessionScreen.Pin || challenge != pinChallengeVersion) return@runOperation
-                    // Choose what submit pin should do for the current value.
+                    // Opens the Safe App, shows an error, or starts lockout based on the PIN result.
                     when (result) {
                         PinResult.Accepted -> unlockVerifiedDevice(
                             device,

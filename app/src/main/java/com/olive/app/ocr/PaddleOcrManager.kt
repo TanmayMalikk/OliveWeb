@@ -38,9 +38,9 @@ class PaddleOcrManager(private val context: Context) {
     // Starts the OCR engine once and reuses that initialized instance for later scans.
     private suspend fun ensureInitialized(): PaddleOCR {
         check(!released) { "OCR engine has been released" }
-        // Only continue with ensure initialized when paddle ocr is null.
+        // Create the OCR engine only once, the first time a document needs it.
         if (paddleOcr == null) {
-            // If ensure initialized fails, catch the error so the app can keep running and explain the problem.
+            // Turn an unexpected ensure initialized failure into a readable message.
             try {
                 OpenCVUtils.init(context.applicationContext)
                 straightener = OrientationPreprocessor(context.applicationContext)
@@ -86,7 +86,7 @@ class PaddleOcrManager(private val context: Context) {
     suspend fun recognizeDocumentWithPreview(imageBytes: ByteArray): Pair<ByteArray, OcrResult> =
         withContext(Dispatchers.IO) {
             mutex.withLock {
-                // If recognize document with preview fails, catch the error so the app can keep running and explain the problem.
+                // Turn an unexpected recognize document with preview failure into a readable message.
                 try {
                     val ocr = ensureInitialized()
                     val uprightBytes = checkNotNull(straightener).process(imageBytes)

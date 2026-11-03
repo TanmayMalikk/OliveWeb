@@ -28,7 +28,7 @@ import com.olive.app.data.*
 import kotlinx.coroutines.CancellationException
 
 
-// returns the display text for food cover.
+// Joins the saved delivery-address fields into one readable line.
 internal fun DeliveryAddress.displayText() =
     listOf(line1, line2, city, province, postalCode, country)
         .filter(String::isNotBlank).joinToString(", ")
@@ -179,7 +179,7 @@ private fun AddressAutocomplete(
     var selectedText by remember { mutableStateOf<String?>(null) }
     var focused by remember { mutableStateOf(false) }
     val query = if (cityOnly) current.city else current.line1
-    // Update address autocomplete when information used by this screen changes.
+    // Search address suggestions after the user pauses typing.
     LaunchedEffect(query, focused) {
         suggestions = emptyList()
         if (selectedText == query) {

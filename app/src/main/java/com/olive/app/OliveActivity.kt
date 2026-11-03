@@ -49,7 +49,10 @@ internal fun shouldApplyTaskIdentity(
 
 // Android launches this activity first; it hosts the Compose UI and protects private content.
 class OliveActivity : FragmentActivity() {
-    private val deviceLock = com.olive.app.security.AndroidDeviceLock(this) { session.navigation.background() }
+    // Create device authentication after Android has attached this activity to its app context.
+    private val deviceLock by lazy(LazyThreadSafetyMode.NONE) {
+        com.olive.app.security.AndroidDeviceLock(this) { session.navigation.background() }
+    }
 
     // The resource toggle avoids hard-coding the privacy mode into this activity's control flow.
     private val screenCaptureProtectionEnabled by lazy {

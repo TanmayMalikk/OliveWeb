@@ -19,7 +19,7 @@ import org.junit.Test
 import java.util.Locale
 
 class LocalizedCardsUiTest : OliveUiTestBase() {
-    // Shared safe app localized cards ui test: returns the food card uses native french resources and keeps its actions. The test gives the code a clear input and checks the expected result.
+    // Checks the food card uses native french resources and keeps its actions step with the test's sample data.
     @Test
     fun foodCardUsesNativeFrenchResourcesAndKeepsItsActions() {
         val configuration =
@@ -49,7 +49,7 @@ class LocalizedCardsUiTest : OliveUiTestBase() {
         compose.runOnIdle { assertEquals(dish.id, vm.selectedDish?.id) }
     }
 
-    // returns the news labels translate while publisher content stays original for shared safe app localized cards ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the news labels translate while publisher content stays original step with the test's sample data.
     @Test
     fun newsLabelsTranslateWhilePublisherContentStaysOriginal() {
         val configuration =

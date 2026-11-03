@@ -57,7 +57,7 @@ import java.util.Date
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
-// Shows fitness vitals page for fitness cover.
+// Shows daily heart-rate ranges, averages, and watch status.
 @Composable
 internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -134,7 +134,7 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     }
 }
 
-// The heart rate graph card view is part of fitness cover. It gives the user the details and choices needed here.
+// Draws up to 14 days of heart-rate ranges and the selected-day summary.
 @Composable
 private fun HeartRateGraphCard(
     history: List<HeartRateVitals>,
@@ -264,7 +264,7 @@ private fun HeartRateGraphCard(
                         end = Offset(selectedX + dayWidth / 2f, bottom + 8.dp.toPx()),
                         strokeWidth = 3.dp.toPx(),
                     )
-                    // Only continue with heart rate graph card when history is empty is false.
+                    // Draw heart-rate ranges only when the watch has sent readings.
                     if (history.isNotEmpty()) {
                         history.forEach { day ->
                             val dayIndex = java.time.temporal.ChronoUnit.DAYS
@@ -296,7 +296,7 @@ private fun HeartRateGraphCard(
                         Text(label.toString(), color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
                 }
-                // heart rate graph card checks whether history is empty before continuing.
+                // Place the no-data message over an empty heart-rate chart.
                 if (history.isEmpty()) {
                     Text(
                         text = noData,
@@ -336,7 +336,7 @@ private fun HeartRateGraphCard(
     }
 }
 
-// The watch status card view is part of fitness cover. It gives the user the details and choices needed here.
+// Explains whether recent Wear OS heart-rate data is available.
 @Composable
 private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     val locale = LocalConfiguration.current.locales[0]
@@ -388,7 +388,7 @@ private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     }
 }
 
-// This is the vitals grid view for fitness cover. It shows current details and the actions available to the user.
+// Shows peak, lowest, resting, and average heart rate for the selected day.
 @Composable
 private fun VitalsGrid(vitals: HeartRateVitals) {
     val bpm = stringResource(R.string.fitness_bpm)
@@ -424,7 +424,7 @@ private fun VitalsGrid(vitals: HeartRateVitals) {
     }
 }
 
-// This is the vitals metric card view for fitness cover. It shows current details and the actions available to the user.
+// Draws one heart-rate value with its label and unit.
 @Composable
 private fun VitalsMetricCard(
     modifier: Modifier,
@@ -456,7 +456,7 @@ private fun VitalsMetricCard(
     }
 }
 
-// The watch message card view is part of fitness cover. It gives the user the details and choices needed here.
+// Shows setup help when no Wear OS data has been received.
 @Composable
 private fun WatchMessageCard(message: String) {
     Card(

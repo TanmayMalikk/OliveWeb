@@ -43,7 +43,7 @@ internal data class LocationMapState(
     val routeWorking: Boolean = false,
     val routeError: String? = null,
 ) {
-    // returns the displayed own for user location controller.
+    // Chooses the user's own map marker from live or saved location data.
     fun displayedOwn(role: AccountRole) =
         if (role == AccountRole.USER) livePoint ?: ownPoint else ownPoint
 }
@@ -71,7 +71,7 @@ internal class LocationMapController(
         }
     }
 
-    // Opens the requested item for user location controller. It waits for the set time and cancels the timer when the feature closes.
+    // Opens a saved user or trusted-contact marker on the map.
     fun open(configuration: LocationMapConfiguration, requestPermission: suspend () -> Boolean) {
         closeMap()
         val token = ++generation
@@ -114,7 +114,7 @@ internal class LocationMapController(
                 // User location controller: Keeps open active while is active.
                 while (isActive) {
                     DeviceLocation.currentCoordinates(applicationContext)?.let { fix ->
-                        // token is generation is handled here by open.
+                        // Apply the map result only if it belongs to the newest open request.
                         if (token == generation) {
                             val previous = state.ownPoint
                             val trail = previous?.trail.orEmpty()
@@ -158,7 +158,7 @@ internal class LocationMapController(
                         configuration.profile.address
                     )
                 coordinates?.let { (latitude, longitude) ->
-                    // token is generation is handled here by open.
+                    // Apply the map result only if it belongs to the newest open request.
                     if (token == generation) {
                         state = state.copy(
                             ownPoint = MapLocationPoint(
@@ -195,19 +195,19 @@ internal class LocationMapController(
         subscription = null
     }
 
-    // returns the clear for user location controller.
+    // Clears the selected route, target, and navigation message.
     fun clear() {
         closeMap()
         state = LocationMapState()
     }
 
-    // User location controller: Finds navigation target.
+    // Selects which trusted contact or user the map should route toward.
     fun selectNavigationTarget(uid: String) {
         if (!state.navigating && state.contacts.any { it.uid == uid && it.live })
             state = state.copy(navigationTargetUid = uid, routeError = null)
     }
 
-    // Starts navigation for user location controller. It waits for the set time and cancels the timer when the feature closes.
+    // Requests a route to the selected person and starts map navigation.
     fun startNavigation(
         notConfiguredMessage: String,
         unavailableMessage: String,
@@ -275,7 +275,7 @@ internal class LocationMapController(
         }
     }
 
-    // Stops navigation for user location controller.
+    // Stops route guidance and clears the selected destination.
     fun stopNavigation() {
         navigationJob?.cancel()
         navigationJob = null
@@ -299,7 +299,7 @@ internal class LocationMapController(
         return distanceFromRouteMeters(origin.latitude, origin.longitude, route) >= OFF_ROUTE_METERS
     }
 
-    // returns the distance between for user location controller.
+    // Calculates the straight-line distance between two map points.
     private fun distanceBetween(first: MapLocationPoint, second: MapLocationPoint): Float {
         val result = FloatArray(1)
         Location.distanceBetween(
@@ -319,7 +319,7 @@ internal class LocationMapController(
         if (updated.size <= MAX_SHARED_CONTACTS) state = state.copy(selected = updated)
     }
 
-    // Starts sharing for user location controller.
+    // Starts the user's live-location sharing session.
     fun startSharing(
         configuration: LocationMapConfiguration,
         durationMillis: Long,
@@ -338,7 +338,7 @@ internal class LocationMapController(
         )
     }
 
-    // User location controller: Starts sharing with.
+    // Starts live sharing with the selected trusted contact.
     fun startSharingWith(
         configuration: LocationMapConfiguration, recipients: List<Friend>, durationMillis: Long,
         requestPermission: suspend () -> Boolean, permissionError: String, startError: String,
@@ -425,7 +425,7 @@ internal class LocationMapController(
         }
     }
 
-    // User location controller: Watches expiry. It waits for the set time and cancels the timer when the feature closes.
+    // Counts down live sharing and stops it when its expiry time arrives.
     private fun watchExpiry() {
         expiryJob?.cancel()
         expiryJob = scope.launch {

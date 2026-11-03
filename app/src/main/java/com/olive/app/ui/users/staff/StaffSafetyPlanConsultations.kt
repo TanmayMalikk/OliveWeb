@@ -21,7 +21,7 @@ import com.olive.app.R
 import com.olive.app.data.SafetyConsultation
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
-// Shows safety consultations for staff safety plan consultations.
+// Lists the plan-consult tickets assigned to this staff member.
 @Composable
 internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) {
     var selected by remember { mutableStateOf<SafetyConsultation?>(null) }
@@ -33,7 +33,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
         SafetyPlanScreen(session, plan.ownerUid, plan.ownerName) { selected = null }
         return
     }
-    // Update safety consultations when information used by this screen changes.
+    // Reload assigned plan consultations when staff return to this screen.
     LaunchedEffect(Unit) {
         while (true) {
             controller.refreshConsultations()

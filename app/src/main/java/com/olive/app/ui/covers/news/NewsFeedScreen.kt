@@ -61,7 +61,7 @@ internal data class NewsFeedActions(
     val refresh: () -> Unit,
     val openArticle: (NewsArticle) -> Unit,
 )
-// Shows news feed for news cover.
+// Shows loading, error, and article-list states for the Daily Digest.
 @Composable
 internal fun NewsFeed(
     session: SessionViewModel,
@@ -84,7 +84,7 @@ internal fun NewsFeed(
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Choose what news feed should do for the current value.
+                // Shows loading, articles, or an error for the current news request.
                 when (tab) {
                     "Account" -> {
                         item {
@@ -142,7 +142,7 @@ internal fun NewsFeed(
                                 modifier = Modifier.fillMaxWidth().testTag("news_search")
                                     .keepVisibleWhileTyping())
                         }
-                        // news feed checks whether tab is today before continuing.
+                        // Skip the next action unless tab is today.
                         if (tab == "Today") item {
                             Row(
                                 Modifier.fillMaxWidth(),
@@ -162,7 +162,7 @@ internal fun NewsFeed(
                                 ) { actions.changeScope(NewsScope.GLOBAL) }
                             }
                         }
-                        // news feed checks whether tab is today and scope is news scope local before continuing.
+                        // Local news is available only from the Today tab.
                         if (tab == "Today" && scope == NewsScope.LOCAL) item {
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -220,7 +220,7 @@ internal fun NewsFeed(
                             }
                         }
                         if (tab == "Today") {
-                            // Only continue with news feed when loading and articles is empty item news loading state.
+                            // Show a loading row while the first news stories are being fetched.
                             if (loading && articles.isEmpty()) item { NewsLoadingState() }
                             if (newsError) item {
                                 Card(
@@ -244,7 +244,7 @@ internal fun NewsFeed(
                             }
                         }
                         val visible = visibleArticles
-                        // news feed checks whether visible is empty and loading and not news error is false before continuing.
+                        // Show the empty-news message only after loading ends without an error.
                         if (visible.isEmpty() && !loading && !newsError) item {
                             NewsEmptyState(
                                 if (tab == "Saved") uiText(

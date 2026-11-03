@@ -38,16 +38,16 @@ export default function OliveCrossing() {
   const lastFrame = useRef(0);
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // Update board ref when information used by this screen changes.
+  // Keep a reference to the board so the camera can size itself to it.
   useEffect(() => {
     const board = boardRef.current;
     if (!board) return;
-    // Updates camera.
+    // Resize the game camera without adding horizontal page scrolling.
     const updateCamera = () => {
       const bounds = board.getBoundingClientRect();
       if (!bounds.width || !bounds.height) return;
       const fullWidth = CROSSING.columns * CROSSING.cell;
-      // full width checks whether window match media min-width: 48 01rem matches before continuing.
+      // A wider camera is used only on laptop and desktop screens.
       if (window.matchMedia("(min-width: 48.01rem)").matches) {
         setCamera((current) =>
           current.x === 0 && current.width === fullWidth
@@ -86,7 +86,7 @@ export default function OliveCrossing() {
     phaseRef.current = phase;
   }, [phase]);
 
-  // Update observer when information used by this screen changes.
+  // Watch the board for size changes caused by window resizing.
   useEffect(() => {
     let live = true;
     void readCover<number>("olive-crossing-best", 0)
@@ -126,7 +126,7 @@ export default function OliveCrossing() {
       frameRef.current = requestAnimationFrame(tick);
   }, []);
 
-  // Update next when information used by this screen changes.
+  // Run the next game frame while the crossing is active.
   useEffect(() => {
     if (phase !== "running") return;
     lastFrame.current = 0;
@@ -136,9 +136,9 @@ export default function OliveCrossing() {
     };
   }, [phase, tick]);
 
-  // Update next when information used by this screen changes.
+  // Start and stop the animation loop when the game state changes.
   useEffect(() => {
-    // Handles visibility.
+    // Pauses the crossing game when the browser tab is hidden.
     const handleVisibility = () => {
       if (document.hidden && phaseRef.current === "running") setPhase("paused");
     };
@@ -167,7 +167,7 @@ export default function OliveCrossing() {
     });
   }, []);
 
-  // Handles key.
+  // Turn keyboard input into the same moves used by the screen buttons.
   const handleKey = (key: string) => {
     const directions: Record<string, CrossingDirection> = {
       ArrowUp: "up",
@@ -221,7 +221,7 @@ export default function OliveCrossing() {
           tabIndex={0}
           onKeyDown={(event) => {
             if (handleKey(event.key)) event.preventDefault();
-            // event key is or event key is enter is handled here by status.
+            // Space and Enter start a new crossing from the result screen.
             if (event.key === " " || event.key === "Enter") {
               event.preventDefault();
               if (phaseRef.current === "running") setPhase("paused");

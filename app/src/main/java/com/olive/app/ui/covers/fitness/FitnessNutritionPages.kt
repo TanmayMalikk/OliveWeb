@@ -56,7 +56,7 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.shared.oliveScrollbar
 import kotlinx.coroutines.launch
 
-// The today page view is part of fitness cover. It gives the user the details and choices needed here.
+// Shows today's calorie and macro totals with meal logging.
 @Composable
 internal fun TodayPage(
     snapshot: FitnessSnapshot,
@@ -101,7 +101,7 @@ internal fun TodayPage(
         MealType.entries.forEach { meal ->
             val entries = snapshot.foodsToday.filter { it.meal == meal }
             item { Text(meal.displayName, fontWeight = FontWeight.SemiBold) }
-            // Only continue with today page when entries is empty.
+            // Show the empty diary message until the user logs food.
             if (entries.isEmpty()) {
                 item { Text(stringResource(R.string.no_food_logged), color = FitnessSubtle) }
             } else {
@@ -164,7 +164,7 @@ private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
     }
 }
 
-// This is the nutrition amount row view for fitness cover. It shows current details and the actions available to the user.
+// Shows eaten, target, and remaining calories in one row.
 @Composable
 private fun NutritionAmountRow(label: String, value: Float, unit: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -172,7 +172,7 @@ private fun NutritionAmountRow(label: String, value: Float, unit: String) {
         Text("${value.displayAmount()} $unit")
     }
 }
-// Shows nutrition progress for fitness cover.
+// Draws progress toward one calorie or macro goal.
 @Composable
 private fun NutritionProgress(label: String, value: Float, goal: Float, unit: String) {
     val progress = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
@@ -190,7 +190,7 @@ private fun NutritionProgress(label: String, value: Float, goal: Float, unit: St
     }
 }
 
-// This is the logged food row view for fitness cover. It shows current details and the actions available to the user.
+// Shows one diary food with nutrients and a remove action.
 @Composable
 private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onRemove: () -> Unit) {
     Card(
@@ -215,7 +215,7 @@ private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onRemove: () ->
         }
     }
 }
-// Shows food search page for fitness cover.
+// Searches nutrition providers and lets the user add a food result.
 @Composable
 internal fun FoodSearchPage(
     enabled: Boolean,
@@ -376,7 +376,7 @@ private fun AddFoodDialog(
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
-// Shows provider attribution for fitness cover.
+// Shows the required FatSecret and Open Food Facts credits.
 @Composable
 private fun ProviderAttribution() {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {

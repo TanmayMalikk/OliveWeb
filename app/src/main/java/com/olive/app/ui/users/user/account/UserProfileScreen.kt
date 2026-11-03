@@ -157,7 +157,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                                 "Selected remove contact"
                             )
                             session.saveContacts(profile.contacts.filterNot { it.id == contact.id })
-                            // Only continue with contact editor when editing is contact id.
+                            // Clear the form when the removed contact was being edited.
                             if (editing == contact.id) {
                                 editing = null
                                 name = ""
@@ -208,7 +208,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
         Status(session)
         Button(
             onClick = {
-                // name is blank or details is blank is handled here by contact editor.
+                // A trusted contact needs both a name and a phone number or email.
                 if (name.isBlank() || details.isBlank()) {
                     session.account.showError(uiText(R.string.enter_a_name_and_a_phone_number_or_email))
                 } else if (editing == null && profile.contacts.size >= 25) {
@@ -268,7 +268,7 @@ internal fun SafeProfileScreen(session: SessionViewModel, profile: UserProfile) 
             add(
                 uiText(R.string.region_city_state) to profile.region
             )
-            // safe profile screen checks whether profile role is account role user before continuing.
+            // Only users choose a discreet cover; other roles open their workspace directly.
             if (profile.role == AccountRole.USER) {
                 add(uiText(R.string.cover_app) to profile.coverType.localizedTitle(uiText))
                 add(

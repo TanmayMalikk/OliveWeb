@@ -30,7 +30,7 @@ internal class DeviceCredentialTestDriver(
         }
     }
 
-    // returns the confirm phone pin for device credential test driver. The test gives the code a clear input and checks the expected result.
+    // Checks the confirm phone pin step with the test's sample data.
     fun confirmPhonePin() {
         waitForPhonePin()
         // This PIN belongs only to the disposable emulator used by this test run.
@@ -54,7 +54,7 @@ internal class DeviceCredentialTestDriver(
         }
     }
 
-    // returns the wait for phone pin for device credential test driver. The test gives the code a clear input and checks the expected result.
+    // Checks the wait for phone pin step with the test's sample data.
     fun waitForPhonePin() {
         compose.waitUntil(20_000) {
             val root = automation.rootInActiveWindow
@@ -82,7 +82,7 @@ internal class DeviceCredentialTestDriver(
     }
 
 
-    // Device credential test driver: Finds node. The test gives the code a clear input and checks the expected result.
+    // Finds the node needed by this test.
     private fun findNode(
         node: AccessibilityNodeInfo?,
         predicate: (AccessibilityNodeInfo) -> Boolean
@@ -96,12 +96,12 @@ internal class DeviceCredentialTestDriver(
         return null
     }
 
-    // returns the shell for device credential test driver. The test gives the code a clear input and checks the expected result.
+    // Runs a device command needed by this test.
     fun shell(command: String) {
         shellOutput(command)
     }
 
-    // returns the shell output for device credential test driver. The test gives the code a clear input and checks the expected result.
+    // Runs a device command and returns its text output to the test.
     private fun shellOutput(command: String): String {
         val fd = automation.executeShellCommand(command)
         return ParcelFileDescriptor.AutoCloseInputStream(fd).use {

@@ -5,7 +5,7 @@ import androidx.compose.ui.test.*
 import org.junit.Test
 
 class CredentialRulesUiTest : OliveUiTestBase() {
-    // Shared safe app credential rules ui test: returns the new accounts reject numeric usernames and passwords containing username. The test gives the code a clear input and checks the expected result.
+    // Checks the new accounts reject numeric usernames and passwords containing username step with the test's sample data.
     @Test
     fun newAccountsRejectNumericUsernamesAndPasswordsContainingUsername() {
         openOnboarding()

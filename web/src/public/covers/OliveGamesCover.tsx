@@ -27,7 +27,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
   const [moves, setMoves] = useState(0);
   const [best, setBest] = useState<number | null>(null);
   const [storageReady, setStorageReady] = useState(false);
-  // Update pair count when information used by this screen changes.
+  // Start a new memory board when the chosen pair count changes.
   useEffect(() => {
     let live = true;
     setStorageReady(false);
@@ -45,7 +45,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       live = false;
     };
   }, [size]);
-  // Update live when information used by this screen changes.
+  // Keep the latest memory-game state available to the timer.
   useEffect(() => {
     if (flipped.length !== 2) return;
     const [a, b] = flipped;
@@ -58,7 +58,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     );
     return () => clearTimeout(timer);
   }, [flipped, cards]);
-  // Update timer when information used by this screen changes.
+  // Count playing time only while the memory round is active.
   useEffect(() => {
     if (
       matched.length === pairCount * 2 &&
@@ -69,7 +69,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       void writeCover(`grove-best-${size}`, moves).catch(() => {});
     }
   }, [matched, moves, best, storageReady, pairCount, size]);
-  // returns the turn for web olive games cover.
+  // Flips two cards and checks whether they form a matching pair.
   function turn(index: number) {
     if (
       flipped.length >= 2 ||
@@ -80,7 +80,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     setFlipped((old) => [...old, index]);
     if (flipped.length === 1) setMoves((n) => n + 1);
   }
-  // returns the restart for web olive games cover.
+  // Clears the board and starts a new memory game.
   function restart(nextSize = size) {
     setSize(nextSize);
     setCards(createMemoryBoard(nextSize));

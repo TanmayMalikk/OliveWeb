@@ -12,7 +12,7 @@ data class CachedNewsFeed(val place: String, val articles: List<NewsArticle>)
 class NewsFeedCacheStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
-    // News: Loads the saved value.
+    // Loads cached news stories saved on this phone.
     fun load(language: String, scope: NewsScope): CachedNewsFeed? = runCatching {
         val raw = preferences.getString(key(language, scope), null) ?: return@runCatching null
         val root = JSONObject(raw)
@@ -23,7 +23,7 @@ class NewsFeedCacheStore(context: Context) {
         if (articles.isEmpty()) null else CachedNewsFeed(root.optString(PLACE), articles)
     }.getOrNull()
 
-    // Saves the new value for news. It reads the value saved on this device.
+    // Saves the latest news response in the local feed cache.
     fun save(language: String, scope: NewsScope, place: String, articles: List<NewsArticle>) {
         if (articles.isEmpty()) return
         val root = JSONObject()
@@ -32,7 +32,7 @@ class NewsFeedCacheStore(context: Context) {
         preferences.edit { putString(key(language, scope), root.toString()) }
     }
 
-    // News: returns the key.
+    // Creates the stable cache key used for this news request.
     private fun key(language: String, scope: NewsScope) =
         "${language.lowercase()}_${scope.name.lowercase()}"
 

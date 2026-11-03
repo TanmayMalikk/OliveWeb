@@ -22,14 +22,14 @@ class CoverStateStore(private val vault: EncryptedVault) {
         return foodFrom(item) to newsFrom(item)
     }
 
-    // Cover: returns the food.
+    // Loads the saved cart, favourites, and dish choices for the food cover.
     fun food(uid: String): FoodCoverState {
         val item =
             vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return FoodCoverState()
         return foodFrom(item)
     }
 
-    // Cover: returns the food from.
+    // Rebuilds the saved food-cover state from local JSON.
     private fun foodFrom(item: JSONObject): FoodCoverState {
         val cart = item.optJSONObject("cart") ?: JSONObject()
         val saved = item.optJSONArray("favorites") ?: JSONArray()
@@ -47,7 +47,7 @@ class CoverStateStore(private val vault: EncryptedVault) {
             })
     }
 
-    // Saves food for cover.
+    // Saves the food cover cart, favourites, and custom choices on this device.
     fun saveFood(uid: String, state: FoodCoverState) {
         vault.update { root ->
             val item = root.child("accounts").child(uid)
@@ -70,13 +70,13 @@ class CoverStateStore(private val vault: EncryptedVault) {
         }
     }
 
-    // returns the news for cover.
+    // Creates an empty saved-news state for a new cover account.
     fun news(uid: String): List<NewsArticle> {
         val item = vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return emptyList()
         return newsFrom(item)
     }
 
-    // Cover: returns the news from.
+    // Rebuilds saved news bookmarks from local JSON.
     private fun newsFrom(item: JSONObject): List<NewsArticle> {
         val rows = item.optJSONArray("news") ?: JSONArray()
         return (0 until rows.length()).mapNotNull {
@@ -90,7 +90,7 @@ class CoverStateStore(private val vault: EncryptedVault) {
         }
     }
 
-    // Saves news for cover.
+    // Saves news bookmarks and cover settings on this device.
     fun saveNews(uid: String, articles: List<NewsArticle>) {
         vault.update { root ->
             root.child("accounts").child(uid).put(

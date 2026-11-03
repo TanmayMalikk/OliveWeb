@@ -38,7 +38,7 @@ import java.io.File
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
 
-// The safety documents screen is part of user safety documents screen. It gives the user the details and choices needed here.
+// Lists encrypted documents and provides upload, filter, open, and share actions.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SafetyDocumentsScreen(session: SessionViewModel) {
@@ -54,7 +54,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     var choosingUpload by rememberSaveable { mutableStateOf(false) }
     val unableUpload = stringResource(R.string.documents_upload_failed)
-    // Stops selection for user safety documents screen. It checks access, protects the file, and then reads or saves it.
+    // Clears the selected document and closes its action dialog.
     fun finishSelection(uri: android.net.Uri?) {
         session.endExternalFilePicker()
         if (uri != null) controller.upload(
@@ -71,7 +71,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     val documentPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), ::finishSelection)
 
-    // Starts protected picker for user safety documents screen.
+    // Confirms private entry before opening the Android file picker.
     fun launchProtectedPicker(action: () -> Unit) {
         choosingUpload = false
         session.beginExternalFilePicker()
@@ -144,7 +144,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                             label = {
                                 Text(
                                     stringResource(
-                                        // Choose what launch protected picker should do for the current value.
+                                        // Opens the protected file picker only after private entry is confirmed.
                                         when (option) {
                                             DocumentFilter.All -> R.string.documents_all
                                             DocumentFilter.Photos -> R.string.safety_storage_photos
@@ -164,7 +164,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { AccessibleMessage(it) }
         val shown = state.files.filter { file ->
-            // Choose what launch protected picker should do for the current value.
+            // Opens the protected file picker only after private entry is confirmed.
             when (filter) {
                 DocumentFilter.All -> true
                 DocumentFilter.Photos -> file.mimeType.startsWith("image/")
@@ -311,7 +311,7 @@ private fun PreparingUploadCard() {
     }
 }
 
-// The pending upload card view is part of user safety documents screen. It gives the user the details and choices needed here.
+// Shows upload progress, errors, and retry controls for one pending file.
 @Composable
 private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
     val failed = upload.status == MediaTransferStatus.FAILED
@@ -439,7 +439,7 @@ private fun SafetyDocumentCard(
                         stringResource(R.string.open)
                     )
                 }
-                // safety document card checks whether own outlined button on click = on share, modifier = modifier weight 1f before continuing.
+                // Owners can share the document; recipients only get the open action.
                 if (own) OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
                     Icon(
                         Icons.Outlined.Share,
@@ -458,7 +458,7 @@ private fun SafetyDocumentCard(
         }
     }
 }
-// Shows document sharing dialog for user safety documents screen.
+// Lets the user choose which trusted contacts may open a document.
 @Composable
 private fun DocumentSharingDialog(
     file: SafetyDocument,

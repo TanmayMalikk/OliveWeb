@@ -13,9 +13,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
-// Handles reported captures and User inactivity; Android's accessibility timeout can extend the idle warning.
+// Keeps private-note actions separate from the rest of the signed-in session.
 internal class SessionPrivacy(private val runtime: SessionRuntime) {
-    // Session privacy: Returns the note interaction. It reads the Android monotonic clock so clock changes cannot break the timing.
+    // Opens or closes the private note editor for the selected person.
     fun noteInteraction() {
         with(runtime) {
             with(state) {
@@ -26,7 +26,7 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
-    // returns the capture detected for session privacy. It waits for the set time and cancels the timer when the feature closes.
+    // Records a screenshot or screen-recording alert in private activity history.
     fun captureDetected(kind: String) {
         with(runtime) {
             with(state) {
@@ -52,7 +52,7 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session privacy: returns the recording stopped.
+    // Records when Android says screen recording has stopped.
     fun recordingStopped() {
         with(runtime) {
             with(state) {
@@ -72,7 +72,7 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
                 }
                 noteInteraction()
                 idleJob = scope.launch {
-                    // Session privacy: Keeps start idle timer active while screen equals session screen safe.
+                    // Keep the idle timer running only while the private Safe App is open.
                     while (screen == SessionScreen.Safe) {
                         delay(250.milliseconds)
                         val accessibility =

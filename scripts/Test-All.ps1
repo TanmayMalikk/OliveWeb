@@ -10,6 +10,7 @@ $completedChecks = [System.Collections.Generic.List[string]]::new()
 $testReportDirectory = Join-Path $projectRoot "build\reports"
 New-Item -ItemType Directory -Force -Path $testReportDirectory | Out-Null
 Remove-Item -LiteralPath (Join-Path $projectRoot "app\build\test-results\testDebugUnitTest") -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath (Join-Path $projectRoot "wear\build\test-results\testDebugUnitTest") -Recurse -Force -ErrorAction SilentlyContinue
 @(
     "current-test-check.txt",
     "failed-test-check.txt",
@@ -110,13 +111,15 @@ function Install-AndroidTestApk {
 }
 
 Set-Location -LiteralPath $projectRoot
-Invoke-Checked "Android unit tests, debug APK, UI-test APK, and lint" {
-    & ".\gradlew.bat" testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug checkArchitecture
+Invoke-Checked "Android and Wear unit tests, APKs, UI-test APK, and lint" {
+    & ".\gradlew.bat" :app:testDebugUnitTest :wear:testDebugUnitTest :app:assembleDebug :wear:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :wear:lintDebug checkArchitecture
 }
 @(
     "$projectRoot\app\build\outputs\apk\debug\app-debug.apk",
     "$projectRoot\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk",
-    "$projectRoot\app\build\reports\lint-results-debug.html"
+    "$projectRoot\app\build\reports\lint-results-debug.html",
+    "$projectRoot\wear\build\outputs\apk\debug\wear-debug.apk",
+    "$projectRoot\wear\build\reports\lint-results-debug.html"
 ).ForEach({ if (-not (Test-Path -LiteralPath $_)) { throw "Required test artifact was not created: $_" } })
 $completedChecks.Add("Required Android artifacts created")
 
@@ -311,7 +314,7 @@ if ($WithDeviceTests) {
             $deviceResult = $instrumentationOutput -join "`n"
             $countMatch = [regex]::Match($deviceResult, 'OK \(([1-9][0-9]*) tests?\)')
             $passed = $LASTEXITCODE -eq 0 -and $countMatch.Success -and $deviceResult -notmatch 'FAILURES!!!'
-            $frameworkCrash = $deviceResult -match 'shortMsg=Process crashed|Activity client record must not be null'
+            $frameworkCrash = $deviceResult -match 'shortMsg=Process crashed|Activity client record must not be null|INSTRUMENTATION_ABORTED: System has crashed'
             if (-not $passed -and $attempt -eq 1 -and $frameworkCrash) {
                 Write-Warning "Android framework crashed during $testCase; retrying once in a clean process."
             }

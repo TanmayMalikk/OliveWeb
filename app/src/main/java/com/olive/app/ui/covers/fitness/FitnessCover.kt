@@ -88,7 +88,7 @@ internal val FitnessWarmCard = Color(0xFFF1F3E9)
 
 private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, FOOD_SEARCH, GOALS, ACCOUNT }
 
-// This shows the fitness cover view for fitness cover. It fills the view with the latest details and actions.
+// Shows the fitness cover and keeps its selected page and saved health data in sync.
 @Composable
 internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true) {
     val context = LocalContext.current
@@ -99,7 +99,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     var page by remember { mutableStateOf(FitnessPage.HOME) }
 
     FitnessStepSensor(store) { snapshot = it }
-    // Update fitness cover when information used by this screen changes.
+    // Load fitness history and watch data when the cover becomes active.
     LaunchedEffect(store) {
         while (true) {
             delay(2_000L)
@@ -108,7 +108,9 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     }
     LaunchedEffect(snapshot) {
         FitnessWatchSync.publish(context, accountId, snapshot)
-        FitnessCloudSync.upload(accountId, snapshot, history)
+        if (!session.localMode) {
+            FitnessCloudSync.upload(accountId, snapshot, history)
+        }
     }
     LaunchedEffect(session.coverReset) {
         snapshot = store.snapshot()
@@ -131,7 +133,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                 onPage = { page = it },
                 onSettings = { page = FitnessPage.ACCOUNT },
             )
-            // Choose what fitness cover should do for the current value.
+            // Opens the selected fitness overview, activity, nutrition, or vitals page.
             when (page) {
                 FitnessPage.HOME -> FitnessHomePage(
                     snapshot = snapshot,
@@ -174,7 +176,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         }
     }
 }
-// Shows fitness header for fitness cover.
+// Draws the fitness title and top navigation.
 @Composable
 private fun FitnessHeader(
     page: FitnessPage,
@@ -241,7 +243,7 @@ private fun FitnessHeader(
     }
 }
 
-// This shows the fitness tab view for fitness cover. It fills the view with the latest details and actions.
+// Draws one fitness navigation tab and marks it selected when active.
 @Composable
 private fun FitnessTab(
     modifier: Modifier,
@@ -272,7 +274,7 @@ private fun FitnessTab(
     }
 }
 
-// The fitness step sensor view is part of fitness cover. It gives the user the details and choices needed here.
+// Starts and stops the phone step sensor with the screen lifecycle.
 @Composable
 private fun FitnessStepSensor(store: FitnessStore, onUpdate: (FitnessSnapshot) -> Unit) {
     val context = LocalContext.current
@@ -296,19 +298,19 @@ private fun FitnessStepSensor(store: FitnessStore, onUpdate: (FitnessSnapshot) -
             permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
         }
     }
-    // Update fitness step sensor when information used by this screen changes.
+    // Start or stop the phone step sensor as permission and lifecycle change.
     DisposableEffect(stepSensor, permissionGranted, store) {
-        // Only continue with fitness step sensor when step sensor is null or permission granted is false.
+        // Stop listening when the phone has no step sensor or activity permission.
         if (stepSensor == null || !permissionGranted) return@DisposableEffect onDispose { }
         val listener = object : SensorEventListener {
-            // Fitness cover: Responds when sensor changed. It uses the saved health data to update the fitness screen.
+            // Adds new step-counter readings to today's fitness total.
             override fun onSensorChanged(event: SensorEvent) {
                 event.values.firstOrNull()?.roundToInt()?.let {
                     onUpdate(store.recordSensorValue(it))
                 }
             }
 
-            // Responds when accuracy changed for fitness cover. It uses the saved health data to update the fitness screen.
+            // The step counter does not need accuracy changes, so this callback stays empty.
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
         }
         sensorManager.registerListener(listener, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
@@ -316,7 +318,7 @@ private fun FitnessStepSensor(store: FitnessStore, onUpdate: (FitnessSnapshot) -
     }
 }
 
-// This shows the fitness activity page view for fitness cover. It fills the view with the latest details and actions.
+// Draws the fitness activity page for the fitness cover.
 @Composable
 private fun FitnessActivityPage(
     snapshot: FitnessSnapshot,
@@ -412,7 +414,7 @@ private fun FitnessGoalsPage(
     }
 }
 
-// This shows the goal field view for fitness cover. It fills the view with the latest details and actions.
+// Draws the goal field for the fitness cover.
 @Composable
 private fun GoalField(value: String, onChange: (String) -> Unit, label: String, enabled: Boolean) {
     OutlinedTextField(

@@ -19,13 +19,13 @@ data class Dish(
 
 // Swap the menu source behind this tiny interface without rebuilding the whole food UI.
 interface CatalogRepository {
-    // returns the dishes for cover. It uses the current cover data to update what the user sees.
+    // Loads the food-cover menu from bundled resources.
     fun dishes(): List<Dish>
 }
 
 // Olive prepares this whole menu itself, so every item can offer predictable ingredient choices.
 class DemoCatalogRepository(private val text: (Int) -> String) : CatalogRepository {
-    // Cover: returns the dishes. It uses the current cover data to update what the user sees.
+    // Loads the food-cover menu from bundled resources.
     override fun dishes() = listOf(
         Dish(
             "bowl",

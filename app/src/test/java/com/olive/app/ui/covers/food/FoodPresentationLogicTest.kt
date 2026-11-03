@@ -9,7 +9,7 @@ import org.junit.Test
 
 class FoodPresentationLogicTest {
     private val text = ResourceText { id, _ -> "resource-$id" }
-    // returns the dish for food cover. It uses the current cover data to update what the user sees.
+    // Returns the dish used by this test.
     private fun dish(id: String = "bowl") = Dish(
         id = id,
         name = "Stored name",
