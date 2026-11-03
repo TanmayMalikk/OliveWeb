@@ -38,6 +38,7 @@ internal class SafetyDocumentsController(
     var state by mutableStateOf(SafetyDocumentsState())
         private set
 
+    // Clears old document state before loading a different account owner.
     fun prepare(ownerUid: String) {
         subscription?.close()
         subscription = null
@@ -45,7 +46,8 @@ internal class SafetyDocumentsController(
         state = SafetyDocumentsState(ownerUid = ownerUid)
     }
 
-    fun load(ownerUid: String, localMode: Boolean) {
+    // Watches the owner's allowed documents and updates the screen as Firebase changes.
+    fun load(ownerUid: String, username: String, localMode: Boolean) {
         if (state.ownerUid != ownerUid) {
             subscription?.close()
             subscription = null
@@ -58,9 +60,15 @@ internal class SafetyDocumentsController(
         val token = generation
         state = state.copy(loading = true, error = null)
         subscription = repository.observeFor(ownerUid, { files ->
+            // Apply loaded documents only when the same owner and request are still active.
             if (token == generation && state.ownerUid == ownerUid) {
                 state = state.copy(files = files, loading = false, error = null)
                 media?.acknowledgePublished(files.mapTo(mutableSetOf()) { it.id })
+                files.forEach { document ->
+                    scope.launch {
+                        runCatching { repository.approveCurrentAccountDevices(document, ownerUid, username) }
+                    }
+                }
             }
         }, { error ->
             if (token == generation && state.ownerUid == ownerUid) {
@@ -71,15 +79,17 @@ internal class SafetyDocumentsController(
         })
     }
 
+    // Queues a file selected from Android storage for encrypted upload.
     fun upload(uri: Uri, identity: AccountIdentity, fallbackError: String, ocrReview: OcrReview = OcrReview.NOT_RUN) {
         val transfers = media ?: return reportError(fallbackError)
         state = state.copy(loading = true, error = null)
         transfers.queueDocument(uri, identity, ocrReview, onQueued = {
             state = state.copy(loading = false, error = null)
-            if (subscription == null) load(identity.uid, false)
+            if (subscription == null) load(identity.uid, identity.username, false)
         }, onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
     }
 
+    // Queues a camera photo, video, or OCR document for encrypted upload.
     fun uploadCaptured(
         file: File,
         name: String,
@@ -102,12 +112,13 @@ internal class SafetyDocumentsController(
             onQueued = {
                 file.delete()
                 state = state.copy(loading = false, error = null)
-                if (subscription == null) load(identity.uid, false)
+                if (subscription == null) load(identity.uid, identity.username, false)
                 onComplete()
             },
             onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
     }
 
+    // Downloads and decrypts an allowed document, then opens its in-app viewer.
     fun download(document: SafetyDocument, onReady: (File) -> Unit) {
         val viewerUid = state.ownerUid ?: return
         val token = generation
@@ -126,6 +137,7 @@ internal class SafetyDocumentsController(
         }
     }
 
+    // Opens a document shared through an encrypted conversation.
     fun openShared(
         viewerUid: String,
         documentId: String,
@@ -152,10 +164,12 @@ internal class SafetyDocumentsController(
         }
     }
 
+    // User safety document controller: Deletes the selected item. It requires the active feature controller before continuing.
     fun delete(document: SafetyDocument, ownerUid: String) = run(refreshAfter = true) {
         checkNotNull(repository).delete(document, ownerUid)
     }
 
+    // User safety document controller: Shares the selected item. It requires the active feature controller before continuing.
     fun share(
         document: SafetyDocument,
         ownerUid: String,
@@ -165,10 +179,12 @@ internal class SafetyDocumentsController(
         checkNotNull(repository).share(document, ownerUid, recipients)
     }
 
+    // Changes a document failure into a clear message shown on the Safe App screen.
     fun reportError(message: String?) {
         state = state.copy(error = message)
     }
 
+    // Clears the current document viewer and its error message.
     fun clear() {
         subscription?.close()
         subscription = null
@@ -177,6 +193,7 @@ internal class SafetyDocumentsController(
         state = SafetyDocumentsState()
     }
 
+    // Runs one document task, reports its error, and refreshes the list when needed.
     private fun run(
         refreshAfter: Boolean = false,
         fallbackError: String? = null,
@@ -200,11 +217,13 @@ internal class SafetyDocumentsController(
         }
     }
 
+    // Reloads the owner's document list after a write finishes.
     private suspend fun refresh(ownerUid: String) {
         val files = checkNotNull(repository).listFor(ownerUid)
         if (state.ownerUid == ownerUid) state = state.copy(files = files, error = null)
     }
 
+    // Opens a saved document after its encrypted content is ready.
     private suspend fun openDocument(document: SafetyDocument, viewerUid: String): File =
         if (document.objectKey.isNotBlank()) {
             checkNotNull(media) { "Encrypted media is unavailable" }.downloadFile(document, viewerUid)

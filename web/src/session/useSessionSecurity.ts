@@ -9,12 +9,13 @@ import {
 } from "react";
 import { accounts } from "../services/AccountService";
 import { validEntryToken } from "../services/PrivateEntryLinks";
-import { coverPath, emptyHistory, type Enrollment, type Profile } from "../domain/DomainModels";
+import { coverPath, emptyHistory, type Enrollment, type Profile, type Role } from "../domain/DomainModels";
 import type { SiteMode } from "../sites/SiteRouting";
 import type { SessionPhase } from "./SessionContext";
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 
+// Web private entry: Keeps the safe session locked when it is not in use. It watches navigation, entry links, and idle time, then clears private data before returning to a cover.
 export function useSessionSecurity({
   enrollment,
   entryOwner,
@@ -22,6 +23,7 @@ export function useSessionSecurity({
   mode,
   pendingEntry,
   phase,
+  role,
   quickExit,
   setBusy,
   setEnrollmentAttempt,
@@ -40,6 +42,7 @@ export function useSessionSecurity({
   mode: SiteMode;
   pendingEntry: MutableRefObject<string | null>;
   phase: SessionPhase;
+  role: Role | null;
   quickExit: () => void;
   setBusy: Setter<boolean>;
   setEnrollmentAttempt: Setter<number>;
@@ -53,10 +56,15 @@ export function useSessionSecurity({
   setProfile: Setter<Profile | null>;
 }) {
   const phaseRef = useRef(phase);
+  const roleRef = useRef(role);
   const lastInteraction = useRef(Date.now());
   phaseRef.current = phase;
+  roleRef.current = role;
+  const buttonOnlyExit = role === "SAFE_CONTACT" || role === "STAFF" || role === "ADMIN";
 
+  // Web private entry: Installs navigation guards for the private session. The handlers clear account data before browser back or hash changes can expose another screen.
   useEffect(() => {
+    // Web private entry: Locks the safe session. It clears account data, history, setup state, messages, and the current private route.
     const resetPrivateSession = () => {
       epoch.current++;
       entryOwner.current = null;
@@ -71,7 +79,12 @@ export function useSessionSecurity({
       setPhase("public");
       setMessage("");
     };
+    // The browser Back button locks private pages before returning to the cover.
     const onPop = () => {
+      if (buttonOnlyExit) {
+        window.history.pushState({}, "", window.location.pathname);
+        return;
+      }
       resetPrivateSession();
       setPath(
         mode === "admin"
@@ -82,6 +95,7 @@ export function useSessionSecurity({
       );
       window.history.replaceState({}, "", "/");
     };
+    // A changed URL can start private entry only when its saved token is valid.
     const onHash = () => {
       const candidate = location.hash.slice(1);
       if (!validEntryToken(candidate)) return;
@@ -100,22 +114,28 @@ export function useSessionSecurity({
       removeEventListener("popstate", onPop);
       removeEventListener("hashchange", onHash);
     };
-  }, [enrollment, entryOwner, epoch, mode, pendingEntry]);
+  }, [buttonOnlyExit, enrollment, entryOwner, epoch, mode, pendingEntry]);
 
+  // Watches browser privacy events while a private web session is open.
   useEffect(() => {
+    // User accounts quick-exit when their private tab becomes hidden.
     const onHidden = () => {
-      if (document.hidden && phaseRef.current !== "public") quickExit();
+      if (document.hidden && phaseRef.current === "safe" && roleRef.current === "USER") quickExit();
     };
+    // Escape provides a fast exit unless this role requires the exit button.
     const onKey = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" &&
+        !buttonOnlyExit &&
         ["safe", "pin", "portal"].includes(phaseRef.current)
       ) {
         event.preventDefault();
         quickExit();
       }
     };
+    // Locks private data when the page closes or moves into browser history.
     const onPageHide = () => {
+      if (buttonOnlyExit) return;
       if (phaseRef.current !== "public") quickExit();
       else {
         epoch.current++;
@@ -130,15 +150,20 @@ export function useSessionSecurity({
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("keydown", onKey);
     };
-  }, [epoch, quickExit]);
+  }, [buttonOnlyExit, epoch, quickExit]);
 
   const noteInteraction = useCallback(() => {
     lastInteraction.current = Date.now();
     setIdleSeconds(null);
   }, [setIdleSeconds]);
 
+  // Starts the user idle timer and resets it after keyboard, pointer, or form activity.
   useEffect(() => {
-    if (phase !== "safe" && phase !== "portal") return;
+    // Organization workspaces stay open until their user signs out or exits manually.
+    if (phase !== "safe" || buttonOnlyExit) {
+      setIdleSeconds(null);
+      return;
+    }
     noteInteraction();
     const events = ["pointerdown", "keydown", "input"] as const;
     events.forEach((event) => document.addEventListener(event, noteInteraction));
@@ -156,7 +181,7 @@ export function useSessionSecurity({
         document.removeEventListener(event, noteInteraction),
       );
     };
-  }, [phase, noteInteraction, quickExit, setIdleSeconds]);
+  }, [buttonOnlyExit, phase, noteInteraction, quickExit, setIdleSeconds]);
 
   return noteInteraction;
 }

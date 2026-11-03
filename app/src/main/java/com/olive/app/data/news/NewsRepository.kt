@@ -28,6 +28,7 @@ data class NewsArticle(
     val isPaywalled: Boolean? = null,
     val publisherUrl: String = ""
 ) {
+    // News: Converts this record into JSON.
     fun toJson(): JSONObject =
         JSONObject().put("title", title).put("summary", summary).put("link", link)
             .put("source", source).put("published", published)
@@ -35,6 +36,7 @@ data class NewsArticle(
             .put("isPaywalled", isPaywalled ?: JSONObject.NULL).put("publisherUrl", publisherUrl)
 
     companion object {
+        // Rebuilds one cached news story from its saved JSON fields.
         fun fromJson(json: JSONObject) = NewsArticle(
             json.getString("title"),
             json.optString("summary"),
@@ -53,6 +55,7 @@ enum class NewsScope { LOCAL, GLOBAL }
 
 // Daily Digest uses Google's live RSS feeds and keeps the original story links.
 class GoogleNewsRepository {
+    // Builds the Google News language and country query for the selected locale.
     fun rssLocaleQuery(language: String): String {
         val langTag = AppLocaleManager.getLanguageTag(language)
         return when (langTag) {
@@ -65,6 +68,7 @@ class GoogleNewsRepository {
         }
     }
 
+    // Loads the newest news articles from cache and available feeds.
     suspend fun latest(language: String, scope: NewsScope, place: String): List<NewsArticle> =
         withContext(Dispatchers.IO) {
             val locale = rssLocaleQuery(language)
@@ -83,6 +87,7 @@ class GoogleNewsRepository {
                     instanceFollowRedirects = true
                     setRequestProperty("Accept", "application/rss+xml, application/xml")
                 }
+            // Use the fallback when latest is unavailable.
             try {
                 check(connection.responseCode in 200..299)
                 connection.inputStream.use { stream ->
@@ -94,7 +99,9 @@ class GoogleNewsRepository {
                     var link = ""
                     var source = ""
                     var published = ""
+                    // News: Keeps latest active while parser event type does not equal xml pull parser end document and articles size < 40.
                     while (parser.eventType != XmlPullParser.END_DOCUMENT && articles.size < 40) {
+                        // Keeps the newest valid news result when feeds return at different times.
                         when (parser.eventType) {
                             XmlPullParser.START_TAG -> when (parser.name) {
                                 "item" -> {
@@ -116,6 +123,7 @@ class GoogleNewsRepository {
 
                             XmlPullParser.END_TAG -> if (parser.name == "item") {
                                 inItem = false
+                                // Keep only titled HTTPS Google News results before resolving publisher links.
                                 if (title.isNotBlank() && link.startsWith("https://news.google.com/")) {
                                     val clean = Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY)
                                         .toString().trim().take(240)

@@ -8,6 +8,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ProfileSetupValidationTest {
+    // Checks the validation step with the test's sample data.
     private fun validation(
         safeContact: Boolean = false,
         trigger: String = "moon garden",

@@ -40,7 +40,11 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
   await expect(
     page.locator('a[href$="/account"],a[href$="/download"]'),
   ).toHaveCount(0);
-  await page.locator(".grove-brand").click({ clickCount: 5, delay: 120 });
+  await page.getByRole("tab", { name: "Account", exact: true }).click();
+  await page.getByRole("button", { name: "olive icon", exact: true }).click({
+    clickCount: 2,
+    delay: 120,
+  });
   await expect(
     page.getByRole("button", { name: "Sign in", exact: true }),
   ).toBeVisible();

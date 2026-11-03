@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="32dp" />
+            <solid android:color="#FAF9F5" />
+        </shape>
+    </item>
+    <item android:inset="72dp">
+        <shape android:shape="ring" android:innerRadiusRatio="3" android:thicknessRatio="10">
+            <solid android:color="#45613C" />
+        </shape>
+    </item>
+</layer-list>

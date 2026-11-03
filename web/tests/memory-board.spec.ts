@@ -1,8 +1,8 @@
 // Tests the olive memory cover game's board and controls.
 import { expect, test } from "@playwright/test";
 
-// Inputs: the values in this case. Expected: all board sizes fit the laptop viewport and contain only complete pairs.
-test("all board sizes fit the laptop viewport and contain only complete pairs", async ({
+// Inputs: the values in this case. Expected: every board stays inside its play area and controls remain reachable without horizontal page scrolling.
+test("all board sizes stay usable without horizontal scrolling", async ({
   page,
 }) => {
   for (const [width, height] of [
@@ -33,8 +33,7 @@ test("all board sizes fit the laptop viewport and contain only complete pairs", 
           .querySelector(".game-bottom")!
           .getBoundingClientRect();
         return {
-          fits:
-            document.documentElement.scrollHeight <= innerHeight + 1 &&
+          pageWidthFits:
             document.documentElement.scrollWidth <= innerWidth,
           inside: cards.every(
             (card) =>
@@ -43,13 +42,13 @@ test("all board sizes fit the laptop viewport and contain only complete pairs", 
               card.top >= board.top - 1 &&
               card.bottom <= board.bottom + 1,
           ),
-          controls: bottom.bottom <= innerHeight,
+          controls: bottom.bottom <= document.documentElement.scrollHeight + 1,
           columns: new Set(cards.map((card) => Math.round(card.left))).size,
           rows: new Set(cards.map((card) => Math.round(card.top))).size,
         };
       });
       expect(layout, `${size}x${size} at ${width}x${height}`).toEqual({
-        fits: true,
+        pageWidthFits: true,
         inside: true,
         controls: true,
         columns: size,

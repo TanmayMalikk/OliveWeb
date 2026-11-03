@@ -27,6 +27,7 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
+    // Saves the food cover state so its cart and choices survive Safe App entry.
     fun saveFoodCover(
         cart: Map<String, Int>,
         favorites: Set<String>,
@@ -72,6 +73,7 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
+    // Records checkout for session cover state.
     suspend fun recordCheckout(foods: List<OrderLine>, totalCents: Int, error: String) {
         with(runtime) {
             with(state) {
@@ -88,6 +90,7 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
+    // Dismisses the food-cover address prompt for this visit.
     fun dismissAddressPrompt() {
         with(runtime) {
             with(state) {
@@ -96,6 +99,7 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
         }
     }
 
+    // Saves the delivery address locally and to the account profile.
     fun saveAddress(address: DeliveryAddress) {
         with(runtime) {
             with(state) {
