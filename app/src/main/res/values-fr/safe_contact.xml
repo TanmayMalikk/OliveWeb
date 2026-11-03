@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">Préparation du téléversement chiffré</string>
     <string name="documents_preparing_upload_help">Le fichier sélectionné est traité et chiffré sur cet appareil.</string>
     <string name="documents_upload_queued">En attente d’une connexion</string>
-    <string name="documents_upload_waiting_retry">En attente d’une nouvelle tentative</string>
+    <string name="documents_upload_waiting_retry">Téléversement en pause — nouvelle tentative automatique</string>
     <string name="documents_upload_starting">Démarrage du téléversement sécurisé</string>
     <string name="documents_upload_progress">Téléversement : %1$d%%</string>
     <string name="documents_upload_finalizing">Finalisation du téléversement sécurisé</string>
