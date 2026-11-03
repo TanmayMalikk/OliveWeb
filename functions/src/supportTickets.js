@@ -7,8 +7,10 @@ const {safetyCaller} = require("./safetyPlanAccess");
 const {saveSupportConversation, closeSupportConversation, supportConversationId, SUPPORT} =
   require("./supportGroups");
 
+// Finds staff accounts that are active and ready to receive support tickets.
 async function candidates() {
   const result = [];
+  // Checks trusted role claims and profile readiness for each account.
   for (const user of await listEveryUser()) {
     if (user.disabled || user.customClaims?.role !== "STAFF") continue;
     const profile = await readProfile(user.uid);
@@ -17,6 +19,7 @@ async function candidates() {
   return result;
 }
 
+// Starts or cancels a user's regular support ticket independently of consultations.
 exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
   const caller = await safetyCaller(request);
   const action = request.data?.action;
@@ -24,6 +27,7 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
     throw new HttpsError("permission-denied", "Owner only.");
   }
   const reference = db.collection("supportRequests").doc(caller.uid);
+  // Cancels the active request, archives its chat, and releases the assigned staff slot.
   if (action === "stop") {
     const current = (await reference.get()).data();
     if (current?.staffUid) {
@@ -42,6 +46,7 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
 
   const staffCandidates = await candidates();
   const newConversationId = supportConversationId(caller.uid, SUPPORT);
+  // Assigns the least-busy staff member and saves the new ticket atomically.
   const ticket = await db.runTransaction(async transaction => {
     const current = (await transaction.get(reference)).data();
     if (current?.requested && current.staffUid) return current;
@@ -49,6 +54,7 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
       staff.uid, db.collection("safetyStaff").doc(staff.uid),
     ]));
     const settings = new Map();
+    // Loads each candidate's live assignment count inside the transaction.
     for (const [uid, staffReference] of references) {
       settings.set(uid, (await transaction.get(staffReference)).data() || {});
     }

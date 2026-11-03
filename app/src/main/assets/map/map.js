@@ -21,16 +21,20 @@ let mapboxAttributionAdded=false;
 let points=[];
 let followEnabled=false;
 let followUid=null;
+// Map: Builds the map marker icon. It creates a Leaflet div icon with the required accessible marker markup.
 function markerIcon(point){
   const className=point.blue?'olive-own-live-dot':(point.live?'olive-live-dot':(point.lastKnown?'olive-last-known-dot':'olive-contact-dot'));
   const size=(point.live||point.lastKnown)?24:22;
   return L.divIcon({className:'olive-live-marker',html:'<div class="'+className+'"></div>',iconSize:[size,size],iconAnchor:[size/2,size/2]});
 }
+// Map: Chooses the map marker style. It checks the value against the rules before using it.
 function markerStyle(point){return point.blue?'blue':(point.live?'live':(point.lastKnown?'last-known':'contact'));}
+// returns the animate marker for map. It goes through the list and keeps or changes each item that is needed.
 function animateMarker(uid,marker,target,duration){
   if(markerAnimations[uid]) cancelAnimationFrame(markerAnimations[uid]);
   const start=marker.getLatLng();
   const began=performance.now();
+  // returns the frame for map. It saves the new value and refreshes what the user sees.
   function frame(now){
     const progress=Math.min(1,(now-began)/duration);
     const eased=1-Math.pow(1-progress,3);
@@ -50,6 +54,7 @@ window.oliveSetPoints=function(next,moveCamera){
     active[uid]=true;
     const target=[point.latitude,point.longitude];
     let marker=markers[uid];
+    // Only continue with marker when marker is false.
     if(!marker){
       marker=L.marker(target,{icon:markerIcon(point)}).addTo(map);
       marker._oliveStyle=markerStyle(point);
@@ -65,6 +70,7 @@ window.oliveSetPoints=function(next,moveCamera){
     if(marker.getTooltip()) marker.setTooltipContent(label); else marker.bindTooltip(label,{direction:'top'});
     if(marker.getPopup()) marker.setPopupContent(label); else marker.bindPopup(label);
     const trailPoints=(point.trail||[]).map(entry=>[entry.latitude,entry.longitude]);
+    // Only continue with trail points when trail points length>1.
     if(trailPoints.length>1){
       if(trails[uid]) trails[uid].setLatLngs(trailPoints).setStyle({color:point.blue?'#1769aa':'#c52b25'});
       else trails[uid]=L.polyline(trailPoints,{color:point.blue?'#1769aa':'#c52b25',weight:4,opacity:.78,lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
@@ -79,6 +85,7 @@ window.oliveSetPoints=function(next,moveCamera){
     if(trails[uid]){map.removeLayer(trails[uid]);delete trails[uid];}
   }});
   const tracked=points.find(point=>point.live&&point.accuracy);
+  // tracked is handled here by tracked.
   if(tracked){
     if(accuracyCircle) accuracyCircle.setLatLng([tracked.latitude,tracked.longitude]).setRadius(tracked.accuracy).setStyle({color:tracked.blue?'#1769aa':'#c52b25',fillColor:tracked.blue?'#1769aa':'#c52b25'});
     else accuracyCircle=L.circle([tracked.latitude,tracked.longitude],{
@@ -92,6 +99,7 @@ window.oliveSetPoints=function(next,moveCamera){
 };
 window.oliveSetRoute=function(coordinates,fitRoute){
   const line=coordinates||[];
+  // line checks whether line length>1 before continuing.
   if(line.length>1){
     if(!mapboxAttributionAdded){
       map.attributionControl.addAttribution('&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a>');

@@ -402,10 +402,6 @@
     <string name="admin_accounts_description">创建账号并查看工作人员的用户分配数量。</string>
 
     <string name="steps_today">今日步数</string>
-    <plurals name="steps_goal_value">
-        <item quantity="other">目标：%1$d 步</item>
-    </plurals>
-
     <string name="calories">卡路里</string>
 
 

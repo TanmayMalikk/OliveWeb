@@ -91,6 +91,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         ).withZone(ZoneId.systemDefault())
     }
 
+    // Opens a new or existing private note in the editor.
     fun openEditor(entry: PrivateEntry?) {
         session.clearPrivateEntryStatus()
         editingId = entry?.id
@@ -112,6 +113,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         PrivateEntryEditLog(logEntry, formatter) { logEntryId = null }
         return
     }
+    // Show the note editor when the user is creating or changing a note.
     if (editorOpen) {
         val entry = session.privateEntries.firstOrNull { it.id == editingId }
         val editorListState = rememberLazyListState()
@@ -203,6 +205,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     Text(if (editingId == null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry))
                 }
             }
+            // Save the note only after at least one field has changed.
             if (entry?.edits?.isNotEmpty() == true) item {
                 TextButton(
                     onClick = { logEntryId = entry.id },
@@ -217,6 +220,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     }
     val trashed =
         session.privateEntries.filter { it.deletedAt != null }.sortedByDescending { it.deletedAt }
+    // Leave the editor before opening the deleted-note folder.
     if (trashOpen) {
         Trash(trashed, formatter, { id ->
             session.restorePrivateEntry(id)
@@ -297,6 +301,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 session
             )
         }
+        // Let the empty-search message use the full grid width.
         if (filtered.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
                 if (search.isBlank()) uiText(
@@ -304,6 +309,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 ) else uiText(R.string.no_notes_found), color = Muted
             )
         }
+        // Put the pinned heading across the full note grid.
         if (pinned.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
                 stringResource(R.string.pinned),

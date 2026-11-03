@@ -15,6 +15,7 @@ internal data class SafetyPlanContact(val id: String, val name: String, val deta
 
 private const val SAFETY_CONTACT_PREFIX = "trusted-contact:"
 
+// Creates one trusted-contact checklist item for a new safety plan.
 internal fun safetyPlanContactItem(contact: SafeContact) = SafetyChecklistItem(
     SAFETY_CONTACT_PREFIX + contact.id,
     JSONObject().put("name", contact.name).put("details", contact.details).toString()
@@ -61,6 +62,7 @@ internal fun readSafetyChecklist(
     }
 }
 
+// Encodes a safety checklist so it can be stored in one plan field.
 internal fun writeSafetyChecklist(items: List<SafetyChecklistItem>): String =
     JSONObject().put("oliveSafetyChecklist", 1)
         .put("items", JSONArray().also { rows ->
@@ -72,6 +74,7 @@ internal fun writeSafetyChecklist(items: List<SafetyChecklistItem>): String =
             }
         }).toString()
 
+// Creates the short checklist summary shown before opening a safety-plan section.
 internal fun safetyChecklistPreview(raw: String) = readSafetyChecklist(raw).joinToString("\n") {
     readSafetyPlanContact(it)?.let { contact -> "• ${contact.name}: ${contact.details}" }
         ?: ((if (it.checked) "☑ " else "☐ ") + it.text)

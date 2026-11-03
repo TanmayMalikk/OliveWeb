@@ -52,6 +52,7 @@ import java.util.Base64
 // UI sizing/color: this root fills the window; the 12dp quick-exit inset and OliveGreen button styling live in its Scaffold.
 internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
+// Chooses the account, cover, onboarding, or Safe App root screen.
 @Composable
 internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int = 0) {
     val uiText = rememberResourceText()
@@ -97,6 +98,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
     ) { mutableStateOf(false) }
     var observedUnlock by remember { mutableIntStateOf(session.unlockAnimationVersion) }
     var pinAnimationRunning by remember { mutableStateOf(false) }
+    // Start the olive reveal only after a new successful private entry.
     LaunchedEffect(session.unlockAnimationVersion, session.screen) {
         val currentUnlock = session.unlockAnimationVersion
         if (currentUnlock > observedUnlock && session.screen == SessionScreen.Safe) {
@@ -115,6 +117,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                 .clearAndSetSemantics { }) {
             Box(Modifier.fillMaxSize()) {
                 if (shouldComposeCover(session.usesCover)) {
+                    // Keep the user's selected cover alive underneath private screens.
                     when (session.coverType) {
                         CoverType.FOOD -> OliveCover(
                             cover,
@@ -146,6 +149,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                     }
                 }
             }
+            // Return TalkBack focus to the cover after a privacy exit finishes.
             if (isCover && !session.privacyBlackout && session.accessibilityExitVersion > 0) {
                 key(session.accessibilityExitVersion) {
                     AccessibleMessage(
@@ -156,6 +160,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
             }
         }
         if (!isCover) {
+            // Hide the keyboard whenever the private PIN screen opens.
             LaunchedEffect(session.screen) {
                 if (session.screen == SessionScreen.Pin) {
                     keyboard?.hide()
@@ -252,6 +257,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                                     Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
                                         paneTitle = pane
                                     }).then(if (targetScreen != session.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
+                                        // Opens the cover, account entry, onboarding, or Safe App for the current session.
                                         when (targetScreen) {
                                             SessionScreen.Loading -> Box(
                                                 Modifier.fillMaxSize(),
@@ -366,12 +372,14 @@ internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Setting
 internal enum class ActivityCategory { Settings, Triggers, PinAttempts, Checkouts, Privacy }
 internal enum class CredentialFieldError { InvalidUsername, InvalidPassword, UsernameTaken, IncorrectPassword }
 
+// Creates the messaging identity used after account sign-in.
 internal fun messagingIdentityMarker(identity: AccountIdentity, publicKey: ByteArray): String {
     val digest = MessageDigest.getInstance("SHA-256").digest(publicKey)
     val keyId = Base64.getUrlEncoder().withoutPadding().encodeToString(digest).take(16)
     return "secure-v2:${identity.uid}:${identity.username.lowercase()}:$keyId"
 }
 
+// Registers an encryption identity before opening secure messaging.
 internal fun shouldRegisterMessagingIdentity(
     savedMarker: String?,
     identity: AccountIdentity,

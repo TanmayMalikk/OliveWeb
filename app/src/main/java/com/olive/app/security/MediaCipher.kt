@@ -74,7 +74,9 @@ object MediaCipher {
     private fun transform(input:InputStream,output:OutputStream,cipher:Cipher,onProgress:(Long)->Unit) {
         val buffer=ByteArray(bufferSize)
         var processed=0L
+        // Turn an unexpected transform failure into a readable message.
         try {
+            // Media cipher: Keeps transform active while true.
             while(true) {
                 val count=input.read(buffer)
                 if(count<0) break

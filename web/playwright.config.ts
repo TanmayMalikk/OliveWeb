@@ -21,5 +21,12 @@ export default defineConfig({
     url: "http://127.0.0.1:5173/api/health",
     reuseExistingServer: true,
     timeout: 30000,
+    env: {
+      ...process.env,
+      VITE_FIREBASE_API_KEY: "",
+      VITE_FIREBASE_PROJECT_ID: "",
+      VITE_FIREBASE_STORAGE_BUCKET: "",
+      VITE_FIREBASE_APP_ID: "",
+    },
   },
 });

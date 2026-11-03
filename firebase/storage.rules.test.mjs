@@ -174,6 +174,19 @@ test("private notes and incident records belong only to their account", async ()
   await assertSucceeds(deleteObject(ref(owner, path)));
 });
 
+test("fitness summaries sync only with their signed-in owner", async () => {
+  const owner = env.authenticatedContext("fitness-owner").storage();
+  const other = env.authenticatedContext("fitness-other").storage();
+  const path = "accounts/fitness-owner/fitness/summary.json";
+  const options = {contentType: "application/json"};
+  await assertSucceeds(uploadString(ref(owner, path), '{"days":[]}', "raw", options));
+  await assertSucceeds(getBytes(ref(owner, path)));
+  await assertFails(getBytes(ref(other, path)));
+  await assertFails(uploadString(ref(other, path), "{}", "raw", options));
+  await assertFails(uploadString(ref(owner, path), "{}", "raw", {contentType: "text/plain"}));
+  await assertFails(uploadString(ref(owner, path), "x".repeat(128 * 1024 + 1), "raw", options));
+});
+
 test("media files follow protected object sharing metadata", async () => {
   const path = "users/media-alice/media/storage-media-1";
   await env.withSecurityRulesDisabled(async (context) => {

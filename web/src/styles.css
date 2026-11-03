@@ -3,8 +3,9 @@
 @import "./styles/covers.css";
 @import "./styles/safe-app.css";
 @import "./styles/base.css";
+@import "./styles/fluid-layout.css";
 .page-width {
-  width: min(100% - clamp(2rem, 7vw, 8rem), 88rem);
+  width: var(--fluid-page-width);
   margin-inline: auto;
 }
 .eyebrow {

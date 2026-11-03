@@ -31,6 +31,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         hideKeyboard()
     }
 
+    // Checks the clean install opens onboarding only after the olive is double tapped step with the test's sample data.
     @Test
     fun cleanInstallOpensOnboardingOnlyAfterTheOliveIsDoubleTapped() {
         waitCover()
@@ -46,6 +47,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("new_user").assertIsDisplayed()
     }
 
+    // Checks the credentials use live requirements and inline errors step with the test's sample data.
     @Test
     fun credentialsUseLiveRequirementsAndInlineErrors() {
         openOnboarding()
@@ -61,6 +63,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 4")
     }
 
+    // Checks the safe contact gets shorter onboarding and no cover step with the test's sample data.
     @Test
     fun safeContactGetsShorterOnboardingAndNoCover() {
         openOnboarding()
@@ -107,6 +110,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("sign_out").assertExists()
     }
 
+    // Checks the onboarding needs city but not afull delivery address step with the test's sample data.
     @Test
     fun onboardingNeedsCityButNotAFullDeliveryAddress() {
         openOnboarding()
@@ -171,6 +175,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the onboarding contacts quick exit and returning user step with the test's sample data.
     @Test
     fun onboardingContactsQuickExitAndReturningUser() {
         register(username = "returning_user_tester")

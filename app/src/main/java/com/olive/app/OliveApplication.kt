@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 class OliveApplication : Application() {
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // Creates app-wide notification channels and background services at startup.
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.FIREBASE_CONFIGURED) {

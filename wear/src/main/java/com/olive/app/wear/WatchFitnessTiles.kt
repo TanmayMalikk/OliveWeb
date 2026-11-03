@@ -39,6 +39,7 @@ internal data class WatchTileSnapshot(
 )
 
 internal object WatchTileData {
+    // Reads the latest synchronized fitness snapshot used by both watch tiles.
     fun read(context: Context): WatchTileSnapshot {
         val preferences = context.getSharedPreferences("watch_fitness", Context.MODE_PRIVATE)
         val today = LocalDate.now().toString()
@@ -67,6 +68,7 @@ internal object WatchTileData {
 }
 
 class OliveActivityTileService : Material3TileService() {
+    // Builds the glanceable step, distance, and calorie tile shown outside the watch app.
     override suspend fun MaterialScope.tileResponse(requestParams: TileRequest): Tile {
         val data = WatchTileData.read(this@OliveActivityTileService)
         val progress = (data.steps.toFloat() / data.stepGoal).coerceIn(0f, 1f)
@@ -108,6 +110,7 @@ class OliveActivityTileService : Material3TileService() {
 }
 
 class OliveVitalsTileService : Material3TileService() {
+    // Builds the glanceable heart-rate tile and its no-reading state.
     override suspend fun MaterialScope.tileResponse(requestParams: TileRequest): Tile {
         val data = WatchTileData.read(this@OliveVitalsTileService)
         val current = data.currentHeartRate?.toString() ?: "--"
@@ -152,6 +155,7 @@ class OliveVitalsTileService : Material3TileService() {
     }
 }
 
+// Opens the full Olive Fitness watch app when a user taps either tile.
 private fun MaterialScope.openWatchApp(id: String) = clickable(
     id = id,
     action = launchAction(

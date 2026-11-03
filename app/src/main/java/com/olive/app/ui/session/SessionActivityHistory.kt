@@ -14,6 +14,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Owns activity records and history synchronization.
 internal class SessionHistory(private val runtime: SessionRuntime) {
+    // Adds a non-sensitive settings action to private account history.
     fun recordSettingsInteraction(area: String, action: String) {
         with(runtime) {
             with(state) {
@@ -32,6 +33,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
+    // Reloads local activity history and private notes for the current account.
     fun refreshHistory(uid: String) {
         with(runtime) {
             with(state) {
@@ -45,6 +47,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
                         ) to purged
                     }
                     val entries = withContext(Dispatchers.IO) { store.privateEntries(uid) }
+                    // Ignore results from an account that signed out while history was loading.
                     if (enrollment?.uid == uid) {
                         settingsHistory =
                             histories.first.filter { it.area != "Privacy" && (it.area != "Olive Branch" || it.changes.isNotEmpty()) }
@@ -73,6 +76,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
+    // Leaves a history category, or leaves the activity page when no category is open.
     fun activityBack() {
         with(runtime) {
             with(state) {
@@ -101,6 +105,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
+    // Starts a background upload when local history has not reached the cloud yet.
     fun queueHistorySync() {
         with(runtime) {
             with(state) {
@@ -111,10 +116,12 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
                 historySyncJob = scope.launch {
                     delay(750.milliseconds)
                     historySyncMutex.withLock {
+                        // Keep syncing only while the same account remains signed in.
                         while (enrollment?.uid == uid) {
                             val pending = withContext(Dispatchers.IO) { store.pendingHistory(uid) }
                             if (pending.isEmpty()) break
                             for (record in pending) {
+                                // Turn an unexpected queue history sync failure into a readable message.
                                 try {
                                     accounts.saveHistoryRecord(
                                         AccountIdentity(uid, username),

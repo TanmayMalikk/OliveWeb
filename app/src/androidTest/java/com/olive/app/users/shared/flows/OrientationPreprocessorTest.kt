@@ -21,6 +21,7 @@ class OrientationPreprocessorTest {
     private lateinit var preprocessor: OrientationPreprocessor
     private lateinit var testDocBytes: ByteArray
 
+    // Prepares the sample data and device state used by this test.
     @Before
     fun setUp() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -32,11 +33,13 @@ class OrientationPreprocessorTest {
         assertTrue("test_doc.png should not be empty", testDocBytes.isNotEmpty())
     }
 
+    // Clears the sample data after this test finishes.
     @After
     fun tearDown() {
         preprocessor.close()
     }
 
+    // Checks the process upright document step with the test's sample data.
     @Test
     fun testProcessUprightDocument() {
         val processedBytes = preprocessor.process(testDocBytes)
@@ -48,6 +51,7 @@ class OrientationPreprocessorTest {
         resultBitmap.recycle()
     }
 
+    // Checks the process rotated documents step with the test's sample data.
     @Test
     fun testProcessRotatedDocuments() {
         val originalBitmap = BitmapFactory.decodeByteArray(testDocBytes, 0, testDocBytes.size)
@@ -116,6 +120,7 @@ class OrientationPreprocessorTest {
         originalBitmap.recycle()
     }
 
+    // Checks the mean pixel difference step with the test's sample data.
     private fun meanPixelDifference(first: Bitmap, second: Bitmap): Double {
         val width = 64
         val height = 64

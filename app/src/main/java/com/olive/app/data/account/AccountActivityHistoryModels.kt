@@ -23,10 +23,12 @@ data class PrivateEntryEdit(
     val timestamp: Long = System.currentTimeMillis(),
     val changes: List<FieldChange>,
 ) {
+    // Account: Converts this record into JSON.
     fun toJson(): JSONObject = JSONObject().put("id", id).putReadableTime("timestamp", timestamp)
         .put("changes", JSONArray().also { rows -> changes.forEach { rows.put(it.toJson()) } })
 
     companion object {
+        // Rebuilds this activity record from its saved JSON fields.
         fun fromJson(value: JSONObject): PrivateEntryEdit {
             val rows = value.optJSONArray("changes") ?: JSONArray()
             return PrivateEntryEdit(
@@ -49,9 +51,11 @@ data class PrivateEntry(
     val deletedAt: Long? = null,
     val purgedAt: Long? = null,
 ) {
+    // Account: Converts this record into JSON.
     fun toJson(): JSONObject = JSONObject().put("id", id).putReadableTime("timestamp", timestamp)
         .putReadableTime("updatedAt", updatedAt)
         .put("title", title).put("body", body).put("pinned", pinned)
+        // Add each changed profile field to the saved history record.
         .put("edits", JSONArray().also { rows -> edits.forEach { rows.put(it.toJson()) } })
         .also {
             if (kind != null) it.put("kind", kind.name)
@@ -60,6 +64,7 @@ data class PrivateEntry(
         }
 
     companion object {
+        // Rebuilds this activity record from its saved JSON fields.
         fun fromJson(value: JSONObject): PrivateEntry {
             val edits = value.optJSONArray("edits") ?: JSONArray()
             return PrivateEntry(
@@ -95,15 +100,18 @@ private fun elapsedSince(timestamp: Long, now: Long): Long {
     return runCatching { Math.subtractExact(now, timestamp) }.getOrDefault(Long.MAX_VALUE)
 }
 
+// Returns true after a trashed entry reaches the deletion limit.
 fun PrivateEntry.trashExpired(now: Long = System.currentTimeMillis()) =
     deletedAt?.let { elapsedSince(it, now) >= PRIVATE_ENTRY_TRASH_RETENTION_MS } == true
 
+// Calculates how many full days remain before a trashed entry is deleted.
 fun PrivateEntry.trashDaysRemaining(now: Long = System.currentTimeMillis()): Int {
     val deleted = deletedAt ?: return 0
     val remaining = (PRIVATE_ENTRY_TRASH_RETENTION_MS - elapsedSince(deleted, now)).coerceAtLeast(0L)
     return ((remaining + 86_399_999L) / 86_400_000L).toInt()
 }
 
+// Calculates the remaining trash time for the live countdown.
 fun PrivateEntry.trashSecondsRemaining(now: Long = System.currentTimeMillis()): Int {
     val deleted = deletedAt ?: return 0
     return ((PRIVATE_ENTRY_TRASH_RETENTION_MS - elapsedSince(deleted, now)).coerceAtLeast(0L) + 999L).div(
@@ -112,10 +120,12 @@ fun PrivateEntry.trashSecondsRemaining(now: Long = System.currentTimeMillis()): 
 }
 
 data class FieldChange(val field: String, val before: String, val after: String) {
+    // Account: Converts this record into JSON.
     fun toJson(): JSONObject =
         JSONObject().put("field", field).put("before", before).put("after", after)
 
     companion object {
+        // Rebuilds this account record from protected JSON data.
         fun fromJson(value: JSONObject) = FieldChange(
             value.getString("field"),
             value.optString("before"),
@@ -132,12 +142,14 @@ data class SettingsEvent(
     val action: String,
     val changes: List<FieldChange> = emptyList(),
 ) {
+    // Converts this account record into protected JSON data.
     fun toJson(): JSONObject =
         JSONObject().put("id", id).putReadableTime("timestamp", timestamp).put("area", area)
             .put("action", action)
             .put("changes", JSONArray().also { rows -> changes.forEach { rows.put(it.toJson()) } })
 
     companion object {
+        // Rebuilds this account record from protected JSON data.
         fun fromJson(value: JSONObject): SettingsEvent {
             val rows = value.optJSONArray("changes") ?: JSONArray()
             return SettingsEvent(
@@ -157,11 +169,13 @@ data class TriggerEvent(
     val pinAttempts: Int = 0,
     val lastResult: String = "No PIN attempt",
 ) {
+    // Converts this account record into protected JSON data.
     fun toJson(): JSONObject =
         JSONObject().put("id", id).putReadableTime("timestamp", timestamp).put("source", source)
             .put("pinAttempts", pinAttempts).put("lastResult", lastResult)
 
     companion object {
+        // Rebuilds this activity record from its saved JSON fields.
         fun fromJson(value: JSONObject) = TriggerEvent(
             value.getString("id"),
             value.getLong("timestamp"),
@@ -173,9 +187,11 @@ data class TriggerEvent(
 }
 
 data class OrderLine(val food: String, val quantity: Int) {
+    // Account: Converts this record into JSON.
     fun toJson(): JSONObject = JSONObject().put("food", food).put("quantity", quantity)
 
     companion object {
+        // Rebuilds this activity record from its saved JSON fields.
         fun fromJson(value: JSONObject) =
             OrderLine(value.getString("food"), value.getInt("quantity"))
     }
@@ -188,12 +204,14 @@ data class CheckoutEvent(
     val totalCents: Int,
     val error: String,
 ) {
+    // Account: Converts this record into JSON.
     fun toJson(): JSONObject = JSONObject().put("id", id).putReadableTime("timestamp", timestamp)
         .put("totalCents", totalCents)
         .put("error", error)
         .put("foods", JSONArray().also { rows -> foods.forEach { rows.put(it.toJson()) } })
 
     companion object {
+        // Rebuilds this activity record from its saved JSON fields.
         fun fromJson(value: JSONObject): CheckoutEvent {
             val rows = value.optJSONArray("foods") ?: JSONArray()
             return CheckoutEvent(
@@ -209,6 +227,7 @@ data class CheckoutEvent(
 
 // Changes are recorded field by field so the history can show old and new values clearly.
 fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> = buildList {
+    // Records a setting only when the old and new values differ.
     fun changed(field: String, old: String, new: String) {
         if (old != new) add(FieldChange(field, old, new))
     }
@@ -233,6 +252,7 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
         )
     )
     if (before.contacts != after.contacts) {
+        // Formats the summary shown by account storage.
         fun summary(contacts: List<SafeContact>) = contacts.joinToString("; ") {
             "${it.name}: ${it.details}${if (it.safeToStay) " (Safe to stay)" else ""}${if (it.linkedUid.isNotBlank()) " (Linked chat account)" else ""}"
         }

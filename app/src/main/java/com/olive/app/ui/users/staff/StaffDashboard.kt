@@ -36,11 +36,13 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages, Map }
 
+// Shows the staff workspace with assigned users, tickets, map, and settings.
 @Composable
 internal fun StaffPortal(session: SessionViewModel) {
     LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
     var page by remember { mutableStateOf(StaffPage.Dashboard) }
     BackHandler(enabled = page != StaffPage.Dashboard) { page = StaffPage.Dashboard }
+    // Opens the selected staff dashboard section.
     when (page) {
         StaffPage.Dashboard -> StaffDashboard(
             session,
@@ -66,6 +68,7 @@ internal fun StaffPortal(session: SessionViewModel) {
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
+// Draws the staff workspace navigation and selected section.
 @Composable
 private fun StaffDashboard(
     session: SessionViewModel,

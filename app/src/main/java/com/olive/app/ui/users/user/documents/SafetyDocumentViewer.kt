@@ -50,9 +50,11 @@ import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.util.zip.ZipFile
 
+// Opens an in-app image, video, PDF, or text viewer for a safety document.
 @Composable
 internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
+    // Reload the preview when the selected encrypted file changes.
     DisposableEffect(file) { onDispose { file.delete() } }
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -80,6 +82,7 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
             }
         }
         HorizontalDivider()
+        // Opens the correct in-app viewer for an image, video, PDF, or text document.
         when {
             document.mimeType.startsWith("image/") -> ImageViewer(file, document.name)
             document.mimeType.startsWith("video/") -> VideoViewer(file)
@@ -100,7 +103,7 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
         }
     }
 }
-
+// Fits an image inside the document viewer with zoom controls.
 @Composable
 private fun ImageViewer(file: File, name: String) {
     var scale by remember { mutableFloatStateOf(1f) }
@@ -158,10 +161,12 @@ private fun ImageViewer(file: File, name: String) {
     }
 }
 
+// Plays a saved safety video inside the app.
 @Composable
 private fun VideoViewer(file: File) {
     val context = LocalContext.current
     var player by remember { mutableStateOf<VideoView?>(null) }
+    // Prepare and release video playback with the viewer lifecycle.
     DisposableEffect(Unit) { onDispose { player?.stopPlayback() } }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(factory = {
@@ -189,6 +194,7 @@ private fun VideoViewer(file: File) {
 
 private data class PdfPage(val bitmap: Bitmap, val count: Int)
 
+// Renders a saved PDF one page at a time inside the app.
 @Composable
 private fun PdfViewer(file: File) {
     var page by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
@@ -250,6 +256,7 @@ private fun renderPdfPage(file: File, index: Int): PdfPage {
     }
 }
 
+// user safety document viewer shows this text viewer view so the user can view its details and use its actions.
 @Composable
 private fun TextViewer(file: File, docx: Boolean) {
     val content by produceState<String?>(null, file) {
@@ -289,6 +296,7 @@ private fun readDocx(file: File): String {
     }
 }
 
+// user safety document viewer shows this unsupported viewer view so the user can view its details and use its actions.
 @Composable
 private fun UnsupportedViewer() {
     Column(

@@ -127,6 +127,7 @@ class OrientationPreprocessor(context: Context) : AutoCloseable {
         }
     }
 
+    // Closes the active feature for orientation preprocessor.
     override fun close() {
         ortSession.close()
     }
@@ -143,7 +144,6 @@ class OrientationPreprocessor(context: Context) : AutoCloseable {
 
         // Allocate direct buffer capacity for floating calculations (3 channels * 224 * 224)
         val buffer = FloatBuffer.allocate(3 * width * height)
-
         for (channel in 0 until 3) {
             for (y in 0 until height) {
                 for (x in 0 until width) {

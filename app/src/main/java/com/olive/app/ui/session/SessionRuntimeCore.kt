@@ -31,6 +31,7 @@ internal class SessionRuntime(
     val vault get() = localStorage.vault
     val activityVault get() = localStorage.activityVault
 
+    // Checks whether Android has a PIN, pattern, password, or biometric lock.
     fun phoneSecure() =
         application.getSystemService(android.app.KeyguardManager::class.java).isDeviceSecure
 
@@ -59,6 +60,7 @@ internal class SessionRuntime(
     var historySyncJob: Job? = null
     var idleJob: Job? = null
     var socialSubscription: ChatSubscription? = null
+    var accountSyncSubscription: ChatSubscription? = null
     var conversationSubscription: ChatSubscription? = null
     var messageSubscription: ChatSubscription? = null
     var observedFriendshipIds = emptySet<String>()
@@ -127,6 +129,7 @@ internal class SessionRuntime(
 
 // Uses a 25-second timeout by default; Android authentication gets longer. Epoch/job checks reject canceled work.
 internal class SessionOperations(private val runtime: SessionRuntime) {
+    // Runs one session task with a timeout and a readable error message.
     fun runOperation(failure: String, timeoutMillis: Long = 25_000, block: suspend (Long) -> Unit) {
         with(runtime) {
             with(state) {
@@ -136,6 +139,7 @@ internal class SessionOperations(private val runtime: SessionRuntime) {
                 operationJob = scope.launch {
                     val runningJob = coroutineContext.job
                     var finalFailure: String? = null
+                    // Turn an unexpected task failure into the message prepared by its feature.
                     try {
                         withTimeout(timeoutMillis.milliseconds) { block(token) }
                     } catch (_: TimeoutCancellationException) {

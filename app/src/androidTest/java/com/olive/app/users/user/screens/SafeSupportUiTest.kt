@@ -31,6 +31,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafeSupportUiTest : OliveUiTestBase() {
+    // Checks the support overlay uses the shared talk back traversal order step with the test's sample data.
     @Test
     fun supportOverlayUsesTheSharedTalkBackTraversalOrder() {
         setup()
@@ -55,6 +56,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         )
     }
 
+    // Checks the setup step with the test's sample data.
     private fun setup(): SessionViewModel {
         openOnboarding()
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
@@ -97,7 +99,9 @@ class SafeSupportUiTest : OliveUiTestBase() {
         return session
     }
 
+    // Checks the toggle step with the test's sample data.
     private fun toggle() = compose.onNodeWithTag("support_menu_toggle").performClick()
+    // Checks the capture step with the test's sample data.
     private fun capture(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val file = File(instrumentation.targetContext.getExternalFilesDir(null), name)
@@ -107,6 +111,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the available support actions and quick exit work with the menu open step with the test's sample data.
     @Test
     fun availableSupportActionsAndQuickExitWorkWithTheMenuOpen() {
         setup()
@@ -124,6 +129,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("support_menu_toggle").assertDoesNotExist()
     }
 
+    // Checks the trusted contacts open from the support menu instead of settings step with the test's sample data.
     @Test
     fun trustedContactsOpenFromTheSupportMenuInsteadOfSettings() {
         val session = setup()
@@ -138,6 +144,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safe_contacts").assertDoesNotExist()
     }
 
+    // Checks the hotlines match the saved city and can browse another province step with the test's sample data.
     @Test
     fun hotlinesMatchTheSavedCityAndCanBrowseAnotherProvince() {
         val session = setup()
@@ -176,6 +183,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the device location changes resources without changing the saved address step with the test's sample data.
     @Test
     fun deviceLocationChangesResourcesWithoutChangingTheSavedAddress() {
         val session = setup()
@@ -217,6 +225,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("hotline_city").assertDoesNotExist()
     }
 
+    // Checks the back dismisses support before leaving the current safe page step with the test's sample data.
     @Test
     fun backDismissesSupportBeforeLeavingTheCurrentSafePage() {
         val session = setup()
@@ -233,6 +242,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         assertEquals(SafePage.Home, session.page)
     }
 
+    // Checks the support menu fits compact screens with large french text step with the test's sample data.
     @Test
     fun supportMenuFitsCompactScreensWithLargeFrenchText() {
         val session = setup()
@@ -268,12 +278,14 @@ class SafeSupportUiTest : OliveUiTestBase() {
         capture("support-menu-large-text.png")
     }
 
+    // Checks the talk back can open support and quick exit without reaching the underlying screen step with the test's sample data.
     @Test
     fun talkBackCanOpenSupportAndQuickExitWithoutReachingTheUnderlyingScreen() {
         val session = setup()
         TalkBackTestSession(compose.activity).use { talkBack ->
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             compose.waitUntil(10_000) { context.getSystemService(android.view.accessibility.AccessibilityManager::class.java).isTouchExplorationEnabled }
+            // Checks the activate step with the test's sample data.
             fun activate(tag: String) =
                 compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnClick) { it() }
             activate("support_menu_toggle")
