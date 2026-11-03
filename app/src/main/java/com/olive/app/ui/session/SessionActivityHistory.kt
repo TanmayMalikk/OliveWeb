@@ -14,7 +14,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Owns activity records and history synchronization.
 internal class SessionHistory(private val runtime: SessionRuntime) {
-    // Records settings interaction for session activity history.
+    // Adds a non-sensitive settings action to private account history.
     fun recordSettingsInteraction(area: String, action: String) {
         with(runtime) {
             with(state) {
@@ -33,7 +33,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session activity history: Refreshes history.
+    // Reloads local activity history and private notes for the current account.
     fun refreshHistory(uid: String) {
         with(runtime) {
             with(state) {
@@ -47,7 +47,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
                         ) to purged
                     }
                     val entries = withContext(Dispatchers.IO) { store.privateEntries(uid) }
-                    // refresh history checks whether enrollment uid is uid before continuing.
+                    // Ignore results from an account that signed out while history was loading.
                     if (enrollment?.uid == uid) {
                         settingsHistory =
                             histories.first.filter { it.area != "Privacy" && (it.area != "Olive Branch" || it.changes.isNotEmpty()) }
@@ -76,7 +76,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session activity history: returns the activity back.
+    // Leaves a history category, or leaves the activity page when no category is open.
     fun activityBack() {
         with(runtime) {
             with(state) {
@@ -105,7 +105,7 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session activity history: returns the queue history sync. It waits for the set time and cancels the timer when the feature closes.
+    // Starts a background upload when local history has not reached the cloud yet.
     fun queueHistorySync() {
         with(runtime) {
             with(state) {
@@ -116,12 +116,12 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
                 historySyncJob = scope.launch {
                     delay(750.milliseconds)
                     historySyncMutex.withLock {
-                        // Session activity history: Keeps queue history sync active while enrollment? uid equals uid.
+                        // Keep syncing only while the same account remains signed in.
                         while (enrollment?.uid == uid) {
                             val pending = withContext(Dispatchers.IO) { store.pendingHistory(uid) }
                             if (pending.isEmpty()) break
                             for (record in pending) {
-                                // If queue history sync fails, catch the error so the app can keep running and explain the problem.
+                                // Turn an unexpected queue history sync failure into a readable message.
                                 try {
                                     accounts.saveHistoryRecord(
                                         AccountIdentity(uid, username),

@@ -35,7 +35,7 @@ internal fun PinSafeOliveTransition(
 ) {
     val progress = remember { Animatable(0f) }
 
-    // Update pin safe olive transition when information used by this screen changes.
+    // Start the reveal animation again after a new successful private entry.
     LaunchedEffect(Unit) {
         progress.snapTo(0f)
         progress.animateTo(
@@ -88,9 +88,9 @@ internal fun OliveBranchAnimation(
 ) {
     val progressAnimatable = remember { Animatable(0f) }
 
-    // Update olive branch animation when information used by this screen changes.
+    // Restart or clear the branch animation when its active state changes.
     LaunchedEffect(isAnimating) {
-        // Only continue with olive branch animation when is animating.
+        // Run this part only when is animating.
         if (isAnimating) {
             progressAnimatable.snapTo(0f)
             progressAnimatable.animateTo(
@@ -200,7 +200,7 @@ internal fun OliveBranchAnimationContent(
             for ((i, frac) in leafFractions.withIndex()) {
                 if (branchGrowth >= frac * 0.82f) {
                     val leafGrowth = ((branchGrowth - frac * 0.82f) / 0.22f).coerceIn(0f, 1f)
-                    // olive branch animation content checks whether path measure get pos tan total length * frac, pos, tan before continuing.
+                    // Only continue when path measure get pos tan total length * frac, pos, tan.
                     if (pathMeasure.getPosTan(totalLength * frac, pos, tan)) {
                         val baseAngle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
                         val side = if (i % 2 == 0) -1f else 1f
@@ -248,7 +248,7 @@ internal fun OliveBranchAnimationContent(
                 val currentOliveY: Float
                 val oliveRotation: Float
 
-                // olive drop is 0f is handled here by olive branch animation content.
+                // Keep the olive attached to its stem until the falling stage begins.
                 if (oliveDrop == 0f) {
                     currentOliveX = anchorX + 2.dp.toPx()
                     currentOliveY = anchorY + (16.dp.toPx() * budScale)
@@ -290,7 +290,7 @@ internal fun OliveBranchAnimationContent(
                     val currentRadius = maxRadius * FastOutSlowInEasing.transform(rippleProgress)
                     val rAlpha = (1f - rippleProgress).coerceIn(0f, 1f) * oliveAlpha
 
-                    // olive branch animation content checks whether r alpha > 0 01f before continuing.
+                    // Skip the ripple once it is too transparent to see.
                     if (rAlpha > 0.01f) {
                         drawCircle(
                             color = Color(0xFF6B8E23).copy(alpha = rAlpha * 0.45f),

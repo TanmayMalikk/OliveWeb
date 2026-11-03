@@ -6,7 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AccountPolicyTest {
-    // Account policy test kt: returns the profile. The test gives the code a clear input and checks the expected result.
+    // Builds a complete sample profile for this test.
     private fun profile(role: AccountRole, trigger: String = "hash", email: String = "") =
         UserProfile(
             username = "olive_test",

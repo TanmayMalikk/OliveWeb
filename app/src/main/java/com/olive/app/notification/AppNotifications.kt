@@ -73,7 +73,7 @@ object AppNotifications {
         )
     }
 
-    // App notifications: returns the content for. It checks the current account and sends the right alert.
+    // Builds the title and message shown in this app notification.
     internal fun contentFor(
         title: String?,
         body: String?,
@@ -118,6 +118,6 @@ object AppNotifications {
         )
     }
 
-    // App notifications: returns the or default. It checks the current account and sends the right alert.
+    // Reads a notification field and uses its safe default when it is missing.
     private fun String?.orDefault(fallback: String) = takeUnless { it.isNullOrBlank() } ?: fallback
 }

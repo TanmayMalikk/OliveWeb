@@ -25,7 +25,7 @@ class DeviceStore(
         )
     }
 
-    // Device store: returns the current.
+    // Loads the account currently linked to this phone.
     fun current(): DeviceEnrollment? {
         val root = vault.read()
         val uid = root.optString("activeUid")
@@ -45,7 +45,7 @@ class DeviceStore(
         return restored
     }
 
-    // Device store: returns the enroll.
+    // Creates a PIN-based device enrollment and saves the protected account key.
     fun enroll(identity: AccountIdentity, profile: UserProfile, pin: String): DeviceEnrollment {
         require(InputPolicy.validPin(pin))
         val verifier = SecretVerifier.createPin(pin)
@@ -77,7 +77,7 @@ class DeviceStore(
         return DeviceEnrollment(identity.uid, profile.triggerHash, profile.role)
     }
 
-    // Device store: returns the enrollment.
+    // Rebuilds one device enrollment from its saved JSON fields.
     private fun enrollment(uid: String, entry: JSONObject) = DeviceEnrollment(
         uid,
         entry.optString("triggerHash"),
@@ -86,14 +86,14 @@ class DeviceStore(
         entry.has("pinVerifier")
     )
 
-    // returns the device lock grant for device store.
+    // Returns the short-lived proof that Android device authentication succeeded.
     internal fun deviceLockGrant(uid: String): JSONObject {
         val entry = vault.read().getJSONObject("enrollments").getJSONObject(uid)
         check(SafeEntryMethod.fromStored(entry.optString("entryMethod")) == SafeEntryMethod.DEVICE_LOCK)
         return entry.getJSONObject("deviceLockGrant")
     }
 
-    // Device store: returns the enroll device lock.
+    // Creates a device-lock enrollment while keeping an optional backup app PIN.
     internal fun enrollDeviceLock(
         identity: AccountIdentity,
         profile: UserProfile,
@@ -187,7 +187,7 @@ class DeviceStore(
             saved.put("failures", if (next.failures >= 5) 0 else next.failures)
             // Ignore and remove cooldowns written by earlier app versions.
             saved.remove("lockedUntil")
-            // verify checks whether accepted is false before continuing.
+            // Record the failed attempt without storing the PIN that was entered.
             if (!accepted) {
                 val logs = root.child("attempts")
                 val entries = logs.optJSONArray(uid) ?: JSONArray().also { logs.put(uid, it) }
@@ -200,11 +200,11 @@ class DeviceStore(
         return result
     }
 
-    // Device store: returns the profile.
+    // Reads the private profile saved for this account on the phone.
     fun profile(uid: String): UserProfile =
         UserProfile.fromJson(vault.read().getJSONObject("profiles").getJSONObject(uid))
 
-    // Device store: Unlocks the private area snapshot.
+    // Loads the profile, failed PIN attempts, and pending-sync state together.
     fun unlockSnapshot(uid: String): Triple<UserProfile, List<FailedAttempt>, Boolean> {
         val root = vault.read()
         val profile = UserProfile.fromJson(root.getJSONObject("profiles").getJSONObject(uid))
@@ -213,7 +213,7 @@ class DeviceStore(
         return Triple(profile, attempts, pending)
     }
 
-    // Device store: Returns the cache profile. It writes the value to the correct Firebase path.
+    // Replaces the phone's saved copy of an account profile.
     fun cacheProfile(
         uid: String,
         profile: UserProfile,
@@ -243,11 +243,11 @@ class DeviceStore(
         audit?.let { recordSettings(uid, it) }
     }
 
-    // returns the pending sync for device store.
+    // Reports whether this profile still needs to be uploaded.
     fun pendingSync(uid: String) =
         vault.read().optJSONObject("pendingSync")?.optBoolean(uid) ?: false
 
-    // returns the archived conversation ids for device store.
+    // Returns the chats this account archived on this phone.
     fun archivedConversationIds(uid: String): Set<String> {
         val rows = vault.read().optJSONObject("archivedConversations")?.optJSONArray(uid)
             ?: return emptySet()
@@ -255,7 +255,7 @@ class DeviceStore(
             .toSet()
     }
 
-    // Updates conversation archived for device store.
+    // Adds or removes one chat from the phone's archived list.
     fun setConversationArchived(uid: String, conversationId: String, archived: Boolean) {
         require(conversationId.isNotBlank() && conversationId.length <= 160)
         vault.update { root ->
@@ -269,7 +269,7 @@ class DeviceStore(
         }
     }
 
-    // Device store: returns the private contact notes.
+    // Loads the private contact notes needed by app security.
     fun privateContactNotes(uid: String): Map<String, PrivateContactNote> {
         val rows = vault.read().optJSONObject("privateContactNotes")?.optJSONObject(uid)
             ?: return emptyMap()
@@ -280,7 +280,7 @@ class DeviceStore(
         }.toMap()
     }
 
-    // Device store: returns the append private contact note.
+    // Saves the private contact note so app security can load it again.
     fun appendPrivateContactNote(uid: String, targetUid: String, username: String, text: String) {
         val addition = text.trim()
         require(targetUid.isNotBlank() && targetUid != uid && targetUid.length <= 160)
@@ -298,17 +298,17 @@ class DeviceStore(
         }
     }
 
-    // Device store: Returns the mark synced. It writes the value to the correct Firebase path.
+    // Saves when this phone last downloaded the account's history.
     fun markSynced(uid: String) {
         vault.update { it.child("pendingSync").put(uid, false) }
     }
 
-    // returns the attempts for device store.
+    // Loads the failed private-entry attempts for this account.
     fun attempts(uid: String): List<FailedAttempt> {
         return attemptsFrom(vault.read(), uid)
     }
 
-    // Device store: returns the attempts from.
+    // Parses failed PIN attempts from the encrypted file.
     private fun attemptsFrom(root: JSONObject, uid: String): List<FailedAttempt> {
         val entries = root.optJSONObject("attempts")?.optJSONArray(uid) ?: JSONArray()
         return (0 until entries.length()).map { index ->
@@ -319,39 +319,39 @@ class DeviceStore(
 
     // Delegate activity storage so PIN/account state remains isolated from history merging.
     fun recordSettings(uid: String, event: SettingsEvent) = histories.recordSettings(uid, event)
-    // returns the settings history for device store.
+    // Adds one account-setting change to private activity history.
     fun settingsHistory(uid: String) = histories.settingsHistory(uid)
-    // Device store: Records trigger.
+    // Records a discreet trigger change without saving the trigger text.
     fun recordTrigger(uid: String, event: TriggerEvent) = histories.recordTrigger(uid, event)
-    // returns the trigger history for device store.
+    // Loads the saved discreet-trigger history.
     fun triggerHistory(uid: String) = histories.triggerHistory(uid)
-    // Device store: Records trigger attempt.
+    // Records when a cover app accepted or rejected a trigger attempt.
     fun recordTriggerAttempt(uid: String, id: String, accepted: Boolean) =
         histories.recordTriggerAttempt(uid, id, accepted)
 
-    // Device store: Records checkout.
+    // Records one completed or declined food-cover checkout.
     fun recordCheckout(uid: String, event: CheckoutEvent) = histories.recordCheckout(uid, event)
-    // returns the checkout history for device store.
+    // Loads saved food-cover checkout history.
     fun checkoutHistory(uid: String) = histories.checkoutHistory(uid)
-    // Device store: Saves private entry.
+    // Encrypts and saves one private note or incident entry.
     fun savePrivateEntry(uid: String, entry: PrivateEntry) = histories.savePrivateEntry(uid, entry)
-    // returns the private entries for device store.
+    // Loads private notes and incidents that have not expired.
     fun privateEntries(uid: String) = histories.privateEntries(uid)
-    // Device store: Removes expired private entries. It reads the current device time.
+    // Permanently removes private entries whose trash timer has ended.
     fun purgeExpiredPrivateEntries(uid: String, now: Long = System.currentTimeMillis()) =
         histories.purgeExpiredPrivateEntries(uid, now)
 
-    // Device store: returns the pending history.
+    // Loads history records that still need cloud sync.
     fun pendingHistory(uid: String) = histories.pendingHistory(uid)
-    // returns the mark history synced for device store.
+    // Marks uploaded history records as synced on this phone.
     fun markHistorySynced(uid: String, record: HistoryRecord) =
         histories.markHistorySynced(uid, record)
 
-    // returns the merge history for device store.
+    // Merges downloaded history with this phone's encrypted copy.
     fun mergeHistory(uid: String, records: List<HistoryRecord>) =
         histories.mergeHistory(uid, records)
 
-    // returns the forget device for device store.
+    // Removes this account's saved enrollment and private phone data.
     fun forgetDevice() {
         vault.update { it.remove("activeUid") }
     }

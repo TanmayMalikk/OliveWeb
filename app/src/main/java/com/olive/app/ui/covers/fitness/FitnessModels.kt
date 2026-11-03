@@ -161,18 +161,18 @@ internal data class FitnessHistoryDay(
 )
 
 internal object FitnessHistory {
-    // Fitness cover: returns the dates ending on.
+    // Creates the ordered date list used by the 14-day fitness graphs.
     fun datesEndingOn(endDate: LocalDate, days: Int): List<LocalDate> =
         (days.coerceIn(1, 31) - 1 downTo 0).map { endDate.minusDays(it.toLong()) }
 }
 
 internal object FitnessMath {
-    // returns the stride meters for fitness cover.
+    // Gives the fitness cover the stride meters it needs.
     fun strideMeters(heightCm: Float) = (heightCm.coerceIn(100f, 230f) * 0.413f) / 100f
-    // Fitness cover: returns the distance km. It uses the saved health data to update the fitness screen.
+    // Estimates walking distance from the saved step count.
     fun distanceKm(steps: Int, heightCm: Float) =
         steps.coerceAtLeast(0) * strideMeters(heightCm) / 1_000f
-    // returns the walking calories for fitness cover. It uses the saved health data to update the fitness screen.
+    // Returns the walking calories used by the fitness cover.
     fun walkingCalories(steps: Int, profile: FitnessProfile) =
         distanceKm(steps, profile.heightCm) * profile.weightKg.coerceIn(30f, 300f) * 0.75f
 }
@@ -185,7 +185,7 @@ internal object StepSourcePolicy {
         lastWatchActivityAt > 0L && nowMillis >= lastWatchActivityAt &&
             nowMillis - lastWatchActivityAt <= WATCH_ACTIVE_WINDOW_MS
 
-    // Fitness cover: returns the phone delta to add. It uses the saved health data to update the fitness screen.
+    // Adds only new phone steps so watch and phone totals are not counted twice.
     fun phoneDeltaToAdd(phoneDelta: Int, lastWatchActivityAt: Long, nowMillis: Long): Int =
         if (watchIsActive(lastWatchActivityAt, nowMillis)) 0 else phoneDelta.coerceAtLeast(0)
 

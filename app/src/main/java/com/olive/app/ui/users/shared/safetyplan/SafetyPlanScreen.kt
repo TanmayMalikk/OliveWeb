@@ -47,7 +47,7 @@ internal fun SafetyPlanScreen(
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    // Shared safe app safety plan screen: returns the leave editor. It reads or saves the correct part of the user's protected safety plan.
+    // Hides the keyboard before leaving or switching safety-plan sections.
     fun leaveEditor() {
         focus.clearFocus(force = true)
         keyboard?.hide()
@@ -55,9 +55,9 @@ internal fun SafetyPlanScreen(
 
     val lease = remember(ownerUid) { Any() }
     val defaults = remember(context) { safetyDefaults(context) }
-    // Update leave editor when information used by this screen changes.
+    // Stop this screen's plan listener when it leaves composition.
     DisposableEffect(lease) { onDispose { controller.close(lease) } }
-    // Update leave editor when information used by this screen changes.
+    // Open the plan and refresh it every five seconds while this screen is visible.
     LaunchedEffect(lease) {
         controller.open(ownerUid, ownerName, defaults, lease)
         while (true) {
@@ -79,7 +79,7 @@ internal fun SafetyPlanScreen(
         key.startsWith("${prefix}_") && key.substringAfter('_') !in SAFETY_CHECKLIST_SECTIONS &&
                 (readSafetyChecklist(field.value).isNotEmpty() || field.conflictRevision != null)
     }
-    // Update leave editor when information used by this screen changes.
+    // Return to the top when switching between primary and backup plans.
     LaunchedEffect(backup) { state.scrollToItem(0) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val headerMaxHeight = maxHeight * .5f
@@ -272,7 +272,7 @@ internal fun SafetyPlanScreen(
                                 )
                             }
                         }
-                        // Only continue with leave editor when organization editor and not safe contact is false.
+                        // Personal users can edit this section; safe contacts can only read it.
                         if (!organizationEditor && !safeContact) item {
                             Box(Modifier.padding(horizontal = 16.dp)) {
                                 SafetyContactSharingControls(
@@ -305,7 +305,7 @@ internal fun SafetyPlanScreen(
     }
 }
 
-// The safe contact safety plans screen is part of shared safe app safety plan screen. It gives the user the details and choices needed here.
+// Lets a trusted contact view the safety plans shared with them.
 @Composable
 internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     val controller = session.safetyPlans
@@ -372,7 +372,7 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     }
 }
 
-// This shows the safety contact sharing controls view for shared safe app safety plan screen. It fills the view with the latest details and actions.
+// Draws the safety contact sharing controls for the safety plan.
 @Composable
 private fun SafetyContactSharingControls(session: SessionViewModel, plan: SafetyPlan) {
     var selected by remember(plan.safeContactUids) { mutableStateOf(plan.safeContactUids.toSet()) }
@@ -423,7 +423,7 @@ private fun SafetyContactSharingControls(session: SessionViewModel, plan: Safety
     }
 }
 
-// The safety consultation controls view is part of shared safe app safety plan screen. It gives the user the details and choices needed here.
+// Lets a user request or cancel a separate plan-consult ticket.
 @Composable
 private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPlan) {
     val controller = session.safetyPlans
@@ -454,7 +454,7 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
         ) {
             Text(stringResource(R.string.safety_stop))
         }
-        // safety consultation controls checks whether plan staff uid is blank and plan safe contact uids is not empty is false before continuing.
+        // Show sharing choices only when the plan is not already shared with staff or a safe contact.
         if (plan.staffUid.isNotBlank() && plan.safeContactUids.isNotEmpty()) {
             Text(
                 stringResource(R.string.support_chat_contact),

@@ -31,7 +31,7 @@ class ProcessedMedia(
     val mimeType:String,
     private val cleanup:()->Unit={},
 ):Closeable {
-    // Closes the active feature for media. It checks access, protects the file, and then reads or saves it.
+    // Closes the source and destination files after media preprocessing ends.
     override fun close() {
         try { input.close() } finally { cleanup() }
     }
@@ -39,6 +39,6 @@ class ProcessedMedia(
 
 /** No-op implementation used until the parallel compression implementation is ready. */
 object PassThroughMediaPreprocessor:MediaPreprocessor {
-    // returns the process for media. It checks access, protects the file, and then reads or saves it.
+    // Passes through files that do not need image or video cleanup.
     override fun process(input:InputStream,mimeType:String,kind:MediaKind)=ProcessedMedia(input,mimeType)
 }

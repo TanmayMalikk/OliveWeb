@@ -49,7 +49,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
-        // wide row modifier fill max size padding bottom = 96 dp is handled here by messages screen.
+        // Wide screens place the conversation list and open chat beside each other.
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
             MessagingSidebar(
                 session, currentUid, portalExit(session, exit), showingArchived,
@@ -78,7 +78,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
     }
 }
 
-// returns the portal exit for shared safe app friends and messages screen.
+// Chooses whether Back returns to the dashboard or closes the organization portal.
 private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
     if (session.screen == SessionScreen.Portal) exit else null
 
@@ -173,7 +173,7 @@ private fun MessagingSidebar(
                 }
             }
         }
-        // Only continue with messaging sidebar when organization account.
+        // Hides friend controls for staff and admin accounts because support chats are assigned.
         if (organizationAccount) item {
             Surface(
                 shape = MaterialTheme.shapes.medium,
@@ -247,7 +247,7 @@ private fun MessagingSidebar(
             Text(stringResource(R.string.support_conversations), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() })
         }
-        // messaging sidebar checks whether support conversations is empty before continuing.
+        // Explain how support starts when this account has no support tickets yet.
         if (supportConversations.isEmpty()) item {
             Text(stringResource(when {
                 showingArchived -> R.string.no_archived_chats
@@ -263,7 +263,7 @@ private fun MessagingSidebar(
                 onActions = { conversationActions = conversation },
             )
         }
-        // messaging sidebar checks whether organization account is false before continuing.
+        // Personal accounts also show friend requests and direct messages.
         if (!organizationAccount) {
             item {
                 Text(stringResource(R.string.direct_messages), style = MaterialTheme.typography.titleMedium,
@@ -378,7 +378,7 @@ private fun ConversationRow(
     }
 }
 
-// returns the support tag label for shared safe app friends and messages screen. It uses the latest values so the user sees the right text and choices.
+// Formats the support tag label shown by secure messaging.
 @Composable
 private fun supportTagLabel(tag: String) = stringResource(
     when (tag) {

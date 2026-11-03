@@ -13,6 +13,8 @@ New-Item -ItemType Directory -Force -Path $summaryDirectory | Out-Null
 $results = [System.Collections.Generic.List[object]]::new()
 $testSourceFiles = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "app\src\test") -Recurse -File -ErrorAction SilentlyContinue) +
     @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "app\src\androidTest") -Recurse -File -ErrorAction SilentlyContinue) +
+    @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "wear\src\test") -Recurse -File -ErrorAction SilentlyContinue) +
+    @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "wear\src\androidTest") -Recurse -File -ErrorAction SilentlyContinue) +
     @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "web") -Recurse -File -Include "*.test.ts", "*.test.mjs", "*.spec.ts" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "node_modules" }) +
     @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "functions") -File -Filter "*.test.js" -ErrorAction SilentlyContinue) +
     @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "firebase") -File -Include "*.test.mjs", "*-plans.test.mjs" -ErrorAction SilentlyContinue)
@@ -78,6 +80,8 @@ function Add-JUnitResults {
 
 $androidFiles = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "app\build\test-results\testDebugUnitTest") -Filter "TEST-*.xml" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
 Add-JUnitResults "Android JVM" $androidFiles
+$wearFiles = @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "wear\build\test-results\testDebugUnitTest") -Filter "TEST-*.xml" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+Add-JUnitResults "Wear JVM" $wearFiles
 Add-JUnitResults "Web unit" @((Join-Path $reportDirectory "web-unit-tests.xml"))
 Add-JUnitResults "Web browser/accessibility" @((Join-Path $reportDirectory "web-browser-tests.xml"))
 Add-JUnitResults "Cloud Functions" @((Join-Path $reportDirectory "functions-tests.xml"))

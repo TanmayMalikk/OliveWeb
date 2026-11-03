@@ -11,22 +11,22 @@ import com.olive.app.ui.session.SessionRuntime
 internal interface SessionAccountManagementActions {
     val runtime: SessionRuntime
 
-    // Shared safe app session account management actions: Saves organization profile.
+    // Saves the staff or admin details entered during account setup.
     fun saveOrganizationProfile(fullName: String, dob: String, email: String, phone: String) =
         runtime.organization.saveOrganizationProfile(fullName, dob, email, phone)
 
-    // Shared safe app session account management actions: Updates organization profile.
+    // Updates the signed-in staff or admin profile after setup.
     fun updateOrganizationProfile(fullName: String, dob: String, email: String, phone: String) =
         runtime.organization.updateOrganizationProfile(fullName, dob, email, phone)
 
-    // Shared safe app session account management actions: Refreshes admin accounts.
+    // Reloads the account list shown in the admin portal.
     fun refreshAdminAccounts() = runtime.organization.refreshAdminAccounts()
-    // Builds managed account for shared safe app session account management actions.
+    // Creates a staff or admin account from the admin form.
     fun createManagedAccount(value: AdminAccountDraft) = runtime.organization.createManagedAccount(value)
-    // Shared safe app session account management actions: Removes managed account.
+    // Deletes a staff or admin account selected in the admin portal.
     fun deleteManagedAccount(value: AdminAccountSummary) = runtime.organization.deleteManagedAccount(value)
 
-    // Shared safe app session account management actions: Saves settings.
+    // Saves the user profile and situation details from Safe App settings.
     fun saveSettings(
         fullName: String,
         affected: String,
@@ -36,24 +36,24 @@ internal interface SessionAccountManagementActions {
         address: DeliveryAddress,
     ) = runtime.settings.saveSettings(fullName, affected, abuserName, dob, situation, address)
 
-    // Saves cover settings for shared safe app session account management actions.
+    // Saves the public profile details used by the selected cover app.
     fun saveCoverSettings(
         fullName: String,
         dob: String = runtime.state.coverDob,
         address: DeliveryAddress = runtime.state.deliveryAddress,
     ) = runtime.settings.saveCoverSettings(fullName, dob, address)
 
-    // Shared safe app session account management actions: Updates cover.
+    // Changes which cover app opens before the private Safe App.
     fun changeCover(type: CoverType) = runtime.settings.changeCover(type)
-    // Updates trigger for shared safe app session account management actions.
+    // Changes the hidden phrase that opens private entry from a cover app.
     fun changeTrigger(trigger: String, pin: String) = runtime.settings.changeTrigger(trigger, pin)
-    // Shared safe app session account management actions: Saves contacts.
+    // Saves the trusted contacts entered during setup or in settings.
     fun saveContacts(value: List<SafeContact>) = runtime.settings.saveContacts(value)
-    // Syncs the latest data for shared safe app session account management actions.
+    // Sends local setting changes to the account and downloads newer changes.
     fun sync() = runtime.settings.sync()
-    // Shared safe app session account management actions: Syncs local notification handler. It waits for the set time and cancels the timer when the feature closes.
+    // Restarts account notification listeners after the signed-in account changes.
     fun syncLocalNotificationHandler() = runtime.messaging.syncLocalNotificationHandler()
-    // Updates password for shared safe app session account management actions.
+    // Checks the current password before replacing it with the new password.
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) =
         runtime.settings.changePassword(currentPassword, newPassword, confirmation)
 }

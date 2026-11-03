@@ -6,7 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafetyPlanStateTest {
-    // Safety plan state test kt: returns the plan. The test gives the code a clear input and checks the expected result.
+    // Builds a sample safety plan for this test.
     private fun plan(
         fields: Map<String, SafetyField> = mapOf("primary_destination" to SafetyField("Home")),
         shareAction: String = "",

@@ -42,7 +42,7 @@ data class ChatConversation(
     val supportTag: String = "",
     val closedAt: Long = 0L,
 ) {
-    // Messaging: returns the display name.
+    // Chooses the private display name shown for this conversation.
     fun displayName(
         currentUid: String,
         viewerRole: AccountRole,
@@ -97,7 +97,7 @@ data class ChatMessage(
 
 // Messaging: Represents a live chat listener. It gives each screen one operation for stopping that listener safely.
 fun interface ChatSubscription {
-    // Messaging: Stops live chat updates. It checks the chat and uses its secure data before reading or saving a message.
+    // Removes the Firebase listener that was delivering live chat updates.
     fun close()
 }
 
