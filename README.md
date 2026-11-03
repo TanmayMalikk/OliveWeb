@@ -24,7 +24,9 @@ and a link to this projects firebase console.
 Copy the debug token and open the link, then add your token as a rule to the firebase project.
 
 ### Message to TA
+
 If you send us your Debug token on your device we can add your device to the firebase project without needing to link your google account.
+
 ---------------------------------------------
 # Testing
 ## UNIX Based Systems
