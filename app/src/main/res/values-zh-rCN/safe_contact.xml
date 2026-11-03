@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">正在准备加密上传</string>
     <string name="documents_preparing_upload_help">正在此设备上处理并加密所选文件。</string>
     <string name="documents_upload_queued">正在等待网络连接</string>
-    <string name="documents_upload_waiting_retry">正在等待重试</string>
+    <string name="documents_upload_waiting_retry">上传已暂停 — 将自动重试</string>
     <string name="documents_upload_starting">正在开始安全上传</string>
     <string name="documents_upload_progress">正在上传 %1$d%%</string>
     <string name="documents_upload_finalizing">正在完成安全上传</string>

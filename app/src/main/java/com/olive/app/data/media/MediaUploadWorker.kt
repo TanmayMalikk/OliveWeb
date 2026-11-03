@@ -16,6 +16,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
 import java.io.File
 import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -51,7 +52,7 @@ import kotlin.coroutines.resumeWithException
 class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWorker(context,parameters) {
     private val store=MediaTransferStore(context)
     private val repository:MediaTicketDataSource=MediaRepository()
-    private val client=OkHttpClient.Builder().retryOnConnectionFailure(true).build()
+    private val client=mediaUploadHttpClient()
 
     // Uploads one encrypted file in the background and saves its cloud record.
     override suspend fun doWork():Result {
@@ -152,7 +153,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
     // Saves the upload error and asks WorkManager to retry after a delay.
     private fun retry(job:MediaUploadJob,error:Exception):Result {
         // WorkManager keeps the same unique work chain and applies the configured exponential delay.
-        store.write(job.copy(status=MediaTransferStatus.QUEUED,error=error.localizedMessage?.take(240)))
+        val message=when(error) {
+            is SocketTimeoutException -> "Encrypted upload timed out. Retrying automatically."
+            else -> error.localizedMessage?.take(240) ?: "Encrypted upload interrupted. Retrying automatically."
+        }
+        store.write(job.copy(status=MediaTransferStatus.QUEUED,error=message))
         return Result.retry()
     }
 
@@ -180,6 +185,19 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         }
     }
 }
+
+/**
+ * Large ciphertext PUTs need a longer write window than OkHttp's short interactive-request
+ * default. The total call remains below the server's ten-minute signed-ticket lifetime so a stalled
+ * request fails before its capability expires and WorkManager can obtain a fresh ticket.
+ */
+internal fun mediaUploadHttpClient():OkHttpClient=OkHttpClient.Builder()
+    .retryOnConnectionFailure(true)
+    .connectTimeout(30,TimeUnit.SECONDS)
+    .readTimeout(1,TimeUnit.MINUTES)
+    .writeTimeout(5,TimeUnit.MINUTES)
+    .callTimeout(9,TimeUnit.MINUTES)
+    .build()
 
 /** Streams a bounded region of the encrypted staging file into one OkHttp request body. */
 private class FileSliceRequestBody(

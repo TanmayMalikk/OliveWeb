@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">Preparando la carga cifrada</string>
     <string name="documents_preparing_upload_help">El archivo seleccionado se está procesando y cifrando en este dispositivo.</string>
     <string name="documents_upload_queued">Esperando una conexión</string>
-    <string name="documents_upload_waiting_retry">Esperando para volver a intentar</string>
+    <string name="documents_upload_waiting_retry">Carga en pausa — se volverá a intentar automáticamente</string>
     <string name="documents_upload_starting">Iniciando la carga segura</string>
     <string name="documents_upload_progress">Subiendo %1$d%%</string>
     <string name="documents_upload_finalizing">Finalizando la carga segura</string>
