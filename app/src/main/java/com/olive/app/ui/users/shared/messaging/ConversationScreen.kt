@@ -57,6 +57,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.olive.app.data.SafetyDocument
 import com.olive.app.data.MessageDeliveryStatus
+import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
 import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
 import java.io.File
@@ -76,6 +77,9 @@ internal fun ChatPane(
     val listState = rememberLazyListState()
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible = imeBottom > 0
+    LaunchedEffect(currentUid, session.coverUsername, session.localMode) {
+        session.documents.load(currentUid, session.coverUsername, session.localMode)
+    }
     LaunchedEffect(session.messages.chatMessages.size, session.messages.chatMessages.lastOrNull()?.body) {
         if (session.messages.chatMessages.isNotEmpty()) listState.animateScrollToItem(session.messages.chatMessages.lastIndex)
     }
@@ -490,6 +494,10 @@ private fun SharedMediaMessage(
     onOpen: (SafetyDocument, File) -> Unit
 ) {
     var opening by remember(id) { mutableStateOf(false) }
+    val document = session.documents.state.files.firstOrNull { it.id == id }
+    val offline = session.media?.offlineCopies?.get(id) ?: OfflineMediaAvailability.NOT_CACHED
+    val error = session.documents.state.attachmentErrors[id]
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     Surface(
         onClick = {
             val uid = session.coverAccountId ?: return@Surface
@@ -523,5 +531,35 @@ private fun SharedMediaMessage(
                 )
             }
         }
+    }
+    if (document?.objectKey?.isNotBlank() == true) {
+        val cached = offline in setOf(
+            OfflineMediaAvailability.AVAILABLE,
+            OfflineMediaAvailability.REVALIDATION_REQUIRED,
+        )
+        TextButton(
+            onClick = {
+                if (cached) session.documents.removeOfflineCopy(document)
+                else session.documents.makeAvailableOffline(document)
+            },
+            enabled = offline != OfflineMediaAvailability.SAVING,
+            modifier = Modifier.testTag("shared_media_offline_$id"),
+        ) {
+            Text(stringResource(when {
+                offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
+                cached -> R.string.documents_remove_offline_copy
+                else -> R.string.documents_make_available_offline
+            }))
+        }
+        if (offline == OfflineMediaAvailability.RECENT_AVAILABLE) Text(
+            stringResource(R.string.documents_recently_cached),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    error?.let {
+        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                .testTag("shared_media_error_$id"))
+    }
     }
 }

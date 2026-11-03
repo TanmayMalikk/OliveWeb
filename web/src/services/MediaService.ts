@@ -70,11 +70,15 @@ async function encryptMediaFile(file: File, rawKey: Uint8Array) {
 }
 
 // Wraps the file key for the owner's registered RSA key using Android's version 2 OAEP settings.
-async function wrapForAccount(rawKey: Uint8Array, publicKeyText: string) {
+async function wrapForPublicKey(
+  rawKey: Uint8Array,
+  publicKeyText: string,
+  hash: "SHA-1" | "SHA-256",
+) {
   const publicKey = await crypto.subtle.importKey(
     "spki",
     fromBase64(publicKeyText),
-    { name: "RSA-OAEP", hash: "SHA-1" },
+    { name: "RSA-OAEP", hash },
     false,
     ["encrypt"],
   );
@@ -92,8 +96,8 @@ async function uploadCiphertext(
   ciphertext: Uint8Array,
   encryptedMetadata: string,
   wrappedKeys: Record<string, string>,
+  deviceWrappedKeys: Record<string, string>,
   uid: string,
-  accountAccessKey: string,
   report: (fraction: number) => void,
 ) {
   const { functions } = await firebase();
@@ -110,9 +114,9 @@ async function uploadCiphertext(
         ciphertextSha256: await checksum(ciphertext),
         encryptedMetadata,
         wrappedKeys,
+        deviceWrappedKeys,
         allowedUsers: [uid],
         encryptionVersion: 2,
-        accountAccessKey,
       })
     ).data as {
       mediaId: string;
@@ -222,14 +226,16 @@ export async function uploadBrowserDocument(
         ),
       ]),
     );
-    const wrappedKey = await wrapForAccount(rawKey, publicKey);
+    const device = await messageDevice(identity.uid);
+    const wrappedKey = await wrapForPublicKey(rawKey, publicKey, "SHA-1");
+    const deviceWrappedKey = await wrapForPublicKey(rawKey, device.publicKey, "SHA-256");
     await uploadCiphertext(
       crypto.randomUUID(),
       ciphertext,
       encryptedMetadata,
       { [identity.uid]: wrappedKey },
+      { [`${identity.uid}--${device.deviceId}`]: deviceWrappedKey },
       identity.uid,
-      toBase64(rawKey),
       report,
     );
     rawKey.fill(0);
@@ -267,7 +273,7 @@ async function decryptMetadata(value: string, key: CryptoKey) {
 export async function listBrowserDocuments(
   identity: Identity,
 ): Promise<BrowserDocument[]> {
-  const { db, functions } = await firebase();
+  const { db } = await firebase();
   const snapshot = await getDocs(
     query(
       collection(db, "files"),
@@ -303,8 +309,6 @@ async function resolveBrowserDocuments(
   identity: Identity,
   rows: Array<{ id: string; data: () => DocumentData }>,
 ): Promise<BrowserDocument[]> {
-  const { functions } = await firebase();
-  const { httpsCallable } = await import("firebase/functions");
   const device = await messageDevice(identity.uid);
   const deviceKey = `${identity.uid}--${device.deviceId}`;
   return Promise.all(
@@ -323,33 +327,8 @@ async function resolveBrowserDocuments(
       if (typeof value.encrypted_metadata === "string") {
         // Keep the document in the list when old metadata cannot be decrypted on this browser.
         try {
-          let raw: Uint8Array;
-          // A wrapped file key is needed before this browser can decrypt the metadata.
-          if (wrapped) {
-            raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
-            // The owner can use the account key when no device-specific key exists yet.
-            if (value.owner_id === identity.uid) {
-              void httpsCallable(
-                functions,
-                "mediaStoreAccountAccessKey",
-              )({
-                mediaId: row.id,
-                accountAccessKey: toBase64(raw),
-              }).catch(() => undefined);
-            }
-          } else {
-            const recovered = (
-              await httpsCallable(
-                functions,
-                "mediaAccountAccessKey",
-              )({
-                mediaId: row.id,
-              })
-            ).data as { accountAccessKey?: unknown };
-            if (typeof recovered.accountAccessKey !== "string")
-              throw new Error("Account document key is unavailable.");
-            raw = fromBase64(recovered.accountAccessKey);
-          }
+          if (!wrapped) throw new Error("This browser has no wrapped document key.");
+          const raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
           key = await importKey(raw);
           raw.fill(0);
           const metadata = await decryptMetadata(value.encrypted_metadata, key);
