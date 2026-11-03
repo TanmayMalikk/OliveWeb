@@ -45,7 +45,14 @@ internal class SessionRuntime(
     val cloudState get() = localStorage.cloudState
     val messageOutbox get() = localStorage.messageOutbox
     val chatCache get() = localStorage.chatCache
-    val dataSources = dataSourcesOverride ?: SessionDataSources.create(application, localMode, vault)
+    val documentIndex get() = localStorage.documentIndex
+    val offlineMediaCache get() = localStorage.offlineMediaCache
+    val dataSources = dataSourcesOverride ?: SessionDataSources.create(
+        application,
+        localMode,
+        vault,
+        documentIndex,
+    )
     val accounts get() = dataSources.accounts
     val adminRepository get() = dataSources.admin
     val messagingRepository get() = dataSources.messaging
