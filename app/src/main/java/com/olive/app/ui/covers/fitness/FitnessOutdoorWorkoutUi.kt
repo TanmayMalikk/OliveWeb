@@ -65,7 +65,7 @@ import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-
+// Shows workout type, live controls, route, and recent outdoor workouts.
 @Composable
 internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     val context = LocalContext.current
@@ -89,7 +89,9 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
         }
     }
 
+    // Refreshes the active workout and recent history once each second.
     LaunchedEffect(store) {
+        // Live workout values change outside Compose, so poll the small local store.
         while (true) {
             workout = store.snapshot()
             recentWorkouts = store.history()
@@ -98,6 +100,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
         }
     }
 
+    // Starts GPS tracking now, or asks for precise location first.
     fun startWorkout(type: OutdoorWorkoutType) {
         val preciseLocationGranted = ContextCompat.checkSelfPermission(
             context,
@@ -152,6 +155,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
                 }
             }
 
+            // Show live controls during a workout; otherwise show the start choices.
             if (workout.active) {
                 ActiveWorkoutContent(
                     workout = workout,
@@ -188,6 +192,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     }
 }
 
+// Draws the workout type selector for the fitness cover.
 @Composable
 private fun WorkoutTypeSelector(
     selected: OutdoorWorkoutType,
@@ -204,7 +209,7 @@ private fun WorkoutTypeSelector(
         }
     }
 }
-
+// Draws one selectable walking, running, cycling, or hiking option.
 @Composable
 private fun WorkoutTypeChip(
     modifier: Modifier,
@@ -227,7 +232,7 @@ private fun WorkoutTypeChip(
         modifier = modifier,
     )
 }
-
+// Shows live distance, duration, pace, map, pause, and finish controls.
 @Composable
 private fun ActiveWorkoutContent(
     workout: OutdoorWorkoutSnapshot,
@@ -278,6 +283,7 @@ private fun ActiveWorkoutContent(
     }
 }
 
+// Draws the workout location map for the fitness cover.
 @Composable
 private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: Long) {
     val points = workout.route
@@ -285,6 +291,7 @@ private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: L
         modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(20.dp)),
         contentAlignment = Alignment.Center,
     ) {
+        // Hide the route map until the workout has at least one GPS point.
         if (points.isEmpty()) {
             Text(
                 stringResource(R.string.fitness_waiting_for_gps),
@@ -323,6 +330,7 @@ private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: L
     }
 }
 
+// Shows up to five recent outdoor workouts.
 @Composable
 private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
     Column(
@@ -370,7 +378,7 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
         }
     }
 }
-
+// Draws one live workout value and its label.
 @Composable
 private fun WorkoutMetric(value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -379,8 +387,10 @@ private fun WorkoutMetric(value: String, label: String) {
     }
 }
 
+// Formats the workout type label shown by the fitness cover.
 @Composable
 private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
+    // Gives each workout type its translated label.
     when (type) {
         OutdoorWorkoutType.WALK -> R.string.fitness_walking
         OutdoorWorkoutType.RUN -> R.string.fitness_running
@@ -389,9 +399,11 @@ private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
     }
 )
 
+// Formats workout metres as kilometres.
 private fun formatDistance(distanceMeters: Double) =
     String.format(Locale.ROOT, "%.2f km", distanceMeters / 1_000.0)
 
+// Formats workout time as hours, minutes, and seconds.
 private fun formatDuration(elapsedMillis: Long): String {
     val totalSeconds = elapsedMillis / 1_000L
     val hours = totalSeconds / 3_600L
@@ -404,12 +416,14 @@ private fun formatDuration(elapsedMillis: Long): String {
     }
 }
 
+// Formats average workout pace in minutes per kilometre.
 private fun formatPace(pace: Double?) = pace?.let {
     val minutes = it.toInt()
     val seconds = ((it - minutes) * 60.0).toInt().coerceIn(0, 59)
     String.format(Locale.ROOT, "%d:%02d /km", minutes, seconds)
 } ?: "--"
 
+// Formats the completed workout date for recent history.
 private fun formatWorkoutDate(timestamp: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(timestamp))
 

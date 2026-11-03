@@ -78,6 +78,7 @@ private fun ActivityDateTimePicker(
         }
         if (value != null) TextButton(onClick = { onChange(null) }) { Text(stringResource(R.string.clear)) }
     }
+    // Run this part only when show date key value.
     if (showDate) key(value) {
         val initial = value ?: System.currentTimeMillis()
         val localDate = Instant.ofEpochMilli(initial).atZone(zone).toLocalDate()
@@ -102,6 +103,7 @@ private fun ActivityDateTimePicker(
             DatePicker(state = picker, modifier = Modifier.testTag("${tag}_calendar"))
         }
     }
+    // Skip the next action unless show time key pending date, value.
     if (showTime) key(pendingDate, value) {
         val initial = value?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
             ?: java.time.LocalTime.now(zone)
@@ -149,6 +151,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
     }
     var from by remember { mutableStateOf<Long?>(null) }
     var to by remember { mutableStateOf<Long?>(null) }
+    // Keeps history rows that fall inside the dates chosen by the user.
     fun inRange(time: Long) =
         (from == null || time >= from!!) && (to == null || time <= to!! + 59_999)
 
@@ -179,6 +182,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
         }
         item {
             Heading(
+                // Show the account summary until the user opens one history category.
                 if (selected == null) uiText(R.string.account_activity) else when (selected) {
                     ActivityCategory.Settings -> uiText(R.string.settings_history)
                     ActivityCategory.Triggers -> uiText(
@@ -235,6 +239,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // The summary shows only the five newest setting changes.
             if (selected == null && settings.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(
@@ -243,6 +248,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                 }) { Text(stringResource(R.string.see_more)) }
             }
         }
+        // Show trigger history on the summary and its full category page.
         if (selected == null || selected == ActivityCategory.Triggers) {
             item {
                 HorizontalDivider()
@@ -266,6 +272,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                         )
                         if (event.pinAttempts > 0) Text(
                             "${stringResource(R.string.pin_attempts)}: ${event.pinAttempts} · ${
+                                // Chooses the activity rows whose dates fall inside the selected range.
                                 when (event.lastResult) {
                                     "Accepted" -> uiText(R.string.accepted); "Incorrect PIN" -> uiText(
                                     R.string.incorrect_pin
@@ -278,6 +285,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // The summary shows only the five newest trigger events.
             if (selected == null && triggers.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(
@@ -286,6 +294,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                 }) { Text(stringResource(R.string.see_more)) }
             }
         }
+        // Show failed PIN attempts on the summary and their full category page.
         if (selected == null || selected == ActivityCategory.PinAttempts) {
             item {
                 HorizontalDivider()
@@ -294,6 +303,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.semantics { heading() })
             }
+            // Tell the user when no failed private-entry attempts were recorded.
             if (attempts.isEmpty()) item { Text(stringResource(R.string.no_failed_attempts_recorded)) }
             items(visible(ActivityCategory.PinAttempts, attempts), key = { it.id }) { attempt ->
                 Card(Modifier.fillMaxWidth().testTag("attempt_row")) {
@@ -309,6 +319,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // The summary shows only the five newest failed attempts.
             if (selected == null && attempts.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(
@@ -325,6 +336,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.semantics { heading() })
             }
+            // Tell the user when the food cover has no checkout history.
             if (checkouts.isEmpty()) item { Text(stringResource(R.string.no_checkout_attempts_yet)) }
             items(visible(ActivityCategory.Checkouts, checkouts), key = { it.id }) { event ->
                 Card(Modifier.fillMaxWidth().testTag("safe_checkout_history_row")) {
@@ -342,6 +354,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // The summary shows only the five newest checkout events.
             if (selected == null && checkouts.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(
@@ -358,6 +371,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.semantics { heading() })
             }
+            // Tell the user when Android has not reported any screen-capture events.
             if (privacy.isEmpty()) item { Text(stringResource(R.string.no_capture_events_reported_by_android)) }
             items(visible(ActivityCategory.Privacy, privacy), key = { it.id }) { event ->
                 Card(Modifier.fillMaxWidth()) {
@@ -371,6 +385,7 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     }
                 }
             }
+            // The summary shows only the five newest privacy events.
             if (selected == null && privacy.size > 5) item {
                 TextButton(onClick = {
                     session.showActivityCategory(

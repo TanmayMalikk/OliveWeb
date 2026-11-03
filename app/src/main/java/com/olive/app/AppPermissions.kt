@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 
 internal enum class OnboardingPermission { Notifications, Location, Camera, Microphone, Done }
 
+// Returns the next Android permission needed by onboarding.
 internal fun nextOnboardingPermission(
     notificationsNeeded: Boolean, notificationsAsked: Boolean,
     locationGranted: Boolean, locationAsked: Boolean, cameraGranted: Boolean, cameraAsked: Boolean,
@@ -88,6 +89,7 @@ internal class AppPermissions(
             afterOnboarding()
         }
 
+    // Checks whether Android granted approximate or precise location access.
     fun hasLocation() = listOf(
         Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_FINE_LOCATION
@@ -95,12 +97,14 @@ internal class AppPermissions(
         ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED
     }
 
+    // Checks whether Android granted precise location access.
     private fun hasPreciseLocation() =
         ContextCompat.checkSelfPermission(
             activity,
             Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
+    // Checks background location on Android 10 and newer; older versions do not need a separate grant.
     fun hasBackgroundLocation() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         ContextCompat.checkSelfPermission(
             activity,
@@ -108,6 +112,7 @@ internal class AppPermissions(
         ) == PackageManager.PERMISSION_GRANTED
     } else true
 
+    // Onboarding permissions: Opens the next permission prompt after onboarding. It checks saved prompt history and requests notifications, location, camera, or microphone in order.
     fun afterOnboarding() {
         activity.lifecycleScope.launch {
             activity.lifecycle.withResumed {
@@ -142,9 +147,11 @@ internal class AppPermissions(
         }
     }
 
+    // Asks Android whether one named permission is currently granted.
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
 
+    // Camera permission: Opens the camera permission prompt. It records that the prompt was shown and clears its state if Android cannot launch it.
     private fun launchCamera() {
         preferences.edit { putBoolean("camera_asked", true) }
         cameraPrompt = true
@@ -155,6 +162,7 @@ internal class AppPermissions(
         }
     }
 
+    // Microphone permission: Opens the microphone permission prompt. It records that the prompt was shown and clears its state if Android cannot launch it.
     private fun launchMicrophone() {
         preferences.edit { putBoolean("microphone_asked", true) }
         microphonePrompt = true
@@ -165,10 +173,12 @@ internal class AppPermissions(
         }
     }
 
+    // Location permission: Waits for all required location access. It returns immediately when access exists or shares one pending request between callers.
     suspend fun requestLocation(): Boolean {
         if (hasPreciseLocation() && hasBackgroundLocation()) return true
         locationResult?.let { return it.await() }
         val pending = CompletableDeferred<Boolean>().also { locationResult = it }
+        // Use the fallback when request location is unavailable.
         try {
             activity.lifecycle.withResumed { launchLocation() }
             return pending.await()
@@ -177,11 +187,14 @@ internal class AppPermissions(
         }
     }
 
+    // Location permission: Opens the next location prompt. It asks for foreground access first, then background access on supported Android versions.
     private fun launchLocation() {
         preferences.edit { putBoolean("location_asked", true) }
         locationPrompt = true
         if (locationResult == null) locationResult = CompletableDeferred()
+        // Use the fallback when launch location is unavailable.
         try {
+            // Location permission: Ask for foreground location before attempting background access.
             if (!hasPreciseLocation()) {
                 location.launch(
                     arrayOf(
@@ -203,10 +216,13 @@ internal class AppPermissions(
         }
     }
 
+    // Background location: Opens the background-location prompt and completes the waiting request when Android returns a result.
     private fun launchBackgroundLocation() {
         locationPrompt = true
         if (locationResult == null) locationResult = CompletableDeferred()
+        // Use the fallback when launch background location is unavailable.
         try {
+            // Background location: Android 10 and newer need a separate prompt; older versions already have enough access.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 backgroundLocation.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
             } else {

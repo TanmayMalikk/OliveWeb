@@ -17,6 +17,7 @@ export default function Notes() {
     return () => clearInterval(id);
   }, []);
   const entries = s.history.private_entries.map((e) => purgeEntry(e, now));
+  // Permanently removes trashed notes after their retention period ends.
   useEffect(() => {
     const expired = s.history.private_entries.find(
       (e) =>
@@ -38,6 +39,7 @@ export default function Notes() {
       (a, b) =>
         Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt,
     );
+  // Web user notes page: Adds the new item.
   function add() {
     const timestamp = Date.now();
     setEditing({

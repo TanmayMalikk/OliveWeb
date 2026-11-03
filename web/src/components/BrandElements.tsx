@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { ArrowRight, ArrowUpRight, Leaf } from "lucide-react";
 
+// Draws the olive branch used beside the website name.
 export function Branch({ className = "" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 320 180" fill="none" aria-hidden="true">
@@ -17,6 +18,7 @@ export function Branch({ className = "" }: { className?: string }) {
   );
 }
 
+// Combines the branch mark, site name, and short brand line.
 export function Logo({ small = false }: { small?: boolean }) {
   return (
     <a href="/" className={`brand ${small ? "small" : ""}`} aria-label="Olive Branch home">
@@ -26,10 +28,12 @@ export function Logo({ small = false }: { small?: boolean }) {
   );
 }
 
+// Draws the small arrow used in branded links and buttons.
 export function Forward({ children }: { children: ReactNode }) {
   return <>{children}<ArrowRight size={18} aria-hidden="true" /></>;
 }
 
+// Marks links that open another website or browser tab.
 export function External({ href, children }: { href: string; children: ReactNode }) {
   return (
     <a className="text-link" href={href} target="_blank" rel="noopener noreferrer">

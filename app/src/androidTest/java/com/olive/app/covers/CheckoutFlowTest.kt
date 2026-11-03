@@ -9,6 +9,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CheckoutFlowTest : OliveUiTestBase() {
+    // Checks the checkout declines discards payment and background clears form step with the test's sample data.
     @Test
     fun checkoutDeclinesDiscardsPaymentAndBackgroundClearsForm() {
         register(username = "checkout_tester")

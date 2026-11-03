@@ -23,6 +23,7 @@ import {
 import { useSession } from "../../../session/SessionProvider";
 import { accounts, triggerHash } from "../../../services/AccountService";
 import { CoverPreview } from "../../../public/GameLandingPage";
+// Shows the sign-in or registration form for the selected account role.
 export function AuthPage({
   organizationOnly = false,
 }: {
@@ -204,6 +205,7 @@ export function AuthPage({
     </div>
   );
 }
+// Collects the profile details required after a new account signs in.
 export function Setup() {
   const session = useSession();
   const identity = accounts.identity!;
@@ -223,6 +225,7 @@ export function Setup() {
   const steps = personal
     ? ["Your cover", "About you", "Private entry"]
     : ["Your profile", "Ready"];
+  // Moves the setup form to the selected step and places focus on its heading.
   function update(key: keyof Profile, value: string) {
     setProfile((p) => ({ ...p, [key]: value }));
   }

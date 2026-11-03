@@ -26,21 +26,26 @@ export interface FlightWorld {
   branches: Branch[];
   over: boolean;
 }
+// Protects the game speed from an invalid or negative score.
 const validScore = (score: number) =>
   Number.isFinite(score) ? Math.max(0, Math.floor(score)) : 0;
+// Replaces an invalid random value so branches stay inside the game area.
 const validRandom = (random: () => number) => {
   const value = random();
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
 };
+// Raises the flight speed a little after every two points.
 export function flightSpeedMultiplier(score: number) {
   return Math.min(7.5, 1 + Math.floor(validScore(score) / 2) / 10);
 }
+// Narrows the branch opening as the player's score grows.
 export function flightGap(score: number) {
   // The rounded branch tips extend half a stroke into each end of the gap.
   // Keep the visible opening at least two complete olive bodies tall.
   const minimumGap = FLIGHT.radiusY * 4 + FLIGHT.branchStroke;
   return Math.max(minimumGap, FLIGHT.gap - Math.floor(validScore(score) / 10) * 8);
 }
+// Starts a new flight with an olive and the first branch pair.
 export function newFlight(
   width: number = FLIGHT.width,
   random: () => number = () => 0.5,
@@ -68,12 +73,15 @@ export const leafPaths = [
   "M0 3 Q-24 8 -25 28 Q-5 26 0 3",
   "M0 9 Q24 12 25 33 Q5 29 0 9",
 ];
+// Draws the curved centre line used by one branch.
 export function branchPath(height: number) {
   return `M27 0 Q17 ${height * 0.36} 29 ${height}`;
 }
+// Tilts the olive up or down to match its movement.
 export function oliveAngle(velocity: number) {
   return Math.max(-25, Math.min(55, velocity / 9));
 }
+// Splits a curved branch into points that collision checks can follow.
 function quadratic(a: Point, control: Point, b: Point, count = 12): Point[] {
   return Array.from({ length: count + 1 }, (_, index) => {
     const t = index / count,
@@ -106,6 +114,7 @@ function bodyHitsPolygon(points: Point[], oliveY: number, velocity: number) {
     return { x: (x * cos + y * sin) / 13, y: (-x * sin + y * cos) / 17 };
   });
   let inside = false;
+  // Compare every edge of the leaf with the olive body.
   for (let i = 0, j = local.length - 1; i < local.length; j = i++) {
     const a = local[j],
       b = local[i];
@@ -121,6 +130,7 @@ function bodyHitsPolygon(points: Point[], oliveY: number, velocity: number) {
   }
   return inside;
 }
+// Checks whether the olive's small hitbox touches a branch, thorn, or leaf.
 export function hitsLeafyBranch(
   x: number,
   end: number,
@@ -131,6 +141,7 @@ export function hitsLeafyBranch(
   if (x > FLIGHT.oliveX + 20 || x + 54 < FLIGHT.oliveX - 20) return false;
   const height = down ? end : FLIGHT.height - end;
   const direction = down ? -1 : 1;
+  // Stop as soon as any branch part touches the olive.
   const hit = (points: Point[]) =>
     bodyHitsPolygon(
       points.map((p) => ({ x: x + p.x, y: end + direction * p.y })),
@@ -144,6 +155,7 @@ export function hitsLeafyBranch(
     { x: 29, y: height },
     24,
   );
+  // Check each short section of the curved stem.
   for (let i = 0; i < stem.length; i++) {
     const a = stem[i];
     if (
@@ -155,6 +167,7 @@ export function hitsLeafyBranch(
       )
     )
       return true;
+    // Skip branch points that are outside the current segment.
     if (i) {
       const b = stem[i - 1],
         length = Math.hypot(a.x - b.x, a.y - b.y);
@@ -178,6 +191,7 @@ export function hitsLeafyBranch(
   }
   return false;
 }
+// Applies gravity and moves every branch for one animation frame.
 export function advanceFlight(
   world: FlightWorld,
   seconds: number,

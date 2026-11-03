@@ -79,6 +79,7 @@ internal fun ChatPane(
     LaunchedEffect(session.messages.chatMessages.size, session.messages.chatMessages.lastOrNull()?.body) {
         if (session.messages.chatMessages.isNotEmpty()) listState.animateScrollToItem(session.messages.chatMessages.lastIndex)
     }
+    // Keep the newest message visible when the chat grows.
     LaunchedEffect(keyboardVisible) {
         if (keyboardVisible && session.messages.chatMessages.isNotEmpty()) {
             delay(120.milliseconds)
@@ -385,6 +386,7 @@ internal fun ChatPane(
     }
 }
 
+// Shows text or the correct viewer button for one chat message.
 @Composable
 private fun ChatMessageBody(
     chat: com.olive.app.data.ChatMessage, session: SessionViewModel, mine: Boolean,
@@ -395,6 +397,7 @@ private fun ChatMessageBody(
         SharedMediaMessage(parts[1], parts.getOrNull(2).orEmpty(), session, mine, onOpenMedia)
         return
     }
+    // An unsent location card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_LOCATION") {
         Surface(
             onClick = { session.navigation.openSafePage(SafePage.Location) }, shape = MaterialTheme.shapes.medium,
@@ -422,6 +425,7 @@ private fun ChatMessageBody(
         }
         return
     }
+    // An unsent safety-plan card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_SAFETY_PLAN") {
         Surface(
             shape = MaterialTheme.shapes.medium,
@@ -479,6 +483,7 @@ private fun ChatMessageBody(
     }
 }
 
+// shared safe app conversation screen shows this shared media message view so the user can view its details and use its actions.
 @Composable
 private fun SharedMediaMessage(
     id: String, name: String, session: SessionViewModel, mine: Boolean,

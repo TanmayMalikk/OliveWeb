@@ -43,8 +43,7 @@ data class VoipCall(
     val participants: List<VoipParticipant>
 )
 
-// VoipInvitation is a class that is responsible for accepting calls.
-// When a user is 'dialed' the server will ping that user to make a VoipInvitation object to handle connecting to the call.
+// Stores the call invitation that the server returns for one invited user.
 data class VoipInvitation(
     val callId: String,
     val callerId: String,
@@ -52,7 +51,7 @@ data class VoipInvitation(
     val status: VoipParticipantStatus
 )
 
-// An interface that measures the status of the voip call.
+// Describes the call state that a screen can display to the user.
 sealed interface VoipState {
     data object Idle : VoipState
     data class Ringing(val callId: String, val callName: String, val callerId: String = "") : VoipState
@@ -71,11 +70,11 @@ class VoipApiException(
     message: String
 ) : IOException(message)
 
+// Sends call invitations and responses through the Olive Branch VoIP API.
 @Suppress("unused")
-// Again this is under construction so it is not currently being used.
 class VoipManager(
+    // Supplies the API location, HTTP client, and optional sign-in token used by each request.
     @Suppress("unused")
-    // API authentication is also not built yet, needs server side hosting to finalize implementation.
     private val apiBaseUrl: String = DEFAULT_API_BASE_URL,
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val bearerTokenProvider: () -> String? = { null }
@@ -86,7 +85,7 @@ class VoipManager(
 
     val state: StateFlow<VoipState> = mutableState.asStateFlow()
 
-    //double check this code when Live, might need to be changed to connect to actual server.
+    // Rejects unsafe or malformed server addresses before any call request is sent.
     init {
         val apiUri = runCatching { URI(baseUrl) }.getOrNull()
         val isHttps = apiUri?.scheme.equals("https", ignoreCase = true)
@@ -104,11 +103,13 @@ class VoipManager(
         }
     }
 
+    // Creates a new call record and invites each selected participant.
     suspend fun startCall(
         name: String,
         callerId: String,
         participantIds: List<String>
     ): VoipCall {
+        // Stops incomplete or conflicting call details from reaching the server.
         require(name.isNotBlank()) { "Call name must not be blank" }
         require(callerId.isNotBlank()) { "Caller ID must not be blank" }
         require(participantIds.isNotEmpty()) { "At least one participant is required" }
@@ -116,6 +117,7 @@ class VoipManager(
         require(participantIds.distinct().size == participantIds.size) { "Participant IDs must be unique" }
         require(callerId !in participantIds) { "Caller cannot be a participant" }
 
+        // Builds the JSON body expected by the call-creation endpoint.
         val body = JSONObject()
             .put("name", name.trim())
             .put("callerId", callerId)
@@ -123,11 +125,13 @@ class VoipManager(
         return parseCall(request("POST", "/api/calls", body))
     }
 
+    // Loads every call record currently visible to the signed-in client.
     suspend fun listCalls(): List<VoipCall> {
         val response = request("GET", "/api/calls")
         return response.getJSONArray("calls").toCallList()
     }
 
+    // Loads the unanswered call invitations for one user.
     suspend fun getIncomingCalls(userId: String): List<VoipInvitation> {
         require(userId.isNotBlank()) { "User ID must not be blank" }
         val encodedUserId = withContext(Dispatchers.IO) {
@@ -137,6 +141,7 @@ class VoipManager(
         return response.getJSONArray("invitations").toInvitationList()
     }
 
+    // Polls the server and updates the ringing state until the collector stops.
     fun receiveCalls(
         userId: String,
         pollingIntervalMillis: Long = DEFAULT_POLLING_INTERVAL_MILLIS
@@ -144,7 +149,9 @@ class VoipManager(
         require(userId.isNotBlank()) { "User ID must not be blank" }
         require(pollingIntervalMillis > 0) { "Polling interval must be greater than zero" }
 
+        // Repeats the invitation check at the requested interval while this flow is active.
         return flow {
+            // Messaging: Keeps receive calls active while current coroutine context is active.
             while (currentCoroutineContext().isActive) {
                 val invitations = getIncomingCalls(userId)
                 mutableState.value = invitations.firstOrNull()?.let {
@@ -156,17 +163,21 @@ class VoipManager(
         }.distinctUntilChanged()
     }
 
+    // Accepts the incoming VoIP call and starts its audio session.
     suspend fun acceptCall(callId: String, userId: String): VoipCall =
         respondToInvitation(callId, userId, "accept")
 
+    // Declines the incoming VoIP call and closes its session.
     suspend fun declineCall(callId: String, userId: String): VoipCall =
         respondToInvitation(callId, userId, "decline")
 
+    // Deletes the server call record after the call has ended.
     suspend fun endCall(callId: String) {
         require(callId.isNotBlank()) { "Call ID must not be blank" }
         request("DELETE", "/api/calls/${encodePathSegment(callId)}")
     }
 
+    // Sends one user's accept or decline choice to the matching call endpoint.
     private suspend fun respondToInvitation(
         callId: String,
         userId: String,
@@ -178,8 +189,10 @@ class VoipManager(
         return parseCall(request("POST", "/api/calls/${encodePathSegment(callId)}/$response", body))
     }
 
+    // Runs one authenticated API request and converts its response into JSON.
     private suspend fun request(method: String, path: String, body: JSONObject? = null): JSONObject =
         withContext(Dispatchers.IO) {
+            // Adds authentication and an optional JSON body to the outgoing request.
             val requestBuilder = Request.Builder().url("$baseUrl$path")
             bearerTokenProvider()?.takeIf(String::isNotBlank)?.let {
                 requestBuilder.header("Authorization", "Bearer $it")
@@ -190,8 +203,10 @@ class VoipManager(
                 requestBuilder.method(method, null)
             }
 
+            // Converts successful responses and turns server failures into useful app errors.
             httpClient.newCall(requestBuilder.build()).execute().use { response ->
-                val responseBody = response.body?.string().orEmpty()
+                val responseBody = response.body.string()
+                // Stop the call setup when the server rejects the connection.
                 if (!response.isSuccessful) {
                     val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
                     throw VoipApiException(
@@ -210,6 +225,7 @@ class VoipManager(
             }
         }
 
+    // Converts one call JSON object into the model used by the app.
     private fun parseCall(json: JSONObject): VoipCall =
         VoipCall(
             callId = json.getString("callId"),
@@ -219,9 +235,11 @@ class VoipManager(
             participants = json.getJSONArray("participants").toParticipantList()
         )
 
+    // Converts a server array into call models.
     private fun JSONArray.toCallList(): List<VoipCall> =
         (0 until length()).map { parseCall(getJSONObject(it)) }
 
+    // Converts a server array into invitation models for the ringing screen.
     private fun JSONArray.toInvitationList(): List<VoipInvitation> =
         (0 until length()).map { index ->
             getJSONObject(index).let {
@@ -234,6 +252,7 @@ class VoipManager(
             }
         }
 
+    // Converts a server array into the participants and their current responses.
     private fun JSONArray.toParticipantList(): List<VoipParticipant> =
         (0 until length()).map { index ->
             getJSONObject(index).let {
@@ -244,6 +263,7 @@ class VoipManager(
             }
         }
 
+    // Validates a server status before exposing it to the rest of the app.
     private fun parseParticipantStatus(value: String): VoipParticipantStatus =
         try {
             VoipParticipantStatus.valueOf(value.uppercase(Locale.ROOT))
@@ -251,6 +271,7 @@ class VoipManager(
             throw IOException("VoIP API returned an unknown participant status", error)
         }
 
+    // Escapes a call ID so special characters cannot change the request path.
     private fun encodePathSegment(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
 

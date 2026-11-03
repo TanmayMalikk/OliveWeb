@@ -14,10 +14,27 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
-    "mediaDownloadTicket", "mediaUpdateAccess", "mediaDelete", "staffSupportRequest",
+    "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
+    "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaDelete", "staffSupportRequest",
     "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+// Inputs: one device key for the caller and one forged key for another UID. Expected: only caller-owned device IDs pass.
+test("encrypted media device keys stay scoped to the signed-in account", () => {
+  assert.deepEqual(mediaTest.validateDeviceWrappedKeys({"owner--phone":"wrapped"}, "owner"),
+    {"owner--phone":"wrapped"});
+  assert.throws(() => mediaTest.validateDeviceWrappedKeys({"other--phone":"wrapped"}, "owner"));
+});
+
+// Inputs: a valid 32-byte Base64 key plus malformed and wrong-length values. Expected: only AES-256 material passes.
+test("account document recovery accepts only a 256-bit key", () => {
+  const valid = Buffer.alloc(32, 7).toString("base64");
+  assert.equal(mediaTest.accountAccessKey(valid, true), valid);
+  assert.equal(mediaTest.accountAccessKey(undefined), "");
+  assert.throws(() => mediaTest.accountAccessKey("not base64", true));
+  assert.throws(() => mediaTest.accountAccessKey(Buffer.alloc(16).toString("base64"), true));
 });
 
 // Inputs: the values in this case. Expected: encrypted media access keeps the owner and exact wrapped-key recipients.
@@ -94,12 +111,13 @@ test("protected account detection is exact and claim aware", () => {
   assert.equal(_test.protectedAccount({}, "staff"), false);
 });
 
-// Inputs: conflicting role claim, profile role, and email aliases. Expected: trusted claims win, then profile, then legacy email.
-test("role resolution follows claim profile and legacy email precedence", () => {
+// Inputs: conflicting claims, profiles, and aliases. Expected: only trusted claims grant staff or admin authority.
+test("role resolution grants privileged roles only from trusted claims", () => {
   assert.equal(_test.roleFromUser({customClaims:{role:"ADMIN"},email:"x@users.olive.invalid"},{role:"USER"}),"ADMIN");
-  assert.equal(_test.roleFromUser({customClaims:{},email:"x@users.olive.invalid"},{role:"STAFF"}),"STAFF");
+  assert.equal(_test.roleFromUser({customClaims:{},email:"x@users.olive.invalid"},{role:"STAFF"}),"USER");
   assert.equal(_test.roleFromUser({customClaims:{},email:"x@safe.olive.invalid"},{}),"SAFE_CONTACT");
-  assert.equal(_test.roleFromUser({customClaims:{role:"ROOT"},email:"x@admin.olive.invalid"},{role:"ROOT"}),"ADMIN");
+  assert.equal(_test.roleFromUser({customClaims:{role:"ROOT"},email:"x@admin.olive.invalid"},{role:"ADMIN"}),"USER");
+  assert.equal(_test.roleFromUser({customClaims:{},email:"x@staff.olive.invalid"},{role:"STAFF"}),"USER");
   assert.equal(_test.roleFromUser({customClaims:{},email:"person@example.ca"},{}),"USER");
 });
 

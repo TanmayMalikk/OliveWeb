@@ -7,6 +7,7 @@ import com.olive.app.data.*
 
 // Owns navigation history and background locking; quick exit clears PIN authorization and invalidates pending operations.
 internal class SessionNavigation(private val runtime: SessionRuntime) {
+    // Opens a Safe App screen and remembers where Back should return.
     fun openScreen(value: SessionScreen) {
         with(runtime) {
             with(state) {
@@ -44,6 +45,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 addressPrompt = false
                 viewedSharedEntry = null
                 profile?.coverType?.let { coverType = it }
+                // Safe contacts return to account entry because they do not use a cover app.
                 if (accountRole == AccountRole.SAFE_CONTACT) {
                     page = SafePage.Home
                     activityCategory =
@@ -86,11 +88,13 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         }
     }
 
+    // Moves the app into its background state for session navigation.
     fun background() {
         with(runtime) {
             with(state) {
                 // Also discard partially entered onboarding fields when leaving the app.
                 if (screen == SessionScreen.Loading || screen == SessionScreen.StorageError) return
+                // Without a saved enrollment, private entry must return to account setup.
                 if (enrollment == null) {
                     epoch++
                     operationJob?.cancel()
@@ -109,6 +113,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         }
     }
 
+    // Returns to the previous screen for session navigation.
     fun back() {
         with(runtime) {
             with(state) {
@@ -137,9 +142,11 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
         }
     }
 
+    // Session navigation: Opens the requested screen.
     fun navigate(value: SafePage) {
         with(runtime) {
             with(state) {
+                // Safe App pages use their own back stack before leaving the private area.
                 if (screen == SessionScreen.Safe) {
                     if (value != page) safePageHistory += page
                     page = value
