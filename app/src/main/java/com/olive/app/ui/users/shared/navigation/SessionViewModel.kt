@@ -8,6 +8,7 @@ import com.olive.app.ui.session.SessionRuntime
 import com.olive.app.ui.users.user.documents.MediaTransferController
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.location.LocationMapController
+import com.olive.app.ui.users.admin.AdminLocationMapController
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 internal class SessionViewModel(application: Application) : AndroidViewModel(application),
@@ -26,6 +27,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)
     internal val locationMap =
         LocationMapController(application, viewModelScope, runtime.locationSharingRepository)
+    internal val adminLocationMap = AdminLocationMapController(runtime.dataSources.adminLocations)
 
     // Root navigation, account entry, and device lock state.
     val screen get() = runtime.state.screen
@@ -107,6 +109,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     fun signOut() {
         documents.clear()
         locationMap.clear()
+        adminLocationMap.close()
         runtime.accountSession.signOut()
     }
 
@@ -114,6 +117,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     override fun onCleared() {
         documents.clear()
         locationMap.clear()
+        adminLocationMap.close()
         runtime.safety.close()
         runtime.messaging.stopMessaging()
     }

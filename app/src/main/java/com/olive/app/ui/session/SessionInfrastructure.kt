@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import com.olive.app.data.AccountRepository
+import com.olive.app.data.AdminLocationRepository
 import com.olive.app.data.AdminRepository
 import com.olive.app.data.CoverStateStore
 import com.olive.app.data.FirebaseAccountRepository
@@ -52,6 +53,7 @@ internal class SessionDataSources(
     val media: MediaTicketDataSource?,
     val safetyDocuments: SafetyDocumentRepository?,
     val locations: LocationSharingRepository?,
+    val adminLocations: AdminLocationRepository?,
 ) {
     companion object {
         // Creates the cloud repository bundle used by a signed-in Firebase account.
@@ -66,6 +68,7 @@ internal class SessionDataSources(
                 media = media,
                 safetyDocuments = media?.let { SafetyDocumentRepository(media = it) },
                 locations = if (localMode) null else LocationSharingRepository(application),
+                adminLocations = if (localMode) null else AdminLocationRepository(),
             )
         }
     }

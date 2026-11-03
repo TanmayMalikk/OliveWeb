@@ -53,6 +53,7 @@
         <item quantity="other">%1$s chart for %2$d days.</item>
     </plurals>
     <string name="fitness_chart_latest">%1$s latest %2$s %3$s.</string>
+    <string name="fitness_chart_average">%1$s average %2$s %3$s.</string>
     <string name="fitness_calories_burned">Burned</string>
     <string name="fitness_calories_eaten">Eaten</string>
     <string name="fitness_macros">Macros</string>
@@ -85,6 +86,8 @@
     <string name="fitness_vitals_no_data">— No data —</string>
     <string name="fitness_vitals_range">%1$d–%2$d bpm</string>
     <string name="fitness_vitals_average">Average heart rate %1$d bpm</string>
+    <string name="fitness_previous_day">Show previous day</string>
+    <string name="fitness_next_day">Show next day</string>
     <string name="fitness_outdoor_workout">Outdoor workout</string>
     <string name="fitness_outdoor_workout_description">Track your private GPS route, distance, time, and pace.</string>
     <string name="fitness_start_outdoor_workout">Start outdoor workout</string>

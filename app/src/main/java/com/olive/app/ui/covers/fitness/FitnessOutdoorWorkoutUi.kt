@@ -42,13 +42,18 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -79,6 +84,8 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     var selectedType by remember { mutableStateOf(OutdoorWorkoutType.WALK) }
     var pendingType by remember { mutableStateOf<OutdoorWorkoutType?>(null) }
     var permissionDenied by remember { mutableStateOf(false) }
+    var previousActive by remember { mutableStateOf(workout.active) }
+    val workoutHeadingFocus = remember { FocusRequester() }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -100,6 +107,14 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
             recentWorkouts = store.history()
             currentTime = System.currentTimeMillis()
             delay(1_000L)
+        }
+    }
+    // Keep focus in the workout card when starting or finishing changes its controls.
+    LaunchedEffect(workout.active) {
+        if (workout.active != previousActive) {
+            previousActive = workout.active
+            withFrameNanos { }
+            workoutHeadingFocus.requestFocus()
         }
     }
 
@@ -137,16 +152,24 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                val workoutTitle = stringResource(R.string.fitness_outdoor_workout)
+                val workoutSubtitle = stringResource(R.string.fitness_outdoor_workout_description)
+                Column(
+                    Modifier.weight(1f).focusRequester(workoutHeadingFocus).focusable()
+                        .clearAndSetSemantics {
+                            contentDescription = "$workoutTitle. $workoutSubtitle"
+                            heading()
+                        },
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
                     Text(
-                        stringResource(R.string.fitness_outdoor_workout),
+                        workoutTitle,
                         color = Ink,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        stringResource(R.string.fitness_outdoor_workout_description),
+                        workoutSubtitle,
                         color = Muted,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -348,9 +371,15 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
             modifier = Modifier.semantics { heading() },
         )
         workouts.take(5).forEach { workout ->
+            val workoutDescription = buildString {
+                append(workoutTypeLabel(workout.type))
+                append(". ${formatWorkoutDate(workout.finishedAt)}. ")
+                append("${stringResource(R.string.distance)}, ${formatDistance(workout.distanceMeters)}. ")
+                append("${stringResource(R.string.fitness_duration)}, ${formatDuration(workout.elapsedMillis())}.")
+            }
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(PaleOlive)
-                    .semantics(mergeDescendants = true) { }
+                    .clearAndSetSemantics { contentDescription = workoutDescription }
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -389,7 +418,7 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
 private fun WorkoutMetric(value: String, label: String) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.semantics(mergeDescendants = true) {
+        modifier = Modifier.clearAndSetSemantics {
             contentDescription = "$label, $value"
         },
     ) {

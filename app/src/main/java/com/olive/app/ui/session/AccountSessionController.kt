@@ -7,6 +7,7 @@ import com.olive.app.data.*
 import com.olive.app.data.account.AccountSyncRepository
 import com.olive.app.security.*
 import com.olive.app.location.LiveLocationController
+import com.olive.app.location.AdminLocationService
 import com.olive.app.notification.LocalNotificationEventHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -238,6 +239,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 if (LiveLocationController.active(application)) LiveLocationController.stop(
                     application
                 )
+                if (AdminLocationService.active(application)) AdminLocationService.stop(application)
                 navigation.quickExit()
                 historySyncJob?.cancel()
                 historySyncJob = null

@@ -7,7 +7,6 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 
 import com.olive.app.ui.users.shared.organization.OrganizationSettings
-import com.olive.app.ui.users.shared.organization.OrganizationMap
 import com.olive.app.ui.users.shared.organization.OrganizationDashboardCard
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.safecontact.SharedEntryViewer
@@ -20,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,7 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
-private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages, Map }
+private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages }
 
 // Shows the staff workspace with assigned users, tickets, map, and settings.
 @Composable
@@ -49,7 +47,6 @@ internal fun StaffPortal(session: SessionViewModel) {
             onSettings = { page = StaffPage.Settings },
             onSafetyPlans = { page = StaffPage.SafetyPlans },
             onMessages = { page = StaffPage.Messages },
-            onMap = { page = StaffPage.Map },
         )
         StaffPage.Settings -> OrganizationSettings(
             session,
@@ -63,7 +60,6 @@ internal fun StaffPortal(session: SessionViewModel) {
             LaunchedEffect(Unit) { session.messages.ensureMessagingObservation() }
             MessagesScreen(session, exit = { page = StaffPage.Dashboard })
         }
-        StaffPage.Map -> OrganizationMap(onBack = { page = StaffPage.Dashboard })
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
@@ -75,7 +71,6 @@ private fun StaffDashboard(
     onSettings: () -> Unit,
     onSafetyPlans: () -> Unit,
     onMessages: () -> Unit,
-    onMap: () -> Unit,
 ) {
     val uiText = rememberResourceText()
     Column(
@@ -113,12 +108,6 @@ private fun StaffDashboard(
             stringResource(R.string.support_conversations),
             stringResource(R.string.staff_conversations_assigned_help),
             onMessages,
-        )
-        OrganizationDashboardCard(
-            Icons.Outlined.LocationOn,
-            stringResource(R.string.organization_live_map),
-            stringResource(R.string.organization_location_feed_not_enabled),
-            onMap,
         )
         Status(session)
         OutlinedButton(

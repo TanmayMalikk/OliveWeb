@@ -68,7 +68,7 @@ internal fun AdminPortal(session: SessionViewModel) {
             session,
             onBack = { page = AdminPage.Dashboard },
         )
-        AdminPage.Map -> OrganizationMap(onBack = { page = AdminPage.Dashboard })
+        AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard })
         AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
         AdminPage.Messages -> MessagesScreen(session, exit = { page = AdminPage.Dashboard })
     }
@@ -154,7 +154,7 @@ private fun AdminDashboard(
         OrganizationDashboardCard(
             Icons.Outlined.LocationOn,
             stringResource(R.string.organization_live_map),
-            stringResource(R.string.organization_location_feed_not_enabled),
+            stringResource(R.string.organization_live_map_admin_description),
             onMap,
         )
         Status(session)

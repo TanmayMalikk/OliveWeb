@@ -388,6 +388,8 @@
     <string name="organization_live_map">Carte de localisation en direct</string>
     <string name="organization_live_map_description">Cette vue protégée est prête à afficher les utilisateurs assignés sous forme de points rouges clignotants.</string>
     <string name="organization_location_feed_not_enabled">Le partage de localisation de l’organisation n’est pas encore activé. Aucune localisation n’est recueillie pour cette vue.</string>
+    <string name="organization_live_map_admin_description">Affiche la dernière position en direct ou connue signalée par chaque compte utilisateur.</string>
+    <string name="organization_location_feed_empty">Aucune position d’utilisateur n’a encore été signalée.</string>
     <string name="support_conversations">Conversations de soutien</string>
     <string name="assigned_users_count">Utilisateurs assignés : %1$d</string>
     <string name="safety_plan_shared_in_chat">Plan de sécurité partagé dans la discussion de soutien.</string>
