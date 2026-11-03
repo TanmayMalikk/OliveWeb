@@ -2,6 +2,8 @@
 package com.olive.app.ui.users.user.documents
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.runtime.getValue
@@ -9,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
 import com.olive.app.data.SafetyDocument
@@ -24,6 +27,10 @@ import com.olive.app.data.media.MediaUploadJob
 import com.olive.app.data.media.MediaUploadPresentation
 import com.olive.app.data.media.MediaUploadWorker
 import com.olive.app.data.media.OcrReview
+import com.olive.app.data.media.OfflineMediaAvailability
+import com.olive.app.data.media.OfflineMediaCache
+import com.olive.app.data.media.MediaAccessError
+import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.PassThroughMediaPreprocessor
 import com.olive.app.data.media.PreparedEncryptedMedia
 import com.olive.app.security.EncryptionUtils
@@ -33,7 +40,6 @@ import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
-import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -62,6 +68,9 @@ internal interface MediaTransferOperations {
     )
     // Downloads, checks, and decrypts one allowed media file.
     suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File
+    suspend fun makeAvailableOffline(document:SafetyDocument,viewerUid:String)
+    suspend fun removeOfflineCopy(document:SafetyDocument,viewerUid:String)
+    fun onDocumentSnapshot(viewerUid:String,documents:List<SafetyDocument>,serverConfirmed:Boolean)
     // Clears upload progress and errors when the document screen closes.
     fun clearState()
 }
@@ -94,6 +103,7 @@ internal class MediaTransferController(
     private val scope:CoroutineScope,
     private val repository:MediaTicketDataSource,
     private val store:MediaTransferStore=MediaTransferStore(context),
+    private val offlineCache:OfflineMediaCache=OfflineMediaCache(context),
     private val client:OkHttpClient=OkHttpClient(),
     private val preprocessor:MediaPreprocessor=PassThroughMediaPreprocessor,
 ):MediaTransferOperations {
@@ -107,6 +117,11 @@ internal class MediaTransferController(
         private set
     var uploads by mutableStateOf<List<MediaUploadPresentation>>(emptyList())
         private set
+    var offlineCopies by mutableStateOf<Map<String,OfflineMediaAvailability>>(emptyMap())
+        private set
+    var recentCachingEnabled by mutableStateOf(false)
+        private set
+    private var cachePreferenceOwnerUid:String?=null
 
     /**
      * Restores and observes every durable upload belonging to the visible account.
@@ -123,7 +138,9 @@ internal class MediaTransferController(
             observedOwnerUid = ownerUid
             publishedMediaIds = emptySet()
             uploads = emptyList()
+            offlineCopies = emptyMap()
         }
+        loadRecentCachingPreference(ownerUid)
         scope.launch { refreshUploads(ownerUid)
             .filterNot { it.status in setOf(MediaTransferStatus.COMPLETE,MediaTransferStatus.FAILED,MediaTransferStatus.CANCELLED) }
             .forEach { observe(it.jobId) } }
@@ -236,16 +253,70 @@ internal class MediaTransferController(
         require(document.objectKey.isNotBlank()) { "Legacy media downloads use SafetyDocumentRepository" }
         state=MediaTransferState.Preparing("downloading")
         return try {
-            withContext(Dispatchers.IO) {
+            val opened=withContext(Dispatchers.IO) {
                 downloadGate.withDocumentLock(document.id) {
                     downloadEncrypted(document,viewerUid)
                 }
             }
-                .also { state=MediaTransferState.Idle }
+            refreshOfflineCopies(viewerUid,listOf(document))
+            opened.also { state=MediaTransferState.Idle }
         } catch(failure:Exception) {
-            val message=failure.localizedMessage ?: "Unable to download encrypted media"
+            val mapped = if (failure is FirebaseFunctionsException && failure.code in setOf(
+                    FirebaseFunctionsException.Code.PERMISSION_DENIED,
+                    FirebaseFunctionsException.Code.NOT_FOUND)) {
+                offlineCache.remove(viewerUid, document.id)
+                MediaAccessException(MediaAccessError.ACCESS_REVOKED, failure)
+            } else failure
+            val message=mapped.localizedMessage ?: "Unable to download encrypted media"
             state=MediaTransferState.Failed(null,message,true)
-            throw failure
+            throw mapped
+        }
+    }
+
+    override suspend fun makeAvailableOffline(document:SafetyDocument,viewerUid:String) {
+        require(document.objectKey.isNotBlank())
+        offlineCopies = offlineCopies + (document.id to OfflineMediaAvailability.SAVING)
+        try {
+            withContext(Dispatchers.IO) { downloadGate.withDocumentLock(document.id) {
+                when (offlineCache.availability(viewerUid, document)) {
+                    OfflineMediaAvailability.AVAILABLE -> Unit
+                    OfflineMediaAvailability.RECENT_AVAILABLE -> offlineCache.pin(viewerUid,document.id)
+                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                    OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED -> {
+                        requireNetwork(MediaAccessError.LEASE_EXPIRED)
+                        repository.downloadTicket(document.id)
+                        offlineCache.markRevalidated(viewerUid, document.id)
+                        offlineCache.pin(viewerUid,document.id)
+                    }
+                    else -> if (!offlineCache.promoteUploadCandidate(viewerUid, document)) {
+                        requireNetwork(MediaAccessError.NETWORK_REQUIRED)
+                        val encrypted = downloadRemoteCiphertext(document)
+                        try { offlineCache.retainDownloaded(viewerUid, document, encrypted) }
+                        finally { encrypted.delete() }
+                    }
+                }
+            } }
+        } finally { refreshOfflineCopies(viewerUid, listOf(document)) }
+    }
+
+    override suspend fun removeOfflineCopy(document:SafetyDocument,viewerUid:String) {
+        withContext(Dispatchers.IO) { downloadGate.withDocumentLock(document.id) {
+            offlineCache.remove(viewerUid, document.id)
+        } }
+        offlineCopies = offlineCopies + (document.id to OfflineMediaAvailability.NOT_CACHED)
+    }
+
+    override fun onDocumentSnapshot(
+        viewerUid:String,
+        documents:List<SafetyDocument>,
+        serverConfirmed:Boolean,
+    ) {
+        scope.launch {
+            val values = withContext(Dispatchers.IO) {
+                if (serverConfirmed) offlineCache.reconcile(viewerUid, documents)
+                documents.associate { it.id to offlineCache.availability(viewerUid, it) }
+            }
+            if (observedOwnerUid == null || observedOwnerUid == viewerUid) offlineCopies = values
         }
     }
 
@@ -257,7 +328,38 @@ internal class MediaTransferController(
         observedOwnerUid = null
         publishedMediaIds = emptySet()
         uploads = emptyList()
+        offlineCopies = emptyMap()
+        cachePreferenceOwnerUid = null
+        recentCachingEnabled = false
         state = MediaTransferState.Idle
+    }
+
+    fun loadRecentCachingPreference(ownerUid:String) {
+        cachePreferenceOwnerUid=ownerUid
+        scope.launch {
+            val enabled=withContext(Dispatchers.IO) { offlineCache.recentCachingEnabled(ownerUid) }
+            if(cachePreferenceOwnerUid==ownerUid) recentCachingEnabled=enabled
+        }
+    }
+
+    fun setRecentCachingPreference(ownerUid:String,enabled:Boolean) {
+        cachePreferenceOwnerUid=ownerUid
+        recentCachingEnabled=enabled
+        scope.launch {
+            runCatching { withContext(Dispatchers.IO) {
+                offlineCache.setRecentCachingEnabled(ownerUid,enabled)
+            } }.onFailure {
+                if(cachePreferenceOwnerUid==ownerUid) recentCachingEnabled=
+                    withContext(Dispatchers.IO) { offlineCache.recentCachingEnabled(ownerUid) }
+            }
+            if(cachePreferenceOwnerUid==ownerUid && !enabled) {
+                offlineCopies=offlineCopies.mapValues { (_,availability) ->
+                    if(availability in setOf(OfflineMediaAvailability.RECENT_AVAILABLE,
+                            OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED))
+                        OfflineMediaAvailability.NOT_CACHED else availability
+                }
+            }
+        }
     }
 
     /** Projects durable WorkManager progress into Compose-observable session state. */
@@ -379,8 +481,7 @@ internal class MediaTransferController(
             val deviceWrapped=mapOf("${owner.uid}--${KeyManager.deviceId(publicKey)}" to ownerWrapped)
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
                 EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
-                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped,
-                android.util.Base64.encodeToString(key.encoded,android.util.Base64.NO_WRAP))
+                KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped)
             return MediaUploadJob(jobId,owner.uid,prepared)
         } catch (failure: Exception) {
             target.delete()
@@ -407,6 +508,37 @@ internal class MediaTransferController(
 
     /** Executes the encrypted download workflow without exposing plaintext to Firebase or R2. */
     private suspend fun downloadEncrypted(document:SafetyDocument,viewerUid:String):File {
+        offlineCache.verifiedCiphertext(viewerUid, document)?.let {
+            return decryptCiphertext(it, document, viewerUid)
+        }
+        if (offlineCache.promoteUploadCandidateAsRecent(viewerUid, document)) {
+            offlineCache.verifiedCiphertext(viewerUid, document)?.let {
+                return decryptCiphertext(it, document, viewerUid)
+            }
+        }
+        if (offlineCache.availability(viewerUid, document) in setOf(
+                OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED,
+            )) {
+            requireNetwork(MediaAccessError.LEASE_EXPIRED)
+            repository.downloadTicket(document.id)
+            offlineCache.markRevalidated(viewerUid, document.id)
+            refreshOfflineCopies(viewerUid, listOf(document))
+            offlineCache.verifiedCiphertext(viewerUid, document)?.let {
+                return decryptCiphertext(it, document, viewerUid)
+            }
+        }
+        requireNetwork(MediaAccessError.NETWORK_REQUIRED)
+        val encrypted = downloadRemoteCiphertext(document)
+        return try {
+            val opened=decryptCiphertext(encrypted, document, viewerUid)
+            runCatching { offlineCache.retainRecentDownloaded(viewerUid,document,encrypted) }
+            opened
+        }
+        finally { encrypted.delete() }
+    }
+
+    private suspend fun downloadRemoteCiphertext(document:SafetyDocument):File {
         val ticket=repository.downloadTicket(document.id)
         val builder = Request.Builder().url(ticket.url).get()
         ticket.headers.forEach(builder::header)
@@ -430,39 +562,50 @@ internal class MediaTransferController(
             require(encrypted.length()==document.ciphertextSize) {
                 sizeMismatch(document.ciphertextSize,encrypted.length())
             }
-            val deviceKey="$viewerUid--${KeyManager.deviceId()}"
-            val localKey=(document.deviceWrappedKeys[deviceKey] ?: document.wrappedKeys[viewerUid])?.let {
-                runCatching { KeyManager.unwrapKey(it,document.encryptionVersion) }.getOrNull()
-            }
-            if (localKey != null && document.ownerUid == viewerUid) {
-                runCatching {
-                    repository.storeAccountAccessKey(document.id,android.util.Base64.encodeToString(
-                        localKey.encoded,android.util.Base64.NO_WRAP,
-                    ))
-                }
-            }
-            val key=localKey ?: repository.accountAccessKey(document.id).let { encoded ->
-                SecretKeySpec(android.util.Base64.decode(encoded,android.util.Base64.NO_WRAP),"AES")
-            }
-            val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
-            val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
-            val target = File(opened, document.id + (extension?.let { ".$it" } ?: ""))
-            val partial = File(target.path + ".part")
-            // Use the fallback when download encrypted is unavailable.
-            try {
-                // Decrypt into a non-published file. A bad GCM tag deletes this partial plaintext;
-                // only authenticated completion is atomically renamed to the consumer-visible path.
-                encrypted.inputStream().buffered().use { input -> partial.outputStream().buffered().use { output ->
-                    MediaCipher.decrypt(input,output,key)
-                } }
-                if(target.exists()) target.delete()
-                check(partial.renameTo(target)) { "Unable to publish decrypted media" }
-                return target
-            } catch (failure: Exception) {
-                partial.delete()
-                throw failure
-            }
-        } finally { encrypted.delete() }
+            return encrypted
+        } catch (failure:Exception) {
+            encrypted.delete()
+            throw failure
+        }
+    }
+
+    private fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File {
+        val deviceKey="$viewerUid--${KeyManager.deviceId()}"
+        val wrapped=document.deviceWrappedKeys[deviceKey] ?: document.wrappedKeys[viewerUid]
+            ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE)
+        val key=runCatching { KeyManager.unwrapKey(wrapped,document.encryptionVersion) }
+            .getOrElse { throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it) }
+        val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
+        val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
+        val target=File(opened,document.id+(extension?.let { ".$it" } ?: ""))
+        val partial=File(target.path+".part")
+        try {
+            encrypted.inputStream().buffered().use { input -> partial.outputStream().buffered().use { output ->
+                MediaCipher.decrypt(input,output,key)
+            } }
+            if(target.exists()) target.delete()
+            check(partial.renameTo(target))
+            return target
+        } catch(failure:Exception) {
+            partial.delete()
+            throw failure
+        }
+    }
+
+    private suspend fun refreshOfflineCopies(viewerUid:String,documents:List<SafetyDocument>) {
+        val values=withContext(Dispatchers.IO) {
+            documents.associate { it.id to offlineCache.availability(viewerUid,it) }
+        }
+        offlineCopies=offlineCopies+values
+    }
+
+    private fun requireNetwork(reason:MediaAccessError) {
+        val manager=applicationContext.getSystemService(ConnectivityManager::class.java)
+        val capabilities=manager.getNetworkCapabilities(manager.activeNetwork)
+        if(capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)!=true ||
+            !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+            throw MediaAccessException(reason)
+        }
     }
 
     private companion object {

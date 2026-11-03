@@ -34,6 +34,7 @@ import com.olive.app.data.*
 import com.olive.app.data.media.MediaTransferState
 import com.olive.app.data.media.MediaTransferStatus
 import com.olive.app.data.media.MediaUploadPresentation
+import com.olive.app.data.media.OfflineMediaAvailability
 import java.io.File
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
@@ -134,6 +135,20 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             stringResource(R.string.documents_account_required),
             color = Muted
         )
+        if (!session.localMode && state.source in setOf(
+                DocumentListSource.LOCAL_INDEX,
+                DocumentListSource.FIRESTORE_CACHE,
+            )) Row(
+            Modifier.fillMaxWidth().testTag("documents_offline_index").semantics {
+                liveRegion = LiveRegionMode.Polite
+            },
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.CloudOff, null, tint = Muted)
+            Text(stringResource(R.string.documents_offline_index),
+                style = MaterialTheme.typography.bodySmall, color = Muted)
+        }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             DocumentFilter.entries.toList().chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -204,11 +219,16 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 PendingUploadCard(upload) { mediaController?.retryUpload(upload.jobId) }
             }
             items(shown, key = { it.id }) { file ->
-                SafetyDocumentCard(file, uid, session.messages.friends, onOpen = {
+                SafetyDocumentCard(file, uid, session.messages.friends,
+                    offline = mediaController?.offlineCopies?.get(file.id)
+                        ?: OfflineMediaAvailability.NOT_CACHED,
+                    onOpen = {
                     controller.download(file) { local ->
                         opened = file to local
                     }
-                }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) })
+                }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) },
+                    onMakeOffline = { controller.makeAvailableOffline(file) },
+                    onRemoveOffline = { controller.removeOfflineCopy(file) })
             }
         }
     }
@@ -383,7 +403,8 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
 @Composable
 private fun SafetyDocumentCard(
     file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
-    onShare: () -> Unit, onDelete: () -> Unit
+    offline: OfflineMediaAvailability, onShare: () -> Unit, onDelete: () -> Unit,
+    onMakeOffline: () -> Unit, onRemoveOffline: () -> Unit,
 ) {
     val own = file.ownerUid == currentUid
     val owner = friends.firstOrNull { it.uid == file.ownerUid }?.username
@@ -453,6 +474,45 @@ private fun SafetyDocumentCard(
                         Icons.Outlined.Delete,
                         stringResource(R.string.remove)
                     )
+                }
+            }
+            if (file.objectKey.isNotBlank()) {
+                val cached = offline in setOf(
+                    OfflineMediaAvailability.AVAILABLE,
+                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                )
+                OutlinedButton(
+                    onClick = if (cached) onRemoveOffline else onMakeOffline,
+                    enabled = offline != OfflineMediaAvailability.SAVING,
+                    modifier = Modifier.fillMaxWidth().testTag("document_offline_${file.id}"),
+                ) {
+                    Icon(if (cached) Icons.Outlined.Delete else Icons.Outlined.Download, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(when {
+                        offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
+                        cached -> R.string.documents_remove_offline_copy
+                        else -> R.string.documents_make_available_offline
+                    }))
+                }
+                when (offline) {
+                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                    OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED -> Text(
+                        stringResource(R.string.documents_offline_revalidation_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                    OfflineMediaAvailability.AVAILABLE -> Text(
+                        stringResource(R.string.documents_available_offline),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OliveGreen,
+                    )
+                    OfflineMediaAvailability.RECENT_AVAILABLE -> Text(
+                        stringResource(R.string.documents_recently_cached),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                    else -> Unit
                 }
             }
         }

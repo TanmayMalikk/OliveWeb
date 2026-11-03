@@ -6,12 +6,16 @@ import android.net.Uri
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.ChatSubscription
 import com.olive.app.data.DocumentOcrMetadata
+import com.olive.app.data.DocumentListSnapshot
+import com.olive.app.data.DocumentListSource
 import com.olive.app.data.SafetyDocument
 import com.olive.app.data.SafetyDocumentDataSource
 import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.OcrReview
 import com.olive.app.ui.users.user.documents.MediaTransferOperations
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
+import com.olive.app.ui.users.user.documents.mediaFailureResource
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +76,16 @@ class DocumentControllerMediaRoutingTest {
         assertEquals(null, media.downloadedDocumentId)
     }
 
+    @Test
+    fun `App Check failure reports localized device verification guidance`() {
+        assertEquals(
+            com.olive.app.R.string.documents_device_verification_failed,
+            mediaFailureResource(
+                MediaDeviceVerificationException("internal detail", IllegalStateException()),
+            ),
+        )
+    }
+
     // Builds a sample document for this test.
     private fun document(objectKey: String) = SafetyDocument(
         id = "document-id",
@@ -90,15 +104,17 @@ class DocumentControllerMediaRoutingTest {
         var downloadCalled = false
 
         // Checks the list for step with the test's sample data.
-        override suspend fun listFor(uid: String) = listOf(document)
+        override suspend fun listFor(uid: String) =
+            DocumentListSnapshot(listOf(document), DocumentListSource.SERVER, 1)
         // Checks the observe for step with the test's sample data.
         override fun observeFor(
             uid: String,
-            onUpdate: (List<SafetyDocument>) -> Unit,
+            onUpdate: (DocumentListSnapshot) -> Unit,
             onError: (String) -> Unit,
         ) = ChatSubscription {}
         // Checks the get for step with the test's sample data.
         override suspend fun getFor(uid: String, id: String) = document
+        override fun cachedFor(uid: String, id: String) = document
         // Checks the share step with the test's sample data.
         override suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>) = Unit
         // Checks the delete step with the test's sample data.
@@ -116,7 +132,10 @@ class DocumentControllerMediaRoutingTest {
         ) = Unit
     }
 
-    private class FakeMediaTransfers(private val file: File) : MediaTransferOperations {
+    private class FakeMediaTransfers(
+        private val file: File,
+        private val failure: Exception? = null,
+    ) : MediaTransferOperations {
         var downloadedDocumentId: String? = null
         var viewerUid: String? = null
 
@@ -148,8 +167,16 @@ class DocumentControllerMediaRoutingTest {
         override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File {
             downloadedDocumentId = document.id
             this.viewerUid = viewerUid
+            failure?.let { throw it }
             return file
         }
+        override suspend fun makeAvailableOffline(document: SafetyDocument, viewerUid: String) = Unit
+        override suspend fun removeOfflineCopy(document: SafetyDocument, viewerUid: String) = Unit
+        override fun onDocumentSnapshot(
+            viewerUid: String,
+            documents: List<SafetyDocument>,
+            serverConfirmed: Boolean,
+        ) = Unit
         // Checks the clear state step with the test's sample data.
         override fun clearState() = Unit
     }
