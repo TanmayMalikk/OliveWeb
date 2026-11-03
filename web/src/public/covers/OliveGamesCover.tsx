@@ -1,5 +1,5 @@
 // Cover users: shows the olive games cover.
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   Leaf,
   RotateCcw,
@@ -12,14 +12,11 @@ import {
 } from "lucide-react";
 import { Button } from "../../components/SharedComponents";
 import { readCover, writeCover } from "../../services/CoverStateStore";
-import { useSession } from "../../session/SessionProvider";
 import OliveFlight from "./OliveFlight";
 import OliveCrossing from "./OliveCrossing";
 import { createMemoryBoard } from "./olive-memory-board";
 const symbols = [Leaf, Flower2, Sun, Cloud, Moon, TreePine];
 export default function Game({ landing = false }: { landing?: boolean }) {
-  const session = useSession();
-  const entryTaps = useRef<number[]>([]);
   const Content = landing ? "main" : "div";
   const [game, setGame] = useState<"pairs" | "flight" | "crossing">("pairs");
   const [size, setSize] = useState(5);
@@ -30,6 +27,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
   const [moves, setMoves] = useState(0);
   const [best, setBest] = useState<number | null>(null);
   const [storageReady, setStorageReady] = useState(false);
+  // Start a new memory board when the chosen pair count changes.
   useEffect(() => {
     let live = true;
     setStorageReady(false);
@@ -47,6 +45,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       live = false;
     };
   }, [size]);
+  // Keep the latest memory-game state available to the timer.
   useEffect(() => {
     if (flipped.length !== 2) return;
     const [a, b] = flipped;
@@ -59,6 +58,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     );
     return () => clearTimeout(timer);
   }, [flipped, cards]);
+  // Count playing time only while the memory round is active.
   useEffect(() => {
     if (
       matched.length === pairCount * 2 &&
@@ -69,6 +69,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
       void writeCover(`grove-best-${size}`, moves).catch(() => {});
     }
   }, [matched, moves, best, storageReady, pairCount, size]);
+  // Flips two cards and checks whether they form a matching pair.
   function turn(index: number) {
     if (
       flipped.length >= 2 ||
@@ -79,6 +80,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     setFlipped((old) => [...old, index]);
     if (flipped.length === 1) setMoves((n) => n + 1);
   }
+  // Clears the board and starts a new memory game.
   function restart(nextSize = size) {
     setSize(nextSize);
     setCards(createMemoryBoard(nextSize));
@@ -86,25 +88,15 @@ export default function Game({ landing = false }: { landing?: boolean }) {
     setMatched([]);
     setMoves(0);
   }
-  function tapBrand() {
-    const now = Date.now();
-    entryTaps.current = [
-      ...entryTaps.current.filter((tap) => now - tap < 2500),
-      now,
-    ];
-    if (entryTaps.current.length < 5) return;
-    entryTaps.current = [];
-    void session.perform(session.beginEntry);
-  }
   return (
     <div className={`grove ${landing ? "grove-landing" : ""}`}>
       <header className="grove-header">
-        <button type="button" className="grove-brand" onClick={tapBrand}>
+        <div className="grove-brand">
           <Sprout strokeWidth={1.4} />
           <span>
             little grove<small>A SMALL DAILY PAUSE</small>
           </span>
-        </button>
+        </div>
       </header>
       <Content id={landing ? "main" : undefined} className="grove-main">
         <div className="grove-intro">

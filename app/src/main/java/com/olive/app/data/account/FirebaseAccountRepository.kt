@@ -9,6 +9,7 @@ import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.StorageReference
 import com.google.firebase.functions.FirebaseFunctions
 import android.util.Log
+import com.olive.app.data.account.AccountSyncRepository
 import com.olive.app.security.*
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
@@ -18,9 +19,11 @@ class FirebaseAccountRepository : AccountRepository {
     private val auth = FirebaseAuth.getInstance()
     private val storage = FirebaseStorage.getInstance()
     private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
+    private val accountSync = AccountSyncRepository()
 
     // Change this path together with firebase/storage.rules and its tests.
     private fun profileObject(uid: String) = storage.reference.child("accounts/$uid/profile.json")
+    // Returns the Firebase Storage folder used by this account's history.
     private fun historyFolder(uid: String, category: String) =
         storage.reference.child("accounts/$uid/history/$category")
 
@@ -47,6 +50,7 @@ class FirebaseAccountRepository : AccountRepository {
         return AccountIdentity(user.uid, normalized)
     }
 
+    // Account: Authenticates the account.
     override suspend fun authenticate(
         username: String,
         password: String,
@@ -56,6 +60,7 @@ class FirebaseAccountRepository : AccountRepository {
         val user = try {
             auth.signInWithEmailAndPassword(primary, password).await().user
         } catch (primaryError: Exception) {
+            // Staff and admin email sign-ins can use their protected organization username as an alias.
             if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN) && '@' in username) {
                 val result = functions.getHttpsCallable("resolveOrganizationLogin")
                     .call(mapOf("email" to username.trim().lowercase(), "role" to role.name))
@@ -82,10 +87,12 @@ class FirebaseAccountRepository : AccountRepository {
         return AccountIdentity(user.uid, accountName)
     }
 
+    // Loads the signed-in account profile from this repository.
     override suspend fun profile(identity: AccountIdentity): UserProfile? {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         return try {
             val bytes = profileObject(identity.uid).getBytes(MAX_PROFILE_BYTES).await()
+            // Turn an unexpected profile failure into a readable message.
             try {
                 val current = String(bytes, Charsets.UTF_8)
                 val profile = UserProfile.fromJson(JSONObject(current))
@@ -107,6 +114,7 @@ class FirebaseAccountRepository : AccountRepository {
         }
     }
 
+    // Uploads the latest account profile to Firebase.
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) {
         check(auth.currentUser?.uid == identity.uid) { "Sign in again before syncing" }
         check(profile.username == identity.username) { "Profile account mismatch" }
@@ -115,6 +123,7 @@ class FirebaseAccountRepository : AccountRepository {
         check(bytes.size <= MAX_PROFILE_BYTES) { "Profile is too large" }
         try {
             profileObject(identity.uid).putBytes(bytes, jsonMetadata()).await()
+            accountSync.notifyChanged(identity.uid)
         } finally {
             bytes.fill(0)
         }
@@ -127,19 +136,23 @@ class FirebaseAccountRepository : AccountRepository {
         require(record.id.matches(Regex("[A-Za-z0-9-]{8,64}")))
         val bytes = JSONObject(record.json).toString(2).toByteArray(Charsets.UTF_8)
         require(bytes.size <= MAX_EVENT_BYTES)
+        // Use the fallback when save history record is unavailable.
         try {
             historyFolder(identity.uid, record.category).child("${record.id}.json")
                 .putBytes(bytes, jsonMetadata()).await()
+            accountSync.notifyChanged(identity.uid)
         } finally {
             bytes.fill(0)
         }
     }
 
+    // Loads private activity-history records for this account.
     override suspend fun historyRecords(identity: AccountIdentity): List<HistoryRecord> {
         check(auth.currentUser?.uid == identity.uid)
         return listOf("settings", "triggers", "checkouts", "private_entries").flatMap { category ->
             historyFolder(identity.uid, category).listAll().await().items.map { item ->
                 val bytes = item.getBytes(MAX_EVENT_BYTES.toLong()).await()
+                // Turn an unexpected history records failure into a readable message.
                 try {
                     val current = String(bytes, Charsets.UTF_8)
                     val readable = readableHistory(category, current)
@@ -152,6 +165,7 @@ class FirebaseAccountRepository : AccountRepository {
         }
     }
 
+    // Replaces the Firebase password after the current password is confirmed.
     override suspend fun changePassword(
         identity: AccountIdentity,
         currentPassword: String,
@@ -170,11 +184,14 @@ class FirebaseAccountRepository : AccountRepository {
         user.updatePassword(newPassword).await()
     }
 
+    // Account: Authenticates the accountd uid.
     override fun authenticatedUid(): String? = auth.currentUser?.uid
+    // Checks the username and password, then returns the matching account.
     override fun authenticatedUsername(): String? =
         auth.currentUser?.displayName?.takeIf(InputPolicy::validExistingUsername)
             ?: auth.currentUser?.email?.substringBefore('@')?.let(InputPolicy::username)
 
+    // Account: Signs out the current account.
     override fun signOut() = auth.signOut()
 
     // Converts a stored activity JSON record into short text suitable for the history screen.
@@ -189,9 +206,11 @@ class FirebaseAccountRepository : AccountRepository {
         }.toString(2)
     }
 
+    // Converts account profile details into the JSON saved in protected storage.
     private fun jsonMetadata() = StorageMetadata.Builder().setContentType("application/json")
         .setCustomMetadata("schemaVersion", "2").setCustomMetadata("format", "pretty-json").build()
 
+    // Uploads profile JSON only when its content changed.
     private suspend fun rewriteIfNeeded(
         reference: StorageReference,
         current: String,

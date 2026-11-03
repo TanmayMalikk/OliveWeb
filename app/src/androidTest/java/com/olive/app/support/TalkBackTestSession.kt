@@ -47,6 +47,7 @@ internal class TalkBackTestSession(activity: Activity) : AutoCloseable {
                 focused += event.contentDescription?.toString().orEmpty()
         }
         automation.adoptShellPermissionIdentity(android.Manifest.permission.WRITE_SECURE_SETTINGS)
+        // Use the fallback when talk back test session is unavailable.
         try {
             Settings.Secure.putString(
                 resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
@@ -59,11 +60,13 @@ internal class TalkBackTestSession(activity: Activity) : AutoCloseable {
         }
     }
 
+    // Runs a device command needed by this test.
     fun shell(command: String) {
         ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command))
             .use { it.readBytes() }
     }
 
+    // Talk back test session: Closes the active feature.
     override fun close() {
         automation.setOnAccessibilityEventListener(null)
         automation.adoptShellPermissionIdentity(android.Manifest.permission.WRITE_SECURE_SETTINGS)

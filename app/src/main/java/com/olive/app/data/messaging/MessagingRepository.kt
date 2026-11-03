@@ -19,6 +19,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build()).build()
     }
 
+    // Publishes this account's messaging key and device details to Firebase.
     suspend fun registerUser(
         identity: AccountIdentity,
         publicKey: PublicKey = KeyManager.getOrCreatePublicKey()
@@ -27,19 +28,29 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         val encodedKey = Base64.getEncoder().encodeToString(publicKey.encoded)
         val reference = firestore.collection("messageDirectory").document(username)
         val current = reference.get().await()
-        if (current.getString("uid") == identity.uid && current.getString("username") == username &&
-            current.getString("publicKey") == encodedKey
-        ) return
+        check(!current.exists() || current.getString("uid") == identity.uid) {
+            "That username belongs to another account."
+        }
         reference.set(
             mapOf(
+                "uid" to identity.uid, "username" to username, "publicKey" to encodedKey,
+                "updatedAt" to FieldValue.serverTimestamp(),
+            ), SetOptions.merge()
+        ).await()
+        val deviceId = KeyManager.deviceId(publicKey)
+        reference.collection("devices").document(deviceId).set(
+            mapOf(
                 "uid" to identity.uid,
-                "username" to username,
+                "deviceId" to deviceId,
                 "publicKey" to encodedKey,
+                "platform" to "ANDROID",
+                "mgf1Digest" to "SHA-1",
                 "updatedAt" to FieldValue.serverTimestamp(),
             ), SetOptions.merge()
         ).await()
     }
 
+    // Searches Firebase for an exact username that may be messaged.
     suspend fun searchUsers(query: String, currentUid: String): List<DirectoryUser> {
         val normalized = query.trim().lowercase()
         require(normalized.matches(Regex("[a-z0-9_]{4,24}"))) { "Enter the exact 4-24 character username." }
@@ -65,6 +76,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         var friends = emptyList<Friend>()
         var incoming = emptyList<FriendRequest>()
         var outgoing = emptyList<FriendRequest>()
+        // Sends the newest friend and request lists after any listener changes.
         fun publish() = onUpdate(SocialSnapshot(friends, incoming, outgoing))
         val listeners = mutableListOf<ListenerRegistration>()
         listeners += firestore.collection("friendLists").document(uid).collection("friends")
@@ -125,6 +137,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         ).await()
     }
 
+    // Accepts a friend request and creates the shared friendship record.
     suspend fun acceptRequest(current: AccountIdentity, request: FriendRequest) {
         require(request.recipientUid == current.uid) { "Only the recipient can accept this request." }
         val requestRef = firestore.collection("friendRequests").document(request.id)
@@ -172,6 +185,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         batch.commit().await()
     }
 
+    // Declines an incoming friend request and removes its pending record.
     suspend fun declineRequest(currentUid: String, request: FriendRequest) {
         require(request.recipientUid == currentUid) { "Only the recipient can decline this request." }
         firestore.collection("friendRequests").document(request.id).delete().await()
@@ -183,6 +197,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         firestore.collection("friendRequests").document(request.id).delete().await()
     }
 
+    // Opens the existing direct chat with a friend or creates a blank one.
     suspend fun conversationWith(current: AccountIdentity, friend: Friend): ChatConversation {
         require(current.uid != friend.uid) { "Choose another user." }
         val friendship =
@@ -222,6 +237,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return listener.asSubscription()
     }
 
+    // Loads incoming and outgoing friend requests for this account.
     private fun requestFrom(row: DocumentSnapshot): FriendRequest? {
         val senderUid = row.getString("senderUid") ?: return null
         val recipientUid = row.getString("recipientUid") ?: return null
@@ -235,6 +251,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         )
     }
 
+    // Converts a Firestore friend record into the app friend model.
     private fun friendFrom(row: DocumentSnapshot): Friend? {
         val friendshipId = row.getString("friendshipId") ?: return null
         val friendUid = row.getString("friendUid") ?: return null
@@ -242,6 +259,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return Friend(friendshipId, friendUid, friendUsername)
     }
 
+    // Converts a Firestore chat record into the app conversation model.
     private fun conversationFrom(row: DocumentSnapshot): ChatConversation? {
         val ids = (row.get("participantIds") as? List<*>)?.filterIsInstance<String>() ?: return null
         val names =
@@ -272,8 +290,10 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         )
     }
 
+    // Messaging: Requests id.
     private fun requestId(senderUid: String, recipientUid: String) = "$senderUid--$recipientUid"
 
+    // Loads the direct conversation data needed by secure messaging.
     private fun directConversationData(
         friendshipId: String,
         participantIds: List<String>,
@@ -289,8 +309,10 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         "lastSenderUid" to "",
     )
 
+    // Creates the same friendship ID regardless of which username comes first.
     private fun friendshipId(firstUid: String, secondUid: String) =
         listOf(firstUid, secondUid).sorted().joinToString("--")
 
+    // Wraps a Firebase listener so the screen can close it safely.
     private fun ListenerRegistration.asSubscription() = ChatSubscription { remove() }
 }

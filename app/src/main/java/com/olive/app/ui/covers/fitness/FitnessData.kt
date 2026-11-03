@@ -10,215 +10,6 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
 
-internal data class FitnessProfile(
-    val weightKg: Float = 70f,
-    val heightCm: Float = 170f,
-    val stepGoal: Int = 8_000,
-    val calorieGoal: Int = 2_000,
-    val proteinGoal: Int = 120,
-    val carbohydrateGoal: Int = 250,
-    val fatGoal: Int = 65,
-)
-
-internal data class NutritionFood(
-    val id: String,
-    val name: String,
-    val brand: String,
-    val servingDescription: String,
-    val calories: Float,
-    val proteinGrams: Float,
-    val carbohydrateGrams: Float,
-    val fatGrams: Float,
-    val source: FoodDataSource,
-    val barcode: String = "",
-    val saturatedFatGrams: Float = 0f,
-    val transFatGrams: Float = 0f,
-    val fiberGrams: Float = 0f,
-    val sugarGrams: Float = 0f,
-    val sodiumMilligrams: Float = 0f,
-    val cholesterolMilligrams: Float = 0f,
-    val potassiumMilligrams: Float = 0f,
-)
-
-internal enum class FoodDataSource(val displayName: String) {
-    FATSECRET("FatSecret"),
-    OPEN_FOOD_FACTS("Open Food Facts"),
-    MANUAL("Manual entry"),
-}
-
-internal enum class MealType(val displayName: String) {
-    BREAKFAST("Breakfast"),
-    LUNCH("Lunch"),
-    DINNER("Dinner"),
-    SNACK("Snack"),
-}
-
-internal data class FoodLogEntry(
-    val logId: String,
-    val food: NutritionFood,
-    val servings: Float,
-    val meal: MealType,
-)
-
-internal data class NutritionTotals(
-    val calories: Float = 0f,
-    val proteinGrams: Float = 0f,
-    val carbohydrateGrams: Float = 0f,
-    val fatGrams: Float = 0f,
-    val saturatedFatGrams: Float = 0f,
-    val transFatGrams: Float = 0f,
-    val fiberGrams: Float = 0f,
-    val sugarGrams: Float = 0f,
-    val sodiumMilligrams: Float = 0f,
-    val cholesterolMilligrams: Float = 0f,
-    val potassiumMilligrams: Float = 0f,
-)
-
-internal data class HeartRateVitals(
-    val date: LocalDate,
-    val peakBpm: Int,
-    val lowestBpm: Int,
-    val restingBpm: Int?,
-    val averageBpm: Int,
-    val sampleCount: Int,
-    val watchConnected: Boolean,
-    val lastUpdatedAt: Long,
-    val samples: List<HeartRateSample> = emptyList(),
-)
-
-internal data class HeartRateSample(
-    val recordedAt: Long,
-    val bpm: Int,
-)
-
-internal data class HeartRateDayStats(
-    val peakBpm: Int = 0,
-    val lowestBpm: Int = 0,
-    val totalBpm: Long = 0L,
-    val sampleCount: Int = 0,
-    val restingTotalBpm: Long = 0L,
-    val restingSampleCount: Int = 0,
-) {
-    // Fitness watch users: adds one valid watch reading to today's heart-rate summary.
-    fun record(heartRate: Int, resting: Boolean): HeartRateDayStats {
-        if (heartRate !in MIN_HEART_RATE_BPM..MAX_HEART_RATE_BPM) return this
-        return copy(
-            peakBpm = maxOf(peakBpm, heartRate),
-            lowestBpm = if (lowestBpm == 0) heartRate else minOf(lowestBpm, heartRate),
-            totalBpm = totalBpm + heartRate,
-            sampleCount = sampleCount + 1,
-            restingTotalBpm = restingTotalBpm + if (resting) heartRate else 0,
-            restingSampleCount = restingSampleCount + if (resting) 1 else 0,
-        )
-    }
-
-    fun toVitals(
-        date: LocalDate,
-        watchConnected: Boolean,
-        lastUpdatedAt: Long,
-        samples: List<HeartRateSample> = emptyList(),
-    ): HeartRateVitals? {
-        if (sampleCount <= 0) return null
-        return HeartRateVitals(
-            date = date,
-            peakBpm = peakBpm,
-            lowestBpm = lowestBpm,
-            restingBpm = restingSampleCount.takeIf { it > 0 }?.let {
-                (restingTotalBpm.toDouble() / it).roundToInt()
-            },
-            averageBpm = (totalBpm.toDouble() / sampleCount).roundToInt(),
-            sampleCount = sampleCount,
-            watchConnected = watchConnected,
-            lastUpdatedAt = lastUpdatedAt,
-            samples = samples,
-        )
-    }
-
-    private companion object {
-        const val MIN_HEART_RATE_BPM = 30
-        const val MAX_HEART_RATE_BPM = 240
-    }
-}
-
-internal data class FitnessSnapshot(
-    val profile: FitnessProfile,
-    val stepsToday: Int,
-    val foodsToday: List<FoodLogEntry>,
-    val heartRateVitals: HeartRateVitals? = null,
-    val heartRateHistory: List<HeartRateVitals> = emptyList(),
-    val watchConnected: Boolean = false,
-    val watchSeenWithinFourteenDays: Boolean = false,
-) {
-    val nutrition = foodsToday.fold(NutritionTotals()) { total, entry ->
-        NutritionTotals(
-            calories = total.calories + entry.food.calories * entry.servings,
-            proteinGrams = total.proteinGrams + entry.food.proteinGrams * entry.servings,
-            carbohydrateGrams = total.carbohydrateGrams +
-                    entry.food.carbohydrateGrams * entry.servings,
-            fatGrams = total.fatGrams + entry.food.fatGrams * entry.servings,
-            saturatedFatGrams = total.saturatedFatGrams +
-                    entry.food.saturatedFatGrams * entry.servings,
-            transFatGrams = total.transFatGrams + entry.food.transFatGrams * entry.servings,
-            fiberGrams = total.fiberGrams + entry.food.fiberGrams * entry.servings,
-            sugarGrams = total.sugarGrams + entry.food.sugarGrams * entry.servings,
-            sodiumMilligrams = total.sodiumMilligrams +
-                    entry.food.sodiumMilligrams * entry.servings,
-            cholesterolMilligrams = total.cholesterolMilligrams +
-                    entry.food.cholesterolMilligrams * entry.servings,
-            potassiumMilligrams = total.potassiumMilligrams +
-                    entry.food.potassiumMilligrams * entry.servings,
-        )
-    }
-}
-
-// Fitness cover users: combines one saved day's activity and nutrition for history charts.
-internal data class FitnessHistoryDay(
-    val date: LocalDate,
-    val steps: Int,
-    val distanceKm: Float,
-    val caloriesBurned: Float,
-    val caloriesEaten: Float,
-    val proteinGrams: Float,
-    val carbohydrateGrams: Float,
-    val fatGrams: Float,
-)
-
-internal object FitnessHistory {
-    // Returns oldest-to-newest dates so every graph uses the same horizontal order.
-    fun datesEndingOn(endDate: LocalDate, days: Int): List<LocalDate> =
-        (days.coerceIn(1, 31) - 1 downTo 0).map { offset ->
-            endDate.minusDays(offset.toLong())
-        }
-}
-
-// These formulas keep estimates consistent between the UI and unit tests.
-internal object FitnessMath {
-    fun strideMeters(heightCm: Float) = (heightCm.coerceIn(100f, 230f) * 0.413f) / 100f
-
-    fun distanceKm(steps: Int, heightCm: Float) =
-        steps.coerceAtLeast(0) * strideMeters(heightCm) / 1_000f
-
-    fun walkingCalories(steps: Int, profile: FitnessProfile) =
-        distanceKm(steps, profile.heightCm) *
-                profile.weightKg.coerceIn(30f, 300f) * 0.75f
-}
-
-// Fitness cover users: decides which sensor delta counts without adding the same walk twice.
-internal object StepSourcePolicy {
-    const val WATCH_ACTIVE_WINDOW_MS = 120_000L
-
-    fun watchIsActive(lastWatchActivityAt: Long, nowMillis: Long): Boolean =
-        lastWatchActivityAt > 0L &&
-            nowMillis >= lastWatchActivityAt &&
-            nowMillis - lastWatchActivityAt <= WATCH_ACTIVE_WINDOW_MS
-
-    fun phoneDeltaToAdd(phoneDelta: Int, lastWatchActivityAt: Long, nowMillis: Long): Int =
-        if (watchIsActive(lastWatchActivityAt, nowMillis)) 0 else phoneDelta.coerceAtLeast(0)
-
-    fun watchDeltaToAdd(watchDelta: Int, phoneFallbackSinceWatch: Int): Int =
-        (watchDelta.coerceAtLeast(0) - phoneFallbackSinceWatch.coerceAtLeast(0)).coerceAtLeast(0)
-}
-
 // Each cover account receives separate local fitness and meal history.
 internal class FitnessStore(context: Context, accountId: String) {
     private val preferences = context.getSharedPreferences(
@@ -226,6 +17,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         Context.MODE_PRIVATE,
     )
 
+    // Loads fitness goals and body details saved on this phone.
     fun profile() = FitnessProfile(
         weightKg = preferences.getFloat("weight_kg", 70f),
         heightCm = preferences.getFloat("height_cm", 170f),
@@ -236,6 +28,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         fatGoal = preferences.getInt("fat_goal", 65),
     )
 
+    // Saves calorie, macro, activity, and body goals for the fitness cover.
     fun saveProfile(value: FitnessProfile) = preferences.edit {
         putFloat("weight_kg", value.weightKg.coerceIn(30f, 300f))
         putFloat("height_cm", value.heightCm.coerceIn(100f, 230f))
@@ -246,6 +39,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         putInt("fat_goal", value.fatGoal.coerceIn(10, 1_000))
     }
 
+    // Loads the snapshot needed by the fitness cover.
     fun snapshot(
         today: LocalDate = LocalDate.now(),
         nowMillis: Long = System.currentTimeMillis(),
@@ -329,12 +123,14 @@ internal class FitnessStore(context: Context, accountId: String) {
         )
         preferences.edit {
             putInt("last_sensor_value", totalSinceBoot.coerceAtLeast(0))
+            // Add only new phone steps since the last sensor reading.
             if (phoneDelta > 0) {
                 putInt(
                     phoneStepsKey(today),
                     (phoneSteps(today) + phoneDelta).coerceAtMost(MAX_DAILY_STEPS),
                 )
             }
+            // Ignore duplicate or older step readings.
             if (deltaToAdd > 0) {
                 putInt(
                     activityStepsKey(today),
@@ -424,6 +220,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         return snapshot(today, nowMillis)
     }
 
+    // Adds a selected food and its nutrients to today's diary.
     fun addFood(
         food: NutritionFood,
         servings: Float,
@@ -440,24 +237,29 @@ internal class FitnessStore(context: Context, accountId: String) {
         return snapshot(today)
     }
 
+    // Removes one food entry from today's diary.
     fun removeFood(logId: String, today: LocalDate = LocalDate.now()): FitnessSnapshot {
         saveFoods(today, foods(today).filterNot { it.logId == logId })
         return snapshot(today)
     }
 
+    // Reads today's steps from Health Connect for the fitness dashboard.
     private fun activitySteps(date: LocalDate): Int = preferences.getInt(
         activityStepsKey(date),
         preferences.getInt(legacyStepsKey(date), 0),
     )
 
+    // Combines phone step readings without counting sensor resets twice.
     private fun phoneSteps(date: LocalDate): Int = preferences.getInt(
         phoneStepsKey(date),
         preferences.getInt(legacyStepsKey(date), 0),
     )
 
+    // Gives the fitness cover the phone fallback since watch it needs.
     private fun phoneFallbackSinceWatch(date: LocalDate) =
         preferences.getInt(phoneFallbackKey(date), 0)
 
+    // Returns the heart rate stats used by the fitness cover.
     private fun heartRateStats(date: LocalDate) = HeartRateDayStats(
         peakBpm = preferences.getInt(heartRatePeakKey(date), 0),
         lowestBpm = preferences.getInt(heartRateLowestKey(date), 0),
@@ -467,6 +269,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         restingSampleCount = preferences.getInt(heartRateRestingSampleCountKey(date), 0),
     )
 
+    // Reads recent heart-rate samples for the fitness vitals graph.
     private fun heartRateSamples(date: LocalDate): List<HeartRateSample> {
         val encoded = preferences.getString(heartRateGraphSamplesKey(date), null) ?: return emptyList()
         return runCatching {
@@ -496,6 +299,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         return (existing + sample).takeLast(1_440)
     }
 
+    // Fitness cover: Converts heart rate samples.
     private fun encodeHeartRateSamples(samples: List<HeartRateSample>) = JSONArray().apply {
         samples.forEach { sample ->
             put(JSONObject().apply {
@@ -505,23 +309,39 @@ internal class FitnessStore(context: Context, accountId: String) {
         }
     }.toString()
 
+    // Keeps the saved activity steps key name in one place for the fitness cover.
     private fun activityStepsKey(date: LocalDate) = "activity_steps_$date"
+    // Keeps the saved phone steps key name in one place for the fitness cover.
     private fun phoneStepsKey(date: LocalDate) = "phone_steps_$date"
+    // Watches steps key for fitness cover.
     private fun watchStepsKey(date: LocalDate) = "watch_steps_$date"
+    // Keeps the saved phone fallback key name in one place for the fitness cover.
     private fun phoneFallbackKey(date: LocalDate) = "phone_fallback_since_watch_$date"
+    // Watches active at key for fitness cover.
     private fun watchActiveAtKey(date: LocalDate) = "watch_active_at_$date"
+    // Fitness cover: Watches report at key.
     private fun watchReportAtKey(date: LocalDate) = "watch_report_at_$date"
+    // Keeps the saved heart rate peak key name in one place for the fitness cover.
     private fun heartRatePeakKey(date: LocalDate) = "heart_rate_peak_$date"
+    // Keeps the saved heart rate lowest key name in one place for the fitness cover.
     private fun heartRateLowestKey(date: LocalDate) = "heart_rate_lowest_$date"
+    // Keeps the saved heart rate total key name in one place for the fitness cover.
     private fun heartRateTotalKey(date: LocalDate) = "heart_rate_total_$date"
+    // Keeps the saved heart rate sample count key name in one place for the fitness cover.
     private fun heartRateSampleCountKey(date: LocalDate) = "heart_rate_sample_count_$date"
+    // Keeps the saved heart rate resting total key name in one place for the fitness cover.
     private fun heartRateRestingTotalKey(date: LocalDate) = "heart_rate_resting_total_$date"
+    // Keeps the saved heart rate resting sample count key name in one place for the fitness cover.
     private fun heartRateRestingSampleCountKey(date: LocalDate) =
         "heart_rate_resting_sample_count_$date"
+    // Keeps the saved heart rate last sample at key name in one place for the fitness cover.
     private fun heartRateLastSampleAtKey(date: LocalDate) = "heart_rate_last_sample_at_$date"
+    // Keeps the saved heart rate graph samples key name in one place for the fitness cover.
     private fun heartRateGraphSamplesKey(date: LocalDate) = "heart_rate_graph_samples_$date"
+    // Keeps the saved legacy steps key name in one place for the fitness cover.
     private fun legacyStepsKey(date: LocalDate) = "steps_$date"
 
+    // Loads food-diary entries for the selected day.
     private fun foods(date: LocalDate): List<FoodLogEntry> {
         val encoded = preferences.getString(foodKey(date), null) ?: return emptyList()
         return runCatching {
@@ -534,6 +354,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         }.getOrDefault(emptyList())
     }
 
+    // Saves today's food diary on the phone.
     private fun saveFoods(date: LocalDate, foods: List<FoodLogEntry>) {
         val encoded = JSONArray().apply {
             foods.takeLast(250).forEach { put(it.toJson()) }
@@ -541,6 +362,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         preferences.edit { putString(foodKey(date), encoded) }
     }
 
+    // Keeps the saved food key name in one place for the fitness cover.
     private fun foodKey(date: LocalDate) = "foods_$date"
 
     private companion object {
@@ -548,6 +370,7 @@ internal class FitnessStore(context: Context, accountId: String) {
     }
 }
 
+// Fitness cover: Converts this record into JSON.
 private fun FoodLogEntry.toJson() = JSONObject().apply {
     put("logId", logId)
     put("servings", servings.toDouble())
@@ -573,6 +396,7 @@ private fun FoodLogEntry.toJson() = JSONObject().apply {
     })
 }
 
+// Converts a saved food entry into the model used by the nutrition screen.
 private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
     val food = value.getJSONObject("food")
     FoodLogEntry(
@@ -601,9 +425,11 @@ private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
     )
 }.getOrNull()
 
+// Reads a nutrient value and replaces invalid numbers with zero.
 private fun JSONObject.safeNutrient(name: String) =
     optDouble(name, 0.0).toFloat().takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f
 
+// Formats the food serving amount shown in the diary.
 internal fun Float.displayAmount(): String = if (this == roundToInt().toFloat()) {
     roundToInt().toString()
 } else {

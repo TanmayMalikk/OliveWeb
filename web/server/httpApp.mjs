@@ -2,6 +2,11 @@
 import express from "express";
 import { news, article } from "./newsProxy.mjs";
 import siteConfig from "../site.config.json" with { type: "json" };
+
+const ANDROID_APK_STORAGE_PATH =
+  "/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2Folive-branch.apk";
+const ANDROID_APK_STORAGE_URL = `https://firebasestorage.googleapis.com${ANDROID_APK_STORAGE_PATH}?alt=media`;
+
 export function createServerApp({ development = false } = {}) {
   const app = express();
   app.disable("x-powered-by");
@@ -11,19 +16,45 @@ export function createServerApp({ development = false } = {}) {
       "Referrer-Policy": "no-referrer",
       "X-Frame-Options": "DENY",
       "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
-      "Cache-Control": "no-store",
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     });
     if (!development)
       res.set(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com; frame-src https://*.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com; frame-src https://*.firebaseapp.com https://www.google.com https://www.openstreetmap.org; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
       );
     next();
   });
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
-  app.get("/download/android", (_req, res) =>
-    res.status(410).type("text/plain").send("Android downloads are unavailable. Install from Android Studio."),
-  );
+  app.get("/download/android", (_req, res) => {
+    let destination;
+    try {
+      destination = new URL(
+        process.env.ANDROID_APK_URL || ANDROID_APK_STORAGE_URL,
+      );
+    } catch {
+      return res
+        .status(503)
+        .type("text/plain")
+        .send("APK download is not configured.");
+    }
+    if (
+      destination.protocol !== "https:" ||
+      destination.hostname !== "firebasestorage.googleapis.com" ||
+      destination.pathname !== ANDROID_APK_STORAGE_PATH
+    )
+      return res
+        .status(503)
+        .type("text/plain")
+        .send("APK download is not configured.");
+    res.setHeader("Cache-Control", "no-store");
+    return res.redirect(302, destination.href);
+  });
   app.get(
     [
       "/manifest.webmanifest",
@@ -31,6 +62,7 @@ export function createServerApp({ development = false } = {}) {
       "/cover/:slug/manifest.webmanifest",
     ],
     (req, res) => {
+      res.setHeader("Cache-Control", "no-cache");
       const hostSite = siteConfig.covers.find(
         (site) => site.origin && new URL(site.origin).hostname === req.hostname,
       );

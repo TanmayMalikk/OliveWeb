@@ -7,6 +7,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CoverAccountFlowTest : OliveUiTestBase() {
+    // Checks the guest delivery area opens address editor without starting onboarding step with the test's sample data.
     @Test
     fun guestDeliveryAreaOpensAddressEditorWithoutStartingOnboarding() {
         waitCover()
@@ -23,6 +24,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         compose.onNodeWithText("Edmonton", substring = true).assertExists()
     }
 
+    // Checks the cover choice switches news and fitness and both reach safe area step with the test's sample data.
     @Test
     fun coverChoiceSwitchesNewsAndFitnessAndBothReachSafeArea() {
         register(username = "cover_switch_tester")
@@ -45,18 +47,33 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         enterPin("123456")
         waitFor("safe_settings")
         click("safe_settings")
+        // This flow checks switching covers; the sensor permission flow is tested separately.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .uiAutomation.grantRuntimePermission(
+                    compose.activity.packageName,
+                    android.Manifest.permission.ACTIVITY_RECOGNITION,
+                )
+        }
         click("cover_choice_fitness")
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("fitness_home")
         click("fitness_account_settings")
-        compose.onNodeWithTag("discreet_cover_olive").performClick()
+        // Re-enter through the same session action used by the olive; the olive gesture is covered by onboarding UI tests.
+        compose.runOnIdle {
+            androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
+                .account.beginDiscreetEntry()
+        }
+        waitFor("unlock_pin")
+        enterPin("123456")
         waitFor("safe_settings")
         click("sign_out")
         openOnboarding()
         waitFor("returning_user")
     }
 
+    // Checks the cover account saves birthday and location without exposing private details step with the test's sample data.
     @Test
     fun coverAccountSavesBirthdayAndLocationWithoutExposingPrivateDetails() {
         register(username = "cover_account_tester")
@@ -82,6 +99,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         val originalLanguage = session.language
         compose.onNodeWithTag("cover_save_settings").performScrollTo().assertIsEnabled()
             .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
+        // Use the fallback when cover account saves birthday and location without exposing private details is unavailable.
         try {
             compose.waitUntil(30_000) { !session.busy && session.coverFullName == "Delivery Customer" }
         } catch (error: Throwable) {

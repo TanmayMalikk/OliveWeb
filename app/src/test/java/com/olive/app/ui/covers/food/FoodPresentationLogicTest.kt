@@ -9,6 +9,7 @@ import org.junit.Test
 
 class FoodPresentationLogicTest {
     private val text = ResourceText { id, _ -> "resource-$id" }
+    // Returns the dish used by this test.
     private fun dish(id: String = "bowl") = Dish(
         id = id,
         name = "Stored name",

@@ -37,7 +37,7 @@ class UserProfileEdgeCaseTest {
         assertEquals("", overlong.label)
     }
 
-    // Inputs: the values shown below. Expected: address json handles missing and incorrect coordinate types.
+    // Reads missing and wrongly typed coordinates; invalid values should safely become null.
     @Test
     fun addressJsonHandlesMissingAndIncorrectCoordinateTypes() {
         assertEquals(DeliveryAddress(), DeliveryAddress.fromJson(null))

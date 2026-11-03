@@ -6,6 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafetyPlanStateTest {
+    // Builds a sample safety plan for this test.
     private fun plan(
         fields: Map<String, SafetyField> = mapOf("primary_destination" to SafetyField("Home")),
         shareAction: String = "",

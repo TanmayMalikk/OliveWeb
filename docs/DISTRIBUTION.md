@@ -1,27 +1,19 @@
 # Android debug distribution
 
-The download website uses one stable Firebase Storage object:
+The download page's button redirects to this Firebase Storage object:
 
 `public/android/olive-branch.apk`
 
-After each push to `main`, `.github/workflows/publish-android-main.yml` builds
-the debug APK and replaces that object. The QR code does not need to change
-because its URL always points to the same object.
-
-## Required GitHub Actions secrets
-
-- `FIREBASE_SERVICE_ACCOUNT`: service-account JSON allowed to replace the APK.
-- `GEOAPIFY_API_KEY`: Android address-suggestion key.
-- `MAPBOX_ACCESS_TOKEN`: Android navigation token.
-- `REALTIME_DATABASE_URL`: Firebase Realtime Database HTTPS URL.
+Build the debug APK in Android Studio or with `gradlew :app:assembleDebug`, then
+upload `app/build/outputs/apk/debug/app-debug.apk` to this exact Storage path.
+Upload a new APK there when you want to replace the current download.
 
 Storage rules must be deployed separately. They permit public downloads only
 for the exact APK path and deny client uploads and deletion.
 
 ## Debug-build limits
 
-The workflow caches one debug signing key so newer CI builds can update older
-CI builds. If GitHub removes that cache, users must uninstall the old build
-before installing the newly signed one. Firebase App Check also uses the debug
-provider, so protected services require the device's debug token to be
-registered in Firebase.
+Android debug builds use the debug signing key and Firebase App Check debug
+provider. Protected services require the device's debug token to be registered
+in Firebase. If a new APK was signed with a different debug key, users must
+uninstall the older build before installing it.

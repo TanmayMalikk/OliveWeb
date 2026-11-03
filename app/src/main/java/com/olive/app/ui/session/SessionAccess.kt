@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 
 // Checks cover triggers and PINs; only a verified result for the current enrollment may authorize the safe area.
 internal class SessionAccess(private val runtime: SessionRuntime) {
+    // Detects a valid private-entry search for session access.
     fun interceptSearch(value: String): Boolean {
         with(runtime) {
             with(state) {
@@ -21,6 +22,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 if (value.isBlank() || (InputPolicy.triggerHash(value) != device.triggerHash &&
                             InputPolicy.legacyTriggerHash(value) != device.triggerHash)
                 ) return false
+                // Accept a cover trigger only while the cover is visible and no other entry check is running.
                 if (screen == SessionScreen.Cover && !busy) {
                     val event =
                         TriggerEvent(source = if (coverType == CoverType.NEWS) "Daily Digest search" else "Olive search")
@@ -93,6 +95,7 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                         }
                     }
                     if (epoch != token || screen != SessionScreen.Pin || challenge != pinChallengeVersion) return@runOperation
+                    // Opens the Safe App, shows an error, or starts lockout based on the PIN result.
                     when (result) {
                         PinResult.Accepted -> unlockVerifiedDevice(
                             device,

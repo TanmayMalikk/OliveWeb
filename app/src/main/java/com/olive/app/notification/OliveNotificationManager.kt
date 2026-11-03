@@ -74,6 +74,7 @@ object OliveNotificationManager {
         )
     }
 
+    // Builds the title and message shown in this app notification.
     internal fun contentFor(
         title: String?,
         body: String?,
@@ -125,6 +126,7 @@ object OliveNotificationManager {
         runCatching { NotificationManagerCompat.from(context).notify(notificationId, notification) }
     }
 
+    // Chooses the notification icon that matches this event.
     internal fun iconFor(coverType: CoverType, role: AccountRole = AccountRole.USER) = when {
         role == AccountRole.SAFE_CONTACT -> R.drawable.ic_notification_olive_branch
         role == AccountRole.STAFF || role == AccountRole.ADMIN -> R.drawable.ic_notification_olive_tree

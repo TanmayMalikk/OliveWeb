@@ -407,11 +407,6 @@ Buen humor.</string>
     <string name="admin_accounts_description">Crea cuentas y revisa cuántos usuarios tiene asignado cada empleado.</string>
 
     <string name="steps_today">Pasos de hoy</string>
-    <plurals name="steps_goal_value">
-        <item quantity="one">Objetivo: %1$d paso</item>
-        <item quantity="other">Objetivo: %1$d pasos</item>
-    </plurals>
-
     <string name="calories">Calorías</string>
 
 

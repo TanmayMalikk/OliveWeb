@@ -26,6 +26,7 @@ import org.json.JSONObject
 import java.io.IOException
 
 class VoipManagerTest {
+    // Checks the start call sends every invitee and uses bearer token step with the test's sample data.
     @Test
     fun startCallSendsEveryInviteeAndUsesBearerToken() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -48,6 +49,7 @@ class VoipManagerTest {
             .let { array -> (0 until array.length()).map(array::getString) })
     }
 
+    // Checks the incoming calls can be observed and accepted step with the test's sample data.
     @Test
     fun incomingCallsCanBeObservedAndAccepted() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -68,6 +70,7 @@ class VoipManagerTest {
         assertEquals("user 2", requests.first().url.queryParameter("userId"))
     }
 
+    // Checks the api errors are propagated with their status and code step with the test's sample data.
     @Test
     fun apiErrorsArePropagatedWithTheirStatusAndCode() {
         val client = OkHttpClient.Builder()
@@ -89,6 +92,7 @@ class VoipManagerTest {
         assertEquals("Sign in required", error.message)
     }
 
+    // Checks the server error without json uses status fallback step with the test's sample data.
     @Test
     fun serverErrorWithoutJsonUsesStatusFallback() {
         val manager = managerForResponse(code = 503, body = "maintenance")
@@ -102,6 +106,7 @@ class VoipManagerTest {
         assertTrue(error.message!!.contains("503"))
     }
 
+    // Checks the network failures are not converted to successful responses step with the test's sample data.
     @Test
     fun networkFailuresAreNotConvertedToSuccessfulResponses() {
         val client = OkHttpClient.Builder()
@@ -116,6 +121,7 @@ class VoipManagerTest {
         assertEquals("Connection refused", error.message)
     }
 
+    // Checks the malformed successful payload is reported step with the test's sample data.
     @Test
     fun malformedSuccessfulPayloadIsReported() {
         val manager = managerForResponse(body = """{"invitations":""")
@@ -125,6 +131,7 @@ class VoipManagerTest {
         }
     }
 
+    // Checks the unknown participant status is reported instead of accepted as valid step with the test's sample data.
     @Test
     fun unknownParticipantStatusIsReportedInsteadOfAcceptedAsValid() {
         val unknownStatus = """{"invitations":[{"callId":"call-1","callerId":"caller-1","name":"Support","status":"maybe"}]}"""
@@ -137,6 +144,7 @@ class VoipManagerTest {
         assertTrue(error.message!!.contains("unknown participant status"))
     }
 
+    // Checks the declining invitation uses decline endpoint and body step with the test's sample data.
     @Test
     fun decliningInvitationUsesDeclineEndpointAndBody() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -149,6 +157,7 @@ class VoipManagerTest {
         assertEquals("user-2", body.getString("userId"))
     }
 
+    // Checks the invalid call and polling inputs are rejected before network access step with the test's sample data.
     @Test
     fun invalidCallAndPollingInputsAreRejectedBeforeNetworkAccess() {
         val requests = mutableListOf<Request>()
@@ -182,6 +191,7 @@ class VoipManagerTest {
         assertEquals(emptyList<Request>(), requests)
     }
 
+    // Checks the polling clears ringing state when invitations disappear step with the test's sample data.
     @Test
     fun pollingClearsRingingStateWhenInvitationsDisappear() = runBlocking {
         var requestCount = 0
@@ -204,6 +214,7 @@ class VoipManagerTest {
         assertEquals(VoipState.Idle, manager.state.value)
     }
 
+    // Checks the manager for step with the test's sample data.
     private fun managerFor(
         responseBody: String,
         requests: MutableList<Request>,
@@ -231,6 +242,7 @@ class VoipManagerTest {
         )
     }
 
+    // Checks the manager for response step with the test's sample data.
     private fun managerForResponse(
         code: Int = 200,
         body: String
@@ -241,6 +253,7 @@ class VoipManagerTest {
         return VoipManager(apiBaseUrl = "https://voip.test", httpClient = client)
     }
 
+    // Builds a fake server response so each VoIP test can control the returned JSON.
     private fun Request.jsonResponse(code: Int = 200, body: String): Response =
         Response.Builder()
             .request(this)

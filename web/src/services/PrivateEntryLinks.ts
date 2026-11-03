@@ -6,12 +6,14 @@ import { toBase64 } from "./EncryptionService";
 import { entryLinkUrl } from "../sites/SiteRouting";
 import { tokenDigest, validEntryToken } from "./EntryTokenPolicy";
 export { tokenDigest, validEntryToken } from "./EntryTokenPolicy";
+// Returns true when this link may be used to approve private entry on the web.
 export async function issueEntryLink(uid: string) {
   const token = toBase64(crypto.getRandomValues(new Uint8Array(32)))
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replace(/=+$/, "");
   const hash = await tokenDigest(token);
+  // Cloud links use the signed-in account key; local demos use a browser-only key.
   if (cloudMode) {
     const { db, auth } = await firebase();
     if (auth.currentUser?.uid !== uid)
@@ -26,6 +28,7 @@ export async function issueEntryLink(uid: string) {
   await writeCover(`${uid}:personal-link`, token);
   return entryLinkUrl(token, location.origin);
 }
+// Checks that a private entry link belongs to this account and is still active.
 export async function verifyEntryLink(
   uid: string,
   token: string,
@@ -44,6 +47,7 @@ export async function verifyEntryLink(
   }
   return (await (await database).get("device", `entry-hash:${uid}`)) === hash;
 }
+// Reads the private entry link saved in this browser and verifies it before use.
 export async function savedEntryLink(uid: string) {
   const token = await readCover<string | null>(`${uid}:personal-link`, null);
   if (!token) return null;

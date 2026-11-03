@@ -35,6 +35,7 @@ type FoodState = {
   ingredients: Record<string, string[]>;
 };
 const empty: FoodState = { cart: {}, favorites: [], ingredients: {} };
+// Formats food prices as Canadian dollars.
 const money = (cents: number) =>
   new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(
     cents / 100,
@@ -50,6 +51,7 @@ export default function Food() {
   const [loaded, setLoaded] = useState(false);
   const [storageError, setStorageError] = useState("");
   const storageId = `${session.enrollment?.uid ?? "preview"}:food`;
+  // Use a separate cart and order list for each signed-in account.
   useEffect(() => {
     let active = true;
     void readCover(storageId, empty)
@@ -69,6 +71,7 @@ export default function Food() {
       active = false;
     };
   }, [storageId]);
+  // Close dish details when the user changes food sections.
   useEffect(() => {
     if (loaded)
       void writeCover(storageId, state).catch(() =>
@@ -80,6 +83,7 @@ export default function Food() {
     0,
   );
   const count = Object.values(state.cart).reduce((n, q) => n + q, 0);
+  // Adds or removes one dish while keeping the cart quantity between 0 and 99.
   function quantity(id: string, delta: number) {
     setState((old) => {
       const next = Math.min(99, Math.max(0, (old.cart[id] ?? 0) + delta));
@@ -88,6 +92,7 @@ export default function Food() {
       return { ...old, cart };
     });
   }
+  // Adds a dish to favourites, or removes it when it is already saved.
   function favorite(id: string) {
     setState((old) => ({
       ...old,
@@ -96,6 +101,7 @@ export default function Food() {
         : [...old.favorites, id],
     }));
   }
+  // Searches the menu while also checking for the user's private trigger words.
   function search(value: string) {
     setQuery(value);
     void session.searchTrigger(value).then((found) => {
@@ -447,6 +453,7 @@ export default function Food() {
     </div>
   );
 }
+// Shows one cart quantity control and sends each change back to the food cover.
 function Quantity({
   dish,
   value,

@@ -406,11 +406,6 @@
     <string name="admin_accounts_description">Créez des comptes et consultez le nombre d’utilisateurs assignés au personnel.</string>
 
     <string name="steps_today">Pas aujourd’hui</string>
-    <plurals name="steps_goal_value">
-        <item quantity="one">Objectif : %1$d pas</item>
-        <item quantity="other">Objectif : %1$d pas</item>
-    </plurals>
-
     <string name="calories">Calories</string>
 
 

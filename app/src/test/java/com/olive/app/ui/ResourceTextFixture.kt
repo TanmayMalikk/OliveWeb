@@ -12,6 +12,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 internal fun testResourceText(locale: String = "values"): ResourceText {
     val root = listOf(File("src/main/res"), File("app/src/main/res")).first { it.isDirectory }
     val names = R.string::class.java.fields.associate { it.getInt(null) to it.name }
+    // Reads the saved value for resource text fixture.
     fun read(folder: String): Map<String, String> = File(root, folder).listFiles().orEmpty()
         .filter { it.extension == "xml" }.flatMap { file ->
             val nodes = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file)

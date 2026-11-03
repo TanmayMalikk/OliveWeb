@@ -10,7 +10,12 @@ export type Page =
   | "Contacts"
   | "Profile"
   | "Settings"
-  | "Activity";
+  | "Activity"
+  | "Hotlines"
+  | "StaffHelp"
+  | "Documents"
+  | "Camera"
+  | "Location";
 export interface Address {
   line1: string;
   line2: string;
@@ -147,18 +152,31 @@ export const covers: {
     caption: "A quieter corner. Find a matching pair.",
   },
 ];
-export const coverInfo = (id: Cover) => covers.find((c) => c.id === id)!;
-export const coverPath = (id: Cover) => coverSite(id).path;
+// Cover apps: converts removed or damaged saved cover values to a supported cover.
+export function normalizeCover(value: unknown): Cover {
+  if (value === "CALCULATOR") return "FITNESS";
+  return covers.some((cover) => cover.id === value) ? (value as Cover) : "GAME";
+}
+// Creates the title, description, and icon details for one cover app.
+export const coverInfo = (id: Cover) =>
+  covers.find((cover) => cover.id === normalizeCover(id)) ?? covers[3];
+// Returns the public web address for the selected cover app.
+export const coverPath = (id: Cover) => coverSite(normalizeCover(id)).path;
+// Account sign-in: Normalizes a username for reliable matching. It removes outside spaces and converts every letter to lowercase.
 export const normalizeUsername = (v: string) => v.trim().toLowerCase();
+// Account sign-in: Validates a username. It requires 8–24 lowercase letters, numbers, or underscores and at least one letter.
 export const validUsername = (v: string) =>
   /^(?=.*[a-z])[a-z0-9_]{8,24}$/.test(normalizeUsername(v));
+// Account sign-in: Validates a password. It checks the length and requires a letter, number, and special character.
 export const validPassword = (v: string) =>
   v.length >= 8 &&
   v.length <= 24 &&
   /[\p{L}]/u.test(v) &&
   /\d/.test(v) &&
   /[^\p{L}\p{N}\s]/u.test(v);
+// Private entry: Validates an app PIN. It accepts only four to six digits.
 export const validPin = (v: string) => /^\d{4,6}$/.test(v);
+// Web domain models: Converts a username into its sign-in email. It accepts an email as-is or converts a username to the account email format.
 export function signInEmail(username: string, role: Role) {
   if ((role === "STAFF" || role === "ADMIN") && username.includes("@"))
     return username.trim().toLowerCase();
@@ -205,6 +223,7 @@ export const newEvent = (action: string, area = "Account"): Event => ({
   changes: [],
 });
 export const TRASH_RETENTION_MS = 10_000; // Matches the mobile project's current ten-second test retention.
+// Notes trash: Permanently clears an expired deleted note. It compares the deletion time with the retention limit while keeping newer trash recoverable.
 export function purgeEntry(entry: Entry, now = Date.now()): Entry {
   return entry.deletedAt && now - entry.deletedAt >= TRASH_RETENTION_MS
     ? {
@@ -216,6 +235,7 @@ export function purgeEntry(entry: Entry, now = Date.now()): Entry {
       }
     : entry;
 }
+// Web domain models: Turns a technical error into a readable message. It checks the error prefix and selects a plain-language explanation.
 export function friendlyError(error: unknown): string {
   const code = (error as { code?: string })?.code;
   if (code?.startsWith("auth/"))

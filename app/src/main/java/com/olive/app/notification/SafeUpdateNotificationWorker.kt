@@ -14,6 +14,7 @@ import kotlin.random.Random
 // Safe updates wait a random amount of time, then appear as a normal notification from the chosen cover.
 class SafeUpdateNotificationWorker(context: Context, parameters: WorkerParameters) :
     Worker(context, parameters) {
+    // Checks for a safe update in the background and posts a local notification when needed.
     override fun doWork(): Result {
         if (FirebaseAuth.getInstance().currentUser == null) return Result.success()
         AppNotifications.showRandomSafeUpdate(
@@ -32,6 +33,7 @@ object SafeUpdateNotificationScheduler {
     internal const val MIN_DELAY_SECONDS = 5L
     internal const val MAX_DELAY_SECONDS = 10L
 
+    // Schedules the background task for safe update notification worker.
     fun schedule(context: Context) {
         val request = OneTimeWorkRequestBuilder<SafeUpdateNotificationWorker>()
             .setInitialDelay(randomDelaySeconds(), TimeUnit.SECONDS)
@@ -41,10 +43,12 @@ object SafeUpdateNotificationScheduler {
             .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
+    // Safe update notification worker: Cancels the active task. It asks WorkManager to cancel the uniquely named background task.
     fun cancel(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
 
+    // Spreads background checks across a small random delay to avoid bursts.
     internal fun randomDelaySeconds(random: Random = Random.Default): Long =
         random.nextLong(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS + 1)
 }

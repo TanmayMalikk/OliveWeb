@@ -13,6 +13,7 @@ import {
   oliveAngle,
 } from "./olive-flight";
 
+// Draws one leafy branch from the current Olive Flight game state.
 function LeafyBranch({
   x,
   end,
@@ -26,6 +27,7 @@ function LeafyBranch({
 }) {
   const height = down ? end : FLIGHT.height - end;
   const variation = seed + (down ? 0.173 : 0.719);
+  // Creates a stable random value for one branch decoration.
   const random = (index: number, salt = 0) => {
     const value =
       Math.sin(variation * 8191 + index * 127.1 + salt * 311.7) * 43758.5453;
@@ -113,6 +115,7 @@ export default function OliveFlight() {
   const widthRef = useRef<number>(FLIGHT.width);
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
+  // Keep the current game phase available inside animation callbacks.
   useEffect(() => {
     const element = stage.current;
     if (!element) return;
@@ -128,6 +131,7 @@ export default function OliveFlight() {
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  // Resize the game world when its panel width changes.
   useEffect(() => {
     let live = true;
     void readCover<number | null>("olive-flight-best", null)
@@ -144,10 +148,12 @@ export default function OliveFlight() {
       live = false;
     };
   }, []);
+  // Keep the latest game world available to the animation frame.
   useEffect(() => {
     if (phase !== "playing" || world.over) return;
     let frame = 0,
       previous = 0;
+    // Move the game forward by one animation frame.
     function tick(time: number) {
       const elapsed = previous ? (time - previous) / 1000 : 0;
       if (elapsed)
@@ -160,7 +166,9 @@ export default function OliveFlight() {
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [phase, world.over]);
+  // Update the visible elapsed time while a round is active.
   useEffect(() => {
+    // Pauses Olive Flight when the browser tab is hidden.
     function hide() {
       if (document.hidden)
         setPhase((current) => (current === "playing" ? "paused" : current));
@@ -168,13 +176,16 @@ export default function OliveFlight() {
     document.addEventListener("visibilitychange", hide);
     return () => document.removeEventListener("visibilitychange", hide);
   }, []);
+  // Pause the game when the browser tab becomes hidden.
   useEffect(() => {
     if (loaded && world.over && world.score > (best ?? 0)) {
       setBest(world.score);
       void writeCover("olive-flight-best", world.score).catch(() => {});
     }
   }, [world.over, world.score, best, loaded]);
+  // Start a round or lift the olive after keyboard, mouse, or touch input.
   function flap() {
+    // Start the round or lift the olive when the player flaps.
     if (world.over || phase === "ready") {
       setWorld({
         ...newFlight(widthRef.current, Math.random),

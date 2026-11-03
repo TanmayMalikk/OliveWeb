@@ -26,6 +26,7 @@ export default function News() {
   const [refresh, setRefresh] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const storageId = `${session.enrollment?.uid ?? "preview"}:news`;
+  // Use a separate bookmark list for each signed-in account.
   useEffect(() => {
     let live = true;
     void readCover<NewsArticle[]>(storageId, [])
@@ -40,12 +41,14 @@ export default function News() {
       live = false;
     };
   }, [storageId]);
+  // Keep the latest feed state available to the refresh timer.
   useEffect(() => {
     if (loaded)
       void writeCover(storageId, saved).catch(() =>
         setError("Unable to save bookmarks in this browser."),
       );
   }, [saved, loaded, storageId]);
+  // Copy changed feed values into the timer's live reference.
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -68,6 +71,7 @@ export default function News() {
       });
     return () => controller.abort();
   }, [scope, place, refresh]);
+  // Loads whether this news story is bookmarked in this browser.
   function bookmark(article: NewsArticle) {
     setSaved((old) =>
       old.some((a) => a.id === article.id)
@@ -273,7 +277,7 @@ export default function News() {
     </div>
   );
 }
-// Reads er.
+// Opens one story inside the built-in article reader.
 function Reader({
   article,
   close,
@@ -293,6 +297,7 @@ function Reader({
     isPaywalled?: boolean;
   } | null>(null);
   const [error, setError] = useState("");
+  // Reset the article reader when the selected story changes.
   useEffect(() => {
     const controller = new AbortController();
     void fetch(`/api/articles/${article.id}`, { signal: controller.signal })

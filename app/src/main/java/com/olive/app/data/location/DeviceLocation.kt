@@ -43,6 +43,7 @@ internal class DeviceLocationUpdates internal constructor(
     private val fusedLocation: FusedLocationProviderClient,
     private val callback: LocationCallback,
 ) {
+    // Cancels location callbacks when the request is no longer needed.
     fun stop() {
         fusedLocation.removeLocationUpdates(callback)
     }
@@ -72,6 +73,7 @@ internal object DeviceLocation {
 
         val fusedLocation = LocationServices.getFusedLocationProviderClient(context.applicationContext)
         val callback = object : LocationCallback() {
+            // Converts the newest Android location into the app's map format.
             override fun onLocationResult(result: LocationResult) {
                 result.locations.forEach { location ->
                     onLocation(
@@ -95,6 +97,7 @@ internal object DeviceLocation {
         return DeviceLocationUpdates(fusedLocation, callback)
     }
 
+    // Reads coordinates from the best available device location.
     suspend fun currentCoordinates(context: Context): DeviceCoordinates? {
         if (ContextCompat.checkSelfPermission(
                 context,
@@ -119,6 +122,7 @@ internal object DeviceLocation {
         }
     }
 
+    // Geocodes a typed address into map coordinates.
     suspend fun coordinatesForAddress(
         context: Context,
         address: DeliveryAddress
@@ -163,6 +167,7 @@ internal object DeviceLocation {
         }
     }
 
+    // Rejects an old cached GPS point when a fresh location is required.
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private fun recent(manager: LocationManager): Location? {
         val now = System.currentTimeMillis()
@@ -175,6 +180,7 @@ internal object DeviceLocation {
             }
     }
 
+    // Requests a fresh location from Google Play services.
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private suspend fun fusedCurrent(context: Context): Location? {
         val cancellation = CancellationTokenSource()
@@ -193,6 +199,7 @@ internal object DeviceLocation {
         }
     }
 
+    // Requests the best available current device location.
     @RequiresPermission(anyOf = [Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION])
     private suspend fun current(context: Context, manager: LocationManager): Location? =
         suspendCancellableCoroutine { continuation ->
@@ -216,6 +223,7 @@ internal object DeviceLocation {
             }.onFailure { if (continuation.isActive) continuation.resume(null) }
         }
 
+    // Builds the reverse-geocoding request that turns coordinates into an address.
     private suspend fun geocode(context: Context, location: Location): Address? {
         val geocoder = Geocoder(context, Locale.getDefault())
         return if (Build.VERSION.SDK_INT >= 33) suspendCancellableCoroutine { continuation ->
@@ -224,12 +232,14 @@ internal object DeviceLocation {
                     location.latitude,
                     location.longitude,
                     1,
-                    // Returns the first matching address, or null when Android geocoding fails.
+                    // Runs the geocode callback when location sharing finishes that step.
                     object : Geocoder.GeocodeListener {
+                        // Runs the geocode callback when location sharing finishes that step.
                         override fun onGeocode(addresses: MutableList<Address>) {
                             if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                         }
 
+                        // Returns a readable location error when the device request fails.
                         override fun onError(errorMessage: String?) {
                             if (continuation.isActive) continuation.resume(null)
                         }
@@ -238,14 +248,18 @@ internal object DeviceLocation {
         } else legacyReverseGeocode(geocoder, location)
     }
 
+    // Builds the address search request that returns map coordinates.
     private suspend fun forwardGeocode(geocoder: Geocoder, query: String): Address? =
+        // Skip the next action unless the Android version is at least 33.
         if (Build.VERSION.SDK_INT >= 33) suspendCancellableCoroutine { continuation ->
             runCatching {
                 geocoder.getFromLocationName(query, 1, object : Geocoder.GeocodeListener {
+                    // Runs the geocode callback when location sharing finishes that step.
                     override fun onGeocode(addresses: MutableList<Address>) {
                         if (continuation.isActive) continuation.resume(addresses.firstOrNull())
                     }
 
+                    // Returns a readable location error when the device request fails.
                     override fun onError(errorMessage: String?) {
                         if (continuation.isActive) continuation.resume(null)
                     }
@@ -253,6 +267,7 @@ internal object DeviceLocation {
             }.onFailure { if (continuation.isActive) continuation.resume(null) }
         } else legacyForwardGeocode(geocoder, query)
 
+    // Gives location sharing the legacy forward geocode it needs.
     @Suppress("DEPRECATION")
     private suspend fun legacyForwardGeocode(geocoder: Geocoder, query: String): Address? =
         withContext(Dispatchers.IO) {
@@ -260,6 +275,7 @@ internal object DeviceLocation {
             runCatching { geocoder.getFromLocationName(query, 1)?.firstOrNull() }.getOrNull()
         }
 
+    // Uses Android's older geocoder callback on devices below Android 13.
     @Suppress("DEPRECATION")
     private suspend fun legacyReverseGeocode(geocoder: Geocoder, location: Location): Address? =
         withContext(Dispatchers.IO) {

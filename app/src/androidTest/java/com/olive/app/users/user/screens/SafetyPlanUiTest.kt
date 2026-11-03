@@ -14,6 +14,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafetyPlanUiTest : OliveUiTestBase() {
+    // Checks the setup step with the test's sample data.
     private fun setup(): SessionViewModel {
         openOnboarding()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
@@ -61,6 +62,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         return session
     }
 
+    // Checks the primary and backup save separately and remain available after restart step with the test's sample data.
     @Test
     fun primaryAndBackupSaveSeparatelyAndRemainAvailableAfterRestart() {
         val session = setup()
@@ -94,6 +96,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safety_primary_documents").assertTextContains("Primary safe place")
     }
 
+    // Checks the immediate quick exit keeps the edit but clears private presentation step with the test's sample data.
     @Test
     fun immediateQuickExitKeepsTheEditButClearsPrivatePresentation() {
         val session = setup()
@@ -118,6 +121,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         assertEquals(SessionScreen.Safe, session.screen)
     }
 
+    // Checks the trusted contacts can be selected or added without typing them into the plan step with the test's sample data.
     @Test
     fun trustedContactsCanBeSelectedOrAddedWithoutTypingThemIntoThePlan() {
         val session = setup()
@@ -163,6 +167,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safety_contact_existing_partner").performScrollTo().assertIsOff()
     }
 
+    // Checks the leaving sections can be reached edited and saved in both plans step with the test's sample data.
     @Test
     fun leavingSectionsCanBeReachedEditedAndSavedInBothPlans() {
         val session = setup()
@@ -193,6 +198,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safety_backup_destination").assertTextContains("Stay with a friend")
     }
 
+    // Checks the talk back can switch plans and quick exit clears the private editor step with the test's sample data.
     @Test
     fun talkBackCanSwitchPlansAndQuickExitClearsThePrivateEditor() {
         val session = setup()
@@ -219,6 +225,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the checklist ticks persist and document items are visible step with the test's sample data.
     @Test
     fun checklistTicksPersistAndDocumentItemsAreVisible() {
         val session = setup()
@@ -259,6 +266,7 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         compose.onNode(hasSetTextAction() and hasText("Bring spare keys")).assertDoesNotExist()
     }
 
+    // Checks the consultation explains local mode and document upload does not open apicker step with the test's sample data.
     @Test
     fun consultationExplainsLocalModeAndDocumentUploadDoesNotOpenAPicker() {
         setup()

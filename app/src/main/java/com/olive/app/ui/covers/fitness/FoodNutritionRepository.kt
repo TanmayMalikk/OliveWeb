@@ -51,6 +51,7 @@ internal class FoodNutritionRepository(
         )
     }
 
+    // Searches FatSecret for nutrition results that match the typed food.
     private suspend fun searchFatSecret(query: String): List<NutritionFood> {
         val response = functions.getHttpsCallable("nutritionFoodSearch")
             .call(mapOf("query" to query))
@@ -60,6 +61,7 @@ internal class FoodNutritionRepository(
         return foods.mapNotNull { raw -> parseFatSecretFood(raw as? Map<*, *> ?: return@mapNotNull null) }
     }
 
+    // Searches Open Food Facts when packaged-food results are needed.
     private suspend fun searchOpenFoodFacts(query: String): List<NutritionFood> =
         withContext(Dispatchers.IO) {
             val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
@@ -88,6 +90,7 @@ internal data class FoodSearchResult(
     val providerFailures: Int = 0,
 )
 
+// Converts a FatSecret result into the shared nutrition model.
 private fun parseFatSecretFood(value: Map<*, *>): NutritionFood? {
     val name = value["name"]?.toString()?.trim().orEmpty()
     if (name.isBlank()) return null
@@ -113,9 +116,11 @@ private fun parseFatSecretFood(value: Map<*, *>): NutritionFood? {
     )
 }
 
+// Fitness nutrition: Reads a nutrient number from an API map and prevents negative or missing values.
 private fun Map<*, *>.number(key: String) =
     (this[key] as? Number)?.toFloat()?.coerceAtLeast(0f) ?: 0f
 
+// Fitness cover: Converts open food facts product.
 private fun parseOpenFoodFactsProduct(product: JSONObject?): NutritionFood? {
     product ?: return null
     val name = product.optString("product_name").trim()
@@ -144,9 +149,11 @@ private fun parseOpenFoodFactsProduct(product: JSONObject?): NutritionFood? {
     )
 }
 
+// Keeps only foods that include calories and the three main macros.
 private fun JSONObject.hasCoreNutrition() =
     has("energy-kcal_100g") && has("proteins_100g") &&
             has("carbohydrates_100g") && has("fat_100g")
 
+// Reads one nutrient value from the food API response.
 private fun JSONObject.nutrient(name: String) =
     optDouble(name, 0.0).toFloat().takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f

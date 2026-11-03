@@ -56,6 +56,7 @@ internal class SessionDataSources(
     val locations: LocationSharingRepository?,
 ) {
     companion object {
+        // Creates the cloud repository bundle used by a signed-in Firebase account.
         fun create(application: Application, localMode: Boolean, vault: EncryptedVault): SessionDataSources {
             val media: MediaTicketDataSource? = if (localMode) null else MediaRepository()
             return SessionDataSources(
