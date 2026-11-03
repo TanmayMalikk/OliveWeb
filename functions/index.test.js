@@ -60,7 +60,7 @@ test("evidence labels reject text, numbers, missing values, and objects", () => 
 test("role aliases and real organization emails are deterministic", () => {
   assert.equal(_test.signInEmail("alex_1", "USER"), "alex_1@users.olive.invalid");
   assert.equal(_test.signInEmail("alex_1", "SAFE_CONTACT"), "alex_1@safe.olive.invalid");
-  assert.equal(_test.signInEmail("alex_1", "STAFF"), "alex_1@staff.olive.invalid");
+  assert.equal(_test.signInEmail("alex_1", "STAFF"), "alex_1@yourolivebranch.ca");
   assert.equal(_test.signInEmail("alex_1", "ADMIN", "Admin@Example.ca"), "admin@example.ca");
   assert.equal(_test.organizationEmailKey(" Admin@Example.ca "), _test.organizationEmailKey("admin@example.ca"));
 });
@@ -136,7 +136,7 @@ test("organization sign-in emails reject malformed addresses", () => {
   for (const email of ["missing-at.example.ca","missing-domain@","@missing-user.ca","two words@example.ca"]) {
     assert.throws(() => _test.signInEmail("staff_name","STAFF",email));
   }
-  assert.equal(_test.signInEmail("staff_name","STAFF",""),"staff_name@staff.olive.invalid");
+  assert.equal(_test.signInEmail("staff_name","STAFF",""),"staff_name@yourolivebranch.ca");
 });
 
 // Inputs: exact and over-limit password lengths with Unicode. Expected: policy accepts only complete bounded credentials.

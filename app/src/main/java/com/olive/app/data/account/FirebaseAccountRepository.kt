@@ -61,9 +61,9 @@ class FirebaseAccountRepository : AccountRepository {
             auth.signInWithEmailAndPassword(primary, password).await().user
         } catch (primaryError: Exception) {
             // Staff and admin email sign-ins can use their protected organization username as an alias.
-            if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN) && '@' in username) {
+            if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
                 val result = functions.getHttpsCallable("resolveOrganizationLogin")
-                    .call(mapOf("email" to username.trim().lowercase(), "role" to role.name))
+                    .call(mapOf("identifier" to username.trim().lowercase(), "role" to role.name))
                     .await().data as? Map<*, *>
                 val alias = result?.get("authEmail")?.toString().orEmpty()
                 if (alias.isBlank()) throw primaryError

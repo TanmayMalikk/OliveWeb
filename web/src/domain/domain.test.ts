@@ -28,6 +28,9 @@ describe("mobile-compatible contracts", () => {
       "alice_user@safe.olive.invalid",
     );
     expect(signInEmail("Staff@Example.com", "STAFF")).toBe("staff@example.com");
+    expect(signInEmail("staff_user", "STAFF")).toBe(
+      "staff_user@yourolivebranch.ca",
+    );
   });
   // Inputs: the values in this case. Expected: matches mobile credential limits.
   it("matches mobile credential limits", () => {

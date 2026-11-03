@@ -23,6 +23,8 @@
     <string name="ui_no_accounts_found">未找到帐户。</string>
     <string name="ui_profile_information">简介信息</string>
     <string name="ui_email">电子邮件</string>
+    <string name="ui_login_email_optional">登录电子邮件（可选）</string>
+    <string name="ui_login_email_creation_help">如果留空，登录名将为 username@yourolivebranch.ca。帐户创建后无法更改。</string>
     <string name="ui_phone_optional">电话（可选）</string>
     <string name="ui_users">用户</string>
     <string name="ui_safe_contacts">安全接触</string>
