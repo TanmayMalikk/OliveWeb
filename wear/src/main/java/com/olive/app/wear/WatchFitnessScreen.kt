@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,6 +75,7 @@ internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
                 color = WatchAccent,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
             )
             Spacer(Modifier.height(4.dp))
             WatchDashboard(state)
@@ -111,7 +114,7 @@ private fun WatchDashboard(state: WatchFitnessState) {
     WatchTabs(selectedPage = selectedPage, onSelected = { selectedPageName = it.name })
     Spacer(Modifier.height(5.dp))
 
-    ScrollableWatchPage {
+    ScrollableWatchPage(selectedPage.label) {
         if (selectedPage == WatchPage.HOME) {
             WatchSummaryCard(title = null) {
                 CircularStepSummary(state, stepProgress, totalCaloriesBurned)

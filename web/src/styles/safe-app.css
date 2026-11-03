@@ -601,6 +601,34 @@
   gap: 0.65rem;
 }
 
+.incident-location-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+
+.incident-location-input input {
+  min-width: 0;
+  border-radius: 0.85rem 0 0 0.85rem;
+}
+
+.incident-location-input button {
+  display: grid;
+  width: 3.25rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-left: 0;
+  border-radius: 0 0.85rem 0.85rem 0;
+  background: var(--paper);
+  color: var(--olive);
+  cursor: pointer;
+}
+
+.incident-location-input button:hover,
+.incident-location-input button:focus-visible {
+  background: var(--soft);
+}
+
 .incident-address-results {
   z-index: 500;
   display: grid;

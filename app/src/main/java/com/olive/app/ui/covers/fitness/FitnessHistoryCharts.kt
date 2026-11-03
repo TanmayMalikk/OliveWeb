@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -87,6 +88,7 @@ internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
                 style = MaterialTheme.typography.headlineSmall,
                 color = Ink,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
             )
             Text(
                 text = stringResource(R.string.fitness_history_description),
@@ -207,7 +209,9 @@ private fun HistoryLineChartCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            contentDescription = description
+        },
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Paper),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),

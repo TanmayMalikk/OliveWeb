@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -82,6 +83,7 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
                     text = stringResource(R.string.fitness_vitals),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(
                     text = stringResource(R.string.fitness_vitals_today_description),
@@ -179,9 +181,7 @@ private fun HeartRateGraphCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-            contentDescription = graphDescription
-        },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Paper),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -190,36 +190,44 @@ private fun HeartRateGraphCard(
             modifier = Modifier.fillMaxWidth().padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text = stringResource(R.string.fitness_heart_rate_graph),
-                color = Ink,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = selectedDateText,
-                color = Muted,
-                style = MaterialTheme.typography.labelLarge,
-            )
-            if (selectedVitals != null) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.semantics(mergeDescendants = true) {
+                    contentDescription = graphDescription
+                },
+            ) {
                 Text(
-                    text = stringResource(
-                        R.string.fitness_vitals_range,
-                        selectedVitals.lowestBpm,
-                        selectedVitals.peakBpm,
-                    ),
-                    color = OliveGreen,
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = stringResource(R.string.fitness_heart_rate_graph),
+                    color = Ink,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(
-                    text = stringResource(
-                        R.string.fitness_vitals_average,
-                        selectedVitals.averageBpm,
-                    ),
+                    text = selectedDateText,
                     color = Muted,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.labelLarge,
                 )
+                if (selectedVitals != null) {
+                    Text(
+                        text = stringResource(
+                            R.string.fitness_vitals_range,
+                            selectedVitals.lowestBpm,
+                            selectedVitals.peakBpm,
+                        ),
+                        color = OliveGreen,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.fitness_vitals_average,
+                            selectedVitals.averageBpm,
+                        ),
+                        color = Muted,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
             Box(Modifier.fillMaxWidth().height(170.dp), contentAlignment = Alignment.Center) {
                 Canvas(
@@ -319,7 +327,12 @@ private fun HeartRateGraphCard(
                                 selected = selected,
                                 role = Role.RadioButton,
                                 onClick = { onDateSelected(date) },
-                            ),
+                            ).semantics {
+                                contentDescription = date.format(
+                                    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+                                        .withLocale(locale)
+                                )
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(

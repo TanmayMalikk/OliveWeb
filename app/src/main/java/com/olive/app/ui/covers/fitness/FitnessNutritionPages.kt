@@ -46,6 +46,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -79,6 +80,7 @@ internal fun TodayPage(
                     stringResource(R.string.nutrition_work_in_progress),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(stringResource(R.string.daily_nutrition), color = FitnessSubtle)
             }
@@ -90,7 +92,11 @@ internal fun TodayPage(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.meals), style = MaterialTheme.typography.titleLarge)
+                Text(
+                    stringResource(R.string.meals),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.semantics { heading() },
+                )
                 Button(onClick = onAddFood, enabled = enabled) {
                     Icon(Icons.Outlined.Add, null)
                     Spacer(Modifier.width(6.dp))
@@ -100,7 +106,13 @@ internal fun TodayPage(
         }
         MealType.entries.forEach { meal ->
             val entries = snapshot.foodsToday.filter { it.meal == meal }
-            item { Text(meal.displayName, fontWeight = FontWeight.SemiBold) }
+            item {
+                Text(
+                    meal.displayName,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.semantics { heading() },
+                )
+            }
             // Show the empty diary message until the user logs food.
             if (entries.isEmpty()) {
                 item { Text(stringResource(R.string.no_food_logged), color = FitnessSubtle) }
@@ -128,7 +140,7 @@ private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom,
             ) {
@@ -167,7 +179,12 @@ private fun DailyNutritionCard(snapshot: FitnessSnapshot) {
 // Shows eaten, target, and remaining calories in one row.
 @Composable
 private fun NutritionAmountRow(label: String, value: Float, unit: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    Row(
+        Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
+            contentDescription = "$label, ${value.displayAmount()} $unit"
+        },
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
         Text(label)
         Text("${value.displayAmount()} $unit")
     }
@@ -176,7 +193,12 @@ private fun NutritionAmountRow(label: String, value: Float, unit: String) {
 @Composable
 private fun NutritionProgress(label: String, value: Float, goal: Float, unit: String) {
     val progress = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = "$label, ${value.displayAmount()} of ${goal.displayAmount()} $unit"
+        },
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label)
             Text("${value.displayAmount()} / ${goal.displayAmount()} $unit")
@@ -201,7 +223,7 @@ private fun LoggedFoodRow(entry: FoodLogEntry, enabled: Boolean, onRemove: () ->
             Modifier.fillMaxWidth().padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
+            Column(Modifier.weight(1f).semantics(mergeDescendants = true) { }) {
                 Text(entry.food.name, fontWeight = FontWeight.SemiBold)
                 Text(
                     "${entry.servings.displayAmount()} × ${entry.food.servingDescription} · " +
@@ -234,7 +256,11 @@ internal fun FoodSearchPage(
         Modifier.fillMaxSize().padding(padding).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(R.string.find_food), style = MaterialTheme.typography.headlineSmall)
+        Text(
+            stringResource(R.string.find_food),
+            style = MaterialTheme.typography.headlineSmall,
+            modifier = Modifier.semantics { heading() },
+        )
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = query,
@@ -302,28 +328,30 @@ private fun FoodSearchResultCard(food: NutritionFood, enabled: Boolean, onAdd: (
             Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            Text(food.name, fontWeight = FontWeight.SemiBold)
-            if (food.brand.isNotBlank()) Text(food.brand, color = FitnessSubtle)
-            Text(
-                "${food.servingDescription} · ${food.calories.displayAmount()} kcal · " +
-                        "P ${food.proteinGrams.displayAmount()} g · " +
-                        "C ${food.carbohydrateGrams.displayAmount()} g · F ${food.fatGrams.displayAmount()} g",
-            )
-            Text(
-                "${stringResource(R.string.fiber)} ${food.fiberGrams.displayAmount()} g · " +
-                        "${stringResource(R.string.sugar)} ${food.sugarGrams.displayAmount()} g · " +
-                        "${stringResource(R.string.saturated_fat)} ${food.saturatedFatGrams.displayAmount()} g",
-                style = MaterialTheme.typography.bodySmall,
-                color = FitnessSubtle,
-            )
-            Text(
-                "${stringResource(R.string.sodium)} ${food.sodiumMilligrams.displayAmount()} mg · " +
-                        "${stringResource(R.string.cholesterol)} ${food.cholesterolMilligrams.displayAmount()} mg · " +
-                        "${stringResource(R.string.potassium)} ${food.potassiumMilligrams.displayAmount()} mg",
-                style = MaterialTheme.typography.bodySmall,
-                color = FitnessSubtle,
-            )
-            Text(food.source.displayName, style = MaterialTheme.typography.labelSmall, color = FitnessSubtle)
+            Column(Modifier.semantics(mergeDescendants = true) { }) {
+                Text(food.name, fontWeight = FontWeight.SemiBold)
+                if (food.brand.isNotBlank()) Text(food.brand, color = FitnessSubtle)
+                Text(
+                    "${food.servingDescription} · ${food.calories.displayAmount()} kcal · " +
+                            "P ${food.proteinGrams.displayAmount()} g · " +
+                            "C ${food.carbohydrateGrams.displayAmount()} g · F ${food.fatGrams.displayAmount()} g",
+                )
+                Text(
+                    "${stringResource(R.string.fiber)} ${food.fiberGrams.displayAmount()} g · " +
+                            "${stringResource(R.string.sugar)} ${food.sugarGrams.displayAmount()} g · " +
+                            "${stringResource(R.string.saturated_fat)} ${food.saturatedFatGrams.displayAmount()} g",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FitnessSubtle,
+                )
+                Text(
+                    "${stringResource(R.string.sodium)} ${food.sodiumMilligrams.displayAmount()} mg · " +
+                            "${stringResource(R.string.cholesterol)} ${food.cholesterolMilligrams.displayAmount()} mg · " +
+                            "${stringResource(R.string.potassium)} ${food.potassiumMilligrams.displayAmount()} mg",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FitnessSubtle,
+                )
+                Text(food.source.displayName, style = MaterialTheme.typography.labelSmall, color = FitnessSubtle)
+            }
             OutlinedButton(onClick = onAdd, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.add_to_diary))
             }

@@ -48,6 +48,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -140,6 +143,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
                         color = Ink,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { heading() },
                     )
                     Text(
                         stringResource(R.string.fitness_outdoor_workout_description),
@@ -341,10 +345,12 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
             stringResource(R.string.fitness_recent_outdoor_workouts),
             color = Ink,
             fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { heading() },
         )
         workouts.take(5).forEach { workout ->
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(PaleOlive)
+                    .semantics(mergeDescendants = true) { }
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -381,7 +387,12 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
 // Draws one live workout value and its label.
 @Composable
 private fun WorkoutMetric(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = "$label, $value"
+        },
+    ) {
         Text(value, color = Ink, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(label, color = Muted, style = MaterialTheme.typography.labelSmall)
     }
