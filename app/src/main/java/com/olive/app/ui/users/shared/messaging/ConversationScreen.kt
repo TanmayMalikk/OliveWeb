@@ -10,6 +10,8 @@ import com.olive.app.ui.users.shared.camera.AttachmentPicker
 import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
 
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.shared.LocalizedIcon as Icon
@@ -54,6 +56,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.olive.app.data.SafetyDocument
+import com.olive.app.data.MessageDeliveryStatus
 import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
 import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
 import java.io.File
@@ -230,8 +233,35 @@ internal fun ChatPane(
                                             style = MaterialTheme.typography.labelSmall,
                                             color = if (mine) Color.White.copy(alpha = .7f) else Muted
                                         )
+                                        if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
+                                            val retryable = chat.deliveryStatus in setOf(
+                                                MessageDeliveryStatus.FAILED_RETRYABLE,
+                                                MessageDeliveryStatus.FAILED_PERMANENT,
+                                            )
+                                            TextButton(
+                                                onClick = { session.messages.retryMessage(chat) },
+                                                enabled = retryable,
+                                                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                                                modifier = Modifier.testTag("message_status_${chat.id}")
+                                                    .semantics { liveRegion = LiveRegionMode.Polite },
+                                            ) {
+                                                Text(
+                                                    stringResource(
+                                                        when (chat.deliveryStatus) {
+                                                            MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued
+                                                            MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
+                                                            MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_retrying
+                                                            MessageDeliveryStatus.FAILED_PERMANENT -> R.string.message_delivery_failed_retry
+                                                            MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
+                                                        }
+                                                    ),
+                                                    color = Color.White.copy(alpha = if (retryable) 1f else .75f),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                )
+                                            }
+                                        }
                                     }
-                                    if (mine && !chat.unsent) Box {
+                                    if (mine && !chat.unsent && chat.deliveryStatus == MessageDeliveryStatus.SENT) Box {
                                         IconButton(
                                             onClick = { menuOpen = true },
                                             modifier = Modifier.size(34.dp)

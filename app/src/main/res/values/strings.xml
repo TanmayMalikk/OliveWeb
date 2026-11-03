@@ -345,6 +345,11 @@
     <string name="select_a_friend_or_conversation_to_start_messaging">Select a friend or conversation to start messaging.</string>
     <string name="unsend_message">Unsend message</string>
     <string name="message_unsent">Message unsent</string>
+    <string name="message_delivery_queued">Queued — waiting for connection</string>
+    <string name="message_delivery_sending">Sending…</string>
+    <string name="message_delivery_retrying">Not sent yet — retrying automatically</string>
+    <string name="message_delivery_failed_retry">Not sent — tap to retry</string>
+    <string name="message_delivery_sent">Sent</string>
 <string name="share_attachment">Share attachment</string>
     <string name="select_attachment_category">Select %1$s</string>
     <string name="private_notes">Private notes</string>

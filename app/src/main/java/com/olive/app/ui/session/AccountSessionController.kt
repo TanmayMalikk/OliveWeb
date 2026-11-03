@@ -34,8 +34,13 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 runtime.enrollment = restoredSession?.enrollment
                 restoredSession?.let { restorePresentation(it) }
                 routeRestoredAccount()
-                runtime.enrollment?.let {
-                    watchAccountChanges(AccountIdentity(it.uid, runtime.state.coverUsername))
+                runtime.enrollment?.let { enrollment ->
+                    if (!runtime.localMode) withContext(Dispatchers.IO) {
+                        MessageSendWorker.enqueuePending(runtime.application, enrollment.uid)
+                    }
+                    watchAccountChanges(
+                        AccountIdentity(enrollment.uid, runtime.state.coverUsername)
+                    )
                 }
                 if (runtime.enrollment?.role == AccountRole.ADMIN && !runtime.localMode) {
                     runtime.organization.queueAdminRefresh()
@@ -241,6 +246,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 navigation.quickExit()
                 historySyncJob?.cancel()
                 historySyncJob = null
+                MessageSendWorker.cancelOwner(application, uid)
                 busy = true
                 scope.launch {
                     // Turn an unexpected sign out failure into a readable message.
@@ -254,6 +260,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                                 )
                             )
                             store.forgetDevice()
+                            messageOutbox.purge(uid)
                         }
                         // Cloud accounts also remove their Firebase sign-in record.
                         if (!localMode) runCatching {
