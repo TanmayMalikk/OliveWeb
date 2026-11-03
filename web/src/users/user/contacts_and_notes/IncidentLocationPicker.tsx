@@ -1,6 +1,7 @@
 // User incident notes: lets the user search for an address or place a pin on a map.
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
+import { MapPin } from "lucide-react";
 import "leaflet/dist/leaflet.css";
 
 type LocationResult = {
@@ -143,6 +144,7 @@ export function IncidentLocationPicker({
   const [query, setQuery] = useState(label);
   const [results, setResults] = useState<LocationResult[]>([]);
   const [message, setMessage] = useState("");
+  const [mapOpen, setMapOpen] = useState(false);
 
   useEffect(() => setQuery(label), [label]);
   useEffect(() => {
@@ -188,18 +190,29 @@ export function IncidentLocationPicker({
 
   return (
     <div className="incident-location-picker">
-      <label className="field">
-        <span>Location of incident</span>
-        <input
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            onChange({ label: event.target.value, latitude: NaN, longitude: NaN });
-          }}
-          autoComplete="off"
-          required
-        />
-      </label>
+      <div className="field">
+        <label htmlFor="incident-location-input">Location of incident</label>
+        <div className="incident-location-input">
+          <input
+            id="incident-location-input"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              onChange({ label: event.target.value, latitude: NaN, longitude: NaN });
+            }}
+            autoComplete="off"
+            required
+          />
+          <button
+            type="button"
+            aria-label={mapOpen ? "Hide incident location map" : "Choose incident location on map"}
+            aria-expanded={mapOpen}
+            onClick={() => setMapOpen((open) => !open)}
+          >
+            <MapPin aria-hidden="true" size={20} />
+          </button>
+        </div>
+      </div>
       {results.length > 0 && (
         <ul className="incident-address-results" aria-label="Address suggestions">
           {results.map((result) => (
@@ -212,7 +225,7 @@ export function IncidentLocationPicker({
         </ul>
       )}
       {message && <small className="error">{message} You can still type the location or use the map.</small>}
-      <IncidentMap latitude={latitude} longitude={longitude} onChange={chooseMapPoint} />
+      {mapOpen && <IncidentMap latitude={latitude} longitude={longitude} onChange={chooseMapPoint} />}
     </div>
   );
 }

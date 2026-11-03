@@ -52,13 +52,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
@@ -102,6 +107,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var incidentLocation by remember { mutableStateOf("") }
     var incidentLatitude by remember { mutableStateOf<Double?>(null) }
     var incidentLongitude by remember { mutableStateOf<Double?>(null) }
+    var incidentMapOpen by remember { mutableStateOf(false) }
     var selectedAttachments by remember { mutableStateOf(emptySet<String>()) }
     var locationSuggestions by remember { mutableStateOf(emptyList<AddressSuggestion>()) }
     var attachAfterUpload by remember { mutableStateOf(false) }
@@ -112,6 +118,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var search by rememberSaveable { mutableStateOf("") }
     var logEntryId by remember { mutableStateOf<String?>(null) }
     var trashOpen by remember { mutableStateOf(false) }
+    val editorTitleFocus = remember { FocusRequester() }
+    val mapTitleFocus = remember { FocusRequester() }
     val formatter = remember {
         DateTimeFormatter.ofPattern(
             "MMM d, yyyy · HH:mm z",
@@ -132,6 +140,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         incidentLocation = entry?.incidentLocation.orEmpty()
         incidentLatitude = entry?.incidentLatitude
         incidentLongitude = entry?.incidentLongitude
+        incidentMapOpen = false
         selectedAttachments = entry?.attachmentIds.orEmpty().toSet()
         editorOpen = true
     }
@@ -176,9 +185,24 @@ internal fun PrivateNotes(session: SessionViewModel) {
             attachAfterUpload = false
         }
     }
+    // Move TalkBack to the editor title so opening a note or incident is announced immediately.
+    LaunchedEffect(editorOpen, editingId) {
+        if (editorOpen) {
+            withFrameNanos { }
+            editorTitleFocus.requestFocus()
+        }
+    }
+    // Announce the map panel only after the user opens it from the location field.
+    LaunchedEffect(incidentMapOpen) {
+        if (incidentMapOpen) {
+            withFrameNanos { }
+            mapTitleFocus.requestFocus()
+        }
+    }
     BackHandler(editorOpen || logEntryId != null || trashOpen) {
         when {
             logEntryId != null -> logEntryId = null
+            incidentMapOpen -> incidentMapOpen = false
             editorOpen -> editorOpen = false
             else -> trashOpen = false
         }
@@ -212,7 +236,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     Text(
                         if (editingId == null) uiText(R.string.new_private_entry) else uiText(R.string.edit_private_entry),
                         style = MaterialTheme.typography.titleLarge,
-                        modifier = (Modifier.weight(1f)).semantics { heading() })
+                        modifier = Modifier.weight(1f).testTag("private_editor_title")
+                            .focusRequester(editorTitleFocus).focusable()
+                            .semantics {
+                                heading()
+                                paneTitle = if (editingId == null) uiText(R.string.new_private_entry)
+                                else uiText(R.string.edit_private_entry)
+                            })
                     if (entry != null) IconButton(
                         onClick = { session.togglePrivateEntryPin(entry.id) },
                         enabled = !session.busy,
@@ -271,9 +301,28 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Field(stringResource(R.string.incident_location), incidentLocation, "incident_location", enabled = !session.busy) {
-                            incidentLocation = it.take(240)
-                        }
+                        OutlinedTextField(
+                            value = incidentLocation,
+                            onValueChange = { incidentLocation = it.take(240) },
+                            label = { Text(stringResource(R.string.incident_location)) },
+                            enabled = !session.busy,
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { incidentMapOpen = !incidentMapOpen },
+                                    enabled = !session.busy,
+                                    modifier = Modifier.testTag("incident_location_pin"),
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.PushPin,
+                                        stringResource(R.string.incident_pin_title),
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                                .testTag("incident_location")
+                                .keepVisibleWhileTyping(),
+                        )
                         locationSuggestions.forEach { suggestion ->
                             TextButton(
                                 onClick = {
@@ -290,9 +339,17 @@ internal fun PrivateNotes(session: SessionViewModel) {
                         }
                     }
                 }
-                item {
+                if (incidentMapOpen) item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.incident_pin_title), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.incident_pin_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.testTag("incident_map_title")
+                                .focusRequester(mapTitleFocus).focusable().semantics {
+                                heading()
+                                paneTitle = uiText(R.string.incident_pin_title)
+                            },
+                        )
                         Text(stringResource(R.string.incident_pin_help), color = Muted)
                         TextButton(onClick = {
                             locationPermission.launch(arrayOf(
@@ -336,7 +393,10 @@ internal fun PrivateNotes(session: SessionViewModel) {
                         enabled = uid != null && !session.busy,
                     ) { Text(stringResource(R.string.upload_new_attachment)) }
                     session.documents.state.files.forEach { document ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Checkbox(
                                 checked = document.id in selectedAttachments,
                                 onCheckedChange = { checked ->
