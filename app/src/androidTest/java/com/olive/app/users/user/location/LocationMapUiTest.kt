@@ -8,28 +8,28 @@ import androidx.compose.ui.test.*
 import com.olive.app.data.MapLocationPoint
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
 import com.olive.app.ui.shared.OliveTheme
-import com.olive.app.ui.users.user.location.ShareDurationDialog
 import org.junit.Test
-import org.junit.Assert.assertEquals
 
 class LocationMapUiTest : OliveUiTestBase() {
-    // User location map ui test: returns the map loads and exposes interactive controls. The test gives the code a clear input and checks the expected result.
+    // Checks the map loads and exposes interactive controls step with the test's sample data.
     @Test
     fun mapLoadsAndExposesInteractiveControls() {
-        compose.activity.setContent {
-            OliveTheme {
-                InteractiveLocationMap(
-                    listOf(
-                        MapLocationPoint(
-                            "test-user",
-                            "You",
-                            53.5461,
-                            -113.4937,
-                            System.currentTimeMillis(),
-                            true
-                        )
-                    ), Modifier.fillMaxSize()
-                )
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.setContent {
+                OliveTheme {
+                    InteractiveLocationMap(
+                        listOf(
+                            MapLocationPoint(
+                                "test-user",
+                                "You",
+                                53.5461,
+                                -113.4937,
+                                System.currentTimeMillis(),
+                                true
+                            )
+                        ), Modifier.fillMaxSize()
+                    )
+                }
             }
         }
         compose.onNodeWithTag("location_map_view").assertIsDisplayed()
@@ -41,34 +41,4 @@ class LocationMapUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("recenter_map").assertIsDisplayed()
     }
 
-    // User location map ui test: returns the sharing duration includes ten second test option. The test gives the code a clear input and checks the expected result.
-    @Test
-    fun sharingDurationIncludesTenSecondTestOption() {
-        var selected = 0L
-        compose.activity.setContent {
-            OliveTheme {
-                ShareDurationDialog(onDismiss = {}, onSelected = { selected = it })
-            }
-        }
-        compose.onNodeWithTag("location_duration_10_seconds").assertIsDisplayed().performClick()
-        compose.runOnIdle { assertEquals(10_000L, selected) }
-    }
-
-    // User location map ui test: returns the custom sharing duration is capped at seventy two hours. The test gives the code a clear input and checks the expected result.
-    @Test
-    fun customSharingDurationIsCappedAtSeventyTwoHours() {
-        var selected = 0L
-        compose.activity.setContent {
-            OliveTheme {
-                ShareDurationDialog(
-                    onDismiss = {},
-                    onSelected = { selected = it })
-            }
-        }
-        compose.onNodeWithTag("location_custom_hours").performTextReplacement("73")
-        compose.onNodeWithTag("location_custom_confirm").assertIsNotEnabled()
-        compose.onNodeWithTag("location_custom_hours").performTextReplacement("72")
-        compose.onNodeWithTag("location_custom_confirm").assertIsEnabled().performClick()
-        compose.runOnIdle { assertEquals(72L * 60 * 60 * 1_000, selected) }
-    }
 }

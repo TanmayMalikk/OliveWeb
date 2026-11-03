@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 internal enum class OnboardingPermission { Notifications, Location, Camera, Microphone, Done }
 
-// App permissions: Finds the next onboarding permission.
+// Returns the next Android permission needed by onboarding.
 internal fun nextOnboardingPermission(
     notificationsNeeded: Boolean, notificationsAsked: Boolean,
     locationGranted: Boolean, locationAsked: Boolean, cameraGranted: Boolean, cameraAsked: Boolean,
@@ -89,7 +89,7 @@ internal class AppPermissions(
             afterOnboarding()
         }
 
-    // App permissions: Checks whether the app has any location access. It asks Android about both coarse and precise location permissions.
+    // Checks whether Android granted approximate or precise location access.
     fun hasLocation() = listOf(
         Manifest.permission.ACCESS_COARSE_LOCATION,
         Manifest.permission.ACCESS_FINE_LOCATION
@@ -97,14 +97,14 @@ internal class AppPermissions(
         ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED
     }
 
-    // App permissions: Checks whether precise location is available. It asks Android whether fine-location permission is granted.
+    // Checks whether Android granted precise location access.
     private fun hasPreciseLocation() =
         ContextCompat.checkSelfPermission(
             activity,
             Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
-    // App permissions: Checks whether location can run in the background. It asks Android on version 10 or newer and accepts older versions automatically.
+    // Checks background location on Android 10 and newer; older versions do not need a separate grant.
     fun hasBackgroundLocation() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         ContextCompat.checkSelfPermission(
             activity,
@@ -147,7 +147,7 @@ internal class AppPermissions(
         }
     }
 
-    // App permissions: Checks one Android permission. It asks the system whether the supplied permission name is currently granted.
+    // Asks Android whether one named permission is currently granted.
     private fun hasPermission(permission: String) =
         ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
 
@@ -178,7 +178,7 @@ internal class AppPermissions(
         if (hasPreciseLocation() && hasBackgroundLocation()) return true
         locationResult?.let { return it.await() }
         val pending = CompletableDeferred<Boolean>().also { locationResult = it }
-        // A request location error is handled here instead of closing the app.
+        // Use the fallback when request location is unavailable.
         try {
             activity.lifecycle.withResumed { launchLocation() }
             return pending.await()
@@ -192,7 +192,7 @@ internal class AppPermissions(
         preferences.edit { putBoolean("location_asked", true) }
         locationPrompt = true
         if (locationResult == null) locationResult = CompletableDeferred()
-        // A launch location error is handled here instead of closing the app.
+        // Use the fallback when launch location is unavailable.
         try {
             // Location permission: Ask for foreground location before attempting background access.
             if (!hasPreciseLocation()) {
@@ -220,7 +220,7 @@ internal class AppPermissions(
     private fun launchBackgroundLocation() {
         locationPrompt = true
         if (locationResult == null) locationResult = CompletableDeferred()
-        // A launch background location error is handled here instead of closing the app.
+        // Use the fallback when launch background location is unavailable.
         try {
             // Background location: Android 10 and newer need a separate prompt; older versions already have enough access.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

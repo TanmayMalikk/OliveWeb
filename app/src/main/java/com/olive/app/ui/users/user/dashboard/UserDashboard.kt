@@ -76,7 +76,7 @@ internal fun SafeArea(session: SessionViewModel, exit: () -> Unit) {
             (fadeIn(tween(180)) + slideInHorizontally(tween(180)) { it / 12 })
                 .togetherWith(fadeOut(tween(120)) + slideOutHorizontally(tween(120)) { -it / 16 })
         }) { targetPage ->
-        // Choose what safe area should do for the current value.
+        // Opens the selected user Safe App feature.
         when (targetPage) {
             SafePage.Home -> SafeHomeScreen(session, profile)
             SafePage.Profile -> SafeProfileScreen(session, profile)
@@ -104,7 +104,7 @@ private fun StaffHelpScreen(session: SessionViewModel) {
         session.messages.ensureMessagingObservation()
         controller.requestHelp()
     }
-    // Update staff help screen when information used by this screen changes.
+    // Watch the support request until staff are assigned or the user cancels.
     LaunchedEffect(controller.conversationId, session.messages.conversations) {
         val chat = session.messages.conversations.firstOrNull {
             it.id == controller.conversationId
@@ -133,7 +133,7 @@ private fun StaffHelpScreen(session: SessionViewModel) {
             textAlign = TextAlign.Center
         )
         controller.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-        // controller requested is handled here by staff help screen.
+        // Show the matching status after the user requests staff help.
         if (controller.requested) {
             OutlinedButton(
                 onClick = {
@@ -155,7 +155,7 @@ internal fun SafeSupportControls(
 ) {
     if (!showExit && !showSupport) return
     val firstActionFocus = remember { FocusRequester() }
-    // Update safe support controls when information used by this screen changes.
+    // Keep support-menu focus and expanded state in sync for TalkBack.
     LaunchedEffect(expanded) {
         if (expanded) {
             withFrameNanos { }
@@ -278,7 +278,7 @@ internal fun SafeSupportControls(
                 .accessibilityTraversal(AccessibilityTraversalOrder.PersistentActions),
             verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Only continue with safe support controls when show support.
+            // Shows the support sheet only after the user asks for help.
             if (showSupport) {
                 val label =
                     stringResource(if (expanded) R.string.support_close_menu else R.string.support_open_menu)
@@ -293,7 +293,7 @@ internal fun SafeSupportControls(
                         stateDescription = state
                     }) { Icon(Icons.Outlined.Add, null, Modifier.rotate(iconRotation)) }
             } else Spacer(Modifier.width(0.dp))
-            // show exit or expanded is handled here by safe support controls.
+            // Show the support menu when it is expanded or when Quick Exit must stay visible.
             if (showExit || expanded) {
                 val label = stringResource(R.string.a11y_quick_exit)
                 ExtendedFloatingActionButton(
@@ -316,7 +316,7 @@ internal fun SafeSupportControls(
     }
 }
 
-// This shows the support action view for user dashboard. It fills the view with the latest details and actions.
+// Draws one support-menu button and delays its entrance so the list opens smoothly.
 @Composable
 private fun AnimatedVisibilityScope.SupportAction(
     labelId: Int, icon: ImageVector, tag: String, enabled: Boolean,
@@ -432,7 +432,7 @@ private fun SafeHomeScreen(session: SessionViewModel, profile: UserProfile) {
         ) { Text(stringResource(R.string.sign_out_on_this_device)) }
     }
 }
-// Shows safe feature grid for user dashboard.
+// Shows the Safe App feature buttons available to the user.
 @Composable
 private fun SafeFeatureGrid(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -481,7 +481,7 @@ private fun SafeFeatureGrid(session: SessionViewModel) {
         }
     }
 }
-// Shows safe feature tile for user dashboard.
+// Draws one accessible Safe App feature button.
 @Composable
 private fun SafeFeatureTile(
     label: String,

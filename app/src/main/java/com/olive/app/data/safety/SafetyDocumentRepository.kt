@@ -48,7 +48,7 @@ internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata
 }
 
 interface SafetyDocumentDataSource {
-    // Lists for for safety.
+    // Lists every safety document this account is allowed to open.
     suspend fun listFor(uid: String): List<SafetyDocument>
     // Streams every document the account may open and reports storage-listener failures separately.
     fun observeFor(
@@ -57,13 +57,13 @@ interface SafetyDocumentDataSource {
         onError: (String) -> Unit
     ): ChatSubscription
 
-    // Loads for for safety.
+    // Loads one allowed safety document by its ID.
     suspend fun getFor(uid: String, id: String): SafetyDocument
-    // Safety: Shares the selected item.
+    // Wraps the document key for new recipients before sharing it.
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
-    // Deletes the selected item for safety.
+    // Deletes a safety document owned by the current user.
     suspend fun delete(document: SafetyDocument, ownerUid: String)
-    // Safety: Downloads the selected file.
+    // Downloads and decrypts a safety document for in-app viewing.
     suspend fun download(context: Context, document: SafetyDocument): File
     /** Gives this account's registered phones and browsers encrypted copies of the document key. */
     suspend fun approveCurrentAccountDevices(document: SafetyDocument, currentUid: String, username: String)
@@ -74,7 +74,7 @@ class SafetyDocumentRepository(
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
     private val media: MediaTicketDataSource,
 ) : SafetyDocumentDataSource {
-    // Safety: Lists for. It reads or saves the matching protected record in Firebase.
+    // Reads every Firebase document this account is allowed to open.
     override suspend fun listFor(uid: String): List<SafetyDocument> = firestore.collection("files")
         .whereArrayContains("allowed_users", uid).get().await().documents.mapNotNull { documentFrom(it, uid) }
         .sortedByDescending { it.createdAt }
@@ -98,7 +98,7 @@ class SafetyDocumentRepository(
         return ChatSubscription { listener.remove() }
     }
 
-    // Safety: Loads for. It reads or saves the matching protected record in Firebase.
+    // Loads the encrypted document records that this account may open.
     override suspend fun getFor(uid: String, id: String): SafetyDocument {
         val document = documentFrom(firestore.collection("files").document(id).get().await(), uid)
             ?: error("File is no longer available")
@@ -106,7 +106,7 @@ class SafetyDocumentRepository(
         return document
     }
 
-    // Safety: Shares the selected item. It reads or saves the matching protected record in Firebase.
+    // Adds encrypted document access for each selected recipient.
     override suspend fun share(
         document: SafetyDocument,
         ownerUid: String,
@@ -120,7 +120,7 @@ class SafetyDocumentRepository(
         }
         val updated = (listOf(ownerUid) + recipients.keys).distinct()
         updateStorageAccess(current, current.allowedUsers.toSet(), updated.toSet())
-        // If share fails, catch the error so the app can keep running and explain the problem.
+        // Turn an unexpected share failure into a readable message.
         try {
             firestore.collection("files").document(document.id).update("allowed_users", updated)
                 .await()
@@ -136,7 +136,7 @@ class SafetyDocumentRepository(
         }
     }
 
-    // returns the grant access for safety. It reads or saves the matching protected record in Firebase.
+    // Wraps the document key for another approved account without exposing the raw key.
     suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
@@ -161,7 +161,7 @@ class SafetyDocumentRepository(
         }
         val updated = current.allowedUsers.toSet() + recipientUid
         updateStorageAccess(current, current.allowedUsers.toSet(), updated)
-        // If grant access fails, catch the error so the app can keep running and explain the problem.
+        // Turn an unexpected grant access failure into a readable message.
         try {
             firestore.collection("files").document(document.id)
                 .update("allowed_users", FieldValue.arrayUnion(recipientUid)).await()
@@ -171,7 +171,7 @@ class SafetyDocumentRepository(
         }
     }
 
-    // returns the revoke access for safety. It reads or saves the matching protected record in Firebase.
+    // Removes access from the safety plan.
     suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) {
         val document = getFor(ownerUid, documentId)
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
@@ -183,7 +183,7 @@ class SafetyDocumentRepository(
         }
         val updated = document.allowedUsers.toSet() - recipientUid
         updateStorageAccess(document, document.allowedUsers.toSet(), updated)
-        // A revoke access error is handled here instead of closing the app.
+        // Use the fallback when revoke access is unavailable.
         try {
             firestore.collection("files").document(documentId)
                 .update("allowed_users", FieldValue.arrayRemove(recipientUid)).await()
@@ -193,7 +193,7 @@ class SafetyDocumentRepository(
         }
     }
 
-    // Safety: Deletes the selected item. It reads or saves the matching protected record in Firebase.
+    // Removes an owned document from cloud storage and Firebase.
     override suspend fun delete(document: SafetyDocument, ownerUid: String) {
         require(document.ownerUid == ownerUid)
         if (document.objectKey.isNotBlank()) {
@@ -218,7 +218,7 @@ class SafetyDocumentRepository(
         return target
     }
 
-    // returns the approve current account devices for safety. It reads or saves the matching protected record in Firebase.
+    // Gives every registered device on this account its own wrapped document key.
     override suspend fun approveCurrentAccountDevices(
         document: SafetyDocument,
         currentUid: String,
@@ -294,7 +294,7 @@ class SafetyDocumentRepository(
         )
     }
 
-    // returns the document from for safety.
+    // Converts a stored document record into the model shown by the Safe App.
     private fun documentFrom(row: DocumentSnapshot, viewerUid: String): SafetyDocument? {
         val owner = row.getString("owner_id") ?: return null
         val encryptedMetadata = row.getString("encrypted_metadata").orEmpty()
@@ -337,7 +337,7 @@ class SafetyDocumentRepository(
 
     private companion object {
         const val CACHE_LIFETIME = 60L * 60L * 1000L
-        // returns the access key for safety.
+        // Uses one protected-storage key for this account's document access data.
         fun accessKey(uid: String) = "access_$uid"
     }
 }

@@ -157,10 +157,10 @@ export function normalizeCover(value: unknown): Cover {
   if (value === "CALCULATOR") return "FITNESS";
   return covers.some((cover) => cover.id === value) ? (value as Cover) : "GAME";
 }
-// Web domain models: Finds the selected cover details. It normalizes the cover name and finds the matching catalog entry.
+// Creates the title, description, and icon details for one cover app.
 export const coverInfo = (id: Cover) =>
   covers.find((cover) => cover.id === normalizeCover(id)) ?? covers[3];
-// Web domain models: Builds the web path for the selected cover. It normalizes the cover name and builds its matching site path.
+// Returns the public web address for the selected cover app.
 export const coverPath = (id: Cover) => coverSite(normalizeCover(id)).path;
 // Account sign-in: Normalizes a username for reliable matching. It removes outside spaces and converts every letter to lowercase.
 export const normalizeUsername = (v: string) => v.trim().toLowerCase();

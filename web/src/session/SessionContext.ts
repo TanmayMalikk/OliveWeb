@@ -60,7 +60,7 @@ export type SessionValue = {
 
 export const SessionContext = createContext<SessionValue | null>(null);
 
-// Web session context: returns the use session.
+// Gives each screen the active account session and stops use outside the provider.
 export const useSession = () => {
   const value = useContext(SessionContext);
   if (!value) throw new Error("Missing session");

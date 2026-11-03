@@ -15,7 +15,7 @@ class ResourceLocalizationTest {
     private val root = listOf(File("src/main"), File("app/src/main")).first { it.isDirectory }
     private val locales = listOf("values-fr", "values-es", "values-ar", "values-zh-rCN")
 
-    // Resource localization test: returns the strings. The test gives the code a clear input and checks the expected result.
+    // Checks the strings step with the test's sample data.
     private fun strings(folder: String): Map<String, String> =
         File(root, "res/$folder").listFiles().orEmpty()
             .filter { it.extension == "xml" }.flatMap { file ->
@@ -35,7 +35,7 @@ class ResourceLocalizationTest {
                 Regex("R\\.string\\.(\\w+)").findAll(file.readText()).map { it.groupValues[1] }
             }.toSet()
         val base = strings("values")
-        // Resource localization test: returns the placeholders. The test gives the code a clear input and checks the expected result.
+        // Checks the placeholders step with the test's sample data.
         fun placeholders(value: String) = Regex("%[0-9]+\\$[a-zA-Z]").findAll(value)
             .map { it.value }.groupingBy { it }.eachCount()
         locales.forEach { locale ->

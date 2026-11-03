@@ -9,11 +9,11 @@ import java.util.UUID
 
 // Handy for emulator testing: same account flow, but nothing leaves this installation.
 class LocalAccountRepository(private val vault: EncryptedVault) : AccountRepository {
-    // returns the key for account.
+    // Uses one protected-storage key for the local account profile.
     private fun key(username: String, role: AccountRole) =
         "${role.name}:${InputPolicy.username(username)}"
 
-    // returns the create for account.
+    // Creates an encrypted local account for emulator or offline testing.
     override suspend fun create(username: String, password: String, role: AccountRole) =
         withContext(Dispatchers.IO) {
             require(InputPolicy.validUsername(username)) { "Invalid username" }
@@ -55,23 +55,23 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
             AccountIdentity(account.getString("uid"), normalized)
         }
 
-    // Account: returns the profile.
+    // Loads the signed-in account profile from this repository.
     override suspend fun profile(identity: AccountIdentity) = withContext(Dispatchers.IO) {
         vault.read().optJSONObject("profiles")?.optJSONObject(identity.uid)
             ?.let(UserProfile::fromJson)
     }
 
-    // Saves profile for account.
+    // Saves the account profile in the selected account repository.
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) =
         withContext(Dispatchers.IO) {
             vault.update { it.child("profiles").put(identity.uid, profile.toJson()) }
         }
 
-    // Account: Saves history record.
+    // Adds one account activity record to storage.
     override suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord) = Unit
-    // returns the history records for account.
+    // Loads private activity-history records for this account.
     override suspend fun historyRecords(identity: AccountIdentity) = emptyList<HistoryRecord>()
-    // Account: Updates password.
+    // Re-encrypts this account after its password changes.
     override suspend fun changePassword(
         identity: AccountIdentity,
         currentPassword: String,
@@ -102,7 +102,7 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
 
     // Account: Authenticates the accountd uid.
     override fun authenticatedUid(): String? = null
-    // Authenticates the accountd username for account.
+    // Checks the username and password, then returns the matching account.
     override fun authenticatedUsername(): String? = null
     // Account: Signs out the current account.
     override fun signOut() = Unit

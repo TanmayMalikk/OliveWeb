@@ -21,7 +21,7 @@ class OrientationPreprocessorTest {
     private lateinit var preprocessor: OrientationPreprocessor
     private lateinit var testDocBytes: ByteArray
 
-    // Shared safe app orientation preprocessor test: Updates up. The test gives the code a clear input and checks the expected result.
+    // Prepares the sample data and device state used by this test.
     @Before
     fun setUp() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -33,13 +33,13 @@ class OrientationPreprocessorTest {
         assertTrue("test_doc.png should not be empty", testDocBytes.isNotEmpty())
     }
 
-    // Shared safe app orientation preprocessor test: returns the tear down. The test gives the code a clear input and checks the expected result.
+    // Clears the sample data after this test finishes.
     @After
     fun tearDown() {
         preprocessor.close()
     }
 
-    // returns the test process upright document for shared safe app orientation preprocessor test. The test gives the code a clear input and checks the expected result.
+    // Checks the process upright document step with the test's sample data.
     @Test
     fun testProcessUprightDocument() {
         val processedBytes = preprocessor.process(testDocBytes)
@@ -51,7 +51,7 @@ class OrientationPreprocessorTest {
         resultBitmap.recycle()
     }
 
-    // returns the test process rotated documents for shared safe app orientation preprocessor test. The test gives the code a clear input and checks the expected result.
+    // Checks the process rotated documents step with the test's sample data.
     @Test
     fun testProcessRotatedDocuments() {
         val originalBitmap = BitmapFactory.decodeByteArray(testDocBytes, 0, testDocBytes.size)
@@ -120,7 +120,7 @@ class OrientationPreprocessorTest {
         originalBitmap.recycle()
     }
 
-    // Shared safe app orientation preprocessor test: returns the mean pixel difference. The test gives the code a clear input and checks the expected result.
+    // Checks the mean pixel difference step with the test's sample data.
     private fun meanPixelDifference(first: Bitmap, second: Bitmap): Double {
         val width = 64
         val height = 64

@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
 
 class NewsReaderUiTest : OliveUiTestBase() {
-    // returns the full story navigation bookmarks and back stay in the app for news reader ui test cover. The test gives the code a clear input and checks the expected result.
+    // Checks the full story navigation bookmarks and back stay in the app step with the test's sample data.
     @Test
     fun fullStoryNavigationBookmarksAndBackStayInTheApp() {
         val saved = mutableStateOf(false)
@@ -78,7 +78,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("news_article_topic", useUnmergedTree = true).onChildren()
             .assertAny(hasText("Environment"))
         compose.onNodeWithTag("news_article_paywall", useUnmergedTree = true).assertDoesNotExist()
-        // Only continue with full story navigation bookmarks and back stay in the app when instrumentation registry get arguments get string capture news card is true.
+        // Run this part only when instrumentation registry get arguments get string capture news card is true.
         if (InstrumentationRegistry.getArguments().getString("captureNewsCard") == "true") {
             compose.waitForIdle()
             val rendered = AtomicBoolean(false)
@@ -107,7 +107,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
             val readerClient = browser.webViewClient
             // Deterministic publisher responses exercise the real reader without relying on live news.
             browser.webViewClient = object : WebViewClient() {
-                // Checks whether intercept request for news reader ui test cover. The test gives the code a clear input and checks the expected result.
+                // Checks the should intercept request step with the test's sample data.
                 override fun shouldInterceptRequest(
                     view: WebView,
                     request: WebResourceRequest
@@ -123,24 +123,24 @@ class NewsReaderUiTest : OliveUiTestBase() {
                     )
                 }
 
-                // Checks whether override url loading for news reader ui test cover. The test gives the code a clear input and checks the expected result.
+                // Checks the should override url loading step with the test's sample data.
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest) =
                     readerClient.shouldOverrideUrlLoading(view, request)
 
-                // Responds when page started for news reader ui test cover. The test gives the code a clear input and checks the expected result.
+                // Records when the test browser starts loading a page.
                 override fun onPageStarted(
                     view: WebView,
                     url: String,
                     favicon: android.graphics.Bitmap?
                 ) = readerClient.onPageStarted(view, url, favicon)
 
-                // Responds when page finished for news reader ui test cover. The test gives the code a clear input and checks the expected result.
+                // Records when the test browser finishes loading a page.
                 override fun onPageFinished(view: WebView, url: String) {
                     readerClient.onPageFinished(view, url)
                     finishedUrl.set(url)
                 }
 
-                // News reader ui test cover: returns the do update visited history. The test gives the code a clear input and checks the expected result.
+                // Checks the do update visited history step with the test's sample data.
                 override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) =
                     readerClient.doUpdateVisitedHistory(view, url, isReload)
             }
@@ -155,7 +155,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
                 null
             )
         }
-        // returns the wait for body for news reader ui test cover. The test gives the code a clear input and checks the expected result.
+        // Checks the wait for body step with the test's sample data.
         fun waitForBody(expected: String, path: String) {
             val page = AtomicReference("")
             compose.waitUntil(20_000) {
@@ -210,7 +210,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
             val visible = AtomicBoolean(false)
             instrumentation.runOnMainSync {
                 browser.postVisualStateCallback(1, object : WebView.VisualStateCallback() {
-                    // Responds when complete for news reader ui test cover. The test gives the code a clear input and checks the expected result.
+                    // Records the result when the test action finishes.
                     override fun onComplete(requestId: Long) {
                         browser.postOnAnimation { visible.set(true) }
                     }
@@ -270,7 +270,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
         }
     }
 
-    // returns the confirmed paywall is visible beside the article topic for news reader ui test cover. The test gives the code a clear input and checks the expected result.
+    // Checks the confirmed paywall is visible beside the article topic step with the test's sample data.
     @Test
     fun confirmedPaywallIsVisibleBesideTheArticleTopic() {
         val article = NewsArticle(
@@ -305,7 +305,7 @@ class NewsReaderUiTest : OliveUiTestBase() {
             .assertTextContains("Paywall")
     }
 
-    // News reader ui test cover: Finds browser. The test gives the code a clear input and checks the expected result.
+    // Finds the browser needed by this test.
     private fun findBrowser(view: View): WebView? {
         if (view is WebView) return view
         if (view is ViewGroup) for (index in 0 until view.childCount) {

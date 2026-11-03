@@ -78,7 +78,7 @@ internal fun SafetyChecklistSection(
             update,
             onContactsChange
         )
-        // Only continue with safety checklist section when section is documents.
+        // Run this part only when section is documents.
         if (section == "documents") {
             Text(
                 stringResource(R.string.safety_document_hint),
@@ -186,7 +186,7 @@ private fun ChecklistRow(
                         input()
                     }
                 })
-            // section key substring after is documents and editable is handled here by checklist row.
+            // Editable document rows can open the attachment picker.
             if (sectionKey.substringAfter('_') == "documents" && editable) {
                 val uploadDescription = stringResource(R.string.safety_upload_for, name)
                 OutlinedButton(
@@ -202,7 +202,7 @@ private fun ChecklistRow(
                 }
             }
         }
-        // editable is handled here by checklist row.
+        // Editing controls are hidden from read-only safety-plan viewers.
         if (editable) {
             val removeLabel = stringResource(R.string.safety_remove_item, name)
             IconButton(
@@ -215,7 +215,7 @@ private fun ChecklistRow(
     }
 }
 
-// The safety plan contact picker view is part of shared safe app safety plan form components. It gives the user the details and choices needed here.
+// Lets the user choose which trusted contacts may view this safety plan.
 @Composable
 private fun SafetyPlanContactPicker(
     items: List<SafetyChecklistItem>,
@@ -234,7 +234,7 @@ private fun SafetyPlanContactPicker(
         style = MaterialTheme.typography.labelMedium,
         color = Muted
     )
-    // editable is handled here by safety plan contact picker.
+    // Only the plan owner can change linked trusted contacts.
     if (editable) {
         Text(
             stringResource(R.string.safety_contact_picker_help),

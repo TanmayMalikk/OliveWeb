@@ -37,16 +37,16 @@ export interface CrossingWorld {
   over: boolean;
 }
 
-// returns the wrap for web olive-crossing ts cover.
+// Keeps moving objects inside the board when they pass an edge.
 const wrap = (value: number, length: number) =>
   ((value % length) + length) % length;
-// Web olive-crossing ts cover: Checks whether random. It uses the current cover data to update what the user sees.
+// Replaces an invalid random value so lane generation always stays within range.
 const validRandom = (random: () => number) => {
   const value = random();
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
 };
 
-// Creates crossing lane.
+// Creates one grass, road, water, or rail lane with safe spacing.
 export function createCrossingLane(
   id: number,
   random: () => number = Math.random,
@@ -133,7 +133,7 @@ export function createCrossingLane(
   };
 }
 
-// returns the new crossing for web olive-crossing ts cover. It uses the current cover data to update what the user sees.
+// Starts a new crossing board with the olive in the safe area.
 export function newCrossing(random: () => number = Math.random): CrossingWorld {
   const lanes = Array.from({ length: CROSSING.rows }, (_, row) => {
     const id = CROSSING.rows - 1 - row;
@@ -150,13 +150,13 @@ export function newCrossing(random: () => number = Math.random): CrossingWorld {
   };
 }
 
-// Web olive-crossing ts cover: returns the crossing collision. It uses the current cover data to update what the user sees.
+// Reports whether the olive currently touches traffic, water, or a train.
 export function crossingCollision(world: CrossingWorld) {
   const lane = world.lanes[world.playerRow];
   if (!lane || lane.type === "grass") return false;
   const playerLeft = world.playerColumn + 0.5 - CROSSING.playerHalfWidth;
   const playerRight = world.playerColumn + 0.5 + CROSSING.playerHalfWidth;
-  // lane type is water is handled here by player right.
+  // Water is safe only when the olive is standing on a lily pad.
   if (lane.type === "water") {
     const onPad = lane.pads.some(
       (column) => Math.abs(world.playerColumn - column) <= 0.52,
@@ -170,7 +170,7 @@ export function crossingCollision(world: CrossingWorld) {
   });
 }
 
-// Web olive-crossing ts cover: returns the rail signal.
+// Changes the rail light as a train gets closer to the crossing.
 export function railSignal(lane: CrossingLane): "green" | "yellow" | "red" {
   if (lane.type !== "rail") return "green";
   if (lane.vehicles.length || lane.spawnIn <= 0.85) return "red";
@@ -178,7 +178,7 @@ export function railSignal(lane: CrossingLane): "green" | "yellow" | "red" {
   return "green";
 }
 
-// Web olive-crossing ts cover: returns the move crossing. It uses the current cover data to update what the user sees.
+// Moves the olive one space when the destination is inside the board.
 export function moveCrossing(
   world: CrossingWorld,
   direction: CrossingDirection,
@@ -221,7 +221,7 @@ export function moveCrossing(
   return { ...next, over: crossingCollision(next) };
 }
 
-// Web olive-crossing ts cover: returns the advance crossing.
+// Moves traffic and trains forward for one animation frame.
 export function advanceCrossing(
   world: CrossingWorld,
   seconds: number,
@@ -243,7 +243,7 @@ export function advanceCrossing(
       );
     let spawnIn = lane.spawnIn - delta;
     let spawnCount = lane.spawnCount;
-    // spawn in is at most 0 is handled here by spawn count.
+    // Mark the lane clear after the train has fully passed.
     if (spawnIn <= 0) {
       const kind: CrossingVehicle["kind"] =
         lane.type === "rail" ? "train" : random() < 0.45 ? "truck" : "tractor";

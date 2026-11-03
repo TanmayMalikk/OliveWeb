@@ -4,12 +4,12 @@ package com.olive.app.ui.users.shared.navigation
 import com.olive.app.ui.session.SessionRuntime
 
 internal class SessionScreenNavigation(private val runtime: SessionRuntime) {
-    // returns the quick exit for shared safe app session screen navigation.
+    // Gives navigation screens the same quick-exit action from the current session.
     fun quickExit() = runtime.navigation.quickExit()
-    // Shared safe app session screen navigation: Moves the app into its background state.
+    // Sends the app to the background when the user presses Quick Exit.
     fun background() = runtime.navigation.background()
-    // Returns to the previous screen for shared safe app session screen navigation.
+    // Returns to the previous Safe App screen.
     fun back() = runtime.navigation.back()
-    // Shared safe app session screen navigation: Starts safe page.
+    // Opens the requested Safe App page from shared navigation.
     fun openSafePage(page: SafePage) = runtime.navigation.navigate(page)
 }

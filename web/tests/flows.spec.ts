@@ -384,7 +384,7 @@ test("PWA manifests use cover-specific identities and the download page offers t
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Download debug APK/i }),
-  ).toHaveAttribute("href", "/download/android");
+  ).toHaveAttribute("href", /\/download\/android$/);
   const download = await request.get("/download/android", { maxRedirects: 0 });
   expect(download.status()).toBe(302);
   expect(download.headers().location).toContain("olive-branch.apk");

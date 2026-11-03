@@ -12,7 +12,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         activityVault.update { append(it, uid, "settingsHistory", event.toJson()) }
     }
 
-    // returns the settings history for device activity store.
+    // Adds one setting change to the phone's encrypted history.
     fun settingsHistory(uid: String): List<SettingsEvent> =
         rows(uid, "settingsHistory").map(SettingsEvent::fromJson)
 
@@ -21,7 +21,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         activityVault.update { append(it, uid, "triggerHistory", event.toJson()) }
     }
 
-    // Device activity store: returns the trigger history.
+    // Loads discreet-trigger history from encrypted phone storage.
     fun triggerHistory(uid: String): List<TriggerEvent> =
         rows(uid, "triggerHistory").map(TriggerEvent::fromJson).map { event ->
             // Hide old first-try Accepted rows too; the trigger itself still stays in history.
@@ -37,7 +37,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
             val events = root.optJSONObject("triggerHistory")?.optJSONArray(uid) ?: return@update
             for (index in 0 until events.length()) {
                 val item = events.getJSONObject(index)
-                // Only continue with record trigger attempt when item opt string id is id.
+                // Only do this when item opt string id is id.
                 if (item.optString("id") == id) {
                     // A clean first-try unlock is routine; only show Accepted after this trigger already had a wrong PIN.
                     if (accepted && item.optInt("pinAttempts") == 0) break
@@ -55,11 +55,11 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         activityVault.update { append(it, uid, "checkoutHistory", event.toJson()) }
     }
 
-    // returns the checkout history for device activity store.
+    // Loads food checkout history from encrypted phone storage.
     fun checkoutHistory(uid: String): List<CheckoutEvent> =
         rows(uid, "checkoutHistory").map(CheckoutEvent::fromJson)
 
-    // Saves private entry for device activity store.
+    // Adds a private-entry event to encrypted device activity history.
     fun savePrivateEntry(uid: String, entry: PrivateEntry) {
         activityVault.update { root ->
             val byAccount = root.child("privateEntries")
@@ -72,7 +72,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         }
     }
 
-    // Device activity store: returns the private entries.
+    // Loads private notes and incident records from encrypted phone storage.
     fun privateEntries(uid: String): List<PrivateEntry> =
         rows(uid, "privateEntries").map(PrivateEntry::fromJson)
             .filter { it.purgedAt == null }
@@ -84,7 +84,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
             val entries = root.optJSONObject("privateEntries")?.optJSONArray(uid) ?: return@update
             for (index in 0 until entries.length()) {
                 val entry = PrivateEntry.fromJson(entries.getJSONObject(index))
-                // Only continue with purge expired private entries when entry purged at is null and entry trash expired now.
+                // Permanently delete trashed entries only after their recovery timer ends.
                 if (entry.purgedAt == null && entry.trashExpired(now)) {
                     val tombstone = entry.copy(
                         updatedAt = now,
@@ -104,7 +104,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         return changed
     }
 
-    // Device activity store: returns the pending history.
+    // Loads activity records that still need cloud sync.
     fun pendingHistory(uid: String): List<HistoryRecord> {
         val root = activityVault.read()
         val synced = root.optJSONObject("historySynced")?.optJSONObject(uid)
@@ -122,7 +122,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
             }
     }
 
-    // returns the mark history synced for device activity store.
+    // Updates the saved history synced used by app security.
     fun markHistorySynced(uid: String, record: HistoryRecord) {
         activityVault.update { root ->
             val section = when (record.category) {
@@ -140,7 +140,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         }
     }
 
-    // Device activity store: returns the merge history.
+    // Merges cloud history into the encrypted phone copy.
     fun mergeHistory(uid: String, records: List<HistoryRecord>) {
         activityVault.update { root ->
             val sections = mapOf(
@@ -191,7 +191,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         }
     }
 
-    // Device activity store: returns the append.
+    // Adds one security event to the correct account and history section.
     private fun append(root: JSONObject, uid: String, section: String, value: JSONObject) {
         val byAccount = root.child(section)
         val entries = byAccount.optJSONArray(uid) ?: JSONArray().also { byAccount.put(uid, it) }
@@ -206,7 +206,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
         root.child("historySynced").child(uid).put("$category/${value.getString("id")}", false)
     }
 
-    // Device activity store: returns the rows.
+    // Reads one saved history list from the encrypted vault.
     private fun rows(uid: String, section: String): List<JSONObject> {
         val entries = activityVault.read().optJSONObject(section)?.optJSONArray(uid) ?: JSONArray()
         return (0 until entries.length()).map { entries.getJSONObject(it) }.asReversed()

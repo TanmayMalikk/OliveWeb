@@ -52,7 +52,7 @@ import java.util.Base64
 // UI sizing/color: this root fills the window; the 12dp quick-exit inset and OliveGreen button styling live in its Scaffold.
 internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
-// This shows the olive root view for shared safe app app screen navigation. It fills the view with the latest details and actions.
+// Chooses the account, cover, onboarding, or Safe App root screen.
 @Composable
 internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int = 0) {
     val uiText = rememberResourceText()
@@ -98,7 +98,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
     ) { mutableStateOf(false) }
     var observedUnlock by remember { mutableIntStateOf(session.unlockAnimationVersion) }
     var pinAnimationRunning by remember { mutableStateOf(false) }
-    // Update olive root when information used by this screen changes.
+    // Start the olive reveal only after a new successful private entry.
     LaunchedEffect(session.unlockAnimationVersion, session.screen) {
         val currentUnlock = session.unlockAnimationVersion
         if (currentUnlock > observedUnlock && session.screen == SessionScreen.Safe) {
@@ -117,7 +117,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                 .clearAndSetSemantics { }) {
             Box(Modifier.fillMaxSize()) {
                 if (shouldComposeCover(session.usesCover)) {
-                    // Choose what olive root should do for the current value.
+                    // Keep the user's selected cover alive underneath private screens.
                     when (session.coverType) {
                         CoverType.FOOD -> OliveCover(
                             cover,
@@ -149,7 +149,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                     }
                 }
             }
-            // Only continue with olive root when is cover and not session privacy blackout and session accessibility exit version > 0.
+            // Return TalkBack focus to the cover after a privacy exit finishes.
             if (isCover && !session.privacyBlackout && session.accessibilityExitVersion > 0) {
                 key(session.accessibilityExitVersion) {
                     AccessibleMessage(
@@ -160,7 +160,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
             }
         }
         if (!isCover) {
-            // Update olive root when information used by this screen changes.
+            // Hide the keyboard whenever the private PIN screen opens.
             LaunchedEffect(session.screen) {
                 if (session.screen == SessionScreen.Pin) {
                     keyboard?.hide()
@@ -257,7 +257,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                                     Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
                                         paneTitle = pane
                                     }).then(if (targetScreen != session.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
-                                        // Choose what olive root should do for the current value.
+                                        // Opens the cover, account entry, onboarding, or Safe App for the current session.
                                         when (targetScreen) {
                                             SessionScreen.Loading -> Box(
                                                 Modifier.fillMaxSize(),
@@ -372,14 +372,14 @@ internal enum class SafePage { Home, Notes, Messages, Profile, Contacts, Setting
 internal enum class ActivityCategory { Settings, Triggers, PinAttempts, Checkouts, Privacy }
 internal enum class CredentialFieldError { InvalidUsername, InvalidPassword, UsernameTaken, IncorrectPassword }
 
-// Shared safe app app screen navigation: returns the messaging identity marker.
+// Creates the messaging identity used after account sign-in.
 internal fun messagingIdentityMarker(identity: AccountIdentity, publicKey: ByteArray): String {
     val digest = MessageDigest.getInstance("SHA-256").digest(publicKey)
     val keyId = Base64.getUrlEncoder().withoutPadding().encodeToString(digest).take(16)
     return "secure-v2:${identity.uid}:${identity.username.lowercase()}:$keyId"
 }
 
-// Shared safe app app screen navigation: Checks whether register messaging identity.
+// Registers an encryption identity before opening secure messaging.
 internal fun shouldRegisterMessagingIdentity(
     savedMarker: String?,
     identity: AccountIdentity,

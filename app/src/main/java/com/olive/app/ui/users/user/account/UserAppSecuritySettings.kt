@@ -170,13 +170,13 @@ internal fun SafeEntrySetup(session: SessionViewModel) {
     }
 }
 
-// This shows the device lock prompt view for user app security settings. It fills the view with the latest details and actions.
+// Draws the device lock prompt for the user safe app.
 @Composable
 internal fun DeviceLockPrompt(
     session: SessionViewModel,
     onUseBackupPin: (() -> Unit)? = null,
 ) {
-    // Update device lock prompt when information used by this screen changes.
+    // Rechecks Android device-lock support when the security screen returns.
     LaunchedEffect(Unit) { session.account.authenticateDeviceLock() }
     FormColumn {
         Heading(
@@ -320,14 +320,14 @@ internal fun SafeEntrySettings(session: SessionViewModel) {
         showSecretToggle = true,
         enabled = !session.busy
     ) { confirmation = it.filter(Char::isDigit).take(6) }
-    // Saves the new value for user app security settings. It uses the account key so private data stays locked.
+    // Validates the form before saving a new backup PIN or entry method.
     fun save(usePin: Boolean) {
         session.account.saveSafeEntryPin(currentPin, newPin, confirmation, usePin)
         currentPin = ""
         newPin = ""
         confirmation = ""
     }
-    // save checks whether session account preferred entry method is safe entry method device lock before continuing.
+    // A current PIN is optional only when Android device lock is the main entry method.
     if (session.account.preferredEntryMethod == SafeEntryMethod.DEVICE_LOCK) {
         OutlinedButton(
             onClick = { save(false) },

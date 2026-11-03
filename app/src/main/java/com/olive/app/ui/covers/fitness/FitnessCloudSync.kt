@@ -4,7 +4,7 @@ package com.olive.app.ui.covers.fitness
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
-import com.olive.app.data.AccountSyncRepository
+import com.olive.app.data.account.AccountSyncRepository
 import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
@@ -17,7 +17,12 @@ internal object FitnessCloudSync {
 
     // Uploads only changed summaries and never more than once every 30 seconds.
     suspend fun upload(accountId: String, snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) {
-        val user = FirebaseAuth.getInstance().currentUser ?: return
+        // Local previews and UI tests may not have a Firebase app; there is no cloud account to sync.
+        val user = try {
+            FirebaseAuth.getInstance().currentUser
+        } catch (_: IllegalStateException) {
+            return
+        } ?: return
         if (accountId != user.uid) return
         val summary = summaryJson(snapshot, history)
         val payloadSignature = summary.toString()
@@ -30,7 +35,7 @@ internal object FitnessCloudSync {
         summary.put("updatedAt", now)
         val payload = summary.toString()
         val bytes = payload.toByteArray(Charsets.UTF_8)
-        // A upload error is handled here instead of closing the app.
+        // Use the fallback when upload is unavailable.
         try {
             FirebaseStorage.getInstance().reference
                 .child("accounts/${user.uid}/fitness/summary.json")
@@ -49,7 +54,7 @@ internal object FitnessCloudSync {
         }
     }
 
-    // returns the summary json for fitness cover.
+    // Converts today's fitness totals into the JSON sent to the watch.
     private fun summaryJson(snapshot: FitnessSnapshot, history: List<FitnessHistoryDay>) = JSONObject().apply {
         put("stepGoal", snapshot.profile.stepGoal)
         put("calorieGoal", snapshot.profile.calorieGoal)

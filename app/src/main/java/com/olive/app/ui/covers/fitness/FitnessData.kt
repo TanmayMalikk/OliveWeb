@@ -17,7 +17,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         Context.MODE_PRIVATE,
     )
 
-    // Fitness cover: returns the profile. It uses the saved health data to update the fitness screen.
+    // Loads fitness goals and body details saved on this phone.
     fun profile() = FitnessProfile(
         weightKg = preferences.getFloat("weight_kg", 70f),
         heightCm = preferences.getFloat("height_cm", 170f),
@@ -28,7 +28,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         fatGoal = preferences.getInt("fat_goal", 65),
     )
 
-    // Saves profile for fitness cover. It reads the value saved on this device.
+    // Saves calorie, macro, activity, and body goals for the fitness cover.
     fun saveProfile(value: FitnessProfile) = preferences.edit {
         putFloat("weight_kg", value.weightKg.coerceIn(30f, 300f))
         putFloat("height_cm", value.heightCm.coerceIn(100f, 230f))
@@ -39,7 +39,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         putInt("fat_goal", value.fatGoal.coerceIn(10, 1_000))
     }
 
-    // returns the snapshot for fitness cover. It uses the saved health data to update the fitness screen.
+    // Loads the snapshot needed by the fitness cover.
     fun snapshot(
         today: LocalDate = LocalDate.now(),
         nowMillis: Long = System.currentTimeMillis(),
@@ -123,14 +123,14 @@ internal class FitnessStore(context: Context, accountId: String) {
         )
         preferences.edit {
             putInt("last_sensor_value", totalSinceBoot.coerceAtLeast(0))
-            // record sensor value checks whether phone delta > 0 before continuing.
+            // Add only new phone steps since the last sensor reading.
             if (phoneDelta > 0) {
                 putInt(
                     phoneStepsKey(today),
                     (phoneSteps(today) + phoneDelta).coerceAtMost(MAX_DAILY_STEPS),
                 )
             }
-            // Only continue with record sensor value when delta to add > 0.
+            // Ignore duplicate or older step readings.
             if (deltaToAdd > 0) {
                 putInt(
                     activityStepsKey(today),
@@ -220,7 +220,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         return snapshot(today, nowMillis)
     }
 
-    // Fitness cover: Adds food. It uses the saved health data to update the fitness screen.
+    // Adds a selected food and its nutrients to today's diary.
     fun addFood(
         food: NutritionFood,
         servings: Float,
@@ -237,29 +237,29 @@ internal class FitnessStore(context: Context, accountId: String) {
         return snapshot(today)
     }
 
-    // Fitness cover: Removes food. It uses the saved health data to update the fitness screen.
+    // Removes one food entry from today's diary.
     fun removeFood(logId: String, today: LocalDate = LocalDate.now()): FitnessSnapshot {
         saveFoods(today, foods(today).filterNot { it.logId == logId })
         return snapshot(today)
     }
 
-    // returns the activity steps for fitness cover. It uses the saved health data to update the fitness screen.
+    // Reads today's steps from Health Connect for the fitness dashboard.
     private fun activitySteps(date: LocalDate): Int = preferences.getInt(
         activityStepsKey(date),
         preferences.getInt(legacyStepsKey(date), 0),
     )
 
-    // Fitness cover: returns the phone steps. It uses the saved health data to update the fitness screen.
+    // Combines phone step readings without counting sensor resets twice.
     private fun phoneSteps(date: LocalDate): Int = preferences.getInt(
         phoneStepsKey(date),
         preferences.getInt(legacyStepsKey(date), 0),
     )
 
-    // returns the phone fallback since watch for fitness cover. It uses the saved health data to update the fitness screen.
+    // Gives the fitness cover the phone fallback since watch it needs.
     private fun phoneFallbackSinceWatch(date: LocalDate) =
         preferences.getInt(phoneFallbackKey(date), 0)
 
-    // returns the heart rate stats for fitness cover. It uses the saved health data to update the fitness screen.
+    // Returns the heart rate stats used by the fitness cover.
     private fun heartRateStats(date: LocalDate) = HeartRateDayStats(
         peakBpm = preferences.getInt(heartRatePeakKey(date), 0),
         lowestBpm = preferences.getInt(heartRateLowestKey(date), 0),
@@ -269,7 +269,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         restingSampleCount = preferences.getInt(heartRateRestingSampleCountKey(date), 0),
     )
 
-    // Fitness cover: returns the heart rate samples.
+    // Reads recent heart-rate samples for the fitness vitals graph.
     private fun heartRateSamples(date: LocalDate): List<HeartRateSample> {
         val encoded = preferences.getString(heartRateGraphSamplesKey(date), null) ?: return emptyList()
         return runCatching {
@@ -309,39 +309,39 @@ internal class FitnessStore(context: Context, accountId: String) {
         }
     }.toString()
 
-    // returns the activity steps key for fitness cover.
+    // Keeps the saved activity steps key name in one place for the fitness cover.
     private fun activityStepsKey(date: LocalDate) = "activity_steps_$date"
-    // Fitness cover: returns the phone steps key.
+    // Keeps the saved phone steps key name in one place for the fitness cover.
     private fun phoneStepsKey(date: LocalDate) = "phone_steps_$date"
     // Watches steps key for fitness cover.
     private fun watchStepsKey(date: LocalDate) = "watch_steps_$date"
-    // Fitness cover: returns the phone fallback key.
+    // Keeps the saved phone fallback key name in one place for the fitness cover.
     private fun phoneFallbackKey(date: LocalDate) = "phone_fallback_since_watch_$date"
     // Watches active at key for fitness cover.
     private fun watchActiveAtKey(date: LocalDate) = "watch_active_at_$date"
     // Fitness cover: Watches report at key.
     private fun watchReportAtKey(date: LocalDate) = "watch_report_at_$date"
-    // returns the heart rate peak key for fitness cover.
+    // Keeps the saved heart rate peak key name in one place for the fitness cover.
     private fun heartRatePeakKey(date: LocalDate) = "heart_rate_peak_$date"
-    // Fitness cover: returns the heart rate lowest key.
+    // Keeps the saved heart rate lowest key name in one place for the fitness cover.
     private fun heartRateLowestKey(date: LocalDate) = "heart_rate_lowest_$date"
-    // returns the heart rate total key for fitness cover.
+    // Keeps the saved heart rate total key name in one place for the fitness cover.
     private fun heartRateTotalKey(date: LocalDate) = "heart_rate_total_$date"
-    // Fitness cover: returns the heart rate sample count key.
+    // Keeps the saved heart rate sample count key name in one place for the fitness cover.
     private fun heartRateSampleCountKey(date: LocalDate) = "heart_rate_sample_count_$date"
-    // returns the heart rate resting total key for fitness cover.
+    // Keeps the saved heart rate resting total key name in one place for the fitness cover.
     private fun heartRateRestingTotalKey(date: LocalDate) = "heart_rate_resting_total_$date"
-    // Fitness cover: returns the heart rate resting sample count key.
+    // Keeps the saved heart rate resting sample count key name in one place for the fitness cover.
     private fun heartRateRestingSampleCountKey(date: LocalDate) =
         "heart_rate_resting_sample_count_$date"
-    // Fitness cover: returns the heart rate last sample at key.
+    // Keeps the saved heart rate last sample at key name in one place for the fitness cover.
     private fun heartRateLastSampleAtKey(date: LocalDate) = "heart_rate_last_sample_at_$date"
-    // returns the heart rate graph samples key for fitness cover.
+    // Keeps the saved heart rate graph samples key name in one place for the fitness cover.
     private fun heartRateGraphSamplesKey(date: LocalDate) = "heart_rate_graph_samples_$date"
-    // Fitness cover: returns the legacy steps key.
+    // Keeps the saved legacy steps key name in one place for the fitness cover.
     private fun legacyStepsKey(date: LocalDate) = "steps_$date"
 
-    // returns the foods for fitness cover.
+    // Loads food-diary entries for the selected day.
     private fun foods(date: LocalDate): List<FoodLogEntry> {
         val encoded = preferences.getString(foodKey(date), null) ?: return emptyList()
         return runCatching {
@@ -354,7 +354,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         }.getOrDefault(emptyList())
     }
 
-    // Fitness cover: Saves foods. It reads the value saved on this device.
+    // Saves today's food diary on the phone.
     private fun saveFoods(date: LocalDate, foods: List<FoodLogEntry>) {
         val encoded = JSONArray().apply {
             foods.takeLast(250).forEach { put(it.toJson()) }
@@ -362,7 +362,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         preferences.edit { putString(foodKey(date), encoded) }
     }
 
-    // Fitness cover: returns the food key.
+    // Keeps the saved food key name in one place for the fitness cover.
     private fun foodKey(date: LocalDate) = "foods_$date"
 
     private companion object {
@@ -396,7 +396,7 @@ private fun FoodLogEntry.toJson() = JSONObject().apply {
     })
 }
 
-// Converts food log entry for fitness cover.
+// Converts a saved food entry into the model used by the nutrition screen.
 private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
     val food = value.getJSONObject("food")
     FoodLogEntry(
@@ -425,11 +425,11 @@ private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
     )
 }.getOrNull()
 
-// returns the safe nutrient for fitness cover.
+// Reads a nutrient value and replaces invalid numbers with zero.
 private fun JSONObject.safeNutrient(name: String) =
     optDouble(name, 0.0).toFloat().takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f
 
-// returns the display amount for fitness cover. It uses the saved health data to update the fitness screen.
+// Formats the food serving amount shown in the diary.
 internal fun Float.displayAmount(): String = if (this == roundToInt().toFloat()) {
     roundToInt().toString()
 } else {

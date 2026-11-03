@@ -32,7 +32,7 @@ import com.olive.app.R
 
 private enum class AttachmentCategory { Notes, Incidents, Media, SafetyPlan, Location }
 
-// The attachment picker view is part of shared safe app chat attachment picker. It gives the user the details and choices needed here.
+// Shows photo, video, document, and camera choices for a chat attachment.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AttachmentPicker(
@@ -50,7 +50,7 @@ internal fun AttachmentPicker(
     val sheetTitle = if (selectedCategory == null) stringResource(R.string.share_attachment) else stringResource(
         R.string.select_attachment_category,
         stringResource(
-            // Choose what attachment picker should do for the current value.
+            // Opens the selected photo, video, document, or camera source.
             when (selectedCategory) {
                 AttachmentCategory.Notes -> R.string.private_notes
                 AttachmentCategory.Incidents -> R.string.incident_reports
@@ -61,7 +61,7 @@ internal fun AttachmentPicker(
             }
         )
     )
-    // Update attachment picker when information used by this screen changes.
+    // Move TalkBack focus to the heading when a new attachment section opens.
     LaunchedEffect(selectedCategory) {
         // The sheet takes focus while its opening animation creates the dialog window. Wait until
         // that transition finishes, then move focus to the heading for the newly displayed step.
@@ -138,7 +138,7 @@ internal fun AttachmentPicker(
             // STEP 2: Show Specific Items based on the selection
             else {
                 LazyColumn {
-                    // Choose what attachment picker should do for the current value.
+                    // Opens the selected photo, video, document, or camera source.
                     when (selectedCategory) {
                         AttachmentCategory.Notes -> {
                             val notes =
@@ -163,7 +163,7 @@ internal fun AttachmentPicker(
                         AttachmentCategory.Incidents -> {
                             val incidents =
                                 session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Incident }
-                            // incidents is empty is handled here by attachment picker.
+                            // Tell the user when there are no incident reports to attach.
                             if (incidents.isEmpty()) item {
                                 Text(
                                     stringResource(R.string.no_incident_reports_found),
@@ -183,7 +183,7 @@ internal fun AttachmentPicker(
 
                         AttachmentCategory.Media -> {
                             val media = documentState.files.filter { it.ownerUid == uid }
-                            // document state loading item linear progress indicator modifier fill max width is handled here by attachment picker.
+                            // Show progress while encrypted documents are loading.
                             if (documentState.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                             if (documentState.error != null) item {
                                 Text(
@@ -192,7 +192,7 @@ internal fun AttachmentPicker(
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }
-                            // attachment picker checks whether document state loading and document state error is null and media is empty is false before continuing.
+                            // Show document choices after loading succeeds and at least one file exists.
                             if (!documentState.loading && documentState.error == null && media.isEmpty()) item {
                                 Text(
                                     stringResource(if (session.localMode) R.string.documents_account_required else R.string.documents_empty),
@@ -228,7 +228,7 @@ internal fun AttachmentPicker(
             }
         }
     }
-    // attachment picker checks whether location duration before continuing.
+    // Show duration choices only when the user is sharing live location.
     if (locationDuration) ShareDurationDialog(onDismiss = {
         locationDuration = false
     }) { duration ->

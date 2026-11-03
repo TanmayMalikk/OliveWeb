@@ -73,7 +73,7 @@ private data class ChartAxisScale(
         }
 }
 
-// This shows the fitness history charts view for fitness cover. It fills the view with the latest details and actions.
+// Draws the fitness history charts for the fitness cover.
 @Composable
 internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
     val stepsUnit = stringResource(R.string.fitness_steps_unit)

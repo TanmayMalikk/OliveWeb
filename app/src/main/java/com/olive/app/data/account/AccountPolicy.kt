@@ -24,20 +24,20 @@ object AccountPolicy {
         return "${InputPolicy.username(value)}@$domain"
     }
 
-    // Account: returns the legacy user email.
+    // Recreates the hidden email format used by older personal accounts.
     fun legacyUserEmail(username: String) = "${InputPolicy.username(username)}@users.olive.invalid"
 
-    // Account: returns the personal profile needs setup.
+    // Finds missing personal details that must be completed before using the safe app.
     fun personalProfileNeedsSetup(value: UserProfile) =
         value.fullName.isBlank() || !InputPolicy.validDob(value.dob) ||
                 value.language.isBlank() || !value.address.locationValid
 
-    // Account: returns the organization profile needs setup.
+    // Finds missing staff or admin details that must be completed before opening their portal.
     fun organizationProfileNeedsSetup(value: UserProfile) =
         value.fullName.isBlank() || !InputPolicy.validDob(value.dob) ||
                 value.email.isBlank() || value.email.endsWith(".olive.invalid", true)
 
-    // Finds the next setup for account.
+    // Returns the setup rules for the selected account role.
     fun nextSetup(profile: UserProfile?, role: AccountRole): AccountSetupStep {
         if (profile == null) return if (role in setOf(
                 AccountRole.STAFF,
