@@ -12,15 +12,17 @@ The content should be
 	sdk.dir=Your/Path/to/Android/SDK
 	GEOAPIFY_API_KEY=YOURKEYHERE
 	REALTIME_DATABASE_URL=https://olive-21239-default-rtdb.firebaseio.com
+	VOIP_API_BASE_URL=https://your-deployed-voip-api.example
 ```
 
 Example settings:
 
-| Variable | Required | Description | Example |
-| --- | --- | --- | --- |
-| `APP_ENV` | Yes | Runtime environment | `development` |
-| `PORT` | No | Local server port | `3000` |
-| `DATABASE_URL` | If using a database | Connection string for your local database | `postgres://localhost/app` |
+| Variable            | Required            | Description                               | Example                                  |
+|---------------------|---------------------|-------------------------------------------|------------------------------------------|
+| `APP_ENV`           | Yes                 | Runtime environment                       | `development`                            |
+| `PORT`              | No                  | Local server port                         | `3000`                                   |
+| `DATABASE_URL`      | If using a database | Connection string for your local database | `postgres://localhost/app`               |
+| `VOIP_API_BASE_URL` | When using VoIP     | HTTPS origin of the deployed VoIP API     | `https://your-deployed-voip-api.example` |
 
 Replace these examples with the actual names and behavior used by your project. Keep `.env` out of version control.
 
