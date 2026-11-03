@@ -20,13 +20,13 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         get() = activeAutomation?.let { DeviceCredentialTestDriver(compose, it) }
             ?: DeviceCredentialTestDriver(compose)
 
-    // User safe entry settings ui test: returns the activate. The test gives the code a clear input and checks the expected result.
+    // Checks the activate step with the test's sample data.
     private fun activate(tag: String) {
         compose.onNodeWithTag(tag).performScrollTo()
             .performSemanticsAction(SemanticsActions.OnClick) { it() }
     }
 
-    // returns the accessible pin for user safe entry settings ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the accessible pin step with the test's sample data.
     private fun accessiblePin(pin: String) {
         // The keypad is fixed on screen, outside the scrollable form used by settings.
         pin.forEach { digit ->
@@ -37,9 +37,9 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
             .performSemanticsAction(SemanticsActions.OnClick) { it() }
     }
 
-    // User safe entry settings ui test: returns the session. The test gives the code a clear input and checks the expected result.
+    // Checks the session step with the test's sample data.
     private fun session() = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
-    // returns the setup for user safe entry settings ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the setup step with the test's sample data.
     private fun setup(deviceLock: Boolean = false): SessionViewModel {
         if (deviceLock) driver.ensurePhonePin()
         openOnboarding()
@@ -70,7 +70,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
             )
         }
         waitFor("entry_knows_pin_yes")
-        // Only continue with setup when device lock.
+        // Only do this when device lock.
         if (deviceLock) {
             activate("entry_knows_pin_no")
             activate("entry_choose_device")
@@ -90,25 +90,25 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         return model
     }
 
-    // returns the settings for user safe entry settings ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the settings step with the test's sample data.
     private fun settings(model: SessionViewModel) {
         compose.runOnIdle { model.navigation.openSafePage(SafePage.Settings) }
         waitFor("entry_use_device")
     }
 
-    // User safe entry settings ui test: returns the finished. The test gives the code a clear input and checks the expected result.
+    // Checks the finished step with the test's sample data.
     private fun finished(model: SessionViewModel) {
         compose.waitUntil(20_000) { !model.busy }
     }
 
-    // User safe entry settings ui test: returns the trigger. The test gives the code a clear input and checks the expected result.
+    // Checks the trigger step with the test's sample data.
     private fun trigger(model: SessionViewModel) {
         compose.runOnIdle { model.navigation.quickExit() }
         waitCover()
         compose.runOnIdle { assertTrue(model.account.interceptSearch("moon garden")) }
     }
 
-    // User safe entry settings ui test: returns the enable device. The test gives the code a clear input and checks the expected result.
+    // Checks the enable device step with the test's sample data.
     private fun enableDevice(model: SessionViewModel, pin: String = "123456") {
         driver.ensurePhonePin()
         settings(model)
@@ -119,7 +119,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         assertEquals(SafeEntryMethod.DEVICE_LOCK, model.account.preferredEntryMethod)
     }
 
-    // returns the saved pin matches for user safe entry settings ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the saved pin matches step with the test's sample data.
     private fun savedPinMatches(model: SessionViewModel, pin: String): Boolean {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val entry = EncryptedVault(context, "demo").read().getJSONObject("enrollments")
@@ -127,7 +127,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         return SecretVerifier.matches(pin, entry.getString("pinVerifier"))
     }
 
-    // returns the switching and backup setup require proof and never expose pin during device lock for user safe entry settings ui test. The test gives the code a clear input and checks the expected result.
+    // Checks the switching and backup setup require proof and never expose pin during device lock step with the test's sample data.
     @Test
     fun switchingAndBackupSetupRequireProofAndNeverExposePinDuringDeviceLock() {
         val model = setup(deviceLock = true)
@@ -211,7 +211,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         driver.ensurePhonePin()
         val model = setup()
         enableDevice(model)
-        // A backup pin opens automatically when phone screen lock is removed error is handled here instead of closing the app.
+        // Use the fallback when backup pin opens automatically when phone screen lock is removed is unavailable.
         try {
             compose.runOnIdle { model.navigation.quickExit() }
             waitCover()
@@ -239,7 +239,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
         driver.ensurePhonePin()
         val model = setup(deviceLock = true)
         assertFalse(model.account.hasAppPin)
-        // A removing phone lock without backup never creates an app pin bypass error is handled here instead of closing the app.
+        // Use the fallback when removing phone lock without backup never creates an app pin bypass is unavailable.
         try {
             driver.shell("locksettings clear --old 246810")
             compose.activityRule.scenario.recreate()

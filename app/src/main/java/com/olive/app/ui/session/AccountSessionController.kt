@@ -4,6 +4,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import com.olive.app.BuildConfig
 import com.olive.app.data.*
+import com.olive.app.data.account.AccountSyncRepository
 import com.olive.app.security.*
 import com.olive.app.location.LiveLocationController
 import com.olive.app.notification.LocalNotificationEventHandler
@@ -15,7 +16,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Restores enrollment, signs accounts in/out and runs onboarding; stale account-choice callbacks cannot restart setup.
 internal class AccountSessionController(private val runtime: SessionRuntime) {
-    // Account session controller: Loads the saved value.
+    // Restores the saved account and sends the person to the correct first screen.
     fun load() {
         val state = runtime.state
         if (state.busy) return
@@ -26,14 +27,16 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.safePageHistory.clear()
         state.screen = SessionScreen.Loading
         runtime.scope.launch {
-            // If load fails, catch the error so the app can keep running and explain the problem.
+            // Turn an unexpected load failure into a readable message.
             try {
                 check(BuildConfig.DEBUG || !runtime.localMode)
                 val restoredSession = restoreStoredSession()
                 runtime.enrollment = restoredSession?.enrollment
                 restoredSession?.let { restorePresentation(it) }
                 routeRestoredAccount()
-                runtime.enrollment?.let { watchAccountChanges(AccountIdentity(it.uid, runtime.coverUsername)) }
+                runtime.enrollment?.let {
+                    watchAccountChanges(AccountIdentity(it.uid, runtime.state.coverUsername))
+                }
                 if (runtime.enrollment?.role == AccountRole.ADMIN && !runtime.localMode) {
                     runtime.organization.queueAdminRefresh()
                 }
@@ -50,14 +53,14 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         return state.screen == SessionScreen.Welcome && runtime.enrollment == null && !state.busy
     }
 
-    // Finds role for account session controller.
+    // Saves the account type chosen on the welcome screen.
     fun selectRole(role: AccountRole) {
         if (!canChooseAccount()) return
         runtime.state.accountRole = role
         runtime.state.message = null
         runtime.state.credentialFieldError = null
     }
-    // Finds new for account session controller.
+    // Starts account creation after blocking staff and admin self-registration.
     fun chooseNew() {
         if (!canChooseAccount()) return
         val state = runtime.state
@@ -72,7 +75,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.NewCredentials)
     }
 
-    // Finds returning for account session controller.
+    // Opens the sign-in form for a person who already has an account.
     fun chooseReturning() {
         if (!canChooseAccount()) return
         runtime.state.creatingAccount = false
@@ -80,7 +83,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.ReturningCredentials)
     }
 
-    // Starts account setup for account session controller.
+    // Opens first-time setup when the cover app has not joined an account yet.
     fun openAccountSetup() {
         val state = runtime.state
         if (state.busy || runtime.enrollment != null || state.screen != SessionScreen.Cover) return
@@ -91,13 +94,13 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         runtime.navigation.openScreen(SessionScreen.Welcome)
     }
 
-    // Account session controller: Removes credential error.
+    // Clears the old sign-in error before the person tries again.
     fun clearCredentialError() {
         runtime.state.credentialFieldError = null
         runtime.state.message = null
     }
 
-    // Saves setup profile for account session controller.
+    // Validates and saves the profile entered during account setup.
     fun saveSetupProfile(value: UserProfile) {
         if (runtime.state.screen != SessionScreen.ProfileSetup) return
         with(runtime) {
@@ -174,7 +177,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Account session controller: Stops enrollment.
+    // Finishes enrollment only if this is still the same setup attempt.
     internal suspend fun finishEnrollment(
         saved: DeviceEnrollment,
         value: UserProfile,
@@ -199,7 +202,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Account session controller: Saves provisioned trigger.
+    // Saves the private trigger phrase before asking the user to create a PIN.
     fun saveProvisionedTrigger(trigger: String) {
         with(runtime) {
             with(state) {
@@ -223,7 +226,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         }
     }
 
-    // Account session controller: Signs out the current account. It waits for the set time and cancels the timer when the feature closes.
+    // Stops private services, clears the session, and returns to account entry.
     fun signOut() {
         with(runtime) {
             with(state) {
@@ -240,7 +243,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 historySyncJob = null
                 busy = true
                 scope.launch {
-                    // If sign out fails, catch the error so the app can keep running and explain the problem.
+                    // Turn an unexpected sign out failure into a readable message.
                     try {
                         withContext(Dispatchers.IO) {
                             store.recordSettings(
@@ -252,7 +255,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             )
                             store.forgetDevice()
                         }
-                        // Only continue with sign out when local mode is false.
+                        // Cloud accounts also remove their Firebase sign-in record.
                         if (!localMode) runCatching {
                             withTimeoutOrNull(2_000.milliseconds) {
                                 store.pendingHistory(uid).forEach { record ->
@@ -356,12 +359,12 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         val records = accounts.historyRecords(identity)
                         withContext(Dispatchers.IO) { store.mergeHistory(identity.uid, records) }
                         if (enrollment?.uid != identity.uid) return@launch
-                        profile = updatedProfile
-                        deliveryAddress = updatedProfile.address
-                        language = updatedProfile.language
-                        coverDob = updatedProfile.dob
-                        coverFullName = updatedProfile.fullName
-                        coverType = updatedProfile.coverType
+                        state.profile = updatedProfile
+                        state.deliveryAddress = updatedProfile.address
+                        state.language = updatedProfile.language
+                        state.coverDob = updatedProfile.dob
+                        state.coverFullName = updatedProfile.fullName
+                        state.coverType = updatedProfile.coverType
                         enrollment = enrollment?.copy(
                             triggerHash = updatedProfile.triggerHash,
                             role = updatedProfile.role,

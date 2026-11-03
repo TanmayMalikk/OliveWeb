@@ -10,49 +10,49 @@ import com.olive.app.ui.session.SessionRuntime
 internal interface SessionCoverNotesActivityActions {
     val runtime: SessionRuntime
 
-    // returns the note interaction for shared safe app session cover notes activity actions.
+    // Passes the private-note button action to the session privacy controller.
     fun noteInteraction() = runtime.privacy.noteInteraction()
-    // Shared safe app session cover notes activity actions: returns the capture detected.
+    // Records that Android detected a screenshot or screen recording.
     fun captureDetected(kind: String) = runtime.privacy.captureDetected(kind)
-    // returns the recording stopped for shared safe app session cover notes activity actions.
+    // Records when Android reports that screen recording has stopped.
     fun recordingStopped() = runtime.privacy.recordingStopped()
-    // Shared safe app session cover notes activity actions: Records settings interaction.
+    // Adds a settings change to the user's private activity history.
     fun recordSettingsInteraction(area: String, action: String) =
         runtime.history.recordSettingsInteraction(area, action)
 
-    // Shared safe app session cover notes activity actions: Saves food cover.
+    // Saves the food cover's cart, favourites, and meal choices on this device.
     fun saveFoodCover(
         cart: Map<String, Int>,
         favorites: Set<String>,
         customizations: Map<String, Set<String>>,
     ) = runtime.covers.saveFoodCover(cart, favorites, customizations)
 
-    // returns the toggle news bookmark for shared safe app session cover notes activity actions.
+    // Adds or removes an article from the news cover's bookmarks.
     fun toggleNewsBookmark(article: NewsArticle) = runtime.covers.toggleNewsBookmark(article)
-    // Shared safe app session cover notes activity actions: Records checkout.
+    // Stores the result of a food-cover checkout in the activity history.
     suspend fun recordCheckout(foods: List<OrderLine>, totalCents: Int, error: String) =
         runtime.covers.recordCheckout(foods, totalCents, error)
 
-    // Shared safe app session cover notes activity actions: Stops address prompt.
+    // Hides the food-cover address prompt until it is needed again.
     fun dismissAddressPrompt() = runtime.covers.dismissAddressPrompt()
-    // Saves address for shared safe app session cover notes activity actions.
+    // Saves the delivery address entered in the food cover.
     fun saveAddress(address: DeliveryAddress) = runtime.covers.saveAddress(address)
 
-    // Starts activity category for shared safe app session cover notes activity actions.
+    // Opens one category in the private activity-history screen.
     fun showActivityCategory(value: ActivityCategory) = runtime.history.showActivityCategory(value)
-    // Shared safe app session cover notes activity actions: returns the activity back.
+    // Returns from an activity category to the full history list.
     fun activityBack() = runtime.history.activityBack()
 
-    // Removes private entry status for shared safe app session cover notes activity actions.
+    // Clears the note editor's success or error message before the next action.
     fun clearPrivateEntryStatus() = runtime.notes.clearPrivateEntryStatus()
-    // Shared safe app session cover notes activity actions: Saves private entry.
+    // Creates a private note or updates the note with the matching ID.
     fun savePrivateEntry(id: String?, kind: PrivateEntryKind?, title: String, body: String) =
         runtime.notes.savePrivateEntry(id, kind, title, body)
 
-    // Shared safe app session cover notes activity actions: returns the toggle private entry pin.
+    // Pins or unpins a private note so important notes stay easy to find.
     fun togglePrivateEntryPin(id: String) = runtime.notes.togglePrivateEntryPin(id)
-    // returns the trash private entry for shared safe app session cover notes activity actions.
+    // Moves a private note into the note trash.
     fun trashPrivateEntry(id: String) = runtime.notes.trashPrivateEntry(id)
-    // Shared safe app session cover notes activity actions: Restores private entry.
+    // Restores a private note from the note trash.
     fun restorePrivateEntry(id: String) = runtime.notes.restorePrivateEntry(id)
 }

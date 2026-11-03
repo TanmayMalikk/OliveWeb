@@ -79,7 +79,7 @@ export function useSessionSecurity({
       setPhase("public");
       setMessage("");
     };
-    // Web private entry: Handles the browser Back button. It locks the session and replaces the private URL with the correct public cover.
+    // The browser Back button locks private pages before returning to the cover.
     const onPop = () => {
       if (buttonOnlyExit) {
         window.history.pushState({}, "", window.location.pathname);
@@ -95,7 +95,7 @@ export function useSessionSecurity({
       );
       window.history.replaceState({}, "", "/");
     };
-    // Web private entry: Handles a changed URL entry token. It checks the new hash and starts private entry only when the token is valid.
+    // A changed URL can start private entry only when its saved token is valid.
     const onHash = () => {
       const candidate = location.hash.slice(1);
       if (!validEntryToken(candidate)) return;
@@ -116,13 +116,13 @@ export function useSessionSecurity({
     };
   }, [buttonOnlyExit, enrollment, entryOwner, epoch, mode, pendingEntry]);
 
-  // Update candidate when information used by this screen changes.
+  // Watches browser privacy events while a private web session is open.
   useEffect(() => {
-    // Web use session security: Responds when hidden.
+    // User accounts quick-exit when their private tab becomes hidden.
     const onHidden = () => {
       if (document.hidden && phaseRef.current === "safe" && roleRef.current === "USER") quickExit();
     };
-    // Web use session security: Responds when key.
+    // Escape provides a fast exit unless this role requires the exit button.
     const onKey = (event: KeyboardEvent) => {
       if (
         event.key === "Escape" &&
@@ -133,7 +133,7 @@ export function useSessionSecurity({
         quickExit();
       }
     };
-    // Responds when page hide for web use session security. It listens for new data and stops listening when the screen closes.
+    // Locks private data when the page closes or moves into browser history.
     const onPageHide = () => {
       if (buttonOnlyExit) return;
       if (phaseRef.current !== "public") quickExit();
@@ -157,7 +157,7 @@ export function useSessionSecurity({
     setIdleSeconds(null);
   }, [setIdleSeconds]);
 
-  // Update note interaction when information used by this screen changes.
+  // Starts the user idle timer and resets it after keyboard, pointer, or form activity.
   useEffect(() => {
     // Organization workspaces stay open until their user signs out or exits manually.
     if (phase !== "safe" || buttonOnlyExit) {

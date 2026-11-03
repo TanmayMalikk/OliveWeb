@@ -26,7 +26,7 @@ import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 
-// The safe contact identity card view is part of safe contact dashboard cards. It gives the user the details and choices needed here.
+// Shows the trusted contact's profile summary on their dashboard.
 @Composable
 internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) {
     Surface(

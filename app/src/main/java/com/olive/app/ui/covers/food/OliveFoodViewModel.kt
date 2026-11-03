@@ -62,7 +62,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
     var deliveryArea by mutableStateOf("")
         private set
 
-    // Food cover: Finds delivery area. It uses the current cover data to update what the user sees.
+    // Opens the delivery-area picker and saves the selected area.
     fun chooseDeliveryArea(value: String) {
         deliveryArea = value.trim().take(60)
     }
@@ -91,7 +91,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         query = value
     }
 
-    // Food cover: returns the filter.
+    // Gives the food cover the filter it needs.
     fun filter(value: String) {
         category = value
     }
@@ -103,7 +103,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         selectedDish = null
     }
 
-    // Food cover: returns the select.
+    // Selects a dish so the food cover can show its details.
     fun select(dish: Dish?) {
         selectedDish = dish
     }
@@ -125,13 +125,13 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         return false
     }
 
-    // returns the favorite for food cover. It uses the current cover data to update what the user sees.
+    // Adds or removes a dish from the user's favourites.
     fun favorite(id: String) {
         favorites = if (id in favorites) favorites - id else favorites + id
         persistCover?.invoke(cart, favorites, customizations)
     }
 
-    // Returns the user's saved ingredient choices or the dish defaults when none were changed.
+    // Adds or removes one ingredient from the selected dish.
     fun selectedIngredients(dish: Dish) = customizations[dish.id] ?: dish.ingredients.toSet()
     // Switches ingredient on or off.
     fun toggleIngredient(dish: Dish, ingredient: String) {
@@ -151,7 +151,7 @@ internal class OliveViewModel(private val repository: CatalogRepository) : ViewM
         persistCover?.invoke(cart, favorites, customizations)
     }
 
-    // Food cover: returns the return to cover. It uses the current cover data to update what the user sees.
+    // Leaves the food flow and returns to its main cover page.
     fun returnToCover() {
         selectedDish = null
         query = ""

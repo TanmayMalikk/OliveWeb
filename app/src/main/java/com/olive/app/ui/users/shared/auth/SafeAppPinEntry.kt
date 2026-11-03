@@ -115,7 +115,7 @@ internal fun AppPinSetup(session: SessionViewModel, onBack: () -> Unit) {
 internal fun PinPrompt(session: SessionViewModel) {
     val challenge = session.pinChallengeVersion
     var useBackupPin by remember(challenge) { mutableStateOf(false) }
-    // pin prompt checks whether session account uses device lock and use backup pin is false before continuing.
+    // Open Android authentication when device lock is preferred and the user did not choose the backup PIN.
     if (session.account.usesDeviceLock && !useBackupPin) {
         DeviceLockPrompt(
             session = session,
@@ -221,7 +221,7 @@ internal fun PinPrompt(session: SessionViewModel) {
                                     if (session.account.busy || session.privacyBlackout || session.screen != SessionScreen.Pin ||
                                         session.pinChallengeVersion != challenge
                                     ) return@FilledTonalButton
-                                    // Choose what pin prompt should do for the current value.
+                                    // Shows the next PIN setup step based on the chosen entry method.
                                     when (key) {
                                         "⌫" -> pin = pin.dropLast(1)
                                         "↪" -> if (InputPolicy.validPin(pin)) {

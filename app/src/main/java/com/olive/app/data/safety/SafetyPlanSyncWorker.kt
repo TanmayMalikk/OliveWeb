@@ -14,7 +14,7 @@ import kotlinx.coroutines.withTimeout
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
-// Safety: Checks whether safety connection.
+// Checks whether the phone has a network connection for safety-plan sync.
 internal fun hasSafetyConnection(context: Context): Boolean {
     val manager = context.getSystemService(ConnectivityManager::class.java)
     val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
@@ -26,7 +26,7 @@ internal fun hasSafetyConnection(context: Context): Boolean {
 // Each upload reads the durable encrypted queue. Replacing a worker is safe because mutations are idempotent.
 class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
-    // Safety: Processes the queued background work.
+    // Uploads safety-plan changes that were queued while the app was offline.
     override suspend fun doWork(): Result {
         if (!BuildConfig.FIREBASE_CONFIGURED) return Result.success()
         val actor = inputData.getString("actor") ?: return Result.failure()
@@ -52,7 +52,7 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: FirebaseFunctionsException) {
-            // Choose what do work should do for the current value.
+            // Returns the correct WorkManager result for a completed, retryable, or failed sync.
             when {
                 error.code == FirebaseFunctionsException.Code.PERMISSION_DENIED && actor != owner -> {
                     SafetyPlanStore(applicationContext, false).remove(
@@ -75,7 +75,7 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
     }
 
     companion object {
-        // Safety: returns the enqueue.
+        // Queues a background safety-plan sync without creating duplicate work.
         fun enqueue(context: Context, actor: String, owner: String) {
             if (!BuildConfig.FIREBASE_CONFIGURED) return
             val request = OneTimeWorkRequestBuilder<SafetyPlanSyncWorker>().setInputData(

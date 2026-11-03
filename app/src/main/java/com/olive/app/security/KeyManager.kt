@@ -65,7 +65,7 @@ object KeyManager {
         return certificate?.publicKey
     }
 
-    // Loads or create public key for key manager.
+    // Loads this device's key pair or creates it the first time it is needed.
     fun getOrCreatePublicKey(): PublicKey = getPublicKey() ?: generateUserKeyPair().public
 
     // Secure messaging: identifies this installation without exposing its private key.
@@ -133,7 +133,7 @@ object KeyManager {
         var lastFailure: GeneralSecurityException? = null
         privateKeys.forEach { privateKey ->
             candidates.forEach { digest ->
-                // A unwrap key error is handled here instead of closing the app.
+                // Use the fallback when unwrap key is unavailable.
                 try {
                     val cipher = Cipher.getInstance(RSA_MODE)
                     // Bypass UNWRAP_MODE entirely and manually rebuild the AES key.

@@ -13,7 +13,7 @@ export interface ManagedAccount {
   protected: boolean;
 }
 
-// Web admin: Calls the matching backend service admin. It sends a signed-in request to the protected cloud function and checks the reply.
+// Sends a signed-in admin request to the protected Cloud Function.
 async function callAdmin(name: string, input: unknown = {}) {
   if (!cloudMode) {
     throw new Error("Organization management requires a Firebase-connected account.");

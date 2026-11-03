@@ -17,7 +17,7 @@ export default function Notes() {
     return () => clearInterval(id);
   }, []);
   const entries = s.history.private_entries.map((e) => purgeEntry(e, now));
-  // Update entries when information used by this screen changes.
+  // Permanently removes trashed notes after their retention period ends.
   useEffect(() => {
     const expired = s.history.private_entries.find(
       (e) =>

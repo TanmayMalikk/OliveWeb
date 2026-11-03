@@ -44,7 +44,7 @@ export type BrowserDocument = {
   key?: CryptoKey;
 };
 
-// Creates a value from base64 for web media service. It checks access, protects the file, and then reads or saves it.
+// Turns stored Base64 text back into bytes before a file is decrypted.
 const fromBase64 = (value: string) =>
   Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
 
@@ -247,7 +247,7 @@ async function checksum(bytes: Uint8Array) {
     .join("");
 }
 
-// Decrypts metadata for web media service.
+// Decrypts the file name, type, and other private document details.
 async function decryptMetadata(value: string, key: CryptoKey) {
   const payload = fromBase64(value);
   if (payload.length < 29)
@@ -263,7 +263,7 @@ async function decryptMetadata(value: string, key: CryptoKey) {
   };
 }
 
-// Lists browser documents for web media service. It sends a signed-in request to the protected cloud function and checks the reply.
+// Lists documents this signed-in account is allowed to open.
 export async function listBrowserDocuments(
   identity: Identity,
 ): Promise<BrowserDocument[]> {
@@ -319,15 +319,15 @@ async function resolveBrowserDocuments(
       let key: CryptoKey | undefined;
       let name = "Encrypted document";
       let mimeType = "application/octet-stream";
-      // Only continue with mime type when typeof value encrypted metadata is string.
+      // New uploads keep their private details in one encrypted metadata value.
       if (typeof value.encrypted_metadata === "string") {
-        // If mime type fails, catch the error so the app can keep running and explain the problem.
+        // Keep the document in the list when old metadata cannot be decrypted on this browser.
         try {
           let raw: Uint8Array;
-          // mime type checks whether wrapped before continuing.
+          // A wrapped file key is needed before this browser can decrypt the metadata.
           if (wrapped) {
             raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
-            // Only continue with mime type when value owner id is identity uid.
+            // The owner can use the account key when no device-specific key exists yet.
             if (value.owner_id === identity.uid) {
               void httpsCallable(
                 functions,
@@ -383,7 +383,7 @@ async function resolveBrowserDocuments(
   ).then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt));
 }
 
-// Web media service: returns the hexadecimal.
+// Formats a checksum as lowercase hexadecimal for integrity checks.
 function hexadecimal(bytes: Uint8Array) {
   return [...bytes]
     .map((value) => value.toString(16).padStart(2, "0"))

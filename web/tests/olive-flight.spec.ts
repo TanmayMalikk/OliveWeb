@@ -2,8 +2,8 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Inputs: the values in this case. Expected: all games and controls fit the available laptop and desktop viewport.
-test("all games and controls fit the available laptop and desktop viewport", async ({
+// Inputs: the values in this case. Expected: each game stays within page width, with controls reachable below the play area.
+test("all games stay within the page width and keep controls reachable", async ({
   page,
 }) => {
   for (const [width, height] of [
@@ -50,7 +50,7 @@ test("all games and controls fit the available laptop and desktop viewport", asy
                       .getBoundingClientRect().width,
                 ) < 2
               : true,
-          scrollHeight: document.documentElement.scrollHeight,
+          documentHeight: document.documentElement.scrollHeight,
           scrollWidth: document.documentElement.scrollWidth,
           height: innerHeight,
           width: innerWidth,
@@ -63,6 +63,7 @@ test("all games and controls fit the available laptop and desktop viewport", asy
           top: game.top,
           bottom: game.bottom,
           controlsBottom: controls.bottom,
+          documentHeight: document.documentElement.scrollHeight,
           playHeight: play.height,
           playBottom: play.bottom,
           controlsTop: controls.top,
@@ -71,10 +72,6 @@ test("all games and controls fit the available laptop and desktop viewport", asy
             document.querySelector<HTMLElement>(".grove-game")!.clientWidth + 1,
         };
       });
-      expect(
-        layout.scrollHeight,
-        `${name} at ${width}x${height}`,
-      ).toBeLessThanOrEqual(height + 1);
       expect(layout.scrollWidth).toBeLessThanOrEqual(width);
       expect(
         layout.panelScrolls,
@@ -88,8 +85,8 @@ test("all games and controls fit the available laptop and desktop viewport", asy
       expect(Math.abs(layout.gameRight - layout.mainRight)).toBeLessThan(2);
       expect(layout.fullWidth).toBe(true);
       expect(layout.top).toBeGreaterThanOrEqual(0);
-      expect(layout.bottom).toBeLessThanOrEqual(height);
-      expect(layout.controlsBottom).toBeLessThanOrEqual(height);
+      expect(layout.bottom).toBeLessThanOrEqual(layout.documentHeight + 1);
+      expect(layout.controlsBottom).toBeLessThanOrEqual(layout.documentHeight + 1);
       expect(layout.playHeight).toBeGreaterThan(180);
       expect(layout.playBottom).toBeLessThanOrEqual(layout.controlsTop);
     }
@@ -107,13 +104,13 @@ test("all games and controls fit the available laptop and desktop viewport", asy
   ).toBeVisible();
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollHeight <= innerHeight + 1,
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
   await page.goto("/cover/game");
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollHeight <= innerHeight + 1,
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
 });

@@ -10,11 +10,11 @@ import javax.crypto.SecretKey
 internal class LiveLocationKeyStore(context: Context) {
     private val vault = EncryptedVault(context.applicationContext, "live-location")
 
-    // Saves the new value for live location key store.
+    // Saves the live-location encryption key in protected local storage.
     fun save(ownerUid: String, key: SecretKey) =
         vault.update { it.put(ownerUid, EncryptionUtils.encodeKeyToString(key)) }
 
-    // Loads the saved value for live location key store.
+    // Loads the live-location encryption key from protected local storage.
     fun load(ownerUid: String): SecretKey? =
         vault.read().optString(ownerUid).takeIf(String::isNotBlank)
             ?.let(EncryptionUtils::decodeStringToKey)

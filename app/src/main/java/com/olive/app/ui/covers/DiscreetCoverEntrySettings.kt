@@ -112,7 +112,7 @@ internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
     }
 }
 
-// This shows the cover account panel view for discreet cover entry settings cover. It fills the view with the latest details and actions.
+// Shows cover-account settings and the hidden olive used for private entry.
 @Composable
 internal fun CoverAccountPanel(session: SessionViewModel) {
     var fullName by remember(session.coverFullName) { mutableStateOf(session.coverFullName) }
@@ -167,7 +167,7 @@ internal object CoverLauncher {
             )
     }
 
-    // Discreet cover entry settings cover: returns the apply.
+    // Switches the visible launcher icon to the selected cover app.
     fun apply(context: Context, selected: CoverType, role: AccountRole) {
         val manager = context.packageManager
         val aliases = listOf(

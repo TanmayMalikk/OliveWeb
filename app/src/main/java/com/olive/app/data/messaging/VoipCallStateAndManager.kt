@@ -163,11 +163,11 @@ class VoipManager(
         }.distinctUntilChanged()
     }
 
-    // Marks an invitation as accepted and returns the updated call.
+    // Accepts the incoming VoIP call and starts its audio session.
     suspend fun acceptCall(callId: String, userId: String): VoipCall =
         respondToInvitation(callId, userId, "accept")
 
-    // Marks an invitation as declined and returns the updated call.
+    // Declines the incoming VoIP call and closes its session.
     suspend fun declineCall(callId: String, userId: String): VoipCall =
         respondToInvitation(callId, userId, "decline")
 
@@ -206,7 +206,7 @@ class VoipManager(
             // Converts successful responses and turns server failures into useful app errors.
             httpClient.newCall(requestBuilder.build()).execute().use { response ->
                 val responseBody = response.body.string()
-                // Only continue with request when response is successful is false.
+                // Stop the call setup when the server rejects the connection.
                 if (!response.isSuccessful) {
                     val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
                     throw VoipApiException(

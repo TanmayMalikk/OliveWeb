@@ -51,7 +51,7 @@ internal class FoodNutritionRepository(
         )
     }
 
-    // Fitness cover: Finds fat secret. It calls the protected Firebase Cloud Function for this feature.
+    // Searches FatSecret for nutrition results that match the typed food.
     private suspend fun searchFatSecret(query: String): List<NutritionFood> {
         val response = functions.getHttpsCallable("nutritionFoodSearch")
             .call(mapOf("query" to query))
@@ -61,7 +61,7 @@ internal class FoodNutritionRepository(
         return foods.mapNotNull { raw -> parseFatSecretFood(raw as? Map<*, *> ?: return@mapNotNull null) }
     }
 
-    // Fitness cover: Finds open food facts.
+    // Searches Open Food Facts when packaged-food results are needed.
     private suspend fun searchOpenFoodFacts(query: String): List<NutritionFood> =
         withContext(Dispatchers.IO) {
             val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
@@ -90,7 +90,7 @@ internal data class FoodSearchResult(
     val providerFailures: Int = 0,
 )
 
-// Converts fat secret food for fitness cover. It uses the saved health data to update the fitness screen.
+// Converts a FatSecret result into the shared nutrition model.
 private fun parseFatSecretFood(value: Map<*, *>): NutritionFood? {
     val name = value["name"]?.toString()?.trim().orEmpty()
     if (name.isBlank()) return null
@@ -149,11 +149,11 @@ private fun parseOpenFoodFactsProduct(product: JSONObject?): NutritionFood? {
     )
 }
 
-// Fitness cover: Checks whether core nutrition.
+// Keeps only foods that include calories and the three main macros.
 private fun JSONObject.hasCoreNutrition() =
     has("energy-kcal_100g") && has("proteins_100g") &&
             has("carbohydrates_100g") && has("fat_100g")
 
-// returns the nutrient for fitness cover.
+// Reads one nutrient value from the food API response.
 private fun JSONObject.nutrient(name: String) =
     optDouble(name, 0.0).toFloat().takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f

@@ -55,7 +55,7 @@ internal fun SafeContactArea(session: SessionViewModel) {
     AnimatedContent(
         session.page, label = "safe contact page",
         transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(120))) }) { page ->
-        // Choose what safe contact area should do for the current value.
+        // Opens the selected trusted-contact dashboard section.
         when (page) {
             SafePage.Home -> SafeContactHome(session)
             SafePage.Messages -> MessagesScreen(session)
@@ -72,7 +72,7 @@ internal fun SafeContactArea(session: SessionViewModel) {
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
-// This is the safe contact home view for safe contact dashboard. It shows current details and the actions available to the user.
+// Shows the trusted contact's assigned user, alerts, and Safe App shortcuts.
 @Composable
 private fun SafeContactHome(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -183,7 +183,7 @@ private fun SafeContactHome(session: SessionViewModel) {
     }
 }
 
-// This is the safe contact profile view for safe contact dashboard. It shows current details and the actions available to the user.
+// Shows the trusted contact's own profile and account actions.
 @Composable
 private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()

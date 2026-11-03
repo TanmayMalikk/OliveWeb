@@ -18,7 +18,7 @@ const navigation = [
   ["nutrition", "Nutrition", Salad],
 ] as const;
 
-// Shows the metric view for web fitness cover cover. It uses the saved health data to update the fitness screen.
+// Shows one health number with its icon, label, and optional note.
 function Metric({ icon: Icon, value, label, note }: {
   icon: typeof Activity; value: string; label: string; note?: string;
 }) {
@@ -28,7 +28,7 @@ function Metric({ icon: Icon, value, label, note }: {
   </article>;
 }
 
-// Web fitness cover cover: Shows the history chart view. It uses the saved health data to update the fitness screen.
+// Turns the last 14 days of one health metric into a labelled bar chart.
 function HistoryChart({ days, field, label, suffix = "" }: {
   days: FitnessDay[]; field: keyof FitnessDay; label: string; suffix?: string;
 }) {
@@ -108,12 +108,12 @@ export default function FitnessCover() {
   const week = recentDays.slice(-7);
   const weekSteps = week.reduce((total, day) => total + day.steps, 0);
   const weekCalories = week.reduce((total, day) => total + day.caloriesBurned, 0);
-  // Web fitness cover cover: Adds the new item.
+  // Adds the chosen food to today's nutrition totals and confirms it on screen.
   const add = async (food: Food, servings = 1) => {
     setSummary(await logFood(summary, food, servings));
     setFeedback(`${food.name} added to today.`);
   };
-  // Starts tab for web fitness cover cover.
+  // Opens a fitness page and closes the settings panel.
   const showTab = (next: FitnessTab) => {
     setTab(next);
     setSettingsOpen(false);
@@ -277,7 +277,7 @@ export default function FitnessCover() {
   </main>;
 }
 
-// Web fitness cover cover: Shows the macro progress view. It uses the saved health data to update the fitness screen.
+// Shows how much protein, carbohydrate, or fat was eaten against its daily goal.
 function MacroProgress({ summary, day }: { summary: FitnessSummary; day: FitnessDay }) {
   return <div className="fitness-macro-list large">
     {[["Protein", day.proteinGrams, summary.proteinGoal], ["Carbohydrates", day.carbohydrateGrams, summary.carbohydrateGoal],
