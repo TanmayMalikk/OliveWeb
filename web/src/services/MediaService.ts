@@ -29,6 +29,7 @@ type StoredMedia = {
   ciphertext_sha256?: unknown;
   encryption_version?: unknown;
   created_at?: { toMillis?: () => number };
+  evidence?: unknown;
 };
 
 export type BrowserDocument = {
@@ -42,6 +43,7 @@ export type BrowserDocument = {
   ciphertextSize: number;
   ciphertextSha256: string;
   key?: CryptoKey;
+  evidence: boolean;
 };
 
 // Turns stored Base64 text back into bytes before a file is decrypted.
@@ -378,9 +380,17 @@ async function resolveBrowserDocuments(
             ? value.ciphertext_sha256
             : "",
         key,
+        evidence: value.evidence === true,
       };
     }),
   ).then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt));
+}
+
+// Documents: saves the Evidence toggle for the owner without opening the encrypted file.
+export async function setBrowserDocumentEvidence(mediaId: string, evidence: boolean) {
+  const { functions } = await firebase();
+  const { httpsCallable } = await import("firebase/functions");
+  await httpsCallable(functions, "mediaUpdateEvidence")({ mediaId, evidence });
 }
 
 // Formats a checksum as lowercase hexadecimal for integrity checks.

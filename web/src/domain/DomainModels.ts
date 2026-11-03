@@ -50,9 +50,15 @@ export interface Entry {
   id: string;
   timestamp: number;
   updatedAt: number;
-  kind: "Note" | "Incident" | null;
+  kind: "Note" | "Incident";
   title: string;
   body: string;
+  incidentDate?: string;
+  incidentTime?: string;
+  incidentLocation?: string;
+  incidentLatitude?: number;
+  incidentLongitude?: number;
+  attachmentIds?: string[];
   pinned: boolean;
   edits: {
     id: string;

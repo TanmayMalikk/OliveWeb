@@ -5,6 +5,14 @@ import { useSession } from "../../../session/SessionProvider";
 import { Button, Empty, Field, Form, Modal } from "../../../components/SharedComponents";
 import { purgeEntry, TRASH_RETENTION_MS, type Entry } from "../../../domain/DomainModels";
 import { formatDateTime } from "../../shared/safe_app/ActivityHistoryPage";
+import { accounts } from "../../../services/AccountService";
+import {
+  listBrowserDocuments,
+  setBrowserDocumentEvidence,
+  uploadBrowserDocument,
+  type BrowserDocument,
+} from "../../../services/MediaService";
+import { IncidentLocationPicker } from "./IncidentLocationPicker";
 export default function Notes() {
   const s = useSession();
   const [query, setQuery] = useState("");
@@ -12,9 +20,16 @@ export default function Notes() {
   const [editing, setEditing] = useState<Entry | null>(null);
   const [revisions, setRevisions] = useState<Entry | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [documents, setDocuments] = useState<BrowserDocument[]>([]);
+  const [attachmentUploadProgress, setAttachmentUploadProgress] = useState<number | null>(null);
+  const [attachmentError, setAttachmentError] = useState("");
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
+  }, []);
+  useEffect(() => {
+    if (!accounts.identity) return;
+    void listBrowserDocuments(accounts.identity).then(setDocuments).catch(() => setDocuments([]));
   }, []);
   const entries = s.history.private_entries.map((e) => purgeEntry(e, now));
   // Permanently removes trashed notes after their retention period ends.
@@ -93,6 +108,9 @@ export default function Notes() {
             <button className="note-open" onClick={() => setEditing(entry)}>
               <h2>{entry.title || "Untitled thought"}</h2>
               <p>{entry.body}</p>
+              {(entry.attachmentIds?.length ?? 0) > 0 && (
+                <small>{entry.attachmentIds!.length} attached file{entry.attachmentIds!.length === 1 ? "" : "s"}</small>
+              )}
             </button>
             <div className="note-actions">
               {trash ? (
@@ -198,11 +216,25 @@ export default function Notes() {
                 const title = String(data.get("title")).trim();
                 const body = String(data.get("body")).trim();
                 const kind = data.get("kind") as Entry["kind"];
+                const incidentDate = String(data.get("incidentDate") ?? "").trim();
+                const incidentTime = String(data.get("incidentTime") ?? "").trim();
+                const incidentLocation = String(data.get("incidentLocation") ?? "").trim();
+                const latitudeText = String(data.get("incidentLatitude") ?? "").trim();
+                const longitudeText = String(data.get("incidentLongitude") ?? "").trim();
+                const incidentLatitude = latitudeText ? Number(latitudeText) : Number.NaN;
+                const incidentLongitude = longitudeText ? Number(longitudeText) : Number.NaN;
+                const attachmentIds = data.getAll("attachments").map(String);
                 if (!body) throw new Error("Write something before saving.");
+                if (kind === "Incident" && (!title || !incidentDate || !incidentLocation))
+                  throw new Error("Add a title, incident date, and incident location.");
                 const changes = [
                   ["Title", editing.title, title],
                   ["Body", editing.body, body],
                   ["Kind", editing.kind ?? "", kind ?? ""],
+                  ["Incident date", editing.incidentDate ?? "", incidentDate],
+                  ["Approximate time", editing.incidentTime ?? "", incidentTime],
+                  ["Incident location", editing.incidentLocation ?? "", incidentLocation],
+                  ["Attachments", (editing.attachmentIds ?? []).join(","), attachmentIds.join(",")],
                 ]
                   .filter(([, before, after]) => before !== after)
                   .map(([field, before, after]) => ({
@@ -215,6 +247,18 @@ export default function Notes() {
                   title,
                   body,
                   kind,
+                  incidentDate: kind === "Incident" ? incidentDate : "",
+                  incidentTime: kind === "Incident" ? incidentTime : "",
+                  incidentLocation: kind === "Incident" ? incidentLocation : "",
+                  incidentLatitude:
+                    kind === "Incident" && Number.isFinite(incidentLatitude)
+                      ? incidentLatitude
+                      : undefined,
+                  incidentLongitude:
+                    kind === "Incident" && Number.isFinite(incidentLongitude)
+                      ? incidentLongitude
+                      : undefined,
+                  attachmentIds,
                   updatedAt: Date.now(),
                   edits:
                     editing.body && changes.length
@@ -228,23 +272,58 @@ export default function Notes() {
                         ]
                       : editing.edits,
                 });
+                if (kind === "Incident") {
+                  await Promise.all(
+                    documents.filter((document) => attachmentIds.includes(document.id) && !document.evidence)
+                      .map((document) => setBrowserDocumentEvidence(document.id, true)),
+                  );
+                }
                 setEditing(null);
               });
             }}
           >
-            <label className="field">
-              <span>Entry type</span>
-              <select name="kind" defaultValue={editing.kind ?? "Note"}>
-                <option>Note</option>
-                <option>Incident</option>
-              </select>
-            </label>
+            <div className="entry-type-tabs" role="tablist" aria-label="Entry type">
+              {(["Note", "Incident"] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="tab"
+                  aria-selected={editing.kind === kind}
+                  className={editing.kind === kind ? "active" : ""}
+                  onClick={() => setEditing({ ...editing, kind })}
+                >
+                  {kind}
+                </button>
+              ))}
+              <input type="hidden" name="kind" value={editing.kind} />
+            </div>
             <Field
-              label="Title (optional)"
+              label={editing.kind === "Incident" ? "Title" : "Title (optional)"}
               name="title"
               defaultValue={editing.title}
               maxLength={160}
+              required={editing.kind === "Incident"}
             />
+            {editing.kind === "Incident" && (
+              <>
+                <Field label="Date of incident" name="incidentDate" type="date" defaultValue={editing.incidentDate ?? ""} required />
+                <Field label="Approx. time of incident" name="incidentTime" type="time" defaultValue={editing.incidentTime ?? ""} />
+                <IncidentLocationPicker
+                  label={editing.incidentLocation ?? ""}
+                  latitude={editing.incidentLatitude}
+                  longitude={editing.incidentLongitude}
+                  onChange={(location) => setEditing((current) => current && ({
+                    ...current,
+                    incidentLocation: location.label,
+                    incidentLatitude: Number.isFinite(location.latitude) ? location.latitude : undefined,
+                    incidentLongitude: Number.isFinite(location.longitude) ? location.longitude : undefined,
+                  }))}
+                />
+                <input type="hidden" name="incidentLocation" value={editing.incidentLocation ?? ""} />
+                <input type="hidden" name="incidentLatitude" value={editing.incidentLatitude ?? ""} />
+                <input type="hidden" name="incidentLongitude" value={editing.incidentLongitude ?? ""} />
+              </>
+            )}
             <label className="field">
               <span>Your words</span>
               <textarea
@@ -256,6 +335,59 @@ export default function Notes() {
                 autoFocus
               />
             </label>
+            <fieldset className="field attachment-picker">
+              <legend>Attachments</legend>
+              <p>Choose saved photos, videos, or documents. Incident attachments become evidence.</p>
+              <label className="button outline">
+                {attachmentUploadProgress === null
+                  ? "Upload a new attachment"
+                  : `Uploading ${Math.round(attachmentUploadProgress * 100)}%`}
+                <input
+                  className="sr-only"
+                  type="file"
+                  accept="image/*,video/*,application/pdf,text/*"
+                  disabled={attachmentUploadProgress !== null || !accounts.identity}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    const identity = accounts.identity;
+                    if (!file || !identity) return;
+                    const previous = new Set(documents.map((document) => document.id));
+                    setAttachmentError("");
+                    setAttachmentUploadProgress(0);
+                    void uploadBrowserDocument(file, identity, setAttachmentUploadProgress)
+                      .then(() => listBrowserDocuments(identity))
+                      .then((updated) => {
+                        setDocuments(updated);
+                        const added = updated.find((document) => !previous.has(document.id));
+                        if (added) setEditing((current) => current && ({
+                          ...current,
+                          attachmentIds: [...new Set([...(current.attachmentIds ?? []), added.id])],
+                        }));
+                      })
+                      .catch((failure) => setAttachmentError(
+                        failure instanceof Error ? failure.message : "Unable to upload this attachment.",
+                      ))
+                      .finally(() => {
+                        setAttachmentUploadProgress(null);
+                        event.target.value = "";
+                      });
+                  }}
+                />
+              </label>
+              {attachmentError && <small className="error" role="alert">{attachmentError}</small>}
+              {documents.map((document) => (
+                <label key={document.id}>
+                  <input
+                    type="checkbox"
+                    name="attachments"
+                    value={document.id}
+                    defaultChecked={(editing.attachmentIds ?? []).includes(document.id)}
+                  />
+                  {document.name}{document.evidence ? " · Evidence" : ""}
+                </label>
+              ))}
+              {!documents.length && <small>Upload files in Documents, then attach them here.</small>}
+            </fieldset>
             <div className="modal-actions">
               <Button type="submit" disabled={s.busy}>
                 Save entry
