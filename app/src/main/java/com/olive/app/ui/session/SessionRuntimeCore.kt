@@ -44,6 +44,7 @@ internal class SessionRuntime(
     val messageReadState get() = localStorage.messageReadState
     val cloudState get() = localStorage.cloudState
     val messageOutbox get() = localStorage.messageOutbox
+    val chatCache get() = localStorage.chatCache
     val documentIndex get() = localStorage.documentIndex
     val offlineMediaCache get() = localStorage.offlineMediaCache
     val dataSources = dataSourcesOverride ?: SessionDataSources.create(
@@ -73,6 +74,7 @@ internal class SessionRuntime(
     var messageSubscription: ChatSubscription? = null
     var messageOutboxObservation: Job? = null
     var remoteChatMessages = emptyList<ChatMessage>()
+    var activeRoomKey: javax.crypto.SecretKey? = null
     var observedFriendshipIds = emptySet<String>()
     var chatQuickExitHintShown = false
     var verifiedMessagingIdentityMarker: String? = null
