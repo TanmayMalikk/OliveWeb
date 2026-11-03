@@ -51,6 +51,7 @@ import kotlin.coroutines.resumeWithException
  */
 class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWorker(context,parameters) {
     private val store=MediaTransferStore(context)
+    private val offlineCache=OfflineMediaCache(context)
     private val repository:MediaTicketDataSource=MediaRepository()
     private val client=mediaUploadHttpClient()
 
@@ -86,8 +87,13 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             store.update(job.id) { it.copy(status=MediaTransferStatus.FINALIZING,error=null) }
             val record=repository.completeUpload(job.id,parts)
             store.update(job.id) { it.copy(status=MediaTransferStatus.COMPLETE,mediaId=record.id,error=null) }
-            // Ciphertext staging is no longer needed once both R2 and Firestore confirm completion.
-            file.delete()
+            // Preserve a bounded reuse window so an owner can pin the already-uploaded ciphertext
+            // without downloading it from R2. Cleanup remains durable if the UI never opens.
+            runCatching {
+                offlineCache.registerUploadCandidate(job.ownerUid,record.id,file,
+                    job.source.ciphertextSize,job.source.ciphertextSha256)
+                OfflineMediaCleanupWorker.enqueue(applicationContext,record.id)
+            }.onFailure { file.delete() }
             Result.success(workDataOf(MEDIA_ID to record.id))
         } catch(cancelled:CancellationException) { throw cancelled }
         catch(error:MediaDeviceVerificationException) {

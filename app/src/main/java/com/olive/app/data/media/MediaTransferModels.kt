@@ -38,8 +38,6 @@ enum class MediaTransferStatus { QUEUED, CREATING_SESSION, UPLOADING, FINALIZING
  * @property wrappedKeys per-user copies of the media AES key, wrapped with each allowed user's public key.
  * @property allowedUsers UIDs authorized to request a download ticket; must match [wrappedKeys] exactly.
  * @property encryptionVersion format/key-contract version stored with the remote metadata.
- * @property accountAccessKey callable-only recovery copy that lets the signed-in account open the
- * same encrypted R2 object on another phone or browser without device approval.
  */
 data class PreparedEncryptedMedia(
     val filePath:String,
@@ -52,7 +50,6 @@ data class PreparedEncryptedMedia(
     val kind:MediaKind,
     val ocrReview:OcrReview,
     val deviceWrappedKeys:Map<String,String> = emptyMap(),
-    val accountAccessKey:String = "",
 )
 
 /**
@@ -91,7 +88,6 @@ data class MediaUploadJob(
         put("encryptedMetadata",source.encryptedMetadata);put("wrappedKeys",JSONObject(source.wrappedKeys))
         put("allowedUsers",JSONArray(source.allowedUsers));put("encryptionVersion",source.encryptionVersion)
         put("deviceWrappedKeys",JSONObject(source.deviceWrappedKeys))
-        put("accountAccessKey",source.accountAccessKey)
         put("kind",source.kind.name);put("ocrReview",source.ocrReview.name);put("status",status.name)
         mode?.let { put("mode",it.name) };put("mediaId",mediaId);put("objectKey",objectKey)
         put("uploadId",uploadId);put("partSize",partSize);put("createdAt",createdAt)
@@ -117,8 +113,7 @@ data class MediaUploadJob(
             val source=PreparedEncryptedMedia(value.getString("filePath"),value.getLong("ciphertextSize"),
                 value.getString("ciphertextSha256"),value.getString("encryptedMetadata"),wrapped,allowed,
                 value.optInt("encryptionVersion",1),MediaKind.valueOf(value.getString("kind")),
-                OcrReview.valueOf(value.optString("ocrReview",OcrReview.NOT_RUN.name)),deviceWrapped,
-                value.optString("accountAccessKey"))
+                OcrReview.valueOf(value.optString("ocrReview",OcrReview.NOT_RUN.name)),deviceWrapped)
             return MediaUploadJob(value.getString("id"),value.getString("ownerUid"),source,
                 MediaTransferStatus.valueOf(value.getString("status")),value.optString("mode").takeIf(String::isNotBlank)?.let(MediaUploadMode::valueOf),
                 value.optString("mediaId"),value.optString("objectKey"),value.optString("uploadId"),

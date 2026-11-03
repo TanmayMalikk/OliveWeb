@@ -74,15 +74,6 @@ function string(value, name, max) {
   }
   return value;
 }
-/** Validates the 256-bit recovery copy used by authenticated account devices. */
-function accountAccessKey(value, required = false) {
-  if ((value == null || value === "") && !required) return "";
-  if (typeof value !== "string" || value.length > 64 ||
-      !/^[A-Za-z0-9+/]+={0,2}$/.test(value) || Buffer.from(value, "base64").length !== 32) {
-    throw new HttpsError("invalid-argument", "Invalid accountAccessKey");
-  }
-  return value;
-}
 /**
  * Validates the zero-knowledge upload manifest.
  * `wrappedKeys` must contain exactly one wrapped key for every allowed user, including the owner.
@@ -151,7 +142,6 @@ function uploadRequest(data, uid) {
   const deviceWrappedKeys = data?.deviceWrappedKeys == null
     ? {}
     : validateDeviceWrappedKeys(data.deviceWrappedKeys, uid);
-  const recoveryKey = accountAccessKey(data?.accountAccessKey);
   return {
     jobId,
     size,
@@ -161,7 +151,6 @@ function uploadRequest(data, uid) {
     wrappedKeys,
     encryptionVersion,
     deviceWrappedKeys,
-    accountAccessKey: recoveryKey,
   };
 }
 
@@ -205,7 +194,26 @@ function accessRequest(data, uid) {
   ) {
     throw new HttpsError("invalid-argument", "Invalid wrappedKeys");
   }
-  return { wrappedKeys, allowedUsers };
+  const deviceWrappedKeys = data?.deviceWrappedKeys == null
+    ? null
+    : validateAccessDeviceWrappedKeys(data.deviceWrappedKeys, allowedUsers);
+  return { wrappedKeys, allowedUsers, deviceWrappedKeys };
+}
+
+/** Validates an exact device-key replacement and rejects wrappers for revoked accounts. */
+function validateAccessDeviceWrappedKeys(value, allowedUsers) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  const entries = Object.entries(value);
+  if (entries.length > 250 || entries.some(([id, wrapped]) => {
+    const owner = allowedUsers.find((uid) => id.startsWith(`${uid}--`));
+    return !owner || id.length <= owner.length + 2 || id.length > 300 ||
+      typeof wrapped !== "string" || wrapped.length < 1 || wrapped.length > 2048;
+  })) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  return Object.fromEntries(entries);
 }
 /** Callable-only resumable session record keyed by the client's stable job id. */
 function pendingRef(jobId) {
@@ -281,9 +289,6 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
       found.ciphertextSize !== value.size
     )
       throw new HttpsError("already-exists", "jobId is already in use");
-    if (!found.accountAccessKey && value.accountAccessKey) {
-      await reference.update({accountAccessKey: value.accountAccessKey});
-    }
     return sessionResponse(found);
   }
   const mediaId = crypto.randomUUID();
@@ -319,7 +324,6 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
     encryptedMetadata: value.encryptedMetadata,
     wrappedKeys: value.wrappedKeys,
     deviceWrappedKeys: value.deviceWrappedKeys,
-    accountAccessKey: value.accountAccessKey,
     allowedUsers: value.allowedUsers,
     encryptionVersion: value.encryptionVersion,
     status: "pending",
@@ -443,13 +447,6 @@ exports.mediaCompleteUpload = onCall(options, async (request) => {
     status: "complete",
     completedAt: FieldValue.serverTimestamp(),
   });
-  if (value.accountAccessKey) {
-    batch.create(mediaAccessKeyRef(value.mediaId), {
-      owner_id: uid,
-      key: value.accountAccessKey,
-      created_at: FieldValue.serverTimestamp(),
-    });
-  }
   await batch.commit();
   return publicRecord(await mediaRef(value.mediaId).get());
 });
@@ -499,45 +496,6 @@ exports.mediaDownloadTicket = onCall(options, async (request) => {
   return { url, headers: {}, expiresAt: Date.now() + ticketSeconds * 1000 };
 });
 
-/** Returns the account recovery copy only after checking the current file access list. */
-exports.mediaAccountAccessKey = onCall(options, async (request) => {
-  const uid = caller(request);
-  const mediaId = string(request.data?.mediaId, "mediaId", 64);
-  const [media, recovery] = await Promise.all([
-    mediaRef(mediaId).get(),
-    mediaAccessKeyRef(mediaId).get(),
-  ]);
-  if (!media.exists) throw new HttpsError("not-found", "Media was not found");
-  const value = media.data();
-  if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
-    throw new HttpsError("permission-denied", "Media access was denied");
-  }
-  if (!recovery.exists) {
-    throw new HttpsError("failed-precondition", "This older document has not been upgraded for account access");
-  }
-  return {accountAccessKey: accountAccessKey(recovery.data().key, true)};
-});
-
-/** Lets an owner upgrade a legacy document after decrypting it on any previously authorized device. */
-exports.mediaStoreAccountAccessKey = onCall(options, async (request) => {
-  const uid = caller(request);
-  const mediaId = string(request.data?.mediaId, "mediaId", 64);
-  const key = accountAccessKey(request.data?.accountAccessKey, true);
-  const media = await mediaRef(mediaId).get();
-  if (!media.exists) throw new HttpsError("not-found", "Media was not found");
-  if (media.data().owner_id !== uid) {
-    throw new HttpsError("permission-denied", "Only the owner can upgrade document access");
-  }
-  await mediaAccessKeyRef(mediaId).create({
-    owner_id: uid,
-    key,
-    created_at: FieldValue.serverTimestamp(),
-  }).catch((error) => {
-    if (error?.code !== 6 && error?.code !== "already-exists") throw error;
-  });
-  return {stored: true};
-});
-
 /** Owner-only recipient update; ciphertext and encrypted display metadata remain unchanged. */
 exports.mediaUpdateAccess = onCall(options, async (request) => {
   const uid = caller(request);
@@ -564,10 +522,16 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
       "Only encrypted media supports this access update",
     );
   }
-  await reference.update({
+  const update = {
     wrapped_keys: access.wrappedKeys,
     allowed_users: access.allowedUsers,
-  });
+  };
+  // Older clients did not send device keys. Preserve their existing wrappers during rollout;
+  // updated clients always send the exact replacement map so grants and revocations are atomic.
+  if (access.deviceWrappedKeys !== null) {
+    update.device_wrapped_keys = access.deviceWrappedKeys;
+  }
+  await reference.update(update);
   return publicRecord(await reference.get());
 });
 
@@ -625,6 +589,6 @@ exports.mediaDelete = onCall(options, async (request) => {
 
 // Keep validation helpers available to Node tests without exporting another deployed endpoint.
 Object.defineProperty(exports, "_test", {
-  value: { accessRequest, validateDeviceWrappedKeys, accountAccessKey },
+  value: { accessRequest, validateDeviceWrappedKeys, validateAccessDeviceWrappedKeys },
   enumerable: false,
 });
