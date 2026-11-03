@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">جارٍ تحضير الرفع المشفر</string>
     <string name="documents_preparing_upload_help">تتم معالجة الملف المحدد وتشفيره على هذا الجهاز.</string>
     <string name="documents_upload_queued">في انتظار الاتصال</string>
-    <string name="documents_upload_waiting_retry">في انتظار إعادة المحاولة</string>
+    <string name="documents_upload_waiting_retry">تم إيقاف الرفع مؤقتًا — ستتم إعادة المحاولة تلقائيًا</string>
     <string name="documents_upload_starting">جارٍ بدء الرفع الآمن</string>
     <string name="documents_upload_progress">جارٍ الرفع %1$d%%</string>
     <string name="documents_upload_finalizing">جارٍ إنهاء الرفع الآمن</string>
