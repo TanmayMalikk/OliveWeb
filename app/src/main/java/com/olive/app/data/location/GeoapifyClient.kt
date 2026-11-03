@@ -15,11 +15,11 @@ data class AddressSuggestion(
     val address: DeliveryAddress
 )
 
-// Handles typed address searches through Geoapify.
+// Builds an address-suggestion request for Geoapify.
 internal object GeoapifyClient {
     val configured get() = BuildConfig.GEOAPIFY_API_KEY.isNotBlank()
 
-    // returns the autocomplete for location sharing.
+    // Sends the typed address to Geoapify and converts its suggestions.
     suspend fun autocomplete(query: String, cityOnly: Boolean): List<AddressSuggestion> =
         withContext(Dispatchers.IO) {
             if (!configured || query.trim().length < 3) return@withContext emptyList()
@@ -42,7 +42,7 @@ internal object GeoapifyClient {
                         "GET"
                     setRequestProperty("Accept", "application/json")
                 }
-            // If autocomplete fails, catch the error so the app can keep running and explain the problem.
+            // Turn an unexpected autocomplete failure into a readable message.
             try {
                 if (connection.responseCode !in 200..299) return@withContext emptyList()
                 parseGeoapifySuggestions(connection.inputStream.bufferedReader().use { it.readText() })
@@ -51,7 +51,7 @@ internal object GeoapifyClient {
             }
         }
 
-    // returns the coordinates for location sharing.
+    // Converts Geoapify result fields into map coordinates.
     suspend fun coordinates(address: DeliveryAddress): Pair<Double, Double>? {
         address.latitude?.let { lat -> address.longitude?.let { return lat to it } }
         val query = listOf(
@@ -67,7 +67,7 @@ internal object GeoapifyClient {
         ).firstOrNull()?.address?.let { value -> value.latitude?.let { lat -> value.longitude?.let { lat to it } } }
     }
 
-    // Converts geoapify suggestions for location sharing.
+    // Converts Geoapify results into the address suggestions shown by the app.
     internal fun parseGeoapifySuggestions(raw: String): List<AddressSuggestion> = runCatching {
         val rows = JSONObject(raw).optJSONArray("results") ?: return@runCatching emptyList()
         (0 until rows.length()).mapNotNull { index ->
@@ -75,7 +75,7 @@ internal object GeoapifyClient {
         }
     }.getOrDefault(emptyList())
 
-    // returns the suggestion for location sharing.
+    // Gives location sharing the suggestion it needs.
     private fun suggestion(row: JSONObject): AddressSuggestion? {
         val lat = row.optDouble("lat", Double.NaN)
         val lon = row.optDouble("lon", Double.NaN)
@@ -109,6 +109,6 @@ internal object GeoapifyClient {
         )
     }
 
-    // Location sharing: returns the encode.
+    // Formats a Geoapify result as a readable address.
     private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name())
 }

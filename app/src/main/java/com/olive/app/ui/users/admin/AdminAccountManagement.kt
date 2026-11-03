@@ -88,7 +88,7 @@ internal fun AdminAccounts(
         PrivateContactNoteDialog(session, listOf(target), onDismiss = { noteTarget = null })
     }
 }
-// Shows account count grid for admin account management.
+// Shows user, trusted-contact, staff, and admin totals as accessible cards.
 @Composable
 internal fun AccountCountGrid(counts: AccountCounts) {
     val uiText = rememberResourceText()
@@ -121,7 +121,7 @@ internal fun AccountCountGrid(counts: AccountCounts) {
         }
     }
 }
-// Shows account row for admin account management.
+// Shows one managed account and the actions allowed for it.
 @Composable
 private fun AccountRow(
     account: AdminAccountSummary,
@@ -249,7 +249,7 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
                     fullName = it.take(120)
                 }
                 BirthdayPicker(dob, "admin_dob", true) { dob = it }
-                // create account dialog checks whether role in set of account role staff, account role admin before continuing.
+                // Only staff and admin accounts can be protected from deletion.
                 if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
                     Field(uiText(R.string.ui_email), email, "admin_email") { email = it.take(254) }
                     Field(uiText(R.string.ui_phone_optional), phone, "admin_phone") {

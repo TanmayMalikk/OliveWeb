@@ -23,7 +23,7 @@ import org.junit.Test
 
 @Suppress("SameParameterValue", "SameParameterValue")
 class VoipSessionControllerTest {
-    // Voip session controller test kt: Starts join mute and leave keeps group call open. The test gives the code a clear input and checks the expected result.
+    // Checks the start join mute and leave keeps group call open step with the test's sample data.
     @Test
     fun startJoinMuteAndLeaveKeepsGroupCallOpen() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -54,7 +54,7 @@ class VoipSessionControllerTest {
         assertEquals(listOf("/api/calls"), requests.map { it.url.encodedPath })
     }
 
-    // Accepts join and end ends call on api for voip session controller test kt. The test gives the code a clear input and checks the expected result.
+    // Checks the accept join and end ends call on api step with the test's sample data.
     @Test
     fun acceptJoinAndEndEndsCallOnApi() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -75,7 +75,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
-    // Voip session controller test kt: returns the audio connection failure is visible and can be retried. The test gives the code a clear input and checks the expected result.
+    // Checks the audio connection failure is visible and can be retried step with the test's sample data.
     @Test
     fun audioConnectionFailureIsVisibleAndCanBeRetried() = runBlocking {
         val audio = FakeMumbleAudioSession(connectFailure = IllegalStateException("Audio unavailable"))
@@ -101,7 +101,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Active(call, microphoneMuted = false), controller.state.value)
     }
 
-    // returns the mumble connection details reject invalid endpoint for voip session controller test kt. The test gives the code a clear input and checks the expected result.
+    // Checks the mumble connection details reject invalid endpoint step with the test's sample data.
     @Test
     fun mumbleConnectionDetailsRejectInvalidEndpoint() {
         assertThrows(IllegalArgumentException::class.java) {
@@ -112,7 +112,7 @@ class VoipSessionControllerTest {
         }
     }
 
-    // Voip session controller test kt: Reports whether cannot start second call while one is active. The test gives the code a clear input and checks the expected result.
+    // Checks the cannot start second call while one is active step with the test's sample data.
     @Test
     fun cannotStartSecondCallWhileOneIsActive() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -128,7 +128,7 @@ class VoipSessionControllerTest {
         assertEquals(listOf("/api/calls"), requests.map { it.url.encodedPath })
     }
 
-    // Voip session controller test kt: returns the microphone failure is visible and session can still be left. The test gives the code a clear input and checks the expected result.
+    // Checks the microphone failure is visible and session can still be left step with the test's sample data.
     @Test
     fun microphoneFailureIsVisibleAndSessionCanStillBeLeft() = runBlocking {
         val audio = FakeMumbleAudioSession(muteFailure = IllegalStateException("Microphone unavailable"))
@@ -148,7 +148,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
-    // Voip session controller test kt: Disconnects failure is visible and can be retried. The test gives the code a clear input and checks the expected result.
+    // Checks the disconnect failure is visible and can be retried step with the test's sample data.
     @Test
     fun disconnectFailureIsVisibleAndCanBeRetried() = runBlocking {
         val audio = FakeMumbleAudioSession(disconnectFailure = IllegalStateException("Socket close failed"))
@@ -167,7 +167,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
-    // Voip session controller test kt: returns the failed call creation leaves controller idle. The test gives the code a clear input and checks the expected result.
+    // Checks the failed call creation leaves controller idle step with the test's sample data.
     @Test
     fun failedCallCreationLeavesControllerIdle() = runBlocking {
         val client = OkHttpClient.Builder()
@@ -193,7 +193,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
-    // returns the failed end request is visible and does not report call ended for voip session controller test kt. The test gives the code a clear input and checks the expected result.
+    // Checks the failed end request is visible and does not report call ended step with the test's sample data.
     @Test
     fun failedEndRequestIsVisibleAndDoesNotReportCallEnded() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -213,7 +213,7 @@ class VoipSessionControllerTest {
         )
     }
 
-    // returns the api manager for voip session controller test kt. The test gives the code a clear input and checks the expected result.
+    // Checks the api manager step with the test's sample data.
     private fun apiManager(
         requests: MutableList<Request>,
         deleteStatus: Int = 200
@@ -246,7 +246,7 @@ class VoipSessionControllerTest {
         return VoipManager(apiBaseUrl = "https://voip.test", httpClient = client)
     }
 
-    // returns the json response for voip session controller test kt. The test gives the code a clear input and checks the expected result.
+    // Builds a fake server response so the session test can check success and error cases.
     private fun Request.jsonResponse(code: Int, body: String): Response =
         Response.Builder()
             .request(this)
@@ -265,19 +265,19 @@ class VoipSessionControllerTest {
         val muteChanges = mutableListOf<Boolean>()
         var disconnectCount = 0
 
-        // returns the connect for voip session controller test kt. The test gives the code a clear input and checks the expected result.
+        // Checks the connect step with the test's sample data.
         override suspend fun connect(call: VoipCall, details: MumbleConnectionDetails) {
             connectFailure?.let { throw it }
             connections += call to details
         }
 
-        // Voip session controller test kt: Updates microphone muted. The test gives the code a clear input and checks the expected result.
+        // Checks the set microphone muted step with the test's sample data.
         override suspend fun setMicrophoneMuted(muted: Boolean) {
             muteFailure?.let { throw it }
             muteChanges += muted
         }
 
-        // returns the disconnect for voip session controller test kt. The test gives the code a clear input and checks the expected result.
+        // Checks the disconnect step with the test's sample data.
         override suspend fun disconnect() {
             disconnectCount += 1
             disconnectFailure?.let { throw it }

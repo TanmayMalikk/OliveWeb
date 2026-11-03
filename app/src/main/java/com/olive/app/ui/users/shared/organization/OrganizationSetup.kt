@@ -33,7 +33,7 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
     val pages = listOf(uiText(R.string.ui_personal_details), uiText(R.string.ui_contact_details))
     val emailValid = Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
     val required = listOf(fullName.isNotBlank(), InputPolicy.validDob(dob), emailValid)
-    // returns the page valid for shared safe app organization setup.
+    // Enables the next button only when every field on the current setup page is valid.
     fun pageValid() =
         if (page == 0) fullName.isNotBlank() && InputPolicy.validDob(dob) else emailValid
     FormColumn {
@@ -47,7 +47,7 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
             required.count { it }, required.size, page, pages.size,
             listOf(fullName.isNotBlank() && InputPolicy.validDob(dob), emailValid)
         )
-        // page valid checks whether page is 0 before continuing.
+        // Only continue when page is 0.
         if (page == 0) {
             Field(
                 uiText(R.string.full_name_required),

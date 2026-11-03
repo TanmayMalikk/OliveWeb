@@ -26,65 +26,65 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     val needsReconnect get() = runtime.state.messagingNeedsReconnect
     val pendingActionCount get() = runtime.pendingMessageActionCount
 
-    // returns the ensure messaging observation for shared safe app session messages.
+    // Starts chat listeners when the current screen needs messaging.
     fun ensureMessagingObservation(showFeedback: Boolean = false) =
         runtime.messaging.ensureMessagingObservation(showFeedback)
 
-    // returns the reconnect messaging for shared safe app session messages.
+    // Reconnects chat listeners after a network or account change.
     fun reconnectMessaging(password: String, onConnected: () -> Unit = {}) =
         runtime.messaging.reconnectMessaging(password, onConnected)
 
-    // Finds users for shared safe app session messages.
+    // Searches the account directory for an exact username.
     fun searchUsers(query: String) = runtime.friendActions.searchUsers(query)
-    // Shared safe app session messages: Finds the relationship with the selected account.
+    // Returns the current friend relationship with this account.
     fun relationshipFor(uid: String): FriendRelationship = runtime.friendActions.relationshipFor(uid)
-    // Sends friend request for shared safe app session messages.
+    // Sends a friend request to the selected account.
     fun sendFriendRequest(user: DirectoryUser) = runtime.friendActions.sendFriendRequest(user)
-    // Shared safe app session messages: Accepts friend request.
+    // Accepts an incoming friend request.
     fun acceptFriendRequest(request: FriendRequest) = runtime.friendActions.acceptFriendRequest(request)
-    // Declines friend request for shared safe app session messages.
+    // Declines an incoming friend request.
     fun declineFriendRequest(request: FriendRequest) = runtime.friendActions.declineFriendRequest(request)
-    // Shared safe app session messages: returns the cancel friend request.
+    // Returns true when the outgoing friend request may still be cancelled.
     fun cancelFriendRequest(request: FriendRequest) = runtime.friendActions.cancelFriendRequest(request)
-    // Starts conversation for shared safe app session messages.
+    // Opens an existing conversation by its ID.
     fun startConversation(friend: Friend) = runtime.friendActions.startConversation(friend)
 
-    // Shared safe app session messages: Starts conversation.
+    // Creates or opens a direct conversation with this account.
     fun openConversation(conversation: ChatConversation) =
         runtime.conversationActions.openConversation(conversation)
 
-    // Shared safe app session messages: Stops conversation.
+    // Closes the current conversation and returns to the chat list.
     fun closeConversation() = runtime.conversationActions.closeConversation()
-    // Updates conversation archived for shared safe app session messages.
+    // Archives or restores the selected conversation for this account.
     fun setConversationArchived(conversation: ChatConversation, archived: Boolean) =
         runtime.conversationActions.setArchived(conversation, archived)
 
-    // returns the append private contact note for shared safe app session messages. It checks the chat and uses its secure data before reading or saving a message.
+    // Saves a private note about this friend or supported user.
     fun appendPrivateContactNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) =
         runtime.conversationActions.appendPrivateNote(target, text, onSaved)
 
-    // Sends message for shared safe app session messages.
+    // Encrypts and sends the typed message to the current conversation.
     fun sendMessage(text: String, onSent: () -> Unit = {}) =
         runtime.conversationActions.sendMessage(text, onSent)
 
-    // returns the unsend message for shared safe app session messages.
+    // Un-sends a message when the signed-in account is allowed to remove it.
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
-    // Shared safe app session messages: Stops chat quick exit hint.
+    // Dismisses the quick-exit tip shown inside a chat.
     fun dismissChatQuickExitHint() = runtime.conversationActions.dismissChatQuickExitHint()
 
-    // Shared safe app session messages: Sends private entry in chat. It checks the chat and uses its secure data before reading or saving a message.
+    // Encrypts a private note and shares it with the current chat.
     fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
-    // Sends safety document in chat for shared safe app session messages. It checks the chat and uses its secure data before reading or saving a message.
+    // Gives the current chat encrypted access to a safety document.
     fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
-    // Shared safe app session messages: Sends safety plan in chat. It checks the chat and uses its secure data before reading or saving a message.
+    // Shares the safety plan and starts a separate plan-consult ticket.
     fun shareSafetyPlanInChat() = runtime.secureSharing.shareSafetyPlan()
-    // Starts shared private entry for shared safe app session messages. It checks the chat and uses its secure data before reading or saving a message.
+    // Opens a private note that was shared in this conversation.
     fun openSharedPrivateEntry(entryId: String) = runtime.secureSharing.open(entryId)
-    // Shared safe app session messages: Stops shared private entry. It closes the active subscription or resource.
+    // Closes the shared-note viewer and releases its live listener.
     fun closeSharedPrivateEntry() = runtime.secureSharing.close()
 
-    // Requests admin help for shared safe app session messages. It checks the chat and uses its secure data before reading or saving a message.
+    // Escalates this support ticket by adding an available admin.
     fun requestAdminHelp(conversationId: String) = runtime.staffSupport.requestAdmin(conversationId)
-    // Shared safe app session messages: Stops support chat. It closes the active subscription or resource.
+    // Closes the support ticket and archives it for every participant.
     fun closeSupportChat(conversationId: String) = runtime.staffSupport.close(conversationId)
 }

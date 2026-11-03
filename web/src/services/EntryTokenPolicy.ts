@@ -2,7 +2,7 @@
 export const validEntryToken = (token: string) =>
   typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token);
 
-// Web entry token policy: returns the token digest.
+// Hides the entry token behind a SHA-256 hash before it is compared or stored.
 export async function tokenDigest(token: string) {
   return Array.from(
     new Uint8Array(

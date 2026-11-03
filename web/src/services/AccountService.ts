@@ -32,7 +32,7 @@ export const cloudMode = Boolean(
 );
 type Cloud = typeof import("./FirebaseClient");
 let cloud: Cloud | null = null;
-// Web account service: returns the firebase.
+// Opens Firebase once and waits until the saved sign-in session is ready.
 export async function firebase() {
   cloud ??= await import("./FirebaseClient");
   await cloud.authReady;
@@ -72,7 +72,7 @@ export class Accounts {
     role: Role,
     create = false,
   ) {
-    // firebase checks whether cloud mode is false before continuing.
+    // Local demo accounts do not contact Firebase.
     if (!cloudMode) {
       const result = await (create ? createLocal : loginLocal)(
         username,
@@ -86,7 +86,7 @@ export class Accounts {
       const sdk = await import("firebase/auth");
       const { httpsCallable } = await import("firebase/functions");
       let user;
-      // create is handled here by sdk.
+      // Firebase creates the sign-in account before Olive saves its profile.
       if (create) {
         if (role === "STAFF" || role === "ADMIN")
           throw new Error(
@@ -109,7 +109,7 @@ export class Accounts {
           )
         ).user;
       } else {
-        // A normalized error is handled here instead of closing the app.
+        // A second lookup supports older accounts that saved the username in a different form.
         try {
           user = (
             await sdk.signInWithEmailAndPassword(
@@ -164,7 +164,7 @@ export class Accounts {
       };
       const db = await database;
       const saved = await db.get("accounts", `CLOUD:${user.uid}`);
-      // If saved fails, catch the error so the app can keep running and explain the problem.
+      // A missing history file means this account has no saved activity yet.
       try {
         this.raw = saved
           ? await unwrapKey(password, saved.passwordKey)
@@ -182,7 +182,7 @@ export class Accounts {
   }
   async load(): Promise<{ profile: Profile | null; history: History }> {
     const { identity, raw } = this.active();
-    // Only continue with saved when cloud mode is false.
+    // Local demo accounts read their profile from this browser.
     if (!cloudMode) {
       const value = await readLocal(identity.uid, raw);
       value.history.private_entries = value.history.private_entries.map((e) =>
@@ -196,7 +196,7 @@ export class Accounts {
     const { ref, getBytes, listAll } = await import("firebase/storage");
     let profile: Profile | null = null;
     const history = emptyHistory();
-    // If history fails, catch the error so the app can keep running and explain the problem.
+    // Return an empty history when an older account has not created this file yet.
     try {
       const bytes = await getBytes(
         ref(storage, `accounts/${identity.uid}/profile.json`),
@@ -264,7 +264,7 @@ export class Accounts {
       await database
     ).get("device", "current");
     let raw: Uint8Array;
-    // A enrollment error is handled here instead of closing the app.
+    // Older accounts may not have a browser-enrollment file yet.
     try {
       raw = await unwrapKey(pin, enrollment.pinKey);
     } catch {
@@ -290,7 +290,7 @@ export class Accounts {
       username: enrollment.username,
       role: enrollment.role,
     };
-    // A failures error is handled here instead of closing the app.
+    // Older accounts may not have any failed-entry history yet.
     try {
       const value = await readLocal(enrollment.uid, raw);
       if (!value.profile) throw new Error("Sign in again to finish setup.");
@@ -325,7 +325,7 @@ export class Accounts {
       throw new Error("Account mismatch.");
     return this.serialize(async () => {
       const { identity, raw } = this.active();
-      // Only continue with value when cloud mode.
+      // Cloud accounts also remove their Firebase sign-in record.
       if (cloudMode) {
         const { storage } = await firebase();
         const { ref, uploadBytes } = await import("firebase/storage");
@@ -361,7 +361,7 @@ export class Accounts {
   async saveRecord(category: Category, record: Event | Entry) {
     return this.serialize(async () => {
       const { identity, raw } = this.active();
-      // cloud mode is handled here by enrollment.
+      // Cloud accounts register this browser so encrypted features can identify it.
       if (cloudMode) {
         const { storage } = await firebase();
         const { ref, uploadBytes } = await import("firebase/storage");

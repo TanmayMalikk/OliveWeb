@@ -83,7 +83,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         plan = null
         error = null
         saving = 0
-        // A open error is handled here instead of closing the app.
+        // Use the fallback when open is unavailable.
         try {
             val value =
                 withContext(Dispatchers.IO) { store.ensure(actor, ownerUid, ownerName, defaults) }
@@ -171,7 +171,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         saving++
         error = null
         runtime.scope.launch {
-            // If consult fails, catch the error so the app can keep running and explain the problem.
+            // Turn an unexpected consult failure into a readable message.
             try {
                 withContext(Dispatchers.IO) {
                     writes.withLock {
@@ -214,7 +214,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         saving++
         error = null
         runtime.scope.launch {
-            // A share with contacts error is handled here instead of closing the app.
+            // Use the fallback when share with contacts is unavailable.
             try {
                 repository.sync(draft)
                 val updated = repository.shareContacts(friends)
@@ -243,7 +243,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         saving++
         error = null
         runtime.scope.launch {
-            // If set support contact fails, catch the error so the app can keep running and explain the problem.
+            // Turn an unexpected set support contact failure into a readable message.
             try {
                 repository.setSupportContact(uid)
                 if (current(actor, actor, token)) {
@@ -267,7 +267,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val actor = runtime.coverAccountId
         val token = generation
         runtime.scope.launch {
-            // If refresh shared plans fails, catch the error so the app can keep running and explain the problem.
+            // Turn an unexpected refresh shared plans failure into a readable message.
             try {
                 val result = repository.sharedWithMe()
                 if (actor != null && runtime.coverAccountId == actor && authorized() && generation == token) {
@@ -292,7 +292,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         saving++
         error = null
         runtime.scope.launch {
-            // A persist error is handled here instead of closing the app.
+            // Use the fallback when persist is unavailable.
             try {
                 withContext(Dispatchers.IO) {
                     writes.withLock {
@@ -337,9 +337,9 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             return
         }
         val token = generation
-        // If refresh fails, catch the error so the app can keep running and explain the problem.
+        // Turn an unexpected refresh failure into a readable message.
         try {
-            // Only continue with refresh when runtime local mode and has safety connection runtime application is false.
+            // Local demo plans are saved immediately because there is no cloud connection.
             if (!runtime.localMode && hasSafetyConnection(runtime.application)) {
                 withTimeout(35.seconds) {
                     withContext(Dispatchers.IO) {
@@ -378,7 +378,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     suspend fun refreshConsultations() {
         if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return
         val actor = runtime.coverAccountId ?: return
-        // If refresh consultations fails, catch the error so the app can keep running and explain the problem.
+        // Turn an unexpected refresh consultations failure into a readable message.
         try {
             val cached = withContext(Dispatchers.IO) { store.all(actor) }
             if (authorized() && actor == runtime.coverAccountId) consultations =
@@ -406,7 +406,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (!authorized() || runtime.state.accountRole != AccountRole.STAFF || runtime.localMode) return
         val actor = runtime.coverAccountId
         runtime.scope.launch {
-            // If change availability fails, catch the error so the app can keep running and explain the problem.
+            // Turn an unexpected change availability failure into a readable message.
             try {
                 repository.available(value)
                 if (authorized() && actor == runtime.coverAccountId) available =

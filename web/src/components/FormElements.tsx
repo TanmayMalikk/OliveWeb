@@ -2,7 +2,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Check, Eye, EyeOff, Leaf, X } from "lucide-react";
 
-// Web form elements: Shows the button view.
+// Draws the shared web button style used across every site.
 export function Button({
   children,
   onClick,
@@ -30,7 +30,7 @@ export function Button({
     </button>
   );
 }
-// Web form elements: Shows the field view.
+// Draws a labelled text field with its hint and error message.
 export function Field({
   label,
   type = "text",
@@ -77,7 +77,7 @@ export function Field({
     </div>
   );
 }
-// Web form elements: Shows the modal view.
+// Opens an accessible dialog above the current web page.
 export function Modal({
   title,
   children,
@@ -91,7 +91,7 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  // Update title id when information used by this screen changes.
+  // Give each dialog title a stable ID for its accessibility description.
   useEffect(() => {
     const dialog = ref.current;
     const previous = document.activeElement as HTMLElement | null;
@@ -125,7 +125,7 @@ export function Modal({
     </dialog>
   );
 }
-// Web form elements: Shows the empty view.
+// Shows a calm empty-state message when a list has no records.
 export function Empty({
   title,
   children,
@@ -146,7 +146,7 @@ export function Empty({
     </div>
   );
 }
-// Web form elements: Shows the form view.
+// Groups related fields into one clearly titled form card.
 export function Form({
   onSubmit,
   children,
@@ -168,7 +168,7 @@ export function Form({
     </form>
   );
 }
-// Shows the step progress view for web form elements.
+// Shows the current onboarding step and total steps.
 export function StepProgress({
   step,
   steps,

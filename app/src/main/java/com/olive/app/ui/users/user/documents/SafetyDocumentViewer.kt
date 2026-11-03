@@ -50,11 +50,11 @@ import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.util.zip.ZipFile
 
-// The safety document viewer view is part of user safety document viewer. It gives the user the details and choices needed here.
+// Opens an in-app image, video, PDF, or text viewer for a safety document.
 @Composable
 internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    // Update safety document viewer when information used by this screen changes.
+    // Reload the preview when the selected encrypted file changes.
     DisposableEffect(file) { onDispose { file.delete() } }
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -82,7 +82,7 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
             }
         }
         HorizontalDivider()
-        // Choose what safety document viewer should do for the current value.
+        // Opens the correct in-app viewer for an image, video, PDF, or text document.
         when {
             document.mimeType.startsWith("image/") -> ImageViewer(file, document.name)
             document.mimeType.startsWith("video/") -> VideoViewer(file)
@@ -103,7 +103,7 @@ internal fun SafetyDocumentViewer(document: SafetyDocument, file: File, onBack: 
         }
     }
 }
-// Shows image viewer for user safety document viewer.
+// Fits an image inside the document viewer with zoom controls.
 @Composable
 private fun ImageViewer(file: File, name: String) {
     var scale by remember { mutableFloatStateOf(1f) }
@@ -161,12 +161,12 @@ private fun ImageViewer(file: File, name: String) {
     }
 }
 
-// This is the video viewer view for user safety document viewer. It shows current details and the actions available to the user.
+// Plays a saved safety video inside the app.
 @Composable
 private fun VideoViewer(file: File) {
     val context = LocalContext.current
     var player by remember { mutableStateOf<VideoView?>(null) }
-    // Update video viewer when information used by this screen changes.
+    // Prepare and release video playback with the viewer lifecycle.
     DisposableEffect(Unit) { onDispose { player?.stopPlayback() } }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(factory = {
@@ -194,7 +194,7 @@ private fun VideoViewer(file: File) {
 
 private data class PdfPage(val bitmap: Bitmap, val count: Int)
 
-// This is the pdf viewer view for user safety document viewer. It shows current details and the actions available to the user.
+// Renders a saved PDF one page at a time inside the app.
 @Composable
 private fun PdfViewer(file: File) {
     var page by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }

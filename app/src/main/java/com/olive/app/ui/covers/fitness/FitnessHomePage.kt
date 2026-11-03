@@ -45,7 +45,7 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.shared.oliveScrollbar
 import kotlin.math.roundToInt
 
-// This is the fitness home page view for fitness cover. It shows current details and the actions available to the user.
+// Shows a quick summary of steps, calories, macros, and goals.
 @Composable
 internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -113,7 +113,7 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
         }
     }
 }
-// Shows hero metric for fitness cover.
+// Draws one large summary value on the fitness home page.
 @Composable
 private fun RowScope.HeroMetric(value: String, label: String) {
     Column(

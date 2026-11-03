@@ -112,7 +112,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         if (writes > 0) batch.commit().await()
     }
 
-    // returns the send for messaging. It reads or saves the matching protected record in Firebase.
+    // Encrypts and sends one chat message to every current participant.
     suspend fun send(
         conversationId: String,
         sender: AccountIdentity,
@@ -180,7 +180,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         return ChatSubscription { listener.remove() }
     }
 
-    // returns the unsend for messaging. It reads or saves the matching protected record in Firebase.
+    // Removes  from secure messaging.
     suspend fun unsend(conversationId: String, message: ChatMessage, currentUid: String) {
         require(message.senderUid == currentUid && !message.unsent)
         val conversation = firestore.collection("conversations").document(conversationId)
@@ -202,12 +202,12 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         }.await()
     }
 
-    // Messaging: returns the room keys. It checks the chat and uses its secure data before reading or saving a message.
+    // Loads and unwraps the room key used to decrypt this conversation.
     @Suppress("UNCHECKED_CAST")
     private fun com.google.firebase.firestore.DocumentSnapshot.roomKeys() =
         get("roomKeys") as? Map<String, String>
 
-    // returns the participant public keys for messaging.
+    // Loads each participant's public key before sharing a room key.
     @Suppress("UNCHECKED_CAST")
     private fun com.google.firebase.firestore.DocumentSnapshot.participantPublicKeys() =
         get("participantPublicKeys") as? Map<String, String>

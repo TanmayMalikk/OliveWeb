@@ -23,11 +23,11 @@ data class MumbleConnectionDetails(
 
 // Defines the audio operations that a real Mumble client must provide.
 interface MumbleAudioSession {
-    // returns the connect for messaging.
+    // Connects to the Mumble audio room used by this call.
     suspend fun connect(call: VoipCall, details: MumbleConnectionDetails)
-    // Messaging: Updates microphone muted.
+    // Mutes or restores the microphone for the active voice call.
     suspend fun setMicrophoneMuted(muted: Boolean)
-    // returns the disconnect for messaging. It checks the chat and uses its secure data before reading or saving a message.
+    // Disconnects from the Mumble audio room and releases audio resources.
     suspend fun disconnect()
 }
 

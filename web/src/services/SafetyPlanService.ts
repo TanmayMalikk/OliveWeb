@@ -94,13 +94,13 @@ function initialDefaults() {
   );
 }
 
-// Calls the matching backend service for web safety plan service. It sends a signed-in request to the protected cloud function and checks the reply.
+// Sends a signed-in safety-plan request to the protected Cloud Function.
 async function call<T>(name: string, data: unknown = {}): Promise<T> {
   const { functions } = await firebase();
   const { httpsCallable } = await import("firebase/functions");
   return (await httpsCallable(functions, name)(data)).data as T;
 }
-// Loads plan.
+// Loads one user's safety plan through the protected cloud function.
 export async function loadPlan(ownerUid: string) {
   return (
     await call<{ plan: SafetyPlan }>("safetyPlanSync", {
@@ -140,7 +140,7 @@ export async function observePlan(
     (error) => onError(error),
   );
 }
-// Web safety plan service: Saves field.
+// Saves one safety-plan field without overwriting a newer edit.
 export async function saveField(plan: SafetyPlan, key: string, value: string) {
   const current = plan.fields[key] ?? { value: "", revision: 0 };
   return (
@@ -158,12 +158,12 @@ export async function saveField(plan: SafetyPlan, key: string, value: string) {
     })
   ).plan;
 }
-// returns the consultation for web safety plan service.
+// Starts or stops a plan consultation for the signed-in user.
 export async function consultation(action: "request" | "stop") {
   return (await call<{ plan: SafetyPlan }>("safetyPlanConsult", { action }))
     .plan;
 }
-// returns the shared plans for web safety plan service.
+// Loads the safety plans that other users have shared with this account.
 export async function sharedPlans() {
   return (
     await call<{
@@ -171,14 +171,14 @@ export async function sharedPlans() {
     }>("safetyPlansSharedWithMe")
   ).plans;
 }
-// returns the staff consultations for web safety plan service.
+// Loads the plan consultations assigned to the signed-in staff member.
 export async function staffConsultations() {
   return call<{
     available: boolean;
     plans: { ownerUid: string; ownerName: string; updatedAt: number }[];
   }>("safetyPlanConsultations");
 }
-// Updates staff availability for web safety plan service.
+// Lets the support queue know whether this staff member can take a ticket.
 export async function setStaffAvailability(available: boolean) {
   return call<{ available: boolean }>("safetyPlanAvailability", { available });
 }

@@ -76,7 +76,7 @@ internal fun ChatPane(
     LaunchedEffect(session.messages.chatMessages.size, session.messages.chatMessages.lastOrNull()?.body) {
         if (session.messages.chatMessages.isNotEmpty()) listState.animateScrollToItem(session.messages.chatMessages.lastIndex)
     }
-    // Update chat pane when information used by this screen changes.
+    // Keep the newest message visible when the chat grows.
     LaunchedEffect(keyboardVisible) {
         if (keyboardVisible && session.messages.chatMessages.isNotEmpty()) {
             delay(120.milliseconds)
@@ -356,7 +356,7 @@ internal fun ChatPane(
     }
 }
 
-// The chat message body view is part of shared safe app conversation screen. It gives the user the details and choices needed here.
+// Shows text or the correct viewer button for one chat message.
 @Composable
 private fun ChatMessageBody(
     chat: com.olive.app.data.ChatMessage, session: SessionViewModel, mine: Boolean,
@@ -367,7 +367,7 @@ private fun ChatMessageBody(
         SharedMediaMessage(parts[1], parts.getOrNull(2).orEmpty(), session, mine, onOpenMedia)
         return
     }
-    // Only continue with chat message body when chat unsent and parts first or null is shared location is false.
+    // An unsent location card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_LOCATION") {
         Surface(
             onClick = { session.navigation.openSafePage(SafePage.Location) }, shape = MaterialTheme.shapes.medium,
@@ -395,7 +395,7 @@ private fun ChatMessageBody(
         }
         return
     }
-    // Only continue with chat message body when chat unsent and parts first or null is shared safety plan is false.
+    // An unsent safety-plan card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_SAFETY_PLAN") {
         Surface(
             shape = MaterialTheme.shapes.medium,

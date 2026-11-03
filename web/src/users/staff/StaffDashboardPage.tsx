@@ -20,7 +20,7 @@ export default function StaffPortal() {
   const [available, setAvailable] = useState(true);
   const [plan, setPlan] = useState<SafetyPlan | null>(null);
 
-  // Update session when information used by this screen changes.
+  // Reload staff tickets when the signed-in session changes.
   useEffect(() => {
     void session.perform(async () => {
       const value = await staffConsultations();
