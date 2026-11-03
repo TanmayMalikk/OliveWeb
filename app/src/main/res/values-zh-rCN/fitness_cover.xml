@@ -52,6 +52,7 @@
         <item quantity="other">%1$s的 %2$d 天图表。</item>
     </plurals>
     <string name="fitness_chart_latest">%1$s最新为 %2$s %3$s。</string>
+    <string name="fitness_chart_average">%1$s平均为 %2$s %3$s。</string>
     <string name="fitness_calories_burned">消耗</string>
     <string name="fitness_calories_eaten">摄入</string>
     <string name="fitness_macros">宏量营养素</string>
@@ -83,6 +84,8 @@
     <string name="fitness_vitals_no_data">— 无数据 —</string>
     <string name="fitness_vitals_range">每分钟 %1$d–%2$d 次</string>
     <string name="fitness_vitals_average">平均心率每分钟 %1$d 次</string>
+    <string name="fitness_previous_day">显示前一天</string>
+    <string name="fitness_next_day">显示后一天</string>
     <string name="fitness_outdoor_workout">户外锻炼</string>
     <string name="fitness_outdoor_workout_description">私密记录 GPS 路线、距离、时间和配速。</string>
     <string name="fitness_start_outdoor_workout">开始户外锻炼</string>

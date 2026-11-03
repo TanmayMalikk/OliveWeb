@@ -389,6 +389,8 @@ Buen humor.</string>
     <string name="organization_live_map">Mapa de ubicación en vivo</string>
     <string name="organization_live_map_description">Esta vista protegida está lista para mostrar a los usuarios asignados como puntos rojos parpadeantes.</string>
     <string name="organization_location_feed_not_enabled">La ubicación en vivo de la organización aún no está habilitada. Esta vista no recopila ubicaciones.</string>
+    <string name="organization_live_map_admin_description">Muestra la ubicación en vivo o la última ubicación conocida de cada cuenta de usuario.</string>
+    <string name="organization_location_feed_empty">Todavía no se ha informado ninguna ubicación de usuario.</string>
     <string name="support_conversations">Conversaciones de apoyo</string>
     <string name="assigned_users_count">Usuarios asignados: %1$d</string>
     <string name="safety_plan_shared_in_chat">Plan de seguridad compartido en el chat de apoyo.</string>

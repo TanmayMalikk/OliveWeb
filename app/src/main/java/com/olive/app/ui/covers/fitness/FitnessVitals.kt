@@ -36,6 +36,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -179,6 +182,8 @@ private fun HeartRateGraphCard(
             append(stringResource(R.string.fitness_vitals_average, selectedVitals.averageBpm))
         }
     }
+    val previousDayLabel = stringResource(R.string.fitness_previous_day)
+    val nextDayLabel = stringResource(R.string.fitness_next_day)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -192,7 +197,7 @@ private fun HeartRateGraphCard(
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.semantics(mergeDescendants = true) {
+                modifier = Modifier.clearAndSetSemantics {
                     contentDescription = graphDescription
                 },
             ) {
@@ -229,7 +234,26 @@ private fun HeartRateGraphCard(
                     )
                 }
             }
-            Box(Modifier.fillMaxWidth().height(170.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.fillMaxWidth().height(170.dp).clearAndSetSemantics {
+                    contentDescription = graphDescription
+                    customActions = listOf(
+                        CustomAccessibilityAction(previousDayLabel) {
+                            if (selectedDate > startDate) {
+                                onDateSelected(selectedDate.minusDays(1))
+                                true
+                            } else false
+                        },
+                        CustomAccessibilityAction(nextDayLabel) {
+                            if (selectedDate < endDate) {
+                                onDateSelected(selectedDate.plusDays(1))
+                                true
+                            } else false
+                        },
+                    )
+                },
+                contentAlignment = Alignment.Center,
+            ) {
                 Canvas(
                     Modifier.fillMaxSize().pointerInput(startDate, endDate) {
                         detectTapGestures { tap ->
@@ -316,7 +340,10 @@ private fun HeartRateGraphCard(
                     )
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(start = 42.dp, end = 6.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 42.dp, end = 6.dp)
+                    .clearAndSetSemantics { },
+            ) {
                 (0L..13L).forEach { offset ->
                     val date = startDate.plusDays(offset)
                     val selected = date == selectedDate
@@ -360,8 +387,24 @@ private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
             DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
         )
     }
+    val connectionText = stringResource(
+        if (watchConnected) R.string.fitness_watch_connected else R.string.fitness_watch_not_connected
+    )
+    val updatedText = stringResource(
+        R.string.fitness_vitals_updated,
+        DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(vitals.lastUpdatedAt)),
+    )
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            .clearAndSetSemantics {
+                contentDescription = buildString {
+                    append(connectionText)
+                    append(". ")
+                    append(dateText)
+                    append(". ")
+                    append(updatedText)
+                }
+            }
             .background(PaleOlive).padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -446,7 +489,7 @@ private fun VitalsMetricCard(
     unit: String,
 ) {
     Card(
-        modifier = modifier.semantics(mergeDescendants = true) {
+        modifier = modifier.clearAndSetSemantics {
             contentDescription = "$label, $value $unit"
         },
         shape = RoundedCornerShape(24.dp),

@@ -54,6 +54,7 @@
         <item quantity="other">Graphique %1$s sur %2$d jours.</item>
     </plurals>
     <string name="fitness_chart_latest">Dernier résultat %1$s : %2$s %3$s.</string>
+    <string name="fitness_chart_average">Moyenne de %1$s : %2$s %3$s.</string>
     <string name="fitness_calories_burned">Dépensées</string>
     <string name="fitness_calories_eaten">Consommées</string>
     <string name="fitness_macros">Macronutriments</string>
@@ -87,6 +88,8 @@
     <string name="fitness_vitals_no_data">— Aucune donnée —</string>
     <string name="fitness_vitals_range">%1$d–%2$d bpm</string>
     <string name="fitness_vitals_average">Fréquence cardiaque moyenne %1$d bpm</string>
+    <string name="fitness_previous_day">Afficher le jour précédent</string>
+    <string name="fitness_next_day">Afficher le jour suivant</string>
     <string name="fitness_outdoor_workout">Entraînement extérieur</string>
     <string name="fitness_outdoor_workout_description">Suivez en privé votre trajet GPS, la distance, le temps et l’allure.</string>
     <string name="fitness_start_outdoor_workout">Commencer l’entraînement</string>

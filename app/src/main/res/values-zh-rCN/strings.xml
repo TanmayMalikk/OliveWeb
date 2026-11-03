@@ -389,6 +389,8 @@
     <string name="organization_live_map">实时位置地图</string>
     <string name="organization_live_map_description">此受保护视图已准备好用闪烁红点显示已分配的用户。</string>
     <string name="organization_location_feed_not_enabled">组织实时位置共享尚未启用。此视图不会收集用户位置。</string>
+    <string name="organization_live_map_admin_description">显示每个用户账户报告的最新实时位置或最后已知位置。</string>
+    <string name="organization_location_feed_empty">尚未收到任何用户位置。</string>
     <string name="support_conversations">支持对话</string>
     <string name="assigned_users_count">已分配用户：%1$d</string>
     <string name="safety_plan_shared_in_chat">安全计划已分享到支持聊天。</string>

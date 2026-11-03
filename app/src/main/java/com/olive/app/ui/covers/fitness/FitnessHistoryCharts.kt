@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -190,28 +191,26 @@ private fun HistoryLineChartCard(
         title,
         days.size,
     )
-    val latestDescriptions = series.map { line ->
-        val latest = line.values.lastOrNull() ?: 0f
+    val averageDescriptions = series.map { line ->
+        val average = if (line.values.isEmpty()) 0f else line.values.average().toFloat()
         stringResource(
-            R.string.fitness_chart_latest,
+            R.string.fitness_chart_average,
             line.name,
-            valueText(latest),
+            valueText(average),
             unit,
         )
     }
-    val description = buildString {
+    val overviewDescription = buildString {
         append(chartDescription)
         append(' ')
-        latestDescriptions.forEach { latest ->
-            append(latest)
+        averageDescriptions.forEach { average ->
+            append(average)
             append(' ')
         }
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-            contentDescription = description
-        },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Paper),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -221,7 +220,9 @@ private fun HistoryLineChartCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clearAndSetSemantics {
+                    contentDescription = overviewDescription
+                },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom,
             ) {
@@ -245,7 +246,7 @@ private fun HistoryLineChartCard(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 series.forEach { line -> HistoryLegendItem(line, unit, valueText) }
@@ -254,7 +255,7 @@ private fun HistoryLineChartCard(
             HistoryChart(
                 series = series,
                 axisScale = axisScale,
-                description = description,
+                description = chartDescription,
                 useBars = useBars,
                 valueText = valueText,
             )
@@ -301,7 +302,8 @@ private fun HistoryChart(
 ) {
     Row(Modifier.fillMaxWidth().height(145.dp)) {
         Column(
-            modifier = Modifier.width(42.dp).fillMaxHeight().padding(vertical = 8.dp),
+            modifier = Modifier.width(42.dp).fillMaxHeight().padding(vertical = 8.dp)
+                .clearAndSetSemantics { },
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.End,
         ) {
@@ -316,7 +318,7 @@ private fun HistoryChart(
         }
         Spacer(Modifier.width(8.dp))
         Canvas(
-            modifier = Modifier.weight(1f).fillMaxHeight().semantics {
+            modifier = Modifier.weight(1f).fillMaxHeight().clearAndSetSemantics {
                 contentDescription = description
             }
         ) {
@@ -449,7 +451,7 @@ private fun HistoryDateAxis(days: List<FitnessHistoryDay>) {
     val locale = LocalConfiguration.current.locales[0]
     val dateFormat = DateTimeFormatter.ofPattern("MMM d", locale)
     val middle = days[days.lastIndex / 2].date.format(dateFormat)
-    Row(Modifier.fillMaxWidth()) {
+    Row(Modifier.fillMaxWidth().clearAndSetSemantics { }) {
         Spacer(Modifier.width(50.dp))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(days.first().date.format(dateFormat), color = Muted, style = MaterialTheme.typography.labelSmall)

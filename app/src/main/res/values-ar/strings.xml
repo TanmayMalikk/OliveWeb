@@ -389,6 +389,8 @@
     <string name="organization_live_map">خريطة الموقع المباشر</string>
     <string name="organization_live_map_description">هذا العرض المحمي جاهز لإظهار المستخدمين المعيّنين كنقاط حمراء وامضة.</string>
     <string name="organization_location_feed_not_enabled">مشاركة الموقع المباشر للمؤسسة غير مفعّلة بعد. لا يتم جمع مواقع المستخدمين لهذا العرض.</string>
+    <string name="organization_live_map_admin_description">يعرض أحدث موقع مباشر أو آخر موقع معروف تم الإبلاغ عنه لكل حساب مستخدم.</string>
+    <string name="organization_location_feed_empty">لم يتم الإبلاغ عن أي موقع مستخدم حتى الآن.</string>
     <string name="support_conversations">محادثات الدعم</string>
     <string name="assigned_users_count">المستخدمون المعيّنون: %1$d</string>
     <string name="safety_plan_shared_in_chat">تمت مشاركة خطة الأمان في محادثة الدعم.</string>
