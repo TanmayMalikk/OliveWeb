@@ -571,9 +571,9 @@ internal class MediaTransferController(
 
     private fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File {
         val deviceKey="$viewerUid--${KeyManager.deviceId()}"
-        val wrapped=document.deviceWrappedKeys[deviceKey] ?: document.wrappedKeys[viewerUid]
-            ?: throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE)
-        val key=runCatching { KeyManager.unwrapKey(wrapped,document.encryptionVersion) }
+        val wrapped=listOfNotNull(document.deviceWrappedKeys[deviceKey],document.wrappedKeys[viewerUid])
+        if(wrapped.isEmpty()) throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE)
+        val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
             .getOrElse { throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it) }
         val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
         val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
