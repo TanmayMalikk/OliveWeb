@@ -1,6 +1,9 @@
 // Safe-app users: shows the user’s main safe-app actions.
 package com.olive.app.ui.users.user.dashboard
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
 import com.olive.app.ui.shared.*
 
 
@@ -16,6 +19,8 @@ import com.olive.app.ui.users.user.location.LocationMapScreen
 import com.olive.app.ui.users.user.notes.PrivateNotes
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -49,6 +54,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.focus.FocusRequester
@@ -62,7 +68,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.data.*
 import com.olive.app.R
+import androidx.core.content.ContextCompat
+import com.olive.app.ui.users.user.documents.EmergencyReportLocation
 import com.olive.app.ui.shared.LocalizedIcon as Icon
+import kotlinx.coroutines.launch
 
 // Route account-owner pages to focused screen files; Safe Contacts use their separate workspace.
 // SafeHomeScreen owns the feature tiles; individual screens own their layout and accessibility semantics.
@@ -154,6 +163,61 @@ internal fun SafeSupportControls(
     showSupport: Boolean, expanded: Boolean, onExpanded: (Boolean) -> Unit
 ) {
     if (!showExit && !showSupport) return
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var emergencyExportBusy by remember { mutableStateOf(false) }
+    val emergencySavedMessage = stringResource(R.string.emergency_report_saved)
+    val emergencyFailureMessage = stringResource(R.string.emergency_report_failed)
+
+    // The emergency action adds the completed report to the user's encrypted Documents list.
+    fun createEmergencyReport() {
+        if (emergencyExportBusy) return
+        val profile = session.profile ?: return
+        val ownerUid = session.coverAccountId ?: return
+        emergencyExportBusy = true
+        scope.launch {
+            val fix = DeviceLocation.currentCoordinates(context)
+            val location = fix?.let {
+                EmergencyReportLocation(it.latitude, it.longitude, it.accuracy, it.timestamp)
+            }
+            session.documents.createEmergencyReport(
+                identity = AccountIdentity(ownerUid, session.coverUsername),
+                profile = profile,
+                entries = session.privateEntries,
+                location = location,
+            ) { result ->
+                emergencyExportBusy = false
+                result.onSuccess {
+                    Toast.makeText(
+                        context,
+                        emergencySavedMessage,
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }.onFailure {
+                    Toast.makeText(
+                        context,
+                        emergencyFailureMessage,
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        }
+    }
+
+    // Location permission is requested only when the user chooses to create the emergency report.
+    val emergencyLocationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { createEmergencyReport() }
+    fun beginEmergencyReport() {
+        val hasLocation = listOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ).any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+        if (hasLocation) createEmergencyReport()
+        else emergencyLocationPermission.launch(
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+        )
+    }
     val firstActionFocus = remember { FocusRequester() }
     // Keep support-menu focus and expanded state in sync for TalkBack.
     LaunchedEffect(expanded) {
@@ -240,12 +304,17 @@ internal fun SafeSupportControls(
                     }
                 }
                 SupportAction(
-                    R.string.support_emergency,
+                    if (emergencyExportBusy) R.string.emergency_report_creating else R.string.support_emergency,
                     Icons.Outlined.WarningAmber,
                     "support_emergency",
-                    false,
+                    true,
                     60
-                ) {}
+                ) {
+                    if (expanded && !emergencyExportBusy) {
+                        onExpanded(false)
+                        beginEmergencyReport()
+                    }
+                }
                 SupportAction(
                     R.string.support_hotlines,
                     Icons.Outlined.PhoneInTalk,

@@ -22,6 +22,7 @@ import {
   observeBrowserDocuments,
   openBrowserDocument,
   uploadBrowserDocument,
+  setBrowserDocumentEvidence,
   type BrowserDocument,
 } from "../../../services/MediaService";
 
@@ -453,6 +454,23 @@ export function DocumentsPage() {
                     : document.approvalMessage}
                 </p>
               </div>
+              <label className="document-evidence-toggle">
+                <input
+                  type="checkbox"
+                  checked={document.evidence}
+                  disabled={document.ownerUid !== accounts.identity?.uid || session.busy}
+                  onChange={(event) => {
+                    const evidence = event.target.checked;
+                    void session.perform(async () => {
+                      await setBrowserDocumentEvidence(document.id, evidence);
+                      setDocuments((current) => current.map((item) =>
+                        item.id === document.id ? { ...item, evidence } : item,
+                      ));
+                    });
+                  }}
+                />
+                Evidence
+              </label>
               <Button
                 variant={document.approved ? "primary" : "outline"}
                 disabled={!document.approved || session.busy}

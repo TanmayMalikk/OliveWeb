@@ -23,6 +23,9 @@
     <string name="support_staff_search_help">سيربطك Olive Branch بأحد الموظفين المتاحين بشكل آمن.</string>
     <string name="support_cancel_staff_request">إلغاء الطلب</string>
     <string name="support_emergency">طوارئ</string>
+    <string name="emergency_report_creating">جارٍ إنشاء ملف PDF للطوارئ…</string>
+    <string name="emergency_report_saved">تمت إضافة ملف PDF للطوارئ إلى المستندات لرفعه بأمان.</string>
+    <string name="emergency_report_failed">تعذر إنشاء ملف PDF للطوارئ. تحقق من الاتصال وحاول مرة أخرى.</string>
     <string name="support_hotlines">خطوط المساعدة</string>
     <string name="support_coming_soon">%1$s · قريبًا</string>
     <string name="support_safety_plan">خطة السلامة</string>

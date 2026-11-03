@@ -207,6 +207,14 @@ function accessRequest(data, uid) {
   }
   return { wrappedKeys, allowedUsers };
 }
+
+/** Evidence updates accept only a real boolean so text and number values cannot change the label. */
+function evidenceRequest(data) {
+  if (typeof data?.evidence !== "boolean") {
+    throw new HttpsError("invalid-argument", "evidence must be true or false");
+  }
+  return data.evidence;
+}
 /** Callable-only resumable session record keyed by the client's stable job id. */
 function pendingRef(jobId) {
   return db.collection("mediaUploads").doc(jobId);
@@ -258,6 +266,7 @@ function publicRecord(snapshot) {
     ciphertextSize: value.ciphertext_size,
     ciphertextSha256: value.ciphertext_sha256,
     encryptionVersion: value.encryption_version,
+    evidence: value.evidence === true,
     createdAt: value.created_at?.toMillis?.() || Date.now(),
   };
 }
@@ -435,6 +444,7 @@ exports.mediaCompleteUpload = onCall(options, async (request) => {
     ciphertext_size: value.ciphertextSize,
     ciphertext_sha256: value.ciphertextSha256,
     encryption_version: value.encryptionVersion,
+    evidence: false,
     created_at: FieldValue.serverTimestamp(),
   };
   // Publish the media record and mark its session complete atomically.
@@ -594,6 +604,21 @@ exports.mediaUpdateDeviceKeys = onCall(options, async (request) => {
   return publicRecord(await reference.get());
 });
 
+/** Changes the owner's evidence label without reading or rewriting encrypted file bytes. */
+exports.mediaUpdateEvidence = onCall(options, async (request) => {
+  const uid = caller(request);
+  const mediaId = string(request.data?.mediaId, "mediaId", 64);
+  const evidence = evidenceRequest(request.data);
+  const reference = mediaRef(mediaId);
+  const snapshot = await reference.get();
+  if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
+  if (snapshot.data().owner_id !== uid) {
+    throw new HttpsError("permission-denied", "Only the owner can change evidence");
+  }
+  await reference.update({evidence});
+  return {mediaId, evidence};
+});
+
 /** Owner-only deletion that removes the R2 object before deleting its Firestore metadata. */
 exports.mediaDelete = onCall(options, async (request) => {
   const uid = caller(request);
@@ -625,6 +650,6 @@ exports.mediaDelete = onCall(options, async (request) => {
 
 // Keep validation helpers available to Node tests without exporting another deployed endpoint.
 Object.defineProperty(exports, "_test", {
-  value: { accessRequest, validateDeviceWrappedKeys, accountAccessKey },
+  value: { accessRequest, validateDeviceWrappedKeys, accountAccessKey, evidenceRequest },
   enumerable: false,
 });

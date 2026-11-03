@@ -23,6 +23,9 @@
     <string name="support_staff_search_help">Olive Branch 会安全地为您联系一名有空的工作人员。</string>
     <string name="support_cancel_staff_request">取消请求</string>
     <string name="support_emergency">紧急情况</string>
+    <string name="emergency_report_creating">正在创建紧急 PDF…</string>
+    <string name="emergency_report_saved">紧急 PDF 已添加到“文档”，并将安全上传。</string>
+    <string name="emergency_report_failed">无法创建紧急 PDF。请检查网络连接后重试。</string>
     <string name="support_hotlines">求助热线</string>
     <string name="support_coming_soon">%1$s · 即将推出</string>
     <string name="support_safety_plan">安全计划</string>
