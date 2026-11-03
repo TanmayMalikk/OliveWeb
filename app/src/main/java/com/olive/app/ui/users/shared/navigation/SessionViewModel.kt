@@ -20,7 +20,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
 
     // Document and map screens keep their own feature controllers.
     internal val media = runtime.mediaRepository?.let {
-        MediaTransferController(application, viewModelScope, it)
+        MediaTransferController(application, viewModelScope, it, offlineCache = runtime.offlineMediaCache)
     }
     internal val documents =
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)
