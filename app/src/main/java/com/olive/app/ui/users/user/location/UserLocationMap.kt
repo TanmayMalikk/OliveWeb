@@ -67,6 +67,7 @@ internal fun InteractiveLocationMap(
     showOwnPointInBlue: Boolean = false,
     route: LocationRoute? = null,
     navigationActive: Boolean = false,
+    detailsOnlyForSelectedPoint: Boolean = false,
     selectedLocation: Pair<Double, Double>? = null,
     onSelectedLocationChange: ((Double, Double) -> Unit)? = null,
 ) {
@@ -124,7 +125,10 @@ internal fun InteractiveLocationMap(
                 })
             }
         }
-        view.evaluateJavascript("window.oliveSetPoints($encoded,$moveCamera);", null)
+        view.evaluateJavascript(
+            "window.oliveSetPoints($encoded,$moveCamera,$detailsOnlyForSelectedPoint);",
+            null,
+        )
     }
 
     // Draws the current navigation route and can fit the camera around it.
