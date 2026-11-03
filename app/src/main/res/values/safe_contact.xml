@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">Preparing encrypted upload</string>
     <string name="documents_preparing_upload_help">The selected file is being processed and encrypted on this device.</string>
     <string name="documents_upload_queued">Waiting for a connection</string>
-    <string name="documents_upload_waiting_retry">Waiting to retry</string>
+    <string name="documents_upload_waiting_retry">Upload paused — retrying automatically</string>
     <string name="documents_upload_starting">Starting secure upload</string>
     <string name="documents_upload_progress">Uploading %1$d%%</string>
     <string name="documents_upload_finalizing">Finishing secure upload</string>
