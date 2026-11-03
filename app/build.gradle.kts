@@ -23,6 +23,11 @@ val mapboxAccessToken = localProperties.getProperty("MAPBOX_ACCESS_TOKEN").orEmp
 require(mapboxAccessToken.matches(Regex("[A-Za-z0-9._-]*"))) { "MAPBOX_ACCESS_TOKEN contains unsupported characters" }
 val realtimeDatabaseUrl = localProperties.getProperty("REALTIME_DATABASE_URL").orEmpty()
 require(realtimeDatabaseUrl.isBlank() || realtimeDatabaseUrl.startsWith("https://")) { "REALTIME_DATABASE_URL must use HTTPS" }
+val voipApiBaseUrl = localProperties.getProperty("VOIP_API_BASE_URL").orEmpty().trimEnd('/')
+require(
+    voipApiBaseUrl.isBlank() ||
+        voipApiBaseUrl.matches(Regex("https://[A-Za-z0-9.-]+(:[0-9]{1,5})?|http://10\\.0\\.2\\.2(:[0-9]{1,5})?"))
+) { "VOIP_API_BASE_URL must use HTTPS (or Android emulator loopback)" }
 val releaseProperties = Properties().apply {
     val source = rootProject.file("keystore.properties")
     if (source.exists()) source.inputStream().use { load(it) }
@@ -69,6 +74,7 @@ android {
         buildConfigField("String", "GEOAPIFY_API_KEY", "\"$geoapifyApiKey\"")
         buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
         buildConfigField("String", "REALTIME_DATABASE_URL", "\"$realtimeDatabaseUrl\"")
+        buildConfigField("String", "VOIP_API_BASE_URL", "\"$voipApiBaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -106,6 +112,7 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-functions")
@@ -122,6 +129,7 @@ dependencies {
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.31.1")
     // Media transfers use OkHttp directly; do not rely on Coil's transitive dependency.
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
+    implementation("io.livekit:livekit-android:2.30.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     testImplementation("junit:junit:4.13.2")

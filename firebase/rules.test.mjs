@@ -26,6 +26,19 @@ before(async () => {
 
 after(async () => { await env?.cleanup(); });
 
+test('VoIP call records and push-token registrations are server-only', async () => {
+  const alice = env.authenticatedContext('alice-uid').database();
+  await env.withSecurityRulesDisabled(async context => {
+    const admin = context.database();
+    await set(ref(admin, 'calls/call-1'), { callerId: 'alice-uid' });
+    await set(ref(admin, 'users/alice-uid/fcmTokens/phone'), 'fcm-token');
+  });
+  await assertFails(get(ref(alice, 'calls/call-1')));
+  await assertFails(set(ref(alice, 'calls/call-2'), { callerId: 'alice-uid' }));
+  await assertFails(get(ref(alice, 'users/alice-uid/fcmTokens/phone')));
+  await assertFails(set(ref(alice, 'users/alice-uid/fcmTokens/phone'), 'forged-token'));
+});
+
 
 
 test('owner can create/read a profile; another user and anonymous visitors cannot', async () => {

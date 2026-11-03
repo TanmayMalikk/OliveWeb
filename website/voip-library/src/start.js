@@ -1,37 +1,8 @@
 'use strict';
 
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
-const { MumbleHandler, connectMumbleIce } = require('./index');
+const { initializeFirebaseAdapters } = require('./firebase');
+const { createLiveKitTokenIssuer } = require('./livekit');
 const { createApiServer } = require('./server');
-
-async function start() {
-    const bindingPath = process.env.MUMBLE_SLICE_MODULE;
-
-    if (!bindingPath) {
-        throw new Error('Set MUMBLE_SLICE_MODULE to the generated Mumble bindings file');
-    }
-
-    const [{ Ice }, { MumbleServer }] = await Promise.all([
-        import('@zeroc/ice'),
-        import(pathToFileURL(path.resolve(bindingPath)).href)
-    ]);
-
-    const connection = await connectMumbleIce({
-        Ice,
-        MumbleServer,
-        host: process.env.MUMBLE_ICE_HOST || '127.0.0.1',
-        port: Number(process.env.MUMBLE_ICE_PORT || 6502),
-        serverId: Number(process.env.MUMBLE_SERVER_ID || 1)
-    });
-
-    const handler = new MumbleHandler(connection.mumbleServer);
-
-    return {
-        handler,
-        close: connection.close
-    };
-}
 
 function listen(server, port, host) {
     return new Promise((resolve, reject) => {
@@ -50,41 +21,33 @@ function closeHttpServer(server) {
 }
 
 async function main() {
-    const apiToken = process.env.VOIP_API_TOKEN;
-    if (!apiToken) {
-        throw new Error('Set VOIP_API_TOKEN before starting the API');
-    }
-
     const port = Number(process.env.VOIP_API_PORT || 3000);
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
         throw new Error('VOIP_API_PORT must be a valid port number');
     }
 
-    const { handler, close: closeMumble } = await start();
+    const firebase = initializeFirebaseAdapters();
+    const liveKit = createLiveKitTokenIssuer({
+        serverUrl: process.env.LIVEKIT_URL,
+        apiKey: process.env.LIVEKIT_API_KEY,
+        apiSecret: process.env.LIVEKIT_API_SECRET
+    });
     const apiServer = createApiServer({
-        callManager: handler,
-        apiToken
+        callStore: firebase.callStore,
+        verifyIdToken: firebase.verifyIdToken,
+        verifyUserIds: firebase.verifyUserIds,
+        liveKit,
+        sendInvitation: firebase.sendInvitation
     });
 
-    try {
-        await listen(apiServer, port, '127.0.0.1');
-    } catch (error) {
-        await closeMumble();
-        throw error;
-    }
+    await listen(apiServer, port, process.env.VOIP_API_HOST || '0.0.0.0');
 
-    console.log(`VoIP HTTP API listening at http://127.0.0.1:${port}`);
+    console.log(`VoIP HTTP API listening on ${process.env.VOIP_API_HOST || '0.0.0.0'}:${port}`);
 
     let shutdownPromise;
     function shutdown() {
         if (!shutdownPromise) {
-            shutdownPromise = (async () => {
-                try {
-                    await closeHttpServer(apiServer);
-                } finally {
-                    await closeMumble();
-                }
-            })();
+            shutdownPromise = closeHttpServer(apiServer);
         }
         return shutdownPromise;
     }
@@ -105,4 +68,5 @@ if (require.main === module) {
         process.exitCode = 1;
     });
 }
-module.exports = { start };
+
+module.exports = { main };

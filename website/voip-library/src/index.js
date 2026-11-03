@@ -1,9 +1,15 @@
 'use strict';
 
-const { MumbleHandler } = require('./calls');
-const { connectMumbleIce } = require('./ice-config');
+const { FirebaseCallStore, getParticipantStatus } = require('./calls');
+const { createFirebaseAdapters, initializeFirebaseAdapters } = require('./firebase');
+const { createLiveKitTokenIssuer } = require('./livekit');
+const { createApiServer } = require('./server');
 
 module.exports = {
-    MumbleHandler,
-    connectMumbleIce
+    FirebaseCallStore,
+    createApiServer,
+    createFirebaseAdapters,
+    createLiveKitTokenIssuer,
+    getParticipantStatus,
+    initializeFirebaseAdapters
 };
