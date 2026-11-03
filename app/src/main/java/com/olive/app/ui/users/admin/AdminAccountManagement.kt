@@ -251,7 +251,14 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
                 BirthdayPicker(dob, "admin_dob", true) { dob = it }
                 // Only staff and admin accounts can be protected from deletion.
                 if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-                    Field(uiText(R.string.ui_email), email, "admin_email") { email = it.take(254) }
+                    Field(uiText(R.string.ui_login_email_optional), email, "admin_email") {
+                        email = it.take(254)
+                    }
+                    Text(
+                        uiText(R.string.ui_login_email_creation_help),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted
+                    )
                     Field(uiText(R.string.ui_phone_optional), phone, "admin_phone") {
                         phone = it.take(40)
                     }

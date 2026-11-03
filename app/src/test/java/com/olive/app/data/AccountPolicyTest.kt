@@ -35,11 +35,11 @@ class AccountPolicyTest {
             AccountPolicy.signInEmail("Olive_Test", AccountRole.SAFE_CONTACT)
         )
         assertEquals(
-            "olive_test@staff.olive.invalid",
+            "olive_test@yourolivebranch.ca",
             AccountPolicy.signInEmail("Olive_Test", AccountRole.STAFF)
         )
         assertEquals(
-            "olive_test@admin.olive.invalid",
+            "olive_test@yourolivebranch.ca",
             AccountPolicy.signInEmail("Olive_Test", AccountRole.ADMIN)
         )
         assertEquals(

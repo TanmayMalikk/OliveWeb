@@ -244,11 +244,15 @@ export default function AdminPortal() {
             <Field label="Full name" name="fullName" maxLength={120} />
             <Field label="Date of birth" name="dob" type="date" />
             <Field
-              label="Email (for staff and administrators)"
+              label="Login email (optional for staff and administrators)"
               name="email"
               type="email"
               maxLength={254}
             />
+            <p className="field-help">
+              If left blank, the login is username@yourolivebranch.ca. The
+              login email cannot be changed after this account is created.
+            </p>
             <Field label="City" name="region" maxLength={160} />
             <Button type="submit" disabled={session.busy}>
               Create account
