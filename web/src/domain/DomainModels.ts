@@ -186,7 +186,9 @@ export const validPin = (v: string) => /^\d{4,6}$/.test(v);
 export function signInEmail(username: string, role: Role) {
   if ((role === "STAFF" || role === "ADMIN") && username.includes("@"))
     return username.trim().toLowerCase();
-  return `${normalizeUsername(username)}@${{ USER: "users", SAFE_CONTACT: "safe", STAFF: "staff", ADMIN: "admin" }[role]}.olive.invalid`;
+  if (role === "STAFF" || role === "ADMIN")
+    return `${normalizeUsername(username)}@yourolivebranch.ca`;
+  return `${normalizeUsername(username)}@${{ USER: "users", SAFE_CONTACT: "safe" }[role]}.olive.invalid`;
 }
 export const emptyHistory = (): History => ({
   settings: [],

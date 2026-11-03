@@ -92,11 +92,15 @@ const accounts = [
 ];
 
 async function writeAccountDirectory(user, account) {
+  const authEmail = signInEmail(account.username, account.role, account.email);
   await writeFirestoreDocument("accountDirectory", account.username, {
     uid: {stringValue: user.uid},
     username: {stringValue: account.username},
     role: {stringValue: account.role},
     protected: {booleanValue: account.protected},
+    ...(account.role === "STAFF" || account.role === "ADMIN" ? {
+      loginAlias: {stringValue: authEmail},
+    } : {}),
     createdAt: {timestampValue: new Date().toISOString()},
   });
 }
@@ -121,7 +125,7 @@ async function writeStaffSettings(user, account) {
 }
 
 async function provision(account) {
-  const authEmail = signInEmail(account.username, account.role);
+  const authEmail = signInEmail(account.username, account.role, account.email);
   let user;
   try {
     user = await auth.getUserByEmail(authEmail);
