@@ -93,6 +93,8 @@ data class ChatMessage(
     val body: String,
     val sentAt: Long,
     val unsent: Boolean = false,
+    val deliveryStatus: MessageDeliveryStatus = MessageDeliveryStatus.SENT,
+    val deliveryFailureCode: String? = null,
 )
 
 // Messaging: Represents a live chat listener. It gives each screen one operation for stopping that listener safely.
