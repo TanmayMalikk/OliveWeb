@@ -12,10 +12,14 @@ import com.olive.app.data.SafetyDocument
 import com.olive.app.data.SafetyDocumentDataSource
 import com.olive.app.data.ChatSubscription
 import com.olive.app.data.DocumentOcrMetadata
+import com.olive.app.data.PrivateEntry
+import com.olive.app.data.UserProfile
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.OcrReview
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 internal data class SafetyDocumentsState(
@@ -167,6 +171,87 @@ internal class SafetyDocumentsController(
     // User safety document controller: Deletes the selected item. It requires the active feature controller before continuing.
     fun delete(document: SafetyDocument, ownerUid: String) = run(refreshAfter = true) {
         checkNotNull(repository).delete(document, ownerUid)
+    }
+
+    // Saves the Evidence toggle and refreshes the document card after the cloud accepts it.
+    fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) = run(refreshAfter = true) {
+        checkNotNull(repository).setEvidence(document, ownerUid, evidence)
+    }
+
+    // The emergency button builds a PDF, encrypts it, and adds it to the user's Documents list.
+    fun createEmergencyReport(
+        identity: AccountIdentity,
+        profile: UserProfile,
+        entries: List<PrivateEntry>,
+        location: EmergencyReportLocation?,
+        onFinished: (Result<Unit>) -> Unit,
+    ) {
+        val ownerUid = identity.uid
+        if (ownerUid.isBlank()) return onFinished(
+            Result.failure(IllegalStateException("The account is not ready for an emergency export.")),
+        )
+        val token = generation
+        scope.launch {
+            state = state.copy(loading = true, error = null)
+            val result = runCatching {
+                val incidents = emergencyIncidents(entries)
+                val available = repository?.listFor(ownerUid) ?: state.files
+                val relevantIds = incidents.flatMapTo(linkedSetOf()) { it.attachmentIds }.apply {
+                    addAll(available.filter(SafetyDocument::evidence).map(SafetyDocument::id))
+                }
+                val relevant = available.filter { it.id in relevantIds }
+                val files = linkedMapOf<String, EmergencyReportMedia>()
+                relevant.forEach { document ->
+                    val file = runCatching { openDocument(document, ownerUid) }.getOrNull()
+                    files[document.id] = EmergencyReportMedia(document, file)
+                }
+                withContext(Dispatchers.IO) {
+                    EmergencyReportPdf.create(applicationContext, profile, incidents, location, files)
+                }
+            }
+            result.onFailure { error ->
+                if (token == generation) {
+                    state = state.copy(loading = false, error = error.localizedMessage)
+                    onFinished(Result.failure(error))
+                }
+            }.onSuccess { report ->
+                val transfers = media
+                if (transfers == null) {
+                    report.delete()
+                    val error = IllegalStateException("Secure document storage is not ready.")
+                    if (token == generation) {
+                        state = state.copy(loading = false, error = error.message)
+                        onFinished(Result.failure(error))
+                    }
+                    return@onSuccess
+                }
+                transfers.queueFile(
+                    file = report,
+                    name = report.name,
+                    mimeType = "application/pdf",
+                    owner = identity,
+                    kind = MediaKind.DOCUMENT,
+                    ocrReview = OcrReview.NOT_APPLICABLE,
+                    ocr = null,
+                    onQueued = {
+                        report.delete()
+                        if (token == generation) {
+                            state = state.copy(loading = false, error = null)
+                            if (subscription == null) load(identity.uid, identity.username, false)
+                            onFinished(Result.success(Unit))
+                        }
+                    },
+                    onFailure = { message ->
+                        report.delete()
+                        val error = IllegalStateException(message)
+                        if (token == generation) {
+                            state = state.copy(loading = false, error = message)
+                            onFinished(Result.failure(error))
+                        }
+                    },
+                )
+            }
+        }
     }
 
     // User safety document controller: Shares the selected item. It requires the active feature controller before continuing.

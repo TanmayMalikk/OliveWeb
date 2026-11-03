@@ -21,6 +21,8 @@ let mapboxAttributionAdded=false;
 let points=[];
 let followEnabled=false;
 let followUid=null;
+let selectionMarker=null;
+let selectionEnabled=false;
 // Map: Builds the map marker icon. It creates a Leaflet div icon with the required accessible marker markup.
 function markerIcon(point){
   const className=point.blue?'olive-own-live-dot':(point.live?'olive-live-dot':(point.lastKnown?'olive-last-known-dot':'olive-contact-dot'));
@@ -124,3 +126,21 @@ window.oliveSetFollow=function(enabled,uid){
     if(target) map.panTo([target.latitude,target.longitude],{animate:true,duration:.5});
   }
 };
+// Incident reports: lets the user tap the map or drag one pushpin to save exact coordinates.
+window.oliveSetSelection=function(enabled,latitude,longitude){
+  selectionEnabled=!!enabled;
+  if(!selectionEnabled){if(selectionMarker){map.removeLayer(selectionMarker);selectionMarker=null;}return;}
+  if(Number.isFinite(latitude)&&Number.isFinite(longitude)&&(latitude!==0||longitude!==0)){
+    if(selectionMarker) selectionMarker.setLatLng([latitude,longitude]);
+    else{
+      selectionMarker=L.marker([latitude,longitude],{draggable:true}).addTo(map).bindTooltip('Incident location');
+      selectionMarker.on('dragend',function(){const point=selectionMarker.getLatLng();OliveLocationSelection.selected(point.lat,point.lng);});
+    }
+  }
+};
+map.on('click',function(event){
+  if(!selectionEnabled)return;
+  if(selectionMarker) selectionMarker.setLatLng(event.latlng);
+  else window.oliveSetSelection(true,event.latlng.lat,event.latlng.lng);
+  OliveLocationSelection.selected(event.latlng.lat,event.latlng.lng);
+});

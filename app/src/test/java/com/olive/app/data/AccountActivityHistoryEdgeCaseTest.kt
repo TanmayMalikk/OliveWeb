@@ -33,9 +33,36 @@ class AccountActivityHistoryEdgeCaseTest {
         )
 
         assertEquals(1234L, restored.updatedAt)
-        assertNull(restored.kind)
+        assertEquals(PrivateEntryKind.Note, restored.kind)
         assertFalse(restored.pinned)
         assertTrue(restored.edits.isEmpty())
+    }
+
+    // Saves every incident field and its linked files, then restores the same values from encrypted-history JSON.
+    @Test
+    fun incidentDetailsAndAttachmentsRoundTripWithoutLosingEvidenceLinks() {
+        val entry = PrivateEntry(
+            id = "incident",
+            kind = PrivateEntryKind.Incident,
+            title = "Parking lot incident",
+            body = "Recorded details",
+            incidentDate = "2026-11-02",
+            incidentTime = "about 21:30",
+            incidentLocation = "100 Main Street",
+            incidentLatitude = 53.5461,
+            incidentLongitude = -113.4938,
+            attachmentIds = listOf("photo", "video", "photo"),
+        )
+
+        val restored = PrivateEntry.fromJson(entry.toJson())
+
+        assertEquals(PrivateEntryKind.Incident, restored.kind)
+        assertEquals("2026-11-02", restored.incidentDate)
+        assertEquals("about 21:30", restored.incidentTime)
+        assertEquals("100 Main Street", restored.incidentLocation)
+        assertEquals(53.5461, restored.incidentLatitude!!, 0.00001)
+        assertEquals(-113.4938, restored.incidentLongitude!!, 0.00001)
+        assertEquals(listOf("photo", "video"), restored.attachmentIds)
     }
 
     // Inputs: the values shown below. Expected: obsolete pinned edit rows are removed without removing real changes.

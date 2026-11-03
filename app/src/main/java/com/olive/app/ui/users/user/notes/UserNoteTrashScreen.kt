@@ -110,7 +110,7 @@ internal fun Trash(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF4))
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    entry.kind?.let {
+                    entry.kind.let {
                         Text(
                             if (it == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
                                 R.string.note

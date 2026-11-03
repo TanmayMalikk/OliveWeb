@@ -15,7 +15,7 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
-    "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaDelete", "staffSupportRequest",
+    "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
     "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
@@ -45,6 +45,15 @@ test("encrypted media access keeps the owner and exact wrapped-key recipients", 
   );
   assert.throws(() => mediaTest.accessRequest({wrappedKeys:{staff:"staff-key"}}, "owner"));
   assert.throws(() => mediaTest.accessRequest({wrappedKeys:{}}, "owner"));
+});
+
+// Inputs: boolean evidence values plus common wrong types. Expected: only true and false are accepted.
+test("evidence labels reject text, numbers, missing values, and objects", () => {
+  assert.equal(mediaTest.evidenceRequest({evidence:true}), true);
+  assert.equal(mediaTest.evidenceRequest({evidence:false}), false);
+  for (const evidence of ["true", 1, 0, null, undefined, {value:true}, [true]]) {
+    assert.throws(() => mediaTest.evidenceRequest({evidence}));
+  }
 });
 
 // Inputs: the values in this case. Expected: role aliases and real organization emails are deterministic.

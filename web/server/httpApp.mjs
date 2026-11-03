@@ -143,5 +143,59 @@ export function createServerApp({ development = false } = {}) {
       res.status(422).json({ error: error.message });
     }
   });
+  // Incident notes use this route for address suggestions without exposing the Geoapify key to browsers.
+  app.get("/api/locations", async (req, res) => {
+    const key = process.env.GEOAPIFY_API_KEY?.trim();
+    if (!key) {
+      return res.status(503).json({
+        error: "Address suggestions are not configured on this server.",
+      });
+    }
+    const latitude = Number(req.query.latitude);
+    const longitude = Number(req.query.longitude);
+    const hasCoordinates =
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude) &&
+      latitude >= -90 &&
+      latitude <= 90 &&
+      longitude >= -180 &&
+      longitude <= 180;
+    const query = String(req.query.q ?? "").trim().slice(0, 200);
+    if (!hasCoordinates && query.length < 2) {
+      return res.status(400).json({ error: "Enter at least two address characters." });
+    }
+    const endpoint = hasCoordinates
+      ? new URL("https://api.geoapify.com/v1/geocode/reverse")
+      : new URL("https://api.geoapify.com/v1/geocode/autocomplete");
+    if (hasCoordinates) {
+      endpoint.searchParams.set("lat", String(latitude));
+      endpoint.searchParams.set("lon", String(longitude));
+    } else {
+      endpoint.searchParams.set("text", query);
+      endpoint.searchParams.set("limit", "5");
+      endpoint.searchParams.set("filter", "countrycode:ca");
+    }
+    endpoint.searchParams.set("apiKey", key);
+    try {
+      const response = await fetch(endpoint, {
+        signal: AbortSignal.timeout(5000),
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`Geoapify returned ${response.status}`);
+      const payload = await response.json();
+      const locations = (payload.features ?? []).slice(0, 5).map((feature) => ({
+        label: String(feature.properties?.formatted ?? "Selected map location"),
+        latitude: Number(feature.properties?.lat ?? feature.geometry?.coordinates?.[1]),
+        longitude: Number(feature.properties?.lon ?? feature.geometry?.coordinates?.[0]),
+      })).filter((location) =>
+        location.label && Number.isFinite(location.latitude) && Number.isFinite(location.longitude),
+      );
+      return res.json({ locations });
+    } catch {
+      return res.status(502).json({
+        error: "Address suggestions are temporarily unavailable.",
+      });
+    }
+  });
   return app;
 }

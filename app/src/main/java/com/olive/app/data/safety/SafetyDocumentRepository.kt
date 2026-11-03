@@ -33,6 +33,7 @@ data class SafetyDocument(
     val ciphertextSha256: String = "",
     val encryptionVersion: Int = 0,
     val deviceWrappedKeys: Map<String, String> = emptyMap(),
+    val evidence: Boolean = false,
 )
 
 data class DocumentOcrMetadata(val text: String, val confidence: Float, val successful: Boolean)
@@ -63,6 +64,8 @@ interface SafetyDocumentDataSource {
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
     // Deletes a safety document owned by the current user.
     suspend fun delete(document: SafetyDocument, ownerUid: String)
+    // Marks an owned file as evidence or returns it to a normal document.
+    suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) = Unit
     // Downloads and decrypts a safety document for in-app viewing.
     suspend fun download(context: Context, document: SafetyDocument): File
     /** Gives this account's registered phones and browsers encrypted copies of the document key. */
@@ -204,6 +207,16 @@ class SafetyDocumentRepository(
         firestore.collection("files").document(document.id).delete().await()
     }
 
+    // Stores evidence as document metadata, so the same setting appears on every signed-in device.
+    override suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
+        require(document.ownerUid == ownerUid)
+        if (document.objectKey.isNotBlank()) {
+            media.updateEvidence(document.id, evidence)
+        } else {
+            firestore.collection("files").document(document.id).update("evidence", evidence).await()
+        }
+    }
+
     // Safety: Downloads the selected file.
     override suspend fun download(context: Context, document: SafetyDocument): File {
         require(document.objectKey.isBlank()) { "Encrypted media downloads use MediaTransferController" }
@@ -332,6 +345,7 @@ class SafetyDocumentRepository(
             ciphertextSha256 = row.getString("ciphertext_sha256").orEmpty(),
             encryptionVersion = encryptionVersion,
             deviceWrappedKeys = deviceWrapped,
+            evidence = row.getBoolean("evidence") ?: false,
         )
     }
 
