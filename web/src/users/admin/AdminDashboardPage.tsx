@@ -1,7 +1,13 @@
 // Admins: shows account totals and controls to admins.
 import { useEffect, useState } from "react";
 import { LogOut, Plus, RefreshCw } from "lucide-react";
-import { Button, Field, Form, Logo, Modal } from "../../components/SharedComponents";
+import {
+  Button,
+  Field,
+  Form,
+  Logo,
+  Modal,
+} from "../../components/SharedComponents";
 import { useSession } from "../../session/SessionProvider";
 import {
   createAccount,
@@ -9,6 +15,13 @@ import {
   listAccounts,
   type ManagedAccount,
 } from "./AdminAccountApi";
+import OrganizationSupportInbox from "../shared/OrganizationSupportInbox";
+import {
+  staffConsultations,
+  loadPlan,
+  type SafetyPlan,
+} from "../../services/SafetyPlanService";
+import SafetyPlanEditor from "../staff/StaffSafetyPlanEditor";
 
 export default function AdminPortal() {
   const session = useSession();
@@ -16,13 +29,22 @@ export default function AdminPortal() {
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<ManagedAccount | null>(null);
+  const [plans, setPlans] = useState<
+    { ownerUid: string; ownerName: string; updatedAt: number }[]
+  >([]);
+  const [selectedPlan, setSelectedPlan] = useState<SafetyPlan | null>(null);
 
+  // Web admin: Reloads the latest data.
   async function refresh() {
     setAccounts(await listAccounts());
   }
 
   useEffect(() => {
-    void session.perform(refresh);
+    void session.perform(async () => {
+      await refresh();
+      const value = await staffConsultations();
+      setPlans(value.plans);
+    });
   }, []);
 
   return (
@@ -46,6 +68,29 @@ export default function AdminPortal() {
             {session.message}
           </p>
         )}
+        <section className="panel organization-overview">
+          <h2>Organization overview</h2>
+          <div className="organization-counts">
+            {(["USER", "SAFE_CONTACT", "STAFF", "ADMIN"] as const).map(
+              (role) => (
+                <article key={role}>
+                  <strong>
+                    {accounts.filter((account) => account.role === role).length}
+                  </strong>
+                  <span>
+                    {role === "SAFE_CONTACT"
+                      ? "Safe contacts"
+                      : role === "ADMIN"
+                        ? "Admins"
+                        : role === "STAFF"
+                          ? "Staff"
+                          : "Users"}
+                  </span>
+                </article>
+              ),
+            )}
+          </div>
+        </section>
         <div className="page-toolbar">
           <Field
             label="Search accounts"
@@ -90,7 +135,9 @@ export default function AdminPortal() {
                     <td>@{account.username}</td>
                     <td>{account.role}</td>
                     <td>{account.fullName || "—"}</td>
-                    <td>{account.profileComplete ? "Complete" : "Needs setup"}</td>
+                    <td>
+                      {account.profileComplete ? "Complete" : "Needs setup"}
+                    </td>
                     <td>
                       <Button
                         variant="quiet"
@@ -105,12 +152,62 @@ export default function AdminPortal() {
             </tbody>
           </table>
         </div>
-        <Button variant="quiet" onClick={() => void session.perform(session.signOut)}>
+        <section className="panel organization-plans">
+          <div className="organization-inbox-heading">
+            <div>
+              <span className="eyebrow">PLAN CONSULTS</span>
+              <h2>Safety plans needing review</h2>
+            </div>
+            <Button
+              variant="outline"
+              disabled={session.busy}
+              onClick={() =>
+                void session.perform(async () => {
+                  const value = await staffConsultations();
+                  setPlans(value.plans);
+                })
+              }
+            >
+              <RefreshCw size={16} /> Refresh
+            </Button>
+          </div>
+          {plans.length === 0 ? (
+            <p className="help-note">No active plan consultations.</p>
+          ) : (
+            <div className="organization-plan-list">
+              {plans.map((item) => (
+                <Button
+                  key={item.ownerUid}
+                  variant="outline"
+                  disabled={session.busy}
+                  onClick={() =>
+                    void session.perform(async () =>
+                      setSelectedPlan(await loadPlan(item.ownerUid)),
+                    )
+                  }
+                >
+                  Open {item.ownerName || "shared plan"}
+                </Button>
+              ))}
+            </div>
+          )}
+          {selectedPlan && (
+            <SafetyPlanEditor plan={selectedPlan} onChange={setSelectedPlan} />
+          )}
+        </section>
+        <OrganizationSupportInbox />
+        <Button
+          variant="quiet"
+          onClick={() => void session.perform(session.signOut)}
+        >
           Sign out
         </Button>
       </main>
       {creating && (
-        <Modal title="Create a managed account" onClose={() => setCreating(false)}>
+        <Modal
+          title="Create a managed account"
+          onClose={() => setCreating(false)}
+        >
           <Form
             onSubmit={async (data) => {
               await session.perform(async () => {
@@ -120,7 +217,13 @@ export default function AdminPortal() {
               });
             }}
           >
-            <Field label="Username" name="username" required minLength={8} maxLength={24} />
+            <Field
+              label="Username"
+              name="username"
+              required
+              minLength={8}
+              maxLength={24}
+            />
             <Field
               label="Temporary password"
               name="password"
@@ -156,8 +259,8 @@ export default function AdminPortal() {
       {removing && (
         <Modal title="Delete this account?" onClose={() => setRemoving(null)}>
           <p>
-            This permanently deletes @{removing.username} and their cloud records. This
-            cannot be undone.
+            This permanently deletes @{removing.username} and their cloud
+            records. This cannot be undone.
           </p>
           <Button
             disabled={session.busy}

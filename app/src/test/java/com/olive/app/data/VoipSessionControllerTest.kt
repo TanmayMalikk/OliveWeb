@@ -19,6 +19,7 @@ import org.junit.Test
 
 @Suppress("SameParameterValue", "SameParameterValue")
 class VoipSessionControllerTest {
+    // Checks the start join mute and leave keeps group call open step with the test's sample data.
     @Test
     fun startJoinMuteAndLeaveKeepsGroupCallOpen() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -48,6 +49,7 @@ class VoipSessionControllerTest {
         assertEquals(listOf("/api/calls", "/calls/token"), requests.map { it.url.encodedPath })
     }
 
+    // Checks the accept join and end ends call on api step with the test's sample data.
     @Test
     fun acceptJoinAndEndEndsCallOnApi() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -69,6 +71,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
+    // Checks the audio connection failure is visible and can be retried step with the test's sample data.
     @Test
     fun audioConnectionFailureIsVisibleAndCanBeRetried() = runBlocking {
         val audio = FakeLiveKitAudioSession(connectFailure = IllegalStateException("Audio unavailable"))
@@ -94,6 +97,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Active(call, microphoneMuted = false), controller.state.value)
     }
 
+    // Checks the mumble connection details reject invalid endpoint step with the test's sample data.
     @Test
     fun liveKitConnectionDetailsRejectInvalidEndpoint() {
         assertThrows(IllegalArgumentException::class.java) {
@@ -107,6 +111,7 @@ class VoipSessionControllerTest {
         }
     }
 
+    // Checks the cannot start second call while one is active step with the test's sample data.
     @Test
     fun cannotStartSecondCallWhileOneIsActive() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -122,6 +127,7 @@ class VoipSessionControllerTest {
         assertEquals(listOf("/api/calls", "/calls/token"), requests.map { it.url.encodedPath })
     }
 
+    // Checks the microphone failure is visible and session can still be left step with the test's sample data.
     @Test
     fun microphoneFailureIsVisibleAndSessionCanStillBeLeft() = runBlocking {
         val audio = FakeLiveKitAudioSession(muteFailure = IllegalStateException("Microphone unavailable"))
@@ -141,6 +147,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
+    // Checks the disconnect failure is visible and can be retried step with the test's sample data.
     @Test
     fun disconnectFailureIsVisibleAndCanBeRetried() = runBlocking {
         val audio = FakeLiveKitAudioSession(disconnectFailure = IllegalStateException("Socket close failed"))
@@ -159,6 +166,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
+    // Checks the failed call creation leaves controller idle step with the test's sample data.
     @Test
     fun failedCallCreationLeavesControllerIdle() = runBlocking {
         val client = OkHttpClient.Builder()
@@ -188,6 +196,7 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
+    // Checks the failed end request is visible and does not report call ended step with the test's sample data.
     @Test
     fun failedEndRequestIsVisibleAndDoesNotReportCallEnded() = runBlocking {
         val requests = mutableListOf<Request>()
@@ -207,6 +216,7 @@ class VoipSessionControllerTest {
         )
     }
 
+    // Checks the api manager step with the test's sample data.
     private fun apiManager(
         requests: MutableList<Request>,
         deleteStatus: Int = 200
@@ -245,6 +255,7 @@ class VoipSessionControllerTest {
         )
     }
 
+    // Builds a fake server response so the session test can check success and error cases.
     private fun Request.jsonResponse(code: Int, body: String): Response =
         Response.Builder()
             .request(this)
@@ -268,11 +279,13 @@ class VoipSessionControllerTest {
             connections += details
         }
 
+        // Checks the set microphone muted step with the test's sample data.
         override suspend fun setMicrophoneMuted(muted: Boolean) {
             muteFailure?.let { throw it }
             muteChanges += muted
         }
 
+        // Checks the disconnect step with the test's sample data.
         override suspend fun disconnect() {
             disconnectCount += 1
             disconnectFailure?.let { throw it }

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
+// Shows profile and sign-out settings for staff and admin accounts.
 @Composable
 internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit) {
     val uiText = rememberResourceText()

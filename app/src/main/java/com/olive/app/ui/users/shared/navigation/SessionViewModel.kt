@@ -89,14 +89,17 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         runtime.accountSession.load()
     }
 
+    // Opens Android's file picker for a document attachment.
     fun beginExternalFilePicker() {
         externalFilePickerOpen = true
     }
 
+    // Clears the pending file-picker request after Android returns a result.
     fun endExternalFilePicker() {
         externalFilePickerOpen = false
     }
 
+    // Shares the user's current live-location session with a chat.
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 
@@ -107,6 +110,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         runtime.accountSession.signOut()
     }
 
+    // Stops account listeners and background work when the session view model is removed.
     override fun onCleared() {
         documents.clear()
         locationMap.clear()

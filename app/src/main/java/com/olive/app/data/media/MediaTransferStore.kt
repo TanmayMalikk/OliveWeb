@@ -44,6 +44,7 @@ class MediaTransferStore(context:Context) {
     /** Removes bookkeeping only; callers must separately decide whether ciphertext should be deleted. */
     fun remove(id:String) { vault.update { it.optJSONObject(JOBS)?.remove(id) } }
 
+    // Loads pending media-transfer jobs that belong to this account.
     private fun jobs(root:JSONObject)=root.optJSONObject(JOBS) ?: JSONObject().also { root.put(JOBS,it) }
     private companion object { const val JOBS="jobs" }
 }

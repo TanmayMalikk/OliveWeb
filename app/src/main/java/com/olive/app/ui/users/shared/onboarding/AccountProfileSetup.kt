@@ -82,6 +82,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
     val totalRequired = credentialCount + required.size + if (safeContact) 0 else 2
     val progressCompleted = credentialCount + completed
     val pageCompletion = listOf(true) + localCompletion
+    // Gives account storage the collected contacts it needs.
     fun collectedContacts() =
         (contacts.toList() + if (contactName.isNotBlank() && contactDetails.isNotBlank())
             listOf(
@@ -92,6 +93,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                 )
             ) else emptyList()).take(25)
 
+    // Checks the onboarding fields and saves the completed account profile.
     fun saveProfile() = session.account.saveSetupProfile(
         UserProfile(
             username = session.account.setupUsername,
@@ -113,6 +115,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
         Heading(uiText(R.string.your_profile), pages[page], focusKey = page)
         OnboardingProgress(progressCompleted, totalRequired, progressPage, stages, pageCompletion)
         AnimatedContent(targetState = pages[page], label = "onboarding page") { current ->
+            // Continues setup after the profile saves, or shows the save error.
             when (current) {
                 uiText(R.string.ui_personal_details) -> Column(
                     verticalArrangement = Arrangement.spacedBy(

@@ -57,7 +57,7 @@ import java.util.Date
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
-
+// Shows daily heart-rate ranges, averages, and watch status.
 @Composable
 internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -101,7 +101,6 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
                 },
             )
         }
-
         if (selectedVitals != null) {
             item {
                 WatchStatusCard(selectedVitals, snapshot.watchConnected)
@@ -135,6 +134,7 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     }
 }
 
+// Draws up to 14 days of heart-rate ranges and the selected-day summary.
 @Composable
 private fun HeartRateGraphCard(
     history: List<HeartRateVitals>,
@@ -240,7 +240,6 @@ private fun HeartRateGraphCard(
                     val bottom = size.height - 22.dp.toPx()
                     val width = right - left
                     val height = bottom - top
-
                     axisLabels.forEachIndexed { index, _ ->
                         val y = top + height * index / (axisLabels.size - 1).coerceAtLeast(1).toFloat()
                         drawLine(
@@ -265,6 +264,7 @@ private fun HeartRateGraphCard(
                         end = Offset(selectedX + dayWidth / 2f, bottom + 8.dp.toPx()),
                         strokeWidth = 3.dp.toPx(),
                     )
+                    // Draw heart-rate ranges only when the watch has sent readings.
                     if (history.isNotEmpty()) {
                         history.forEach { day ->
                             val dayIndex = java.time.temporal.ChronoUnit.DAYS
@@ -296,6 +296,7 @@ private fun HeartRateGraphCard(
                         Text(label.toString(), color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
                 }
+                // Place the no-data message over an empty heart-rate chart.
                 if (history.isEmpty()) {
                     Text(
                         text = noData,
@@ -335,6 +336,7 @@ private fun HeartRateGraphCard(
     }
 }
 
+// Explains whether recent Wear OS heart-rate data is available.
 @Composable
 private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     val locale = LocalConfiguration.current.locales[0]
@@ -386,6 +388,7 @@ private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     }
 }
 
+// Shows peak, lowest, resting, and average heart rate for the selected day.
 @Composable
 private fun VitalsGrid(vitals: HeartRateVitals) {
     val bpm = stringResource(R.string.fitness_bpm)
@@ -421,6 +424,7 @@ private fun VitalsGrid(vitals: HeartRateVitals) {
     }
 }
 
+// Draws one heart-rate value with its label and unit.
 @Composable
 private fun VitalsMetricCard(
     modifier: Modifier,
@@ -452,6 +456,7 @@ private fun VitalsMetricCard(
     }
 }
 
+// Shows setup help when no Wear OS data has been received.
 @Composable
 private fun WatchMessageCard(message: String) {
     Card(

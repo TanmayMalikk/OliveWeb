@@ -15,6 +15,7 @@ import com.olive.app.data.UserProfile
 import com.olive.app.data.DeliveryAddress
 
 class SafeEntryUiTest : OliveUiTestBase() {
+    // Checks the entry setup step with the test's sample data.
     private fun entrySetup() {
         openOnboarding()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
@@ -47,6 +48,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         waitFor("entry_knows_pin_yes")
     }
 
+    // Checks the correct pin runs olive animation before safe area becomes interactive step with the test's sample data.
     @Test
     fun correctPinRunsOliveAnimationBeforeSafeAreaBecomesInteractive() {
         entrySetup()
@@ -59,6 +61,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         val unlockVersion = session.unlockAnimationVersion
         compose.mainClock.autoAdvance = false
+        // Use the fallback when correct pin runs olive animation before safe area becomes interactive is unavailable.
         try {
             enterPin("123456")
             compose.waitUntil(30_000) { session.unlockAnimationVersion > unlockVersion }
@@ -77,6 +80,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("safe_settings").assertIsDisplayed()
     }
 
+    // Checks the safety answer changes recommendation and separate pin still unlocks step with the test's sample data.
     @Test
     fun safetyAnswerChangesRecommendationAndSeparatePinStillUnlocks() {
         entrySetup()
@@ -124,6 +128,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the device lock cancellation does not enroll or unlock step with the test's sample data.
     @Test
     fun deviceLockCancellationDoesNotEnrollOrUnlock() {
         entrySetup()
@@ -146,6 +151,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("new_pin").assertDoesNotExist()
     }
 
+    // Checks the device lock cancellation returns actual talk back focus and allows retry step with the test's sample data.
     @Test
     fun deviceLockCancellationReturnsActualTalkBackFocusAndAllowsRetry() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -155,6 +161,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         TalkBackTestSession(compose.activity).use { talkBack ->
             compose.waitUntil(10_000) { context.getSystemService(android.view.accessibility.AccessibilityManager::class.java).isTouchExplorationEnabled }
+            // Checks the activate step with the test's sample data.
             fun activate(tag: String) {
                 compose.onNodeWithTag(tag).performScrollTo()
                     .performSemanticsAction(SemanticsActions.OnClick) { it() }
@@ -191,11 +198,13 @@ class SafeEntryUiTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the android keystore refuses unauthenticated operation step with the test's sample data.
     @Test
     fun androidKeystoreRefusesUnauthenticatedOperation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         if (!context.getSystemService(KeyguardManager::class.java).isDeviceSecure) return
         val challenge = DeviceLockKey("instrumented").prepare("unauthenticated-key-test", null)
+        // Turn an unexpected android keystore refuses unauthenticated operation failure into a readable message.
         try {
             val cipher = challenge.promptCipher ?: challenge.legacyCipher()
             try {
@@ -208,6 +217,7 @@ class SafeEntryUiTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the device lock enrollment and every reentry require android authentication step with the test's sample data.
     @Test
     fun deviceLockEnrollmentAndEveryReentryRequireAndroidAuthentication() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -252,7 +262,10 @@ class SafeEntryUiTest : OliveUiTestBase() {
         assertEquals(SessionScreen.Cover, session.screen)
     }
 
+    // Checks the confirm phone pin step with the test's sample data.
     private fun confirmPhonePin() = DeviceCredentialTestDriver(compose).confirmPhonePin()
+    // Checks the wait for phone pin step with the test's sample data.
     private fun waitForPhonePin() = DeviceCredentialTestDriver(compose).waitForPhonePin()
+    // Runs a device command needed by this test.
     private fun shell(command: String) = DeviceCredentialTestDriver(compose).shell(command)
 }

@@ -13,38 +13,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Fullscreen
-import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Navigation
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,13 +48,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.AccountIdentity
@@ -75,8 +63,10 @@ import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
-import kotlin.math.ceil
 
+private const val MAX_SHARED_CONTACTS = 10
+
+// Shows the user and trusted-contact map, sharing controls, and route tools.
 @Composable
 internal fun LocationMapScreen(session: SessionViewModel) {
     val profile = session.profile ?: return
@@ -356,174 +346,4 @@ internal fun LocationMapScreen(session: SessionViewModel) {
         state.error?.let { AccessibleMessage(it) }
         state.routeError?.let { AccessibleMessage(it) }
     }
-}
-
-@Composable
-private fun FullScreenNavigationMap(
-    points: List<MapLocationPoint>,
-    ownPoint: MapLocationPoint?,
-    route: LocationRoute?,
-    destinationName: String,
-    routeWorking: Boolean,
-    routeError: String?,
-    onExitFullScreen: () -> Unit,
-    onStopNavigation: () -> Unit,
-) {
-    val direction = ownPoint?.let { route?.nextDirection(it.latitude, it.longitude) }
-    val progress = ownPoint?.let { route?.progress(it.latitude, it.longitude) }
-    val view = LocalView.current
-    DisposableEffect(view) {
-        val previous = view.keepScreenOn
-        view.keepScreenOn = true
-        onDispose { view.keepScreenOn = previous }
-    }
-    Box(Modifier.fillMaxSize().testTag("full_screen_navigation")) {
-        InteractiveLocationMap(
-            points = points,
-            modifier = Modifier.fillMaxSize(),
-            ownPointUid = ownPoint?.uid,
-            showOwnPointInBlue = true,
-            route = route,
-            navigationActive = true,
-        )
-        IconButton(
-            onClick = onExitFullScreen,
-            modifier = Modifier.statusBarsPadding().padding(12.dp).align(Alignment.TopStart)
-                .testTag("exit_full_screen_navigation"),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surface,
-            ),
-        ) {
-            Icon(Icons.Outlined.FullscreenExit, stringResource(R.string.location_exit_full_screen))
-        }
-        Surface(
-            modifier = Modifier.statusBarsPadding().padding(start = 68.dp, end = 72.dp, top = 12.dp)
-                .fillMaxWidth().align(Alignment.TopCenter),
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shadowElevation = 8.dp,
-        ) {
-            Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-                Text(
-                    direction?.text ?: stringResource(R.string.location_finding_route),
-                    style = MaterialTheme.typography.titleLarge,
-                )
-                if (routeWorking) LinearProgressIndicator(
-                    Modifier.fillMaxWidth().padding(top = 8.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
-            }
-        }
-        Surface(
-            modifier = Modifier.navigationBarsPadding().padding(14.dp).fillMaxWidth()
-                .align(Alignment.BottomCenter),
-            shape = MaterialTheme.shapes.extraLarge,
-            shadowElevation = 10.dp,
-        ) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    stringResource(R.string.location_navigating_to, destinationName),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                route?.let {
-                    Text(
-                        stringResource(
-                            R.string.location_route_summary,
-                            formatRouteDistance(progress?.distanceMeters ?: it.distanceMeters),
-                            formatRouteDuration(progress?.durationSeconds ?: it.durationSeconds),
-                        ),
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                }
-                routeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedButton(onClick = onExitFullScreen, modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Outlined.FullscreenExit, null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.location_map_view))
-                    }
-                    Button(
-                        onClick = onStopNavigation,
-                        modifier = Modifier.weight(1f).testTag("full_screen_stop_navigation"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                        ),
-                    ) {
-                        Icon(Icons.Outlined.Close, null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.location_stop_navigation))
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun formatRouteDistance(meters: Double): String =
-    if (meters < 1_000) "${meters.toInt()} m"
-    else String.format(java.util.Locale.getDefault(), "%.1f km", meters / 1_000)
-
-private fun formatRouteDuration(seconds: Double): String =
-    "${ceil(seconds / 60.0).toInt().coerceAtLeast(1)} min"
-
-private const val MAX_SHARED_CONTACTS = 10
-
-@Composable
-internal fun ShareDurationDialog(onDismiss: () -> Unit, onSelected: (Long) -> Unit) {
-    var custom by remember { mutableStateOf("") }
-    val customHours = custom.toLongOrNull()?.takeIf { it in 1..72 }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.location_choose_duration)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { onSelected(10_000L) },
-                    modifier = Modifier.fillMaxWidth().testTag("location_duration_10_seconds")
-                ) {
-                    Text(stringResource(R.string.location_ten_seconds_testing))
-                }
-                listOf(1L, 2L, 8L, 24L).forEach { hours ->
-                    OutlinedButton(
-                        onClick = { onSelected(hours * 60 * 60 * 1000) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            if (hours == 1L) stringResource(R.string.location_one_hour)
-                            else pluralStringResource(
-                                R.plurals.location_hours,
-                                hours.toInt(),
-                                hours
-                            )
-                        )
-                    }
-                }
-                OutlinedTextField(
-                    custom, { custom = it.filter(Char::isDigit).take(2) }, singleLine = true,
-                    label = { Text(stringResource(R.string.location_custom_hours)) },
-                    supportingText = { Text(stringResource(R.string.location_custom_range)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth().testTag("location_custom_hours")
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { customHours?.let { onSelected(it * 60 * 60 * 1000) } },
-                enabled = customHours != null,
-                modifier = Modifier.testTag("location_custom_confirm")
-            ) {
-                Text(stringResource(R.string.location_share_for_custom))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
-}
-
-@Composable
-// Formats share time.
-private fun formatShareTime(timestamp: Long): String {
-    if (timestamp <= 0L) return ""
-    val formatter = remember { java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT) }
-    return formatter.format(java.util.Date(timestamp))
 }

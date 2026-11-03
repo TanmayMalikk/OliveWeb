@@ -5,6 +5,7 @@ import androidx.compose.ui.test.*
 import org.junit.Test
 
 class CredentialRulesUiTest : OliveUiTestBase() {
+    // Checks the new accounts reject numeric usernames and passwords containing username step with the test's sample data.
     @Test
     fun newAccountsRejectNumericUsernamesAndPasswordsContainingUsername() {
         openOnboarding()

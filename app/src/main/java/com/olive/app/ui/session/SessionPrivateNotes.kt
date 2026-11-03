@@ -24,6 +24,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
+    // Creates or updates one encrypted private note.
     fun savePrivateEntry(id: String?, kind: PrivateEntryKind?, title: String, body: String) {
         with(runtime) {
             with(state) {
@@ -45,6 +46,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                     id?.let { wanted -> privateEntries.firstOrNull { it.id == wanted && it.deletedAt == null } }
                 val changes = existing?.let { old ->
                     buildList {
+                        // Records a profile field only when its value really changed.
                         fun changed(field: String, before: String, after: String) {
                             if (before != after) add(FieldChange(field, before, after))
                         }
@@ -72,6 +74,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                 )
                 operations.runOperation(runtime.application.getString(R.string.unable_to_save_this_private_entry_please_retry)) { token ->
                     withContext(Dispatchers.IO) { store.savePrivateEntry(uid, entry) }
+                    // Update the note list only while the same Safe App notes page is open.
                     if (epoch == token && screen == SessionScreen.Safe && page == SafePage.Notes) {
                         privateEntries = withContext(Dispatchers.IO) { store.privateEntries(uid) }
                         message =
@@ -107,6 +110,7 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
         }
     }
 
+    // Removes private entry from the signed-in session.
     fun trashPrivateEntry(id: String) {
         with(runtime) {
             with(state) {

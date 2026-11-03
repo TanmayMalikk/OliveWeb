@@ -58,6 +58,7 @@ private data class CapturedMedia(
     val ocrResult: OcrResult? = null
 )
 
+// Marks a document scan for review when OCR confidence is below 75 percent.
 internal fun isLowOcrConfidence(result: OcrResult) =
     !result.success || !result.confidence.isFinite() || result.confidence !in .75f..1f
 
@@ -96,7 +97,9 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         }
     val captureFolder = remember { File(context.cacheDir, "captured-media").apply { mkdirs() } }
 
+    // Stores the new camera result so the preview can show it.
     fun newCapture(extension: String) = File(captureFolder, "${UUID.randomUUID()}.$extension")
+    // Accepts the captured photo, video, or document and returns its file.
     fun accept(file: File, mime: String, name: String, kind: MediaKind, ocrResult: OcrResult? = null) {
         pendingFile = null
         viewModel.leaveCamera()
@@ -104,6 +107,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
             CapturedMedia(file, mime, name, kind, ocrResult)
     }
 
+    // Deletes the temporary capture when the user retakes or cancels it.
     fun discardCapture() {
         captured?.file?.delete()
         pendingFile?.delete()
@@ -120,6 +124,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     LaunchedEffect(permissionGranted, captured) {
         if (permissionGranted && captured == null) viewModel.bind(lifecycleOwner, preview)
     }
+    // Clear the preview when the user discards the latest capture.
     DisposableEffect(Unit) {
         onDispose {
             viewModel.leaveCamera()
@@ -129,6 +134,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("camera_screen")) {
+        // Returns to the camera or closes it based on how capture was opened.
         when {
             !permissionGranted -> CameraPermissionPrompt(
                 { permissionLauncher.launch(Manifest.permission.CAMERA) },
@@ -241,6 +247,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
                         .padding(bottom = 52.dp)
                 ) {
+                    // Returns to the camera or closes it based on how capture was opened.
                     when {
                         mode == CameraMode.Photo -> {
                             val file = newCapture("jpg")
@@ -314,7 +321,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         }
     }
 }
-
+// Explains why camera access is needed and lets the user request it.
 @Composable
 private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     Column(
@@ -329,6 +336,7 @@ private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     }
 }
 
+// Draws the shutter button and gives TalkBack its action label.
 @Composable
 private fun CameraShutter(
     mode: CameraMode,
@@ -352,6 +360,7 @@ private fun CameraShutter(
                 CameraMode.Document -> Icons.Outlined.Description
             },
             stringResource(
+                // Takes a photo, starts video, or scans a document based on the selected mode.
                 when {
                     recording -> R.string.camera_stop_recording
                     mode == CameraMode.Photo -> R.string.camera_take_photo
@@ -363,7 +372,7 @@ private fun CameraShutter(
         )
     }
 }
-
+// Previews the captured file before the user saves or retakes it.
 @Composable
 private fun CameraReview(
     media: CapturedMedia,

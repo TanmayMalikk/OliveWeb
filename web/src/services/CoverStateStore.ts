@@ -3,6 +3,7 @@ import { database } from "./LocalDataStore";
 import { encrypt, decrypt } from "./EncryptionService";
 import type { Envelope, Event } from "../domain/DomainModels";
 let keyPromise: Promise<CryptoKey> | undefined;
+// Loads this browser's encryption key, or creates one the first time it is needed.
 async function deviceKey() {
   keyPromise ??= (async () => {
     const db = await database;
@@ -18,18 +19,20 @@ async function deviceKey() {
   })();
   return keyPromise;
 }
-// Reads cover.
+// Decrypts one saved cover setting from this browser.
 export async function readCover<T>(id: string, fallback: T): Promise<T> {
   const box: Envelope | undefined = await (
     await database
   ).get("device", `cover:${id}`);
   return box ? decrypt<T>(await deviceKey(), box) : fallback;
 }
+// Encrypts one cover setting before storing it in this browser.
 export async function writeCover(id: string, value: unknown) {
   await (
     await database
   ).put("device", await encrypt(await deviceKey(), value), `cover:${id}`);
 }
+// Keeps the latest food orders so the cover app can show recent checkouts.
 export async function pendingCheckout(uid: string, event: Event) {
   const rows = await readCover<Event[]>(`${uid}:checkouts`, []);
   await writeCover(`${uid}:checkouts`, [event, ...rows].slice(0, 100));

@@ -34,6 +34,15 @@ service firebase.storage {
       allow delete: if owner(uid) && kind in ['settings', 'triggers', 'checkouts', 'private_entries'];
     }
 
+    // The Android fitness cover publishes an owner-only summary for the web activity viewer.
+    match /accounts/{uid}/fitness/summary.json {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid)
+        && request.resource.size <= 128 * 1024
+        && request.resource.contentType == 'application/json';
+      allow delete: if owner(uid);
+    }
+
     // Media stays in its owner's folder; the Firestore metadata controls any later sharing.
     match /users/{userId}/media/{fileId} {
       allow create, update: if owner(userId) && request.resource.size <= 250 * 1024 * 1024;

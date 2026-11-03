@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.net.URI
 
+/** Connection details required by LiveKit Cloud to join a voice call room. */
 data class LiveKitConnectionDetails(
     val serverUrl: String,
     val token: String,
@@ -34,12 +35,14 @@ data class LiveKitConnectionDetails(
     }
 }
 
+/** Audio session interface for connecting to LiveKit. */
 interface VoipAudioSession {
     suspend fun connect(details: LiveKitConnectionDetails)
     suspend fun setMicrophoneMuted(muted: Boolean)
     suspend fun disconnect()
 }
 
+/** LiveKit-backed implementation of [VoipAudioSession]. */
 class LiveKitAudioSession(context: Context) : VoipAudioSession {
     private val appContext = context.applicationContext
     private val mutex = Mutex()
@@ -83,6 +86,7 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
     }
 }
 
+/** Represents the current state of a VoIP session. */
 sealed interface VoipSessionState {
     data object Idle : VoipSessionState
     data class Connecting(val call: VoipCall) : VoipSessionState
@@ -91,6 +95,7 @@ sealed interface VoipSessionState {
     data class Error(val call: VoipCall?, val message: String) : VoipSessionState
 }
 
+/** Coordinates VoIP API calls and LiveKit audio sessions. */
 class VoipSessionController(
     private val voipManager: VoipManager,
     private val audioSession: VoipAudioSession
@@ -110,7 +115,7 @@ class VoipSessionController(
     suspend fun startAndJoin(
         name: String,
         callerId: String,
-        participantIds: List<String>,
+        participantIds: List<String>
     ): VoipCall = mutex.withLock {
         check(mutableState.value == VoipSessionState.Idle) { "A VoIP session is already in progress" }
         val call = voipManager.startCall(name, callerId, participantIds)
@@ -119,7 +124,7 @@ class VoipSessionController(
 
     suspend fun acceptAndJoin(
         callId: String,
-        userId: String,
+        userId: String
     ): VoipCall = mutex.withLock {
         check(mutableState.value == VoipSessionState.Idle) { "A VoIP session is already in progress" }
         val call = voipManager.acceptCall(callId, userId)
@@ -127,11 +132,12 @@ class VoipSessionController(
     }
 
     suspend fun joinCall(
-        call: VoipCall,
+        call: VoipCall
     ): VoipCall = mutex.withLock {
         val current = mutableState.value
-        check(current == VoipSessionState.Idle ||
-            (current is VoipSessionState.Error && current.call?.callId == call.callId)
+        check(
+            current == VoipSessionState.Idle ||
+                (current is VoipSessionState.Error && current.call?.callId == call.callId)
         ) { "A different VoIP session is already in progress" }
         joinAudio(call)
     }
@@ -143,7 +149,10 @@ class VoipSessionController(
             audioSession.setMicrophoneMuted(muted)
             mutableState.value = active.copy(microphoneMuted = muted)
         } catch (error: Exception) {
-            mutableState.value = VoipSessionState.Error(active.call, error.message ?: "Could not change microphone state")
+            mutableState.value = VoipSessionState.Error(
+                active.call,
+                error.message ?: "Could not change microphone state"
+            )
             throw error
         }
     }
@@ -159,7 +168,10 @@ class VoipSessionController(
             audioSession.disconnect()
             mutableState.value = VoipSessionState.Idle
         } catch (error: Exception) {
-            mutableState.value = VoipSessionState.Error(call, error.message ?: "Could not disconnect from LiveKit")
+            mutableState.value = VoipSessionState.Error(
+                call,
+                error.message ?: "Could not disconnect from LiveKit"
+            )
             throw error
         }
     }
@@ -176,7 +188,10 @@ class VoipSessionController(
             voipManager.endCall(call.callId)
             mutableState.value = VoipSessionState.Idle
         } catch (error: Exception) {
-            mutableState.value = VoipSessionState.Error(call, error.message ?: "Could not end the VoIP call")
+            mutableState.value = VoipSessionState.Error(
+                call,
+                error.message ?: "Could not end the VoIP call"
+            )
             throw error
         }
     }

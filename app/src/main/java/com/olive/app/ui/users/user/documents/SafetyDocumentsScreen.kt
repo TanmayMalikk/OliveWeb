@@ -38,6 +38,7 @@ import java.io.File
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
 
+// Lists encrypted documents and provides upload, filter, open, and share actions.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SafetyDocumentsScreen(session: SessionViewModel) {
@@ -53,6 +54,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     var choosingUpload by rememberSaveable { mutableStateOf(false) }
     val unableUpload = stringResource(R.string.documents_upload_failed)
+    // Clears the selected document and closes its action dialog.
     fun finishSelection(uri: android.net.Uri?) {
         session.endExternalFilePicker()
         if (uri != null) controller.upload(
@@ -69,6 +71,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     val documentPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), ::finishSelection)
 
+    // Confirms private entry before opening the Android file picker.
     fun launchProtectedPicker(action: () -> Unit) {
         choosingUpload = false
         session.beginExternalFilePicker()
@@ -79,7 +82,9 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             )
         }
     }
-    LaunchedEffect(uid, session.localMode) { controller.load(uid, session.localMode) }
+    LaunchedEffect(uid, session.coverUsername, session.localMode) {
+        controller.load(uid, session.coverUsername, session.localMode)
+    }
     opened?.let { (document, localFile) ->
         SafetyDocumentViewer(document, localFile) {
             localFile.delete()
@@ -139,6 +144,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                             label = {
                                 Text(
                                     stringResource(
+                                        // Opens the protected file picker only after private entry is confirmed.
                                         when (option) {
                                             DocumentFilter.All -> R.string.documents_all
                                             DocumentFilter.Photos -> R.string.safety_storage_photos
@@ -158,6 +164,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { AccessibleMessage(it) }
         val shown = state.files.filter { file ->
+            // Opens the protected file picker only after private entry is confirmed.
             when (filter) {
                 DocumentFilter.All -> true
                 DocumentFilter.Photos -> file.mimeType.startsWith("image/")
@@ -281,6 +288,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     }
 }
 
+// user safety documents screen shows this preparing upload card view so the user can view its details and use its actions.
 @Composable
 private fun PreparingUploadCard() {
     val title = stringResource(R.string.documents_preparing_upload)
@@ -303,6 +311,7 @@ private fun PreparingUploadCard() {
     }
 }
 
+// Shows upload progress, errors, and retry controls for one pending file.
 @Composable
 private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
     val failed = upload.status == MediaTransferStatus.FAILED
@@ -370,6 +379,7 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
     }
 }
 
+// user safety documents screen shows this safety document card view so the user can view its details and use its actions.
 @Composable
 private fun SafetyDocumentCard(
     file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
@@ -429,6 +439,7 @@ private fun SafetyDocumentCard(
                         stringResource(R.string.open)
                     )
                 }
+                // Owners can share the document; recipients only get the open action.
                 if (own) OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
                     Icon(
                         Icons.Outlined.Share,
@@ -447,7 +458,7 @@ private fun SafetyDocumentCard(
         }
     }
 }
-
+// Lets the user choose which trusted contacts may open a document.
 @Composable
 private fun DocumentSharingDialog(
     file: SafetyDocument,

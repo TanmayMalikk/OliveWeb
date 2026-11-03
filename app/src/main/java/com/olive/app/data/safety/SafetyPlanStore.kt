@@ -8,9 +8,11 @@ import com.olive.app.security.child
 // Separate encrypted vaults isolate local university accounts from Firebase accounts and each signed-in actor's cache.
 internal class SafetyPlanStore(context: Context, localMode: Boolean) {
     private val vault = EncryptedVault(context, if (localMode) "safety-demo" else "safety-firebase")
+    // Reads one account's safety plan from encrypted local storage.
     fun read(actorUid: String, ownerUid: String) =
         vault.read().optJSONObject(actorUid)?.optJSONObject(ownerUid)?.let(SafetyPlan::fromJson)
 
+    // Creates a blank safety plan only when this account does not have one yet.
     fun ensure(
         actorUid: String,
         ownerUid: String,
@@ -33,6 +35,7 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         return checkNotNull(read(actorUid, ownerUid))
     }
 
+    // Replaces one saved safety plan while holding the encrypted-store lock.
     fun update(actorUid: String, ownerUid: String, change: (SafetyPlan) -> SafetyPlan): SafetyPlan {
         var updated: SafetyPlan? = null
         vault.update { root ->
@@ -45,17 +48,20 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         return checkNotNull(updated)
     }
 
+    // Replaces one safety plan in encrypted local storage.
     fun write(actorUid: String, ownerUid: String, value: SafetyPlan) {
         require(value.ownerUid == ownerUid)
         vault.update { root -> root.child(actorUid).put(ownerUid, value.toJson()) }
     }
 
+    // Loads every saved safety-plan section for the signed-in account.
     fun all(actorUid: String): List<SafetyPlan> {
         val actor = vault.read().optJSONObject(actorUid) ?: return emptyList()
         return actor.keys().asSequence()
             .mapNotNull { actor.optJSONObject(it)?.let(SafetyPlan::fromJson) }.toList()
     }
 
+    // Removes one locally cached safety plan for this signed-in actor.
     fun remove(actorUid: String, ownerUid: String) {
         vault.update { it.optJSONObject(actorUid)?.remove(ownerUid) }
     }

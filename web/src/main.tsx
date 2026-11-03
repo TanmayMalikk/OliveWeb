@@ -4,6 +4,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useRef,
   useState,
   type ErrorInfo,
   type ReactNode,
@@ -24,6 +25,7 @@ const News = lazy(() => import("./public/covers/DailyDigestCover"));
 const Fitness = lazy(() => import("./public/covers/FitnessCover"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
 const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
+// User cover apps: asks for the private PIN before opening the Safe App.
 function PinGate() {
   const s = useSession();
   const [pin, setPin] = useState("");
@@ -139,27 +141,66 @@ function PinGate() {
     </main>
   );
 }
+// User cover apps: displays the cover chosen for this account.
 function Cover() {
   const s = useSession();
+  const [accountOpen, setAccountOpen] = useState(false);
+  const lastOliveTap = useRef(0);
+  const coverLabel = s.cover === "FOOD"
+    ? "Olive"
+    : s.cover === "NEWS"
+      ? "Daily Digest"
+      : s.cover === "FITNESS"
+        ? "Fitness"
+        : "Game";
+  const tapOlive = () => {
+    const now = Date.now();
+    if (now - lastOliveTap.current > 1500) {
+      lastOliveTap.current = now;
+      return;
+    }
+    lastOliveTap.current = 0;
+    void s.perform(s.beginEntry);
+  };
   return (
     <main
       id="main"
-      className={`cover-container${s.cover === "GAME" ? " game-cover" : ""}`}
+      className={`cover-container ${s.cover.toLowerCase()}-cover`}
     >
-      {s.cover === "FOOD" ? (
-        <Food />
-      ) : s.cover === "NEWS" ? (
-        <News />
-      ) : s.cover === "FITNESS" ? (
-        <Fitness />
-      ) : (
-        <Game />
-      )}
+      <nav className="cover-account-tabs" role="tablist" aria-label={`${coverLabel} app pages`}>
+        <button type="button" role="tab" aria-selected={!accountOpen} aria-controls="cover-display-panel" onClick={() => setAccountOpen(false)}>
+          {coverLabel}
+        </button>
+        <button type="button" role="tab" aria-selected={accountOpen} aria-controls="cover-account-panel" onClick={() => setAccountOpen(true)}>
+          Account
+        </button>
+      </nav>
+      <div id="cover-display-panel" className="cover-tab-panel" role="tabpanel" hidden={accountOpen}>
+        {s.cover === "FOOD" ? (
+          <Food />
+        ) : s.cover === "NEWS" ? (
+          <News />
+        ) : s.cover === "FITNESS" ? (
+          <Fitness />
+        ) : (
+          <Game />
+        )}
+      </div>
+      <section id="cover-account-panel" className="cover-account-panel" role="tabpanel" aria-label="Account" hidden={!accountOpen}>
+          <span className="eyebrow">ACCOUNT</span>
+          <h1>Your account.</h1>
+          <p>Account access and private settings.</p>
+          <button type="button" className="cover-hidden-olive" aria-label="olive icon" onClick={tapOlive}>
+            <Leaf aria-hidden="true" />
+          </button>
+      </section>
     </main>
   );
 }
+// Sends each domain and signed-in role to its matching web screen.
 function Routes({ mode }: { mode: SiteMode }) {
   const s = useSession();
+  // Read the current session whenever the route changes.
   useEffect(() => {
     const cover = coverSite(s.cover).slug;
     let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
@@ -247,23 +288,54 @@ class ErrorBoundary extends Component<
   }
 }
 const mode = siteMode();
-if (!crypto.subtle) {
+const hostedSetupProblems = [
+  !import.meta.env.VITE_FIREBASE_API_KEY && "VITE_FIREBASE_API_KEY",
+  !import.meta.env.VITE_FIREBASE_AUTH_DOMAIN && "VITE_FIREBASE_AUTH_DOMAIN",
+  !import.meta.env.VITE_FIREBASE_PROJECT_ID && "VITE_FIREBASE_PROJECT_ID",
+  !import.meta.env.VITE_FIREBASE_STORAGE_BUCKET &&
+    "VITE_FIREBASE_STORAGE_BUCKET",
+  !import.meta.env.VITE_FIREBASE_APP_ID && "VITE_FIREBASE_APP_ID",
+  !import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY &&
+    "VITE_FIREBASE_APPCHECK_SITE_KEY",
+  import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true" &&
+    "VITE_USE_FIREBASE_EMULATORS must be false",
+].filter(Boolean);
+// Hosted private sites must use shared Firebase accounts; local browser accounts cannot sync to phones.
+if (import.meta.env.PROD && mode !== "download" && hostedSetupProblems.length > 0) {
   createRoot(document.getElementById("root")!).render(
-    <main className="error-page">
-      <h1>A secure connection is needed.</h1>
+    <main className="error-page" id="main">
+      <h1>Account service needs setup.</h1>
       <p>
-        Open this app over HTTPS, or use localhost on this computer. Browser
-        encryption is unavailable on an ordinary LAN HTTP address.
+        This site is not connected to shared accounts yet. Add the Firebase web
+        settings and the App Check site key in Hostinger, then redeploy so this
+        website and the phone app use the same accounts.
+      </p>
+      <p className="help-note">
+        This build cannot see: {hostedSetupProblems.join(", ")}. Set these in
+        this Hostinger app and rebuild it. VITE settings are read during the
+        build.
       </p>
     </main>,
   );
 } else
-  createRoot(document.getElementById("root")!).render(
-    <ErrorBoundary>
-      <SessionProvider mode={mode}>
-        <Routes mode={mode} />
-      </SessionProvider>
-    </ErrorBoundary>,
-  );
+  // Private entry needs the browser's built-in encryption tools.
+  if (!crypto.subtle) {
+    createRoot(document.getElementById("root")!).render(
+      <main className="error-page">
+        <h1>A secure connection is needed.</h1>
+        <p>
+          Open this app over HTTPS, or use localhost on this computer. Browser
+          encryption is unavailable on an ordinary LAN HTTP address.
+        </p>
+      </main>,
+    );
+  } else
+    createRoot(document.getElementById("root")!).render(
+      <ErrorBoundary>
+        <SessionProvider mode={mode}>
+          <Routes mode={mode} />
+        </SessionProvider>
+      </ErrorBoundary>,
+    );
 if ("serviceWorker" in navigator && import.meta.env.PROD)
   void navigator.serviceWorker.register("/sw.js").catch(() => {});
