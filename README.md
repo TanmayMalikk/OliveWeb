@@ -10,6 +10,21 @@ Currently, there is no way to download the .apk file directly to your android de
 Instead, Clone this GitHub repository "https://github.com/macewanCS/F26_D1.git" and open the repository in Android Studio.
 Then run the Gradle build/sync, to compile the application
 then you can run the application on an emulated or physical device.
+
+The app runs fine currently however, to enable some of the database features. You need to set up your debug token on the firebase.
+## Debug Token
+On emulators this is a process you need to do every time you start a new emulator.
+on a physical device the debug token is static.
+Start the device either physical or emulated. Open Logcat in android studio and filter by 'debug token'
+You will see a log that starts with
+"Firebase App check debug token: XXXXXX
+to use this token ofr app debugging, register it with your project."
+and a link to this projects firebase console.
+
+Copy the debug token and open the link, then add your token as a rule to the firebase project.
+
+### Message to TA
+If you send us your Debug token on your device we can add your device to the firebase project without needing to link your google account.
 ---------------------------------------------
 # Testing
 ## UNIX Based Systems
