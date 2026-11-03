@@ -26,12 +26,12 @@ interface MediaTicketDataSource {
     suspend fun abortUpload(jobId:String)
     /** Returns a short-lived GET capability after the callable checks `allowed_users`. */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
-    /** Returns the callable-only account recovery key after the server checks file access. */
-    suspend fun accountAccessKey(mediaId:String):String
-    /** Saves a recovery key for an older owner document after this device decrypts it. */
-    suspend fun storeAccountAccessKey(mediaId:String,accountAccessKey:String) = Unit
-    /** Replaces the owner-controlled recipient list and wrapped AES keys without exposing plaintext. */
-    suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord
+    /** Atomically replaces recipients plus their account/device-wrapped AES keys. */
+    suspend fun updateAccess(
+        mediaId:String,
+        wrappedKeys:Map<String,String>,
+        deviceWrappedKeys:Map<String,String>,
+    ):CloudMediaRecord
     /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
     suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
     /** Deletes both the owner's R2 object and its Firestore metadata through trusted code. */
@@ -67,7 +67,6 @@ class MediaRepository(
             "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
             "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
             "deviceWrappedKeys" to source.deviceWrappedKeys,
-            "accountAccessKey" to source.accountAccessKey,
             "encryptionVersion" to source.encryptionVersion,
         ))
         return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
@@ -99,22 +98,19 @@ class MediaRepository(
         return MediaDownloadTicket(mediaId,validateUrl(result.string("url")),result.stringMap("headers"),result.long("expiresAt"))
     }
 
-    // Uses one protected-storage key for this account's encrypted-media access data.
-    override suspend fun accountAccessKey(mediaId:String):String =
-        call("mediaAccountAccessKey",mapOf("mediaId" to mediaId)).string("accountAccessKey")
-
-    // Saves this account's wrapped document keys in protected local storage.
-    override suspend fun storeAccountAccessKey(mediaId:String,accountAccessKey:String) {
-        call("mediaStoreAccountAccessKey",mapOf(
-            "mediaId" to mediaId,
-            "accountAccessKey" to accountAccessKey,
-        ))
-    }
-
     // Saves the latest encrypted-media access keys for this account.
-    override suspend fun updateAccess(mediaId:String,wrappedKeys:Map<String,String>):CloudMediaRecord {
+    override suspend fun updateAccess(
+        mediaId:String,
+        wrappedKeys:Map<String,String>,
+        deviceWrappedKeys:Map<String,String>,
+    ):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
-        return call("mediaUpdateAccess",mapOf("mediaId" to mediaId,"wrappedKeys" to wrappedKeys)).record()
+        require(deviceWrappedKeys.size<=250)
+        return call("mediaUpdateAccess",mapOf(
+            "mediaId" to mediaId,
+            "wrappedKeys" to wrappedKeys,
+            "deviceWrappedKeys" to deviceWrappedKeys,
+        )).record()
     }
 
     // Adds the wrapped file keys needed by newly authorized devices.
