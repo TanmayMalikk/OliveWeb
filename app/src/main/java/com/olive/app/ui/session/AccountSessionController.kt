@@ -33,7 +33,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 runtime.enrollment = restoredSession?.enrollment
                 restoredSession?.let { restorePresentation(it) }
                 routeRestoredAccount()
-                runtime.enrollment?.let { watchAccountChanges(AccountIdentity(it.uid, runtime.coverUsername)) }
+                runtime.enrollment?.let {
+                    watchAccountChanges(AccountIdentity(it.uid, runtime.state.coverUsername))
+                }
                 if (runtime.enrollment?.role == AccountRole.ADMIN && !runtime.localMode) {
                     runtime.organization.queueAdminRefresh()
                 }
@@ -356,12 +358,12 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         val records = accounts.historyRecords(identity)
                         withContext(Dispatchers.IO) { store.mergeHistory(identity.uid, records) }
                         if (enrollment?.uid != identity.uid) return@launch
-                        profile = updatedProfile
-                        deliveryAddress = updatedProfile.address
-                        language = updatedProfile.language
-                        coverDob = updatedProfile.dob
-                        coverFullName = updatedProfile.fullName
-                        coverType = updatedProfile.coverType
+                        state.profile = updatedProfile
+                        state.deliveryAddress = updatedProfile.address
+                        state.language = updatedProfile.language
+                        state.coverDob = updatedProfile.dob
+                        state.coverFullName = updatedProfile.fullName
+                        state.coverType = updatedProfile.coverType
                         enrollment = enrollment?.copy(
                             triggerHash = updatedProfile.triggerHash,
                             role = updatedProfile.role,
