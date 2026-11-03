@@ -89,6 +89,7 @@ class OliveActivity : FragmentActivity() {
                 authentication?.let(deviceLock::show)
                 onDispose { deviceLock.cancel() }
             }
+
             val selectedCover = session.coverType
             val selectedRole = session.accountRole
             val notificationAccountId = session.coverAccountId
@@ -109,6 +110,11 @@ class OliveActivity : FragmentActivity() {
                 OliveTheme { OliveRoot(session, locationPermissionVersion) }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
     }
 
     // Leaving the foreground locks the User safe area; the resource flag controls the extra native privacy cover.

@@ -1,7 +1,6 @@
 package com.olive.app.data
 
 import com.olive.app.data.messaging.VoipApiException
-import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipManager
 import com.olive.app.data.messaging.VoipParticipantStatus
@@ -51,6 +50,80 @@ class VoipManagerTest {
 
     // Checks the incoming calls can be observed and accepted step with the test's sample data.
     @Test
+    fun startCallSurfacesInviteesWithNotificationDeliveryFailures() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val body = CALLRESPONSE.dropLast(1) + ""","notificationFailures":["user-3"]}"""
+        val call = managerFor(
+            responseBody = body,
+            requests = requests,
+            token = "user-token"
+        ).startCall("Support", "caller-1", listOf("user-2", "user-3"))
+
+        assertEquals(listOf("user-3"), call.undeliveredInviteeIds)
+    }
+
+    @Test
+    fun liveKitTokenRequestUsesFirebaseIdentityAndParsesRoomDetails() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                requests += chain.request()
+                chain.request().jsonResponse(
+                    body = """{"callId":"call-1","serverUrl":"wss://olive-test.livekit.cloud","token":"signed-token","roomName":"olive-call"}"""
+                )
+            }
+            .build()
+        val manager = VoipManager(
+            apiBaseUrl = "https://voip.test",
+            httpClient = client,
+            bearerTokenProvider = { "firebase-id-token" }
+        )
+
+        val details = manager.getLiveKitConnectionDetails("call-1")
+
+        assertEquals(
+            LiveKitConnectionDetails(
+                serverUrl = "wss://olive-test.livekit.cloud",
+                token = "signed-token",
+                roomName = "olive-call"
+            ),
+            details
+        )
+        assertEquals("/calls/token", requests.single().url.encodedPath)
+        assertTrue(requests.single().header("Authorization")?.startsWith("Bearer ") == true)
+        assertEquals("call-1", JSONObject(Buffer().also {
+            requests.single().body?.writeTo(it)
+        }.readUtf8()).getString("callId"))
+    }
+
+    @Test
+    fun pushTokenRegistrationUsesAuthenticatedDeviceScopedEndpoints() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val manager = managerFor(
+            responseBody = "{}",
+            requests = requests,
+            token = "firebase-id-token"
+        )
+
+        manager.registerPushToken("install-123", "fcm-token")
+        manager.unregisterPushToken("install-123")
+
+        assertEquals(
+            listOf(
+                "POST /notifications/register",
+                "DELETE /notifications/register"
+            ),
+            requests.map { "${it.method} ${it.url.encodedPath}" }
+        )
+        assertTrue(requests.all { it.header("Authorization")?.startsWith("Bearer ") == true })
+        val registration = JSONObject(Buffer().also { requests.first().body?.writeTo(it) }.readUtf8())
+        assertEquals("install-123", registration.getString("deviceId"))
+        assertEquals("fcm-token", registration.getString("token"))
+        val unregistration = JSONObject(Buffer().also { requests.last().body?.writeTo(it) }.readUtf8())
+        assertEquals("install-123", unregistration.getString("deviceId"))
+    }
+
+    @Test
     fun incomingCallsCanBeObservedAndAccepted() = runBlocking {
         val requests = mutableListOf<Request>()
         val manager = managerFor(
@@ -81,7 +154,11 @@ class VoipManagerTest {
                 )
             }
             .build()
-        val manager = VoipManager(apiBaseUrl = "https://voip.test", httpClient = client)
+        val manager = VoipManager(
+            apiBaseUrl = "https://voip.test",
+            httpClient = client,
+            bearerTokenProvider = { "firebase-id-token" }
+        )
 
         val error = assertThrows(VoipApiException::class.java) {
             runBlocking { manager.getIncomingCalls("user-1") }
@@ -112,7 +189,11 @@ class VoipManagerTest {
         val client = OkHttpClient.Builder()
             .addInterceptor { throw IOException("Connection refused") }
             .build()
-        val manager = VoipManager(apiBaseUrl = "https://voip.test", httpClient = client)
+        val manager = VoipManager(
+            apiBaseUrl = "https://voip.test",
+            httpClient = client,
+            bearerTokenProvider = { "firebase-id-token" }
+        )
 
         val error = assertThrows(IOException::class.java) {
             runBlocking { manager.getIncomingCalls("user-1") }
@@ -202,7 +283,11 @@ class VoipManagerTest {
                 chain.request().jsonResponse(body = body)
             }
             .build()
-        val manager = VoipManager(apiBaseUrl = "https://voip.test", httpClient = client)
+        val manager = VoipManager(
+            apiBaseUrl = "https://voip.test",
+            httpClient = client,
+            bearerTokenProvider = { "firebase-id-token" }
+        )
 
         val results = manager.receiveCalls("user-2", pollingIntervalMillis = 1)
             .take(2)
@@ -250,7 +335,11 @@ class VoipManagerTest {
         val client = OkHttpClient.Builder()
             .addInterceptor { chain -> chain.request().jsonResponse(code = code, body = body) }
             .build()
-        return VoipManager(apiBaseUrl = "https://voip.test", httpClient = client)
+        return VoipManager(
+            apiBaseUrl = "https://voip.test",
+            httpClient = client,
+            bearerTokenProvider = { "firebase-id-token" }
+        )
     }
 
     // Builds a fake server response so each VoIP test can control the returned JSON.
@@ -265,7 +354,7 @@ class VoipManagerTest {
 
     companion object {
         private const val CALLRESPONSE =
-            """{"callId":"call-1","channelId":42,"name":"Support","callerId":"caller-1","participants":[{"userId":"caller-1","status":"accepted"},{"userId":"user-2","status":"accepted"},{"userId":"user-3","status":"pending"}]}"""
+            """{"callId":"call-1","name":"Support","callerId":"caller-1","participants":[{"userId":"caller-1","status":"accepted"},{"userId":"user-2","status":"accepted"},{"userId":"user-3","status":"pending"}]}"""
         private const val INVITATIONRESPONSE =
             """{"invitations":[{"callId":"call-1","callerId":"caller-1","name":"Support","status":"pending"}]}"""
     }
