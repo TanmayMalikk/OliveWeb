@@ -14,7 +14,7 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
-    "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
+    "mediaDownloadTicket",
     "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaDelete", "staffSupportRequest",
     "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
@@ -28,23 +28,57 @@ test("encrypted media device keys stay scoped to the signed-in account", () => {
   assert.throws(() => mediaTest.validateDeviceWrappedKeys({"other--phone":"wrapped"}, "owner"));
 });
 
-// Inputs: a valid 32-byte Base64 key plus malformed and wrong-length values. Expected: only AES-256 material passes.
-test("account document recovery accepts only a 256-bit key", () => {
-  const valid = Buffer.alloc(32, 7).toString("base64");
-  assert.equal(mediaTest.accountAccessKey(valid, true), valid);
-  assert.equal(mediaTest.accountAccessKey(undefined), "");
-  assert.throws(() => mediaTest.accountAccessKey("not base64", true));
-  assert.throws(() => mediaTest.accountAccessKey(Buffer.alloc(16).toString("base64"), true));
-});
-
 // Inputs: the values in this case. Expected: encrypted media access keeps the owner and exact wrapped-key recipients.
 test("encrypted media access keeps the owner and exact wrapped-key recipients", () => {
   assert.deepEqual(
-    mediaTest.accessRequest({wrappedKeys:{owner:"owner-key",staff:"staff-key"}}, "owner"),
-    {wrappedKeys:{owner:"owner-key",staff:"staff-key"},allowedUsers:["owner","staff"]},
+    mediaTest.accessRequest({
+      wrappedKeys:{owner:"owner-key",staff:"staff-key"},
+      deviceWrappedKeys:{"owner--phone":"owner-device","staff--phone":"staff-device"},
+    }, "owner"),
+    {
+      wrappedKeys:{owner:"owner-key",staff:"staff-key"},
+      allowedUsers:["owner","staff"],
+      deviceWrappedKeys:{"owner--phone":"owner-device","staff--phone":"staff-device"},
+    },
   );
   assert.throws(() => mediaTest.accessRequest({wrappedKeys:{staff:"staff-key"}}, "owner"));
   assert.throws(() => mediaTest.accessRequest({wrappedKeys:{}}, "owner"));
+});
+
+// Inputs: exact authorized device wrappers plus a stale revoked wrapper. Expected: only wrappers
+// belonging to the replacement allowed-user set can be persisted.
+test("encrypted media access rejects device wrappers for revoked users", () => {
+  assert.deepEqual(
+    mediaTest.validateAccessDeviceWrappedKeys(
+      {"owner--phone":"owner-device", "staff--browser":"staff-device"},
+      ["owner", "staff"],
+    ),
+    {"owner--phone":"owner-device", "staff--browser":"staff-device"},
+  );
+  assert.deepEqual(mediaTest.validateAccessDeviceWrappedKeys({}, ["owner"]), {});
+  assert.throws(() => mediaTest.validateAccessDeviceWrappedKeys(
+    {"revoked--phone":"stale-device"}, ["owner"],
+  ));
+});
+
+// Inputs: 25 accounts across Android, browser, tablet, and repeated replacement cycles.
+// Expected: maximum valid access sets remain stable and oversized device maps are rejected.
+test("encrypted media access validates repeated multi-device stress sets", () => {
+  const users = Array.from({length:25}, (_, index) => `user-${index}`);
+  for (let iteration = 0; iteration < 100; iteration += 1) {
+    const devices = Object.fromEntries(users.flatMap((uid) => [
+      [`${uid}--android-${iteration}`, "android-key"],
+      [`${uid}--browser-${iteration}`, "browser-key"],
+      [`${uid}--tablet-${iteration}`, "tablet-key"],
+    ]));
+    assert.equal(Object.keys(
+      mediaTest.validateAccessDeviceWrappedKeys(devices, users),
+    ).length, 75);
+  }
+  const oversized = Object.fromEntries(Array.from(
+    {length:251}, (_, index) => [`owner--device-${index}`, "wrapped"],
+  ));
+  assert.throws(() => mediaTest.validateAccessDeviceWrappedKeys(oversized, ["owner"]));
 });
 
 // Inputs: the values in this case. Expected: role aliases and real organization emails are deterministic.

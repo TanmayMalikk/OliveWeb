@@ -4,6 +4,7 @@ package com.olive.app.ui.users.user.account
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,12 +19,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -65,6 +69,10 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    val cacheUid = session.coverAccountId
+    LaunchedEffect(cacheUid) {
+        cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
+    }
 
     FormColumn {
         SafeBack(session)
@@ -218,6 +226,31 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
         if (userRole) {
             HorizontalDivider()
             SafeEntrySettings(session)
+            HorizontalDivider()
+            Text(
+                stringResource(R.string.documents_recent_cache_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { heading() },
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.documents_recent_cache_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = session.media?.recentCachingEnabled == true,
+                    onCheckedChange = { enabled ->
+                        cacheUid?.let { session.media?.setRecentCachingPreference(it, enabled) }
+                    },
+                    enabled = cacheUid != null,
+                    modifier = Modifier.testTag("recent_file_caching"),
+                )
+            }
             HorizontalDivider()
             Text(
                 stringResource(R.string.change_trigger_word),

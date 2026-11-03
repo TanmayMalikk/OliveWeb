@@ -14,10 +14,15 @@ import com.olive.app.data.MessagingRepository
 import com.olive.app.data.MessageOutboxStore
 import com.olive.app.data.ChatCacheStore
 import com.olive.app.data.SafetyDocumentRepository
+import com.olive.app.data.SafetyDocumentDataSource
+import com.olive.app.data.DocumentIndexStore
+import com.olive.app.data.DocumentIndexDataSource
+import com.olive.app.data.IndexedSafetyDocumentRepository
 import com.olive.app.data.SecureChatRepository
 import com.olive.app.data.SecureDocumentRepository
 import com.olive.app.data.media.MediaRepository
 import com.olive.app.data.media.MediaTicketDataSource
+import com.olive.app.data.media.OfflineMediaCache
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.DeviceStore
 import kotlinx.coroutines.sync.Mutex
@@ -44,6 +49,8 @@ internal class SessionLocalStorage(application: Application, localMode: Boolean)
     )
     val messageOutbox = MessageOutboxStore(application)
     val chatCache = ChatCacheStore(application)
+    val documentIndex = DocumentIndexStore(application)
+    val offlineMediaCache = OfflineMediaCache(application)
 }
 
 // Builds cloud repositories only for a Firebase session. Tests can supply a replacement bundle.
@@ -54,12 +61,17 @@ internal class SessionDataSources(
     val secureChat: SecureChatRepository?,
     val secureDocument: SecureDocumentRepository?,
     val media: MediaTicketDataSource?,
-    val safetyDocuments: SafetyDocumentRepository?,
+    val safetyDocuments: SafetyDocumentDataSource?,
     val locations: LocationSharingRepository?,
 ) {
     companion object {
         // Creates the cloud repository bundle used by a signed-in Firebase account.
-        fun create(application: Application, localMode: Boolean, vault: EncryptedVault): SessionDataSources {
+        fun create(
+            application: Application,
+            localMode: Boolean,
+            vault: EncryptedVault,
+            documentIndex: DocumentIndexDataSource,
+        ): SessionDataSources {
             val media: MediaTicketDataSource? = if (localMode) null else MediaRepository()
             return SessionDataSources(
                 accounts = if (localMode) LocalAccountRepository(vault) else FirebaseAccountRepository(),
@@ -68,7 +80,9 @@ internal class SessionDataSources(
                 secureChat = if (localMode) null else SecureChatRepository(),
                 secureDocument = if (localMode) null else SecureDocumentRepository(),
                 media = media,
-                safetyDocuments = media?.let { SafetyDocumentRepository(media = it) },
+                safetyDocuments = media?.let {
+                    IndexedSafetyDocumentRepository(SafetyDocumentRepository(media = it), documentIndex)
+                },
                 locations = if (localMode) null else LocationSharingRepository(application),
             )
         }

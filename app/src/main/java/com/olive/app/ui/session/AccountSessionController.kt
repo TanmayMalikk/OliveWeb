@@ -265,6 +265,8 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             store.forgetDevice()
                             messageOutbox.purge(uid)
                             chatCache.purge(uid)
+                            documentIndex.purge(uid)
+                            offlineMediaCache.purge(uid)
                         }
                         // Cloud accounts also remove their Firebase sign-in record.
                         if (!localMode) runCatching {
