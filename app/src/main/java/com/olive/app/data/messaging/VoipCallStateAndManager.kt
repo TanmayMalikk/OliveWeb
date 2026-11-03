@@ -1,5 +1,9 @@
 package com.olive.app.data.messaging
 
+import com.olive.app.BuildConfig
+import com.google.firebase.auth.FirebaseAuth
+import com.olive.app.data.LiveKitConnectionDetails
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -10,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -37,13 +42,14 @@ data class VoipParticipant(
 
 data class VoipCall(
     val callId: String,
-    val channelId: Int,
     val name: String,
     val callerId: String,
-    val participants: List<VoipParticipant>
+    val participants: List<VoipParticipant>,
+    val undeliveredInviteeIds: List<String> = emptyList()
 )
 
-// Stores the call invitation that the server returns for one invited user.
+// VoipInvitation is a class that is responsible for accepting calls.
+// When a user is 'dialed' the server will ping that user to make a VoipInvitation object to handle connecting to the call.
 data class VoipInvitation(
     val callId: String,
     val callerId: String,
@@ -51,15 +57,11 @@ data class VoipInvitation(
     val status: VoipParticipantStatus
 )
 
-// Describes the call state that a screen can display to the user.
+// An interface that measures the status of the voip call.
 sealed interface VoipState {
     data object Idle : VoipState
     data class Ringing(val callId: String, val callName: String, val callerId: String = "") : VoipState
-    @Suppress("unused") // Connecting and Active are currently not in use, but will be used
-    // when server goes live.
     data class Connecting(val callId: String) : VoipState
-    @Suppress("unused") // Connecting and Active are currently not in use, but will be used
-    // when server goes live.
     data class Active(val callId: String, val participantCount: Int) : VoipState
     data class Error(val message: String) : VoipState
 }
@@ -70,14 +72,13 @@ class VoipApiException(
     message: String
 ) : IOException(message)
 
-// Sends call invitations and responses through the Olive Branch VoIP API.
-@Suppress("unused")
 class VoipManager(
-    // Supplies the API location, HTTP client, and optional sign-in token used by each request.
-    @Suppress("unused")
-    private val apiBaseUrl: String = DEFAULT_API_BASE_URL,
+    // API authentication is also not built yet, needs server side hosting to finalize implementation.
+    private val apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL,
     private val httpClient: OkHttpClient = OkHttpClient(),
-    private val bearerTokenProvider: () -> String? = { null }
+    private val bearerTokenProvider: suspend () -> String? = {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
+    }
 ) {
     private val baseUrl = apiBaseUrl.trimEnd('/')
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -85,7 +86,7 @@ class VoipManager(
 
     val state: StateFlow<VoipState> = mutableState.asStateFlow()
 
-    // Rejects unsafe or malformed server addresses before any call request is sent.
+    //double check this code when Live, might need to be changed to connect to actual server.
     init {
         val apiUri = runCatching { URI(baseUrl) }.getOrNull()
         val isHttps = apiUri?.scheme.equals("https", ignoreCase = true)
@@ -99,7 +100,7 @@ class VoipManager(
                 apiUri.fragment == null &&
                 (isHttps || isEmulatorLoopback)
         ) {
-            "VoIP API base URL must use HTTPS (or the Android emulator loopback host)"
+            "Configure VOIP_API_BASE_URL with HTTPS (or the Android emulator loopback host)"
         }
     }
 
@@ -123,6 +124,20 @@ class VoipManager(
             .put("callerId", callerId)
             .put("participantIds", JSONArray(participantIds))
         return parseCall(request("POST", "/api/calls", body))
+    }
+
+    suspend fun getLiveKitConnectionDetails(callId: String): LiveKitConnectionDetails {
+        require(callId.isNotBlank()) { "Call ID must not be blank" }
+        val response = request(
+            "POST",
+            "/calls/token",
+            JSONObject().put("callId", callId)
+        )
+        return LiveKitConnectionDetails(
+            serverUrl = response.getString("serverUrl"),
+            token = response.getString("token"),
+            roomName = response.getString("roomName")
+        )
     }
 
     // Loads every call record currently visible to the signed-in client.
@@ -174,7 +189,22 @@ class VoipManager(
     // Deletes the server call record after the call has ended.
     suspend fun endCall(callId: String) {
         require(callId.isNotBlank()) { "Call ID must not be blank" }
-        request("DELETE", "/api/calls/${encodePathSegment(callId)}")
+        request("POST", "/calls/end", JSONObject().put("callId", callId))
+    }
+
+    suspend fun registerPushToken(deviceId: String, token: String) {
+        require(deviceId.isNotBlank()) { "Device ID must not be blank" }
+        require(token.isNotBlank()) { "Push token must not be blank" }
+        request(
+            "POST",
+            "/notifications/register",
+            JSONObject().put("deviceId", deviceId).put("token", token)
+        )
+    }
+
+    suspend fun unregisterPushToken(deviceId: String) {
+        require(deviceId.isNotBlank()) { "Device ID must not be blank" }
+        request("DELETE", "/notifications/register", JSONObject().put("deviceId", deviceId))
     }
 
     // Sends one user's accept or decline choice to the matching call endpoint.
@@ -205,8 +235,7 @@ class VoipManager(
 
             // Converts successful responses and turns server failures into useful app errors.
             httpClient.newCall(requestBuilder.build()).execute().use { response ->
-                val responseBody = response.body.string()
-                // Stop the call setup when the server rejects the connection.
+                val responseBody = response.body?.string().orEmpty()
                 if (!response.isSuccessful) {
                     val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
                     throw VoipApiException(
@@ -229,10 +258,12 @@ class VoipManager(
     private fun parseCall(json: JSONObject): VoipCall =
         VoipCall(
             callId = json.getString("callId"),
-            channelId = json.getInt("channelId"),
             name = json.getString("name"),
             callerId = json.getString("callerId"),
-            participants = json.getJSONArray("participants").toParticipantList()
+            participants = json.getJSONArray("participants").toParticipantList(),
+            undeliveredInviteeIds = json.optJSONArray("notificationFailures")
+                ?.let { failures -> (0 until failures.length()).map(failures::getString) }
+                .orEmpty()
         )
 
     // Converts a server array into call models.
@@ -276,7 +307,6 @@ class VoipManager(
         URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
 
     companion object {
-        const val DEFAULT_API_BASE_URL = "https://mumble.yourolivebranch.ca"
         const val DEFAULT_POLLING_INTERVAL_MILLIS = 5_000L
     }
 }

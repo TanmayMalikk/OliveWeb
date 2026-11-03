@@ -2,6 +2,18 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "calls": {
+      ".read": false,
+      ".write": false
+    },
+    "users": {
+      "$userId": {
+        "fcmTokens": {
+          ".read": false,
+          ".write": false
+        }
+      }
+    },
     "liveLocations": {
       "$ownerUid": {
         ".read": "auth != null && (auth.uid === $ownerUid || data.child('authorized').child(auth.uid).val() === true)",

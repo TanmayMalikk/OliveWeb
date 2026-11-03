@@ -1,5 +1,6 @@
 // All account roles: restores sessions, completes account setup, and signs out.
 package com.olive.app.ui.session
+import android.util.Log
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import com.olive.app.BuildConfig
@@ -8,7 +9,9 @@ import com.olive.app.data.account.AccountSyncRepository
 import com.olive.app.security.*
 import com.olive.app.location.LiveLocationController
 import com.olive.app.notification.LocalNotificationEventHandler
+import com.olive.app.data.messaging.VoipPushTokenRegistration
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -271,6 +274,24 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                                     }
                                 }
                                 locationSharingRepository?.setLiveRecipients(uid, emptyList())
+                            }
+                        }
+                        if (!localMode) {
+                            try {
+                                withTimeoutOrNull(2_000.milliseconds) {
+                                    VoipPushTokenRegistration.unregisterCurrentDevice(application)
+                                } ?: Log.w(
+                                    "VoipPushToken",
+                                    "Push-token cleanup timed out during sign-out"
+                                )
+                            } catch (error: CancellationException) {
+                                throw error
+                            } catch (error: Exception) {
+                                Log.w(
+                                    "VoipPushToken",
+                                    "Push-token cleanup failed; signed-out devices ignore call invitations",
+                                    error
+                                )
                             }
                         }
                         accounts.signOut()
