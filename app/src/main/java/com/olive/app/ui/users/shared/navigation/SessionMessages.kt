@@ -67,6 +67,8 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun sendMessage(text: String, onSent: () -> Unit = {}) =
         runtime.conversationActions.sendMessage(text, onSent)
 
+    // Retries the failed encrypted queue head without bypassing message order.
+    fun retryMessage(chat: ChatMessage) = runtime.conversationActions.retryMessage(chat)
     // Un-sends a message when the signed-in account is allowed to remove it.
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
     // Dismisses the quick-exit tip shown inside a chat.

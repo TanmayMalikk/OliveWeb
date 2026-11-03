@@ -346,6 +346,11 @@
     <string name="select_a_friend_or_conversation_to_start_messaging">选择朋友或对话以开始发送消息。</string>
     <string name="unsend_message">取消发送消息</string>
     <string name="message_unsent">消息未发送</string>
+    <string name="message_delivery_queued">已排队 — 等待网络连接</string>
+    <string name="message_delivery_sending">正在发送…</string>
+    <string name="message_delivery_retrying">尚未发送 — 正在自动重试</string>
+    <string name="message_delivery_failed_retry">未发送 — 点按重试</string>
+    <string name="message_delivery_sent">已发送</string>
 <string name="share_attachment">分享附件</string><string name="select_attachment_category">选择%1$s</string>
     <string name="private_notes">私人笔记</string><string name="incident_reports">事件报告</string><string name="saved_media">已保存的媒体</string>
     <string name="no_private_notes_found">未找到笔记。</string><string name="untitled_note">无标题笔记</string><string name="no_incident_reports_found">未找到事件报告。</string>

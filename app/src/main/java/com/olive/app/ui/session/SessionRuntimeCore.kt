@@ -43,6 +43,7 @@ internal class SessionRuntime(
     val newsRevisions get() = localStorage.newsRevisions
     val messageReadState get() = localStorage.messageReadState
     val cloudState get() = localStorage.cloudState
+    val messageOutbox get() = localStorage.messageOutbox
     val dataSources = dataSourcesOverride ?: SessionDataSources.create(application, localMode, vault)
     val accounts get() = dataSources.accounts
     val adminRepository get() = dataSources.admin
@@ -63,6 +64,8 @@ internal class SessionRuntime(
     var accountSyncSubscription: ChatSubscription? = null
     var conversationSubscription: ChatSubscription? = null
     var messageSubscription: ChatSubscription? = null
+    var messageOutboxObservation: Job? = null
+    var remoteChatMessages = emptyList<ChatMessage>()
     var observedFriendshipIds = emptySet<String>()
     var chatQuickExitHintShown = false
     var verifiedMessagingIdentityMarker: String? = null
