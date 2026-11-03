@@ -265,8 +265,13 @@ class SafetyDocumentRepository(
     ) {
         if (document.objectKey.isBlank() || currentUid !in document.allowedUsers) return
         val ownDeviceKey = "$currentUid--${KeyManager.deviceId()}"
-        val wrapped = document.deviceWrappedKeys[ownDeviceKey] ?: document.wrappedKeys[currentUid] ?: return
-        val documentKey = runCatching { KeyManager.unwrapKey(wrapped, document.encryptionVersion) }.getOrNull() ?: return
+        val wrapped = listOfNotNull(
+            document.deviceWrappedKeys[ownDeviceKey],
+            document.wrappedKeys[currentUid],
+        )
+        val documentKey = runCatching {
+            KeyManager.unwrapFirst(wrapped, document.encryptionVersion)
+        }.getOrNull() ?: return
         val normalized = username.trim().lowercase()
         if (!normalized.matches(Regex("[a-z0-9_]{4,24}"))) return
         val directory = firestore.collection("messageDirectory").document(normalized)
@@ -382,10 +387,10 @@ class SafetyDocumentRepository(
         val deviceWrapped = (row.get("device_wrapped_keys") as? Map<String, String>).orEmpty()
         val metadata = if (encryptedMetadata.isBlank()) null else runCatching {
             val deviceKey = "$viewerUid--${KeyManager.deviceId()}"
-            val key = (deviceWrapped[deviceKey] ?: wrapped[viewerUid])?.let {
-                KeyManager.unwrapKey(it, encryptionVersion)
-            }
-                ?: error("Encryption key is unavailable")
+            val key = KeyManager.unwrapFirst(
+                listOfNotNull(deviceWrapped[deviceKey], wrapped[viewerUid]),
+                encryptionVersion,
+            )
             JSONObject(EncryptionUtils.decryptText(encryptedMetadata, key))
         }.getOrNull()
         val ocr = documentOcrMetadataFrom(metadata)
