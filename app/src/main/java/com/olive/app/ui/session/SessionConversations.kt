@@ -13,6 +13,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException
 
 // Owns conversation selection, messages and read markers.
@@ -32,6 +33,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 if (!preserveMessages || !sameConversation) {
                     chatMessages = emptyList()
                     remoteChatMessages = emptyList()
+                    activeRoomKey = null
                 }
                 activeConversation =
                     conversation
@@ -43,29 +45,47 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 val token = epoch
                 messagingBusy = true
                 scope.launch {
-                    // Use the fallback when open conversation is unavailable.
                     try {
-                        val key = secureSharing.roomKey(conversation)
-                        if (epoch != token || activeConversation?.id != conversation.id) return@launch
-                        MessageSendWorker.enqueuePending(application, uid)
-                        messageOutboxObservation = scope.launch {
-                            messageOutbox.observe(uid).collect { outgoing ->
-                                publishMessages(conversation.id, uid, key, outgoing, token)
-                            }
-                        }
-                        messageSubscription =
-                            secureChatRepository?.observeMessages(conversation.id, key, { rows ->
-                                if (epoch == token && activeConversation?.id == conversation.id) {
-                                    remoteChatMessages = rows
-                                    scope.launch {
-                                        publishMessages(conversation.id, uid, key, null, token)
-                                    }
+                        val secure = checkNotNull(secureChatRepository)
+                        val key = try {
+                            withTimeoutOrNull(8_000) {
+                                val onlineKey = secureSharing.roomKey(conversation)
+                                val wrapped = secure.wrappedRoomKey(conversation.id, uid)
+                                    ?: error("Wrapped room key unavailable")
+                                withContext(Dispatchers.IO) {
+                                    chatCache.saveAccess(
+                                        uid,
+                                        conversation,
+                                        wrapped,
+                                        com.olive.app.security.KeyManager.deviceId(),
+                                        System.currentTimeMillis(),
+                                    )
                                 }
-                            }, { error ->
-                                if (epoch == token) message = runtime.application.getString(
-                                    R.string.ui_unable_to_load_this_conversation_value, error
+                                onlineKey
+                            } ?: error("Online room key timed out")
+                        } catch (onlineFailure: Exception) {
+                            if (onlineFailure is CancellationException) throw onlineFailure
+                            val cached = withContext(Dispatchers.IO) {
+                                chatCache.open(
+                                    uid,
+                                    conversation.id,
+                                    com.olive.app.security.KeyManager.deviceId(),
+                                    System.currentTimeMillis(),
                                 )
-                            })
+                            }
+                            val offlineKey = com.olive.app.security.KeyManager.unwrapKey(cached.wrappedRoomKey)
+                            val cachedMessages = withContext(Dispatchers.Default) {
+                                secure.decryptMessages(cached.messages, offlineKey)
+                            }
+                            if (epoch == token && activeConversation?.id == conversation.id) {
+                                remoteChatMessages = cachedMessages
+                            }
+                            offlineKey
+                        }
+                        if (epoch != token || activeConversation?.id != conversation.id) return@launch
+                        activeRoomKey = key
+                        startMessageObservation(conversation, uid, key, token)
+                        publishMessages(conversation.id, uid, key, null, token)
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: Exception) { // Do not expose key details; show the safe conversation error when encrypted room setup fails.
@@ -95,6 +115,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 messageOutboxObservation?.cancel()
                 messageOutboxObservation = null
                 activeConversation = null
+                activeRoomKey = null
                 chatMessages = emptyList()
                 remoteChatMessages = emptyList()
                 message = null
@@ -116,7 +137,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         runtime.scope.launch {
             // Turn an unexpected send message failure into a readable message.
             try {
-                val roomKey = runtime.secureSharing.roomKey(conversation)
+                val roomKey = runtime.activeRoomKey ?: runtime.secureSharing.roomKey(conversation)
                 val outgoing = withContext(Dispatchers.Default) {
                     prepareOutgoingMessage(
                         conversation.id,
@@ -238,6 +259,78 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
             runtime.state.chatMessages = (remote + local)
                 .distinctBy(ChatMessage::id)
                 .sortedWith(compareBy(ChatMessage::sentAt, ChatMessage::id))
+        }
+    }
+
+    private fun startMessageObservation(
+        conversation: ChatConversation,
+        ownerUid: String,
+        roomKey: javax.crypto.SecretKey,
+        token: Long,
+    ) {
+        with(runtime) {
+            val secure = secureChatRepository ?: return
+            MessageSendWorker.enqueuePending(application, ownerUid)
+            messageOutboxObservation?.cancel()
+            messageOutboxObservation = scope.launch {
+                messageOutbox.observe(ownerUid).collect { outgoing ->
+                    publishMessages(conversation.id, ownerUid, roomKey, outgoing, token)
+                }
+            }
+            messageSubscription?.close()
+            messageSubscription = secure.observeMessages(
+                conversation.id,
+                roomKey,
+                { rows ->
+                    if (epoch == token && state.activeConversation?.id == conversation.id) {
+                        remoteChatMessages = rows
+                        scope.launch { publishMessages(conversation.id, ownerUid, roomKey, null, token) }
+                    }
+                },
+                { error ->
+                    if (epoch == token && remoteChatMessages.isEmpty()) {
+                        state.message = application.getString(
+                            R.string.ui_unable_to_load_this_conversation_value,
+                            error,
+                        )
+                    }
+                },
+                { encrypted ->
+                    scope.launch {
+                        try {
+                            val wrapped = secure.wrappedRoomKey(conversation.id, ownerUid)
+                                ?: throw ChatCacheException("Wrapped room key unavailable")
+                            val confirmedKey = com.olive.app.security.KeyManager.unwrapKey(wrapped)
+                            withContext(Dispatchers.IO) {
+                                chatCache.saveAccess(
+                                    ownerUid,
+                                    state.activeConversation?.takeIf { it.id == conversation.id }
+                                        ?: conversation,
+                                    wrapped,
+                                    com.olive.app.security.KeyManager.deviceId(),
+                                    System.currentTimeMillis(),
+                                )
+                                chatCache.saveMessages(
+                                    ownerUid,
+                                    conversation.id,
+                                    encrypted,
+                                    System.currentTimeMillis(),
+                                )
+                            }
+                            if (epoch == token && state.activeConversation?.id == conversation.id &&
+                                activeRoomKey?.encoded?.let(confirmedKey.encoded::contentEquals) != true
+                            ) {
+                                activeRoomKey = confirmedKey
+                                startMessageObservation(conversation, ownerUid, confirmedKey, token)
+                            }
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // A transient revalidation failure never extends the offline lease.
+                        }
+                    }
+                },
+            )
         }
     }
 
