@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MessagingModelsEdgeCaseTest {
+    // returns the conversation for messaging models edge case test kt. The test gives the code a clear input and checks the expected result.
     private fun conversation(
         type: String = "SUPPORT",
         origin: String = SUPPORT_TAG_SUPPORT,
@@ -55,6 +56,7 @@ class MessagingModelsEdgeCaseTest {
     // Inputs: the values shown below. Expected: ticket labels distinguish consultation support and escalation.
     @Test
     fun ticketLabelsDistinguishConsultationSupportAndEscalation() {
+        // returns the name for messaging models edge case test kt. The test gives the code a clear input and checks the expected result.
         fun name(chat: ChatConversation) = chat.anonymousStaffDisplayName(
             staffName = "Olive Staff",
             consultationName = "Consultation",

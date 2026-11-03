@@ -26,8 +26,10 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
     var error by mutableStateOf<Int?>(null)
         private set
 
+    // Requests help for staff support controller.
     fun requestHelp() = updateRequest(cancel = false)
 
+    // Staff support controller: returns the cancel request.
     fun cancelRequest() = updateRequest(cancel = true)
 
     // Keep the current account's ticket on screen; responses from a previous account are ignored.
@@ -41,6 +43,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         saving++
         error = null
         runtime.scope.launch {
+            // A update request error is handled here instead of closing the app.
             try {
                 val ticket = withTimeout(35.seconds) {
                     withContext(Dispatchers.IO) {
@@ -62,11 +65,13 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Staff support controller: Requests admin.
     fun requestAdmin(conversationId: String) {
         if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || conversationId.isBlank()) return
         saving++
         error = null
         runtime.scope.launch {
+            // A request admin error is handled here instead of closing the app.
             try {
                 withContext(Dispatchers.IO) { repository.requestAdmin(conversationId) }
             } catch (cancelled: CancellationException) {
@@ -79,12 +84,14 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Staff support controller: Closes the active feature.
     fun close(conversationId: String) {
         if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || conversationId.isBlank() || saving > 0) return
         val actor = runtime.coverAccountId ?: return
         saving++
         error = null
         runtime.scope.launch {
+            // A close error is handled here instead of closing the app.
             try {
                 withContext(Dispatchers.IO) { repository.close(conversationId) }
                 if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {

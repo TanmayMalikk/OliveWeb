@@ -9,16 +9,19 @@ const PLAN_CONSULT = "PLAN_CONSULT";
 const SUPPORT = "SUPPORT";
 const NEEDS_ADMIN = "NEEDS_ADMIN";
 
+// Creates a unique conversation ID so every new support ticket gets a separate chat.
 function supportConversationId(ownerUid, origin = SUPPORT) {
   const ticketId = crypto.randomUUID();
   return `${origin === PLAN_CONSULT ? "plan-consult" : "support"}-${ownerUid}-${ticketId}`;
 }
 
+// Loads display usernames for every participant stored in a support conversation.
 async function participantNames(participantIds) {
   const profiles = await Promise.all(participantIds.map(readProfile));
   return Object.fromEntries(participantIds.map((uid, index) => [uid, profiles[index]?.username || uid]));
 }
 
+// Creates or updates the encrypted support chat for a support request or consultation.
 async function saveSupportConversation(plan, safeContactUid = "", reopen = false) {
   if (!plan?.ownerUid || !plan?.staffUid) return;
   const origin = plan.supportOrigin === PLAN_CONSULT ? PLAN_CONSULT : SUPPORT;
@@ -53,6 +56,7 @@ async function saveSupportConversation(plan, safeContactUid = "", reopen = false
   await reference.set(value, {merge: true});
 }
 
+// Archives one support conversation for every participant without deleting its messages.
 async function closeSupportConversation(conversationId) {
   if (!conversationId) return;
   const reference = db.collection("conversations").doc(conversationId);
@@ -62,6 +66,7 @@ async function closeSupportConversation(conversationId) {
   }
 }
 
+// Lets a user add one approved safe contact to an active plan consultation.
 exports.safetySupportContact = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   if (caller.role !== "USER") throw new HttpsError("permission-denied", "Owner only.");
@@ -73,6 +78,7 @@ exports.safetySupportContact = onCall({invoker: "public"}, async (request) => {
   if (!plan.staffUid || plan.consultationRequested !== true) {
     throw new HttpsError("failed-precondition", "Request a plan consultation before creating the support chat.");
   }
+  // Confirms that the requested participant is both approved and an accepted friend.
   if (safeContactUid) {
     if (!Array.isArray(plan.safeContactUids) || !plan.safeContactUids.includes(safeContactUid)) {
       throw new HttpsError("permission-denied", "Share the safety plan with this safe contact first.");
@@ -100,6 +106,7 @@ exports.safetySupportAdmin = onCall({invoker: "public"}, async (request) => {
   }
   const conversation = conversationSnapshot.data();
   const candidates = [];
+  // Builds the list from trusted admin claims and completed profiles.
   for (const user of await listEveryUser()) {
     if (user.disabled || user.customClaims?.role !== "ADMIN") continue;
     const profile = await readProfile(user.uid);
@@ -130,6 +137,7 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
     throw new HttpsError("invalid-argument", "Invalid support conversation.");
   }
   const reference = db.collection("conversations").doc(conversationId);
+  // Archives the chat, closes its ticket, and updates the staff workload together.
   await db.runTransaction(async transaction => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists || snapshot.get("type") !== "SUPPORT" || snapshot.get("staffUid") !== caller.uid) {
@@ -145,6 +153,7 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
     transaction.update(reference, {
       closedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     });
+    // Clears only the ticket that still points to this exact conversation.
     if (sourceSnapshot.exists) {
       const source = sourceSnapshot.data();
       const sourceConversationId = conversation.supportOrigin === PLAN_CONSULT ?

@@ -2,19 +2,43 @@
 package com.olive.app.data
 
 import com.google.firebase.functions.FirebaseFunctions
-import kotlinx.coroutines.tasks.await
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import org.json.JSONObject
+import kotlinx.coroutines.tasks.await
 
 // Callable Functions verify current Auth roles and sharing on every read and write; no plaintext Firestore disk cache.
 internal class SafetyPlanRepository(
     private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
 ) {
+    // Calls the matching backend service for safety.
     private suspend fun call(name: String, data: Map<String, Any> = emptyMap()): JSONObject {
         val result = functions.getHttpsCallable(name).call(data).await().data as? Map<*, *>
             ?: error("Invalid response")
         return JSONObject(result)
     }
 
+    // Watches a plan that Firestore rules have already approved for this signed-in account.
+    fun observe(
+        ownerUid: String,
+        onUpdate: (SafetyPlan) -> Unit,
+        onError: (Exception) -> Unit,
+    ): ListenerRegistration = firestore.collection("safetyPlans").document(ownerUid)
+        .addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                onError(error)
+                return@addSnapshotListener
+            }
+            val data = snapshot?.data ?: return@addSnapshotListener
+            try {
+                onUpdate(SafetyPlan.fromJson(JSONObject(data)))
+            } catch (failure: Exception) {
+                onError(failure)
+            }
+        }
+
+    // Syncs the latest data for safety.
     suspend fun sync(plan: SafetyPlan): SafetyPlan {
         val changes =
             plan.fields.filterValues { it.mutationId != null && it.conflictRevision == null }
@@ -37,6 +61,7 @@ internal class SafetyPlanRepository(
         return SafetyPlan.fromJson(result.getJSONObject("plan"))
     }
 
+    // Safety: returns the consult.
     suspend fun consult(action: String) = SafetyPlan.fromJson(
         call(
             "safetyPlanConsult",
@@ -44,15 +69,18 @@ internal class SafetyPlanRepository(
         ).getJSONObject("plan")
     )
 
+    // Safety: Sends contacts.
     suspend fun shareContacts(friends: List<Friend>) =
         SafetyPlan.fromJson(call("safetyPlanShareContacts", mapOf("contacts" to friends.map {
             mapOf("uid" to it.uid, "friendshipId" to it.friendshipId, "name" to it.username)
         })).getJSONObject("plan"))
 
+    // Updates support contact for safety.
     suspend fun setSupportContact(uid: String) {
         call("safetySupportContact", mapOf("safeContactUid" to uid))
     }
 
+    // Safety: returns the shared with me.
     suspend fun sharedWithMe(): List<SharedSafetyPlan> {
         val plans = call("safetyPlansSharedWithMe").getJSONArray("plans")
         return (0 until plans.length()).map { index ->
@@ -65,6 +93,7 @@ internal class SafetyPlanRepository(
         }
     }
 
+    // Safety: returns the consultations. It reads the value saved on this device.
     suspend fun consultations(): Pair<Boolean, List<SafetyConsultation>> {
         val result = call("safetyPlanConsultations")
         val plans = result.getJSONArray("plans")
@@ -77,6 +106,7 @@ internal class SafetyPlanRepository(
         }
     }
 
+    // returns the available for safety.
     suspend fun available(value: Boolean) {
         call("safetyPlanAvailability", mapOf("available" to value))
     }

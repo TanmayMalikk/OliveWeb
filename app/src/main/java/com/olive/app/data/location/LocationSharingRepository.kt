@@ -28,6 +28,7 @@ data class MapLocationPoint(
 )
 
 internal object LocationDatabase {
+    // Location sharing: Returns the shared service instance.
     fun instance(): FirebaseDatabase {
         val configured = com.olive.app.BuildConfig.REALTIME_DATABASE_URL
         if (configured.isNotBlank()) return FirebaseDatabase.getInstance(configured)
@@ -41,7 +42,9 @@ internal class SavedLocationUnavailableException :
     IllegalStateException("Saved location is unavailable")
 
 internal interface LocationSharingPreferences {
+    // Reports whether static sharing enabled for location sharing.
     fun staticSharingEnabled(uid: String): Boolean
+    // Location sharing: Updates static sharing enabled.
     fun setStaticSharingEnabled(uid: String, enabled: Boolean)
 }
 
@@ -49,18 +52,23 @@ private class AndroidLocationSharingPreferences(context: Context) : LocationShar
     private val values =
         context.getSharedPreferences("olive_location_sharing", Context.MODE_PRIVATE)
 
+    // Location sharing: Reports whether static sharing enabled. It reads the value saved on this device.
     override fun staticSharingEnabled(uid: String) = values.getBoolean("static_$uid", false)
+    // Updates static sharing enabled for location sharing. It reads the value saved on this device.
     override fun setStaticSharingEnabled(uid: String, enabled: Boolean) {
         values.edit { putBoolean("static_$uid", enabled) }
     }
 }
 
+// Location sharing: Defines address lookup for saved locations. Implementations return map coordinates for a delivery address.
 internal fun interface AddressCoordinateResolver {
+    // Finds an address on the map for location sharing.
     suspend fun coordinates(address: DeliveryAddress): Pair<Double, Double>?
 }
 
 private class AndroidAddressCoordinateResolver(private val context: Context) :
     AddressCoordinateResolver {
+    // Location sharing: returns the coordinates.
     override suspend fun coordinates(address: DeliveryAddress) = GeoapifyClient.coordinates(address)
         ?: DeviceLocation.coordinatesForAddress(context, address)
 }
@@ -70,8 +78,10 @@ private class StaticLocationSharingDataSource(
     private val resolver: AddressCoordinateResolver,
     private val firestore: FirebaseFirestore,
 ) {
+    // returns the enabled for location sharing. It reads or saves the matching protected record in Firebase.
     fun enabled(uid: String) = preferences.staticSharingEnabled(uid)
 
+    // Location sharing: Updates the feature state. It reads or saves the matching protected record in Firebase.
     suspend fun update(
         identity: AccountIdentity,
         profile: UserProfile,
@@ -82,7 +92,9 @@ private class StaticLocationSharingDataSource(
             firestore.collection("sharedLocations").document(identity.uid).collection("recipients")
         val old = collection.get().await()
         val batch = firestore.batch()
+        // Location sharing: Updates update by processing every item required by this loop.
         old.documents.forEach { batch.delete(it.reference) }
+        // Only continue with update when enabled.
         if (enabled) {
             val coordinates =
                 resolver.coordinates(profile.address) ?: throw SavedLocationUnavailableException()
@@ -109,17 +121,20 @@ private class StaticLocationSharingDataSource(
         preferences.setStaticSharingEnabled(identity.uid, enabled)
     }
 
+    // returns the observe for location sharing. It listens for new data and stops listening when the screen closes.
     fun observe(
         currentUid: String,
         friends: List<Friend>,
         onUpdate: (List<MapLocationPoint>) -> Unit
     ): ChatSubscription {
         val points = mutableMapOf<String, MapLocationPoint>()
+        // Location sharing: returns the publish. It listens for new data and stops listening when the screen closes.
         fun publish() = onUpdate(points.values.sortedBy { it.name })
         val listeners = friends.map { friend ->
             firestore.collection("sharedLocations").document(friend.uid).collection("recipients")
                 .document(currentUid)
                 .addSnapshotListener { row, _ ->
+                    // publish checks whether row exists is true before continuing.
                     if (row?.exists() == true) {
                         val decoded = runCatching {
                             val key =
@@ -152,6 +167,7 @@ private class LiveLocationSharingDataSource(
     private val firestore: FirebaseFirestore,
     private val databaseProvider: () -> FirebaseDatabase,
 ) {
+    // Location sharing: Updates recipients. It reads or saves the matching protected record in Firebase.
     suspend fun setRecipients(ownerUid: String, friends: List<Friend>): SecretKey? {
         require(friends.size <= 10)
         val collection =
@@ -179,6 +195,7 @@ private class LiveLocationSharingDataSource(
         return key
     }
 
+    // Location sharing: returns the observe.
     fun observe(
         currentUid: String,
         friends: List<Friend>,
@@ -188,10 +205,12 @@ private class LiveLocationSharingDataSource(
         val database = runCatching(databaseProvider).getOrNull()
             ?: return ChatSubscription { }
         val trails = mutableMapOf<String, MutableMap<String, LocationTrailPoint>>()
+        // returns the publish for location sharing.
         fun publish() =
             onUpdate(points.values.filter { it.lastKnown || System.currentTimeMillis() - it.updatedAt < 5 * 60_000 }
                 .sortedBy { it.name })
 
+        // Location sharing: returns the attach trail.
         fun attachTrail(uid: String) {
             val trail = trails[uid].orEmpty().values.sortedBy { it.updatedAt }
             points[uid]?.let {
@@ -219,6 +238,7 @@ private class LiveLocationSharingDataSource(
                             .orderByChild("updatedAt")
                             .startAt((System.currentTimeMillis() - TRAIL_WINDOW_MILLIS).toDouble())
                     val listener = object : ValueEventListener {
+                        // Location sharing: Responds when data change.
                         override fun onDataChange(snapshot: DataSnapshot) {
                             val updated =
                                 snapshot.child("updatedAt").getValue(Long::class.java) ?: 0L
@@ -251,33 +271,40 @@ private class LiveLocationSharingDataSource(
                             publish()
                         }
 
+                        // Location sharing: Responds when cancelled.
                         override fun onCancelled(error: DatabaseError) {
                             points.remove(friend.uid)
                             publish()
                         }
                     }
                     val trailListener = object : ChildEventListener {
+                        // Location sharing: Responds when child added.
                         override fun onChildAdded(
                             snapshot: DataSnapshot,
                             previousChildName: String?
                         ) = update(snapshot)
 
+                        // Responds when child changed for location sharing.
                         override fun onChildChanged(
                             snapshot: DataSnapshot,
                             previousChildName: String?
                         ) = update(snapshot)
 
+                        // Location sharing: Responds when child removed.
                         override fun onChildRemoved(snapshot: DataSnapshot) {
                             trails[friend.uid]?.remove(snapshot.key)
                             attachTrail(friend.uid)
                         }
 
+                        // Responds when child moved for location sharing.
                         override fun onChildMoved(
                             snapshot: DataSnapshot,
                             previousChildName: String?
                         ) = Unit
 
+                        // Location sharing: Responds when cancelled.
                         override fun onCancelled(error: DatabaseError) = Unit
+                        // Updates the feature state for location sharing. It listens for new data and stops listening when the screen closes.
                         private fun update(snapshot: DataSnapshot) {
                             val updated =
                                 snapshot.child("updatedAt").getValue(Long::class.java) ?: return
@@ -319,6 +346,7 @@ private class LiveLocationSharingDataSource(
         val location: DatabaseReference, val locationListener: ValueEventListener,
         val trail: Query, val trailListener: ChildEventListener
     ) {
+        // Location sharing: Closes the active feature. It listens for new data and stops listening when the screen closes.
         fun close() {
             location.removeEventListener(locationListener)
             trail.removeEventListener(trailListener)
@@ -331,7 +359,9 @@ private class LiveLocationSharingDataSource(
 }
 
 internal interface LocationSharingDataSource {
+    // Location sharing: Reports whether static sharing enabled.
     fun staticSharingEnabled(uid: String): Boolean
+    // Updates static sharing for location sharing.
     suspend fun setStaticSharing(
         identity: AccountIdentity,
         profile: UserProfile,
@@ -339,6 +369,7 @@ internal interface LocationSharingDataSource {
         enabled: Boolean
     )
 
+    // Updates live recipients for location sharing.
     suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>): SecretKey?
     // Watches static contacts for changes.
     fun observeStaticContacts(
@@ -371,7 +402,9 @@ internal class LocationSharingRepository private constructor(
         LiveLocationSharingDataSource(firestore, LocationDatabase::instance),
     )
 
+    // Location sharing: Reports whether static sharing enabled.
     override fun staticSharingEnabled(uid: String) = staticLocations.enabled(uid)
+    // Updates static sharing for location sharing.
     override suspend fun setStaticSharing(
         identity: AccountIdentity,
         profile: UserProfile,
@@ -380,6 +413,7 @@ internal class LocationSharingRepository private constructor(
     ) =
         staticLocations.update(identity, profile, friends, enabled)
 
+    // Updates live recipients for location sharing.
     override suspend fun setLiveRecipients(ownerUid: String, friends: List<Friend>) =
         liveLocations.setRecipients(ownerUid, friends)
 
@@ -400,6 +434,7 @@ internal class LocationSharingRepository private constructor(
         liveLocations.observe(currentUid, friends, onUpdate)
 }
 
+// Location sharing: returns the friend public key. It reads or saves the matching protected record in Firebase.
 private suspend fun friendPublicKey(firestore: FirebaseFirestore, friend: Friend) =
     firestore.collection("messageDirectory").document(friend.username.lowercase()).get().await()
         .let { row ->

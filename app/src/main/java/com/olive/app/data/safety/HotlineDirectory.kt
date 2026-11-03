@@ -27,15 +27,18 @@ class HotlineDirectory private constructor(
     val resources: List<HotlineResource>,
     private val cities: Map<String, String>,
 ) {
+    // Safety: Checks whether canada.
     fun isCanada(address: DeliveryAddress): Boolean {
         val country = normalize(address.country)
         return country in setOf("canada", "ca", "can", "كندا", "加拿大") ||
                 (country.isBlank() && inferRegion(address) != null)
     }
 
+    // Safety: returns the region for.
     fun regionFor(address: DeliveryAddress): String? =
         if (isCanada(address)) inferRegion(address) else null
 
+    // Safety: returns the infer region. It checks the value before the app accepts it.
     private fun inferRegion(address: DeliveryAddress): String? {
         val province = normalize(address.province).removePrefix("ca ")
         CanadianRegion.entries.firstOrNull { region -> region.aliases.any { normalize(it) == province } }
@@ -71,6 +74,7 @@ class HotlineDirectory private constructor(
         return cities[normalize(address.city)]
     }
 
+    // Safety: returns the matching.
     fun matching(region: String, city: String, query: String = ""): List<HotlineResource> {
         val normalizedQuery = normalize(query)
         val normalizedCity = normalize(city)
@@ -93,6 +97,7 @@ class HotlineDirectory private constructor(
     companion object {
         private const val DATASET_DATE = "2026-10-15"
 
+        // Safety: returns the normalize. It checks the value before the app accepts it.
         fun normalize(value: String) =
             Normalizer.normalize(value, Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
                 .lowercase(Locale.ROOT).replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
@@ -144,6 +149,7 @@ class HotlineDirectory private constructor(
             return HotlineDirectory(DATASET_DATE, resources, cities)
         }
 
+        // Safety: returns the secure website.
         private fun secureWebsite(value: String): String {
             val normalized = when {
                 value.startsWith("https://", true) -> value
@@ -156,6 +162,7 @@ class HotlineDirectory private constructor(
             return normalized
         }
 
+        // Safety: returns the slug.
         private fun slug(value: String) = normalize(value).replace(' ', '-')
     }
 }
@@ -218,6 +225,7 @@ enum class CanadianRegion(val code: String, vararg val aliases: String) {
     YT("YT", "YT", "Yukon", "Yukón", "يوكون", "育空地区")
 }
 
+// Safety: returns the hotline dial number. It checks the value before the app accepts it.
 internal fun hotlineDialNumber(value: String): String? {
     if (!value.startsWith("tel:")) return null
     return value.removePrefix("tel:").substringBefore('?')

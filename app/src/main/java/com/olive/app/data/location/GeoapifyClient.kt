@@ -19,6 +19,7 @@ data class AddressSuggestion(
 internal object GeoapifyClient {
     val configured get() = BuildConfig.GEOAPIFY_API_KEY.isNotBlank()
 
+    // returns the autocomplete for location sharing.
     suspend fun autocomplete(query: String, cityOnly: Boolean): List<AddressSuggestion> =
         withContext(Dispatchers.IO) {
             if (!configured || query.trim().length < 3) return@withContext emptyList()
@@ -41,6 +42,7 @@ internal object GeoapifyClient {
                         "GET"
                     setRequestProperty("Accept", "application/json")
                 }
+            // If autocomplete fails, catch the error so the app can keep running and explain the problem.
             try {
                 if (connection.responseCode !in 200..299) return@withContext emptyList()
                 parseGeoapifySuggestions(connection.inputStream.bufferedReader().use { it.readText() })
@@ -49,6 +51,7 @@ internal object GeoapifyClient {
             }
         }
 
+    // returns the coordinates for location sharing.
     suspend fun coordinates(address: DeliveryAddress): Pair<Double, Double>? {
         address.latitude?.let { lat -> address.longitude?.let { return lat to it } }
         val query = listOf(
@@ -64,6 +67,7 @@ internal object GeoapifyClient {
         ).firstOrNull()?.address?.let { value -> value.latitude?.let { lat -> value.longitude?.let { lat to it } } }
     }
 
+    // Converts geoapify suggestions for location sharing.
     internal fun parseGeoapifySuggestions(raw: String): List<AddressSuggestion> = runCatching {
         val rows = JSONObject(raw).optJSONArray("results") ?: return@runCatching emptyList()
         (0 until rows.length()).mapNotNull { index ->
@@ -71,6 +75,7 @@ internal object GeoapifyClient {
         }
     }.getOrDefault(emptyList())
 
+    // returns the suggestion for location sharing.
     private fun suggestion(row: JSONObject): AddressSuggestion? {
         val lat = row.optDouble("lat", Double.NaN)
         val lon = row.optDouble("lon", Double.NaN)
@@ -104,5 +109,6 @@ internal object GeoapifyClient {
         )
     }
 
+    // Location sharing: returns the encode.
     private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name())
 }

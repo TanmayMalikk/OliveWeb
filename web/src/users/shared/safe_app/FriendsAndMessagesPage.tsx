@@ -10,6 +10,7 @@ import type {
   Request,
   Message,
   DirectoryUser,
+  Conversation,
 } from "../../../services/MessagingService";
 export default function Messages() {
   const session = useSession();
@@ -18,17 +19,19 @@ export default function Messages() {
     incoming: Request[];
     outgoing: Request[];
   }>({ friends: [], incoming: [], outgoing: [] });
-  const [peer, setPeer] = useState<Friend | null>(null);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [rows, setRows] = useState<Message[]>([]);
   const [found, setFound] = useState<DirectoryUser | null>(null);
   const [feedback, setFeedback] = useState("");
   const [draft, setDraft] = useState("");
   const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
   const identity = accounts.identity;
+  // Update identity when information used by this screen changes.
   useEffect(() => {
     if (!cloudMode || !identity) return;
     let active = true;
-    let stop: (() => void) | undefined;
+    const stops: (() => void)[] = [];
     void messaging
       .register(identity)
       .then(() =>
@@ -44,7 +47,7 @@ export default function Messages() {
       )
       .then((cleanup) => {
         if (!active) cleanup();
-        else stop = cleanup;
+        else stops.push(cleanup);
       })
       .catch(() => {
         if (active)
@@ -52,25 +55,33 @@ export default function Messages() {
             "Unable to connect. Sign in again to reconnect to messaging.",
           );
       });
+    void messaging.subscribeConversations(
+      identity.uid,
+      (value) => { if (active) setConversations(value); },
+      (error) => { if (active) setFeedback(error.message); },
+    ).then((cleanup) => {
+      if (!active) cleanup(); else stops.push(cleanup);
+    });
     return () => {
       active = false;
-      stop?.();
+      stops.forEach((stop) => stop());
     };
   }, [identity?.uid]);
+  // Update stops when information used by this screen changes.
   useEffect(() => {
     setRows([]);
     setDraft("");
     setRoomKey(null);
-    if (!peer) return;
+    if (!conversation) return;
     let active = true;
     let stop: (() => void) | undefined;
     void messaging
-      .roomKey(peer.friendshipId, identity!, peer)
+      .roomKey(conversation.id, identity!, conversation)
       .then((key) => {
         if (!active) return undefined;
         setRoomKey(key);
         return messaging.subscribeMessages(
-          peer.friendshipId,
+          conversation.id,
           key,
           (value) => {
             if (active) setRows(value);
@@ -97,7 +108,7 @@ export default function Messages() {
       active = false;
       stop?.();
     };
-  }, [peer]);
+  }, [conversation?.id]);
   if (!cloudMode)
     return (
       <Empty
@@ -109,9 +120,10 @@ export default function Messages() {
       </Empty>
     );
   if (!identity) return null;
+  // Web safe app: returns the action.
   const action = (work: () => Promise<void>) => session.perform(work);
   return (
-    <div className={`messages-layout ${peer ? "chat-open" : ""}`}>
+    <div className={`messages-layout ${conversation ? "chat-open" : ""}`}>
       <aside className="conversation-sidebar">
         <h2>People you trust.</h2>
         <Form
@@ -200,41 +212,58 @@ export default function Messages() {
             </Button>
           </div>
         ))}
-        <h3>Conversations</h3>
-        {social.friends.map((friend) => (
+        {conversations.some((item) => item.type === "SUPPORT" && !item.closedAt) && <h3>Support chats</h3>}
+        {conversations.filter((item) => item.type === "SUPPORT" && !item.closedAt).map((item) => (
           <button
-            key={friend.friendshipId}
-            className={`friend-row ${peer?.friendUid === friend.friendUid ? "selected" : ""}`}
-            onClick={() => setPeer(friend)}
+            key={item.id}
+            className={`friend-row support-chat-row ${conversation?.id === item.id ? "selected" : ""}`}
+            onClick={() => setConversation(item)}
           >
-            <span className="avatar">
-              {friend.friendUsername[0].toUpperCase()}
-            </span>
+            <span className="avatar">O</span>
             <span>
-              @{friend.friendUsername}
-              <small>Open conversation</small>
+              {messaging.conversationName(item, identity)}
+              <small>{item.lastMessage || "New conversation"}</small>
             </span>
             <MessageCircle size={17} />
           </button>
         ))}
-        {!social.friends.length && (
+        {conversations.some((item) => item.type === "DIRECT" && !item.closedAt) && <h3>Direct messages</h3>}
+        {conversations.filter((item) => item.type === "DIRECT" && !item.closedAt).map((item) => (
+          <button key={item.id}
+            className={`friend-row ${conversation?.id === item.id ? "selected" : ""}`}
+            onClick={() => setConversation(item)}>
+            <span className="avatar">{messaging.conversationName(item, identity)[0]?.toUpperCase()}</span>
+            <span>@{messaging.conversationName(item, identity)}<small>{item.lastMessage || "New conversation"}</small></span>
+            <MessageCircle size={17} />
+          </button>
+        ))}
+        {conversations.some((item) => item.closedAt) && <h3>Archived chats</h3>}
+        {conversations.filter((item) => item.closedAt).map((item) => (
+          <button key={item.id} className={`friend-row ${conversation?.id === item.id ? "selected" : ""}`}
+            onClick={() => setConversation(item)}>
+            <span className="avatar">{item.type === "SUPPORT" ? "O" : messaging.conversationName(item, identity)[0]?.toUpperCase()}</span>
+            <span>{messaging.conversationName(item, identity)}<small>Archived conversation</small></span>
+            <MessageCircle size={17} />
+          </button>
+        ))}
+        {!conversations.length && (
           <p className="help-note">
             Find a username and accept a friend request to start a conversation.
           </p>
         )}
       </aside>
       <section className="chat-panel">
-        {peer ? (
+        {conversation ? (
           <>
             <header className="chat-heading">
               <button
                 className="icon-button"
-                onClick={() => setPeer(null)}
+                onClick={() => setConversation(null)}
                 aria-label="Back to conversations"
               >
                 <ArrowLeft />
               </button>
-              <h2>@{peer.friendUsername}</h2>
+              <h2>{messaging.conversationName(conversation, identity)}</h2>
             </header>
             <div
               className="chat-messages"
@@ -247,7 +276,10 @@ export default function Messages() {
                   key={message.id}
                   className={`chat-bubble ${message.senderUid === identity.uid ? "own" : ""}`}
                 >
-                  <small>{message.senderUsername}</small>
+                  <small>{conversation.type === "SUPPORT" &&
+                    identity.role !== "STAFF" && identity.role !== "ADMIN" &&
+                    message.senderUid !== conversation.ownerUid
+                    ? "Olive Staff" : message.senderUsername}</small>
                   <p>{message.deleted ? "Message unsent" : message.body}</p>
                   <time>
                     {new Date(message.clientSentAt).toLocaleTimeString([], {
@@ -261,7 +293,7 @@ export default function Messages() {
                       onClick={() =>
                         void action(() =>
                           messaging.unsendMessage(
-                            peer.friendshipId,
+                            conversation.id,
                             message,
                             identity,
                           ),
@@ -279,7 +311,7 @@ export default function Messages() {
               onSubmit={async () => {
                 await action(async () => {
                   await messaging.sendMessage(
-                    peer.friendshipId,
+                    conversation.id,
                     identity,
                     draft,
                     roomKey!,
@@ -301,7 +333,7 @@ export default function Messages() {
               />
               <Button
                 type="submit"
-                disabled={session.busy || !draft.trim() || !roomKey}
+                disabled={session.busy || !draft.trim() || !roomKey || Boolean(conversation.closedAt)}
               >
                 <Send size={18} />
                 <span className="sr-only">Send message</span>

@@ -21,6 +21,7 @@ describe("Olive Crossing", () => {
 
   // Inputs: the values in this case. Expected: chooses road, grass, water, and rail lanes with 6:4:3:2 weights.
   it("chooses road, grass, water, and rail lanes with 6:4:3:2 weights", () => {
+    // Web olive-crossing test ts cover: returns the lane type. The test gives the code a clear input and checks the expected result.
     const laneType = (roll: number) => createCrossingLane(12, () => roll).type;
     expect(laneType(0)).toBe("road");
     expect(laneType(0.399)).toBe("road");

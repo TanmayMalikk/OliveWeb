@@ -37,8 +37,10 @@ export interface CrossingWorld {
   over: boolean;
 }
 
+// returns the wrap for web olive-crossing ts cover.
 const wrap = (value: number, length: number) =>
   ((value % length) + length) % length;
+// Web olive-crossing ts cover: Checks whether random. It uses the current cover data to update what the user sees.
 const validRandom = (random: () => number) => {
   const value = random();
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0.5;
@@ -131,6 +133,7 @@ export function createCrossingLane(
   };
 }
 
+// returns the new crossing for web olive-crossing ts cover. It uses the current cover data to update what the user sees.
 export function newCrossing(random: () => number = Math.random): CrossingWorld {
   const lanes = Array.from({ length: CROSSING.rows }, (_, row) => {
     const id = CROSSING.rows - 1 - row;
@@ -147,11 +150,13 @@ export function newCrossing(random: () => number = Math.random): CrossingWorld {
   };
 }
 
+// Web olive-crossing ts cover: returns the crossing collision. It uses the current cover data to update what the user sees.
 export function crossingCollision(world: CrossingWorld) {
   const lane = world.lanes[world.playerRow];
   if (!lane || lane.type === "grass") return false;
   const playerLeft = world.playerColumn + 0.5 - CROSSING.playerHalfWidth;
   const playerRight = world.playerColumn + 0.5 + CROSSING.playerHalfWidth;
+  // lane type is water is handled here by player right.
   if (lane.type === "water") {
     const onPad = lane.pads.some(
       (column) => Math.abs(world.playerColumn - column) <= 0.52,
@@ -165,6 +170,7 @@ export function crossingCollision(world: CrossingWorld) {
   });
 }
 
+// Web olive-crossing ts cover: returns the rail signal.
 export function railSignal(lane: CrossingLane): "green" | "yellow" | "red" {
   if (lane.type !== "rail") return "green";
   if (lane.vehicles.length || lane.spawnIn <= 0.85) return "red";
@@ -172,6 +178,7 @@ export function railSignal(lane: CrossingLane): "green" | "yellow" | "red" {
   return "green";
 }
 
+// Web olive-crossing ts cover: returns the move crossing. It uses the current cover data to update what the user sees.
 export function moveCrossing(
   world: CrossingWorld,
   direction: CrossingDirection,
@@ -214,6 +221,7 @@ export function moveCrossing(
   return { ...next, over: crossingCollision(next) };
 }
 
+// Web olive-crossing ts cover: returns the advance crossing.
 export function advanceCrossing(
   world: CrossingWorld,
   seconds: number,
@@ -235,6 +243,7 @@ export function advanceCrossing(
       );
     let spawnIn = lane.spawnIn - delta;
     let spawnCount = lane.spawnCount;
+    // spawn in is at most 0 is handled here by spawn count.
     if (spawnIn <= 0) {
       const kind: CrossingVehicle["kind"] =
         lane.type === "rail" ? "train" : random() < 0.45 ? "truck" : "tractor";

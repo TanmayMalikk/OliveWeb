@@ -51,11 +51,13 @@ private fun formatExpiry(value: String): String {
     return if (digits.length <= 2) digits else digits.take(2) + "/" + digits.drop(2)
 }
 
+// Food cover: Checks whether expiry.
 private fun validExpiry(value: String): Boolean {
     val digits = value.filter(Char::isDigit)
     return digits.length == 4 && digits.take(2).toIntOrNull() in 1..12
 }
 
+// food cover shows this checkout field view so the user can view its details and use its actions.
 @Composable
 internal fun CheckoutField(
     label: String, value: String, tag: String, numeric: Boolean = false, secret: Boolean = false,
@@ -108,6 +110,7 @@ internal fun CheckoutDialog(
         shipping.valid && recipient.isNotBlank() && cardholder.isNotBlank() && numberDigits in 12..16 &&
                 validExpiry(expiry) && securityCode.length in 3..4 && (useShippingForBilling || billing.isNotBlank())
     CoverDialog(onClose) {
+        // Only continue with checkout dialog when declined.
         if (declined) {
             Text(
                 stringResource(R.string.payment_declined),
@@ -210,6 +213,7 @@ internal fun CheckoutDialog(
             Button(
                 onClick = {
                     showErrors = true
+                    // form valid is handled here by checkout dialog.
                     if (formValid) {
                         placing = true
                         scope.launch {
@@ -266,6 +270,7 @@ internal fun SavedDishesScreen(vm: OliveViewModel) {
             )
         }
         val saved = vm.dishes.filter { it.id in vm.favorites }
+        // Only continue with saved dishes screen when saved is empty.
         if (saved.isEmpty()) item {
             FoodEmptyState(
                 Icons.Outlined.FavoriteBorder,
@@ -356,6 +361,7 @@ internal fun FoodCartScreen(vm: OliveViewModel, checkout: () -> Unit) {
                 }
             }
         }
+        // Only continue with food cart screen when vm item count > 0.
         if (vm.itemCount > 0) item {
             Column(
                 Modifier.padding(horizontal = 24.dp),

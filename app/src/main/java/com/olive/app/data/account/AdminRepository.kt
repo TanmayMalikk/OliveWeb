@@ -43,18 +43,22 @@ data class AdminAccountDraft(
 class AdminRepository {
     private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
 
+    // Account: returns the accounts.
     suspend fun accounts(): Pair<AccountCounts, List<AdminAccountSummary>> {
         return parseAdminAccounts(functions.getHttpsCallable("adminListAccounts").call().await().data)
     }
 
+    // Account: Returns the create. It calls the protected Firebase Cloud Function for this feature.
     suspend fun create(value: AdminAccountDraft) {
         functions.getHttpsCallable("adminCreateAccount").call(adminAccountPayload(value)).await()
     }
 
+    // Account: Deletes the selected item. It calls the protected Firebase Cloud Function for this feature.
     suspend fun delete(uid: String) {
         functions.getHttpsCallable("adminDeleteAccount").call(mapOf("uid" to uid)).await()
     }
 
+    // returns the complete organization profile for account.
     suspend fun completeOrganizationProfile(
         fullName: String,
         dob: String,
@@ -122,8 +126,11 @@ internal fun adminAccountPayload(value: AdminAccountDraft): Map<String, Any> = m
     ),
 )
 
+// Converts the value to map for account.
 private fun Any?.asMap(): Map<String, Any?> =
     (this as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }.orEmpty()
 
+// returns the string for account.
 private fun Map<String, Any?>.string(key: String) = this[key]?.toString().orEmpty()
+// Account: returns the int.
 private fun Map<String, Any?>.int(key: String) = (this[key] as? Number)?.toInt() ?: 0
