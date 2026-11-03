@@ -53,6 +53,7 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
             InteractiveLocationMap(
                 points = state.points,
                 ownPointUid = null,
+                detailsOnlyForSelectedPoint = true,
                 modifier = Modifier.fillMaxSize(),
             )
             if (state.loading) CircularProgressIndicator()
