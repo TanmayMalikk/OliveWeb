@@ -98,7 +98,7 @@ object KeyManager {
     // Secure messaging: uses the mask digest declared by the receiving device.
     fun wrapKey(secretKey: SecretKey, publicKey: PublicKey, mgf1Digest: MGF1ParameterSpec): String {
         val cipher = Cipher.getInstance(RSA_MODE)
-        val spec = oaepSpec(mgf1Digest)
+        val spec = oaepSpec(mgf1Digest = mgf1Digest)
         // Bypass WRAP_MODE entirely
         cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
         val wrappedBytes = cipher.doFinal(secretKey.encoded)
@@ -122,24 +122,21 @@ object KeyManager {
         val decodedBytes = android.util.Base64.decode(wrappedKeyBase64, android.util.Base64.NO_WRAP)
         val privateKeys = getPrivateKeys()
         if (privateKeys.isEmpty()) error("Private key missing")
-        val candidates = when {
-            keyWrapVersion != null && keyWrapVersion >= CURRENT_KEY_WRAP_VERSION ->
-                listOf(MGF1ParameterSpec.SHA1)
-            keyWrapVersion == 1 ->
-                listOf(MGF1ParameterSpec.SHA256)
-            else ->
-                listOf(MGF1ParameterSpec.SHA1, MGF1ParameterSpec.SHA256)
-        }
+        val candidates = oaepProfiles(keyWrapVersion)
         var lastFailure: GeneralSecurityException? = null
         privateKeys.forEach { privateKey ->
-            candidates.forEach { digest ->
+            candidates.forEach { profile ->
                 // Use the fallback when unwrap key is unavailable.
                 try {
                     val cipher = Cipher.getInstance(RSA_MODE)
                     // Bypass UNWRAP_MODE entirely and manually rebuild the AES key.
-                    cipher.init(Cipher.DECRYPT_MODE, privateKey, oaepSpec(digest))
+                    cipher.init(Cipher.DECRYPT_MODE, privateKey, oaepSpec(profile.digest, profile.mgf1Digest))
                     val decryptedBytes = cipher.doFinal(decodedBytes)
-                    return SecretKeySpec(decryptedBytes, "AES")
+                    return try {
+                        SecretKeySpec(decryptedBytes, "AES")
+                    } finally {
+                        decryptedBytes.fill(0)
+                    }
                 } catch (failure: GeneralSecurityException) {
                     lastFailure = failure
                 }
@@ -149,14 +146,54 @@ object KeyManager {
     }
 
     /**
-     * Android Keystore uses SHA-1 as OAEP's MGF1 digest unless API 35+ keys explicitly opt into
-     * another value. The OAEP content digest remains SHA-256; SHA-1 is used only by the mask
-     * generation function for cross-device Keystore compatibility.
+     * Tries the device-specific key first and then the account recovery copy. Historical media can
+     * contain keys wrapped at different times with different OAEP profiles, so the record-level
+     * encryption version must not prevent a compatible recipient key from being considered.
      */
-    private fun oaepSpec(mgf1Digest: MGF1ParameterSpec) = OAEPParameterSpec(
-        "SHA-256",
+    fun unwrapFirst(wrappedKeysBase64: Iterable<String>, keyWrapVersion: Int? = null): SecretKey {
+        var lastFailure: Exception? = null
+        wrappedKeysBase64.filter(String::isNotBlank).distinct().forEach { wrappedKey ->
+            try {
+                return unwrapKey(wrappedKey, keyWrapVersion)
+            } catch (failure: Exception) {
+                lastFailure = failure
+            }
+        }
+        throw lastFailure ?: IllegalStateException("Encryption key is unavailable")
+    }
+
+    /**
+     * New Android keys use SHA-256 as the OAEP digest and SHA-1 only for MGF1. The digest parameter
+     * remains explicit so historical WebCrypto SHA-1/SHA-1 keys can be read without provider
+     * defaults.
+     */
+    private fun oaepSpec(
+        digest: String = "SHA-256",
+        mgf1Digest: MGF1ParameterSpec,
+    ) = OAEPParameterSpec(
+        digest,
         "MGF1",
         mgf1Digest,
         PSource.PSpecified.DEFAULT
     )
+
+    private data class OaepProfile(
+        val digest: String,
+        val mgf1Digest: MGF1ParameterSpec,
+    )
+
+    /** Explicit compatibility profiles; this never falls back to provider defaults. */
+    private fun oaepProfiles(keyWrapVersion: Int?): List<OaepProfile> {
+        val current = OaepProfile("SHA-256", MGF1ParameterSpec.SHA1)
+        val legacyAndroidOrWeb = OaepProfile("SHA-256", MGF1ParameterSpec.SHA256)
+        val legacyWeb = OaepProfile("SHA-1", MGF1ParameterSpec.SHA1)
+        return when {
+            keyWrapVersion != null && keyWrapVersion >= CURRENT_KEY_WRAP_VERSION ->
+                listOf(current, legacyAndroidOrWeb, legacyWeb)
+            keyWrapVersion == 1 ->
+                listOf(legacyAndroidOrWeb, current, legacyWeb)
+            else ->
+                listOf(current, legacyAndroidOrWeb, legacyWeb)
+        }
+    }
 }
