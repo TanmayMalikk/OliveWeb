@@ -13,6 +13,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /** WorkManager boundary for idempotent encrypted-message delivery. */
@@ -22,76 +23,41 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     private val repository = SecureChatRepository()
 
     override suspend fun doWork(): Result {
-        val id = inputData.getString(MESSAGE_ID) ?: return Result.failure()
-        var message = store.get(id) ?: return Result.success()
-        if (message.status == MessageDeliveryStatus.SENT) return Result.success()
-
-        val activeUid = FirebaseAuth.getInstance().currentUser?.uid
-        if (activeUid != message.ownerUid) {
-            store.update(id) {
-                it.copy(status = MessageDeliveryStatus.FAILED_RETRYABLE, failureCode = "ACCOUNT_UNAVAILABLE")
-            }
-            return Result.retry()
-        }
-
-        message = store.update(id) {
-            it.copy(
-                status = MessageDeliveryStatus.SENDING,
-                attemptCount = it.attemptCount + 1,
-                failureCode = null,
-            )
-        }
-        return try {
-            repository.deliver(message)
-            store.update(id) { it.copy(status = MessageDeliveryStatus.SENT, failureCode = null) }
-            Result.success()
-        } catch (failure: FirebaseFirestoreException) {
-            if (isPermanentMessageFailure(failure.code) || runAttemptCount >= MAX_AUTOMATIC_RETRIES) {
-                store.update(id) {
-                    it.copy(
-                        status = MessageDeliveryStatus.FAILED_PERMANENT,
-                        failureCode = failure.code.name,
-                    )
-                }
-                Result.failure()
-            } else {
-                store.update(id) {
-                    it.copy(
-                        status = MessageDeliveryStatus.FAILED_RETRYABLE,
-                        failureCode = failure.code.name,
-                    )
-                }
-                Result.retry()
-            }
-        } catch (_: Exception) {
-            if (runAttemptCount >= MAX_AUTOMATIC_RETRIES) {
-                store.update(id) {
-                    it.copy(status = MessageDeliveryStatus.FAILED_PERMANENT, failureCode = "DELIVERY_FAILED")
-                }
-                Result.failure()
-            } else {
-                store.update(id) {
-                    it.copy(status = MessageDeliveryStatus.FAILED_RETRYABLE, failureCode = "TEMPORARY_FAILURE")
-                }
-                Result.retry()
-            }
+        val ownerUid = inputData.getString(OWNER_UID) ?: return Result.failure()
+        val conversationId = inputData.getString(CONVERSATION_ID) ?: return Result.failure()
+        val outcome = MessageQueueDrainer(
+            store = store,
+            activeOwnerUid = { FirebaseAuth.getInstance().currentUser?.uid },
+            deliver = repository::deliver,
+            classifyFailure = ::messageDeliveryFailure,
+        ).drain(ownerUid, conversationId)
+        return when (outcome) {
+            MessageDrainOutcome.COMPLETE -> Result.success()
+            MessageDrainOutcome.RETRY -> Result.retry()
+            MessageDrainOutcome.BLOCKED -> Result.failure()
         }
     }
 
     companion object {
-        private const val MESSAGE_ID = "messageId"
-        private const val MAX_AUTOMATIC_RETRIES = 5
+        private const val OWNER_UID = "ownerUid"
+        private const val CONVERSATION_ID = "conversationId"
 
-        fun workName(messageId: String) = "olive_message_$messageId"
+        fun workName(ownerUid: String, conversationId: String): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest("$ownerUid\u0000$conversationId".toByteArray(Charsets.UTF_8))
+                .take(16).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            return "olive_message_drain_$digest"
+        }
         private fun ownerTag(ownerUid: String) = "olive_messages_owner_$ownerUid"
 
-        fun enqueue(
-            context: Context,
-            message: OutgoingMessage,
-            replaceDelayedWork: Boolean = false,
-        ) {
+        fun enqueue(context: Context, message: OutgoingMessage) {
             val request = OneTimeWorkRequestBuilder<MessageSendWorker>()
-                .setInputData(workDataOf(MESSAGE_ID to message.id))
+                .setInputData(
+                    workDataOf(
+                        OWNER_UID to message.ownerUid,
+                        CONVERSATION_ID to message.conversationId,
+                    )
+                )
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 )
@@ -99,16 +65,17 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
                 .addTag(ownerTag(message.ownerUid))
                 .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
-                workName(message.id),
-                if (replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+                workName(message.ownerUid, message.conversationId),
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
                 request,
             )
         }
 
         fun enqueuePending(context: Context, ownerUid: String) {
-            MessageOutboxStore(context).all(ownerUid)
-                .filter { it.status !in setOf(MessageDeliveryStatus.SENT, MessageDeliveryStatus.FAILED_PERMANENT) }
-                .forEach { enqueue(context, it) }
+            val store = MessageOutboxStore(context)
+            store.drainableConversationIds(ownerUid).forEach { conversationId ->
+                store.head(ownerUid, conversationId)?.let { enqueue(context, it) }
+            }
         }
 
         fun cancelOwner(context: Context, ownerUid: String) {
@@ -116,6 +83,13 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
         }
     }
 }
+
+private fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure =
+    if (failure is FirebaseFirestoreException) {
+        MessageDeliveryFailure(failure.code.name, isPermanentMessageFailure(failure.code))
+    } else {
+        MessageDeliveryFailure("TEMPORARY_FAILURE", permanent = false)
+    }
 
 internal fun isPermanentMessageFailure(code: FirebaseFirestoreException.Code) =
     isPermanentMessageFailure(code.name)
