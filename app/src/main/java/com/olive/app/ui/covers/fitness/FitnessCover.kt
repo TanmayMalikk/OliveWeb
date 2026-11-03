@@ -8,6 +8,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -62,9 +63,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -134,9 +139,17 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         snapshot = store.snapshot()
         page = FitnessPage.HOME
     }
+    // Back returns from a fitness submenu or section before it is allowed to leave the cover app.
+    BackHandler(enabled = interactive) {
+        page = when (page) {
+            FitnessPage.FOOD_SEARCH -> FitnessPage.NUTRITION
+            FitnessPage.HOME -> FitnessPage.HOME
+            else -> FitnessPage.HOME
+        }
+    }
     // Announce the new fitness page from its heading after a navigation tab is selected.
     LaunchedEffect(page) {
-        if (page != FitnessPage.ACCOUNT) {
+        if (page !in setOf(FitnessPage.ACCOUNT, FitnessPage.GOALS, FitnessPage.FOOD_SEARCH)) {
             withFrameNanos { }
             pageFocus.requestFocus()
         }
@@ -296,7 +309,15 @@ private fun FitnessTab(
                 enabled = enabled,
                 role = Role.Tab,
                 onClick = onClick,
-            ).padding(vertical = 8.dp),
+            ).clearAndSetSemantics {
+                contentDescription = label
+                role = Role.Tab
+                this.selected = selected
+                onClick(label) {
+                    onClick()
+                    true
+                }
+            }.padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -397,6 +418,7 @@ private fun FitnessGoalsPage(
     padding: PaddingValues,
     onSave: (FitnessProfile) -> Unit,
 ) {
+    val headingFocus = remember { FocusRequester() }
     var weight by remember(profile) { mutableStateOf(profile.weightKg.roundToInt().toString()) }
     var height by remember(profile) { mutableStateOf(profile.heightCm.roundToInt().toString()) }
     var steps by remember(profile) { mutableStateOf(profile.stepGoal.toString()) }
@@ -404,6 +426,11 @@ private fun FitnessGoalsPage(
     var protein by remember(profile) { mutableStateOf(profile.proteinGoal.toString()) }
     var carbohydrates by remember(profile) { mutableStateOf(profile.carbohydrateGoal.toString()) }
     var fat by remember(profile) { mutableStateOf(profile.fatGoal.toString()) }
+    // Move TalkBack to the goals heading after the submenu opens.
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        headingFocus.requestFocus()
+    }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     LazyColumn(
         Modifier.fillMaxSize().padding(padding).oliveScrollbar(listState),
@@ -415,7 +442,7 @@ private fun FitnessGoalsPage(
             Text(
                 stringResource(R.string.fitness_goals),
                 style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.semantics { heading() },
+                modifier = Modifier.focusRequester(headingFocus).focusable().semantics { heading() },
             )
         }
         item { GoalField(weight, { weight = it }, stringResource(R.string.weight_kg), enabled) }

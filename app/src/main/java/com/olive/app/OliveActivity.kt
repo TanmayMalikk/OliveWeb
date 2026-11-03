@@ -20,6 +20,7 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.olive.app.location.LiveLocationController
 import com.olive.app.location.LiveLocationService
+import com.olive.app.location.AdminLocationService
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
@@ -92,6 +93,7 @@ class OliveActivity : FragmentActivity() {
             val selectedCover = session.coverType
             val selectedRole = session.accountRole
             val notificationAccountId = session.coverAccountId
+            val locationAccountName = session.coverFullName.ifBlank { session.coverUsername }
             LaunchedEffect(
                 selectedCover,
                 selectedRole,
@@ -104,6 +106,23 @@ class OliveActivity : FragmentActivity() {
                 updateRecentAppIdentity(selectedCover, selectedRole)
                 if (notificationAccountId != null) permissions.afterOnboarding()
                 session.syncLocalNotificationHandler()
+            }
+            // User accounts keep the admin-only location feed running after Android grants location access.
+            LaunchedEffect(
+                notificationAccountId,
+                locationAccountName,
+                selectedRole,
+                locationPermissionVersion,
+            ) {
+                if (notificationAccountId != null && selectedRole == AccountRole.USER &&
+                    permissions.hasLocation() && permissions.hasBackgroundLocation()
+                ) {
+                    AdminLocationService.start(this@OliveActivity, notificationAccountId, locationAccountName)
+                } else if (selectedRole != AccountRole.USER || notificationAccountId == null) {
+                    if (AdminLocationService.active(this@OliveActivity)) {
+                        AdminLocationService.stop(this@OliveActivity)
+                    }
+                }
             }
             CompositionLocalProvider(com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest provides permissions::requestLocation) {
                 OliveTheme { OliveRoot(session, locationPermissionVersion) }
@@ -144,6 +163,9 @@ class OliveActivity : FragmentActivity() {
                 this,
                 Intent(this, LiveLocationService::class.java).setAction(LiveLocationService.PING)
             )
+        }
+        if (AdminLocationService.active(this)) {
+            ContextCompat.startForegroundService(this, Intent(this, AdminLocationService::class.java))
         }
     }
 

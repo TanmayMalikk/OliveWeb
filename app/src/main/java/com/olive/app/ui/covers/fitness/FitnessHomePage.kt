@@ -35,7 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
@@ -72,7 +72,7 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
             Box(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
                     .background(Brush.linearGradient(listOf(FitnessAccent, FitnessHeroEnd)))
-                    .semantics(mergeDescendants = true) { contentDescription = summaryDescription }
+                    .clearAndSetSemantics { contentDescription = summaryDescription }
                     .padding(22.dp),
             ) {
                 Column(
@@ -146,7 +146,7 @@ private fun StepSummaryCard(snapshot: FitnessSnapshot) {
         append("${FitnessMath.walkingCalories(snapshot.stepsToday, snapshot.profile).displayAmount()} kcal.")
     }
     Card(
-        modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = description },
+        modifier = Modifier.clearAndSetSemantics { contentDescription = description },
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = FitnessSurface),
     ) {
@@ -207,7 +207,7 @@ private fun StepSummaryCard(snapshot: FitnessSnapshot) {
 private fun RowScope.ActivityMiniMetric(value: String, label: String) {
     Column(
         Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(FitnessWarmCard)
-            .semantics(mergeDescendants = true) { contentDescription = "$label, $value" }
+            .clearAndSetSemantics { contentDescription = "$label, $value" }
             .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
