@@ -1,6 +1,7 @@
 // Cover users: draws roads, rails, water, and the moving olive.
 import { CROSSING, railSignal, type CrossingWorld } from "./olive-crossing";
 
+// Converts a lane number into its vertical board position.
 const laneY = (row: number) => row * CROSSING.cell;
 
 export default function CrossingBoard({

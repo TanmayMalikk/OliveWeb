@@ -8,6 +8,7 @@ import {
   emptyProfile,
   friendlyError,
   newEvent,
+  normalizeCover,
   normalizeUsername,
   purgeEntry,
   signInEmail,
@@ -25,6 +26,14 @@ describe("recent web domain boundaries", () => {
     expect(new Set(covers.map((cover) => cover.slug)).size).toBe(covers.length);
     expect(new Set(covers.map((cover) => coverPath(cover.id))).size).toBe(covers.length);
     for (const cover of covers) expect(coverInfo(cover.id)).toEqual(cover);
+  });
+
+  // Input: the removed calculator cover and an invalid saved value. Expected: old accounts migrate safely without crashing the public page.
+  it("migrates removed and invalid saved cover values", () => {
+    expect(normalizeCover("CALCULATOR")).toBe("FITNESS");
+    expect(normalizeCover("FITNESS")).toBe("FITNESS");
+    expect(normalizeCover("unknown-cover")).toBe("GAME");
+    expect(normalizeCover(null)).toBe("GAME");
   });
 
   // Input: exact username boundaries and non-letter lookalikes. Expected: web validation matches Android and Cloud rules.
@@ -68,6 +77,7 @@ describe("recent web domain boundaries", () => {
     expect(signInEmail(" Olive_User ", "SAFE_CONTACT")).toBe("olive_user@safe.olive.invalid");
     expect(signInEmail(" Staff@Example.CA ", "STAFF")).toBe("staff@example.ca");
     expect(signInEmail(" Admin@Example.CA ", "ADMIN")).toBe("admin@example.ca");
+    expect(signInEmail(" Demo_Staff ", "STAFF")).toBe("demo_staff@yourolivebranch.ca");
   });
 
   // Input: two new histories and profiles. Expected: mutable arrays and nested objects are never shared between accounts.

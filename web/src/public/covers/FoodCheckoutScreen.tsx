@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button, Field, Form, Modal } from "../../components/SharedComponents";
 
+// Formats food prices as Canadian dollars.
 const money = (cents: number) =>
   new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" }).format(
     cents / 100,
@@ -27,6 +28,7 @@ export default function Checkout({
       <Form
         onSubmit={async () => {
           setSubmitting(true);
+          // Turn an unexpected checkout failure into a readable message.
           try {
             await onDeclined();
             setMessage(

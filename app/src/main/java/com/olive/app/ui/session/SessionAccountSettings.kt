@@ -16,6 +16,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Saves private profile, cover choice, password, trigger, PIN and trusted-contact settings.
 internal class SessionSettings(private val runtime: SessionRuntime) {
+    // Saves the user's cover choice and other general account settings.
     fun saveSettings(
         fullName: String,
         affected: String,
@@ -47,6 +48,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    // Saves settings that belong to the current discreet cover app.
     fun saveCoverSettings(fullName: String, dob: String, address: DeliveryAddress) {
         with(runtime) {
             with(state) {
@@ -77,6 +79,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                         )
                         after
                     }
+                    // Apply the result only if the user is still on the same cover session.
                     if (epoch == token && screen == SessionScreen.Cover) {
                         coverDob = updated.dob
                         coverFullName = updated.fullName
@@ -94,6 +97,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    // Saves private Safe App profile changes on the phone and in the cloud.
     fun saveSafeProfile(updated: UserProfile) {
         with(runtime) {
             with(state) {
@@ -110,6 +114,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                             )
                         )
                     }
+                    // Apply the save only to the session that started it.
                     if (epoch == token) {
                         profile = updated
                         coverDob = updated.dob
@@ -129,6 +134,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    // Checks cover requirements before saving the newly selected cover.
     fun changeCover(type: CoverType) {
         with(runtime) {
             with(state) {
@@ -144,6 +150,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 busy = true
                 message = null
                 scope.launch {
+                    // Turn an unexpected change cover failure into a readable message.
                     try {
                         withContext(Dispatchers.IO) {
                             store.cacheProfile(
@@ -155,6 +162,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                                 )
                             )
                         }
+                        // Apply the save only to the session that started it.
                         if (epoch == token) {
                             pendingSync = !localMode
                             message = runtime.application.getString(
@@ -177,6 +185,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    // Checks and saves the discreet trigger phrase used by cover apps.
     fun changeTrigger(trigger: String, pin: String) {
         with(runtime) {
             with(state) {
@@ -191,6 +200,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
                 operations.runOperation(runtime.application.getString(R.string.unable_to_change_the_trigger_please_retry)) { token ->
                     val result = withContext(Dispatchers.IO) { store.verify(device.uid, pin) }
                     if (epoch != token || screen != SessionScreen.Safe) return@runOperation
+                    // Shows whether the hidden trigger was saved or rejected.
                     when (result) {
                         PinResult.Accepted -> {
                             saveVerifiedTrigger(device, trigger, token)
@@ -211,6 +221,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    // Stores a trigger phrase after the current entry method proves the user is authorized.
     internal suspend fun saveVerifiedTrigger(
         device: DeviceEnrollment,
         trigger: String,
@@ -241,6 +252,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    // Saves the user's trusted contacts to the encrypted profile and cloud copy.
     fun saveContacts(value: List<SafeContact>) {
         with(runtime) {
             with(state) {
@@ -273,6 +285,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    // Retries a profile upload that was saved on the phone while the cloud was unavailable.
     fun sync() {
         with(runtime) {
             with(state) {
@@ -292,6 +305,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
     suspend fun syncProfile(uid: String, value: UserProfile, token: Long) {
         with(runtime) {
             with(state) {
+                // Turn an unexpected sync profile failure into a readable message.
                 try {
                     withTimeout(15_000.milliseconds) {
                         accounts.saveProfile(
@@ -320,6 +334,7 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         }
     }
 
+    // Changes the account password after checking the current one.
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) {
         with(runtime) {
             with(state) {

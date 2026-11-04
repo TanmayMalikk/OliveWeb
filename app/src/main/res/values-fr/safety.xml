@@ -34,9 +34,9 @@
     <string name="safety_open_plan">Ouvrir le plan de %1$s</string>
     <string name="safety_source">Conseils : Agence de la santé publique du Canada. Adaptez ces pistes avec une personne de confiance.</string>
     <string name="safety_upload_document">Téléverser le document</string>
-    <string name="safety_upload_for">Téléverser le document : %1$s. Bientôt disponible.</string>
+    <string name="safety_upload_for">Téléverser un document pour %1$s.</string>
 <string name="safety_storage_photos">Photos</string>
     <string name="safety_storage_videos">Vidéos</string>
     <string name="safety_storage_documents">Images de documents</string>
-    <string name="safety_document_upload_hint">Le téléversement arrive bientôt. Les fichiers apparaîtront aussi dans Documents.</string>
+    <string name="safety_document_upload_hint">Les fichiers téléversés apparaissent aussi dans Documents.</string>
 </resources>

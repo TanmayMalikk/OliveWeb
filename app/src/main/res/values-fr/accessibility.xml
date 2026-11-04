@@ -20,6 +20,7 @@
     <string name="a11y_zoom_in">Agrandir</string>
     <string name="a11y_zoom_out">Réduire</string>
     <string name="a11y_reset_zoom">Réinitialiser le zoom</string>
+    <string name="a11y_rotate_clockwise">Faire pivoter dans le sens horaire</string>
     <string name="a11y_zoom_percent">Zoom : %1$d%%</string>
 
 

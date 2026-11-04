@@ -2,8 +2,8 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
-// Inputs: the values in this case. Expected: all games and controls fit the available laptop and desktop viewport.
-test("all games and controls fit the available laptop and desktop viewport", async ({
+// Inputs: the values in this case. Expected: each game stays within page width, with controls reachable below the play area.
+test("all games stay within the page width and keep controls reachable", async ({
   page,
 }) => {
   for (const [width, height] of [
@@ -21,6 +21,12 @@ test("all games and controls fit the available laptop and desktop viewport", asy
       const layout = await page.evaluate(() => {
         const game = document
           .querySelector(".grove-game")!
+          .getBoundingClientRect();
+        const main = document
+          .querySelector(".grove-main")!
+          .getBoundingClientRect();
+        const intro = document
+          .querySelector(".grove-intro")!
           .getBoundingClientRect();
         const play = document
           .querySelector(".flight-stage, .memory-grid, .crossing-stage")!
@@ -44,27 +50,45 @@ test("all games and controls fit the available laptop and desktop viewport", asy
                       .getBoundingClientRect().width,
                 ) < 2
               : true,
-          scrollHeight: document.documentElement.scrollHeight,
+          documentHeight: document.documentElement.scrollHeight,
           scrollWidth: document.documentElement.scrollWidth,
           height: innerHeight,
           width: innerWidth,
+          gameWidth: game.width,
+          mainWidth: main.width,
+          gameLeft: game.left,
+          gameRight: game.right,
+          mainRight: main.right,
+          introRight: intro.right,
           top: game.top,
           bottom: game.bottom,
           controlsBottom: controls.bottom,
+          documentHeight: document.documentElement.scrollHeight,
           playHeight: play.height,
           playBottom: play.bottom,
           controlsTop: controls.top,
+          panelScrolls:
+            document.querySelector<HTMLElement>(".grove-game")!.scrollWidth >
+            document.querySelector<HTMLElement>(".grove-game")!.clientWidth + 1,
         };
       });
-      expect(
-        layout.scrollHeight,
-        `${name} at ${width}x${height}`,
-      ).toBeLessThanOrEqual(height + 1);
       expect(layout.scrollWidth).toBeLessThanOrEqual(width);
+      expect(
+        layout.panelScrolls,
+        `${name} panel should not scroll horizontally at ${width}x${height}`,
+      ).toBe(false);
+      expect(
+        layout.gameWidth / layout.mainWidth,
+        `${name} should fill the right game column at ${width}x${height}`,
+      ).toBeGreaterThan(0.5);
+      expect(layout.gameLeft).toBeGreaterThanOrEqual(layout.introRight - 2);
+      expect(Math.abs(layout.gameRight - layout.mainRight)).toBeLessThan(2);
       expect(layout.fullWidth).toBe(true);
       expect(layout.top).toBeGreaterThanOrEqual(0);
-      expect(layout.bottom).toBeLessThanOrEqual(height);
-      expect(layout.controlsBottom).toBeLessThanOrEqual(height);
+      expect(layout.bottom).toBeLessThanOrEqual(layout.documentHeight + 1);
+      expect(layout.controlsBottom).toBeLessThanOrEqual(
+        layout.documentHeight + 1,
+      );
       expect(layout.playHeight).toBeGreaterThan(180);
       expect(layout.playBottom).toBeLessThanOrEqual(layout.controlsTop);
     }
@@ -82,13 +106,13 @@ test("all games and controls fit the available laptop and desktop viewport", asy
   ).toBeVisible();
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollHeight <= innerHeight + 1,
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
   await page.goto("/cover/game");
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollHeight <= innerHeight + 1,
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
 });
@@ -98,9 +122,9 @@ test("Olive Flight supports keyboard flight, pause, collision, restart and retur
   page,
 }) => {
   await page.goto("/");
-  await expect(
-    page.locator('a[href="/account"], a[href="/download"]'),
-  ).toHaveCount(0);
+  await expect(page.locator('a[href="/account"], a[href="/get"]')).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Olive Flight", exact: true }).click();
   const start = page.getByRole("button", {
     name: "Start Olive Flight",

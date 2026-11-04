@@ -32,6 +32,7 @@ import com.olive.app.R
 
 private enum class AttachmentCategory { Notes, Incidents, Media, SafetyPlan, Location }
 
+// Shows photo, video, document, and camera choices for a chat attachment.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AttachmentPicker(
@@ -49,6 +50,7 @@ internal fun AttachmentPicker(
     val sheetTitle = if (selectedCategory == null) stringResource(R.string.share_attachment) else stringResource(
         R.string.select_attachment_category,
         stringResource(
+            // Opens the selected photo, video, document, or camera source.
             when (selectedCategory) {
                 AttachmentCategory.Notes -> R.string.private_notes
                 AttachmentCategory.Incidents -> R.string.incident_reports
@@ -59,6 +61,7 @@ internal fun AttachmentPicker(
             }
         )
     )
+    // Move TalkBack focus to the heading when a new attachment section opens.
     LaunchedEffect(selectedCategory) {
         // The sheet takes focus while its opening animation creates the dialog window. Wait until
         // that transition finishes, then move focus to the heading for the newly displayed step.
@@ -68,7 +71,7 @@ internal fun AttachmentPicker(
     }
     LaunchedEffect(selectedCategory, uid) {
         if (selectedCategory != AttachmentCategory.Media || uid == null || session.localMode) return@LaunchedEffect
-        session.documents.load(uid, false)
+        session.documents.load(uid, session.coverUsername, false)
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -135,10 +138,11 @@ internal fun AttachmentPicker(
             // STEP 2: Show Specific Items based on the selection
             else {
                 LazyColumn {
+                    // Opens the selected photo, video, document, or camera source.
                     when (selectedCategory) {
                         AttachmentCategory.Notes -> {
                             val notes =
-                                session.privateEntries.filter { it.deletedAt == null && (it.kind == PrivateEntryKind.Note || it.kind == null) }
+                                session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Note }
                             if (notes.isEmpty()) item {
                                 Text(
                                     stringResource(R.string.no_private_notes_found),
@@ -159,6 +163,7 @@ internal fun AttachmentPicker(
                         AttachmentCategory.Incidents -> {
                             val incidents =
                                 session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Incident }
+                            // Tell the user when there are no incident reports to attach.
                             if (incidents.isEmpty()) item {
                                 Text(
                                     stringResource(R.string.no_incident_reports_found),
@@ -178,6 +183,7 @@ internal fun AttachmentPicker(
 
                         AttachmentCategory.Media -> {
                             val media = documentState.files.filter { it.ownerUid == uid }
+                            // Show progress while encrypted documents are loading.
                             if (documentState.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                             if (documentState.error != null) item {
                                 Text(
@@ -186,6 +192,7 @@ internal fun AttachmentPicker(
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }
+                            // Show document choices after loading succeeds and at least one file exists.
                             if (!documentState.loading && documentState.error == null && media.isEmpty()) item {
                                 Text(
                                     stringResource(if (session.localMode) R.string.documents_account_required else R.string.documents_empty),
@@ -221,6 +228,7 @@ internal fun AttachmentPicker(
             }
         }
     }
+    // Show duration choices only when the user is sharing live location.
     if (locationDuration) ShareDurationDialog(onDismiss = {
         locationDuration = false
     }) { duration ->

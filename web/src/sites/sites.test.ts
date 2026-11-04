@@ -20,28 +20,18 @@ it("recognizes legacy cover paths while keeping their canonical cover identity",
 });
 
 // Inputs: the values in this case. Expected: keeps local preview routes usable.
-it("keeps local preview routes usable", () => {
+it("keeps every page on the same origin", () => {
   expect(siteDestination("/olive", "http://localhost:5173")).toBe(
     "http://localhost:5173/olive",
   );
   expect(siteDestination("/download", "http://127.0.0.1:5173")).toBe(
-    "http://127.0.0.1:5173/download",
-  );
-});
-
-// Inputs: the values in this case. Expected: maps production traffic to three pathless sites.
-it("maps production traffic to three pathless sites", () => {
-  expect(siteDestination("/olive", config.publicOrigin)).toBe(
-    `${config.publicOrigin}/`,
-  );
-  expect(siteDestination("/account/sign-in", config.publicOrigin)).toBe(
-    `${config.publicOrigin}/`,
-  );
-  expect(siteDestination("/download", config.publicOrigin)).toBe(
-    `${config.downloadOrigin}/`,
+    "http://127.0.0.1:5173/get",
   );
   expect(siteDestination("/admin", config.publicOrigin)).toBe(
-    `${config.adminOrigin}/`,
+    `${config.publicOrigin}/admin`,
+  );
+  expect(siteDestination("/get", config.publicOrigin)).toBe(
+    `${config.publicOrigin}/get`,
   );
 });
 
@@ -53,10 +43,10 @@ it("uses a root hash for private entry links", () => {
   );
 });
 
-// Inputs: the values in this case. Expected: selects site mode by build override or hostname.
-it("selects site mode by build override or hostname", () => {
-  expect(siteMode("anything.test", "download")).toBe("download");
-  expect(siteMode("admin.yourolivebranch.ca", "")).toBe("admin");
-  expect(siteMode("get.yourolivebranch.ca", "")).toBe("download");
-  expect(siteMode("yourolivebranch.ca", "")).toBe("user");
+// Inputs: the page path. Expected: selects the correct part of the single website.
+it("selects site mode from the page path", () => {
+  expect(siteMode("/get")).toBe("download");
+  expect(siteMode("/download")).toBe("download");
+  expect(siteMode("/admin")).toBe("admin");
+  expect(siteMode("/olive")).toBe("user");
 });

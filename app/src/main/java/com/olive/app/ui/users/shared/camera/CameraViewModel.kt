@@ -32,10 +32,13 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
     private val _frontFacing = MutableStateFlow(false)
+    private val _zoomRatio = MutableStateFlow(1f)
+    val zoomRatio = _zoomRatio.asStateFlow()
     private var documentJob: Job? = null
     private var pendingDocumentFile: File? = null
     private var documentGeneration = 0
 
+    // Connects CameraX to this camera screen.
     fun bind(owner: LifecycleOwner, preview: PreviewView) {
         viewModelScope.launch {
             _ready.value = false
@@ -45,11 +48,15 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
                     preview,
                     _frontFacing.value
                 )
-            }.onSuccess { _ready.value = true }
+            }.onSuccess {
+                _zoomRatio.value = 1f
+                _ready.value = true
+            }
                 .onFailure { _error.value = it.localizedMessage ?: "Camera unavailable" }
         }
     }
 
+    // Switches between the front and back camera.
     fun flip(owner: LifecycleOwner, preview: PreviewView) {
         if (_busy.value || _recording.value) return
         viewModelScope.launch {
@@ -59,6 +66,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
             runCatching { camera.bindCamera(owner, preview, !previous) }
                 .onSuccess {
                     _frontFacing.value = !previous
+                    _zoomRatio.value = 1f
                     _ready.value = true
                 }
                 .onFailure {
@@ -70,6 +78,26 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // Moves the camera one zoom step closer while keeping the preview stable.
+    fun zoomIn() = changeZoom(1.25f)
+
+    // Moves the camera one zoom step farther away without going below its normal view.
+    fun zoomOut() = changeZoom(0.8f)
+
+    // Uses the two-finger camera gesture to smoothly change CameraX's real optical zoom ratio.
+    fun zoomBy(multiplier: Float) {
+        if (!multiplier.isFinite()) return
+        changeZoom(multiplier.coerceIn(0.8f, 1.25f))
+    }
+
+    private fun changeZoom(multiplier: Float) {
+        if (!_ready.value || (_busy.value && !_recording.value)) return
+        runCatching { camera.changeZoom(multiplier) }
+            .onSuccess { _zoomRatio.value = it }
+            .onFailure { _error.value = it.localizedMessage ?: "Camera zoom is unavailable" }
+    }
+
+    // Takes a photo and sends it to the capture preview.
     fun capturePhoto(file: File, onCaptured: (File) -> Unit) {
         viewModelScope.launch {
             _busy.value = true
@@ -80,13 +108,15 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
-    fun captureDocument(file: File, onCaptured: (File, OcrResult) -> Unit) {
+    // Takes a document photo and runs OCR before previewing it.
+    fun captureDocument(file: File, onCaptured: (File, File, OcrResult) -> Unit) {
         if (documentJob?.isActive == true) return
         val generation = ++documentGeneration
         pendingDocumentFile = file
         documentJob = viewModelScope.launch {
             _busy.value = true
             _error.value = null
+            // Use the fallback when capture document is unavailable.
             try {
                 val captured = camera.capturePhoto(file)
                 val result = ocr.recognizeDocument(captured.readBytes())
@@ -94,9 +124,16 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
                     captured.delete()
                     return@launch
                 }
+                val pdfFile = File(captured.parentFile, "${captured.nameWithoutExtension}.pdf")
+                convertDocumentPhotoToPdf(captured, pdfFile)
+                if (generation != documentGeneration) {
+                    captured.delete()
+                    pdfFile.delete()
+                    return@launch
+                }
                 pendingDocumentFile = null
                 documentJob = null
-                onCaptured(captured, result)
+                onCaptured(pdfFile, captured, result)
             } catch (cancelled: CancellationException) {
                 file.delete()
                 throw cancelled
@@ -115,6 +152,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // Starts or stops video recording for the Safe App camera.
     fun startVideo(file: File, includeAudio: Boolean, onCaptured: (File) -> Unit) {
         _error.value = null
         runCatching {
@@ -134,12 +172,14 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    // Stops video recording and sends the saved clip to the preview.
     fun stopVideo() = camera.stopVideo()
     // Dismisses the current camera error after the user acknowledges or retries it.
     fun clearError() {
         _error.value = null
     }
 
+    // Stops camera work and removes temporary files when the screen closes.
     fun leaveCamera() {
         documentGeneration++
         documentJob?.cancel()
@@ -149,9 +189,11 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         camera.unbind()
         _ready.value = false
         _recording.value = false
+        _zoomRatio.value = 1f
         _busy.value = false
     }
 
+    // Releases camera and OCR work when the camera screen closes.
     override fun onCleared() {
         leaveCamera()
         camera.release()

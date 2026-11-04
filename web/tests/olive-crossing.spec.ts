@@ -51,6 +51,28 @@ test("Olive Crossing supports keyboard play, pausing and restarting", async ({
   await expect(page.getByRole("status")).toContainText("0 lanes cleared");
 });
 
+test("Olive Crossing shows the complete world width without side panning on PC", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Olive Crossing", exact: true }).click();
+
+  const board = page.locator(".crossing-stage > svg");
+  await expect(board).toHaveAttribute("viewBox", /^0 0 \d+ \d+$/);
+  const initialViewBox = await board.getAttribute("viewBox");
+
+  await page.getByRole("button", { name: "Start Olive Crossing" }).click();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(board).toHaveAttribute("viewBox", initialViewBox!);
+  expect(
+    await page.locator(".crossing-stage").evaluate(
+      (stage) => stage.scrollWidth <= stage.clientWidth + 1,
+    ),
+  ).toBe(true);
+});
+
 // Inputs: the values in this case. Expected: Olive Crossing has touch controls and fits a phone.
 test("Olive Crossing has touch controls and fits a phone", async ({
   browser,

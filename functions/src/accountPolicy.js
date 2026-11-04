@@ -14,6 +14,7 @@ const PROTECTED_USERNAMES = new Set([
   "olivestaff",
 ]);
 
+// Prevents demo, owner, and protected organization accounts from being deleted.
 function protectedAccount(user, username) {
   return (
     PROTECTED_USERNAMES.has(text(username, 24).toLowerCase()) ||
@@ -22,6 +23,7 @@ function protectedAccount(user, username) {
   );
 }
 
+// Checks new account passwords without allowing the username inside the password.
 function validPassword(value, username) {
   if (typeof value !== "string" || (username !== undefined && typeof username !== "string")) {
     return false;
@@ -34,12 +36,14 @@ function validPassword(value, username) {
   );
 }
 
+// Converts untrusted account input into trimmed text with a safe maximum length.
 function text(value, max = 2000) {
   return String(value ?? "")
     .trim()
     .slice(0, max);
 }
 
+// Validates and normalizes a username submitted during new account creation.
 function normalizedUsername(value) {
   if (typeof value !== "string") {
     throw new HttpsError("invalid-argument", "Username must be text.");
@@ -54,6 +58,7 @@ function normalizedUsername(value) {
   return username;
 }
 
+// Accepts the shorter username rules used by accounts created before the current policy.
 function normalizedExistingUsername(value) {
   if (typeof value !== "string") {
     throw new HttpsError("invalid-argument", "Username must be text.");
@@ -68,6 +73,7 @@ function normalizedExistingUsername(value) {
   return username;
 }
 
+// Converts an account type into one of the four roles understood by the server.
 function normalizedRole(value) {
   if (typeof value !== "string") {
     throw new HttpsError("invalid-argument", "Account type must be text.");
@@ -79,6 +85,7 @@ function normalizedRole(value) {
   return role;
 }
 
+// Uses the alias chosen by an admin, or gives staff and admins the standard Olive Branch alias.
 function signInEmail(username, role, suppliedEmail = "") {
   const email = text(suppliedEmail, 254).toLowerCase();
   if ((role === "STAFF" || role === "ADMIN") && email) {
@@ -90,43 +97,43 @@ function signInEmail(username, role, suppliedEmail = "") {
   const domain = {
     USER: "users",
     SAFE_CONTACT: "safe",
-    STAFF: "staff",
-    ADMIN: "admin",
+    STAFF: null,
+    ADMIN: null,
   }[role];
+  if (role === "STAFF" || role === "ADMIN") {
+    return `${username}@yourolivebranch.ca`;
+  }
   return `${username}@${domain}.olive.invalid`;
 }
 
+// Hashes an organization email before using it as a Firestore document ID.
 function organizationEmailKey(email) {
   return createHash("sha256")
     .update(text(email, 254).toLowerCase())
     .digest("hex");
 }
 
-function roleFromUser(user, profile) {
+// Reads a trusted role claim and falls back only for standard and safe-contact accounts.
+function roleFromUser(user) {
   const claim = user.customClaims?.role;
   if (ROLES.has(claim)) {
     return claim;
-  }
-  if (ROLES.has(profile?.role)) {
-    return profile.role;
   }
   const domain = (user.email || "").split("@")[1] || "";
   if (domain === "safe.olive.invalid") {
     return "SAFE_CONTACT";
   }
-  if (domain === "staff.olive.invalid") {
-    return "STAFF";
-  }
-  if (domain === "admin.olive.invalid") {
-    return "ADMIN";
-  }
+  // Privileged roles must always come from server-managed Firebase Auth claims.
+  // A profile or email alias is not authorization because a user may edit it.
   return "USER";
 }
 
+// Identifies internal Firebase aliases that must not be shown as real contact emails.
 function isTemporaryEmail(email) {
   return /@(users|safe|staff|admin)\.olive\.invalid$/i.test(email || "");
 }
 
+// Checks the required profile fields for the selected account role.
 function profileComplete(role, profile) {
   if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
     return false;
@@ -143,6 +150,7 @@ function profileComplete(role, profile) {
   return hasName && hasDateOfBirth && hasLanguage && hasCity;
 }
 
+// Builds the first stored profile while excluding fields that do not apply to the role.
 function defaultProfile(username, role, input, email) {
   const address =
     input.address && typeof input.address === "object" ? input.address : {};

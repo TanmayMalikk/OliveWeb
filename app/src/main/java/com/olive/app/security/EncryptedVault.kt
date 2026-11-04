@@ -13,13 +13,21 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/** Small JSON persistence contract that keeps cache/index tests independent from Android Keystore. */
+interface JsonVault {
+    fun read(): JSONObject
+    fun update(change: (JSONObject) -> Unit)
+    fun clear()
+}
+
 // The phone's private stash: one atomic AES-encrypted file backed by Android Keystore.
-class EncryptedVault(context: Context, mode: String) {
+class EncryptedVault(context: Context, mode: String) : JsonVault {
     private val file = AtomicFile(File(context.noBackupFilesDir, "olive-$mode.vault"))
 
     // Foreground editors and background workers use separate instances of the same file.
     private val fileLock = locks.computeIfAbsent(file.baseFile.absolutePath) { Any() }
     private val alias = "olive.vault.$mode.v1"
+    // Gets the phone-only key that locks and unlocks this private file.
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(alias, null) as? SecretKey)?.let { return it }
@@ -37,7 +45,8 @@ class EncryptedVault(context: Context, mode: String) {
         }
     }
 
-    fun read(): JSONObject = synchronized(fileLock) { readUnlocked() }
+    // Decrypts and reads the complete private file.
+    override fun read(): JSONObject = synchronized(fileLock) { readUnlocked() }
     // Reads and parses the encrypted vault file while the caller holds the shared file lock.
     private fun readUnlocked(): JSONObject {
         if (!file.baseFile.exists() && !File(file.baseFile.path + ".bak").exists()) return JSONObject()
@@ -53,7 +62,8 @@ class EncryptedVault(context: Context, mode: String) {
         }
     }
 
-    fun update(change: (JSONObject) -> Unit) = synchronized(fileLock) {
+    // Changes the private data, encrypts it again, and replaces the file safely.
+    override fun update(change: (JSONObject) -> Unit) = synchronized(fileLock) {
         val root = readUnlocked()
         change(root)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -65,6 +75,7 @@ class EncryptedVault(context: Context, mode: String) {
             plain.fill(0)
         }
         val stream = file.startWrite()
+        // Restore the old file if Android cannot finish the new write.
         try {
             stream.write(bytes)
             file.finishWrite(stream)
@@ -74,10 +85,14 @@ class EncryptedVault(context: Context, mode: String) {
         }
     }
 
+    /** Deletes a disposable encrypted store without removing its Android Keystore key. */
+    override fun clear() = synchronized(fileLock) { file.delete() }
+
     private companion object {
         val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
     }
 }
 
+// Returns an existing JSON section or adds an empty one when it is missing.
 fun JSONObject.child(name: String): JSONObject =
     optJSONObject(name) ?: JSONObject().also { put(name, it) }

@@ -39,6 +39,7 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 private enum class AdminPage { Dashboard, Accounts, Settings, Map, SafetyPlans, Messages }
 
+// admin dashboard shows this admin portal view so the user can view its details and use its actions.
 @Composable
 internal fun AdminPortal(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -47,6 +48,7 @@ internal fun AdminPortal(session: SessionViewModel) {
     var createOpen by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<AdminAccountSummary?>(null) }
     BackHandler(enabled = page != AdminPage.Dashboard) { page = AdminPage.Dashboard }
+    // Opens the selected admin dashboard section.
     when (page) {
         AdminPage.Dashboard -> AdminDashboard(
             session,
@@ -66,11 +68,12 @@ internal fun AdminPortal(session: SessionViewModel) {
             session,
             onBack = { page = AdminPage.Dashboard },
         )
-        AdminPage.Map -> OrganizationMap(onBack = { page = AdminPage.Dashboard })
+        AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard })
         AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
         AdminPage.Messages -> MessagesScreen(session, exit = { page = AdminPage.Dashboard })
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
+    // Open the protected-account form and close it when the admin dismisses it.
     if (createOpen) CreateAccountDialog(session, onDismiss = { createOpen = false })
     deleteTarget?.let { account ->
         AlertDialog(
@@ -94,7 +97,7 @@ internal fun AdminPortal(session: SessionViewModel) {
         )
     }
 }
-
+// Draws the admin workspace navigation and selected section.
 @Composable
 private fun AdminDashboard(
     session: SessionViewModel,
@@ -151,7 +154,7 @@ private fun AdminDashboard(
         OrganizationDashboardCard(
             Icons.Outlined.LocationOn,
             stringResource(R.string.organization_live_map),
-            stringResource(R.string.organization_location_feed_not_enabled),
+            stringResource(R.string.organization_live_map_admin_description),
             onMap,
         )
         Status(session)

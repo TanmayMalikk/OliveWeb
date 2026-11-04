@@ -29,6 +29,7 @@ import com.olive.app.data.*
 import com.olive.app.ui.users.shared.messaging.PrivateContactNoteDialog
 
 
+// admin account management shows this admin accounts view so the user can view its details and use its actions.
 @Composable
 internal fun AdminAccounts(
     session: SessionViewModel,
@@ -87,7 +88,7 @@ internal fun AdminAccounts(
         PrivateContactNoteDialog(session, listOf(target), onDismiss = { noteTarget = null })
     }
 }
-
+// Shows user, trusted-contact, staff, and admin totals as accessible cards.
 @Composable
 internal fun AccountCountGrid(counts: AccountCounts) {
     val uiText = rememberResourceText()
@@ -120,7 +121,7 @@ internal fun AccountCountGrid(counts: AccountCounts) {
         }
     }
 }
-
+// Shows one managed account and the actions allowed for it.
 @Composable
 private fun AccountRow(
     account: AdminAccountSummary,
@@ -248,8 +249,16 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
                     fullName = it.take(120)
                 }
                 BirthdayPicker(dob, "admin_dob", true) { dob = it }
+                // Only staff and admin accounts can be protected from deletion.
                 if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-                    Field(uiText(R.string.ui_email), email, "admin_email") { email = it.take(254) }
+                    Field(uiText(R.string.ui_login_email_optional), email, "admin_email") {
+                        email = it.take(254)
+                    }
+                    Text(
+                        uiText(R.string.ui_login_email_creation_help),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted
+                    )
                     Field(uiText(R.string.ui_phone_optional), phone, "admin_phone") {
                         phone = it.take(40)
                     }

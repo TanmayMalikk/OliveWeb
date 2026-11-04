@@ -58,9 +58,11 @@ internal fun safetyDefaults(context: Context): Map<String, String> = buildMap {
     }
 }
 
+// Loads the safety document suggestions needed by the safety plan.
 private fun safetyDocumentSuggestions(context: Context) =
     context.resources.getStringArray(R.array.safety_document_checklist).toList()
 
+// Formats the safety section label shown by the safety plan.
 internal fun safetySectionLabel(section: String) = when (section) {
     "destination" -> R.string.safety_destination
     "travel" -> R.string.safety_travel
@@ -72,6 +74,7 @@ internal fun safetySectionLabel(section: String) = when (section) {
     else -> R.string.safety_aftercare
 }
 
+// Returns the safety section hint used by the safety plan.
 internal fun safetySectionHint(section: String) = when (section) {
     "destination" -> R.string.safety_destination_hint
     "travel" -> R.string.safety_travel_hint
@@ -112,6 +115,7 @@ internal fun TrustedContactLinkPicker(
                 Icon(Icons.Outlined.Link, null)
                 Spacer(Modifier.width(8.dp))
                 Text(
+                    // Adds or removes the selected trusted contact from the safety plan.
                     when {
                         selected != null -> stringResource(
                             R.string.trusted_link_to,

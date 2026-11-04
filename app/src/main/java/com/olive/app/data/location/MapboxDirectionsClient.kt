@@ -26,11 +26,13 @@ data class LocationRoute(
     val durationSeconds: Double,
     val directions: List<RouteDirection>,
 ) {
+    // Finds the next turn after the route point closest to the user's location.
     fun nextDirection(latitude: Double, longitude: Double): RouteDirection? {
         val currentIndex = nearestCoordinateIndex(latitude, longitude)
         return directions.firstOrNull { it.toIndex >= currentIndex } ?: directions.lastOrNull()
     }
 
+    // Estimates the distance and time left from the nearest route point.
     fun progress(latitude: Double, longitude: Double): RouteProgress {
         val index = nearestCoordinateIndex(latitude, longitude)
         val segmentLengths = coordinates.zipWithNext { first, second ->
@@ -43,6 +45,7 @@ data class LocationRoute(
         return RouteProgress(distanceMeters * remainingRatio, durationSeconds * remainingRatio)
     }
 
+    // Finds which route point is closest to the supplied latitude and longitude.
     private fun nearestCoordinateIndex(latitude: Double, longitude: Double): Int =
         coordinates.indices.minByOrNull { index ->
             val point = coordinates[index]
@@ -54,6 +57,7 @@ data class LocationRoute(
 internal object MapboxDirectionsClient {
     val configured get() = BuildConfig.MAPBOX_ACCESS_TOKEN.isNotBlank()
 
+    // Requests a driving route and converts the response into map points and directions.
     suspend fun drivingRoute(
         startLatitude: Double,
         startLongitude: Double,
@@ -79,6 +83,7 @@ internal object MapboxDirectionsClient {
                 requestMethod = "GET"
                 setRequestProperty("Accept", "application/json")
             }
+        // Always close the network connection, including when the server rejects the request.
         try {
             if (connection.responseCode !in 200..299) return@withContext null
             parseResponse(connection.inputStream.bufferedReader().use { it.readText() })
@@ -87,6 +92,7 @@ internal object MapboxDirectionsClient {
         }
     }
 
+    // Reads the shortest valid route from the Mapbox response.
     internal fun parseResponse(json: String): LocationRoute? {
         val root = JSONObject(json)
         if (root.optString("code") != "Ok") return null
@@ -105,6 +111,7 @@ internal object MapboxDirectionsClient {
         )
     }
 
+    // Converts GeoJSON longitude-latitude pairs into the app's route points.
     private fun parseCoordinates(rows: JSONArray) = buildList {
         for (index in 0 until rows.length()) {
             val row = rows.optJSONArray(index) ?: continue
@@ -115,6 +122,7 @@ internal object MapboxDirectionsClient {
         }
     }
 
+    // Matches each written turn instruction to its nearest route point.
     private fun parseDirections(
         legs: JSONArray?,
         routeCoordinates: List<RouteCoordinate>,
@@ -138,9 +146,11 @@ internal object MapboxDirectionsClient {
         }
     }
 
+    // Escapes the API token before placing it in the request URL.
     private fun encode(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name())
 }
 
+// Calculates how far a location is from the nearest part of a route.
 internal fun distanceFromRouteMeters(
     latitude: Double,
     longitude: Double,
@@ -148,6 +158,7 @@ internal fun distanceFromRouteMeters(
 ): Double {
     if (route.coordinates.isEmpty()) return Double.POSITIVE_INFINITY
     val originLatitudeRadians = Math.toRadians(latitude)
+    // Projects nearby map coordinates onto a flat metre grid for this calculation.
     fun projected(point: RouteCoordinate): Pair<Double, Double> {
         val x = Math.toRadians(point.longitude - longitude) * cos(originLatitudeRadians) * EARTH_RADIUS_METERS
         val y = Math.toRadians(point.latitude - latitude) * EARTH_RADIUS_METERS
@@ -164,6 +175,7 @@ internal fun distanceFromRouteMeters(
     } ?: 0.0
 }
 
+// Compares two nearby coordinates without doing an unnecessary square root.
 private fun squaredDistance(
     firstLatitude: Double,
     firstLongitude: Double,
@@ -176,6 +188,7 @@ private fun squaredDistance(
     return latitudeDelta * latitudeDelta + longitudeDelta * longitudeDelta
 }
 
+// Uses the haversine formula to measure the distance between two route points.
 private fun coordinateDistanceMeters(first: RouteCoordinate, second: RouteCoordinate): Double {
     val latitudeDelta = Math.toRadians(second.latitude - first.latitude)
     val longitudeDelta = Math.toRadians(second.longitude - first.longitude)

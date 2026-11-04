@@ -9,9 +9,11 @@ import java.util.UUID
 
 // Handy for emulator testing: same account flow, but nothing leaves this installation.
 class LocalAccountRepository(private val vault: EncryptedVault) : AccountRepository {
+    // Uses one protected-storage key for the local account profile.
     private fun key(username: String, role: AccountRole) =
         "${role.name}:${InputPolicy.username(username)}"
 
+    // Creates an encrypted local account for emulator or offline testing.
     override suspend fun create(username: String, password: String, role: AccountRole) =
         withContext(Dispatchers.IO) {
             require(InputPolicy.validUsername(username)) { "Invalid username" }
@@ -34,6 +36,7 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
             identity
         }
 
+    // Account: Authenticates the account.
     override suspend fun authenticate(username: String, password: String, role: AccountRole) =
         withContext(Dispatchers.IO) {
             val normalized = InputPolicy.username(username)
@@ -52,18 +55,23 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
             AccountIdentity(account.getString("uid"), normalized)
         }
 
+    // Loads the signed-in account profile from this repository.
     override suspend fun profile(identity: AccountIdentity) = withContext(Dispatchers.IO) {
         vault.read().optJSONObject("profiles")?.optJSONObject(identity.uid)
             ?.let(UserProfile::fromJson)
     }
 
+    // Saves the account profile in the selected account repository.
     override suspend fun saveProfile(identity: AccountIdentity, profile: UserProfile) =
         withContext(Dispatchers.IO) {
             vault.update { it.child("profiles").put(identity.uid, profile.toJson()) }
         }
 
+    // Adds one account activity record to storage.
     override suspend fun saveHistoryRecord(identity: AccountIdentity, record: HistoryRecord) = Unit
+    // Loads private activity-history records for this account.
     override suspend fun historyRecords(identity: AccountIdentity) = emptyList<HistoryRecord>()
+    // Re-encrypts this account after its password changes.
     override suspend fun changePassword(
         identity: AccountIdentity,
         currentPassword: String,
@@ -92,7 +100,10 @@ class LocalAccountRepository(private val vault: EncryptedVault) : AccountReposit
         }
     }
 
+    // Account: Authenticates the accountd uid.
     override fun authenticatedUid(): String? = null
+    // Checks the username and password, then returns the matching account.
     override fun authenticatedUsername(): String? = null
+    // Account: Signs out the current account.
     override fun signOut() = Unit
 }

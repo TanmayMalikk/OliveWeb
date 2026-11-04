@@ -30,6 +30,7 @@ import javax.net.ssl.HttpsURLConnection
 import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.seconds
 
+// Allows only HTTPS article links in the news reader.
 internal fun isSecureNewsUrl(url: String): Boolean = runCatching {
     val uri = URI(url)
     uri.scheme.equals(
@@ -42,6 +43,7 @@ internal data class NewsArticleMetadata(
     val publisherUrl: String = "", val imageUrl: String = "", val topic: String = "",
     val isPaywalled: Boolean? = null, val description: String = ""
 ) {
+    // Converts this article into JSON for the local news cache.
     fun toJson(): JSONObject =
         JSONObject().put("publisherUrl", publisherUrl).put("imageUrl", imageUrl)
             .put("topic", topic).put("isPaywalled", isPaywalled ?: JSONObject.NULL)
@@ -56,6 +58,7 @@ internal data class NewsArticleMetadata(
         summary = description.ifBlank { article.summary })
 
     companion object {
+        // Rebuilds a news article from cached JSON data.
         fun fromJson(value: JSONObject): NewsArticleMetadata = NewsArticleMetadata(
             value.optString("publisherUrl"),
             value.optString("imageUrl"),
@@ -90,6 +93,7 @@ private fun responsiveArticleImage(
 ): String {
     if (original.isBlank()) return original
     val sizingKeys = setOf("w", "width", "h", "height", "q", "quality", "dpr", "size")
+    // Cleans publisher text so the article card shows a readable source name.
     fun identity(uri: URI): List<Any?> = listOf(
         uri.host?.lowercase(), uri.port, uri.rawPath,
         uri.rawQuery.orEmpty().split('&')
@@ -123,6 +127,7 @@ private fun responsiveArticleImage(
 internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticleMetadata {
     require(isSecureNewsUrl(pageUrl))
     val document = Jsoup.parse(html, pageUrl)
+    // Combines the publisher and date shown under an article title.
     fun meta(vararg names: String): String = document.select("meta").firstOrNull { element ->
         names.any { name ->
             element.attr("property").equals(name, true) || element.attr("name")
@@ -130,8 +135,10 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         }
     }?.attr("content").orEmpty()
 
+    // Reads one article from the RSS or Atom feed node.
     fun articleNode(value: Any?, depth: Int = 0): JSONObject? {
         if (depth > 20) return null
+        // Reads article details from whichever supported feed shape is present.
         when (value) {
             is JSONObject -> {
                 val types: List<String> = when (val type = value.opt("@type")) {
@@ -160,6 +167,7 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         runCatching { articleNode(JSONTokener(it.data()).nextValue()) }.getOrNull()
     }
 
+    // Trims feed text and removes markup that should not appear in article cards.
     fun text(value: Any?): String = when (value) {
         is String -> value
         is JSONArray -> (0 until value.length()).firstNotNullOfOrNull {
@@ -171,6 +179,7 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         else -> ""
     }
 
+    // Finds the best article image in supported feed tags or page metadata.
     fun image(value: Any?): String = when (value) {
         is String -> value
         is JSONObject -> text(value.opt("contentUrl")).ifBlank {
@@ -190,6 +199,7 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         else -> ""
     }
 
+    // Reads a publisher's free-access value as a true, false, or missing result.
     fun freeFlag(value: Any?): Boolean? = when (value) {
         is Boolean -> value
         is String -> value.trim().lowercase()
@@ -198,6 +208,7 @@ internal fun parseNewsArticleMetadata(html: String, pageUrl: String): NewsArticl
         else -> null
     }
 
+    // Searches article metadata for any section marked as paid-only.
     fun paidPart(value: Any?): Boolean = when (value) {
         is JSONObject -> freeFlag(value.opt("isAccessibleForFree")) == false
         is JSONArray -> (0 until value.length()).any { paidPart(value.opt(it)) }
@@ -239,10 +250,12 @@ internal class NewsMetadataRepository(context: Context) {
     private val preferences =
         appContext.getSharedPreferences("daily_digest_article_metadata", Context.MODE_PRIVATE)
 
+    // Creates the stable cache key used for this news request.
     private fun key(link: String): String =
         MessageDigest.getInstance("SHA-256").digest(link.toByteArray())
             .joinToString("") { "%02x".format(it.toInt() and 255) }
 
+    // Reads cached article details and rejects entries that are too old unless allowed.
     fun cached(link: String, allowStale: Boolean = false): NewsArticleMetadata? = runCatching {
         val value = JSONObject(preferences.getString(key(link), null) ?: return@runCatching null)
         val expired = value.optLong("expiresAt") < System.currentTimeMillis()
@@ -252,6 +265,7 @@ internal class NewsMetadataRepository(context: Context) {
         }
     }.getOrNull()
 
+    // Loads cached news stories saved on this phone.
     suspend fun load(article: NewsArticle): NewsArticleMetadata {
         cached(article.link)?.let { return it }
         if (article.imageUrl.isNotBlank() && article.topic.isNotBlank() && article.isPaywalled != null)
@@ -287,6 +301,7 @@ internal class NewsMetadataRepository(context: Context) {
                     cacheKey,
                     metadata.toJson().put("expiresAt", System.currentTimeMillis() + ttl).toString()
                 )
+                // Trim the oldest articles when the phone cache grows past 128 entries.
                 if (preferences.all.size >= 128) preferences.all.entries.filter { it.key != cacheKey }
                     .sortedBy {
                         runCatching { JSONObject(it.value.toString()).optLong("expiresAt") }.getOrDefault(
@@ -298,7 +313,7 @@ internal class NewsMetadataRepository(context: Context) {
         }
     }
 
-    // Follows a safe article URL and returns the final publisher host after redirects.
+    // Reads a clean publisher name from article metadata or its web address.
     private suspend fun resolvePublisher(link: String): String? {
         if (!isSecureNewsUrl(link)) return null
         if (!URI(link).host.equals("news.google.com", true)) return link
@@ -323,6 +338,7 @@ internal class NewsMetadataRepository(context: Context) {
                             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                             settings.javaScriptCanOpenWindowsAutomatically = false
                             webViewClient = object : WebViewClient() {
+                                // Keeps safe article links in the reader and blocks unsupported link types.
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView,
                                     request: WebResourceRequest
@@ -337,6 +353,7 @@ internal class NewsMetadataRepository(context: Context) {
                                     return !isSecureNewsUrl(url)
                                 }
 
+                                // Saves the final publisher URL after the article page finishes loading.
                                 override fun onPageFinished(view: WebView, url: String) {
                                     if (isSecureNewsUrl(url) && !isGoogleHost(URI(url).host) && continuation.isActive) continuation.resume(
                                         url
@@ -358,6 +375,7 @@ internal class NewsMetadataRepository(context: Context) {
         }
     }
 
+    // Loads article metadata from the publisher page when the feed is incomplete.
     private fun fetch(initialUrl: String): NewsArticleMetadata? {
         var current = initialUrl
         repeat(6) {
@@ -372,8 +390,10 @@ internal class NewsMetadataRepository(context: Context) {
                 "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36"
             )
             connection.setRequestProperty("Accept-Encoding", "gzip")
+            // Turn an unexpected fetch failure into a readable message.
             try {
                 val status = connection.responseCode
+                // Follow normal web redirects while fetching the full article.
                 if (status in listOf(301, 302, 303, 307, 308)) {
                     val location = connection.getHeaderField("Location") ?: return null
                     current = URI(current).resolve(location).toString()
@@ -391,6 +411,7 @@ internal class NewsMetadataRepository(context: Context) {
                         ) else response
                     decoded.use { stream ->
                         val buffer = ByteArray(8192)
+                        // News: Keeps fetch active while bytes size < 2 000 000.
                         while (bytes.size() < 2_000_000) {
                             val count =
                                 stream.read(buffer, 0, minOf(buffer.size, 2_000_000 - bytes.size()))
@@ -415,6 +436,7 @@ internal class NewsMetadataRepository(context: Context) {
         val articleLocks = Array(64) { Mutex() }
         val networkSlots = Semaphore(3)
         val redirectSlots = Semaphore(2)
+        // Detects Google News links that need their publisher address resolved.
         fun isGoogleHost(host: String?): Boolean =
             host?.lowercase()?.let { it == "google.com" || it.endsWith(".google.com") } ?: false
     }

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="overview">Overview</string>
     <string name="activity">Activity</string>
     <string name="nutrition">Nutrition</string>
     <string name="nutrition_work_in_progress">Nutrition (WORK IN PROGRESS)</string>
@@ -12,7 +11,6 @@
     <string name="distance">Distance</string>
     <string name="active_calories">Active calories</string>
     <string name="fitness_tracker">Fitness Tracker</string>
-    <string name="food">Food</string>
     <string name="goals">Goals</string>
     <string name="meals">Meals</string>
     <string name="add_food">Add food</string>
@@ -40,7 +38,6 @@
     <string name="protein_goal">Daily protein goal (g)</string>
     <string name="carbohydrate_goal">Daily carbohydrate goal (g)</string>
     <string name="fat_goal">Daily fat goal (g)</string>
-    <string name="fitness_distance_and_calories">%1$.2f km · about %2$.0f active kcal</string>
     <string name="fatsecret_attribution">Powered by FatSecret Platform API</string>
     <string name="open_food_facts_attribution">Packaged-food data from Open Food Facts</string>
     <string name="fitness_cover_choice">Fitness App · Fitness Tracker</string>
@@ -51,8 +48,12 @@
     <string name="fitness_history_daily_total">Daily total</string>
     <string name="fitness_history_max">Max %1$s %2$s</string>
     <string name="fitness_history_latest">%1$s %2$s</string>
-    <string name="fitness_chart_description">%1$s chart for %2$d days.</string>
+    <plurals name="fitness_chart_description">
+        <item quantity="one">%1$s chart for %2$d day.</item>
+        <item quantity="other">%1$s chart for %2$d days.</item>
+    </plurals>
     <string name="fitness_chart_latest">%1$s latest %2$s %3$s.</string>
+    <string name="fitness_chart_average">%1$s average %2$s %3$s.</string>
     <string name="fitness_calories_burned">Burned</string>
     <string name="fitness_calories_eaten">Eaten</string>
     <string name="fitness_macros">Macros</string>
@@ -61,7 +62,10 @@
     <string name="fitness_kilometres_unit">km</string>
     <string name="fitness_kilocalories_unit">kcal</string>
     <string name="fitness_grams_unit">g</string>
-    <string name="fitness_activity_dashboard_description">Daily activity: %1$d steps, %2$.2f kilometres, %3$.0f calories burned.</string>
+    <plurals name="fitness_activity_dashboard_description">
+        <item quantity="one">Daily activity: %1$d step, %2$.2f kilometres, %3$.0f calories burned.</item>
+        <item quantity="other">Daily activity: %1$d steps, %2$.2f kilometres, %3$.0f calories burned.</item>
+    </plurals>
     <string name="fitness_steps">Steps</string>
     <string name="fitness_vitals">Vitals</string>
     <string name="fitness_vitals_today_description">Heart-rate summaries from a connected Wear OS watch.</string>
@@ -80,9 +84,10 @@
     <string name="fitness_vitals_no_recent_readings">A Wear OS watch connected during the last 14 days, but no heart-rate readings are available. Open Olive Fitness on the watch and allow heart-rate access.</string>
     <string name="fitness_heart_rate_graph">Heart rate</string>
     <string name="fitness_vitals_no_data">— No data —</string>
-    <string name="fitness_vitals_graph_description">Heart-rate graph with %1$d days of data, from %2$d to %3$d beats per minute.</string>
     <string name="fitness_vitals_range">%1$d–%2$d bpm</string>
     <string name="fitness_vitals_average">Average heart rate %1$d bpm</string>
+    <string name="fitness_previous_day">Show previous day</string>
+    <string name="fitness_next_day">Show next day</string>
     <string name="fitness_outdoor_workout">Outdoor workout</string>
     <string name="fitness_outdoor_workout_description">Track your private GPS route, distance, time, and pace.</string>
     <string name="fitness_start_outdoor_workout">Start outdoor workout</string>
@@ -92,9 +97,7 @@
     <string name="fitness_pause">Pause</string>
     <string name="fitness_resume">Resume</string>
     <string name="fitness_finish">Finish</string>
-    <string name="fitness_route_points">Workout route with %1$d GPS points.</string>
     <string name="fitness_waiting_for_gps">Waiting for an accurate GPS location…</string>
-    <string name="fitness_last_outdoor_workout">Last outdoor workout</string>
     <string name="fitness_recent_outdoor_workouts">Recent outdoor workouts</string>
     <string name="fitness_walking">Walking</string>
     <string name="fitness_running">Running</string>

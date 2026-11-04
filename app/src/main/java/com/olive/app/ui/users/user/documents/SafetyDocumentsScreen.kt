@@ -34,10 +34,12 @@ import com.olive.app.data.*
 import com.olive.app.data.media.MediaTransferState
 import com.olive.app.data.media.MediaTransferStatus
 import com.olive.app.data.media.MediaUploadPresentation
+import com.olive.app.data.media.OfflineMediaAvailability
 import java.io.File
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
 
+// Lists encrypted documents and provides upload, filter, open, and share actions.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SafetyDocumentsScreen(session: SessionViewModel) {
@@ -53,6 +55,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     var choosingUpload by rememberSaveable { mutableStateOf(false) }
     val unableUpload = stringResource(R.string.documents_upload_failed)
+    // Clears the selected document and closes its action dialog.
     fun finishSelection(uri: android.net.Uri?) {
         session.endExternalFilePicker()
         if (uri != null) controller.upload(
@@ -69,6 +72,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     val documentPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), ::finishSelection)
 
+    // Confirms private entry before opening the Android file picker.
     fun launchProtectedPicker(action: () -> Unit) {
         choosingUpload = false
         session.beginExternalFilePicker()
@@ -79,7 +83,9 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             )
         }
     }
-    LaunchedEffect(uid, session.localMode) { controller.load(uid, session.localMode) }
+    LaunchedEffect(uid, session.coverUsername, session.localMode) {
+        controller.load(uid, session.coverUsername, session.localMode)
+    }
     opened?.let { (document, localFile) ->
         SafetyDocumentViewer(document, localFile) {
             localFile.delete()
@@ -129,6 +135,20 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             stringResource(R.string.documents_account_required),
             color = Muted
         )
+        if (!session.localMode && state.source in setOf(
+                DocumentListSource.LOCAL_INDEX,
+                DocumentListSource.FIRESTORE_CACHE,
+            )) Row(
+            Modifier.fillMaxWidth().testTag("documents_offline_index").semantics {
+                liveRegion = LiveRegionMode.Polite
+            },
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.CloudOff, null, tint = Muted)
+            Text(stringResource(R.string.documents_offline_index),
+                style = MaterialTheme.typography.bodySmall, color = Muted)
+        }
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             DocumentFilter.entries.toList().chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -139,6 +159,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                             label = {
                                 Text(
                                     stringResource(
+                                        // Opens the protected file picker only after private entry is confirmed.
                                         when (option) {
                                             DocumentFilter.All -> R.string.documents_all
                                             DocumentFilter.Photos -> R.string.safety_storage_photos
@@ -158,6 +179,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { AccessibleMessage(it) }
         val shown = state.files.filter { file ->
+            // Opens the protected file picker only after private entry is confirmed.
             when (filter) {
                 DocumentFilter.All -> true
                 DocumentFilter.Photos -> file.mimeType.startsWith("image/")
@@ -197,11 +219,17 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 PendingUploadCard(upload) { mediaController?.retryUpload(upload.jobId) }
             }
             items(shown, key = { it.id }) { file ->
-                SafetyDocumentCard(file, uid, session.messages.friends, onOpen = {
+                SafetyDocumentCard(file, uid, session.messages.friends,
+                    offline = mediaController?.offlineCopies?.get(file.id)
+                        ?: OfflineMediaAvailability.NOT_CACHED,
+                    onOpen = {
                     controller.download(file) { local ->
                         opened = file to local
                     }
-                }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) })
+                }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) },
+                    onMakeOffline = { controller.makeAvailableOffline(file) },
+                    onRemoveOffline = { controller.removeOfflineCopy(file) },
+                    onEvidenceChange = { evidence -> controller.setEvidence(file, uid, evidence) })
             }
         }
     }
@@ -281,6 +309,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     }
 }
 
+// user safety documents screen shows this preparing upload card view so the user can view its details and use its actions.
 @Composable
 private fun PreparingUploadCard() {
     val title = stringResource(R.string.documents_preparing_upload)
@@ -303,6 +332,7 @@ private fun PreparingUploadCard() {
     }
 }
 
+// Shows upload progress, errors, and retry controls for one pending file.
 @Composable
 private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Unit) {
     val failed = upload.status == MediaTransferStatus.FAILED
@@ -370,10 +400,13 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
     }
 }
 
+// user safety documents screen shows this safety document card view so the user can view its details and use its actions.
 @Composable
 private fun SafetyDocumentCard(
     file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
-    onShare: () -> Unit, onDelete: () -> Unit
+    offline: OfflineMediaAvailability, onShare: () -> Unit, onDelete: () -> Unit,
+    onMakeOffline: () -> Unit, onRemoveOffline: () -> Unit,
+    onEvidenceChange: (Boolean) -> Unit,
 ) {
     val own = file.ownerUid == currentUid
     val owner = friends.firstOrNull { it.uid == file.ownerUid }?.username
@@ -418,6 +451,24 @@ private fun SafetyDocumentCard(
                     modifier = Modifier.testTag("document_ocr_${file.id}")
                 )
             }
+            // Only the owner may change evidence status; shared viewers do not see this action.
+            if (own) Row(
+                Modifier.fillMaxWidth().testTag("document_evidence_${file.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = file.evidence,
+                    onCheckedChange = onEvidenceChange,
+                )
+                Column {
+                    Text(stringResource(R.string.evidence), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(if (file.evidence) R.string.evidence_tagged else R.string.evidence_normal_file),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                }
+            }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onOpen,
@@ -429,6 +480,7 @@ private fun SafetyDocumentCard(
                         stringResource(R.string.open)
                     )
                 }
+                // Owners can share the document; recipients only get the open action.
                 if (own) OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
                     Icon(
                         Icons.Outlined.Share,
@@ -444,10 +496,49 @@ private fun SafetyDocumentCard(
                     )
                 }
             }
+            if (file.objectKey.isNotBlank()) {
+                val cached = offline in setOf(
+                    OfflineMediaAvailability.AVAILABLE,
+                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                )
+                OutlinedButton(
+                    onClick = if (cached) onRemoveOffline else onMakeOffline,
+                    enabled = offline != OfflineMediaAvailability.SAVING,
+                    modifier = Modifier.fillMaxWidth().testTag("document_offline_${file.id}"),
+                ) {
+                    Icon(if (cached) Icons.Outlined.Delete else Icons.Outlined.Download, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(when {
+                        offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
+                        cached -> R.string.documents_remove_offline_copy
+                        else -> R.string.documents_make_available_offline
+                    }))
+                }
+                when (offline) {
+                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
+                    OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED -> Text(
+                        stringResource(R.string.documents_offline_revalidation_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                    OfflineMediaAvailability.AVAILABLE -> Text(
+                        stringResource(R.string.documents_available_offline),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = OliveGreen,
+                    )
+                    OfflineMediaAvailability.RECENT_AVAILABLE -> Text(
+                        stringResource(R.string.documents_recently_cached),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                    else -> Unit
+                }
+            }
         }
     }
 }
-
+// Lets the user choose which trusted contacts may open a document.
 @Composable
 private fun DocumentSharingDialog(
     file: SafetyDocument,

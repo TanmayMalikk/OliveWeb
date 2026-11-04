@@ -183,7 +183,7 @@ Buen humor.</string>
 <string name="no_failed_attempts_recorded">No se registraron intentos fallidos.</string>
     <string name="incorrect_pin">PIN incorrecto</string>
     <string name="safe_home">hogar seguro</string>
-    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">Guarde aquí a personas de confianza. Olive no envía mensajes ni realiza llamadas.</string>
+    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">Guarde aquí a personas de confianza para enviarles mensajes o llamarlas de forma segura.</string>
     <string name="edit">Editar</string>
     <string name="remove">Quitar</string>
     <string name="no_contacts_yet_adding_one_is_optional">Aún no hay contactos. Agregar uno es opcional.</string>
@@ -346,12 +346,17 @@ Buen humor.</string>
     <string name="select_a_friend_or_conversation_to_start_messaging">Seleccione un amigo o una conversación para comenzar a enviar mensajes.</string>
     <string name="unsend_message">Dejar enviar mensaje</string>
     <string name="message_unsent">Mensaje no enviado</string>
+    <string name="message_delivery_queued">En cola — esperando conexión</string>
+    <string name="message_delivery_sending">Enviando…</string>
+    <string name="message_delivery_retrying">Aún no se envió — reintentando automáticamente</string>
+    <string name="message_delivery_failed_retry">No enviado — toca para reintentar</string>
+    <string name="message_delivery_sent">Enviado</string>
 <string name="share_attachment">Compartir archivo adjunto</string><string name="select_attachment_category">Seleccionar %1$s</string>
     <string name="private_notes">Notas privadas</string><string name="incident_reports">Informes de incidentes</string><string name="saved_media">Contenido guardado</string>
     <string name="no_private_notes_found">No se encontraron notas.</string><string name="untitled_note">Nota sin título</string><string name="no_incident_reports_found">No se encontraron informes de incidentes.</string>
 <string name="secure_shared_entry">Elemento compartido seguro</string><string name="close_shared_entry">Cerrar elemento compartido</string>
     <string name="attach_secure_entry">Adjuntar una nota o informe seguro</string><string name="encrypted_document">Documento cifrado</string><string name="shared_private_note">Nota privada compartida</string><string name="shared_incident_report">Informe de incidente compartido</string>
-    <string name="private_entry_shared">Elemento privado compartido de forma segura.</string><string name="unable_to_share_private_entry">No se pudo compartir este elemento privado.</string><string name="unable_to_open_shared_entry">No se pudo abrir este elemento compartido.</string><string name="unable_to_open_secure_conversation">No se pudo abrir esta conversación segura. Es posible que la otra persona deba abrir primero la aplicación actualizada.</string>
+    <string name="private_entry_shared">Elemento privado compartido de forma segura.</string><string name="unable_to_share_private_entry">No se pudo compartir este elemento privado.</string><string name="unable_to_open_shared_entry">No se pudo abrir este elemento compartido.</string><string name="unable_to_open_secure_conversation">Este dispositivo no tiene la clave de cifrado de esta conversación. Abre la conversación en un dispositivo ya autorizado para esta cuenta y vuelve a intentarlo.</string>
     <string name="secure_message">Mensaje seguro</string><string name="encrypted_message_unavailable">Mensaje cifrado no disponible</string>
 <string name="news_near_location">Noticias cerca de %1$s</string>
 <string name="accounts">Cuentas</string>
@@ -389,6 +394,8 @@ Buen humor.</string>
     <string name="organization_live_map">Mapa de ubicación en vivo</string>
     <string name="organization_live_map_description">Esta vista protegida está lista para mostrar a los usuarios asignados como puntos rojos parpadeantes.</string>
     <string name="organization_location_feed_not_enabled">La ubicación en vivo de la organización aún no está habilitada. Esta vista no recopila ubicaciones.</string>
+    <string name="organization_live_map_admin_description">Muestra la ubicación en vivo o la última ubicación conocida de cada cuenta de usuario.</string>
+    <string name="organization_location_feed_empty">Todavía no se ha informado ninguna ubicación de usuario.</string>
     <string name="support_conversations">Conversaciones de apoyo</string>
     <string name="assigned_users_count">Usuarios asignados: %1$d</string>
     <string name="safety_plan_shared_in_chat">Plan de seguridad compartido en el chat de apoyo.</string>
@@ -402,11 +409,6 @@ Buen humor.</string>
     <string name="admin_accounts_description">Crea cuentas y revisa cuántos usuarios tiene asignado cada empleado.</string>
 
     <string name="steps_today">Pasos de hoy</string>
-    <plurals name="steps_goal_value">
-        <item quantity="one">Objetivo: %1$d paso</item>
-        <item quantity="other">Objetivo: %1$d pasos</item>
-    </plurals>
-
     <string name="calories">Calorías</string>
 
 
@@ -464,4 +466,22 @@ Buen humor.</string>
     <string name="location_finding_route">Buscando la mejor ruta…</string>
     <string name="location_navigating_to">Navegando hacia %1$s</string>
     <string name="location_map_view">Vista del mapa</string>
+    <string name="evidence">Evidence</string>
+    <string name="incident_date">Date of incident</string>
+    <string name="incident_time">Approx. time</string>
+    <string name="incident_location">Location of incident</string>
+    <string name="incident_pin_title">Drop or drag the pin</string>
+    <string name="incident_pin_help">Tap the map to save exact coordinates. Your current location stays visible as a red dot when available.</string>
+    <string name="incident_show_location">Show my current location</string>
+    <string name="attachments">Attachments</string>
+    <string name="incident_attachments_help">Choose saved photos, videos, or documents. Incident attachments are automatically tagged as evidence.</string>
+    <string name="upload_new_attachment">Upload a new attachment</string>
+    <string name="attachments_empty_help">Upload files in Documents, then attach them here.</string>
+    <string name="title">Title</string>
+    <string name="incident_body">Detalles del incidente</string>
+    <string name="current_location">Your current location</string>
+    <string name="incident_dropped_pin">Dropped pin: %1$.5f, %2$.5f</string>
+    <string name="incident_required_fields">Add a title, incident date, and incident location before saving.</string>
+    <string name="evidence_tagged">Tagged as evidence</string>
+    <string name="evidence_normal_file">Normal account file</string>
 </resources>

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="overview">نظرة عامة</string>
     <string name="activity">النشاط</string>
     <string name="nutrition">التغذية</string>
     <string name="nutrition_work_in_progress">التغذية (قيد التطوير)</string>
@@ -12,7 +11,6 @@
     <string name="distance">المسافة</string>
     <string name="active_calories">السعرات النشطة</string>
     <string name="fitness_tracker">متتبع اللياقة</string>
-    <string name="food">الطعام</string>
     <string name="goals">الأهداف</string>
     <string name="meals">الوجبات</string>
     <string name="add_food">إضافة طعام</string>
@@ -40,7 +38,6 @@
     <string name="protein_goal">هدف البروتين اليومي (غ)</string>
     <string name="carbohydrate_goal">هدف الكربوهيدرات اليومي (غ)</string>
     <string name="fat_goal">هدف الدهون اليومي (غ)</string>
-    <string name="fitness_distance_and_calories">%1$.2f كم · حوالي %2$.0f سعرة نشطة</string>
     <string name="fatsecret_attribution">مدعوم بواسطة FatSecret Platform API</string>
     <string name="open_food_facts_attribution">بيانات الأطعمة المعبأة من Open Food Facts</string>
     <string name="fitness_cover_choice">تطبيق اللياقة · متتبع اللياقة</string>
@@ -51,8 +48,16 @@
     <string name="fitness_history_daily_total">الإجمالي اليومي</string>
     <string name="fitness_history_max">الحد الأقصى %1$s %2$s</string>
     <string name="fitness_history_latest">%1$s %2$s</string>
-    <string name="fitness_chart_description">مخطط %1$s لمدة %2$d يوماً.</string>
+    <plurals name="fitness_chart_description">
+        <item quantity="zero">مخطط %1$s لمدة %2$d يوم.</item>
+        <item quantity="one">مخطط %1$s لمدة يوم واحد.</item>
+        <item quantity="two">مخطط %1$s لمدة يومين.</item>
+        <item quantity="few">مخطط %1$s لمدة %2$d أيام.</item>
+        <item quantity="many">مخطط %1$s لمدة %2$d يوماً.</item>
+        <item quantity="other">مخطط %1$s لمدة %2$d يوم.</item>
+    </plurals>
     <string name="fitness_chart_latest">أحدث قيمة لـ %1$s هي %2$s %3$s.</string>
+    <string name="fitness_chart_average">متوسط %1$s هو %2$s %3$s.</string>
     <string name="fitness_calories_burned">المحروقة</string>
     <string name="fitness_calories_eaten">المتناولة</string>
     <string name="fitness_macros">العناصر الكبرى</string>
@@ -61,7 +66,14 @@
     <string name="fitness_kilometres_unit">كم</string>
     <string name="fitness_kilocalories_unit">سعرة</string>
     <string name="fitness_grams_unit">غ</string>
-    <string name="fitness_activity_dashboard_description">النشاط اليومي: %1$d خطوة، %2$.2f كيلومتر، %3$.0f سعرة محروقة.</string>
+    <plurals name="fitness_activity_dashboard_description">
+        <item quantity="zero">النشاط اليومي: %1$d خطوة، %2$.2f كيلومتر، %3$.0f سعرة محروقة.</item>
+        <item quantity="one">النشاط اليومي: %1$d خطوة، %2$.2f كيلومتر، %3$.0f سعرة محروقة.</item>
+        <item quantity="two">النشاط اليومي: %1$d خطوتان، %2$.2f كيلومتر، %3$.0f سعرة محروقة.</item>
+        <item quantity="few">النشاط اليومي: %1$d خطوات، %2$.2f كيلومتر، %3$.0f سعرة محروقة.</item>
+        <item quantity="many">النشاط اليومي: %1$d خطوة، %2$.2f كيلومتر، %3$.0f سعرة محروقة.</item>
+        <item quantity="other">النشاط اليومي: %1$d خطوة، %2$.2f كيلومتر، %3$.0f سعرة محروقة.</item>
+    </plurals>
     <string name="fitness_steps">الخطوات</string>
     <string name="fitness_vitals">المؤشرات الحيوية</string>
     <string name="fitness_vitals_today_description">ملخصات معدل نبض القلب من ساعة Wear OS متصلة.</string>
@@ -80,9 +92,10 @@
     <string name="fitness_vitals_no_recent_readings">تم توصيل ساعة Wear OS خلال آخر 14 يومًا، ولكن لا توجد قراءات لمعدل نبض القلب. افتح Olive Fitness على الساعة واسمح بالوصول إلى معدل نبض القلب.</string>
     <string name="fitness_heart_rate_graph">معدل نبض القلب</string>
     <string name="fitness_vitals_no_data">— لا توجد بيانات —</string>
-    <string name="fitness_vitals_graph_description">رسم بياني لمعدل نبض القلب يحتوي على بيانات %1$d يوم، من %2$d إلى %3$d نبضة في الدقيقة.</string>
     <string name="fitness_vitals_range">%1$d–%2$d نبضة/دقيقة</string>
     <string name="fitness_vitals_average">متوسط معدل نبض القلب %1$d نبضة/دقيقة</string>
+    <string name="fitness_previous_day">عرض اليوم السابق</string>
+    <string name="fitness_next_day">عرض اليوم التالي</string>
     <string name="fitness_outdoor_workout">تمرين خارجي</string>
     <string name="fitness_outdoor_workout_description">تتبّع مسار GPS والمسافة والوقت والوتيرة بشكل خاص.</string>
     <string name="fitness_start_outdoor_workout">بدء تمرين خارجي</string>
@@ -92,9 +105,7 @@
     <string name="fitness_pause">إيقاف مؤقت</string>
     <string name="fitness_resume">متابعة</string>
     <string name="fitness_finish">إنهاء</string>
-    <string name="fitness_route_points">مسار تمرين يحتوي على %1$d نقطة GPS.</string>
     <string name="fitness_waiting_for_gps">بانتظار موقع GPS دقيق…</string>
-    <string name="fitness_last_outdoor_workout">آخر تمرين خارجي</string>
     <string name="fitness_recent_outdoor_workouts">التمارين الخارجية الأخيرة</string>
     <string name="fitness_walking">مشي</string>
     <string name="fitness_running">جري</string>

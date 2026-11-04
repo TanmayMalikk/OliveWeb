@@ -1,6 +1,10 @@
 // All safe-app roles: shows messages, attachments, and chat actions.
 package com.olive.app.ui.users.shared.messaging
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.olive.app.ui.shared.*
 
 
@@ -10,6 +14,8 @@ import com.olive.app.ui.users.shared.camera.AttachmentPicker
 import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
 
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.shared.LocalizedIcon as Icon
@@ -29,6 +35,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.CallEnd
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Warning
@@ -42,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -54,8 +65,13 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.olive.app.data.SafetyDocument
+import com.olive.app.data.MessageDeliveryStatus
+import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
 import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
+import com.olive.app.data.messaging.VoipInvitation
+import com.olive.app.data.messaging.VoipSessionState
+import androidx.core.content.ContextCompat
 import java.io.File
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -67,15 +83,45 @@ internal fun ChatPane(
 ) {
     val uiText = rememberResourceText()
     val active = session.messages.activeConversation ?: return
+    val callState by session.calls.state.collectAsState()
+    val callAllowed = canCallFromConversation(session.accountRole, active, currentUid)
+    val incomingCall = session.calls.invitations.firstOrNull { invitation ->
+        callAllowed && invitation.callerId in active.participantIds
+    }
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
     var openedMedia by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     val listState = rememberLazyListState()
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible = imeBottom > 0
+    val context = LocalContext.current
+    var permissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val microphonePermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val action = permissionAction
+        permissionAction = null
+        if (granted) action?.invoke()
+        else session.calls.report(uiText(R.string.ui_microphone_permission_required))
+    }
+    val withMicrophonePermission: (() -> Unit) -> Unit = { action ->
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) action() else {
+            permissionAction = action
+            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    LaunchedEffect(currentUid, session.accountRole) {
+        session.calls.observeInvitations(currentUid, session.accountRole)
+    }
+    LaunchedEffect(currentUid, session.coverUsername, session.localMode) {
+        session.documents.load(currentUid, session.coverUsername, session.localMode)
+    }
     LaunchedEffect(session.messages.chatMessages.size, session.messages.chatMessages.lastOrNull()?.body) {
         if (session.messages.chatMessages.isNotEmpty()) listState.animateScrollToItem(session.messages.chatMessages.lastIndex)
     }
+    // Keep the newest message visible when the chat grows.
     LaunchedEffect(keyboardVisible) {
         if (keyboardVisible && session.messages.chatMessages.isNotEmpty()) {
             delay(120.milliseconds)
@@ -136,6 +182,16 @@ internal fun ChatPane(
                         style = MaterialTheme.typography.labelMedium,
                         color = OliveGreen,
                     )
+                }
+                if (callAllowed && callState == VoipSessionState.Idle) IconButton(
+                    onClick = {
+                        withMicrophonePermission {
+                            session.calls.start(active, currentUid, session.accountRole)
+                        }
+                    },
+                    modifier = Modifier.testTag("start_voice_call"),
+                ) {
+                    Icon(Icons.Outlined.Call, stringResource(R.string.ui_start_voice_call))
                 }
                 if (exit != null) Button(
                     onClick = exit,
@@ -229,8 +285,35 @@ internal fun ChatPane(
                                             style = MaterialTheme.typography.labelSmall,
                                             color = if (mine) Color.White.copy(alpha = .7f) else Muted
                                         )
+                                        if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
+                                            val retryable = chat.deliveryStatus in setOf(
+                                                MessageDeliveryStatus.FAILED_RETRYABLE,
+                                                MessageDeliveryStatus.FAILED_PERMANENT,
+                                            )
+                                            TextButton(
+                                                onClick = { session.messages.retryMessage(chat) },
+                                                enabled = retryable,
+                                                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+                                                modifier = Modifier.testTag("message_status_${chat.id}")
+                                                    .semantics { liveRegion = LiveRegionMode.Polite },
+                                            ) {
+                                                Text(
+                                                    stringResource(
+                                                        when (chat.deliveryStatus) {
+                                                            MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued
+                                                            MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
+                                                            MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_retrying
+                                                            MessageDeliveryStatus.FAILED_PERMANENT -> R.string.message_delivery_failed_retry
+                                                            MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
+                                                        }
+                                                    ),
+                                                    color = Color.White.copy(alpha = if (retryable) 1f else .75f),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                )
+                                            }
+                                        }
                                     }
-                                    if (mine && !chat.unsent) Box {
+                                    if (mine && !chat.unsent && chat.deliveryStatus == MessageDeliveryStatus.SENT) Box {
                                         IconButton(
                                             onClick = { menuOpen = true },
                                             modifier = Modifier.size(34.dp)
@@ -352,9 +435,120 @@ internal fun ChatPane(
             }
         }
         if (showAttachmentPicker) AttachmentPicker(session) { showAttachmentPicker = false }
+        incomingCall?.takeIf { callState == VoipSessionState.Idle }?.let { invitation ->
+            IncomingCallDialog(
+                invitation = invitation,
+                onAccept = {
+                    withMicrophonePermission {
+                        session.calls.accept(invitation, currentUid, session.accountRole)
+                    }
+                },
+                onDecline = { session.calls.decline(invitation, currentUid, session.accountRole) },
+            )
+        }
+        if (callState != VoipSessionState.Idle) ActiveCallDialog(
+            state = callState,
+            currentUid = currentUid,
+            onMute = session.calls::setMuted,
+            onFinish = { session.calls.finish(currentUid) },
+        )
+        session.calls.message?.takeIf { callState == VoipSessionState.Idle }?.let { message ->
+            AlertDialog(
+                onDismissRequest = session.calls::clearMessage,
+                title = { Text(stringResource(R.string.ui_voice_call)) },
+                text = { Text(message) },
+                confirmButton = {
+                    TextButton(onClick = session.calls::clearMessage) { Text(stringResource(R.string.ui_okay)) }
+                },
+            )
+        }
     }
 }
 
+// Direct chats show an incoming-call choice without exposing it in staff or admin support tickets.
+@Composable
+private fun IncomingCallDialog(
+    invitation: VoipInvitation,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = {},
+        icon = { Icon(Icons.Outlined.Call, null) },
+        title = { Text(stringResource(R.string.ui_incoming_call)) },
+        text = { Text(invitation.name.ifBlank { stringResource(R.string.ui_voice_call) }) },
+        confirmButton = {
+            Button(onClick = onAccept, modifier = Modifier.testTag("accept_voice_call")) {
+                Text(stringResource(R.string.accept))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDecline, modifier = Modifier.testTag("decline_voice_call")) {
+                Text(stringResource(R.string.decline))
+            }
+        },
+    )
+}
+
+// The active-call panel keeps mute and hang-up controls together in one clear place.
+@Composable
+private fun ActiveCallDialog(
+    state: VoipSessionState,
+    currentUid: String,
+    onMute: (Boolean) -> Unit,
+    onFinish: () -> Unit,
+) {
+    val active = state as? VoipSessionState.Active
+    val call = when (state) {
+        is VoipSessionState.Connecting -> state.call
+        is VoipSessionState.Active -> state.call
+        is VoipSessionState.Leaving -> state.call
+        is VoipSessionState.Error -> state.call
+        VoipSessionState.Idle -> null
+    }
+    AlertDialog(
+        onDismissRequest = {},
+        icon = { Icon(if (active == null) Icons.Outlined.Call else Icons.Outlined.Mic, null) },
+        title = {
+            Text(stringResource(if (active == null) R.string.ui_calling else R.string.ui_call_in_progress))
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(call?.name.orEmpty().ifBlank { stringResource(R.string.ui_voice_call) })
+                if (state is VoipSessionState.Error) Text(
+                    state.message,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        confirmButton = {
+            if (active != null) TextButton(
+                onClick = { onMute(!active.microphoneMuted) },
+                modifier = Modifier.testTag("mute_voice_call"),
+            ) {
+                Icon(if (active.microphoneMuted) Icons.Outlined.Mic else Icons.Outlined.MicOff, null)
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(if (active.microphoneMuted) R.string.ui_unmute else R.string.ui_mute))
+            }
+        },
+        dismissButton = {
+            if (active != null || state is VoipSessionState.Error) Button(
+                onClick = onFinish,
+                modifier = Modifier.testTag("finish_voice_call"),
+            ) {
+                Icon(Icons.Outlined.CallEnd, null)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    stringResource(
+                        if (call?.callerId == currentUid) R.string.ui_end_call else R.string.ui_leave_call
+                    )
+                )
+            }
+        },
+    )
+}
+
+// Shows text or the correct viewer button for one chat message.
 @Composable
 private fun ChatMessageBody(
     chat: com.olive.app.data.ChatMessage, session: SessionViewModel, mine: Boolean,
@@ -365,6 +559,7 @@ private fun ChatMessageBody(
         SharedMediaMessage(parts[1], parts.getOrNull(2).orEmpty(), session, mine, onOpenMedia)
         return
     }
+    // An unsent location card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_LOCATION") {
         Surface(
             onClick = { session.navigation.openSafePage(SafePage.Location) }, shape = MaterialTheme.shapes.medium,
@@ -392,6 +587,7 @@ private fun ChatMessageBody(
         }
         return
     }
+    // An unsent safety-plan card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_SAFETY_PLAN") {
         Surface(
             shape = MaterialTheme.shapes.medium,
@@ -449,12 +645,17 @@ private fun ChatMessageBody(
     }
 }
 
+// shared safe app conversation screen shows this shared media message view so the user can view its details and use its actions.
 @Composable
 private fun SharedMediaMessage(
     id: String, name: String, session: SessionViewModel, mine: Boolean,
     onOpen: (SafetyDocument, File) -> Unit
 ) {
     var opening by remember(id) { mutableStateOf(false) }
+    val document = session.documents.state.files.firstOrNull { it.id == id }
+    val offline = session.media?.offlineCopies?.get(id) ?: OfflineMediaAvailability.NOT_CACHED
+    val error = session.documents.state.attachmentErrors[id]
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     Surface(
         onClick = {
             val uid = session.coverAccountId ?: return@Surface
@@ -488,5 +689,35 @@ private fun SharedMediaMessage(
                 )
             }
         }
+    }
+    if (document?.objectKey?.isNotBlank() == true) {
+        val cached = offline in setOf(
+            OfflineMediaAvailability.AVAILABLE,
+            OfflineMediaAvailability.REVALIDATION_REQUIRED,
+        )
+        TextButton(
+            onClick = {
+                if (cached) session.documents.removeOfflineCopy(document)
+                else session.documents.makeAvailableOffline(document)
+            },
+            enabled = offline != OfflineMediaAvailability.SAVING,
+            modifier = Modifier.testTag("shared_media_offline_$id"),
+        ) {
+            Text(stringResource(when {
+                offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
+                cached -> R.string.documents_remove_offline_copy
+                else -> R.string.documents_make_available_offline
+            }))
+        }
+        if (offline == OfflineMediaAvailability.RECENT_AVAILABLE) Text(
+            stringResource(R.string.documents_recently_cached),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    error?.let {
+        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                .testTag("shared_media_error_$id"))
+    }
     }
 }

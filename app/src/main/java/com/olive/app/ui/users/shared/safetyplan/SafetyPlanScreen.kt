@@ -8,6 +8,8 @@ import com.olive.app.ui.users.shared.navigation.*
 
 
 import androidx.compose.foundation.BorderStroke
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,19 +35,36 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.*
 import com.olive.app.R
+import com.olive.app.data.media.OcrReview
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+// shared safe app safety plan screen shows this safety plan screen so the user can view its details and use its actions.
 @Composable
 internal fun SafetyPlanScreen(
     session: SessionViewModel, ownerUid: String = session.coverAccountId.orEmpty(),
     ownerName: String = session.coverUsername, onBack: () -> Unit = session.navigation::back
 ) {
     val controller = session.safetyPlans
+    val documentController = session.documents
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val uploadError = stringResource(R.string.documents_upload_failed)
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val uid = session.coverAccountId
+        if (uri != null && uid != null) {
+            documentController.upload(
+                uri = uri,
+                identity = AccountIdentity(uid, session.coverUsername),
+                fallbackError = uploadError,
+                ocrReview = OcrReview.NOT_RUN,
+                tags = setOf("Safety Plan"),
+            )
+        }
+    }
+    // Hides the keyboard before leaving or switching safety-plan sections.
     fun leaveEditor() {
         focus.clearFocus(force = true)
         keyboard?.hide()
@@ -53,7 +72,9 @@ internal fun SafetyPlanScreen(
 
     val lease = remember(ownerUid) { Any() }
     val defaults = remember(context) { safetyDefaults(context) }
+    // Stop this screen's plan listener when it leaves composition.
     DisposableEffect(lease) { onDispose { controller.close(lease) } }
+    // Open the plan and refresh it every five seconds while this screen is visible.
     LaunchedEffect(lease) {
         controller.open(ownerUid, ownerName, defaults, lease)
         while (true) {
@@ -75,6 +96,7 @@ internal fun SafetyPlanScreen(
         key.startsWith("${prefix}_") && key.substringAfter('_') !in SAFETY_CHECKLIST_SECTIONS &&
                 (readSafetyChecklist(field.value).isNotEmpty() || field.conflictRevision != null)
     }
+    // Return to the top when switching between primary and backup plans.
     LaunchedEffect(backup) { state.scrollToItem(0) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val headerMaxHeight = maxHeight * .5f
@@ -221,7 +243,10 @@ internal fun SafetyPlanScreen(
                                     contacts = if (!organizationEditor && !safeContact && section == "contacts") session.profile?.contacts.orEmpty() else emptyList(),
                                     contactsEditable = !organizationEditor && !safeContact && section == "contacts",
                                     onContactsChange = if (!organizationEditor && !safeContact && section == "contacts") session::saveContacts else null,
-                                    editable = !safeContact
+                                    editable = !safeContact,
+                                    onUploadDocument = if (!organizationEditor && !safeContact && section == "documents") {
+                                        { documentPicker.launch(arrayOf("image/*", "video/*", "application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) }
+                                    } else null,
                                 )
                                 HorizontalDivider(
                                     Modifier.padding(horizontal = 16.dp),
@@ -267,6 +292,7 @@ internal fun SafetyPlanScreen(
                                 )
                             }
                         }
+                        // Personal users can edit this section; safe contacts can only read it.
                         if (!organizationEditor && !safeContact) item {
                             Box(Modifier.padding(horizontal = 16.dp)) {
                                 SafetyContactSharingControls(
@@ -299,6 +325,7 @@ internal fun SafetyPlanScreen(
     }
 }
 
+// Lets a trusted contact view the safety plans shared with them.
 @Composable
 internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     val controller = session.safetyPlans
@@ -365,6 +392,7 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     }
 }
 
+// Draws the safety contact sharing controls for the safety plan.
 @Composable
 private fun SafetyContactSharingControls(session: SessionViewModel, plan: SafetyPlan) {
     var selected by remember(plan.safeContactUids) { mutableStateOf(plan.safeContactUids.toSet()) }
@@ -415,6 +443,7 @@ private fun SafetyContactSharingControls(session: SessionViewModel, plan: Safety
     }
 }
 
+// Lets a user request or cancel a separate plan-consult ticket.
 @Composable
 private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPlan) {
     val controller = session.safetyPlans
@@ -445,6 +474,7 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
         ) {
             Text(stringResource(R.string.safety_stop))
         }
+        // Show sharing choices only when the plan is not already shared with staff or a safe contact.
         if (plan.staffUid.isNotBlank() && plan.safeContactUids.isNotEmpty()) {
             Text(
                 stringResource(R.string.support_chat_contact),

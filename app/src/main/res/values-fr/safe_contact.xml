@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">Préparation du téléversement chiffré</string>
     <string name="documents_preparing_upload_help">Le fichier sélectionné est traité et chiffré sur cet appareil.</string>
     <string name="documents_upload_queued">En attente d’une connexion</string>
-    <string name="documents_upload_waiting_retry">En attente d’une nouvelle tentative</string>
+    <string name="documents_upload_waiting_retry">Téléversement en pause — nouvelle tentative automatique</string>
     <string name="documents_upload_starting">Démarrage du téléversement sécurisé</string>
     <string name="documents_upload_progress">Téléversement : %1$d%%</string>
     <string name="documents_upload_finalizing">Finalisation du téléversement sécurisé</string>
@@ -80,4 +80,23 @@
     <string name="documents_share_help">Choisissez jusqu’à 10 amis acceptés. Seuls les comptes sélectionnés peuvent ouvrir ce fichier.</string>
     <string name="open">Ouvrir</string>
     <string name="share">Partager</string>
+    <string name="documents_offline_index">Affichage de votre index hors ligne chiffré. Les modifications seront synchronisées à la reconnexion.</string>
+    <string name="documents_not_available_offline">Ce fichier n’est pas encore disponible hors ligne.</string>
+    <string name="documents_make_available_offline">Rendre disponible hors ligne</string>
+    <string name="documents_remove_offline_copy">Supprimer la copie hors ligne</string>
+    <string name="documents_saving_offline">Enregistrement de la copie chiffrée hors ligne…</string>
+    <string name="documents_available_offline">Disponible hors ligne</string>
+    <string name="documents_recently_cached">Mis en cache récemment et susceptible d’être supprimé automatiquement</string>
+    <string name="documents_recent_cache_title">Cache des fichiers récents</string>
+    <string name="documents_recent_cache_help">Conserve automatiquement hors ligne les fichiers chiffrés récemment ouverts. Les copies automatiques partagent une limite de 250 Mo et cette option est désactivée par défaut.</string>
+    <string name="documents_offline_revalidation_required">Reconnectez-vous pour confirmer l’accès avant d’ouvrir ce fichier partagé.</string>
+    <string name="documents_network_required">Connectez-vous à Internet pour accéder à ce fichier.</string>
+    <string name="documents_access_revoked">Vous n’avez plus accès à ce fichier. Sa copie hors ligne a été supprimée.</string>
+    <string name="documents_offline_copy_corrupt">La copie hors ligne est endommagée et a été supprimée. Téléchargez-la à nouveau.</string>
+    <string name="documents_key_unavailable">Cet appareil ne possède pas la clé de chiffrement de ce fichier. Ouvrez Documents sur un appareil déjà autorisé pour ce compte ou demandez au propriétaire de le partager à nouveau.</string>
+    <string name="documents_account_mismatch">Cette copie hors ligne appartient à un autre compte.</string>
+    <string name="documents_storage_full">L’espace de stockage est insuffisant pour cette copie hors ligne.</string>
+    <string name="documents_download_failed">Le fichier chiffré n’a pas pu être téléchargé. Réessayez.</string>
+    <string name="documents_device_verification_failed">Cette installation n’a pas pu être vérifiée. Rouvrez l’application et réessayez.</string>
+    <string name="documents_open_failed">Le fichier chiffré n’a pas pu être ouvert.</string>
 </resources>

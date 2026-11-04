@@ -28,6 +28,7 @@ import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
 class AccessibilityUiTest : OliveUiTestBase() {
+    // Checks the admin counts read as one label per card step with the test's sample data.
     @Test
     fun adminCountsReadAsOneLabelPerCard() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -40,6 +41,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithText("5").assertDoesNotExist()
     }
 
+    // Checks the game cover keeps its controls individually accessible step with the test's sample data.
     @Test
     fun gameCoverKeepsItsControlsIndividuallyAccessible() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -55,6 +57,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("game_score").assertTextContains("Score: 1")
     }
 
+    // Checks the pin errors and quick exit use live regions without stealing talk back focus step with the test's sample data.
     @Test
     fun pinErrorsAndQuickExitUseLiveRegionsWithoutStealingTalkBackFocus() {
         register()
@@ -76,9 +79,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
                 )
             )
             .assertTextContains("Incorrect PIN", substring = true)
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            session.account.submitPin("123456")
-        }
+        enterPin("123456")
         waitFor("safe_settings")
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
@@ -92,6 +93,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
     }
 
+    // Checks the food card details are merged while favourite and quantity actions stay available step with the test's sample data.
     @Test
     fun foodCardDetailsAreMergedWhileFavouriteAndQuantityActionsStayAvailable() {
         register()
@@ -111,6 +113,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithContentDescription("Add one Garden harvest bowl").assertHasClickAction()
     }
 
+    // Checks the native accessibility events reach the interaction observer step with the test's sample data.
     @Test
     fun nativeAccessibilityEventsReachTheInteractionObserver() {
         openOnboarding()
@@ -127,6 +130,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.waitUntil(5_000) { observed.get() > 0 }
     }
 
+    // Checks the chat tip appears once points to exit and hides the floating menu step with the test's sample data.
     @Test
     fun chatTipAppearsOncePointsToExitAndHidesTheFloatingMenu() {
         register()
@@ -166,6 +170,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         waitCover()
     }
 
+    // Checks the attachment picker moves focus to each new category title step with the test's sample data.
     @Test
     fun attachmentPickerMovesFocusToEachNewCategoryTitle() {
         register()
@@ -197,6 +202,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
             .assertIsFocused()
     }
 
+    // Checks the pin actions and digit count are spoken without exposing the pin step with the test's sample data.
     @Test
     fun pinActionsAndDigitCountAreSpokenWithoutExposingThePin() {
         register()
@@ -241,6 +247,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         unlock()
     }
 
+    // Checks the blackout hides the native accessibility tree and restores the cover afterwards step with the test's sample data.
     @Test
     fun blackoutHidesTheNativeAccessibilityTreeAndRestoresTheCoverAfterwards() {
         register()
@@ -250,6 +257,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         instrumentation.runOnMainSync { session.captureDetected("Screen recording") }
         waitFor("privacy_blackout")
         compose.waitForIdle()
+        // Finds the compose needed by this test.
         fun findCompose(view: View): ComposeView? {
             if (view is ComposeView) return view
             if (view is ViewGroup) for (index in 0 until view.childCount) findCompose(
@@ -276,6 +284,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the icon labels use the selected app language step with the test's sample data.
     @Test
     fun iconLabelsUseTheSelectedAppLanguage() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -313,6 +322,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         ).assertExists()
     }
 
+    // Checks the only user accessibility events count as activity step with the test's sample data.
     @Test
     fun onlyUserAccessibilityEventsCountAsActivity() {
         assertTrue(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED))
@@ -323,6 +333,7 @@ class AccessibilityUiTest : OliveUiTestBase() {
         assertFalse(isAccessibilityUserInteraction(AccessibilityEvent.TYPE_VIEW_SCROLLED))
     }
 
+    // Checks the accessibility labels follow all supported android locales step with the test's sample data.
     @Test
     fun accessibilityLabelsFollowAllSupportedAndroidLocales() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext

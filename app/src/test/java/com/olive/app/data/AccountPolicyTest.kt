@@ -6,6 +6,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AccountPolicyTest {
+    // Builds a complete sample profile for this test.
     private fun profile(role: AccountRole, trigger: String = "hash", email: String = "") =
         UserProfile(
             username = "olive_test",
@@ -34,11 +35,11 @@ class AccountPolicyTest {
             AccountPolicy.signInEmail("Olive_Test", AccountRole.SAFE_CONTACT)
         )
         assertEquals(
-            "olive_test@staff.olive.invalid",
+            "olive_test@yourolivebranch.ca",
             AccountPolicy.signInEmail("Olive_Test", AccountRole.STAFF)
         )
         assertEquals(
-            "olive_test@admin.olive.invalid",
+            "olive_test@yourolivebranch.ca",
             AccountPolicy.signInEmail("Olive_Test", AccountRole.ADMIN)
         )
         assertEquals(

@@ -29,7 +29,7 @@ class NewsArticleMetadataTest {
         assertEquals("The publisher's article preview.", result.description)
     }
 
-    // Inputs: the values shown below. Expected: finds articles in graphs and accepts image arrays.
+    // Gives the parser nested article data and image arrays; both articles should be found.
     @Test
     fun findsArticlesInGraphsAndAcceptsImageArrays() {
         val result = parseNewsArticleMetadata(
