@@ -43,13 +43,14 @@ LiveKit secret in a `VITE_` variable or under `web/src`.
 Add the following only to the `voip.yourolivebranch.ca` app:
 
 - `FIREBASE_DATABASE_URL`
-- `GOOGLE_APPLICATION_CREDENTIALS`
+- `FIREBASE_SERVICE_ACCOUNT_JSON`
 - `LIVEKIT_URL`
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
 
-The service-account JSON must be stored outside the repository and public web
-root. See `website/voip-library/readme.md` for the API and permission details.
+Store the full service-account JSON in Hostinger's secret environment settings;
+never commit it or place it under the public web root. See
+`website/voip-library/readme.md` for the API and permission details.
 
 ## Firebase and storage setup
 

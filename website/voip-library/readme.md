@@ -47,6 +47,7 @@ Set these environment variables:
 | Variable                | Required | Description                                                        |
 |-------------------------|----------|--------------------------------------------------------------------|
 | `FIREBASE_DATABASE_URL` | Yes      | Realtime Database URL for the Firebase project                     |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Host recommended | Full service-account JSON stored as a secret environment value |
 | `LIVEKIT_URL`           | Yes      | LiveKit Cloud websocket URL, such as `wss://example.livekit.cloud` |
 | `LIVEKIT_API_KEY`       | Yes      | LiveKit API key                                                    |
 | `LIVEKIT_API_SECRET`    | Yes      | LiveKit API secret; keep it on the server                          |
@@ -65,12 +66,15 @@ LIVEKIT_URL
 LIVEKIT_API_KEY
 LIVEKIT_API_SECRET
 FIREBASE_DATABASE_URL
-GOOGLE_APPLICATION_CREDENTIALS
+FIREBASE_SERVICE_ACCOUNT_JSON
 ```
 
-`LIVEKIT_URL` is the project’s `wss://...` URL. The Google credentials value
-is the absolute path to the Firebase service-account JSON file stored outside
-the repository and public web root.
+`LIVEKIT_URL` is the project’s `wss://...` URL. Store the complete Firebase
+service-account JSON in `FIREBASE_SERVICE_ACCOUNT_JSON` as a secret environment
+value. This avoids relying on a filesystem path that may not be mounted inside
+Hostinger's isolated Node.js runtime. For local development,
+`GOOGLE_APPLICATION_CREDENTIALS` remains supported when the inline variable is
+not set.
 
 Hostinger provides `PORT` when it starts the app. Do not add `PORT` or
 `VOIP_API_PORT` to the Hostinger environment; the server reads Hostinger's
