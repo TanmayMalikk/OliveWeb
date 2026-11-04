@@ -186,12 +186,47 @@ abstract class OliveUiTestBase {
         advanceOnboarding("address_city", "trigger")
         fill("trigger", "moon garden")
         waitFor("profile_submit")
-        click("profile_submit")
+        submitProfile()
         chooseAppPin()
         fill("new_pin", pin)
         fill("confirm_pin", pin)
-        click("pin_setup_submit")
+        submitPinSetup()
         waitCover()
+    }
+
+    // Submits the final profile page and retries once if Android consumed the tap while closing
+    // the keyboard or settling the scrolling form. This mirrors the guarded page-to-page helper.
+    private fun submitProfile() {
+        hideKeyboard()
+        click("profile_submit")
+        val moved = runCatching {
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("entry_knows_pin_yes").fetchSemanticsNodes().isNotEmpty()
+            }
+        }.isSuccess
+        if (!moved) {
+            waitFor("profile_submit")
+            compose.waitForIdle()
+            click("profile_submit")
+        }
+    }
+
+    // Finishes PIN enrollment after closing the keyboard. Some emulator frames consume the first
+    // tap while bringing the off-screen Finish button into view, so retry only while DevicePin is
+    // still present and the cover has not appeared.
+    private fun submitPinSetup() {
+        hideKeyboard()
+        click("pin_setup_submit")
+        val moved = runCatching {
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("cover_root").fetchSemanticsNodes().isNotEmpty()
+            }
+        }.isSuccess
+        if (!moved) {
+            waitFor("pin_setup_submit")
+            compose.waitForIdle()
+            click("pin_setup_submit")
+        }
     }
 
     // Most flows skip Android's permission dialogs so they can test their own feature directly.
@@ -248,12 +283,16 @@ abstract class OliveUiTestBase {
     protected fun waitCover() {
         // Add the current screen and Compose tree when the cover never appears.
         try {
-            compose.waitUntil(30_000) {
+            compose.waitForIdle()
+            compose.waitUntil(45_000) {
                 runCatching {
-                    compose.onAllNodesWithTag("cover_root").fetchSemanticsNodes().isNotEmpty()
+                    val covers = compose.onAllNodesWithTag("cover_root")
+                    covers.fetchSemanticsNodes().indices.any { index ->
+                        runCatching { covers[index].assertIsDisplayed() }.isSuccess
+                    }
                 }.getOrDefault(false)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             val session =
                 androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
             val hierarchy = runCatching { compose.onRoot().printToString() }
