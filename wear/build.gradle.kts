@@ -16,10 +16,12 @@ android {
     }
 
     buildFeatures { compose = true }
+    testOptions.unitTests.all { it.jvmArgs("--enable-native-access=ALL-UNNAMED") }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    packaging { jniLibs.keepDebugSymbols += "**/*.so" }
 }
 
 dependencies {

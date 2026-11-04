@@ -85,6 +85,14 @@ function toApiCall(call) {
         callId: call.callId,
         callerId: call.callerId,
         name: call.name,
+        callerName: call.callerName || call.name,
+        conversationId: call.conversationId || '',
+        status: call.status,
+        createdAt: call.createdAt || 0,
+        expiresAt: call.expiresAt || 0,
+        acceptedAt: call.acceptedAt || 0,
+        endedAt: call.endedAt || 0,
+        endReason: call.endReason || '',
         participants: [
             { userId: call.callerId, status: 'accepted' },
             ...Object.entries(call.participants || {}).map(([userId, participant]) => ({
@@ -127,6 +135,17 @@ function createApiServer({
             }
 
             const identity = await authenticate(request, verifyIdToken);
+            const expireCalls = async () => {
+                if (typeof callStore.expirePendingCalls !== 'function') return;
+                const expired = await callStore.expirePendingCalls();
+                if (typeof liveKit.endRoom === 'function') {
+                    await Promise.all(expired.map((callId) =>
+                        liveKit.endRoom(`call-${callId}`).catch((error) =>
+                            logger.warn?.('Could not close an expired LiveKit room:', error)
+                        )
+                    ));
+                }
+            };
 
             if (request.method === 'POST' && url.pathname === '/auth/verify') {
                 return sendJson(response, 200, {
@@ -136,6 +155,7 @@ function createApiServer({
             }
 
             if (request.method === 'GET' && url.pathname === '/api/calls') {
+                await expireCalls();
                 const calls = await callStore.listCallsFor(identity.uid);
                 return sendJson(response, 200, { calls: calls.map(toApiCall) });
             }
@@ -144,6 +164,8 @@ function createApiServer({
                 const body = await readJson(request);
                 const callerId = requireIdentifier(body.callerId, 'callerId');
                 const name = requireIdentifier(body.name, 'name');
+                const callerName = requireIdentifier(body.callerName || body.name, 'callerName');
+                const conversationId = requireIdentifier(body.conversationId, 'conversationId');
                 if (callerId !== identity.uid) {
                     throw new ApiError(403, 'identity_mismatch', 'callerId must match the authenticated user');
                 }
@@ -173,6 +195,8 @@ function createApiServer({
 
                 const call = await callStore.createCall(name, {
                     callerId: identity.uid,
+                    callerName,
+                    conversationId,
                     participantIds
                 });
                 const notificationFailures = [];
@@ -181,7 +205,7 @@ function createApiServer({
                         recipientId,
                         callId: call.callId,
                         callerId: identity.uid,
-                        callName: call.name
+                        callName: call.callerName || call.name
                     })
                 ));
                 deliveries.forEach((result, index) => {
@@ -202,6 +226,7 @@ function createApiServer({
             }
 
             if (request.method === 'GET' && url.pathname === '/api/calls/invitations') {
+                await expireCalls();
                 const userId = requireIdentifier(url.searchParams.get('userId'), 'userId');
                 if (userId !== identity.uid) {
                     throw new ApiError(403, 'identity_mismatch', 'userId must match the authenticated user');
@@ -213,6 +238,7 @@ function createApiServer({
 
             const invitationMatch = url.pathname.match(/^\/api\/calls\/([^/]+)\/(accept|decline)$/);
             if (request.method === 'POST' && invitationMatch) {
+                await expireCalls();
                 const callId = decodeCallId(invitationMatch[1]);
                 const body = await readJson(request);
                 const userId = requireIdentifier(body.userId, 'userId');
@@ -231,16 +257,22 @@ function createApiServer({
                         'The invitation is no longer available to this user'
                     );
                 }
+                if (invitationMatch[2] === 'decline' && typeof liveKit.endRoom === 'function') {
+                    await liveKit.endRoom(`call-${callId}`).catch((error) =>
+                        logger.warn?.('Could not close the declined LiveKit room:', error)
+                    );
+                }
                 return sendJson(response, 200, toApiCall(call));
             }
 
             if (request.method === 'POST' && url.pathname === '/calls/token') {
                 const body = await readJson(request);
                 const callId = requireIdentifier(body.callId, 'callId');
-                const call = await callStore.getCall(callId);
-                requireActiveCall(call);
+                await expireCalls();
+                const currentCall = await callStore.getCall(callId);
+                requireActiveCall(currentCall);
 
-                if (getParticipantStatus(call, identity.uid) !== 'accepted') {
+                if (getParticipantStatus(currentCall, identity.uid) !== 'accepted') {
                     throw new ApiError(403, 'not_a_call_member', 'User is not an accepted call participant');
                 }
 
@@ -256,18 +288,26 @@ function createApiServer({
                 (request.method === 'POST' && url.pathname === '/calls/end') ||
                 (request.method === 'DELETE' && legacyEndMatch)
             ) {
+                await expireCalls();
                 const callId = request.method === 'DELETE'
                     ? decodeCallId(legacyEndMatch[1])
                     : requireIdentifier((await readJson(request)).callId, 'callId');
                 const call = await callStore.getCall(callId);
                 requireActiveCall(call);
-                if (call.callerId !== identity.uid) {
-                    throw new ApiError(403, 'not_call_owner', 'Only the call owner can end this call');
+                if (getParticipantStatus(call, identity.uid) !== 'accepted') {
+                    throw new ApiError(403, 'not_call_member', 'Only a call participant can end this call');
                 }
 
-                const ended = await callStore.endCall(callId);
+                const ended = await callStore.endCall(callId, identity.uid);
                 if (!ended) {
                     throw new ApiError(409, 'call_not_active', 'Call is no longer active');
+                }
+                if (typeof liveKit.endRoom === 'function') {
+                    try {
+                        await liveKit.endRoom(`call-${callId}`);
+                    } catch (error) {
+                        logger.warn?.('Could not close the LiveKit room:', error);
+                    }
                 }
                 if (request.method === 'DELETE') {
                     return sendJson(response, 200, { deleted: true, callId });
@@ -276,6 +316,7 @@ function createApiServer({
             }
 
             if (request.method === 'POST' && url.pathname === '/notifications/send') {
+                await expireCalls();
                 const body = await readJson(request);
                 const callId = requireIdentifier(body.callId, 'callId');
                 const recipientId = requireIdentifier(body.recipientId, 'recipientId');
@@ -292,7 +333,7 @@ function createApiServer({
                     recipientId,
                     callId,
                     callerId: identity.uid,
-                    callName: call.name,
+                    callName: call.callerName || call.name,
                     recipientId
                 });
                 return sendJson(response, 200, { callId, recipientId, delivery });

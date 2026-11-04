@@ -34,9 +34,9 @@
     <string name="safety_open_plan">Abrir plan de %1$s</string>
     <string name="safety_source">Orientación: Agencia de Salud Pública de Canadá. Adapta estas indicaciones con alguien de confianza.</string>
     <string name="safety_upload_document">Subir documento</string>
-    <string name="safety_upload_for">Subir documento: %1$s. Próximamente.</string>
+    <string name="safety_upload_for">Subir un documento para %1$s.</string>
 <string name="safety_storage_photos">Fotos</string>
     <string name="safety_storage_videos">Vídeos</string>
     <string name="safety_storage_documents">Imágenes de documentos</string>
-    <string name="safety_document_upload_hint">Las cargas estarán disponibles próximamente. Los archivos también aparecerán en Documentos.</string>
+    <string name="safety_document_upload_hint">Los archivos subidos también aparecen en Documentos.</string>
 </resources>

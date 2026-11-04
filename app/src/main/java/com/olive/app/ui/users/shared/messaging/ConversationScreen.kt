@@ -36,9 +36,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.CallEnd
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Warning
@@ -69,10 +66,26 @@ import com.olive.app.data.MessageDeliveryStatus
 import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
 import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
-import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipSessionState
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallStatus
 import androidx.core.content.ContextCompat
 import java.io.File
+
+private sealed interface ConversationTimelineItem {
+    val key: String
+    val timestamp: Long
+
+    data class Message(val value: com.olive.app.data.ChatMessage) : ConversationTimelineItem {
+        override val key = "message-${value.id}"
+        override val timestamp = value.sentAt
+    }
+
+    data class Call(val value: VoipCall) : ConversationTimelineItem {
+        override val key = "call-${value.callId}"
+        override val timestamp = value.endedAt.takeIf { it > 0 } ?: value.createdAt
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
@@ -85,9 +98,6 @@ internal fun ChatPane(
     val active = session.messages.activeConversation ?: return
     val callState by session.calls.state.collectAsState()
     val callAllowed = canCallFromConversation(session.accountRole, active, currentUid)
-    val incomingCall = session.calls.invitations.firstOrNull { invitation ->
-        callAllowed && invitation.callerId in active.participantIds
-    }
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
     var openedMedia by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
@@ -95,6 +105,13 @@ internal fun ChatPane(
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible = imeBottom > 0
     val context = LocalContext.current
+    val callHistory = session.calls.historyFor(active.id)
+        .filter { it.status != VoipCallStatus.ACTIVE }
+    val timeline = remember(session.messages.chatMessages, callHistory) {
+        (session.messages.chatMessages.map(ConversationTimelineItem::Message) +
+            callHistory.map(ConversationTimelineItem::Call))
+            .sortedWith(compareBy(ConversationTimelineItem::timestamp, ConversationTimelineItem::key))
+    }
     var permissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val microphonePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -111,9 +128,6 @@ internal fun ChatPane(
             permissionAction = action
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
-    }
-    LaunchedEffect(currentUid, session.accountRole) {
-        session.calls.observeInvitations(currentUid, session.accountRole)
     }
     LaunchedEffect(currentUid, session.coverUsername, session.localMode) {
         session.documents.load(currentUid, session.coverUsername, session.localMode)
@@ -227,14 +241,19 @@ internal fun ChatPane(
                     contentPadding = PaddingValues(vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (session.messages.chatMessages.isEmpty()) item {
+                    if (timeline.isEmpty()) item {
                         Text(
                             stringResource(R.string.no_messages_yet_say_hello_when_you_are_ready),
                             color = Muted,
                             modifier = Modifier.padding(12.dp)
                         )
                     }
-                    items(session.messages.chatMessages, key = { it.id }) { chat ->
+                    items(timeline, key = ConversationTimelineItem::key) { timelineItem ->
+                        if (timelineItem is ConversationTimelineItem.Call) {
+                            CallHistoryRow(timelineItem.value)
+                            return@items
+                        }
+                        val chat = (timelineItem as ConversationTimelineItem.Message).value
                         val mine = chat.senderUid == currentUid
                         var menuOpen by remember(chat.id) { mutableStateOf(false) }
                         Row(
@@ -435,23 +454,6 @@ internal fun ChatPane(
             }
         }
         if (showAttachmentPicker) AttachmentPicker(session) { showAttachmentPicker = false }
-        incomingCall?.takeIf { callState == VoipSessionState.Idle }?.let { invitation ->
-            IncomingCallDialog(
-                invitation = invitation,
-                onAccept = {
-                    withMicrophonePermission {
-                        session.calls.accept(invitation, currentUid, session.accountRole)
-                    }
-                },
-                onDecline = { session.calls.decline(invitation, currentUid, session.accountRole) },
-            )
-        }
-        if (callState != VoipSessionState.Idle) ActiveCallDialog(
-            state = callState,
-            currentUid = currentUid,
-            onMute = session.calls::setMuted,
-            onFinish = { session.calls.finish(currentUid) },
-        )
         session.calls.message?.takeIf { callState == VoipSessionState.Idle }?.let { message ->
             AlertDialog(
                 onDismissRequest = session.calls::clearMessage,
@@ -465,87 +467,41 @@ internal fun ChatPane(
     }
 }
 
-// Direct chats show an incoming-call choice without exposing it in staff or admin support tickets.
 @Composable
-private fun IncomingCallDialog(
-    invitation: VoipInvitation,
-    onAccept: () -> Unit,
-    onDecline: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = {},
-        icon = { Icon(Icons.Outlined.Call, null) },
-        title = { Text(stringResource(R.string.ui_incoming_call)) },
-        text = { Text(invitation.name.ifBlank { stringResource(R.string.ui_voice_call) }) },
-        confirmButton = {
-            Button(onClick = onAccept, modifier = Modifier.testTag("accept_voice_call")) {
-                Text(stringResource(R.string.accept))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDecline, modifier = Modifier.testTag("decline_voice_call")) {
-                Text(stringResource(R.string.decline))
-            }
-        },
+internal fun CallHistoryRow(call: VoipCall) {
+    val label = stringResource(
+        when (call.status) {
+            VoipCallStatus.MISSED -> R.string.ui_missed_call
+            VoipCallStatus.DECLINED -> R.string.ui_call_declined
+            VoipCallStatus.ENDED -> R.string.ui_call_ended
+            VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
+        }
     )
-}
-
-// The active-call panel keeps mute and hang-up controls together in one clear place.
-@Composable
-private fun ActiveCallDialog(
-    state: VoipSessionState,
-    currentUid: String,
-    onMute: (Boolean) -> Unit,
-    onFinish: () -> Unit,
-) {
-    val active = state as? VoipSessionState.Active
-    val call = when (state) {
-        is VoipSessionState.Connecting -> state.call
-        is VoipSessionState.Active -> state.call
-        is VoipSessionState.Leaving -> state.call
-        is VoipSessionState.Error -> state.call
-        VoipSessionState.Idle -> null
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+            .testTag("call_history_${call.callId}"),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Call, null, tint = OliveGreen)
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleSmall)
+                val timestamp = call.endedAt.takeIf { it > 0 } ?: call.createdAt
+                if (timestamp > 0) Text(
+                    DateTimeFormatter.ofPattern("MMM d, HH:mm")
+                        .withZone(ZoneId.systemDefault())
+                        .format(Instant.ofEpochMilli(timestamp)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Muted,
+                )
+            }
+        }
     }
-    AlertDialog(
-        onDismissRequest = {},
-        icon = { Icon(if (active == null) Icons.Outlined.Call else Icons.Outlined.Mic, null) },
-        title = {
-            Text(stringResource(if (active == null) R.string.ui_calling else R.string.ui_call_in_progress))
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(call?.name.orEmpty().ifBlank { stringResource(R.string.ui_voice_call) })
-                if (state is VoipSessionState.Error) Text(
-                    state.message,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        },
-        confirmButton = {
-            if (active != null) TextButton(
-                onClick = { onMute(!active.microphoneMuted) },
-                modifier = Modifier.testTag("mute_voice_call"),
-            ) {
-                Icon(if (active.microphoneMuted) Icons.Outlined.Mic else Icons.Outlined.MicOff, null)
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(if (active.microphoneMuted) R.string.ui_unmute else R.string.ui_mute))
-            }
-        },
-        dismissButton = {
-            if (active != null || state is VoipSessionState.Error) Button(
-                onClick = onFinish,
-                modifier = Modifier.testTag("finish_voice_call"),
-            ) {
-                Icon(Icons.Outlined.CallEnd, null)
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    stringResource(
-                        if (call?.callerId == currentUid) R.string.ui_end_call else R.string.ui_leave_call
-                    )
-                )
-            }
-        },
-    )
 }
 
 // Shows text or the correct viewer button for one chat message.

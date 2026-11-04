@@ -84,9 +84,20 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val sensitive get() = runtime.sensitive
     val usesCover get() = runtime.usesCover
 
+    fun pauseIdleTimerForCall() = runtime.privacy.pauseIdleTimerForCall()
+
+    fun resumeIdleTimerAfterCall() = runtime.privacy.resumeIdleTimerAfterCall()
+
     @Volatile
     var externalFilePickerOpen = false
         private set
+
+    @Volatile
+    var callPermissionRequestOpen = false
+        private set
+
+    /** Carries checklist-specific tags across navigation into the full-screen camera. */
+    internal var pendingCameraUploadTags: Set<String> = emptySet()
 
     init {
         runtime.accountSession.load()
@@ -102,12 +113,21 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         externalFilePickerOpen = false
     }
 
+    fun beginCallPermissionRequest() {
+        callPermissionRequestOpen = true
+    }
+
+    fun endCallPermissionRequest() {
+        callPermissionRequestOpen = false
+    }
+
     // Shares the user's current live-location session with a chat.
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 
     // Closing this session also clears document and map data held by their screen controllers.
     fun signOut() {
+        pendingCameraUploadTags = emptySet()
         documents.clear()
         locationMap.clear()
         adminLocationMap.close()

@@ -6,6 +6,8 @@ import com.olive.app.ui.shared.*
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import android.view.ViewGroup
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.NavigateBefore
 import androidx.compose.material.icons.automirrored.outlined.NavigateNext
+import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Remove
@@ -115,8 +118,9 @@ private fun ImageViewer(file: File, name: String) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    var rotation by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
     val image by produceState<Bitmap?>(null, file) {
-        value = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(file.absolutePath) }
+        value = withContext(Dispatchers.IO) { decodeImageWithExif(file) }
     }
     val zoomPercent = (scale * 100).toInt()
     val zoomIn = stringResource(R.string.a11y_zoom_in)
@@ -161,7 +165,8 @@ private fun ImageViewer(file: File, name: String) {
                 scaleX = scale,
                 scaleY = scale,
                 translationX = offsetX,
-                translationY = offsetY
+                translationY = offsetY,
+                rotationZ = rotation.toFloat(),
             )
         )
         ZoomControls(
@@ -172,6 +177,7 @@ private fun ImageViewer(file: File, name: String) {
             },
             onReset = { scale = 1f; offsetX = 0f; offsetY = 0f },
             onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
+            onRotate = { rotation = (rotation + 90) % 360 },
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
         )
     }
@@ -183,6 +189,7 @@ private fun VideoViewer(file: File) {
     val context = LocalContext.current
     var player by remember { mutableStateOf<VideoView?>(null) }
     var scale by rememberSaveable(file.absolutePath) { mutableFloatStateOf(1f) }
+    var rotation by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
     // Prepare and release video playback with the viewer lifecycle.
     DisposableEffect(Unit) { onDispose { player?.stopPlayback() } }
     Box(Modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
@@ -205,12 +212,17 @@ private fun VideoViewer(file: File) {
                 }
                 player = this
             }
-        }, modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = scale, scaleY = scale))
+        }, modifier = Modifier.fillMaxSize().graphicsLayer(
+            scaleX = scale,
+            scaleY = scale,
+            rotationZ = rotation.toFloat(),
+        ))
         ZoomControls(
             scale = scale,
             onZoomOut = { scale = (scale / 1.25f).coerceAtLeast(1f) },
             onReset = { scale = 1f },
             onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
+            onRotate = { rotation = (rotation + 90) % 360 },
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
         )
     }
@@ -225,6 +237,7 @@ private fun PdfViewer(file: File) {
     var scale by rememberSaveable(file.absolutePath) { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    var rotation by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
     val rendered by produceState<PdfPage?>(null, file, page) {
         value = withContext(Dispatchers.IO) { renderPdfPage(file, page) }
     }
@@ -263,6 +276,7 @@ private fun PdfViewer(file: File) {
                     scaleY = scale,
                     translationX = offsetX,
                     translationY = offsetY,
+                    rotationZ = rotation.toFloat(),
                 )
             )
             ZoomControls(
@@ -273,6 +287,7 @@ private fun PdfViewer(file: File) {
                 },
                 onReset = { scale = 1f; offsetX = 0f; offsetY = 0f },
                 onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
+                onRotate = { rotation = (rotation + 90) % 360 },
                 modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             )
         }
@@ -353,11 +368,16 @@ private fun ZoomControls(
     onZoomOut: () -> Unit,
     onReset: () -> Unit,
     onZoomIn: () -> Unit,
+    onRotate: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val resetDescription = stringResource(R.string.a11y_reset_zoom)
     Surface(modifier, shape = MaterialTheme.shapes.extraLarge, tonalElevation = 4.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (onRotate != null) IconButton(
+                onClick = onRotate,
+                modifier = Modifier.testTag("media_rotate"),
+            ) { Icon(Icons.AutoMirrored.Outlined.RotateRight, stringResource(R.string.a11y_rotate_clockwise)) }
             IconButton(
                 onClick = onZoomOut,
                 enabled = scale > 1.01f,
@@ -376,6 +396,38 @@ private fun ZoomControls(
                 modifier = Modifier.testTag("media_zoom_in"),
             ) { Icon(Icons.Outlined.Add, stringResource(R.string.a11y_zoom_in)) }
         }
+    }
+}
+
+// Uses the photo's EXIF orientation so camera images are upright before the viewer adds user rotation.
+private fun decodeImageWithExif(file: File): Bitmap? {
+    val bitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return null
+    val orientation = runCatching {
+        ExifInterface(file.absolutePath).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL,
+        )
+    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    val matrix = Matrix().apply {
+        when (orientation) {
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> setRotate(180f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> setScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                setRotate(90f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_90 -> setRotate(90f)
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                setRotate(-90f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_270 -> setRotate(-90f)
+        }
+    }
+    if (orientation == ExifInterface.ORIENTATION_NORMAL || matrix.isIdentity) return bitmap
+    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also {
+        if (it !== bitmap) bitmap.recycle()
     }
 }
 

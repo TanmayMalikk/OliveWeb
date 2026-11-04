@@ -84,6 +84,12 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
     // Moves the camera one zoom step farther away without going below its normal view.
     fun zoomOut() = changeZoom(0.8f)
 
+    // Uses the two-finger camera gesture to smoothly change CameraX's real optical zoom ratio.
+    fun zoomBy(multiplier: Float) {
+        if (!multiplier.isFinite()) return
+        changeZoom(multiplier.coerceIn(0.8f, 1.25f))
+    }
+
     private fun changeZoom(multiplier: Float) {
         if (!_ready.value || (_busy.value && !_recording.value)) return
         runCatching { camera.changeZoom(multiplier) }
@@ -103,7 +109,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
     }
 
     // Takes a document photo and runs OCR before previewing it.
-    fun captureDocument(file: File, onCaptured: (File, OcrResult) -> Unit) {
+    fun captureDocument(file: File, onCaptured: (File, File, OcrResult) -> Unit) {
         if (documentJob?.isActive == true) return
         val generation = ++documentGeneration
         pendingDocumentFile = file
@@ -118,9 +124,16 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
                     captured.delete()
                     return@launch
                 }
+                val pdfFile = File(captured.parentFile, "${captured.nameWithoutExtension}.pdf")
+                convertDocumentPhotoToPdf(captured, pdfFile)
+                if (generation != documentGeneration) {
+                    captured.delete()
+                    pdfFile.delete()
+                    return@launch
+                }
                 pendingDocumentFile = null
                 documentJob = null
-                onCaptured(captured, result)
+                onCaptured(pdfFile, captured, result)
             } catch (cancelled: CancellationException) {
                 file.delete()
                 throw cancelled

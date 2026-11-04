@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.*
 import com.olive.app.R
+import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -44,9 +45,11 @@ internal fun SafetyPlanScreen(
     ownerName: String = session.coverUsername, onBack: () -> Unit = session.navigation::back
 ) {
     val controller = session.safetyPlans
+    val documentController = session.documents
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    var pendingDocumentAttachmentTag by rememberSaveable { mutableStateOf<String?>(null) }
     // Hides the keyboard before leaving or switching safety-plan sections.
     fun leaveEditor() {
         focus.clearFocus(force = true)
@@ -63,6 +66,11 @@ internal fun SafetyPlanScreen(
         while (true) {
             delay(5.seconds)
             controller.refresh()
+        }
+    }
+    LaunchedEffect(ownerUid, ownerName, session.localMode) {
+        if (ownerUid == session.coverAccountId) {
+            documentController.load(ownerUid, ownerName, session.localMode)
         }
     }
     var backup by rememberSaveable(ownerUid) { mutableStateOf(false) }
@@ -226,7 +234,17 @@ internal fun SafetyPlanScreen(
                                     contacts = if (!organizationEditor && !safeContact && section == "contacts") session.profile?.contacts.orEmpty() else emptyList(),
                                     contactsEditable = !organizationEditor && !safeContact && section == "contacts",
                                     onContactsChange = if (!organizationEditor && !safeContact && section == "contacts") session::saveContacts else null,
-                                    editable = !safeContact
+                                    editable = !safeContact,
+                                    documents = if (ownerUid == session.coverAccountId)
+                                        documentController.state.files else emptyList(),
+                                    onUploadDocument = if (!organizationEditor && !safeContact && section == "documents") {
+                                        { itemId ->
+                                            pendingDocumentAttachmentTag = safetyChecklistAttachmentTag(
+                                                "${prefix}_documents",
+                                                itemId,
+                                            )
+                                        }
+                                    } else null,
                                 )
                                 HorizontalDivider(
                                     Modifier.padding(horizontal = 16.dp),
@@ -303,6 +321,12 @@ internal fun SafetyPlanScreen(
             }
         }
     }
+    SafetyDocumentUploadFlow(
+        session = session,
+        visible = pendingDocumentAttachmentTag != null,
+        onDismiss = { pendingDocumentAttachmentTag = null },
+        tags = setOfNotNull("Safety Plan", pendingDocumentAttachmentTag),
+    )
 }
 
 // Lets a trusted contact view the safety plans shared with them.

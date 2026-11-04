@@ -96,4 +96,28 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
             }
         }
     }
+
+    // A full-screen call is active interaction. Preserve the underlying Safe page and restart
+    // its full inactivity window only after the call overlay has gone away.
+    fun pauseIdleTimerForCall() {
+        with(runtime) {
+            with(state) {
+                if (screen != SessionScreen.Safe || accountRole != AccountRole.USER) return
+                idlePausedForCall = true
+                idleJob?.cancel()
+                idleJob = null
+                idleCountdownSeconds = null
+            }
+        }
+    }
+
+    fun resumeIdleTimerAfterCall() {
+        with(runtime) {
+            if (!idlePausedForCall) return
+            idlePausedForCall = false
+            if (state.screen == SessionScreen.Safe && state.accountRole == AccountRole.USER) {
+                startIdleTimer()
+            }
+        }
+    }
 }
