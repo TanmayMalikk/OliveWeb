@@ -182,7 +182,7 @@
 <string name="no_failed_attempts_recorded">No failed attempts recorded.</string>
     <string name="incorrect_pin">Incorrect PIN</string>
     <string name="safe_home">Safe home</string>
-    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">Save trusted people here. Olive does not send messages or make calls.</string>
+    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">Save trusted people here so you can message or call them securely.</string>
     <string name="edit">Edit</string>
     <string name="remove">Remove</string>
     <string name="no_contacts_yet_adding_one_is_optional">No contacts yet. Adding one is optional.</string>

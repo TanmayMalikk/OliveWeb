@@ -183,7 +183,7 @@ Buen humor.</string>
 <string name="no_failed_attempts_recorded">No se registraron intentos fallidos.</string>
     <string name="incorrect_pin">PIN incorrecto</string>
     <string name="safe_home">hogar seguro</string>
-    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">Guarde aquí a personas de confianza. Olive no envía mensajes ni realiza llamadas.</string>
+    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">Guarde aquí a personas de confianza para enviarles mensajes o llamarlas de forma segura.</string>
     <string name="edit">Editar</string>
     <string name="remove">Quitar</string>
     <string name="no_contacts_yet_adding_one_is_optional">Aún no hay contactos. Agregar uno es opcional.</string>

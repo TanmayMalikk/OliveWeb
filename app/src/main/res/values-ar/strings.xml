@@ -183,7 +183,7 @@
 <string name="no_failed_attempts_recorded">لم يتم تسجيل أية محاولات فاشلة.</string>
     <string name="incorrect_pin">رقم التعريف الشخصي غير صحيح</string>
     <string name="safe_home">منزل آمن</string>
-    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">احفظ الأشخاص الموثوق بهم هنا. الزيتون لا يرسل رسائل أو يجري مكالمات.</string>
+    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">احفظ الأشخاص الموثوق بهم هنا حتى تتمكن من مراسلتهم أو الاتصال بهم بأمان.</string>
     <string name="edit">تحرير</string>
     <string name="remove">إزالة</string>
     <string name="no_contacts_yet_adding_one_is_optional">لا توجد اتصالات حتى الآن. إضافة واحدة أمر اختياري.</string>
