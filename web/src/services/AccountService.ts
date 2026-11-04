@@ -8,6 +8,7 @@ import {
   changeLocalPassword,
 } from "./LocalDataStore";
 import { unwrapKey, wrapKey, triggerHash } from "./EncryptionService";
+import { readStoredObject } from "./StoredAccountJson";
 import {
   emptyHistory,
   emptyProfile,
@@ -217,14 +218,11 @@ export class Accounts {
         ref(storage, `accounts/${identity.uid}/profile.json`),
         65536,
       );
-      let saved: Partial<Profile>;
-      try {
-        saved = JSON.parse(new TextDecoder().decode(bytes)) as Partial<Profile>;
-      } catch {
+      const saved = readStoredObject(bytes) as Partial<Profile> | null;
+      if (!saved)
         throw new Error(
           "This account profile is incomplete or damaged. Open the account in the updated Android app to save it again, then retry.",
         );
-      }
       profile = {
         ...emptyProfile(identity.username, identity.role),
         ...saved,
@@ -243,21 +241,22 @@ export class Accounts {
       const listing = await listAll(
         ref(storage, `accounts/${identity.uid}/history/${category}`),
       );
-      const rows = await Promise.all(
-        listing.items.map(async (item) =>
-          JSON.parse(
-            new TextDecoder().decode(
+      // One interrupted or older history upload is ignored so it cannot lock the user out of every web feature.
+      const rows = (
+        await Promise.all(
+          listing.items.map(async (item) =>
+            readStoredObject(
               await getBytes(
                 item,
                 category === "private_entries" ? 5 * 1024 * 1024 : 65536,
               ),
             ),
           ),
-        ),
-      );
+        )
+      ).filter((row): row is Record<string, unknown> => row !== null);
       if (category === "private_entries")
-        history.private_entries = rows.map((row) => purgeEntry(row));
-      else history[category] = rows;
+        history.private_entries = rows.map((row) => purgeEntry(row as unknown as Entry));
+      else history[category] = rows as unknown as Event[];
     }
     await writeLocal(identity.uid, raw, { profile, history });
     return { profile, history };
