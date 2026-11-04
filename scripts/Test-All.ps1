@@ -5,6 +5,18 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$testRunMutex = [System.Threading.Mutex]::new($false, "Local\OliveBranch.F26_D1.TestAll")
+$ownsTestRunMutex = $false
+try {
+    try {
+        $ownsTestRunMutex = $testRunMutex.WaitOne(0)
+    } catch [System.Threading.AbandonedMutexException] {
+        $ownsTestRunMutex = $true
+    }
+    if (-not $ownsTestRunMutex) {
+        throw "Another test-all run is already active. Wait for it to finish before starting a new run."
+    }
+
 # Node warns when both color controls are inherited from the launching terminal. Keep the explicit
 # FORCE_COLOR preference and remove the contradictory opt-out for all child npm/Playwright runs.
 if ($env:FORCE_COLOR -and $env:NO_COLOR) { Remove-Item Env:NO_COLOR }
@@ -386,3 +398,7 @@ Write-Host "`nAll requested Olive tests passed ($($completedChecks.Count) checks
 $completedChecks | ForEach-Object { Write-Host "  PASS  $_" -ForegroundColor Green }
 Set-Content -LiteralPath (Join-Path $testReportDirectory "completed-test-checks.txt") -Value $completedChecks
 Remove-Item -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Force -ErrorAction SilentlyContinue
+} finally {
+    if ($ownsTestRunMutex) { [void]$testRunMutex.ReleaseMutex() }
+    $testRunMutex.Dispose()
+}
