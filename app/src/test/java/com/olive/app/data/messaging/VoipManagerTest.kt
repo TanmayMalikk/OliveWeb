@@ -30,7 +30,13 @@ class VoipManagerTest {
             token = "user-token"
         )
 
-        val call = manager.startCall("  Support  ", "caller-1", listOf("user-2", "user-3"))
+        val call = manager.startCall(
+            "  Support  ",
+            "caller-1",
+            listOf("user-2", "user-3"),
+            callerName = "Alice",
+            conversationId = "conversation-1",
+        )
 
         assertEquals("call-1", call.callId)
         assertEquals("Support", call.name)
@@ -39,6 +45,8 @@ class VoipManagerTest {
         val requestBody = JSONObject(Buffer().also { requests.single().body?.writeTo(it) }.readUtf8())
         assertEquals("Support", requestBody.getString("name"))
         assertEquals("caller-1", requestBody.getString("callerId"))
+        assertEquals("Alice", requestBody.getString("callerName"))
+        assertEquals("conversation-1", requestBody.getString("conversationId"))
         assertEquals(listOf("user-2", "user-3"), requestBody.getJSONArray("participantIds")
             .let { array -> (0 until array.length()).map(array::getString) })
     }
@@ -52,7 +60,12 @@ class VoipManagerTest {
             responseBody = body,
             requests = requests,
             token = "user-token"
-        ).startCall("Support", "caller-1", listOf("user-2", "user-3"))
+        ).startCall(
+            "Support",
+            "caller-1",
+            listOf("user-2", "user-3"),
+            conversationId = "conversation-1",
+        )
 
         assertEquals(listOf("user-3"), call.undeliveredInviteeIds)
     }
@@ -136,6 +149,20 @@ class VoipManagerTest {
         assertEquals(VoipParticipantStatus.ACCEPTED, accepted.participants[1].status)
         assertEquals("/api/calls/call-1/accept", requests.last().url.encodedPath)
         assertEquals("user 2", requests.first().url.queryParameter("userId"))
+    }
+
+    @Test
+    fun callHistoryParsesMissedCallConversationAndTimestamps() = runBlocking {
+        val manager = managerForResponse(
+            body = """{"calls":[{"callId":"call-1","name":"Bob","callerId":"alice","callerName":"Alice","conversationId":"conversation-1","status":"missed","createdAt":1000,"expiresAt":21000,"endedAt":21000,"endReason":"missed","participants":[{"userId":"alice","status":"accepted"},{"userId":"bob","status":"pending"}]}]}"""
+        )
+
+        val call = manager.listCalls().single()
+
+        assertEquals(VoipCallStatus.MISSED, call.status)
+        assertEquals("conversation-1", call.conversationId)
+        assertEquals(1_000L, call.createdAt)
+        assertEquals(21_000L, call.endedAt)
     }
 
     // Checks the api errors are propagated with their status and code step with the test's sample data.
@@ -249,7 +276,14 @@ class VoipManagerTest {
 
         invalidCalls.forEach { (name, callerId, participants) ->
             assertThrows(IllegalArgumentException::class.java) {
-                runBlocking { manager.startCall(name, callerId, participants) }
+                runBlocking {
+                    manager.startCall(
+                        name,
+                        callerId,
+                        participants,
+                        conversationId = "conversation-1",
+                    )
+                }
             }
         }
         assertThrows(IllegalArgumentException::class.java) { manager.receiveCalls(" ", 1) }

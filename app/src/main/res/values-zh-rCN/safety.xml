@@ -34,9 +34,9 @@
     <string name="safety_open_plan">打开 %1$s 的计划</string>
     <string name="safety_source">规划参考：加拿大公共卫生局。请与可信的人一起调整这些提示。</string>
     <string name="safety_upload_document">上传文件</string>
-    <string name="safety_upload_for">上传文件：%1$s。即将推出。</string>
+    <string name="safety_upload_for">为%1$s上传文件。</string>
 <string name="safety_storage_photos">照片</string>
     <string name="safety_storage_videos">视频</string>
     <string name="safety_storage_documents">文件图片</string>
-    <string name="safety_document_upload_hint">上传功能即将推出。上传的文件也会显示在“文件”中。</string>
+    <string name="safety_document_upload_hint">上传的文件也会显示在“文件”中。</string>
 </resources>

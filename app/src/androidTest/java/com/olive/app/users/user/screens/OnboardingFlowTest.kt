@@ -198,11 +198,14 @@ class OnboardingFlowTest : OliveUiTestBase() {
         click("new_private_entry")
         click("private_kind_incident")
         fill("private_entry_title", "Private incident")
+        fill("incident_date", "2026-11-02")
+        fill("incident_location", "Edmonton")
         fill("private_entry_body", "Details that must stay inside Olive Branch")
         click("save_private_entry")
         compose.waitUntil(30_000) {
-            compose.onAllNodesWithText("Details that must stay inside Olive Branch")
-                .fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithTag("private_editor_title").fetchSemanticsNodes().isEmpty() &&
+                compose.onAllNodesWithText("Details that must stay inside Olive Branch")
+                    .fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
@@ -244,8 +247,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
                 },
             )
         }
-        waitFor("private_edit_log")
-        compose.onNodeWithTag("private_edit_log").performClick()
+        click("private_edit_log")
         compose.onNodeWithText("Edit log").assertExists()
         compose.onNodeWithText("Details that must stay inside Olive Branch", substring = true)
             .assertExists()

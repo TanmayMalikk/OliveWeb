@@ -477,9 +477,11 @@
     <string name="upload_new_attachment">Upload a new attachment</string>
     <string name="attachments_empty_help">Upload files in Documents, then attach them here.</string>
     <string name="title">Title</string>
+    <string name="incident_body">Détails de l’incident</string>
     <string name="current_location">Your current location</string>
     <string name="incident_dropped_pin">Dropped pin: %1$.5f, %2$.5f</string>
     <string name="incident_required_fields">Add a title, incident date, and incident location before saving.</string>
     <string name="evidence_tagged">Tagged as evidence</string>
     <string name="evidence_normal_file">Normal account file</string>
+    <string name="safety_remove_attachment">Supprimer la pièce jointe %1$s</string>
 </resources>

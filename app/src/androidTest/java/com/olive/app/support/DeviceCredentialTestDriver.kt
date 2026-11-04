@@ -34,14 +34,22 @@ internal class DeviceCredentialTestDriver(
     fun confirmPhonePin() {
         waitForPhonePin()
         // This PIN belongs only to the disposable emulator used by this test run.
-        if (findNode(automation.rootInActiveWindow) { it.viewIdResourceName == "cred_pin_pad" } != null) {
-            "246810".forEach { digit ->
-                val key =
-                    findNode(automation.rootInActiveWindow) { it.className?.toString() == "android.widget.Button" && it.text?.toString() == digit.toString() }
-                assertTrue(
-                    "Android PIN key $digit unavailable",
-                    key?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+        val digitNode: (AccessibilityNodeInfo, Char) -> Boolean = { node, digit ->
+            val label = digit.toString()
+            val resource = node.viewIdResourceName.orEmpty()
+            node.isClickable && (
+                node.text?.toString() == label ||
+                    node.contentDescription?.toString() == label ||
+                    resource.endsWith("key$label") || resource.endsWith("digit_$label")
                 )
+        }
+        val hasOnScreenKeypad = findNode(automation.rootInActiveWindow) { digitNode(it, '2') } != null
+        if (hasOnScreenKeypad) {
+            "246810".forEach { digit ->
+                compose.waitUntil(5_000) {
+                    findNode(automation.rootInActiveWindow) { digitNode(it, digit) }
+                        ?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+                }
                 automation.waitForIdle(150, 3_000)
             }
             compose.waitUntil(5_000) {

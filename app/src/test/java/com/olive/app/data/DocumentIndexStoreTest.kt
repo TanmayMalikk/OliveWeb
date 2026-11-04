@@ -23,6 +23,8 @@ class DocumentIndexStoreTest {
         assertEquals(setOf(ALICE), alice.documents.single().wrappedKeys.keys)
         assertTrue(alice.documents.single().deviceWrappedKeys.keys.all { it.startsWith("$ALICE--") })
         assertFalse(alice.documents.single().deviceWrappedKeys.keys.any { it.startsWith("$BOB--") })
+        assertTrue(alice.documents.single().evidence)
+        assertEquals(listOf("Safety Plan"), alice.documents.single().tags)
 
         store.purge(ALICE)
         assertTrue(store.read(ALICE).documents.isEmpty())
@@ -83,6 +85,8 @@ class DocumentIndexStoreTest {
         ciphertextSha256 = "a".repeat(64),
         encryptionVersion = 2,
         deviceWrappedKeys = mapOf("$ALICE--phone" to "device-a", "$BOB--phone" to "device-b"),
+        evidence = true,
+        tags = listOf("Safety Plan"),
     ).also { require(viewer in it.allowedUsers) }
 
     private class FakeRemote(private val getFailure: Exception? = null) : SafetyDocumentDataSource {
