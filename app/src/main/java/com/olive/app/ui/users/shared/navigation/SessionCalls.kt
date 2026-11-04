@@ -11,11 +11,14 @@ import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipManager
 import com.olive.app.data.messaging.VoipSessionController
 import com.olive.app.data.messaging.VoipSessionState
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 // Calls are private-account features. Support tickets can include staff or admins and never qualify.
@@ -42,6 +45,8 @@ internal class SessionCalls(
     val state: StateFlow<VoipSessionState> = controller.state
     var invitations by mutableStateOf(emptyList<VoipInvitation>())
         private set
+    var callHistory by mutableStateOf(emptyList<VoipCall>())
+        private set
     var message by mutableStateOf<String?>(null)
         private set
 
@@ -55,24 +60,31 @@ internal class SessionCalls(
         stopObserving()
         observedUid = uid
         invitationJob = scope.launch {
-            manager.receiveCalls(uid)
-                .catch { error ->
-                    if (error is CancellationException) throw error
+            while (isActive) {
+                try {
+                    val calls = manager.listCalls()
+                    callHistory = calls
+                    val now = System.currentTimeMillis()
+                    invitations = manager.getIncomingCalls(uid).filter {
+                        it.expiresAt == 0L || it.expiresAt > now
+                    }
+                    val sessionCall = when (val current = state.value) {
+                        is VoipSessionState.Connecting -> current.call
+                        is VoipSessionState.Active -> current.call
+                        else -> null
+                    }
+                    if (sessionCall != null && calls.firstOrNull {
+                            it.callId == sessionCall.callId
+                        }?.status?.let { it != VoipCallStatus.ACTIVE } == true
+                    ) controller.dismiss()
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
                     message = error.message ?: "Could not check incoming calls"
                 }
-                .collect { invitations = it }
+                delay(1_000)
+            }
         }
-    }
-
-    fun receiveInvitation(callId: String, callerId: String, name: String) {
-        if (callId.isBlank() || callerId.isBlank()) return
-        val invitation = VoipInvitation(
-            callId = callId,
-            callerId = callerId,
-            name = name.ifBlank { "Private call" },
-            status = com.olive.app.data.messaging.VoipParticipantStatus.PENDING,
-        )
-        invitations = invitations.filterNot { it.callId == callId } + invitation
     }
 
     // Creates a call only from a direct chat owned by a User or Safe Contact account.
@@ -92,7 +104,13 @@ internal class SessionCalls(
             .ifBlank { "Private call" }
         scope.launch {
             runCallAction {
-                controller.startAndJoin(recipientName, callerUid, recipients, callerName)
+                controller.startAndJoin(
+                    recipientName,
+                    callerUid,
+                    recipients,
+                    callerName,
+                    conversation.id,
+                )
             }
         }
     }
@@ -128,8 +146,8 @@ internal class SessionCalls(
         scope.launch { runCallAction { controller.setSpeakerEnabled(enabled) } }
     }
 
-    // The caller ends the shared call; another participant only leaves their own audio room.
-    fun finish(currentUid: String) {
+    // Either participant ends the one shared room for both phones.
+    fun finish(@Suppress("UNUSED_PARAMETER") currentUid: String) {
         scope.launch {
             runCallAction {
                 val active = state.value
@@ -141,8 +159,7 @@ internal class SessionCalls(
                 } ?: return@runCallAction
                 when {
                     active is VoipSessionState.Error -> controller.dismiss()
-                    call.callerId == currentUid -> controller.endCall()
-                    else -> controller.leaveCall()
+                    else -> controller.endCall()
                 }
             }
         }
@@ -170,6 +187,9 @@ internal class SessionCalls(
         observedUid = null
         invitations = emptyList()
     }
+
+    fun historyFor(conversationId: String): List<VoipCall> =
+        callHistory.filter { it.conversationId == conversationId }
 
     private fun cancelNotification(callId: String) {
         androidx.core.app.NotificationManagerCompat.from(application).cancel(callId.hashCode())

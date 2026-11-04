@@ -67,8 +67,25 @@ import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
 import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
 import com.olive.app.data.messaging.VoipSessionState
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallStatus
 import androidx.core.content.ContextCompat
 import java.io.File
+
+private sealed interface ConversationTimelineItem {
+    val key: String
+    val timestamp: Long
+
+    data class Message(val value: com.olive.app.data.ChatMessage) : ConversationTimelineItem {
+        override val key = "message-${value.id}"
+        override val timestamp = value.sentAt
+    }
+
+    data class Call(val value: VoipCall) : ConversationTimelineItem {
+        override val key = "call-${value.callId}"
+        override val timestamp = value.endedAt.takeIf { it > 0 } ?: value.createdAt
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
@@ -88,6 +105,13 @@ internal fun ChatPane(
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible = imeBottom > 0
     val context = LocalContext.current
+    val callHistory = session.calls.historyFor(active.id)
+        .filter { it.status != VoipCallStatus.ACTIVE }
+    val timeline = remember(session.messages.chatMessages, callHistory) {
+        (session.messages.chatMessages.map(ConversationTimelineItem::Message) +
+            callHistory.map(ConversationTimelineItem::Call))
+            .sortedWith(compareBy(ConversationTimelineItem::timestamp, ConversationTimelineItem::key))
+    }
     var permissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val microphonePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -217,14 +241,19 @@ internal fun ChatPane(
                     contentPadding = PaddingValues(vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (session.messages.chatMessages.isEmpty()) item {
+                    if (timeline.isEmpty()) item {
                         Text(
                             stringResource(R.string.no_messages_yet_say_hello_when_you_are_ready),
                             color = Muted,
                             modifier = Modifier.padding(12.dp)
                         )
                     }
-                    items(session.messages.chatMessages, key = { it.id }) { chat ->
+                    items(timeline, key = ConversationTimelineItem::key) { timelineItem ->
+                        if (timelineItem is ConversationTimelineItem.Call) {
+                            CallHistoryRow(timelineItem.value)
+                            return@items
+                        }
+                        val chat = (timelineItem as ConversationTimelineItem.Message).value
                         val mine = chat.senderUid == currentUid
                         var menuOpen by remember(chat.id) { mutableStateOf(false) }
                         Row(
@@ -434,6 +463,43 @@ internal fun ChatPane(
                     TextButton(onClick = session.calls::clearMessage) { Text(stringResource(R.string.ui_okay)) }
                 },
             )
+        }
+    }
+}
+
+@Composable
+internal fun CallHistoryRow(call: VoipCall) {
+    val label = stringResource(
+        when (call.status) {
+            VoipCallStatus.MISSED -> R.string.ui_missed_call
+            VoipCallStatus.DECLINED -> R.string.ui_call_declined
+            VoipCallStatus.ENDED -> R.string.ui_call_ended
+            VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
+        }
+    )
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+            .testTag("call_history_${call.callId}"),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Call, null, tint = OliveGreen)
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleSmall)
+                val timestamp = call.endedAt.takeIf { it > 0 } ?: call.createdAt
+                if (timestamp > 0) Text(
+                    DateTimeFormatter.ofPattern("MMM d, HH:mm")
+                        .withZone(ZoneId.systemDefault())
+                        .format(Instant.ofEpochMilli(timestamp)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Muted,
+                )
+            }
         }
     }
 }
