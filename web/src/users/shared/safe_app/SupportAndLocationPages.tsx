@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Upload,
 } from "lucide-react";
-import { Button, Empty, Modal } from "../../../components/SharedComponents";
+import { Button, Empty } from "../../../components/SharedComponents";
 import {
   accounts,
   cloudMode,
@@ -25,6 +25,7 @@ import {
   setBrowserDocumentEvidence,
   type BrowserDocument,
 } from "../../../services/MediaService";
+import { SafeMediaViewer } from "./SafeMediaViewer";
 
 // Sends a signed-in support request to the protected Cloud Function.
 async function callable<T>(name: string, data: unknown): Promise<T> {
@@ -483,34 +484,14 @@ export function DocumentsPage() {
         </div>
       )}
       {viewerDocument && viewerUrl && (
-        <Modal
-          title={viewerDocument.name}
-          wide
+        <SafeMediaViewer
+          document={viewerDocument}
+          url={viewerUrl}
           onClose={() => {
             setViewerDocument(null);
             setViewerUrl("");
           }}
-        >
-          <div className="safe-document-viewer">
-            {viewerDocument.mimeType.startsWith("image/") ? (
-              <img src={viewerUrl} alt={viewerDocument.name} />
-            ) : viewerDocument.mimeType.startsWith("video/") ? (
-              <video src={viewerUrl} controls aria-label={viewerDocument.name} />
-            ) : viewerDocument.mimeType.startsWith("audio/") ? (
-              <audio src={viewerUrl} controls aria-label={viewerDocument.name} />
-            ) : viewerDocument.mimeType === "application/pdf" ||
-              viewerDocument.mimeType.startsWith("text/") ? (
-              <iframe src={viewerUrl} title={viewerDocument.name} />
-            ) : (
-              <div className="panel">
-                <p>This file type cannot be previewed in the browser.</p>
-                <a className="button" href={viewerUrl} download={viewerDocument.name}>
-                  Download decrypted file
-                </a>
-              </div>
-            )}
-          </div>
-        </Modal>
+        />
       )}
     </section>
   );
