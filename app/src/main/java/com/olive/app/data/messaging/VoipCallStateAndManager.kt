@@ -234,7 +234,7 @@ class VoipManager(
 
             // Converts successful responses and turns server failures into useful app errors.
             httpClient.newCall(requestBuilder.build()).execute().use { response ->
-                val responseBody = response.body?.string().orEmpty()
+                val responseBody = response.body.string()
                 if (!response.isSuccessful) {
                     val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
                     throw VoipApiException(

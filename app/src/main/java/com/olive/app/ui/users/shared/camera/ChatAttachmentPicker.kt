@@ -142,7 +142,7 @@ internal fun AttachmentPicker(
                     when (selectedCategory) {
                         AttachmentCategory.Notes -> {
                             val notes =
-                                session.privateEntries.filter { it.deletedAt == null && (it.kind == PrivateEntryKind.Note || it.kind == null) }
+                                session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Note }
                             if (notes.isEmpty()) item {
                                 Text(
                                     stringResource(R.string.no_private_notes_found),
