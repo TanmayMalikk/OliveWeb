@@ -43,8 +43,8 @@ function IncidentMap({ latitude, longitude, onChange }: Omit<IncidentLocationPic
       zoom: Number.isFinite(latitude) ? 15 : 10,
       scrollWheelZoom: false,
     });
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors",
+    L.tileLayer("/api/map-tiles/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors · Tiles by Geoapify",
       maxZoom: 19,
     }).addTo(instance);
 

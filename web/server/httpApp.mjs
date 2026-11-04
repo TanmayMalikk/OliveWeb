@@ -31,6 +31,35 @@ export function createServerApp({ development = false } = {}) {
     next();
   });
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
+  // Incident maps load their tiles through this server so the private Geoapify key is never sent to the browser.
+  app.get("/api/map-tiles/:z/:x/:y.png", async (req, res) => {
+    const key = process.env.GEOAPIFY_API_KEY?.trim();
+    const z = Number(req.params.z);
+    const x = Number(req.params.x);
+    const y = Number(req.params.y);
+    if (!key) return res.status(503).type("text/plain").send("Map tiles are not configured.");
+    if (![z, x, y].every(Number.isInteger) || z < 0 || z > 20 || x < 0 || y < 0)
+      return res.status(400).type("text/plain").send("Invalid map tile.");
+    const maximum = 2 ** z;
+    if (x >= maximum || y >= maximum)
+      return res.status(400).type("text/plain").send("Invalid map tile.");
+    const endpoint = new URL(
+      `https://maps.geoapify.com/v1/tile/osm-bright/${z}/${x}/${y}.png`,
+    );
+    endpoint.searchParams.set("apiKey", key);
+    try {
+      const response = await fetch(endpoint, {
+        signal: AbortSignal.timeout(5000),
+        headers: { Accept: "image/png,image/*" },
+      });
+      if (!response.ok) throw new Error(`Geoapify returned ${response.status}`);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.type(response.headers.get("content-type") || "image/png");
+      return res.send(Buffer.from(await response.arrayBuffer()));
+    } catch {
+      return res.status(502).type("text/plain").send("Map tile unavailable.");
+    }
+  });
   app.get("/download/android", (_req, res) => {
     let destination;
     try {

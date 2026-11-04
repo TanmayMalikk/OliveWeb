@@ -12,6 +12,7 @@ import {
   emptyHistory,
   emptyProfile,
   normalizeCover,
+  normalizeUsername,
   signInEmail,
   purgeEntry,
   type Profile,
@@ -120,17 +121,34 @@ export class Accounts {
           ).user;
         } catch (error) {
           if (role === "STAFF" || role === "ADMIN") {
-            const result = await httpsCallable(
-              functions,
-              "resolveOrganizationLogin",
-            )({ identifier: username.trim().toLowerCase(), role });
-            user = (
-              await sdk.signInWithEmailAndPassword(
-                auth,
-                String((result.data as { authEmail: string }).authEmail),
-                password,
-              )
-            ).user;
+            // Older staff and admin accounts used a role-specific Olive address before the current alias was introduced.
+            try {
+              user = (
+                await sdk.signInWithEmailAndPassword(
+                  auth,
+                  `${normalizeUsername(username)}@${role.toLowerCase()}.olive.invalid`,
+                  password,
+                )
+              ).user;
+            } catch {
+              try {
+                const result = await httpsCallable(
+                  functions,
+                  "resolveOrganizationLogin",
+                )({ identifier: username.trim().toLowerCase(), role });
+                user = (
+                  await sdk.signInWithEmailAndPassword(
+                    auth,
+                    String((result.data as { authEmail: string }).authEmail),
+                    password,
+                  )
+                ).user;
+              } catch {
+                throw new Error(
+                  "This organization account could not be found. Check the selected role and username, then ask an administrator to confirm the account alias.",
+                );
+              }
+            }
           } else if (role !== "USER")
             user = (
               await sdk.signInWithEmailAndPassword(
@@ -199,7 +217,14 @@ export class Accounts {
         ref(storage, `accounts/${identity.uid}/profile.json`),
         65536,
       );
-      const saved = JSON.parse(new TextDecoder().decode(bytes));
+      let saved: Partial<Profile>;
+      try {
+        saved = JSON.parse(new TextDecoder().decode(bytes)) as Partial<Profile>;
+      } catch {
+        throw new Error(
+          "This account profile is incomplete or damaged. Open the account in the updated Android app to save it again, then retry.",
+        );
+      }
       profile = {
         ...emptyProfile(identity.username, identity.role),
         ...saved,

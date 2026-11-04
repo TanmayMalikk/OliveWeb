@@ -1,10 +1,28 @@
 // All safe-app roles: shows friends and direct messages in the web safe app.
-import { useEffect, useState } from "react";
-import { ArrowLeft, Send, MessageCircle, UserPlus, Search } from "lucide-react";
-import { Button, Empty, Field, Form } from "../../../components/SharedComponents";
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  FileLock2,
+  FileText,
+  MapPin,
+  MessageCircle,
+  Search,
+  Send,
+  ShieldCheck,
+  UserPlus,
+} from "lucide-react";
+import { Button, Empty, Field, Form, Modal } from "../../../components/SharedComponents";
 import { useSession } from "../../../session/SessionProvider";
 import { accounts, cloudMode } from "../../../services/AccountService";
 import * as messaging from "../../../services/MessagingService";
+import {
+  listBrowserDocuments,
+  openBrowserDocument,
+  type BrowserDocument,
+} from "../../../services/MediaService";
+import type { Entry } from "../../../domain/DomainModels";
+import { SafeMediaViewer } from "./SafeMediaViewer";
+import { sharedMessage } from "./SharedMessageContent";
 import type {
   Friend,
   Request,
@@ -12,6 +30,7 @@ import type {
   DirectoryUser,
   Conversation,
 } from "../../../services/MessagingService";
+
 export default function Messages() {
   const session = useSession();
   const [social, setSocial] = useState<{
@@ -26,7 +45,18 @@ export default function Messages() {
   const [feedback, setFeedback] = useState("");
   const [draft, setDraft] = useState("");
   const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
+  const [viewerDocument, setViewerDocument] = useState<BrowserDocument | null>(null);
+  const [viewerUrl, setViewerUrl] = useState("");
+  const [viewerEntry, setViewerEntry] = useState<Entry | null>(null);
+  const messageEnd = useRef<HTMLDivElement>(null);
   const identity = accounts.identity;
+  useEffect(() => {
+    messageEnd.current?.scrollIntoView({ block: "end" });
+  }, [rows, conversation?.id]);
+  useEffect(() => {
+    if (!viewerUrl) return;
+    return () => URL.revokeObjectURL(viewerUrl);
+  }, [viewerUrl]);
   // Restart secure-message listeners when the signed-in account changes.
   useEffect(() => {
     if (!cloudMode || !identity) return;
@@ -122,6 +152,25 @@ export default function Messages() {
   if (!identity) return null;
   // Runs a messaging request through the shared busy and error handling.
   const action = (work: () => Promise<void>) => session.perform(work);
+  // Opens a shared encrypted file with the same in-app viewer used by the Documents page.
+  const openMedia = (id: string) =>
+    void action(async () => {
+      const document = (await listBrowserDocuments(identity)).find((item) => item.id === id);
+      if (!document)
+        throw new Error("This shared file is not available to this account.");
+      const url = await openBrowserDocument(document);
+      setViewerDocument(document);
+      setViewerUrl(url);
+    });
+  // Opens an incident or note saved in this account instead of exposing its internal message code.
+  const openEntry = (id: string) => {
+    const entry = session.history.private_entries.find((item) => item.id === id);
+    if (entry) setViewerEntry(entry);
+    else
+      setFeedback(
+        "This protected record is not stored on this web account yet. Open it once in the updated Android app.",
+      );
+  };
   return (
     <div className={`messages-layout ${conversation ? "chat-open" : ""}`}>
       <aside className="conversation-sidebar">
@@ -263,7 +312,10 @@ export default function Messages() {
               >
                 <ArrowLeft />
               </button>
-              <h2>{messaging.conversationName(conversation, identity)}</h2>
+              <div>
+                <small>{conversation.type === "SUPPORT" ? "Support conversation" : "Direct message"}</small>
+                <h2>{messaging.conversationName(conversation, identity)}</h2>
+              </div>
             </header>
             <div
               className="chat-messages"
@@ -271,40 +323,72 @@ export default function Messages() {
               role="log"
               aria-live="polite"
             >
-              {rows.map((message) => (
-                <article
-                  key={message.id}
-                  className={`chat-bubble ${message.senderUid === identity.uid ? "own" : ""}`}
-                >
-                  <small>{conversation.type === "SUPPORT" &&
-                    identity.role !== "STAFF" && identity.role !== "ADMIN" &&
-                    message.senderUid !== conversation.ownerUid
-                    ? "Olive Staff" : message.senderUsername}</small>
-                  <p>{message.deleted ? "Message unsent" : message.body}</p>
-                  <time>
-                    {new Date(message.clientSentAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </time>
-                  {message.senderUid === identity.uid && !message.deleted && (
-                    <button
-                      className="text-link"
-                      onClick={() =>
-                        void action(() =>
-                          messaging.unsendMessage(
-                            conversation.id,
-                            message,
-                            identity,
-                          ),
-                        )
-                      }
-                    >
-                      Unsend
-                    </button>
-                  )}
-                </article>
-              ))}
+              {rows.map((message) => {
+                const shared = !message.deleted ? sharedMessage(message.body) : null;
+                const icon = shared?.kind === "media" ? <FileLock2 />
+                  : shared?.kind === "incident" ? <ShieldCheck />
+                    : shared?.kind === "location" ? <MapPin /> : <FileText />;
+                return (
+                  <article
+                    key={message.id}
+                    className={`chat-bubble ${message.senderUid === identity.uid ? "own" : ""}`}
+                  >
+                    <small>{conversation.type === "SUPPORT" &&
+                      identity.role !== "STAFF" && identity.role !== "ADMIN" &&
+                      message.senderUid !== conversation.ownerUid
+                      ? "Olive Staff" : message.senderUsername}</small>
+                    {shared ? (
+                      <button
+                        type="button"
+                        className="shared-message-card"
+                        onClick={() => {
+                          if (shared.kind === "media") openMedia(shared.id);
+                          else if (shared.kind === "incident" || shared.kind === "note") openEntry(shared.id);
+                          else if (shared.kind === "safety-plan") session.setPage("SafetyPlan");
+                          else session.setPage("Location");
+                        }}
+                      >
+                        {icon}
+                        <span>
+                          <small>{shared.kind.replace("-", " ")}</small>
+                          <strong>{shared.title}</strong>
+                          <span>Open securely</span>
+                        </span>
+                      </button>
+                    ) : (
+                      <p>{message.deleted ? "Message unsent" : message.body}</p>
+                    )}
+                    <footer className="chat-message-meta">
+                      <time>
+                        {new Date(message.clientSentAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </time>
+                      {message.senderUid === identity.uid && !message.deleted && (
+                        <button
+                          className="text-link"
+                          onClick={() =>
+                            void action(() =>
+                              messaging.unsendMessage(conversation.id, message, identity),
+                            )
+                          }
+                        >
+                          Unsend
+                        </button>
+                      )}
+                    </footer>
+                  </article>
+                );
+              })}
+              {!rows.length && (
+                <div className="chat-empty-state">
+                  <MessageCircle />
+                  <strong>No messages yet</strong>
+                  <span>Send a message when you are ready.</span>
+                </div>
+              )}
+              <div ref={messageEnd} />
             </div>
             <Form
               className="chat-compose"
@@ -351,6 +435,32 @@ export default function Messages() {
         <p className="form-error message-feedback" role="status">
           {feedback}
         </p>
+      )}
+      {viewerDocument && viewerUrl && (
+        <SafeMediaViewer
+          document={viewerDocument}
+          url={viewerUrl}
+          onClose={() => {
+            setViewerDocument(null);
+            setViewerUrl("");
+          }}
+        />
+      )}
+      {viewerEntry && (
+        <Modal title={viewerEntry.title} wide onClose={() => setViewerEntry(null)}>
+          <article className="shared-entry-viewer">
+            <span className="mode-pill">{viewerEntry.kind}</span>
+            {viewerEntry.incidentDate && <p><strong>Date:</strong> {viewerEntry.incidentDate}</p>}
+            {viewerEntry.incidentTime && <p><strong>Approximate time:</strong> {viewerEntry.incidentTime}</p>}
+            {viewerEntry.incidentLocation && <p><strong>Location:</strong> {viewerEntry.incidentLocation}</p>}
+            <p className="shared-entry-body">{viewerEntry.body}</p>
+            {viewerEntry.attachmentIds?.map((id) => (
+              <Button key={id} variant="outline" onClick={() => openMedia(id)}>
+                <FileLock2 size={16} /> Open attached evidence
+              </Button>
+            ))}
+          </article>
+        </Modal>
       )}
     </div>
   );
