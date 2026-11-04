@@ -8,6 +8,16 @@ Open Android Studio's **Terminal** tab at the project root and run:
 .\test-all.bat
 ```
 
+On Linux or macOS, run the equivalent Bash runner from the project root (the script also resolves the project correctly when invoked by path from another directory):
+
+```bash
+./test-all.sh
+```
+
+Both runners use the same test suites and stop on the first failure. The Bash runner requires Python 3 (standard library only) for Android test discovery and JUnit reporting, plus Node/npm, the Android SDK/JDK, and Chrome for Playwright. Set `JAVA_HOME` for Gradle when Android Studio's runtime is not in a standard location. Optionally set `OLIVE_FIREBASE_JAVA_HOME` to a Java 21 installation for Firebase emulators.
+
+Both commands write the combined report to `test-reports/olive-test-summary.txt`, including when a test fails. Individual JUnit reports and the current/failed check are under `build/reports`.
+
 This automatically runs:
 
 1. Android/Kotlin JVM unit tests, debug and UI-test APK builds, lint, and architecture checks.
@@ -19,13 +29,27 @@ The script stops at the first failure and returns a nonzero exit code. A success
 
 ## Include phone or emulator UI tests
 
-Start a Pixel emulator or connect an Android device with USB debugging enabled. Then run:
+Start and unlock a disposable Android emulator. Then run:
 
 ```powershell
 .\test-all.bat -WithDeviceTests
 ```
 
-The disposable emulator must be unlocked and use PIN `246810` so the device-credential tests can exercise the real Android prompt. Device tests run one method per instrumentation process to prevent Android 17 activity state from leaking between unrelated workflows. Assertion failures stop immediately; only a confirmed Android framework process crash is retried once.
+```bash
+./test-all.sh --with-device-tests
+# Select a particular disposable emulator:
+./test-all.sh --with-device-tests --device-serial emulator-5554
+```
+
+Device tests are optional in both runners. They reject physical phones, uninstall the Olive app/test packages on the selected emulator, and configure/clear test PIN `246810`. Use a disposable emulator: its Olive data is erased. The Bash runner finds `adb` through `ANDROID_SDK_ROOT`, `ANDROID_HOME`, `local.properties`, common SDK locations, or `PATH`.
+
+The disposable emulator must be unlocked. The runners set PIN `246810` if it has no lock and remove that test PIN on exit. If it uses another PIN, the credential-dependent methods are skipped. Device tests run one method per instrumentation process to prevent Android 17 activity state from leaking between unrelated workflows. Assertion failures stop immediately; only a confirmed Android framework process crash is retried once.
+
+To verify the Unix runner itself without building the app or contacting a device/backend:
+
+```bash
+python3 scripts/tests/test_unix_runner.py -v
+```
 
 ## Faster runs while editing
 
@@ -47,6 +71,12 @@ Run everything except Firebase rule-emulator tests:
 ```powershell
 .\test-all.bat -SkipFirebaseRules
 ```
+
+```bash
+./test-all.sh --skip-firebase-rules
+```
+
+The Bash runner also accepts `-WithDeviceTests`, `-SkipFirebaseRules`, and `-DeviceSerial SERIAL` for compatibility with the Windows command examples. Run `./test-all.sh --help` for usage.
 
 ## Android Studio buttons
 
