@@ -3,9 +3,12 @@ package com.olive.app.ui.users.shared.navigation
 
 import com.olive.app.ui.shared.*
 
-
+import android.Manifest
+import android.content.pm.PackageManager
 import android.view.View
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -21,6 +24,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -45,6 +49,10 @@ import com.olive.app.ui.users.staff.StaffPortal
 import com.olive.app.ui.users.user.account.TriggerSetup
 import com.olive.app.ui.users.user.dashboard.SafeArea
 import com.olive.app.ui.users.user.dashboard.SafeSupportControls
+import com.olive.app.data.messaging.VoipSessionState
+import com.olive.app.ui.users.shared.messaging.ActiveCallDialog
+import com.olive.app.ui.users.shared.messaging.IncomingCallDialog
+import androidx.core.content.ContextCompat
 import java.security.MessageDigest
 import java.util.Base64
 
@@ -56,6 +64,32 @@ internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 @Composable
 internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int = 0) {
     val uiText = rememberResourceText()
+    val callState by session.calls.state.collectAsState()
+    val callAccountId = session.coverAccountId.orEmpty()
+    val incomingCall = session.calls.invitations.firstOrNull()
+    val context = LocalContext.current
+    var pendingCallPermissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val microphonePermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val action = pendingCallPermissionAction
+        pendingCallPermissionAction = null
+        if (granted) action?.invoke()
+        else session.calls.report(uiText(R.string.ui_microphone_permission_required))
+    }
+    val withMicrophonePermission: (() -> Unit) -> Unit = { action ->
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) action() else {
+            pendingCallPermissionAction = action
+            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    LaunchedEffect(callAccountId, session.accountRole) {
+        if (callAccountId.isNotBlank()) {
+            session.calls.observeInvitations(callAccountId, session.accountRole)
+        }
+    }
     val cover: OliveViewModel = com.olive.app.ui.covers.food.oliveViewModel()
     SideEffect {
         cover.persistCover = { cart, favorites, customizations ->
@@ -364,6 +398,30 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                     indication = null
                 ) {}
                 .testTag("privacy_blackout"))
+        if (session.screen == SessionScreen.Safe &&
+            session.accountRole in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
+        ) {
+            incomingCall?.takeIf { callState == VoipSessionState.Idle }?.let { invitation ->
+                IncomingCallDialog(
+                    invitation = invitation,
+                    onAccept = {
+                        withMicrophonePermission {
+                            session.calls.accept(invitation, callAccountId, session.accountRole)
+                        }
+                    },
+                    onDecline = {
+                        session.calls.decline(invitation, callAccountId, session.accountRole)
+                    },
+                )
+            }
+            if (callState != VoipSessionState.Idle) ActiveCallDialog(
+                state = callState,
+                currentUid = callAccountId,
+                onMute = session.calls::setMuted,
+                onSpeaker = session.calls::setSpeakerEnabled,
+                onFinish = { session.calls.finish(callAccountId) },
+            )
+        }
     }
 }
 

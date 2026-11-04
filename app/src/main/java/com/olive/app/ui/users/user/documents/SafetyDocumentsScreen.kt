@@ -10,6 +10,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -54,35 +56,6 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     var sharing by remember { mutableStateOf<SafetyDocument?>(null) }
     var opened by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     var choosingUpload by rememberSaveable { mutableStateOf(false) }
-    val unableUpload = stringResource(R.string.documents_upload_failed)
-    // Clears the selected document and closes its action dialog.
-    fun finishSelection(uri: android.net.Uri?) {
-        session.endExternalFilePicker()
-        if (uri != null) controller.upload(
-            uri,
-            AccountIdentity(uid, session.coverUsername),
-            unableUpload
-        )
-    }
-
-    val mediaPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-        ::finishSelection
-    )
-    val documentPicker =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument(), ::finishSelection)
-
-    // Confirms private entry before opening the Android file picker.
-    fun launchProtectedPicker(action: () -> Unit) {
-        choosingUpload = false
-        session.beginExternalFilePicker()
-        runCatching(action).onFailure {
-            session.endExternalFilePicker()
-            controller.reportError(
-                unableUpload
-            )
-        }
-    }
     LaunchedEffect(uid, session.coverUsername, session.localMode) {
         controller.load(uid, session.coverUsername, session.localMode)
     }
@@ -229,6 +202,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) },
                     onMakeOffline = { controller.makeAvailableOffline(file) },
                     onRemoveOffline = { controller.removeOfflineCopy(file) },
+                    evidenceUpdating = file.id in state.evidenceUpdates,
                     onEvidenceChange = { evidence -> controller.setEvidence(file, uid, evidence) })
             }
         }
@@ -243,7 +217,51 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             controller.share(file, uid, recipients) { sharing = null }
         }
     }
-    if (choosingUpload) ModalBottomSheet(onDismissRequest = { choosingUpload = false }) {
+    SafetyDocumentUploadFlow(
+        session = session,
+        visible = choosingUpload,
+        onDismiss = { choosingUpload = false },
+    )
+}
+
+/** Keeps every document entry point on the same protected camera/media/file upload workflow. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun SafetyDocumentUploadFlow(
+    session: SessionViewModel,
+    visible: Boolean,
+    onDismiss: () -> Unit,
+    tags: Set<String> = emptySet(),
+) {
+    val controller = session.documents
+    val unableUpload = stringResource(R.string.documents_upload_failed)
+    fun finishSelection(uri: android.net.Uri?) {
+        session.endExternalFilePicker()
+        val uid = session.coverAccountId
+        if (uri != null && uid != null) controller.upload(
+            uri = uri,
+            identity = AccountIdentity(uid, session.coverUsername),
+            fallbackError = unableUpload,
+            tags = tags,
+        )
+    }
+    val mediaPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia(),
+        ::finishSelection,
+    )
+    val documentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+        ::finishSelection,
+    )
+    fun launchProtectedPicker(action: () -> Unit) {
+        onDismiss()
+        session.beginExternalFilePicker()
+        runCatching(action).onFailure {
+            session.endExternalFilePicker()
+            controller.reportError(unableUpload)
+        }
+    }
+    if (visible) ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -259,7 +277,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             )
             Button(
                 onClick = {
-                    choosingUpload = false
+                    onDismiss()
                     session.navigation.openSafePage(SafePage.Camera)
                 },
                 modifier = Modifier.fillMaxWidth().testTag("documents_choose_camera")
@@ -302,7 +320,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 )
             }
             TextButton(
-                onClick = { choosingUpload = false },
+                onClick = onDismiss,
                 modifier = Modifier.align(Alignment.End)
             ) { Text(stringResource(R.string.cancel)) }
         }
@@ -406,6 +424,7 @@ private fun SafetyDocumentCard(
     file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
     offline: OfflineMediaAvailability, onShare: () -> Unit, onDelete: () -> Unit,
     onMakeOffline: () -> Unit, onRemoveOffline: () -> Unit,
+    evidenceUpdating: Boolean,
     onEvidenceChange: (Boolean) -> Unit,
 ) {
     val own = file.ownerUid == currentUid
@@ -453,14 +472,21 @@ private fun SafetyDocumentCard(
             }
             // Only the owner may change evidence status; shared viewers do not see this action.
             if (own) Row(
-                Modifier.fillMaxWidth().testTag("document_evidence_${file.id}"),
+                Modifier.fillMaxWidth().testTag("document_evidence_${file.id}")
+                    .toggleable(
+                        value = file.evidence,
+                        enabled = !evidenceUpdating,
+                        role = Role.Checkbox,
+                        onValueChange = onEvidenceChange,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(
                     checked = file.evidence,
-                    onCheckedChange = onEvidenceChange,
+                    onCheckedChange = null,
+                    enabled = !evidenceUpdating,
                 )
-                Column {
+                Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.evidence), style = MaterialTheme.typography.titleSmall)
                     Text(
                         stringResource(if (file.evidence) R.string.evidence_tagged else R.string.evidence_normal_file),
@@ -468,6 +494,7 @@ private fun SafetyDocumentCard(
                         color = Muted,
                     )
                 }
+                if (evidenceUpdating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(

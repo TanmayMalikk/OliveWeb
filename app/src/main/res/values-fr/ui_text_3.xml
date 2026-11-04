@@ -85,6 +85,8 @@
     <string name="ui_olive_branch_updates">Mises à jour du rameau d\'olivier</string>
     <string name="ui_olive_tree_updates">Mises à jour de l\'olivier</string>
     <string name="ui_call_invitation_notifications">Invitations d’appel</string>
+    <string name="ui_speaker">Haut-parleur</string>
+    <string name="ui_speaker_off">Désactiver le haut-parleur</string>
     <string name="ui_incoming_call">Appel entrant</string>
     <string name="ui_voice_call">Appel vocal</string>
     <string name="ui_start_voice_call">Démarrer un appel vocal</string>

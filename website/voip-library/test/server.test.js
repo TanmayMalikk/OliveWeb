@@ -18,6 +18,7 @@ function createDependencies() {
         }]
     ]);
     const invitations = [];
+    const endedRooms = [];
     const deviceTokens = new Map();
     const callStore = {
         async getCall(callId) {
@@ -77,6 +78,7 @@ function createDependencies() {
     return {
         calls,
         invitations,
+        endedRooms,
         deviceTokens,
         callStore,
         verifyIdToken: async (token) => {
@@ -98,6 +100,9 @@ function createDependencies() {
                     roomName,
                     token: `signed-${identity}`
                 };
+            },
+            async endRoom(roomName) {
+                endedRooms.push(roomName);
             }
         },
         async sendInvitation(invitation) {
@@ -374,6 +379,7 @@ test('POST /calls/end is restricted to the call owner and updates call status', 
     assert.equal(ended.status, 200);
     assert.deepEqual(await ended.json(), { callId: 'call-1', status: 'ended' });
     assert.equal(dependencies.calls.get('call-1').status, 'ended');
+    assert.deepEqual(dependencies.endedRooms, ['call-call-1']);
 });
 
 test('POST /notifications/send permits the owner to invite only pending participants', async (context) => {

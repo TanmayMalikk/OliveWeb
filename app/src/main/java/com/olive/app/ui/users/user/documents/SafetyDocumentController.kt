@@ -37,6 +37,7 @@ internal data class SafetyDocumentsState(
     val source: DocumentListSource? = null,
     val lastSyncedAt: Long? = null,
     val attachmentErrors: Map<String, String> = emptyMap(),
+    val evidenceUpdates: Set<String> = emptySet(),
 )
 
 /** Owns document-storage workflows so the Compose screen only renders state and dispatches actions. */
@@ -215,9 +216,40 @@ internal class SafetyDocumentsController(
         run { checkNotNull(media).removeOfflineCopy(document, viewerUid) }
     }
 
-    // Saves the Evidence toggle and refreshes the document card after the cloud accepts it.
-    fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) = run(refreshAfter = true) {
-        checkNotNull(repository).setEvidence(document, ownerUid, evidence)
+    // Updates the Evidence toggle immediately, then confirms it with the server or rolls it back.
+    fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
+        if (state.ownerUid != ownerUid || document.ownerUid != ownerUid ||
+            document.id in state.evidenceUpdates || document.evidence == evidence) return
+        val token = generation
+        state = state.copy(
+            files = state.files.map { if (it.id == document.id) it.copy(evidence = evidence) else it },
+            error = null,
+            evidenceUpdates = state.evidenceUpdates + document.id,
+        )
+        scope.launch {
+            runCatching {
+                checkNotNull(repository).setEvidence(document, ownerUid, evidence)
+            }.onSuccess {
+                if (token == generation && state.ownerUid == ownerUid) {
+                    state = state.copy(
+                        error = null,
+                        evidenceUpdates = state.evidenceUpdates - document.id,
+                    )
+                }
+            }.onFailure { failure ->
+                if (token == generation && state.ownerUid == ownerUid) {
+                    state = state.copy(
+                        files = state.files.map {
+                            if (it.id == document.id) it.copy(evidence = document.evidence) else it
+                        },
+                        error = if (failure is MediaAccessException ||
+                            failure is MediaDeviceVerificationException) localizedFailure(failure)
+                        else failure.localizedMessage,
+                        evidenceUpdates = state.evidenceUpdates - document.id,
+                    )
+                }
+            }
+        }
     }
 
     // The emergency button builds a PDF, encrypts it, and adds it to the user's Documents list.

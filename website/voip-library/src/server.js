@@ -269,6 +269,13 @@ function createApiServer({
                 if (!ended) {
                     throw new ApiError(409, 'call_not_active', 'Call is no longer active');
                 }
+                if (typeof liveKit.endRoom === 'function') {
+                    try {
+                        await liveKit.endRoom(`call-${callId}`);
+                    } catch (error) {
+                        logger.warn?.('Could not close the LiveKit room:', error);
+                    }
+                }
                 if (request.method === 'DELETE') {
                     return sendJson(response, 200, { deleted: true, callId });
                 }

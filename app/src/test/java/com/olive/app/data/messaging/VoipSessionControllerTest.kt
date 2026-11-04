@@ -38,6 +38,13 @@ class VoipSessionControllerTest {
         assertEquals(listOf(true), audio.muteChanges)
         assertEquals(VoipSessionState.Active(call, microphoneMuted = true), controller.state.value)
 
+        controller.setSpeakerEnabled(true)
+        assertEquals(listOf(true), audio.speakerChanges)
+        assertEquals(
+            VoipSessionState.Active(call, microphoneMuted = true, speakerEnabled = true),
+            controller.state.value
+        )
+
         controller.leaveCall()
         assertEquals(1, audio.disconnectCount)
         assertEquals(VoipSessionState.Idle, controller.state.value)
@@ -63,6 +70,17 @@ class VoipSessionControllerTest {
             requests.map { it.url.encodedPath }
         )
         assertEquals(1, audio.disconnectCount)
+        assertEquals(VoipSessionState.Idle, controller.state.value)
+    }
+
+    @Test
+    fun remoteRoomClosureReturnsTheOtherPhoneToIdle() = runBlocking {
+        val audio = FakeLiveKitAudioSession()
+        val controller = VoipSessionController(apiManager(mutableListOf()), audio)
+        controller.startAndJoin("Support", "caller-1", listOf("user-2"))
+
+        audio.disconnectRemotely()
+
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
@@ -265,9 +283,19 @@ class VoipSessionControllerTest {
         var muteFailure: Exception? = null,
         var disconnectFailure: Exception? = null
     ) : VoipAudioSession {
+        private var disconnectedListener: (String?) -> Unit = {}
         val connections = mutableListOf<LiveKitConnectionDetails>()
         val muteChanges = mutableListOf<Boolean>()
+        val speakerChanges = mutableListOf<Boolean>()
         var disconnectCount = 0
+
+        override fun setOnDisconnected(listener: (String?) -> Unit) {
+            disconnectedListener = listener
+        }
+
+        fun disconnectRemotely(message: String? = null) {
+            disconnectedListener(message)
+        }
 
         override suspend fun connect(details: LiveKitConnectionDetails) {
             connectFailure?.let { throw it }
@@ -278,6 +306,10 @@ class VoipSessionControllerTest {
         override suspend fun setMicrophoneMuted(muted: Boolean) {
             muteFailure?.let { throw it }
             muteChanges += muted
+        }
+
+        override suspend fun setSpeakerEnabled(enabled: Boolean) {
+            speakerChanges += enabled
         }
 
         // Checks the disconnect step with the test's sample data.
