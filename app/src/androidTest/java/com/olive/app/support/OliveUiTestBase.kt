@@ -112,6 +112,16 @@ abstract class OliveUiTestBase {
 
     // Finds a tagged control and scrolls it onto the screen when needed.
     private fun visibleNode(tag: String): SemanticsNodeInteraction {
+        val editorListExists = compose.onAllNodesWithTag("private_editor_list")
+            .fetchSemanticsNodes().isNotEmpty()
+        if (editorListExists && compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()) {
+            // LazyColumn items outside the keyboard-resized viewport are not part of the
+            // semantics tree yet. Clear the previous field's bring-into-view request before
+            // asking the editor list to compose the requested item.
+            hideKeyboard()
+            compose.onNodeWithTag("private_editor_list").performScrollToNode(hasTestTag(tag))
+            compose.waitForIdle()
+        }
         val node = compose.onNodeWithTag(tag)
         if (runCatching { node.assertIsDisplayed() }.isFailure) node.performScrollTo()
         return node
@@ -119,7 +129,21 @@ abstract class OliveUiTestBase {
 
     // Replaces all text in a tagged input field.
     protected fun fill(tag: String, text: String) {
-        visibleNode(tag).performTextReplacement(text)
+        // Focusing can resize the window and recompose a scrolling form. Let that settle, then
+        // reacquire the semantics node so text entry never targets the field instance from before
+        // the keyboard/bring-into-view transition.
+        visibleNode(tag).performClick()
+        compose.waitForIdle()
+        repeat(3) { attempt ->
+            try {
+                visibleNode(tag).performTextReplacement(text)
+                return
+            } catch (error: AssertionError) {
+                val staleNode = error.message?.contains("no longer in the tree") == true
+                if (!staleNode || attempt == 2) throw error
+                compose.waitForIdle()
+            }
+        }
     }
 
     // Scrolls to a tagged control and clicks it.
