@@ -216,7 +216,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         val entry = session.privateEntries.firstOrNull { it.id == editingId }
         val editorListState = rememberLazyListState()
         LazyColumn(
-            Modifier.fillMaxSize().oliveScrollbar(editorListState),
+            Modifier.fillMaxSize().testTag("private_editor_list").oliveScrollbar(editorListState),
             state = editorListState,
             contentPadding = PaddingValues(
                 start = 24.dp,
