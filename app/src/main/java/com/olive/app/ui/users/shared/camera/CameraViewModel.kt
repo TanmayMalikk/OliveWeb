@@ -32,6 +32,8 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
     private val _frontFacing = MutableStateFlow(false)
+    private val _zoomRatio = MutableStateFlow(1f)
+    val zoomRatio = _zoomRatio.asStateFlow()
     private var documentJob: Job? = null
     private var pendingDocumentFile: File? = null
     private var documentGeneration = 0
@@ -46,7 +48,10 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
                     preview,
                     _frontFacing.value
                 )
-            }.onSuccess { _ready.value = true }
+            }.onSuccess {
+                _zoomRatio.value = 1f
+                _ready.value = true
+            }
                 .onFailure { _error.value = it.localizedMessage ?: "Camera unavailable" }
         }
     }
@@ -61,6 +66,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
             runCatching { camera.bindCamera(owner, preview, !previous) }
                 .onSuccess {
                     _frontFacing.value = !previous
+                    _zoomRatio.value = 1f
                     _ready.value = true
                 }
                 .onFailure {
@@ -70,6 +76,19 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
                     _error.value = it.localizedMessage ?: "Camera unavailable"
                 }
         }
+    }
+
+    // Moves the camera one zoom step closer while keeping the preview stable.
+    fun zoomIn() = changeZoom(1.25f)
+
+    // Moves the camera one zoom step farther away without going below its normal view.
+    fun zoomOut() = changeZoom(0.8f)
+
+    private fun changeZoom(multiplier: Float) {
+        if (!_ready.value || (_busy.value && !_recording.value)) return
+        runCatching { camera.changeZoom(multiplier) }
+            .onSuccess { _zoomRatio.value = it }
+            .onFailure { _error.value = it.localizedMessage ?: "Camera zoom is unavailable" }
     }
 
     // Takes a photo and sends it to the capture preview.
@@ -157,6 +176,7 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
         camera.unbind()
         _ready.value = false
         _recording.value = false
+        _zoomRatio.value = 1f
         _busy.value = false
     }
 
