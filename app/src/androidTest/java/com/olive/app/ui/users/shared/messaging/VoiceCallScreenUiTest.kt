@@ -10,6 +10,7 @@ import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipParticipant
 import com.olive.app.data.messaging.VoipParticipantStatus
 import com.olive.app.data.messaging.VoipSessionState
+import com.olive.app.data.messaging.VoipCallStatus
 import com.olive.app.ui.shared.OliveTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -86,6 +87,25 @@ class VoiceCallScreenUiTest {
 
         compose.onNodeWithText("Calling…").assertIsDisplayed()
         compose.onNodeWithTag("finish_voice_call").assertIsDisplayed()
+    }
+
+    @Test
+    fun missedCallAppearsAsAChatHistoryEvent() {
+        compose.activity.setContent {
+            OliveTheme {
+                CallHistoryRow(
+                    call.copy(
+                        status = VoipCallStatus.MISSED,
+                        conversationId = "conversation-1",
+                        createdAt = 1_000,
+                        endedAt = 21_000,
+                    )
+                )
+            }
+        }
+
+        compose.onNodeWithText("Missed call").assertIsDisplayed()
+        compose.onNodeWithTag("call_history_call-1").assertIsDisplayed()
     }
 
     companion object {

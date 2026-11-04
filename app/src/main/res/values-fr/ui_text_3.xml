@@ -92,6 +92,9 @@
     <string name="ui_start_voice_call">Démarrer un appel vocal</string>
     <string name="ui_calling">Appel en cours…</string>
     <string name="ui_call_in_progress">Appel en cours</string>
+    <string name="ui_missed_call">Appel manqué</string>
+    <string name="ui_call_declined">Appel refusé</string>
+    <string name="ui_call_ended">Appel terminé</string>
     <string name="ui_mute">Couper le micro</string>
     <string name="ui_unmute">Réactiver le micro</string>
     <string name="ui_end_call">Terminer l’appel</string>

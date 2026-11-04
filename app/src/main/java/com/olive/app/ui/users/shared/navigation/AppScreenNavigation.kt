@@ -50,6 +50,7 @@ import com.olive.app.ui.users.user.account.TriggerSetup
 import com.olive.app.ui.users.user.dashboard.SafeArea
 import com.olive.app.ui.users.user.dashboard.SafeSupportControls
 import com.olive.app.data.messaging.VoipSessionState
+import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.ui.users.shared.messaging.ActiveCallDialog
 import com.olive.app.ui.users.shared.messaging.IncomingCallDialog
 import androidx.core.content.ContextCompat
@@ -61,8 +62,18 @@ import java.util.Base64
 internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
 internal fun shouldShowCallOverlay(screen: SessionScreen, role: AccountRole): Boolean =
-    (role == AccountRole.USER && screen in setOf(SessionScreen.Cover, SessionScreen.Safe)) ||
-        (role == AccountRole.SAFE_CONTACT && screen == SessionScreen.Safe)
+    screen == SessionScreen.Safe && role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
+
+internal fun resolveIncomingCaller(
+    invitation: VoipInvitation,
+    conversations: List<ChatConversation>,
+    currentUid: String,
+): VoipInvitation? {
+    val callerUsername = conversations.firstOrNull { conversation ->
+        invitation.callerId in conversation.participantIds && currentUid in conversation.participantIds
+    }?.participantUsernames?.get(invitation.callerId).orEmpty()
+    return invitation.copy(name = callerUsername).takeIf { callerUsername.isNotBlank() }
+}
 
 // Chooses the account, cover, onboarding, or Safe App root screen.
 @Composable
@@ -70,7 +81,9 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
     val uiText = rememberResourceText()
     val callState by session.calls.state.collectAsState()
     val callAccountId = session.coverAccountId.orEmpty()
-    val incomingCall = session.calls.invitations.firstOrNull()
+    val incomingCall = session.calls.invitations.firstOrNull()?.let {
+        resolveIncomingCaller(it, session.messages.conversations, callAccountId)
+    }
     val callOverlayVisible = shouldShowCallOverlay(session.screen, session.accountRole) &&
         (incomingCall != null || callState != VoipSessionState.Idle)
     val context = LocalContext.current
