@@ -2,10 +2,13 @@
 package com.olive.app.wear
 
 import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import org.junit.Rule
 import org.junit.Test
 
@@ -33,5 +36,15 @@ class WatchFitnessAccessibilityTest {
         listOf("Home", "Move", "Vitals", "Food").forEach { label ->
             composeRule.onNodeWithText(label).assertIsDisplayed()
         }
+    }
+
+    // Selects Vitals and checks that TalkBack hears the selected tab and the new page summary.
+    @Test
+    fun changingWatchPageUpdatesSelectionAndMovesAccessibilityFocus() {
+        composeRule.setContent { OliveWatchFitnessApp(WatchFitnessState()) }
+
+        composeRule.onNodeWithText("Vitals").performClick().assertIsSelected()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription("Vitals fitness summary").assertIsFocused()
     }
 }

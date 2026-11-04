@@ -3,10 +3,13 @@ package com.olive.app.ui.users.user.location
 
 
 import android.annotation.SuppressLint
+import android.webkit.JavascriptInterface
 import android.graphics.Color
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.os.Handler
+import android.os.Looper
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -64,6 +67,9 @@ internal fun InteractiveLocationMap(
     showOwnPointInBlue: Boolean = false,
     route: LocationRoute? = null,
     navigationActive: Boolean = false,
+    detailsOnlyForSelectedPoint: Boolean = false,
+    selectedLocation: Pair<Double, Double>? = null,
+    onSelectedLocationChange: ((Double, Double) -> Unit)? = null,
 ) {
     val description = stringResource(R.string.location_map_accessibility)
     val lastKnownLabel = stringResource(R.string.location_last_known)
@@ -119,7 +125,10 @@ internal fun InteractiveLocationMap(
                 })
             }
         }
-        view.evaluateJavascript("window.oliveSetPoints($encoded,$moveCamera);", null)
+        view.evaluateJavascript(
+            "window.oliveSetPoints($encoded,$moveCamera,$detailsOnlyForSelectedPoint);",
+            null,
+        )
     }
 
     // Draws the current navigation route and can fit the camera around it.
@@ -138,6 +147,16 @@ internal fun InteractiveLocationMap(
         val cssHeight =
             (view.height / view.resources.displayMetrics.density).roundToInt().coerceAtLeast(1)
         view.evaluateJavascript("window.oliveResizeTo&&window.oliveResizeTo($cssHeight);", null)
+    }
+
+    // Keeps the incident pushpin in sync when an address suggestion changes the coordinates.
+    fun updateSelection(view: WebView) {
+        val latitude = selectedLocation?.first ?: 0.0
+        val longitude = selectedLocation?.second ?: 0.0
+        view.evaluateJavascript(
+            "window.oliveSetSelection(${onSelectedLocationChange != null},$latitude,$longitude);",
+            null,
+        )
     }
 
     // Tells the map which person to follow after navigation or loading changes.
@@ -214,6 +233,12 @@ internal fun InteractiveLocationMap(
                         settings.allowContentAccess = false
                         settings.allowFileAccess = true
                         settings.setSupportZoom(false)
+                        if (onSelectedLocationChange != null) {
+                            addJavascriptInterface(
+                                LocationSelectionBridge(onSelectedLocationChange),
+                                "OliveLocationSelection",
+                            )
+                        }
                         webChromeClient = object : WebChromeClient() {
                             // The bundled map uses its page title to report that JavaScript is ready.
                             override fun onReceivedTitle(view: WebView, title: String?) {
@@ -254,6 +279,7 @@ internal fun InteractiveLocationMap(
                         false
                     )
                     if (loadState == MapLoadState.Ready) updateRoute(view, false)
+                    if (loadState == MapLoadState.Ready) updateSelection(view)
                 },
                 onRelease = { view ->
                     view.stopLoading()
@@ -321,6 +347,20 @@ internal fun InteractiveLocationMap(
                     )
                 }
             }
+        }
+    }
+}
+
+// Passes a map tap or dragged pushpin back to the incident editor.
+private class LocationSelectionBridge(
+    private val onChange: (Double, Double) -> Unit,
+) {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    @JavascriptInterface
+    fun selected(latitude: Double, longitude: Double) {
+        if (latitude in -90.0..90.0 && longitude in -180.0..180.0) {
+            mainHandler.post { onChange(latitude, longitude) }
         }
     }
 }

@@ -59,6 +59,8 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("fitness_home")
+        // The fitness cover moves TalkBack to its page heading after the cover opens.
+        compose.onNodeWithTag("fitness_page_title").assertIsFocused()
         click("fitness_account_settings")
         // Re-enter through the same session action used by the olive; the olive gesture is covered by onboarding UI tests.
         compose.runOnIdle {

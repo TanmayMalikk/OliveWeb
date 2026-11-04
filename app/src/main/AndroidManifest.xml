@@ -37,6 +37,8 @@
         </service>
         <service android:name=".location.LiveLocationService" android:exported="false"
             android:foregroundServiceType="location" android:stopWithTask="false" />
+        <service android:name=".location.AdminLocationService" android:exported="false"
+            android:foregroundServiceType="location" android:stopWithTask="false" />
         <service
             android:name=".ui.covers.fitness.FitnessWorkoutService"
             android:exported="false"

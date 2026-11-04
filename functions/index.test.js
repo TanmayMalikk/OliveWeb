@@ -14,8 +14,8 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
     "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
-    "mediaDownloadTicket",
-    "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaDelete", "staffSupportRequest",
+    "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
+    "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
     "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
@@ -26,6 +26,15 @@ test("encrypted media device keys stay scoped to the signed-in account", () => {
   assert.deepEqual(mediaTest.validateDeviceWrappedKeys({"owner--phone":"wrapped"}, "owner"),
     {"owner--phone":"wrapped"});
   assert.throws(() => mediaTest.validateDeviceWrappedKeys({"other--phone":"wrapped"}, "owner"));
+});
+
+// Inputs: a valid 32-byte Base64 key plus malformed and wrong-length values. Expected: only AES-256 material passes.
+test("account document recovery accepts only a 256-bit key", () => {
+  const valid = Buffer.alloc(32, 7).toString("base64");
+  assert.equal(mediaTest.accountAccessKey(valid, true), valid);
+  assert.equal(mediaTest.accountAccessKey(undefined), "");
+  assert.throws(() => mediaTest.accountAccessKey("not base64", true));
+  assert.throws(() => mediaTest.accountAccessKey(Buffer.alloc(16).toString("base64"), true));
 });
 
 // Inputs: the values in this case. Expected: encrypted media access keeps the owner and exact wrapped-key recipients.
@@ -81,11 +90,20 @@ test("encrypted media access validates repeated multi-device stress sets", () =>
   assert.throws(() => mediaTest.validateAccessDeviceWrappedKeys(oversized, ["owner"]));
 });
 
+// Inputs: boolean evidence values plus common wrong types. Expected: only true and false are accepted.
+test("evidence labels reject text, numbers, missing values, and objects", () => {
+  assert.equal(mediaTest.evidenceRequest({evidence:true}), true);
+  assert.equal(mediaTest.evidenceRequest({evidence:false}), false);
+  for (const evidence of ["true", 1, 0, null, undefined, {value:true}, [true]]) {
+    assert.throws(() => mediaTest.evidenceRequest({evidence}));
+  }
+});
+
 // Inputs: the values in this case. Expected: role aliases and real organization emails are deterministic.
 test("role aliases and real organization emails are deterministic", () => {
   assert.equal(_test.signInEmail("alex_1", "USER"), "alex_1@users.olive.invalid");
   assert.equal(_test.signInEmail("alex_1", "SAFE_CONTACT"), "alex_1@safe.olive.invalid");
-  assert.equal(_test.signInEmail("alex_1", "STAFF"), "alex_1@staff.olive.invalid");
+  assert.equal(_test.signInEmail("alex_1", "STAFF"), "alex_1@yourolivebranch.ca");
   assert.equal(_test.signInEmail("alex_1", "ADMIN", "Admin@Example.ca"), "admin@example.ca");
   assert.equal(_test.organizationEmailKey(" Admin@Example.ca "), _test.organizationEmailKey("admin@example.ca"));
 });
@@ -161,7 +179,7 @@ test("organization sign-in emails reject malformed addresses", () => {
   for (const email of ["missing-at.example.ca","missing-domain@","@missing-user.ca","two words@example.ca"]) {
     assert.throws(() => _test.signInEmail("staff_name","STAFF",email));
   }
-  assert.equal(_test.signInEmail("staff_name","STAFF",""),"staff_name@staff.olive.invalid");
+  assert.equal(_test.signInEmail("staff_name","STAFF",""),"staff_name@yourolivebranch.ca");
 });
 
 // Inputs: exact and over-limit password lengths with Unicode. Expected: policy accepts only complete bounded credentials.

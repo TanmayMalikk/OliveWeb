@@ -17,7 +17,6 @@
     <string name="entry_confirm_setup">Confirmez votre identité pour configurer l’accès sécurisé.</string>
     <string name="entry_unlock_description">Confirmez votre identité avec Android pour déverrouiller l’espace sécurisé.</string>
     <string name="entry_unlock">Déverrouiller avec l’appareil</string>
-    <string name="entry_use_phone_lock">Utiliser le verrouillage du téléphone</string>
     <string name="entry_auth_failed">L’authentification Android n’a pas pu être vérifiée. L’accès reste verrouillé. Réessayez ou reconnectez-vous pour reconfigurer l’accès sécurisé.</string>
     <string name="entry_auth_cancelled">Authentification annulée ou indisponible. L’accès reste verrouillé.</string>
 <string name="entry_verify_trigger">Confirmez avec le verrouillage de l’appareil pour modifier le mot déclencheur.</string>

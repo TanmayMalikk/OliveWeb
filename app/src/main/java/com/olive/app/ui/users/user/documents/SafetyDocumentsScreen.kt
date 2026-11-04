@@ -228,7 +228,8 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                     }
                 }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) },
                     onMakeOffline = { controller.makeAvailableOffline(file) },
-                    onRemoveOffline = { controller.removeOfflineCopy(file) })
+                    onRemoveOffline = { controller.removeOfflineCopy(file) },
+                    onEvidenceChange = { evidence -> controller.setEvidence(file, uid, evidence) })
             }
         }
     }
@@ -405,6 +406,7 @@ private fun SafetyDocumentCard(
     file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
     offline: OfflineMediaAvailability, onShare: () -> Unit, onDelete: () -> Unit,
     onMakeOffline: () -> Unit, onRemoveOffline: () -> Unit,
+    onEvidenceChange: (Boolean) -> Unit,
 ) {
     val own = file.ownerUid == currentUid
     val owner = friends.firstOrNull { it.uid == file.ownerUid }?.username
@@ -448,6 +450,23 @@ private fun SafetyDocumentCard(
                     text, style = MaterialTheme.typography.bodySmall, maxLines = 3,
                     modifier = Modifier.testTag("document_ocr_${file.id}")
                 )
+            }
+            Row(
+                Modifier.fillMaxWidth().testTag("document_evidence_${file.id}"),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Checkbox(
+                    checked = file.evidence,
+                    onCheckedChange = if (own) onEvidenceChange else null,
+                )
+                Column {
+                    Text(stringResource(R.string.evidence), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        stringResource(if (file.evidence) R.string.evidence_tagged else R.string.evidence_normal_file),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                    )
+                }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(

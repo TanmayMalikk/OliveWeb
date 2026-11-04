@@ -18,8 +18,7 @@ object AccountPolicy {
         val domain = when (role) {
             AccountRole.USER -> "users.olive.invalid"
             AccountRole.SAFE_CONTACT -> "safe.olive.invalid"
-            AccountRole.STAFF -> "staff.olive.invalid"
-            AccountRole.ADMIN -> "admin.olive.invalid"
+            AccountRole.STAFF, AccountRole.ADMIN -> "yourolivebranch.ca"
         }
         return "${InputPolicy.username(value)}@$domain"
     }

@@ -43,9 +43,15 @@ data class PrivateEntry(
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
     val updatedAt: Long = timestamp,
-    val kind: PrivateEntryKind? = null,
+    val kind: PrivateEntryKind = PrivateEntryKind.Note,
     val title: String,
     val body: String,
+    val incidentDate: String = "",
+    val incidentTime: String = "",
+    val incidentLocation: String = "",
+    val incidentLatitude: Double? = null,
+    val incidentLongitude: Double? = null,
+    val attachmentIds: List<String> = emptyList(),
     val pinned: Boolean = false,
     val edits: List<PrivateEntryEdit> = emptyList(),
     val deletedAt: Long? = null,
@@ -54,11 +60,15 @@ data class PrivateEntry(
     // Account: Converts this record into JSON.
     fun toJson(): JSONObject = JSONObject().put("id", id).putReadableTime("timestamp", timestamp)
         .putReadableTime("updatedAt", updatedAt)
-        .put("title", title).put("body", body).put("pinned", pinned)
+        .put("kind", kind.name).put("title", title).put("body", body).put("pinned", pinned)
+        .put("incidentDate", incidentDate).put("incidentTime", incidentTime)
+        .put("incidentLocation", incidentLocation)
+        .put("attachmentIds", JSONArray().also { rows -> attachmentIds.distinct().forEach(rows::put) })
         // Add each changed profile field to the saved history record.
         .put("edits", JSONArray().also { rows -> edits.forEach { rows.put(it.toJson()) } })
         .also {
-            if (kind != null) it.put("kind", kind.name)
+            incidentLatitude?.let { latitude -> it.put("incidentLatitude", latitude) }
+            incidentLongitude?.let { longitude -> it.put("incidentLongitude", longitude) }
             if (deletedAt != null) it.putReadableTime("deletedAt", deletedAt)
             if (purgedAt != null) it.putReadableTime("purgedAt", purgedAt)
         }
@@ -67,14 +77,24 @@ data class PrivateEntry(
         // Rebuilds this activity record from its saved JSON fields.
         fun fromJson(value: JSONObject): PrivateEntry {
             val edits = value.optJSONArray("edits") ?: JSONArray()
+            val attachments = value.optJSONArray("attachmentIds") ?: JSONArray()
             return PrivateEntry(
                 id = value.getString("id"),
                 timestamp = value.getLong("timestamp"),
                 updatedAt = value.optLong("updatedAt", value.getLong("timestamp")),
                 kind = value.optString("kind").takeIf(String::isNotBlank)
-                    ?.let { runCatching { PrivateEntryKind.valueOf(it) }.getOrNull() },
+                    ?.let { runCatching { PrivateEntryKind.valueOf(it) }.getOrNull() }
+                    ?: PrivateEntryKind.Note,
                 title = value.optString("title"),
                 body = value.getString("body"),
+                incidentDate = value.optString("incidentDate"),
+                incidentTime = value.optString("incidentTime"),
+                incidentLocation = value.optString("incidentLocation"),
+                incidentLatitude = value.optDouble("incidentLatitude", Double.NaN).takeIf(Double::isFinite),
+                incidentLongitude = value.optDouble("incidentLongitude", Double.NaN).takeIf(Double::isFinite),
+                attachmentIds = (0 until attachments.length()).mapNotNull { index ->
+                    attachments.optString(index).takeIf(String::isNotBlank)
+                }.distinct(),
                 pinned = value.optBoolean("pinned"),
                 edits = (0 until edits.length()).map {
                     PrivateEntryEdit.fromJson(

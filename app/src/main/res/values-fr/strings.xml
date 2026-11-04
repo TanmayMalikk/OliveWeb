@@ -393,6 +393,8 @@
     <string name="organization_live_map">Carte de localisation en direct</string>
     <string name="organization_live_map_description">Cette vue protégée est prête à afficher les utilisateurs assignés sous forme de points rouges clignotants.</string>
     <string name="organization_location_feed_not_enabled">Le partage de localisation de l’organisation n’est pas encore activé. Aucune localisation n’est recueillie pour cette vue.</string>
+    <string name="organization_live_map_admin_description">Affiche la dernière position en direct ou connue signalée par chaque compte utilisateur.</string>
+    <string name="organization_location_feed_empty">Aucune position d’utilisateur n’a encore été signalée.</string>
     <string name="support_conversations">Conversations de soutien</string>
     <string name="assigned_users_count">Utilisateurs assignés : %1$d</string>
     <string name="safety_plan_shared_in_chat">Plan de sécurité partagé dans la discussion de soutien.</string>
@@ -463,4 +465,21 @@
     <string name="location_finding_route">Recherche du meilleur itinéraire…</string>
     <string name="location_navigating_to">Navigation vers %1$s</string>
     <string name="location_map_view">Vue de la carte</string>
+    <string name="evidence">Evidence</string>
+    <string name="incident_date">Date of incident</string>
+    <string name="incident_time">Approx. time</string>
+    <string name="incident_location">Location of incident</string>
+    <string name="incident_pin_title">Drop or drag the pin</string>
+    <string name="incident_pin_help">Tap the map to save exact coordinates. Your current location stays visible as a red dot when available.</string>
+    <string name="incident_show_location">Show my current location</string>
+    <string name="attachments">Attachments</string>
+    <string name="incident_attachments_help">Choose saved photos, videos, or documents. Incident attachments are automatically tagged as evidence.</string>
+    <string name="upload_new_attachment">Upload a new attachment</string>
+    <string name="attachments_empty_help">Upload files in Documents, then attach them here.</string>
+    <string name="title">Title</string>
+    <string name="current_location">Your current location</string>
+    <string name="incident_dropped_pin">Dropped pin: %1$.5f, %2$.5f</string>
+    <string name="incident_required_fields">Add a title, incident date, and incident location before saving.</string>
+    <string name="evidence_tagged">Tagged as evidence</string>
+    <string name="evidence_normal_file">Normal account file</string>
 </resources>
