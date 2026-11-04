@@ -15,9 +15,17 @@ app.use(
     },
   }),
 );
-app.get("/{*path}", (_req, res) => {
+// Browser pages such as /get and /admin are handled by React after index.html loads.
+// Use plain middleware here so Hostinger does not need to interpret an Express wildcard route.
+app.use((req, res, next) => {
+  if (
+    (req.method !== "GET" && req.method !== "HEAD") ||
+    req.path.startsWith("/api/")
+  ) {
+    return next();
+  }
   res.setHeader("Cache-Control", "no-store");
-  res.sendFile(resolve(dist, "index.html"));
+  return res.sendFile(resolve(dist, "index.html"));
 });
 app.listen(
   Number(process.env.PORT ?? 4173),
