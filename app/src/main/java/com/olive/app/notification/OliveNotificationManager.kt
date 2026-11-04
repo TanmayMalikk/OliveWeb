@@ -115,10 +115,9 @@ object OliveNotificationManager {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setContentIntent(pendingIntent)
-            .setFullScreenIntent(pendingIntent, true)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setOngoing(true)
-            .setTimeoutAfter(45_000)
+            .setAutoCancel(true)
+            .setTimeoutAfter(20_000)
             .build()
         NotificationManagerCompat.from(context).notify(callId.hashCode(), notification)
     }

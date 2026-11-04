@@ -142,12 +142,11 @@ class OliveActivity : FragmentActivity() {
         val callId = intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_ID).orEmpty()
         val callerId = intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_CALLER_ID).orEmpty()
         if (callId.isBlank() || callerId.isBlank()) return
-        session.calls.receiveInvitation(
-            callId,
-            callerId,
-            intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_NAME).orEmpty(),
-        )
+        // The authenticated call poll is the source of truth. A notification may be tapped after
+        // its 20-second invitation expired, so never reconstruct a ringing screen from old extras.
         intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_ID)
+        intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_CALLER_ID)
+        intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_NAME)
     }
 
     // Leaving the foreground locks the User safe area; the resource flag controls the extra native privacy cover.

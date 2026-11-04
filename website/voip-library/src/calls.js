@@ -2,6 +2,8 @@
 
 const { randomUUID } = require('node:crypto');
 
+const CALL_TIMEOUT_MS = 20_000;
+
 class FirebaseCallStore {
     constructor(database, {
         callsPath = 'calls',
@@ -21,33 +23,37 @@ class FirebaseCallStore {
         return snapshot.val();
     }
 
-    async createCall(name, { callerId, callerName, participantIds }) {
+    async createCall(name, { callerId, callerName, participantIds, conversationId }) {
         const callId = this.idGenerator();
+        const createdAt = this.clock();
         const call = {
             callId,
             name,
             callerId,
             callerName: callerName || name,
+            conversationId,
             status: 'active',
             participants: Object.fromEntries(
                 participantIds.map((userId) => [userId, { status: 'pending' }])
             ),
-            createdAt: this.clock()
+            createdAt,
+            expiresAt: createdAt + CALL_TIMEOUT_MS
         };
         await this.callsRef.child(callId).set(call);
         return call;
     }
 
     async listCallsFor(userId) {
+        await this.expirePendingCalls();
         const snapshot = await this.callsRef.once('value');
         const calls = snapshot.val() || {};
         return Object.values(calls).filter((call) =>
-            call?.status === 'active' &&
-            (call.callerId === userId || getParticipantStatus(call, userId) === 'accepted')
-        );
+            call && (call.callerId === userId || getParticipantStatus(call, userId) != null)
+        ).sort((left, right) => (right.createdAt || 0) - (left.createdAt || 0));
     }
 
     async listInvitations(userId) {
+        await this.expirePendingCalls();
         const snapshot = await this.callsRef.once('value');
         const calls = snapshot.val() || {};
         return Object.values(calls)
@@ -58,11 +64,13 @@ class FirebaseCallStore {
                 callId: call.callId,
                 callerId: call.callerId,
                 name: call.callerName || call.name,
-                status: 'pending'
+                status: 'pending',
+                expiresAt: call.expiresAt
             }));
     }
 
     async respondToInvitation(callId, userId, accepted) {
+        await this.expirePendingCalls();
         const result = await this.callsRef.child(callId).transaction((call) => {
             if (
                 !call ||
@@ -71,23 +79,55 @@ class FirebaseCallStore {
             ) {
                 return;
             }
-            return {
+            const now = this.clock();
+            const updated = {
                 ...call,
                 participants: {
                     ...call.participants,
                     [userId]: { status: accepted ? 'accepted' : 'declined' }
                 }
             };
+            return accepted
+                ? { ...updated, acceptedAt: now }
+                : {
+                    ...updated,
+                    status: 'declined',
+                    endedAt: now,
+                    endedBy: userId,
+                    endReason: 'declined'
+                };
         });
         return result.committed ? result.snapshot.val() : null;
     }
 
-    async endCall(callId, endedAt = Date.now()) {
+    async endCall(callId, endedBy, endedAt = this.clock()) {
         const result = await this.callsRef.child(callId).transaction((call) => {
             if (!call || call.status !== 'active') return;
-            return { ...call, status: 'ended', endedAt };
+            return { ...call, status: 'ended', endedAt, endedBy, endReason: 'ended' };
         });
         return result.committed;
+    }
+
+    async expirePendingCalls(now = this.clock()) {
+        const snapshot = await this.callsRef.once('value');
+        const calls = snapshot.val() || {};
+        const expired = [];
+        await Promise.all(Object.values(calls).map(async (call) => {
+            if (!call || call.status !== 'active' || call.acceptedAt ||
+                !call.expiresAt || call.expiresAt > now) return;
+            const result = await this.callsRef.child(call.callId).transaction((current) => {
+                if (!current || current.status !== 'active' || current.acceptedAt ||
+                    !current.expiresAt || current.expiresAt > now) return;
+                return {
+                    ...current,
+                    status: 'missed',
+                    endedAt: now,
+                    endReason: 'missed'
+                };
+            });
+            if (result.committed) expired.push(call.callId);
+        }));
+        return expired;
     }
 
     async getFcmTokens(userId) {
@@ -120,4 +160,4 @@ function getParticipantStatus(call, userId) {
     return participant?.status;
 }
 
-module.exports = { FirebaseCallStore, getParticipantStatus };
+module.exports = { FirebaseCallStore, getParticipantStatus, CALL_TIMEOUT_MS };

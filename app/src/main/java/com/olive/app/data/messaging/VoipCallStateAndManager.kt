@@ -34,6 +34,8 @@ enum class VoipParticipantStatus {
     DECLINED
 }
 
+enum class VoipCallStatus { ACTIVE, ENDED, DECLINED, MISSED }
+
 data class VoipParticipant(
     val userId: String,
     val status: VoipParticipantStatus
@@ -45,7 +47,14 @@ data class VoipCall(
     val callerId: String,
     val participants: List<VoipParticipant>,
     val callerName: String = "",
-    val undeliveredInviteeIds: List<String> = emptyList()
+    val undeliveredInviteeIds: List<String> = emptyList(),
+    val conversationId: String = "",
+    val status: VoipCallStatus = VoipCallStatus.ACTIVE,
+    val createdAt: Long = 0L,
+    val expiresAt: Long = 0L,
+    val acceptedAt: Long = 0L,
+    val endedAt: Long = 0L,
+    val endReason: String = "",
 )
 
 internal fun VoipCall.otherPartyName(currentUid: String): String =
@@ -57,7 +66,8 @@ data class VoipInvitation(
     val callId: String,
     val callerId: String,
     val name: String,
-    val status: VoipParticipantStatus
+    val status: VoipParticipantStatus,
+    val expiresAt: Long = 0L,
 )
 
 // An interface that measures the status of the voip call.
@@ -113,11 +123,13 @@ class VoipManager(
         callerId: String,
         participantIds: List<String>,
         callerName: String = name,
+        conversationId: String,
     ): VoipCall {
         // Stops incomplete or conflicting call details from reaching the server.
         require(name.isNotBlank()) { "Call name must not be blank" }
         require(callerId.isNotBlank()) { "Caller ID must not be blank" }
         require(callerName.isNotBlank()) { "Caller name must not be blank" }
+        require(conversationId.isNotBlank()) { "Conversation ID must not be blank" }
         require(participantIds.isNotEmpty()) { "At least one participant is required" }
         require(participantIds.all(String::isNotBlank)) { "Participant IDs must not be blank" }
         require(participantIds.distinct().size == participantIds.size) { "Participant IDs must be unique" }
@@ -128,6 +140,7 @@ class VoipManager(
             .put("name", name.trim())
             .put("callerId", callerId)
             .put("callerName", callerName.trim())
+            .put("conversationId", conversationId)
             .put("participantIds", JSONArray(participantIds))
         return parseCall(request("POST", "/api/calls", body))
     }
@@ -270,7 +283,14 @@ class VoipManager(
             callerName = json.optString("callerName"),
             undeliveredInviteeIds = json.optJSONArray("notificationFailures")
                 ?.let { failures -> (0 until failures.length()).map(failures::getString) }
-                .orEmpty()
+                .orEmpty(),
+            conversationId = json.optString("conversationId"),
+            status = parseCallStatus(json.optString("status", "active")),
+            createdAt = json.optLong("createdAt"),
+            expiresAt = json.optLong("expiresAt"),
+            acceptedAt = json.optLong("acceptedAt"),
+            endedAt = json.optLong("endedAt"),
+            endReason = json.optString("endReason"),
         )
 
     // Converts a server array into call models.
@@ -285,7 +305,8 @@ class VoipManager(
                     callId = it.getString("callId"),
                     callerId = it.getString("callerId"),
                     name = it.getString("name"),
-                    status = parseParticipantStatus(it.getString("status"))
+                    status = parseParticipantStatus(it.getString("status")),
+                    expiresAt = it.optLong("expiresAt"),
                 )
             }
         }
@@ -307,6 +328,13 @@ class VoipManager(
             VoipParticipantStatus.valueOf(value.uppercase(Locale.ROOT))
         } catch (error: IllegalArgumentException) {
             throw IOException("VoIP API returned an unknown participant status", error)
+        }
+
+    private fun parseCallStatus(value: String): VoipCallStatus =
+        try {
+            VoipCallStatus.valueOf(value.uppercase(Locale.ROOT))
+        } catch (error: IllegalArgumentException) {
+            throw IOException("VoIP API returned an unknown call status", error)
         }
 
     // Escapes a call ID so special characters cannot change the request path.

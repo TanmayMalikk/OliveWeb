@@ -47,13 +47,15 @@ test('FirebaseCallStore reads call records and marks active calls ended', async 
     const store = new FirebaseCallStore(fakeDatabase(values));
 
     assert.deepEqual(await store.getCall('call-1'), values['calls/call-1']);
-    assert.equal(await store.endCall('call-1', 123), true);
+    assert.equal(await store.endCall('call-1', 'alice', 123), true);
     assert.deepEqual(values['calls/call-1'], {
         status: 'ended',
         callerId: 'alice',
-        endedAt: 123
+        endedAt: 123,
+        endedBy: 'alice',
+        endReason: 'ended'
     });
-    assert.equal(await store.endCall('call-1', 456), false);
+    assert.equal(await store.endCall('call-1', 'alice', 456), false);
 });
 
 test('FirebaseCallStore creates calls and tracks invitation responses', async () => {
@@ -66,6 +68,7 @@ test('FirebaseCallStore creates calls and tracks invitation responses', async ()
     const call = await store.createCall('Support', {
         callerId: 'alice',
         callerName: 'Alice',
+        conversationId: 'conversation-1',
         participantIds: ['bob', 'carol']
     });
     assert.deepEqual(call, {
@@ -73,25 +76,64 @@ test('FirebaseCallStore creates calls and tracks invitation responses', async ()
         name: 'Support',
         callerId: 'alice',
         callerName: 'Alice',
+        conversationId: 'conversation-1',
         status: 'active',
         participants: {
             bob: { status: 'pending' },
             carol: { status: 'pending' }
         },
-        createdAt: 123
+        createdAt: 123,
+        expiresAt: 20_123
     });
     assert.deepEqual(await store.listInvitations('bob'), [{
         callId: 'call-1',
         callerId: 'alice',
         name: 'Alice',
-        status: 'pending'
+        status: 'pending',
+        expiresAt: 20_123
     }]);
-    assert.deepEqual(await store.listCallsFor('bob'), []);
+    assert.equal((await store.listCallsFor('bob')).length, 1);
 
     const accepted = await store.respondToInvitation('call-1', 'bob', true);
     assert.equal(getParticipantStatus(accepted, 'bob'), 'accepted');
     assert.equal((await store.listCallsFor('bob')).length, 1);
     assert.equal(await store.respondToInvitation('call-1', 'bob', false), null);
+});
+
+test('FirebaseCallStore expires unanswered calls after twenty seconds and records declines', async () => {
+    const values = {};
+    let now = 1_000;
+    const store = new FirebaseCallStore(fakeDatabase(values), {
+        idGenerator: () => 'call-1',
+        clock: () => now
+    });
+    await store.createCall('Bob', {
+        callerId: 'alice',
+        callerName: 'Alice',
+        conversationId: 'conversation-1',
+        participantIds: ['bob']
+    });
+
+    now = 20_999;
+    assert.deepEqual(await store.expirePendingCalls(), []);
+    now = 21_000;
+    assert.deepEqual(await store.expirePendingCalls(), ['call-1']);
+    assert.equal((await store.getCall('call-1')).status, 'missed');
+    assert.deepEqual(await store.listInvitations('bob'), []);
+
+    const secondStore = new FirebaseCallStore(fakeDatabase(values), {
+        idGenerator: () => 'call-2',
+        clock: () => 30_000
+    });
+    await secondStore.createCall('Bob', {
+        callerId: 'alice',
+        callerName: 'Alice',
+        conversationId: 'conversation-1',
+        participantIds: ['bob']
+    });
+    const declined = await secondStore.respondToInvitation('call-2', 'bob', false);
+    assert.equal(declined.status, 'declined');
+    assert.equal(declined.endReason, 'declined');
 });
 
 test('FirebaseCallStore reads FCM tokens stored as arrays or maps', async () => {

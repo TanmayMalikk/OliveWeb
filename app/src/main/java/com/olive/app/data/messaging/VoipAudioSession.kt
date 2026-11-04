@@ -253,9 +253,10 @@ class VoipSessionController(
         callerId: String,
         participantIds: List<String>,
         callerName: String = name,
+        conversationId: String = "direct",
     ): VoipCall = mutex.withLock {
         check(mutableState.value == VoipSessionState.Idle) { "A VoIP session is already in progress" }
-        val call = voipManager.startCall(name, callerId, participantIds, callerName)
+        val call = voipManager.startCall(name, callerId, participantIds, callerName, conversationId)
         joinAudio(call)
     }
 
