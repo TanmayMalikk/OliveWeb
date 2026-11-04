@@ -97,11 +97,10 @@ internal class SessionCalls(
     // Accepts the selected invitation and joins its LiveKit audio room.
     fun accept(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
         if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) || currentUid.isBlank()) return
+        dismissInvitation(invitation.callId)
         scope.launch {
             runCallAction {
                 controller.acceptAndJoin(invitation.callId, currentUid)
-                invitations = invitations.filterNot { it.callId == invitation.callId }
-                cancelNotification(invitation.callId)
             }
         }
     }
@@ -109,11 +108,10 @@ internal class SessionCalls(
     // Declines the invitation without opening the microphone or joining its room.
     fun decline(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
         if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) || currentUid.isBlank()) return
+        dismissInvitation(invitation.callId)
         scope.launch {
             runCallAction {
                 manager.declineCall(invitation.callId, currentUid)
-                invitations = invitations.filterNot { it.callId == invitation.callId }
-                cancelNotification(invitation.callId)
             }
         }
     }
@@ -133,11 +131,16 @@ internal class SessionCalls(
             runCallAction {
                 val active = state.value
                 val call = when (active) {
+                    is VoipSessionState.Connecting -> active.call
                     is VoipSessionState.Active -> active.call
                     is VoipSessionState.Error -> active.call
                     else -> null
                 } ?: return@runCallAction
-                if (call.callerId == currentUid) controller.endCall() else controller.leaveCall()
+                when {
+                    active is VoipSessionState.Error -> controller.dismiss()
+                    call.callerId == currentUid -> controller.endCall()
+                    else -> controller.leaveCall()
+                }
             }
         }
     }
@@ -154,7 +157,8 @@ internal class SessionCalls(
     fun close() {
         stopObserving()
         val current = state.value
-        if (current is VoipSessionState.Active || current is VoipSessionState.Error) finish("")
+        if (current is VoipSessionState.Connecting || current is VoipSessionState.Active ||
+            current is VoipSessionState.Error) finish("")
     }
 
     private fun stopObserving() {
@@ -166,6 +170,11 @@ internal class SessionCalls(
 
     private fun cancelNotification(callId: String) {
         androidx.core.app.NotificationManagerCompat.from(application).cancel(callId.hashCode())
+    }
+
+    private fun dismissInvitation(callId: String) {
+        invitations = invitations.filterNot { it.callId == callId }
+        cancelNotification(callId)
     }
 
     private suspend fun runCallAction(action: suspend () -> Unit) {

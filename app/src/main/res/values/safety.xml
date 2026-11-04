@@ -34,6 +34,7 @@
     <string name="safety_open_plan">Open plan for %1$s</string>
     <string name="safety_source">Planning guidance: Public Health Agency of Canada. Adapt these prompts with someone you trust.</string>
     <string name="safety_upload_document">Upload Document</string>
+    <string name="safety_remove_attachment">Remove attachment %1$s</string>
     <string name="safety_upload_for">Upload a document for %1$s.</string>
 <string name="safety_storage_photos">Photos</string>
     <string name="safety_storage_videos">Videos</string>

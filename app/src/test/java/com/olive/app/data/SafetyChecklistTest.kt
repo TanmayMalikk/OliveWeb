@@ -35,6 +35,45 @@ class SafetyChecklistTest {
         assertEquals(items, readSafetyChecklist(writeSafetyChecklist(items)))
     }
 
+    @Test
+    fun attachmentExclusionsSurviveSavingAndTagsIdentifyOneChecklistRow() {
+        val item = SafetyChecklistItem(
+            id = "item-id",
+            text = "Passport",
+            excludedAttachmentIds = listOf("document-1"),
+        )
+
+        assertEquals(item, readSafetyChecklist(writeSafetyChecklist(listOf(item))).single())
+        assertEquals(
+            "safety-plan:primary_documents:item-id",
+            safetyChecklistAttachmentTag("primary_documents", "item-id"),
+        )
+        assertNotEquals(
+            safetyChecklistAttachmentTag("primary_documents", "item-id"),
+            safetyChecklistAttachmentTag("primary_documents", "other-item"),
+        )
+        val attached = SafetyDocument(
+            id = "document-2",
+            ownerUid = "owner",
+            storagePath = "",
+            name = "Passport.pdf",
+            mimeType = "application/pdf",
+            allowedUsers = listOf("owner"),
+            tags = listOf(safetyChecklistAttachmentTag("primary_documents", "item-id")),
+        )
+        assertEquals(
+            listOf(attached),
+            safetyChecklistAttachments("primary_documents", item, listOf(attached)),
+        )
+        assertTrue(
+            safetyChecklistAttachments(
+                "primary_documents",
+                item.copy(excludedAttachmentIds = listOf(attached.id)),
+                listOf(attached),
+            ).isEmpty(),
+        )
+    }
+
     // Inputs: the values shown below. Expected: removed items stay removed including an entirely empty checklist.
     @Test
     fun removedItemsStayRemovedIncludingAnEntirelyEmptyChecklist() {

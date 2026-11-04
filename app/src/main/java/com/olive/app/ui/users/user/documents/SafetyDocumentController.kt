@@ -124,6 +124,7 @@ internal class SafetyDocumentsController(
         fallbackError: String,
         kind: MediaKind,
         ocr: DocumentOcrMetadata? = null,
+        tags: Set<String> = emptySet(),
         onComplete: () -> Unit
     ) {
         val transfers = media ?: return reportError(fallbackError)
@@ -134,7 +135,7 @@ internal class SafetyDocumentsController(
             ocr.successful -> OcrReview.PASSED
             else -> OcrReview.RETAKE_DECLINED
         }
-        transfers.queueFile(file, name, mimeType, identity, kind, review, ocr, emptySet(),
+        transfers.queueFile(file, name, mimeType, identity, kind, review, ocr, tags,
             onQueued = {
                 file.delete()
                 state = state.copy(loading = false, error = null)

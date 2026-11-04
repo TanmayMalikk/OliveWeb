@@ -160,6 +160,21 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
+    @Test
+    fun staleCallErrorCanBeDismissedLocallyWithoutAnotherServerRequest() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val audio = FakeLiveKitAudioSession(muteFailure = IllegalStateException("Call is no longer active"))
+        val controller = VoipSessionController(apiManager(requests), audio)
+        controller.startAndJoin("Support", "caller-1", listOf("user-2"))
+        runCatching { controller.setMicrophoneMuted(true) }
+
+        controller.dismiss()
+
+        assertEquals(VoipSessionState.Idle, controller.state.value)
+        assertEquals(1, audio.disconnectCount)
+        assertEquals(listOf("/api/calls", "/calls/token"), requests.map { it.url.encodedPath })
+    }
+
     // Checks the disconnect failure is visible and can be retried step with the test's sample data.
     @Test
     fun disconnectFailureIsVisibleAndCanBeRetried() = runBlocking {

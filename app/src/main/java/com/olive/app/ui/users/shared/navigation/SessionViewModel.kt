@@ -88,6 +88,9 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     var externalFilePickerOpen = false
         private set
 
+    /** Carries checklist-specific tags across navigation into the full-screen camera. */
+    internal var pendingCameraUploadTags: Set<String> = emptySet()
+
     init {
         runtime.accountSession.load()
     }
@@ -108,6 +111,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
 
     // Closing this session also clears document and map data held by their screen controllers.
     fun signOut() {
+        pendingCameraUploadTags = emptySet()
         documents.clear()
         locationMap.clear()
         adminLocationMap.close()
