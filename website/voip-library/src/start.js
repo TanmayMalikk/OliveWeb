@@ -20,11 +20,17 @@ function closeHttpServer(server) {
     });
 }
 
-async function main() {
-    const port = Number(process.env.VOIP_API_PORT || 3000);
+// Hostinger chooses PORT for deployed apps. VOIP_API_PORT remains useful when running locally.
+function configuredPort(environment = process.env) {
+    const port = Number(environment.PORT || environment.VOIP_API_PORT || 3000);
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        throw new Error('VOIP_API_PORT must be a valid port number');
+        throw new Error('PORT or VOIP_API_PORT must be a valid port number');
     }
+    return port;
+}
+
+async function main() {
+    const port = configuredPort();
 
     const firebase = initializeFirebaseAdapters();
     const liveKit = createLiveKitTokenIssuer({
@@ -69,4 +75,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { main };
+module.exports = { configuredPort, main };

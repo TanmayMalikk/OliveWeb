@@ -50,20 +50,31 @@ Set these environment variables:
 | `LIVEKIT_URL`           | Yes      | LiveKit Cloud websocket URL, such as `wss://example.livekit.cloud` |
 | `LIVEKIT_API_KEY`       | Yes      | LiveKit API key                                                    |
 | `LIVEKIT_API_SECRET`    | Yes      | LiveKit API secret; keep it on the server                          |
-| `VOIP_API_PORT`         | No       | HTTP listener port; defaults to `3000`                             |
+| `PORT`                  | Host only| Hostinger assigns this automatically; do not set it manually       |
+| `VOIP_API_PORT`         | No       | Local override used when `PORT` is absent; defaults to `3000`      |
 | `VOIP_API_HOST`         | No       | HTTP listener host; defaults to `0.0.0.0`                          |
 | `FIREBASE_CALLS_PATH`   | No       | Realtime Database root for calls; defaults to `calls`              |
 | `FIREBASE_USERS_PATH`   | No       | Realtime Database root for user device tokens; defaults to `users` |
 
-` Extra information
+### Hostinger environment
+
 In Hostinger’s Node.js app environment, set:
-LIVEKIT_URL — the project’s wss://... URL
+
+```text
+LIVEKIT_URL
 LIVEKIT_API_KEY
 LIVEKIT_API_SECRET
 FIREBASE_DATABASE_URL
-GOOGLE_APPLICATION_CREDENTIALS — path to the Firebase service-account JSON file, stored outside the public webroot
-VOIP_API_PORT if Hostinger requires a specific port
-`
+GOOGLE_APPLICATION_CREDENTIALS
+```
+
+`LIVEKIT_URL` is the project’s `wss://...` URL. The Google credentials value
+is the absolute path to the Firebase service-account JSON file stored outside
+the repository and public web root.
+
+Hostinger provides `PORT` when it starts the app. Do not add `PORT` or
+`VOIP_API_PORT` to the Hostinger environment; the server reads Hostinger's
+assigned value automatically. Use `VOIP_API_PORT` only for a local run.
 
 Run the unit tests with:
 
