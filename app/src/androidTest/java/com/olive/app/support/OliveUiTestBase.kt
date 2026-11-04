@@ -3,6 +3,7 @@ package com.olive.app
 
 import androidx.compose.ui.test.*
 import android.content.Intent
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.AndroidComposeTestRule
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -177,7 +178,8 @@ abstract class OliveUiTestBase {
         chooseAppPin()
         fill("new_pin", pin)
         fill("confirm_pin", pin)
-        click("pin_setup_submit")
+        // Submit fixture setup even if the soft keyboard is still moving after PIN entry.
+        visibleNode("pin_setup_submit").performSemanticsAction(SemanticsActions.OnClick) { it() }
         waitCover()
     }
 

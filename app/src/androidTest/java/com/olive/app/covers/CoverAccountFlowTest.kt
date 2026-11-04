@@ -1,7 +1,10 @@
 // Tests cover account setup without opening safe-app onboarding.
 package com.olive.app
 
+import android.Manifest
+import android.os.Build
 import androidx.compose.ui.test.*
+import androidx.test.platform.app.InstrumentationRegistry
 
 import org.junit.Assert.*
 import org.junit.Test
@@ -25,6 +28,14 @@ class CoverAccountFlowTest : OliveUiTestBase() {
 
     @Test
     fun coverChoiceSwitchesNewsAndFitnessAndBothReachSafeArea() {
+        // This test checks navigation, so grant the step counter permission before Fitness loads.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val instrumentation = InstrumentationRegistry.getInstrumentation()
+            instrumentation.uiAutomation.grantRuntimePermission(
+                instrumentation.targetContext.packageName,
+                Manifest.permission.ACTIVITY_RECOGNITION,
+            )
+        }
         register(username = "cover_switch_tester")
         unlock()
         click("safe_settings")
@@ -50,7 +61,10 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("fitness_home")
         click("fitness_account_settings")
-        compose.onNodeWithTag("discreet_cover_olive").performClick()
+        compose.onNodeWithTag("discreet_cover_olive").performScrollTo()
+            .performTouchInput { doubleClick() }
+        waitFor("unlock_pin")
+        enterPin("123456")
         waitFor("safe_settings")
         click("sign_out")
         openOnboarding()
