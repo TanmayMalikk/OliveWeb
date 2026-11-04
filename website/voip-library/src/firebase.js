@@ -1,6 +1,6 @@
 'use strict';
 
-const { applicationDefault, getApps, initializeApp } = require('firebase-admin/app');
+const { applicationDefault, cert, getApps, initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getDatabase } = require('firebase-admin/database');
 const { getMessaging } = require('firebase-admin/messaging');
@@ -12,6 +12,21 @@ const INVALID_TOKEN_CODES = new Set([
     'auth/id-token-revoked',
     'auth/invalid-id-token'
 ]);
+
+function parseServiceAccountJson(value) {
+    if (typeof value !== 'string' || value.trim().length === 0) return null;
+
+    let serviceAccount;
+    try {
+        serviceAccount = JSON.parse(value);
+    } catch (error) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON must contain valid JSON', { cause: error });
+    }
+    if (!serviceAccount || typeof serviceAccount !== 'object' || Array.isArray(serviceAccount)) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON must contain a JSON object');
+    }
+    return serviceAccount;
+}
 
 function createFirebaseAdapters({
     database,
@@ -77,12 +92,14 @@ function createFirebaseAdapters({
 
 function initializeFirebaseAdapters({
     databaseUrl = process.env.FIREBASE_DATABASE_URL,
+    serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
     callsPath = process.env.FIREBASE_CALLS_PATH || 'calls',
     usersPath = process.env.FIREBASE_USERS_PATH || 'users'
 } = {}) {
     if (!databaseUrl) throw new Error('Set FIREBASE_DATABASE_URL before starting the API');
+    const serviceAccount = parseServiceAccountJson(serviceAccountJson);
     const app = getApps()[0] || initializeApp({
-        credential: applicationDefault(),
+        credential: serviceAccount ? cert(serviceAccount) : applicationDefault(),
         databaseURL: databaseUrl
     });
 
@@ -95,4 +112,8 @@ function initializeFirebaseAdapters({
     });
 }
 
-module.exports = { createFirebaseAdapters, initializeFirebaseAdapters };
+module.exports = {
+    createFirebaseAdapters,
+    initializeFirebaseAdapters,
+    parseServiceAccountJson
+};
