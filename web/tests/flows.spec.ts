@@ -372,7 +372,7 @@ test("PWA manifests use cover-specific identities and the download page offers t
   expect(manifest.name).toBe("Olive");
   expect(manifest.start_url).toBe("/");
   expect(manifest.icons[0].src).toContain("olive-192");
-  await page.goto("/download");
+  await page.goto("/get");
   await expect(
     page.getByRole("heading", { name: "A place on your Home Screen." }),
   ).toBeVisible();
@@ -410,7 +410,7 @@ for (const size of [
     for (const path of [
       "/",
       "/account",
-      "/download",
+      "/get",
       "/cover/olive",
       "/cover/daily-digest",
       "/cover/fitness",
@@ -433,7 +433,7 @@ for (const size of [
 test("public game and account screens meet core accessibility checks", async ({
   page,
 }) => {
-  for (const path of ["/", "/account/create", "/download"]) {
+  for (const path of ["/", "/account/create", "/get"]) {
     await page.goto(path);
     await expect(page.locator("h1,h2").first()).toBeVisible();
     const results = await new AxeBuilder({ page })

@@ -1,27 +1,27 @@
 # Hostinger deployment
 
-Create three **Node.js Web Apps** from the same GitHub repository. These settings
-assume Hostinger Business/Unlimited or Cloud hosting.
+Olive Branch needs two Hostinger Node.js apps: one website and one VoIP API.
 
-| Domain                     | Root directory | Build command            | Output directory | Entry file                    |
-| -------------------------- | -------------- | ------------------------ | ---------------- | ----------------------------- |
-| `yourolivebranch.ca`       | `web`          | `npm run build:user`     | `dist`           | `server/productionServer.mjs` |
-| `get.yourolivebranch.ca`   | `web`          | `npm run build:download` | `dist`           | `server/productionServer.mjs` |
-| `admin.yourolivebranch.ca` | `web`          | `npm run build:admin`    | `dist`           | `server/productionServer.mjs` |
+| Address                   | Root directory         | Build command   | Entry file                    |
+| ------------------------- | ---------------------- | --------------- | ----------------------------- |
+| `yourolivebranch.ca`      | `web`                  | `npm run build` | `server/productionServer.mjs` |
+| `voip.yourolivebranch.ca` | `website/voip-library` | None            | `src/start.js`                |
 
-Hostinger may offer only `npm run build` in its build-command menu. That is
-usable: add `VITE_SITE_MODE` as an environment variable on each separate app
-(`user`, `download`, or `admin`) before deploying. Vite reads this value during
-the build, so each app gets the correct site even though all three use the same
-repository and build script. Redeploy after changing a `VITE_` variable.
+The main website serves all browser pages from one build:
 
-Use Node.js 22 or 24. Hostinger supplies `PORT`; the server listens on that port
-and on all container interfaces. Each deployment performs type checking and a
-public-source credential scan before Vite creates the production bundle.
+- `https://yourolivebranch.ca/` — cover apps and private user entry
+- `https://yourolivebranch.ca/get` — downloads and installation help
+- `https://yourolivebranch.ca/admin` — staff and administrator workspace
 
-## Public build variables
+Delete the old `get.` and `admin.` Hostinger apps after the main deployment is
+working. Do not set `VITE_SITE_MODE`; the URL path now chooses the page.
 
-Add these values to each Web App in Hostinger's Environment variables screen:
+Use Node.js 22 or 24. Hostinger supplies `PORT`, and both servers listen on the
+provided port and all container interfaces.
+
+## Main website environment
+
+Add these public browser settings to the `yourolivebranch.ca` app:
 
 - `VITE_FIREBASE_API_KEY`
 - `VITE_FIREBASE_AUTH_DOMAIN`
@@ -30,51 +30,45 @@ Add these values to each Web App in Hostinger's Environment variables screen:
 - `VITE_FIREBASE_APP_ID`
 - `VITE_FIREBASE_APPCHECK_SITE_KEY`
 - `VITE_USE_FIREBASE_EMULATORS=false`
-- `VITE_SITE_MODE` (`user` on the main site, `download` on `get`, and `admin` on `admin`)
 
-On `get.yourolivebranch.ca`, the download button uses `/download/android`,
-which redirects to the public Firebase Storage object
-`public/android/olive-branch.apk`. Upload the debug APK to this path when you
-want to publish a new download. `ANDROID_APK_URL` may override the Firebase
-URL, but it must still point to this exact object.
+The download page uses `/download/android`, which redirects to the configured
+APK object. `ANDROID_APK_URL` may override that server-side destination.
 
-These are browser configuration, not private server credentials. Every variable
-whose name begins with `VITE_` is readable by site visitors after the build.
+Every `VITE_` variable is readable by visitors. Never put a Firebase Admin
+service account, private key, signing keystore, password, FatSecret secret, or
+LiveKit secret in a `VITE_` variable or under `web/src`.
 
-Keep FatSecret credentials in Firebase Functions secrets. Never place a Firebase
-service-account JSON file, private key, signing keystore, password, or OAuth client
-secret in Hostinger build variables prefixed with `VITE_` or anywhere under
-`web/src`.
+## VoIP environment
 
-## Firebase console setup
+Add the following only to the `voip.yourolivebranch.ca` app:
 
-Before opening the sites to users:
+- `FIREBASE_DATABASE_URL`
+- `GOOGLE_APPLICATION_CREDENTIALS`
+- `LIVEKIT_URL`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
 
-1. Add all three domains to Firebase Authentication's authorized domains.
-2. Register a Firebase Web App and use its public browser configuration above.
-3. Register all three domains for Firebase App Check with reCAPTCHA Enterprise,
-   then use the public site key as `VITE_FIREBASE_APPCHECK_SITE_KEY`.
-4. Restrict the Firebase API key in Google Cloud to the Firebase APIs the app uses.
-5. Deploy the reviewed Firestore and Firebase Storage rules. Configure Cloudflare R2
-   bucket CORS for every site origin that uploads documents, including each production
-   subdomain and any preview URL you use. Allow `PUT`, `GET`, and `HEAD`; allow the
-   `Content-Type` and signed `x-amz-*` headers (or `*`); expose `ETag` for multipart uploads.
-   The web document uploader sends ciphertext directly to R2 using short-lived tickets
-   from Firebase Functions. A missing origin or header here causes the browser's generic
-   “Failed to fetch” message even when the ticket was created successfully.
-6. Deploy the Firebase Functions update that requires trusted custom claims for
-   staff and administrator authority.
-7. Confirm `https://yourolivebranch.ca/api/health` returns `{ "ok": true }`, then
-   test registration, private entry, Quick Exit, News, staff sign-in, and admin
-   sign-in on the live domains.
+The service-account JSON must be stored outside the repository and public web
+root. See `website/voip-library/readme.md` for the API and permission details.
 
-Staff and administrator pages require Firebase Auth accounts with trusted `STAFF` or
-`ADMIN` custom claims; setting `VITE_SITE_MODE=admin` only selects the portal and never
-grants a role. Encrypted support messages still require the browser's chat key to be
-approved through the existing device flow. Camera capture, browser geolocation, and
-foreground web routing depend on the browser's permission prompts. Android remains
-needed for background location sharing, OCR capture, and continuous watch sensor data.
+## Firebase and storage setup
 
-`app/google-services.json` is Android client configuration. It is safe to keep in
-the repository when its API key is properly restricted; it is not a Firebase Admin
-service-account key. Never commit a downloaded Admin SDK/service-account JSON file.
+1. Add `yourolivebranch.ca` to Firebase Authentication authorized domains.
+2. Register it as the Firebase App Check web domain.
+3. Restrict the public Firebase API key to the Firebase APIs the browser uses.
+4. Deploy the reviewed Firestore, Realtime Database, and Storage rules.
+5. Allow `https://yourolivebranch.ca` in Cloudflare R2 CORS. Permit `PUT`,
+   `GET`, and `HEAD`, required signed headers, and expose `ETag`.
+6. Confirm `https://yourolivebranch.ca/api/health` and
+   `https://voip.yourolivebranch.ca/health` both report healthy responses.
+7. Test `/get`, user sign-in, private entry, Quick Exit, `/admin`, document
+   upload, support chat, and a two-device VoIP call.
+
+Opening `/admin` selects the organization portal but never grants staff or
+administrator access. Firebase custom claims remain the authority. Android is
+still required for background location sharing, OCR capture, and continuous
+watch sensor data.
+
+`app/google-services.json` is Android client configuration, not a Firebase
+Admin credential. It may remain in the repository when its API key is properly
+restricted. Never commit a downloaded Admin SDK service-account JSON file.

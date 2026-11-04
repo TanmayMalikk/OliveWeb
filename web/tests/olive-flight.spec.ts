@@ -86,7 +86,9 @@ test("all games stay within the page width and keep controls reachable", async (
       expect(layout.fullWidth).toBe(true);
       expect(layout.top).toBeGreaterThanOrEqual(0);
       expect(layout.bottom).toBeLessThanOrEqual(layout.documentHeight + 1);
-      expect(layout.controlsBottom).toBeLessThanOrEqual(layout.documentHeight + 1);
+      expect(layout.controlsBottom).toBeLessThanOrEqual(
+        layout.documentHeight + 1,
+      );
       expect(layout.playHeight).toBeGreaterThan(180);
       expect(layout.playBottom).toBeLessThanOrEqual(layout.controlsTop);
     }
@@ -120,9 +122,9 @@ test("Olive Flight supports keyboard flight, pause, collision, restart and retur
   page,
 }) => {
   await page.goto("/");
-  await expect(
-    page.locator('a[href="/account"], a[href="/download"]'),
-  ).toHaveCount(0);
+  await expect(page.locator('a[href="/account"], a[href="/get"]')).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Olive Flight", exact: true }).click();
   const start = page.getByRole("button", {
     name: "Start Olive Flight",

@@ -9,7 +9,13 @@ import {
 } from "react";
 import { accounts } from "../services/AccountService";
 import { validEntryToken } from "../services/PrivateEntryLinks";
-import { coverPath, emptyHistory, type Enrollment, type Profile, type Role } from "../domain/DomainModels";
+import {
+  coverPath,
+  emptyHistory,
+  type Enrollment,
+  type Profile,
+  type Role,
+} from "../domain/DomainModels";
 import type { SiteMode } from "../sites/SiteRouting";
 import type { SessionPhase } from "./SessionContext";
 
@@ -60,7 +66,8 @@ export function useSessionSecurity({
   const lastInteraction = useRef(Date.now());
   phaseRef.current = phase;
   roleRef.current = role;
-  const buttonOnlyExit = role === "SAFE_CONTACT" || role === "STAFF" || role === "ADMIN";
+  const buttonOnlyExit =
+    role === "SAFE_CONTACT" || role === "STAFF" || role === "ADMIN";
 
   // Web private entry: Installs navigation guards for the private session. The handlers clear account data before browser back or hash changes can expose another screen.
   useEffect(() => {
@@ -90,10 +97,14 @@ export function useSessionSecurity({
         mode === "admin"
           ? "/account/sign-in"
           : mode === "download"
-            ? "/download"
+            ? "/get"
             : coverPath(enrollment?.cover ?? "GAME"),
       );
-      window.history.replaceState({}, "", "/");
+      window.history.replaceState(
+        {},
+        "",
+        mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/",
+      );
     };
     // A changed URL can start private entry only when its saved token is valid.
     const onHash = () => {
@@ -120,7 +131,12 @@ export function useSessionSecurity({
   useEffect(() => {
     // User accounts quick-exit when their private tab becomes hidden.
     const onHidden = () => {
-      if (document.hidden && phaseRef.current === "safe" && roleRef.current === "USER") quickExit();
+      if (
+        document.hidden &&
+        phaseRef.current === "safe" &&
+        roleRef.current === "USER"
+      )
+        quickExit();
     };
     // Escape provides a fast exit unless this role requires the exit button.
     const onKey = (event: KeyboardEvent) => {
@@ -166,7 +182,9 @@ export function useSessionSecurity({
     }
     noteInteraction();
     const events = ["pointerdown", "keydown", "input"] as const;
-    events.forEach((event) => document.addEventListener(event, noteInteraction));
+    events.forEach((event) =>
+      document.addEventListener(event, noteInteraction),
+    );
     const interval = setInterval(() => {
       const elapsed = Date.now() - lastInteraction.current;
       if (elapsed >= 75_000) quickExit();

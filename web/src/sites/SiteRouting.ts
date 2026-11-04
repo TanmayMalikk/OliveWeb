@@ -5,31 +5,11 @@ import type { Cover } from "../domain/DomainModels";
 export const sites = config.covers;
 export type SiteMode = "user" | "download" | "admin";
 
-// Checks whether the site is running on this computer. Local testing keeps every page on one origin.
-const isLocalOrigin = (origin: string) => {
-  const hostname = new URL(origin).hostname;
-  return (
-    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]"
-  );
-};
-
-// Chooses the user, download, or admin site from the current domain name.
-export function siteMode(
-  hostname = location.hostname,
-  override = import.meta.env.VITE_SITE_MODE,
-): SiteMode {
-  if (override === "user" || override === "download" || override === "admin")
-    return override;
-  if (
-    hostname === new URL(config.downloadOrigin).hostname ||
-    hostname.startsWith("get.")
-  )
-    return "download";
-  if (
-    hostname === new URL(config.adminOrigin).hostname ||
-    hostname.startsWith("admin.")
-  )
-    return "admin";
+// Chooses the public, download, or organization screen from the URL path.
+export function siteMode(pathname = location.pathname): SiteMode {
+  const clean = canonicalPath(pathname).replace(/\/+$/, "") || "/";
+  if (clean === config.downloadPath) return "download";
+  if (clean === config.adminPath) return "admin";
   return "user";
 }
 // Finds the website settings for the selected cover app.
@@ -51,18 +31,13 @@ export function coverForRoute(path: string, origin = "") {
 // Changes an old or alternate cover path into the main path used by the site.
 export function canonicalPath(path: string) {
   const [, pathname, suffix] = path.match(/^([^?#]*)(.*)$/)!;
-  return (coverForRoute(pathname)?.path ?? pathname) + suffix;
+  const clean = pathname === "/download" ? config.downloadPath : pathname;
+  return (coverForRoute(clean)?.path ?? clean) + suffix;
 }
-// Sends each path to the correct public, download, or admin domain. Local testing stays on the current address.
+// Keeps every website page on the main domain. VoIP is deployed as its own service and is not routed here.
 export function siteDestination(path: string, currentOrigin: string) {
   const canonical = canonicalPath(path);
-  if (isLocalOrigin(currentOrigin))
-    return new URL(canonical, currentOrigin).href;
-  if (/^\/download(?:\/|$)/.test(canonical))
-    return new URL("/", config.downloadOrigin).href;
-  if (/^\/admin(?:\/|$)/.test(canonical))
-    return new URL("/", config.adminOrigin).href;
-  return new URL("/", config.publicOrigin || currentOrigin).href;
+  return new URL(canonical, currentOrigin).href;
 }
 // Builds a private-entry link and keeps its token after the # so it is not sent to the web server.
 export function entryLinkUrl(token: string, currentOrigin: string) {

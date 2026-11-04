@@ -25,6 +25,7 @@ import {
   canonicalPath,
   coverForRoute,
   siteDestination,
+  siteMode,
   type SiteMode,
 } from "../sites/SiteRouting";
 import {
@@ -44,14 +45,20 @@ import {
   type Event,
   type Category,
 } from "../domain/DomainModels";
-import { SessionContext, useSession, type SessionValue } from "./SessionContext";
+import {
+  SessionContext,
+  useSession,
+  type SessionValue,
+} from "./SessionContext";
 import { useSessionSecurity } from "./useSessionSecurity";
 export { useSession };
 function accountSyncError(error: unknown) {
   const code = (error as { code?: string })?.code;
   if (code === "permission-denied" || code === "firestore/permission-denied")
     return "You are signed in, but Firebase is blocking live account sync. Deploy the current Firestore rules to enable it.";
-  return error instanceof Error ? error.message : "Account sync is unavailable.";
+  return error instanceof Error
+    ? error.message
+    : "Account sync is unavailable.";
 }
 const initialEntryToken =
   (location.pathname === "/" || location.pathname === "/entry") &&
@@ -72,7 +79,7 @@ export function SessionProvider({
     mode === "admin"
       ? "/account/sign-in"
       : mode === "download"
-        ? "/download"
+        ? "/get"
         : initialEntryToken
           ? "/account/sign-in"
           : canonicalPath(location.pathname),
@@ -112,24 +119,29 @@ export function SessionProvider({
       () => {
         window.clearTimeout(timer);
         timer = window.setTimeout(() => {
-          void accounts.load().then((loaded) => {
-            if (!active || accounts.identity?.uid !== identity.uid) return;
-            setProfile(loaded.profile);
-            setHistory(loaded.history);
-          }).catch((error) => {
-            if (active) setMessage(accountSyncError(error));
-          });
+          void accounts
+            .load()
+            .then((loaded) => {
+              if (!active || accounts.identity?.uid !== identity.uid) return;
+              setProfile(loaded.profile);
+              setHistory(loaded.history);
+            })
+            .catch((error) => {
+              if (active) setMessage(accountSyncError(error));
+            });
         }, 150);
       },
       (error) => {
         if (active) setMessage(accountSyncError(error));
       },
-    ).then((cleanup) => {
-      if (active) stop = cleanup;
-      else cleanup();
-    }).catch((error) => {
-      if (active) setMessage(accountSyncError(error));
-    });
+    )
+      .then((cleanup) => {
+        if (active) stop = cleanup;
+        else cleanup();
+      })
+      .catch((error) => {
+        if (active) setMessage(accountSyncError(error));
+      });
     return () => {
       active = false;
       window.clearTimeout(timer);
@@ -140,28 +152,35 @@ export function SessionProvider({
     (to: string) => {
       pendingEntry.current = null;
       entryOwner.current = null;
-      const destination = new URL(siteDestination(to, location.origin));
-      const internalAdmin = mode === "admin" && to !== "/download";
-      const internalDownload = mode === "download" && to === "/download";
-      if (
-        !internalAdmin &&
-        !internalDownload &&
-        destination.origin !== location.origin
-      ) {
+      const canonical = canonicalPath(to);
+      const destination = new URL(siteDestination(canonical, location.origin));
+      const destinationMode = siteMode(canonical);
+      const internal =
+        mode === "admin"
+          ? canonical !== "/" && destinationMode !== "download"
+          : mode === "download"
+            ? destinationMode === "download"
+            : destinationMode === "user";
+      // Moving between /get, /admin, and the public app reloads the matching app shell.
+      if (!internal) {
         accounts.lock();
         window.location.assign(destination.href);
         return;
       }
-      window.history.replaceState({}, "", "/");
-      setPath(canonicalPath(to));
+      const shellPath =
+        mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/";
+      window.history.replaceState({}, "", shellPath);
+      setPath(canonical);
       window.scrollTo({ top: 0 });
     },
     [mode],
   );
   useEffect(() => {
-    if (location.pathname !== "/" || location.search || location.hash)
-      window.history.replaceState({}, "", "/");
-  }, []);
+    const shellPath =
+      mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/";
+    if (location.pathname !== shellPath || location.search || location.hash)
+      window.history.replaceState({}, "", shellPath);
+  }, [mode]);
   // Restores this browser's saved enrollment and continues a pending private entry.
   useEffect(() => {
     let live = true;
@@ -181,7 +200,7 @@ export function SessionProvider({
           if (cloudMode) {
             const { auth } = await firebase();
             await auth.authStateReady();
-          authenticated = auth.currentUser?.uid === savedEnrollment?.uid;
+            authenticated = auth.currentUser?.uid === savedEnrollment?.uid;
           }
           const entryToken = pendingEntry.current;
           if (
@@ -205,13 +224,14 @@ export function SessionProvider({
     };
   }, [entryAttempt]);
   const quickExit = useCallback(() => {
-    const returnPath = profile?.role === "SAFE_CONTACT"
-      ? "/account/sign-in"
-      : mode === "admin"
+    const returnPath =
+      profile?.role === "SAFE_CONTACT"
         ? "/account/sign-in"
-        : mode === "download"
-          ? "/download"
-          : coverPath(profile?.coverType ?? cover);
+        : mode === "admin"
+          ? "/account/sign-in"
+          : mode === "download"
+            ? "/get"
+            : coverPath(profile?.coverType ?? cover);
     epoch.current++;
     entryOwner.current = null;
     pendingEntry.current = null;
@@ -225,7 +245,11 @@ export function SessionProvider({
     setIdleSeconds(null);
     setBusy(false);
     setPhase("public");
-    window.history.replaceState({}, "", "/");
+    window.history.replaceState(
+      {},
+      "",
+      mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/",
+    );
     setPath(returnPath);
     window.scrollTo({ top: 0 });
   }, [cover, mode, profile?.coverType, profile?.role]);
@@ -256,7 +280,8 @@ export function SessionProvider({
         ? "Olive Branch Workspace"
         : mode === "download"
           ? "Olive Branch"
-        : covers.find((candidate) => candidate.id === cover)?.name ?? "Game";
+          : (covers.find((candidate) => candidate.id === cover)?.name ??
+            "Game");
   }, [cover, mode]);
   // Runs one account task at a time and keeps loading and error messages consistent.
   async function perform(work: () => Promise<void>) {
@@ -288,7 +313,7 @@ export function SessionProvider({
       throw new Error(
         mode === "admin"
           ? "Use a Staff or Administrator account for this organization."
-          : "Organization accounts sign in at admin.yourolivebranch.ca.",
+          : "Organization accounts sign in at yourolivebranch.ca/admin.",
       );
     const token = epoch.current;
     const loaded = await accounts.authenticate(
@@ -518,11 +543,12 @@ export function SessionProvider({
   }
   // Ends the web session and returns to the public cover.
   async function signOut() {
-    const returnPath = profile?.role === "SAFE_CONTACT" || mode === "admin"
-      ? "/account/sign-in"
-      : mode === "download"
-        ? "/download"
-        : "/";
+    const returnPath =
+      profile?.role === "SAFE_CONTACT" || mode === "admin"
+        ? "/account/sign-in"
+        : mode === "download"
+          ? "/get"
+          : "/";
     await accounts.signOut();
     epoch.current++;
     setProfile(null);
