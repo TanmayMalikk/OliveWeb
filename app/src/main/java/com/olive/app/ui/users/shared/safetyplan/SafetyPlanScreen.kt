@@ -45,10 +45,11 @@ internal fun SafetyPlanScreen(
     ownerName: String = session.coverUsername, onBack: () -> Unit = session.navigation::back
 ) {
     val controller = session.safetyPlans
+    val documentController = session.documents
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    var choosingDocumentUpload by rememberSaveable { mutableStateOf(false) }
+    var pendingDocumentAttachmentTag by rememberSaveable { mutableStateOf<String?>(null) }
     // Hides the keyboard before leaving or switching safety-plan sections.
     fun leaveEditor() {
         focus.clearFocus(force = true)
@@ -65,6 +66,11 @@ internal fun SafetyPlanScreen(
         while (true) {
             delay(5.seconds)
             controller.refresh()
+        }
+    }
+    LaunchedEffect(ownerUid, ownerName, session.localMode) {
+        if (ownerUid == session.coverAccountId) {
+            documentController.load(ownerUid, ownerName, session.localMode)
         }
     }
     var backup by rememberSaveable(ownerUid) { mutableStateOf(false) }
@@ -229,8 +235,15 @@ internal fun SafetyPlanScreen(
                                     contactsEditable = !organizationEditor && !safeContact && section == "contacts",
                                     onContactsChange = if (!organizationEditor && !safeContact && section == "contacts") session::saveContacts else null,
                                     editable = !safeContact,
+                                    documents = if (ownerUid == session.coverAccountId)
+                                        documentController.state.files else emptyList(),
                                     onUploadDocument = if (!organizationEditor && !safeContact && section == "documents") {
-                                        { choosingDocumentUpload = true }
+                                        { itemId ->
+                                            pendingDocumentAttachmentTag = safetyChecklistAttachmentTag(
+                                                "${prefix}_documents",
+                                                itemId,
+                                            )
+                                        }
                                     } else null,
                                 )
                                 HorizontalDivider(
@@ -310,9 +323,9 @@ internal fun SafetyPlanScreen(
     }
     SafetyDocumentUploadFlow(
         session = session,
-        visible = choosingDocumentUpload,
-        onDismiss = { choosingDocumentUpload = false },
-        tags = setOf("Safety Plan"),
+        visible = pendingDocumentAttachmentTag != null,
+        onDismiss = { pendingDocumentAttachmentTag = null },
+        tags = setOfNotNull("Safety Plan", pendingDocumentAttachmentTag),
     )
 }
 

@@ -8,12 +8,27 @@ import java.util.UUID
 internal data class SafetyChecklistItem(
     val id: String,
     val text: String,
-    val checked: Boolean = false
+    val checked: Boolean = false,
+    val excludedAttachmentIds: List<String> = emptyList(),
 )
 
 internal data class SafetyPlanContact(val id: String, val name: String, val details: String)
 
 private const val SAFETY_CONTACT_PREFIX = "trusted-contact:"
+private const val SAFETY_ATTACHMENT_PREFIX = "safety-plan:"
+
+/** Identifies the exact safety-plan checklist row that created an uploaded document. */
+internal fun safetyChecklistAttachmentTag(fieldKey: String, itemId: String): String =
+    "$SAFETY_ATTACHMENT_PREFIX$fieldKey:$itemId".take(80)
+
+internal fun safetyChecklistAttachments(
+    fieldKey: String,
+    item: SafetyChecklistItem,
+    documents: List<SafetyDocument>,
+): List<SafetyDocument> {
+    val tag = safetyChecklistAttachmentTag(fieldKey, item.id)
+    return documents.filter { tag in it.tags && it.id !in item.excludedAttachmentIds }
+}
 
 // Creates one trusted-contact checklist item for a new safety plan.
 internal fun safetyPlanContactItem(contact: SafeContact) = SafetyChecklistItem(
@@ -49,7 +64,13 @@ internal fun readSafetyChecklist(
             SafetyChecklistItem(
                 row.getString("id"),
                 row.getString("text"),
-                row.getBoolean("checked")
+                row.getBoolean("checked"),
+                row.optJSONArray("excludedAttachmentIds")?.let { values ->
+                    require(values.length() <= 80)
+                    (0 until values.length()).map(values::getString)
+                        .onEach { require(it.length <= 128) }
+                        .distinct()
+                }.orEmpty(),
             )
         }.also { items -> require(items.map { it.id }.distinct().size == items.size) }
     }.getOrNull()
@@ -70,6 +91,10 @@ internal fun writeSafetyChecklist(items: List<SafetyChecklistItem>): String =
                 rows.put(
                     JSONObject().put("id", item.id).put("text", item.text)
                         .put("checked", item.checked)
+                        .put(
+                            "excludedAttachmentIds",
+                            JSONArray(item.excludedAttachmentIds.distinct().takeLast(80)),
+                        )
                 )
             }
         }).toString()

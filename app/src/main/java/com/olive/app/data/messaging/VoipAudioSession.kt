@@ -288,6 +288,7 @@ class VoipSessionController(
 
     suspend fun leaveCall() = mutex.withLock {
         val call = when (val current = mutableState.value) {
+            is VoipSessionState.Connecting -> current.call
             is VoipSessionState.Active -> current.call
             is VoipSessionState.Error -> current.call ?: error("No call to leave")
             else -> error("No call to leave")
@@ -307,6 +308,7 @@ class VoipSessionController(
 
     suspend fun endCall() = mutex.withLock {
         val call = when (val current = mutableState.value) {
+            is VoipSessionState.Connecting -> current.call
             is VoipSessionState.Active -> current.call
             is VoipSessionState.Error -> current.call ?: error("No call to end")
             else -> error("No call to end")
@@ -323,6 +325,12 @@ class VoipSessionController(
             )
             throw error
         }
+    }
+
+    /** Closes an unrecoverable/stale call screen without making another failing server request. */
+    suspend fun dismiss() = mutex.withLock {
+        runCatching { audioSession.disconnect() }
+        mutableState.value = VoipSessionState.Idle
     }
 
     private suspend fun joinAudio(call: VoipCall): VoipCall {

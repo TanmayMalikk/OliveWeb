@@ -46,6 +46,25 @@ class VoiceCallScreenUiTest {
         }
     }
 
+    @Test
+    fun callerCanHangUpWhileTheCallIsStillConnecting() {
+        var finished = false
+        compose.activity.setContent {
+            OliveTheme {
+                ActiveCallDialog(
+                    state = VoipSessionState.Connecting(call),
+                    currentUid = "caller-1",
+                    onMute = {},
+                    onSpeaker = {},
+                    onFinish = { finished = true },
+                )
+            }
+        }
+
+        compose.onNodeWithTag("finish_voice_call").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertTrue(finished) }
+    }
+
     companion object {
         private val call = VoipCall(
             callId = "call-1",
