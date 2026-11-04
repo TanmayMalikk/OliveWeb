@@ -93,7 +93,7 @@
     <string name="documents_network_required">请连接互联网以访问此文件。</string>
     <string name="documents_access_revoked">你已无法访问此文件。其离线副本已被移除。</string>
     <string name="documents_offline_copy_corrupt">离线副本已损坏并被移除。请重新下载。</string>
-    <string name="documents_key_unavailable">此设备无法解锁文件。请重新连接以恢复设备访问权限。</string>
+    <string name="documents_key_unavailable">此设备没有该文件的加密密钥。请在此账户已授权的设备上打开“文档”，或请文件所有者重新共享。</string>
     <string name="documents_account_mismatch">此离线副本属于其他账户。</string>
     <string name="documents_storage_full">设备存储空间不足，无法保存此离线副本。</string>
     <string name="documents_download_failed">无法下载加密文件。请重试。</string>

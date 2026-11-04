@@ -93,7 +93,7 @@
     <string name="documents_network_required">اتصل بالإنترنت للوصول إلى هذا الملف.</string>
     <string name="documents_access_revoked">لم يعد لديك وصول إلى هذا الملف. تمت إزالة النسخة غير المتصلة.</string>
     <string name="documents_offline_copy_corrupt">النسخة غير المتصلة تالفة وتمت إزالتها. نزّلها مرة أخرى.</string>
-    <string name="documents_key_unavailable">يتعذر على هذا الجهاز فتح الملف. أعد الاتصال لاستعادة الوصول.</string>
+    <string name="documents_key_unavailable">لا يملك هذا الجهاز مفتاح تشفير هذا الملف. افتح المستندات على جهاز معتمد سابقًا لهذا الحساب، أو اطلب من مالك الملف مشاركته مرة أخرى.</string>
     <string name="documents_account_mismatch">هذه النسخة غير المتصلة تخص حسابًا آخر.</string>
     <string name="documents_storage_full">لا توجد مساحة كافية لهذه النسخة غير المتصلة.</string>
     <string name="documents_download_failed">تعذر تنزيل الملف المشفر. حاول مرة أخرى.</string>
