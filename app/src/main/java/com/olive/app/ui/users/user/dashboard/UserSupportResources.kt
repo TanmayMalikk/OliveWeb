@@ -82,12 +82,15 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
     val lookupLocation = LocalHotlineLocationLookup.current
     val scope = rememberCoroutineScope()
     val locate: () -> Unit = {
+        // Ignore another location tap while the first lookup is still running.
         if (!locating) {
             locating = true
             locationError = null
             permissionDenied = false
             scope.launch {
+                // A location lookup can fail, but the hotline list should stay open.
                 try {
+                    // Ask for permission before checking the phone's location.
                     if (!requestLocationPermission()) {
                         permissionDenied = true
                         locationError = R.string.support_location_denied
@@ -138,7 +141,9 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                 stringResource(R.string.support_location_description)
             )
         }
+        // Show a loading sign or a useful message while the hotline list loads.
         if (catalog == null) item {
+            // The directory is still loading, so keep the user informed.
             if (directory == null) CircularProgressIndicator() else {
                 AccessibleMessage(stringResource(R.string.support_load_failed))
                 TextButton(onClick = {
@@ -151,6 +156,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                 }
             }
         }
+        // Show search and region controls after the hotline list is ready.
         if (catalog != null) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -185,6 +191,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                                         null
                                     choosingRegion = false
                                 })
+                            // List Canada first, followed by each province and territory.
                             (listOf("CA") + CanadianRegion.entries.map { it.code }).forEach { code ->
                                 DropdownMenuItem(
                                     text = { Text(hotlineRegionName(code)) },
@@ -209,6 +216,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                     ) {
                         Text(stringResource(if (locating) R.string.support_finding_location else R.string.support_use_device_location))
                     }
+                    // Tell the user whether results use their saved or detected location.
                     if (devicePlace != null || (selection == savedRegion && city.isNotBlank())) {
                         Text(
                             stringResource(
@@ -224,6 +232,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                             modifier = Modifier.testTag("hotline_location_error")
                         )
                     }
+                    // Offer a link to app settings if location permission was denied.
                     if (permissionDenied) TextButton(onClick = {
                         runCatching {
                             context.startActivity(
@@ -245,6 +254,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
                     } else Text(stringResource(R.string.support_outside_canada))
                 }
             }
+            // Search results only make sense after a region has been chosen.
             if (selection.isNotBlank()) {
                 item {
                     Text(
@@ -291,6 +301,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
     }
 }
 
+// Shows one hotline or shelter with its phone number, details, and safe action buttons.
 @Composable
 private fun HotlineResourceCard(resource: HotlineResource, onOpen: (String, Boolean) -> Unit) {
     Card(
@@ -375,8 +386,10 @@ private fun openHotlineDestination(context: Context, value: String, dial: Boolea
     }
 }
 
+// Changes a Canadian region code into the province or territory name shown on the hotline card.
 @Composable
 private fun hotlineRegionName(code: String) = stringResource(
+    // Match each short region code to its translated name. Unknown codes fall back to Canada.
     when (code) {
         "AB" -> R.string.support_region_ab
         "BC" -> R.string.support_region_bc

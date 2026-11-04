@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">Preparing encrypted upload</string>
     <string name="documents_preparing_upload_help">The selected file is being processed and encrypted on this device.</string>
     <string name="documents_upload_queued">Waiting for a connection</string>
-    <string name="documents_upload_waiting_retry">Waiting to retry</string>
+    <string name="documents_upload_waiting_retry">Upload paused — retrying automatically</string>
     <string name="documents_upload_starting">Starting secure upload</string>
     <string name="documents_upload_progress">Uploading %1$d%%</string>
     <string name="documents_upload_finalizing">Finishing secure upload</string>
@@ -80,4 +80,23 @@
     <string name="documents_share_help">Choose up to 10 accepted friends. Only the selected accounts can open this file.</string>
     <string name="open">Open</string>
     <string name="share">Share</string>
+    <string name="documents_offline_index">Showing your encrypted offline index. Changes sync when connected.</string>
+    <string name="documents_not_available_offline">This file is not available offline yet.</string>
+    <string name="documents_make_available_offline">Make available offline</string>
+    <string name="documents_remove_offline_copy">Remove offline copy</string>
+    <string name="documents_saving_offline">Saving encrypted offline copy…</string>
+    <string name="documents_available_offline">Available offline</string>
+    <string name="documents_recently_cached">Recently cached and may be removed automatically</string>
+    <string name="documents_recent_cache_title">Recent file caching</string>
+    <string name="documents_recent_cache_help">Automatically keep recently opened encrypted files offline. Automatic copies share a 250 MB limit and this setting is off by default.</string>
+    <string name="documents_offline_revalidation_required">Reconnect to confirm access before opening this shared file.</string>
+    <string name="documents_network_required">Connect to the internet to access this file.</string>
+    <string name="documents_access_revoked">You no longer have access to this file. Its offline copy was removed.</string>
+    <string name="documents_offline_copy_corrupt">The offline copy is damaged and was removed. Download it again.</string>
+    <string name="documents_key_unavailable">This device does not have this file’s encryption key. Open Documents on an existing authorized device for this account, or ask the file owner to share it again.</string>
+    <string name="documents_account_mismatch">This offline copy belongs to a different account.</string>
+    <string name="documents_storage_full">There is not enough device storage for this offline copy.</string>
+    <string name="documents_download_failed">The encrypted file could not be downloaded. Please retry.</string>
+    <string name="documents_device_verification_failed">This app installation could not be verified. Reopen the app and try again.</string>
+    <string name="documents_open_failed">The encrypted file could not be opened.</string>
 </resources>

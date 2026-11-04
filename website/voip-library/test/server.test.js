@@ -4,135 +4,443 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createApiServer } = require('../src/server');
 
-async function startTestServer(context, callManager) {
-    const server = createApiServer({
-        callManager,
-        apiToken: 'local-test-token',
-        logger: { error() {} }
-    });
-
-    server.listen(0, '127.0.0.1');
-    await new Promise((resolve) => server.once('listening', resolve));
-
-    context.after(() => new Promise((resolve, reject) => {
-        server.close((error) => error ? reject(error) : resolve());
-    }));
-
-    return `http://127.0.0.1:${server.address().port}`;
-}
-
-test('GET /health returns healthy without a token', async (context) => {
-    const callManager = {
-        listCalls() {
-            return [];
+function createDependencies() {
+    const calls = new Map([
+        ['call-1', {
+            callId: 'call-1',
+            callerId: 'alice',
+            name: 'Support',
+            status: 'active',
+            participants: {
+                bob: { status: 'accepted' },
+                carol: { status: 'pending' }
+            }
+        }]
+    ]);
+    const invitations = [];
+    const deviceTokens = new Map();
+    const callStore = {
+        async getCall(callId) {
+            return calls.get(callId) ?? null;
         },
-        async createCall(name) {
-            return { name };
+        async listCallsFor(userId) {
+            return [...calls.values()].filter((call) =>
+                call.status === 'active' &&
+                (call.callerId === userId || call.participants[userId]?.status === 'accepted')
+            );
+        },
+        async listInvitations(userId) {
+            return [...calls.entries()]
+                .filter(([, call]) =>
+                    call.status === 'active' && call.participants[userId]?.status === 'pending'
+                )
+                .map(([callId, call]) => ({
+                    callId,
+                    callerId: call.callerId,
+                    name: call.name,
+                    status: 'pending'
+                }));
+        },
+        async createCall(name, { callerId, participantIds }) {
+            const call = {
+                callId: 'new-call',
+                name,
+                callerId,
+                status: 'active',
+                participants: Object.fromEntries(
+                    participantIds.map((id) => [id, { status: 'pending' }])
+                )
+            };
+            calls.set(call.callId, call);
+            return call;
+        },
+        async respondToInvitation(callId, userId, accepted) {
+            const call = calls.get(callId);
+            if (!call || call.participants[userId]?.status !== 'pending') return null;
+            call.participants[userId] = { status: accepted ? 'accepted' : 'declined' };
+            return call;
+        },
+        async endCall(callId) {
+            const call = calls.get(callId);
+            if (!call || call.status !== 'active') return false;
+            call.status = 'ended';
+            return true;
+        },
+        async registerFcmToken(userId, deviceId, token) {
+            deviceTokens.set(`${userId}/${deviceId}`, token);
+        },
+        async unregisterFcmToken(userId, deviceId) {
+            deviceTokens.delete(`${userId}/${deviceId}`);
         }
     };
 
-    const baseUrl = await startTestServer(context, callManager);
+    return {
+        calls,
+        invitations,
+        deviceTokens,
+        callStore,
+        verifyIdToken: async (token) => {
+            const identities = {
+                'token-alice': { uid: 'alice', email: 'alice@example.test' },
+                'token-bob': { uid: 'bob' },
+                'token-carol': { uid: 'carol' },
+                'token-outsider': { uid: 'outsider' }
+            };
+            return identities[token] ?? null;
+        },
+        async verifyUserIds(userIds) {
+            return userIds.every((userId) => ['bob', 'carol'].includes(userId));
+        },
+        liveKit: {
+            async issueToken(identity, roomName) {
+                return {
+                    serverUrl: 'wss://livekit.example.test',
+                    roomName,
+                    token: `signed-${identity}`
+                };
+            }
+        },
+        async sendInvitation(invitation) {
+            invitations.push(invitation);
+            return { sent: 1, failed: 0 };
+        }
+    };
+}
+
+async function startTestServer(context, dependencies = createDependencies()) {
+    const server = createApiServer({
+        ...dependencies,
+        logger: { error() {} }
+    });
+    server.listen(0, '127.0.0.1');
+    await new Promise((resolve) => server.once('listening', resolve));
+    context.after(() => new Promise((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+    }));
+    return `http://127.0.0.1:${server.address().port}`;
+}
+
+function authorized(token, extra = {}) {
+    return { authorization: `Bearer ${token}`, ...extra };
+}
+
+test('GET /health is public', async (context) => {
+    const baseUrl = await startTestServer(context);
     const response = await fetch(`${baseUrl}/health`);
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: 'ok' });
 });
 
-test('GET /api/calls rejects a request without a bearer token', async (context) => {
-    const callManager = {
-        listCalls() {
-            return [];
-        }
-    };
-
-    const baseUrl = await startTestServer(context, callManager);
-    const response = await fetch(`${baseUrl}/api/calls`);
-
-    assert.equal(response.status, 401);
-    assert.deepEqual(await response.json(), {
-        error: {
-            code: 'unauthorized',
-            message: 'A valid bearer token is required'
-        }
-    });
+test('protected routes reject missing and invalid Firebase tokens', async (context) => {
+    const baseUrl = await startTestServer(context);
+    for (const headers of [{}, authorized('invalid')]) {
+        const response = await fetch(`${baseUrl}/auth/verify`, {
+            method: 'POST',
+            headers
+        });
+        assert.equal(response.status, 401);
+        assert.equal((await response.json()).error.code, 'unauthorized');
+    }
 });
 
-test('GET /api/calls returns calls when the token is valid', async (context) => {
-    const expectedCalls = [
-        { callId: 'call-1', name: 'Support' },
-        { callId: 'call-2', name: 'General' }
-    ];
+test('POST /auth/verify returns verified Firebase identity claims', async (context) => {
+    const baseUrl = await startTestServer(context);
+    const response = await fetch(`${baseUrl}/auth/verify`, {
+        method: 'POST',
+        headers: authorized('token-alice')
+    });
 
-    const callManager = {
-        listCalls() {
-            return expectedCalls;
-        }
-    };
+    test('legacy call-signaling routes persist calls and bind user IDs to Firebase identity', async (context) => {
+        const dependencies = createDependencies();
+        dependencies.calls.clear();
+        const baseUrl = await startTestServer(context, dependencies);
+        const created = await fetch(`${baseUrl}/api/calls`, {
+            method: 'POST',
+            headers: authorized('token-alice', { 'content-type': 'application/json' }),
+            body: JSON.stringify({
+                name: '  Product help ',
+                callerId: 'alice',
+                participantIds: ['carol']
+            })
+        });
 
-    const baseUrl = await startTestServer(context, callManager);
-    const response = await fetch(`${baseUrl}/api/calls`, {
-        headers: { authorization: 'Bearer local-test-token' }
+        assert.equal(created.status, 201);
+        assert.deepEqual(await created.json(), {
+            callId: 'new-call',
+            callerId: 'alice',
+            name: 'Product help',
+            participants: [
+                { userId: 'alice', status: 'accepted' },
+                { userId: 'carol', status: 'pending' }
+            ],
+            notificationFailures: []
+        });
+        assert.deepEqual(dependencies.invitations, [{
+            recipientId: 'carol',
+            callId: 'new-call',
+            callerId: 'alice',
+            callName: 'Product help'
+        }]);
+
+        const invitations = await fetch(
+            `${baseUrl}/api/calls/invitations?userId=carol`,
+            { headers: authorized('token-carol') }
+        );
+        assert.deepEqual(await invitations.json(), {
+            invitations: [{
+                callId: 'new-call',
+                callerId: 'alice',
+                name: 'Product help',
+                status: 'pending'
+            }]
+        });
+
+        const activeCalls = await fetch(`${baseUrl}/api/calls`, {
+            headers: authorized('token-alice')
+        });
+        assert.deepEqual((await activeCalls.json()).calls.map(({ callId }) => callId), ['new-call']);
+
+        const forgedIdentity = await fetch(`${baseUrl}/api/calls`, {
+            method: 'POST',
+            headers: authorized('token-bob', { 'content-type': 'application/json' }),
+            body: JSON.stringify({
+                name: 'Forged call',
+                callerId: 'alice',
+                participantIds: ['carol']
+            })
+        });
+        assert.equal(forgedIdentity.status, 403);
+        assert.equal((await forgedIdentity.json()).error.code, 'identity_mismatch');
+    });
+
+    test('legacy invitation routes accept and decline only the authenticated pending user', async (context) => {
+        const baseUrl = await startTestServer(context);
+        const response = await fetch(`${baseUrl}/api/calls/call-1/accept`, {
+            method: 'POST',
+            headers: authorized('token-carol', { 'content-type': 'application/json' }),
+            body: JSON.stringify({ userId: 'carol' })
+        });
+
+        assert.equal(response.status, 200);
+        const call = await response.json();
+        assert.equal(call.participants.find(({ userId }) => userId === 'carol').status, 'accepted');
+
+        const activeCalls = await fetch(`${baseUrl}/api/calls`, {
+            headers: authorized('token-carol')
+        });
+        assert.deepEqual((await activeCalls.json()).calls.map(({ callId }) => callId), ['call-1']);
+
+        const forged = await fetch(`${baseUrl}/api/calls/call-1/decline`, {
+            method: 'POST',
+            headers: authorized('token-bob', { 'content-type': 'application/json' }),
+            body: JSON.stringify({ userId: 'carol' })
+        });
+        assert.equal(forged.status, 403);
+        assert.equal((await forged.json()).error.code, 'identity_mismatch');
     });
 
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { calls: expectedCalls });
+    assert.deepEqual(await response.json(), {
+        uid: 'alice',
+        email: 'alice@example.test'
+    });
 });
 
-test('POST /api/calls passes the name to the manager', async (context) => {
-    let receivedName;
-
-    const callManager = {
-        listCalls() {
-            return [];
-        },
-        async createCall(name) {
-            receivedName = name;
-            return { callId: 'new-call', name };
-        }
-    };
-
-    const baseUrl = await startTestServer(context, callManager);
+test('call creation rejects participant IDs without Firebase accounts', async (context) => {
+    const dependencies = createDependencies();
+    const baseUrl = await startTestServer(context, dependencies);
     const response = await fetch(`${baseUrl}/api/calls`, {
         method: 'POST',
-        headers: {
-            authorization: 'Bearer local-test-token',
-            'content-type': 'application/json'
-        },
+        headers: authorized('token-alice', { 'content-type': 'application/json' }),
         body: JSON.stringify({
-            name: '  Support  ',
-            callerId: 'caller-1',
-            participantIds: ['user-2']
+            name: 'Invalid invite',
+            callerId: 'alice',
+            participantIds: ['missing-user']
+        })
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, 'invalid_participant');
+    assert.equal(dependencies.calls.has('new-call'), false);
+});
+
+test('call creation keeps the call and reports failed invitation delivery', async (context) => {
+    const dependencies = createDependencies();
+    dependencies.sendInvitation = async () => {
+        throw new Error('FCM unavailable');
+    };
+    const baseUrl = await startTestServer(context, dependencies);
+    const response = await fetch(`${baseUrl}/api/calls`, {
+        method: 'POST',
+        headers: authorized('token-alice', { 'content-type': 'application/json' }),
+        body: JSON.stringify({
+            name: 'Delivery check',
+            callerId: 'alice',
+            participantIds: ['carol']
         })
     });
 
     assert.equal(response.status, 201);
-    assert.equal(receivedName, 'Support');
-    assert.deepEqual(await response.json(), {
-        callId: 'new-call',
-        name: 'Support'
-    });
+    const call = await response.json();
+    assert.equal(call.callId, 'new-call');
+    assert.deepEqual(call.notificationFailures, ['carol']);
+    assert.equal(dependencies.calls.has('new-call'), true);
 });
 
-test('DELETE /api/calls/:callId closes the call', async (context) => {
-    let closedCallId;
+test('call creation reports partial delivery to a participant device', async (context) => {
+    const dependencies = createDependencies();
+    dependencies.sendInvitation = async () => ({ sent: 1, failed: 1 });
+    const baseUrl = await startTestServer(context, dependencies);
+    const response = await fetch(`${baseUrl}/api/calls`, {
+        method: 'POST',
+        headers: authorized('token-alice', { 'content-type': 'application/json' }),
+        body: JSON.stringify({
+            name: 'Partial delivery',
+            callerId: 'alice',
+            participantIds: ['carol']
+        })
+    });
 
-    const callManager = {
-        async closeCall(callId) {
-            closedCallId = callId;
-            return true;
-        }
-    };
+    assert.equal(response.status, 201);
+    assert.deepEqual((await response.json()).notificationFailures, ['carol']);
+});
 
-    const baseUrl = await startTestServer(context, callManager);
-    const response = await fetch(`${baseUrl}/api/calls/call-123`, {
-        method: 'DELETE',
-        headers: { authorization: 'Bearer local-test-token' }
+test('POST /calls/token issues a room-scoped token only to accepted participants', async (context) => {
+    const baseUrl = await startTestServer(context);
+    const response = await fetch(`${baseUrl}/calls/token`, {
+        method: 'POST',
+        headers: authorized('token-bob', { 'content-type': 'application/json' }),
+        body: JSON.stringify({ callId: 'call-1' })
     });
 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
-        deleted: true,
-        callId: 'call-123'
+        callId: 'call-1',
+        serverUrl: 'wss://livekit.example.test',
+        roomName: 'call-call-1',
+        token: 'signed-bob'
     });
-    assert.equal(closedCallId, 'call-123');
+
+    const pendingResponse = await fetch(`${baseUrl}/calls/token`, {
+        method: 'POST',
+        headers: authorized('token-carol', { 'content-type': 'application/json' }),
+        body: JSON.stringify({ callId: 'call-1' })
+    });
+    assert.equal(pendingResponse.status, 403);
+    assert.equal((await pendingResponse.json()).error.code, 'not_a_call_member');
+});
+
+test('POST /calls/token rejects inactive calls and unknown call IDs', async (context) => {
+    const dependencies = createDependencies();
+    dependencies.calls.set('ended-call', { status: 'ended', callerId: 'alice' });
+    const baseUrl = await startTestServer(context, dependencies);
+    const options = {
+        method: 'POST',
+        headers: authorized('token-alice', { 'content-type': 'application/json' }),
+        body: JSON.stringify({ callId: 'ended-call' })
+    };
+
+    const inactive = await fetch(`${baseUrl}/calls/token`, options);
+    assert.equal(inactive.status, 409);
+    assert.equal((await inactive.json()).error.code, 'call_not_active');
+
+    const missing = await fetch(`${baseUrl}/calls/token`, {
+        ...options,
+        body: JSON.stringify({ callId: 'missing' })
+    });
+    assert.equal(missing.status, 404);
+    assert.equal((await missing.json()).error.code, 'call_not_found');
+});
+
+test('POST /calls/end is restricted to the call owner and updates call status', async (context) => {
+    const dependencies = createDependencies();
+    const baseUrl = await startTestServer(context, dependencies);
+    const options = {
+        method: 'POST',
+        headers: authorized('token-bob', { 'content-type': 'application/json' }),
+        body: JSON.stringify({ callId: 'call-1' })
+    };
+
+    const forbidden = await fetch(`${baseUrl}/calls/end`, options);
+    assert.equal(forbidden.status, 403);
+    assert.equal((await forbidden.json()).error.code, 'not_call_owner');
+    assert.equal(dependencies.calls.get('call-1').status, 'active');
+
+    const ended = await fetch(`${baseUrl}/calls/end`, {
+        ...options,
+        headers: authorized('token-alice', { 'content-type': 'application/json' })
+    });
+    assert.equal(ended.status, 200);
+    assert.deepEqual(await ended.json(), { callId: 'call-1', status: 'ended' });
+    assert.equal(dependencies.calls.get('call-1').status, 'ended');
+});
+
+test('POST /notifications/send permits the owner to invite only pending participants', async (context) => {
+    const dependencies = createDependencies();
+    const baseUrl = await startTestServer(context, dependencies);
+    const request = (token, recipientId) => fetch(`${baseUrl}/notifications/send`, {
+        method: 'POST',
+        headers: authorized(token, { 'content-type': 'application/json' }),
+        body: JSON.stringify({ callId: 'call-1', recipientId })
+    });
+
+    test('push tokens are registered and removed only for the authenticated Firebase user', async (context) => {
+        const dependencies = createDependencies();
+        const baseUrl = await startTestServer(context, dependencies);
+        const register = await fetch(`${baseUrl}/notifications/register`, {
+            method: 'POST',
+            headers: authorized('token-bob', { 'content-type': 'application/json' }),
+            body: JSON.stringify({ deviceId: 'install-123', token: 'fcm-device-token' })
+        });
+
+        assert.equal(register.status, 200);
+        assert.deepEqual(await register.json(), { registered: true });
+        assert.equal(dependencies.deviceTokens.get('bob/install-123'), 'fcm-device-token');
+
+        const unregister = await fetch(`${baseUrl}/notifications/register`, {
+            method: 'DELETE',
+            headers: authorized('token-bob', { 'content-type': 'application/json' }),
+            body: JSON.stringify({ deviceId: 'install-123' })
+        });
+        assert.equal(unregister.status, 200);
+        assert.deepEqual(await unregister.json(), { registered: false });
+        assert.equal(dependencies.deviceTokens.has('bob/install-123'), false);
+
+        const invalid = await fetch(`${baseUrl}/notifications/register`, {
+            method: 'POST',
+            headers: authorized('token-bob', { 'content-type': 'application/json' }),
+            body: JSON.stringify({ deviceId: '../alice', token: 'fcm-device-token' })
+        });
+        assert.equal(invalid.status, 400);
+    });
+
+    const acceptedParticipant = await request('token-alice', 'bob');
+    assert.equal(acceptedParticipant.status, 403);
+    assert.equal((await acceptedParticipant.json()).error.code, 'invalid_recipient');
+
+    const sent = await request('token-alice', 'carol');
+    assert.equal(sent.status, 200);
+    assert.deepEqual(dependencies.invitations, [{
+        recipientId: 'carol',
+        callId: 'call-1',
+        callerId: 'alice',
+        callName: 'Support'
+    }]);
+
+    const nonOwner = await request('token-bob', 'carol');
+    assert.equal(nonOwner.status, 403);
+    assert.equal((await nonOwner.json()).error.code, 'not_call_owner');
+});
+
+test('malformed JSON requests receive a client error', async (context) => {
+    const baseUrl = await startTestServer(context);
+    const response = await fetch(`${baseUrl}/calls/token`, {
+        method: 'POST',
+        headers: authorized('token-alice', { 'content-type': 'application/json' }),
+        body: '{'
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, 'invalid_json');
 });

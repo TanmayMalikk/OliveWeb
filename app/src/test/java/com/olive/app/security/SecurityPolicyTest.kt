@@ -142,7 +142,7 @@ class SecurityPolicyTest {
         assertFalse(SecretVerifier.pinNeedsUpgrade("invalid"))
     }
 
-    // Inputs: the values shown below. Expected: idle policy handles negative and very large durations.
+    // Tries negative, normal, and very large idle times; only valid elapsed times should trigger privacy exit.
     @Test
     fun idlePolicyHandlesNegativeAndVeryLargeDurations() {
         assertNull(IdlePolicy.countdown(-1L))

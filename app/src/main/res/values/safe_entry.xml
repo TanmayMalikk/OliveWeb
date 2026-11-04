@@ -17,7 +17,6 @@
     <string name="entry_confirm_setup">Confirm your identity to set up safe entry.</string>
     <string name="entry_unlock_description">Confirm your identity with Android to unlock the safe area.</string>
     <string name="entry_unlock">Unlock with device lock</string>
-    <string name="entry_use_phone_lock">Use phone screen lock</string>
     <string name="entry_auth_failed">Android authentication could not be verified. Access remains locked. Try again, or sign in to set up safe entry again.</string>
     <string name="entry_auth_cancelled">Authentication was cancelled or unavailable. Access remains locked.</string>
 <string name="entry_verify_trigger">Confirm with device lock to change your trigger word.</string>

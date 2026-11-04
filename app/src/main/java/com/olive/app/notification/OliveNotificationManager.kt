@@ -24,6 +24,7 @@ object OliveNotificationManager {
     const val CHANNEL_GAME = "olive_game_channel"
     const val CHANNEL_BRANCH = "olive_branch_channel"
     const val CHANNEL_TREE = "olive_tree_channel"
+    const val CHANNEL_CALLS = "olive_calls_channel"
 
     // Each cover gets a matching public-facing notification category in Android settings.
     fun createNotificationChannels(context: Context) {
@@ -70,10 +71,60 @@ object OliveNotificationManager {
                     context.getString(R.string.ui_olive_tree_updates),
                     NotificationManager.IMPORTANCE_DEFAULT
                 ),
+                NotificationChannel(
+                    CHANNEL_CALLS,
+                    context.getString(R.string.ui_call_invitation_notifications),
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = context.getString(R.string.ui_call_invitation_notifications)
+                }
             )
         )
     }
 
+    fun showIncomingCall(
+        context: Context,
+        callId: String,
+        callerId: String,
+        callName: String
+    ) {
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) return
+        createNotificationChannels(context)
+        val intent = Intent(context, OliveActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(EXTRA_INCOMING_CALL_ID, callId)
+            putExtra(EXTRA_INCOMING_CALL_CALLER_ID, callerId)
+            putExtra(EXTRA_INCOMING_CALL_NAME, callName)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            callId.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_CALLS)
+            .setSmallIcon(R.drawable.ic_notification_olive)
+            .setContentTitle(context.getString(R.string.ui_incoming_call))
+            .setContentText(context.getString(R.string.ui_open_olive_to_respond_to_this_call))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(callId.hashCode(), notification)
+    }
+
+    const val EXTRA_INCOMING_CALL_ID = "com.olive.app.INCOMING_CALL_ID"
+    const val EXTRA_INCOMING_CALL_CALLER_ID = "com.olive.app.INCOMING_CALL_CALLER_ID"
+    const val EXTRA_INCOMING_CALL_NAME = "com.olive.app.INCOMING_CALL_NAME"
+
+    // Builds the title and message shown in this app notification.
     internal fun contentFor(
         title: String?,
         body: String?,
@@ -125,6 +176,7 @@ object OliveNotificationManager {
         runCatching { NotificationManagerCompat.from(context).notify(notificationId, notification) }
     }
 
+    // Chooses the notification icon that matches this event.
     internal fun iconFor(coverType: CoverType, role: AccountRole = AccountRole.USER) = when {
         role == AccountRole.SAFE_CONTACT -> R.drawable.ic_notification_olive_branch
         role == AccountRole.STAFF || role == AccountRole.ADMIN -> R.drawable.ic_notification_olive_tree

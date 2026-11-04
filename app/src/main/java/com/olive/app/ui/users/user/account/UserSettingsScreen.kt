@@ -4,6 +4,7 @@ package com.olive.app.ui.users.user.account
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,12 +19,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -34,7 +38,6 @@ import com.olive.app.R
 import com.olive.app.data.AccountRole
 import com.olive.app.data.CoverType
 import com.olive.app.data.UserProfile
-import com.olive.app.security.InputPolicy
 import com.olive.app.ui.covers.food.AddressFields
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.Muted
@@ -49,6 +52,7 @@ import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 
 
+// Saves profile and situation edits from the user settings screen.
 @Composable
 internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
@@ -64,10 +68,15 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    val cacheUid = session.coverAccountId
+    LaunchedEffect(cacheUid) {
+        cacheUid?.let { session.media?.loadRecentCachingPreference(it) }
+    }
 
     FormColumn {
         SafeBack(session)
         Heading(uiText(R.string.settings), uiText(R.string.ui_update_your_profile_details))
+        // User accounts can edit cover and private-entry settings here.
         if (userRole) {
             // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
             CoverPicker(
@@ -91,6 +100,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                     "Focused full name"
                 )
             }) { fullName = it.take(120) }
+        // User accounts can edit cover and private-entry settings here.
         if (userRole) {
             Field(
                 uiText(R.string.names_of_people_experiencing_abuse_optional),
@@ -211,9 +221,35 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                 stringResource(R.string.change_password)
             )
         }
+        // Only do this when user role.
         if (userRole) {
             HorizontalDivider()
             SafeEntrySettings(session)
+            HorizontalDivider()
+            Text(
+                stringResource(R.string.documents_recent_cache_title),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { heading() },
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.documents_recent_cache_help),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = session.media?.recentCachingEnabled == true,
+                    onCheckedChange = { enabled ->
+                        cacheUid?.let { session.media?.setRecentCachingPreference(it, enabled) }
+                    },
+                    enabled = cacheUid != null,
+                    modifier = Modifier.testTag("recent_file_caching"),
+                )
+            }
             HorizontalDivider()
             Text(
                 stringResource(R.string.change_trigger_word),
@@ -310,6 +346,7 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
                 .semantics { this.selected = isSelected },
         ) {
             Icon(
+                // Saves the chosen cover, or asks for a backup PIN when the cover needs one.
                 when (type) {
                     CoverType.FOOD -> Icons.Outlined.LocalDining
                     CoverType.NEWS -> Icons.Outlined.Newspaper

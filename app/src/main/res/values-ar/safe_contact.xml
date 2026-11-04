@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">جارٍ تحضير الرفع المشفر</string>
     <string name="documents_preparing_upload_help">تتم معالجة الملف المحدد وتشفيره على هذا الجهاز.</string>
     <string name="documents_upload_queued">في انتظار الاتصال</string>
-    <string name="documents_upload_waiting_retry">في انتظار إعادة المحاولة</string>
+    <string name="documents_upload_waiting_retry">تم إيقاف الرفع مؤقتًا — ستتم إعادة المحاولة تلقائيًا</string>
     <string name="documents_upload_starting">جارٍ بدء الرفع الآمن</string>
     <string name="documents_upload_progress">جارٍ الرفع %1$d%%</string>
     <string name="documents_upload_finalizing">جارٍ إنهاء الرفع الآمن</string>
@@ -80,4 +80,23 @@
     <string name="documents_share_help">اختر حتى 10 أصدقاء مقبولين. لا يمكن فتح الملف إلا من الحسابات المحددة.</string>
     <string name="open">فتح</string>
     <string name="share">مشاركة</string>
+    <string name="documents_offline_index">يتم عرض الفهرس المشفر بلا اتصال. ستتم مزامنة التغييرات عند الاتصال.</string>
+    <string name="documents_not_available_offline">هذا الملف غير متاح بلا اتصال حتى الآن.</string>
+    <string name="documents_make_available_offline">إتاحة بلا اتصال</string>
+    <string name="documents_remove_offline_copy">إزالة النسخة غير المتصلة</string>
+    <string name="documents_saving_offline">جارٍ حفظ نسخة مشفرة بلا اتصال…</string>
+    <string name="documents_available_offline">متاح بلا اتصال</string>
+    <string name="documents_recently_cached">تم حفظه مؤخرًا وقد تتم إزالته تلقائيًا</string>
+    <string name="documents_recent_cache_title">حفظ الملفات الحديثة</string>
+    <string name="documents_recent_cache_help">احتفظ تلقائيًا بالملفات المشفرة المفتوحة مؤخرًا بلا اتصال. تشترك النسخ التلقائية في حد 250 ميغابايت، وهذا الإعداد متوقف افتراضيًا.</string>
+    <string name="documents_offline_revalidation_required">أعد الاتصال لتأكيد الوصول قبل فتح هذا الملف المشترك.</string>
+    <string name="documents_network_required">اتصل بالإنترنت للوصول إلى هذا الملف.</string>
+    <string name="documents_access_revoked">لم يعد لديك وصول إلى هذا الملف. تمت إزالة النسخة غير المتصلة.</string>
+    <string name="documents_offline_copy_corrupt">النسخة غير المتصلة تالفة وتمت إزالتها. نزّلها مرة أخرى.</string>
+    <string name="documents_key_unavailable">لا يملك هذا الجهاز مفتاح تشفير هذا الملف. افتح المستندات على جهاز معتمد سابقًا لهذا الحساب، أو اطلب من مالك الملف مشاركته مرة أخرى.</string>
+    <string name="documents_account_mismatch">هذه النسخة غير المتصلة تخص حسابًا آخر.</string>
+    <string name="documents_storage_full">لا توجد مساحة كافية لهذه النسخة غير المتصلة.</string>
+    <string name="documents_download_failed">تعذر تنزيل الملف المشفر. حاول مرة أخرى.</string>
+    <string name="documents_device_verification_failed">تعذر التحقق من تثبيت التطبيق. أعد فتح التطبيق وحاول مرة أخرى.</string>
+    <string name="documents_open_failed">تعذر فتح الملف المشفر.</string>
 </resources>

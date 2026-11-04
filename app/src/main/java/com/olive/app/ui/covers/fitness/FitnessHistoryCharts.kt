@@ -30,7 +30,10 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -72,112 +75,7 @@ private data class ChartAxisScale(
         }
 }
 
-@Composable
-internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
-    val distance = FitnessMath.distanceKm(snapshot.stepsToday, snapshot.profile.heightCm)
-    val burned = FitnessMath.walkingCalories(snapshot.stepsToday, snapshot.profile)
-    val progress = (
-        snapshot.stepsToday.toFloat() / snapshot.profile.stepGoal.coerceAtLeast(1).toFloat()
-    ).coerceIn(0f, 1f)
-    val dashboardDescription = stringResource(
-        R.string.fitness_activity_dashboard_description,
-        snapshot.stepsToday,
-        distance,
-        burned,
-    )
-
-    Card(
-        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-            contentDescription = dashboardDescription
-        },
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF263722)),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                stringResource(R.string.daily_activity),
-                color = Paper,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(13.dp),
-                ) {
-                    DashboardMetric(
-                        value = snapshot.stepsToday.toString(),
-                        label = stringResource(R.string.fitness_steps_unit),
-                        color = Color(0xFFA7CA65),
-                    )
-                    DashboardMetric(
-                        value = String.format(Locale.ROOT, "%.2f", distance),
-                        label = stringResource(R.string.fitness_kilometres_unit),
-                        color = Color(0xFF53BBD8),
-                    )
-                    DashboardMetric(
-                        value = burned.roundToInt().toString(),
-                        label = stringResource(R.string.fitness_kilocalories_unit),
-                        color = FatPlum,
-                    )
-                }
-                ActivityProgressRings(progress)
-            }
-        }
-    }
-}
-
-@Composable
-private fun DashboardMetric(value: String, label: String, color: Color) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Spacer(Modifier.size(13.dp).background(color, CircleShape))
-        Text(
-            value,
-            color = Paper,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(label, color = Paper.copy(alpha = 0.72f))
-    }
-}
-
-@Composable
-private fun ActivityProgressRings(progress: Float) {
-    Canvas(Modifier.size(142.dp)) {
-        val centre = Offset(size.width / 2f, size.height / 2f)
-        val widths = listOf(11.dp.toPx(), 10.dp.toPx(), 9.dp.toPx())
-        val radii = listOf(size.minDimension * 0.43f, size.minDimension * 0.32f, size.minDimension * 0.21f)
-        val colours = listOf(Color(0xFFA7CA65), Color(0xFF53BBD8), FatPlum)
-        radii.indices.forEach { index ->
-            drawCircle(
-                color = Paper.copy(alpha = 0.12f),
-                radius = radii[index],
-                center = centre,
-                style = Stroke(widths[index]),
-            )
-            drawArc(
-                color = colours[index],
-                startAngle = -90f,
-                sweepAngle = 360f * progress,
-                useCenter = false,
-                topLeft = Offset(centre.x - radii[index], centre.y - radii[index]),
-                size = androidx.compose.ui.geometry.Size(radii[index] * 2f, radii[index] * 2f),
-                style = Stroke(widths[index], cap = StrokeCap.Round),
-            )
-        }
-    }
-}
-
+// Draws the fitness history charts for the fitness cover.
 @Composable
 internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
     val stepsUnit = stringResource(R.string.fitness_steps_unit)
@@ -191,6 +89,7 @@ internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
                 style = MaterialTheme.typography.headlineSmall,
                 color = Ink,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
             )
             Text(
                 text = stringResource(R.string.fitness_history_description),
@@ -273,6 +172,7 @@ internal fun FitnessHistoryCharts(days: List<FitnessHistoryDay>) {
     }
 }
 
+// Groups a graph, its legend, and the latest values for one fitness measure.
 @Composable
 private fun HistoryLineChartCard(
     title: String,
@@ -285,21 +185,26 @@ private fun HistoryLineChartCard(
     val highestValue = series.maxOfOrNull { line -> line.values.maxOrNull() ?: 0f }
         ?.coerceAtLeast(1f) ?: 1f
     val axisScale = calculateChartAxisScale(highestValue)
-    val chartDescription = stringResource(R.string.fitness_chart_description, title, days.size)
-    val latestDescriptions = series.map { line ->
-        val latest = line.values.lastOrNull() ?: 0f
+    val chartDescription = pluralStringResource(
+        R.plurals.fitness_chart_description,
+        days.size,
+        title,
+        days.size,
+    )
+    val averageDescriptions = series.map { line ->
+        val average = if (line.values.isEmpty()) 0f else line.values.average().toFloat()
         stringResource(
-            R.string.fitness_chart_latest,
+            R.string.fitness_chart_average,
             line.name,
-            valueText(latest),
+            valueText(average),
             unit,
         )
     }
-    val description = buildString {
+    val overviewDescription = buildString {
         append(chartDescription)
         append(' ')
-        latestDescriptions.forEach { latest ->
-            append(latest)
+        averageDescriptions.forEach { average ->
+            append(average)
             append(' ')
         }
     }
@@ -315,7 +220,9 @@ private fun HistoryLineChartCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clearAndSetSemantics {
+                    contentDescription = overviewDescription
+                },
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom,
             ) {
@@ -339,7 +246,7 @@ private fun HistoryLineChartCard(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().clearAndSetSemantics { },
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 series.forEach { line -> HistoryLegendItem(line, unit, valueText) }
@@ -348,7 +255,7 @@ private fun HistoryLineChartCard(
             HistoryChart(
                 series = series,
                 axisScale = axisScale,
-                description = description,
+                description = chartDescription,
                 useBars = useBars,
                 valueText = valueText,
             )
@@ -357,6 +264,7 @@ private fun HistoryLineChartCard(
     }
 }
 
+// Names one line in the graph and shows its latest recorded value.
 @Composable
 private fun HistoryLegendItem(
     series: HistorySeries,
@@ -383,6 +291,7 @@ private fun HistoryLegendItem(
     }
 }
 
+// Draws the graph lines or bars and labels its vertical scale.
 @Composable
 private fun HistoryChart(
     series: List<HistorySeries>,
@@ -393,10 +302,12 @@ private fun HistoryChart(
 ) {
     Row(Modifier.fillMaxWidth().height(145.dp)) {
         Column(
-            modifier = Modifier.width(42.dp).fillMaxHeight().padding(vertical = 8.dp),
+            modifier = Modifier.width(42.dp).fillMaxHeight().padding(vertical = 8.dp)
+                .clearAndSetSemantics { },
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.End,
         ) {
+            // Put the largest scale label at the top of the graph.
             axisScale.labelsDescending.forEach { axisValue ->
                 Text(
                     text = valueText(axisValue),
@@ -407,7 +318,7 @@ private fun HistoryChart(
         }
         Spacer(Modifier.width(8.dp))
         Canvas(
-            modifier = Modifier.weight(1f).fillMaxHeight().semantics {
+            modifier = Modifier.weight(1f).fillMaxHeight().clearAndSetSemantics {
                 contentDescription = description
             }
         ) {
@@ -417,6 +328,7 @@ private fun HistoryChart(
             val chartHeight = size.height - verticalPadding * 2f
 
             val axisLabels = axisScale.labelsDescending
+            // Draw a guide line beside every vertical-axis label.
             axisLabels.forEachIndexed { index, _ ->
                 val y = verticalPadding + chartHeight * index / (axisLabels.size - 1).coerceAtLeast(1).toFloat()
                 drawLine(
@@ -427,6 +339,7 @@ private fun HistoryChart(
                 )
             }
 
+            // Distance and calorie charts use bars to compare each day.
             if (useBars) {
                 drawHistoryBars(
                     series,
@@ -439,9 +352,11 @@ private fun HistoryChart(
                 return@Canvas
             }
 
+            // Draw one colored line for each measure in the chart.
             series.forEach { line ->
                 if (line.values.isEmpty()) return@forEach
                 val path = Path()
+                // Place each reading at its matching day on the graph.
                 line.values.forEachIndexed { index, value ->
                     val fraction = if (line.values.size == 1) 0.5f else {
                         index.toFloat() / (line.values.size - 1).toFloat()
@@ -460,6 +375,7 @@ private fun HistoryChart(
                         join = StrokeJoin.Round,
                     ),
                 )
+                // Mark the daily readings so they are easy to pick out.
                 line.values.forEachIndexed { index, value ->
                     val fraction = if (line.values.size == 1) 0.5f else {
                         index.toFloat() / (line.values.size - 1).toFloat()
@@ -492,6 +408,7 @@ private fun calculateChartAxisScale(highestValue: Float): ChartAxisScale {
     return ChartAxisScale(maximum = maximum, increment = increment)
 }
 
+// Draws separate bars for each daily measure in the fitness history chart.
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHistoryBars(
     series: List<HistorySeries>,
     highestValue: Float,
@@ -506,7 +423,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHistoryBars(
     val barCount = series.size.coerceAtLeast(1)
     val barWidth = (groupWidth * 0.58f / barCount).coerceAtLeast(2.dp.toPx())
 
+    // Give each measure its own position inside the day's bar group.
     series.forEachIndexed { seriesIndex, line ->
+        // Skip empty readings and draw the rest from the chart baseline.
         line.values.forEachIndexed { dayIndex, rawValue ->
             val value = rawValue.takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f
             if (value == 0f) return@forEachIndexed
@@ -525,13 +444,14 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHistoryBars(
     }
 }
 
+// Labels the first, middle, and last day shown in the graph.
 @Composable
 private fun HistoryDateAxis(days: List<FitnessHistoryDay>) {
     if (days.isEmpty()) return
     val locale = LocalConfiguration.current.locales[0]
     val dateFormat = DateTimeFormatter.ofPattern("MMM d", locale)
     val middle = days[days.lastIndex / 2].date.format(dateFormat)
-    Row(Modifier.fillMaxWidth()) {
+    Row(Modifier.fillMaxWidth().clearAndSetSemantics { }) {
         Spacer(Modifier.width(50.dp))
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(days.first().date.format(dateFormat), color = Muted, style = MaterialTheme.typography.labelSmall)

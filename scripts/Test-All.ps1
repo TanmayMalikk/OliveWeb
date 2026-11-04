@@ -5,11 +5,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# Node warns when both color controls are inherited from the launching terminal. Keep the explicit
+# FORCE_COLOR preference and remove the contradictory opt-out for all child npm/Playwright runs.
+if ($env:FORCE_COLOR -and $env:NO_COLOR) { Remove-Item Env:NO_COLOR }
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $completedChecks = [System.Collections.Generic.List[string]]::new()
 $testReportDirectory = Join-Path $projectRoot "build\reports"
 New-Item -ItemType Directory -Force -Path $testReportDirectory | Out-Null
 Remove-Item -LiteralPath (Join-Path $projectRoot "app\build\test-results\testDebugUnitTest") -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath (Join-Path $projectRoot "wear\build\test-results\testDebugUnitTest") -Recurse -Force -ErrorAction SilentlyContinue
 @(
     "current-test-check.txt",
     "failed-test-check.txt",
@@ -25,6 +29,25 @@ $androidJava = "C:\Program Files\Android\Android Studio\jbr"
 if (Test-Path -LiteralPath $androidJava) {
     $env:JAVA_HOME = $androidJava
     $env:Path = "$androidJava\bin;$env:Path"
+}
+
+$nodePath = "C:\Program Files\nodejs"
+if (Test-Path -LiteralPath (Join-Path $nodePath "npm.cmd")) {
+    # Firebase 13 requires Node 24.12 or newer. Prefer the supported system install even when
+    # an older Node/npm pair appears earlier in the caller's PATH.
+    $env:Path = "$nodePath;$env:Path"
+} elseif (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    $nodeDirs = @(
+        "C:\Program Files\nodejs",
+        "${env:ProgramFiles(x86)}\nodejs",
+        "$env:APPDATA\npm",
+        "$env:LOCALAPPDATA\npm"
+    )
+    foreach ($dir in $nodeDirs) {
+        if ($dir -and (Test-Path -LiteralPath $dir)) {
+            $env:Path = "$dir;$env:Path"
+        }
+    }
 }
 
 # Firebase's bundled Storage rules runtime still calls APIs that produce
@@ -110,13 +133,15 @@ function Install-AndroidTestApk {
 }
 
 Set-Location -LiteralPath $projectRoot
-Invoke-Checked "Android unit tests, debug APK, UI-test APK, and lint" {
-    & ".\gradlew.bat" testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug checkArchitecture
+Invoke-Checked "Android and Wear unit tests, APKs, UI-test APK, and lint" {
+    & ".\gradlew.bat" :app:testDebugUnitTest :wear:testDebugUnitTest :app:assembleDebug :wear:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :wear:lintDebug checkArchitecture
 }
 @(
     "$projectRoot\app\build\outputs\apk\debug\app-debug.apk",
     "$projectRoot\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk",
-    "$projectRoot\app\build\reports\lint-results-debug.html"
+    "$projectRoot\app\build\reports\lint-results-debug.html",
+    "$projectRoot\wear\build\outputs\apk\debug\wear-debug.apk",
+    "$projectRoot\wear\build\reports\lint-results-debug.html"
 ).ForEach({ if (-not (Test-Path -LiteralPath $_)) { throw "Required test artifact was not created: $_" } })
 $completedChecks.Add("Required Android artifacts created")
 
@@ -139,17 +164,26 @@ if (-not $SkipFirebaseRules) {
     Push-Location -LiteralPath "$projectRoot\firebase"
     $previousJavaHome = $env:JAVA_HOME
     $previousPath = $env:Path
+    $previousNoGceCheck = $env:NO_GCE_CHECK
+    $previousNodeNoWarnings = $env:NODE_NO_WARNINGS
     try {
         if ($firebaseJava) {
             $env:JAVA_HOME = $firebaseJava
             $env:Path = "$firebaseJava\bin;$previousPath"
             Write-Host "Using Java 21 for Firebase emulator tests: $firebaseJava" -ForegroundColor Cyan
         }
+        # Emulator tests are always local and must not probe cloud VM metadata endpoints.
+        $env:NO_GCE_CHECK = "true"
+        # The Admin SDK probes VM metadata as a fallback during intentionally offline emulator
+        # tests. Keep that expected failed probe from surfacing as a Node process warning.
+        $env:NODE_NO_WARNINGS = "1"
         if (-not (Test-Path -LiteralPath "node_modules")) { Invoke-Checked "Install Firebase test dependencies" { & npm.cmd ci } }
         Invoke-Checked "Firestore and Storage rules tests" { & npm.cmd test }
     } finally {
         $env:JAVA_HOME = $previousJavaHome
         $env:Path = $previousPath
+        $env:NO_GCE_CHECK = $previousNoGceCheck
+        $env:NODE_NO_WARNINGS = $previousNodeNoWarnings
         Pop-Location
     }
 }
@@ -311,7 +345,7 @@ if ($WithDeviceTests) {
             $deviceResult = $instrumentationOutput -join "`n"
             $countMatch = [regex]::Match($deviceResult, 'OK \(([1-9][0-9]*) tests?\)')
             $passed = $LASTEXITCODE -eq 0 -and $countMatch.Success -and $deviceResult -notmatch 'FAILURES!!!'
-            $frameworkCrash = $deviceResult -match 'shortMsg=Process crashed|Activity client record must not be null'
+            $frameworkCrash = $deviceResult -match 'shortMsg=Process crashed|Activity client record must not be null|INSTRUMENTATION_ABORTED: System has crashed'
             if (-not $passed -and $attempt -eq 1 -and $frameworkCrash) {
                 Write-Warning "Android framework crashed during $testCase; retrying once in a clean process."
             }

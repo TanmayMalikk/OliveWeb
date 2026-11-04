@@ -31,6 +31,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         hideKeyboard()
     }
 
+    // Checks the clean install opens onboarding only after the olive is double tapped step with the test's sample data.
     @Test
     fun cleanInstallOpensOnboardingOnlyAfterTheOliveIsDoubleTapped() {
         waitCover()
@@ -46,6 +47,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("new_user").assertIsDisplayed()
     }
 
+    // Checks the credentials use live requirements and inline errors step with the test's sample data.
     @Test
     fun credentialsUseLiveRequirementsAndInlineErrors() {
         openOnboarding()
@@ -61,6 +63,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("onboarding_progress").assertContentDescriptionEquals("Step 1 / 4")
     }
 
+    // Checks the safe contact gets shorter onboarding and no cover step with the test's sample data.
     @Test
     fun safeContactGetsShorterOnboardingAndNoCover() {
         openOnboarding()
@@ -107,6 +110,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("sign_out").assertExists()
     }
 
+    // Checks the onboarding needs city but not afull delivery address step with the test's sample data.
     @Test
     fun onboardingNeedsCityButNotAFullDeliveryAddress() {
         openOnboarding()
@@ -171,6 +175,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         }
     }
 
+    // Checks the onboarding contacts quick exit and returning user step with the test's sample data.
     @Test
     fun onboardingContactsQuickExitAndReturningUser() {
         register(username = "returning_user_tester")
@@ -193,11 +198,14 @@ class OnboardingFlowTest : OliveUiTestBase() {
         click("new_private_entry")
         click("private_kind_incident")
         fill("private_entry_title", "Private incident")
+        fill("incident_date", "2026-11-02")
+        fill("incident_location", "Edmonton")
         fill("private_entry_body", "Details that must stay inside Olive Branch")
         click("save_private_entry")
         compose.waitUntil(30_000) {
-            compose.onAllNodesWithText("Details that must stay inside Olive Branch")
-                .fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithTag("private_editor_title").fetchSemanticsNodes().isEmpty() &&
+                compose.onAllNodesWithText("Details that must stay inside Olive Branch")
+                    .fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
@@ -221,6 +229,9 @@ class OnboardingFlowTest : OliveUiTestBase() {
                 PrivateEntryKind.Incident,
                 "Private incident",
                 "Updated private incident details",
+                "2026-11-02",
+                "about 13:00",
+                "Edmonton, Alberta",
             )
         }
         compose.waitUntil(30_000) {
@@ -236,8 +247,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
                 },
             )
         }
-        waitFor("private_edit_log")
-        compose.onNodeWithTag("private_edit_log").performClick()
+        click("private_edit_log")
         compose.onNodeWithText("Edit log").assertExists()
         compose.onNodeWithText("Details that must stay inside Olive Branch", substring = true)
             .assertExists()

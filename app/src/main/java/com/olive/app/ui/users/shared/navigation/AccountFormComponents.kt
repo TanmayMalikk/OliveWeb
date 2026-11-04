@@ -88,6 +88,7 @@ internal fun Heading(
     focusKey: Any? = title,
 ) {
     val focusRequester = remember { FocusRequester() }
+    // Moves TalkBack focus to the new form heading after the account step changes.
     LaunchedEffect(focusKey) {
         if (focusKey != null) {
             withFrameNanos { }
@@ -121,6 +122,7 @@ internal fun ModeNotice(session: SessionViewModel) {
 // Announces status changes to TalkBack and shows when the app is busy.
 @Composable
 internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
+    // Shows the account form message only when there is text to explain.
     if (showMessage) session.message?.let {
         AccessibleMessage(
             it,

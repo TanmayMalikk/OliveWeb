@@ -22,6 +22,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    packaging {
+        jniLibs.keepDebugSymbols += setOf(
+            "**/libc++_shared.so",
+            "**/libonnxruntime.so",
+            "**/libonnxruntime4j_jni.so",
+            "**/libopencv_java4.so",
+        )
+    }
 }
 
 dependencies {

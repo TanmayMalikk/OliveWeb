@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SafeContactTest {
+    // Builds a complete sample profile for this test.
     private fun profile(contact: SafeContact) = UserProfile(
         username = "trusted_contact_test",
         fullName = "Test User",

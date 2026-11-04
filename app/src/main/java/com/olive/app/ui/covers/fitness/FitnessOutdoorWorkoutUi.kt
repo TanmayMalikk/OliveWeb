@@ -42,12 +42,20 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -65,7 +73,7 @@ import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-
+// Shows workout type, live controls, route, and recent outdoor workouts.
 @Composable
 internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     val context = LocalContext.current
@@ -76,6 +84,8 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     var selectedType by remember { mutableStateOf(OutdoorWorkoutType.WALK) }
     var pendingType by remember { mutableStateOf<OutdoorWorkoutType?>(null) }
     var permissionDenied by remember { mutableStateOf(false) }
+    var previousActive by remember { mutableStateOf(workout.active) }
+    val workoutHeadingFocus = remember { FocusRequester() }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
@@ -89,7 +99,9 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
         }
     }
 
+    // Refreshes the active workout and recent history once each second.
     LaunchedEffect(store) {
+        // Live workout values change outside Compose, so poll the small local store.
         while (true) {
             workout = store.snapshot()
             recentWorkouts = store.history()
@@ -97,7 +109,16 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
             delay(1_000L)
         }
     }
+    // Keep focus in the workout card when starting or finishing changes its controls.
+    LaunchedEffect(workout.active) {
+        if (workout.active != previousActive) {
+            previousActive = workout.active
+            withFrameNanos { }
+            workoutHeadingFocus.requestFocus()
+        }
+    }
 
+    // Starts GPS tracking now, or asks for precise location first.
     fun startWorkout(type: OutdoorWorkoutType) {
         val preciseLocationGranted = ContextCompat.checkSelfPermission(
             context,
@@ -131,15 +152,24 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                val workoutTitle = stringResource(R.string.fitness_outdoor_workout)
+                val workoutSubtitle = stringResource(R.string.fitness_outdoor_workout_description)
+                Column(
+                    Modifier.weight(1f).focusRequester(workoutHeadingFocus).focusable()
+                        .clearAndSetSemantics {
+                            contentDescription = "$workoutTitle. $workoutSubtitle"
+                            heading()
+                        },
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
                     Text(
-                        stringResource(R.string.fitness_outdoor_workout),
+                        workoutTitle,
                         color = Ink,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        stringResource(R.string.fitness_outdoor_workout_description),
+                        workoutSubtitle,
                         color = Muted,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -152,6 +182,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
                 }
             }
 
+            // Show live controls during a workout; otherwise show the start choices.
             if (workout.active) {
                 ActiveWorkoutContent(
                     workout = workout,
@@ -188,6 +219,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
     }
 }
 
+// Draws the workout type selector for the fitness cover.
 @Composable
 private fun WorkoutTypeSelector(
     selected: OutdoorWorkoutType,
@@ -204,7 +236,7 @@ private fun WorkoutTypeSelector(
         }
     }
 }
-
+// Draws one selectable walking, running, cycling, or hiking option.
 @Composable
 private fun WorkoutTypeChip(
     modifier: Modifier,
@@ -227,7 +259,7 @@ private fun WorkoutTypeChip(
         modifier = modifier,
     )
 }
-
+// Shows live distance, duration, pace, map, pause, and finish controls.
 @Composable
 private fun ActiveWorkoutContent(
     workout: OutdoorWorkoutSnapshot,
@@ -278,6 +310,7 @@ private fun ActiveWorkoutContent(
     }
 }
 
+// Draws the workout location map for the fitness cover.
 @Composable
 private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: Long) {
     val points = workout.route
@@ -285,6 +318,7 @@ private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: L
         modifier = Modifier.fillMaxWidth().height(220.dp).clip(RoundedCornerShape(20.dp)),
         contentAlignment = Alignment.Center,
     ) {
+        // Hide the route map until the workout has at least one GPS point.
         if (points.isEmpty()) {
             Text(
                 stringResource(R.string.fitness_waiting_for_gps),
@@ -323,6 +357,7 @@ private fun WorkoutLocationMap(workout: OutdoorWorkoutSnapshot, elapsedMillis: L
     }
 }
 
+// Shows up to five recent outdoor workouts.
 @Composable
 private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
     Column(
@@ -333,10 +368,18 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
             stringResource(R.string.fitness_recent_outdoor_workouts),
             color = Ink,
             fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { heading() },
         )
         workouts.take(5).forEach { workout ->
+            val workoutDescription = buildString {
+                append(workoutTypeLabel(workout.type))
+                append(". ${formatWorkoutDate(workout.finishedAt)}. ")
+                append("${stringResource(R.string.distance)}, ${formatDistance(workout.distanceMeters)}. ")
+                append("${stringResource(R.string.fitness_duration)}, ${formatDuration(workout.elapsedMillis())}.")
+            }
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(PaleOlive)
+                    .clearAndSetSemantics { contentDescription = workoutDescription }
                     .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -370,17 +413,24 @@ private fun RecentWorkoutHistory(workouts: List<OutdoorWorkoutSnapshot>) {
         }
     }
 }
-
+// Draws one live workout value and its label.
 @Composable
 private fun WorkoutMetric(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clearAndSetSemantics {
+            contentDescription = "$label, $value"
+        },
+    ) {
         Text(value, color = Ink, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         Text(label, color = Muted, style = MaterialTheme.typography.labelSmall)
     }
 }
 
+// Formats the workout type label shown by the fitness cover.
 @Composable
 private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
+    // Gives each workout type its translated label.
     when (type) {
         OutdoorWorkoutType.WALK -> R.string.fitness_walking
         OutdoorWorkoutType.RUN -> R.string.fitness_running
@@ -389,9 +439,11 @@ private fun workoutTypeLabel(type: OutdoorWorkoutType) = stringResource(
     }
 )
 
+// Formats workout metres as kilometres.
 private fun formatDistance(distanceMeters: Double) =
     String.format(Locale.ROOT, "%.2f km", distanceMeters / 1_000.0)
 
+// Formats workout time as hours, minutes, and seconds.
 private fun formatDuration(elapsedMillis: Long): String {
     val totalSeconds = elapsedMillis / 1_000L
     val hours = totalSeconds / 3_600L
@@ -404,12 +456,14 @@ private fun formatDuration(elapsedMillis: Long): String {
     }
 }
 
+// Formats average workout pace in minutes per kilometre.
 private fun formatPace(pace: Double?) = pace?.let {
     val minutes = it.toInt()
     val seconds = ((it - minutes) * 60.0).toInt().coerceIn(0, 59)
     String.format(Locale.ROOT, "%d:%02d /km", minutes, seconds)
 } ?: "--"
 
+// Formats the completed workout date for recent history.
 private fun formatWorkoutDate(timestamp: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(timestamp))
 

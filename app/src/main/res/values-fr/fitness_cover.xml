@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="overview">Aperçu</string>
     <string name="activity">Activité</string>
     <string name="nutrition">Nutrition</string>
     <string name="nutrition_work_in_progress">Nutrition (EN COURS DE DÉVELOPPEMENT)</string>
@@ -12,7 +11,6 @@
     <string name="distance">Distance</string>
     <string name="active_calories">Calories actives</string>
     <string name="fitness_tracker">Suivi de la forme</string>
-    <string name="food">Aliments</string>
     <string name="goals">Objectifs</string>
     <string name="meals">Repas</string>
     <string name="add_food">Ajouter un aliment</string>
@@ -40,7 +38,6 @@
     <string name="protein_goal">Objectif quotidien de protéines (g)</string>
     <string name="carbohydrate_goal">Objectif quotidien de glucides (g)</string>
     <string name="fat_goal">Objectif quotidien de lipides (g)</string>
-    <string name="fitness_distance_and_calories">%1$.2f km · environ %2$.0f kcal actives</string>
     <string name="fatsecret_attribution">Propulsé par l’API FatSecret Platform</string>
     <string name="open_food_facts_attribution">Données des aliments emballés fournies par Open Food Facts</string>
     <string name="fitness_cover_choice">Application de forme · Suivi de la forme</string>
@@ -51,8 +48,13 @@
     <string name="fitness_history_daily_total">Total quotidien</string>
     <string name="fitness_history_max">Maximum %1$s %2$s</string>
     <string name="fitness_history_latest">%1$s %2$s</string>
-    <string name="fitness_chart_description">Graphique %1$s sur %2$d jours.</string>
+    <plurals name="fitness_chart_description">
+        <item quantity="one">Graphique %1$s sur %2$d jour.</item>
+        <item quantity="many">Graphique %1$s sur %2$d jours.</item>
+        <item quantity="other">Graphique %1$s sur %2$d jours.</item>
+    </plurals>
     <string name="fitness_chart_latest">Dernier résultat %1$s : %2$s %3$s.</string>
+    <string name="fitness_chart_average">Moyenne de %1$s : %2$s %3$s.</string>
     <string name="fitness_calories_burned">Dépensées</string>
     <string name="fitness_calories_eaten">Consommées</string>
     <string name="fitness_macros">Macronutriments</string>
@@ -61,7 +63,11 @@
     <string name="fitness_kilometres_unit">km</string>
     <string name="fitness_kilocalories_unit">kcal</string>
     <string name="fitness_grams_unit">g</string>
-    <string name="fitness_activity_dashboard_description">Activité quotidienne : %1$d pas, %2$.2f kilomètres, %3$.0f calories dépensées.</string>
+    <plurals name="fitness_activity_dashboard_description">
+        <item quantity="one">Activité quotidienne : %1$d pas, %2$.2f kilomètres, %3$.0f calories dépensées.</item>
+        <item quantity="many">Activité quotidienne : %1$d pas, %2$.2f kilomètres, %3$.0f calories dépensées.</item>
+        <item quantity="other">Activité quotidienne : %1$d pas, %2$.2f kilomètres, %3$.0f calories dépensées.</item>
+    </plurals>
     <string name="fitness_steps">Pas</string>
     <string name="fitness_vitals">Signes vitaux</string>
     <string name="fitness_vitals_today_description">Résumés de fréquence cardiaque provenant d’une montre Wear OS connectée.</string>
@@ -80,9 +86,10 @@
     <string name="fitness_vitals_no_recent_readings">Une montre Wear OS s’est connectée au cours des 14 derniers jours, mais aucune mesure de fréquence cardiaque n’est disponible. Ouvrez Olive Fitness sur la montre et autorisez l’accès à la fréquence cardiaque.</string>
     <string name="fitness_heart_rate_graph">Fréquence cardiaque</string>
     <string name="fitness_vitals_no_data">— Aucune donnée —</string>
-    <string name="fitness_vitals_graph_description">Graphique de fréquence cardiaque avec %1$d jours de données, de %2$d à %3$d battements par minute.</string>
     <string name="fitness_vitals_range">%1$d–%2$d bpm</string>
     <string name="fitness_vitals_average">Fréquence cardiaque moyenne %1$d bpm</string>
+    <string name="fitness_previous_day">Afficher le jour précédent</string>
+    <string name="fitness_next_day">Afficher le jour suivant</string>
     <string name="fitness_outdoor_workout">Entraînement extérieur</string>
     <string name="fitness_outdoor_workout_description">Suivez en privé votre trajet GPS, la distance, le temps et l’allure.</string>
     <string name="fitness_start_outdoor_workout">Commencer l’entraînement</string>
@@ -92,9 +99,7 @@
     <string name="fitness_pause">Pause</string>
     <string name="fitness_resume">Reprendre</string>
     <string name="fitness_finish">Terminer</string>
-    <string name="fitness_route_points">Trajet avec %1$d points GPS.</string>
     <string name="fitness_waiting_for_gps">En attente d’une position GPS précise…</string>
-    <string name="fitness_last_outdoor_workout">Dernier entraînement extérieur</string>
     <string name="fitness_recent_outdoor_workouts">Entraînements extérieurs récents</string>
     <string name="fitness_walking">Marche</string>
     <string name="fitness_running">Course</string>

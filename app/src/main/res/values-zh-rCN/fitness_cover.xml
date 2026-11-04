@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="overview">概览</string>
     <string name="activity">活动</string>
     <string name="nutrition">营养</string>
     <string name="nutrition_work_in_progress">营养（开发中）</string>
@@ -12,7 +11,6 @@
     <string name="distance">距离</string>
     <string name="active_calories">活动消耗</string>
     <string name="fitness_tracker">健身记录</string>
-    <string name="food">食物</string>
     <string name="goals">目标</string>
     <string name="meals">餐食</string>
     <string name="add_food">添加食物</string>
@@ -40,7 +38,6 @@
     <string name="protein_goal">每日蛋白质目标（克）</string>
     <string name="carbohydrate_goal">每日碳水目标（克）</string>
     <string name="fat_goal">每日脂肪目标（克）</string>
-    <string name="fitness_distance_and_calories">%1$.2f 公里 · 约 %2$.0f 活动千卡</string>
     <string name="fatsecret_attribution">由 FatSecret Platform API 提供支持</string>
     <string name="open_food_facts_attribution">包装食品数据来自 Open Food Facts</string>
     <string name="fitness_cover_choice">健身应用 · 健身记录</string>
@@ -51,8 +48,11 @@
     <string name="fitness_history_daily_total">每日总计</string>
     <string name="fitness_history_max">最高 %1$s %2$s</string>
     <string name="fitness_history_latest">%1$s %2$s</string>
-    <string name="fitness_chart_description">%1$s的 %2$d 天图表。</string>
+    <plurals name="fitness_chart_description">
+        <item quantity="other">%1$s的 %2$d 天图表。</item>
+    </plurals>
     <string name="fitness_chart_latest">%1$s最新为 %2$s %3$s。</string>
+    <string name="fitness_chart_average">%1$s平均为 %2$s %3$s。</string>
     <string name="fitness_calories_burned">消耗</string>
     <string name="fitness_calories_eaten">摄入</string>
     <string name="fitness_macros">宏量营养素</string>
@@ -61,7 +61,9 @@
     <string name="fitness_kilometres_unit">公里</string>
     <string name="fitness_kilocalories_unit">千卡</string>
     <string name="fitness_grams_unit">克</string>
-    <string name="fitness_activity_dashboard_description">每日活动：%1$d 步，%2$.2f 公里，消耗 %3$.0f 千卡。</string>
+    <plurals name="fitness_activity_dashboard_description">
+        <item quantity="other">每日活动：%1$d 步，%2$.2f 公里，消耗 %3$.0f 千卡。</item>
+    </plurals>
     <string name="fitness_steps">步数</string>
     <string name="fitness_vitals">生命体征</string>
     <string name="fitness_vitals_today_description">来自已连接 Wear OS 手表的心率摘要。</string>
@@ -80,9 +82,10 @@
     <string name="fitness_vitals_no_recent_readings">过去 14 天内连接过 Wear OS 手表，但没有可用的心率读数。请在手表上打开 Olive Fitness 并允许心率访问。</string>
     <string name="fitness_heart_rate_graph">心率</string>
     <string name="fitness_vitals_no_data">— 无数据 —</string>
-    <string name="fitness_vitals_graph_description">心率图包含 %1$d 天的数据，范围为每分钟 %2$d 到 %3$d 次。</string>
     <string name="fitness_vitals_range">每分钟 %1$d–%2$d 次</string>
     <string name="fitness_vitals_average">平均心率每分钟 %1$d 次</string>
+    <string name="fitness_previous_day">显示前一天</string>
+    <string name="fitness_next_day">显示后一天</string>
     <string name="fitness_outdoor_workout">户外锻炼</string>
     <string name="fitness_outdoor_workout_description">私密记录 GPS 路线、距离、时间和配速。</string>
     <string name="fitness_start_outdoor_workout">开始户外锻炼</string>
@@ -92,9 +95,7 @@
     <string name="fitness_pause">暂停</string>
     <string name="fitness_resume">继续</string>
     <string name="fitness_finish">结束</string>
-    <string name="fitness_route_points">锻炼路线包含 %1$d 个 GPS 点。</string>
     <string name="fitness_waiting_for_gps">正在等待精确的 GPS 位置…</string>
-    <string name="fitness_last_outdoor_workout">上次户外锻炼</string>
     <string name="fitness_recent_outdoor_workouts">最近的户外锻炼</string>
     <string name="fitness_walking">步行</string>
     <string name="fitness_running">跑步</string>

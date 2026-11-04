@@ -19,10 +19,9 @@ const crypto = require("node:crypto");
 /**
  * Encrypted-media control plane.
  *
- * The Android app sends only ciphertext facts, encrypted metadata, and public-key-wrapped AES keys
- * to these callables. The large encrypted body moves directly between OkHttp and Cloudflare R2 by
- * means of short-lived signed URLs. Consequently Firebase authorizes and records the transfer but
- * never proxies or decrypts user content.
+ * The Android app sends ciphertext facts, encrypted metadata, public-key-wrapped AES keys, and one
+ * callable-only account recovery copy. The large encrypted body moves directly between clients and
+ * Cloudflare R2. Firebase authorizes recovery but never receives or stores plaintext file content.
  *
  * Architectural relationships:
  *   Android MediaRepository -> Firebase callable in this module -> Firestore + R2 signing API
@@ -72,6 +71,15 @@ function client() {
 function string(value, name, max) {
   if (typeof value !== "string" || value.length === 0 || value.length > max) {
     throw new HttpsError("invalid-argument", `Invalid ${name}`);
+  }
+  return value;
+}
+/** Validates the 256-bit recovery copy used by authenticated account devices. */
+function accountAccessKey(value, required = false) {
+  if ((value == null || value === "") && !required) return "";
+  if (typeof value !== "string" || value.length > 64 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(value) || Buffer.from(value, "base64").length !== 32) {
+    throw new HttpsError("invalid-argument", "Invalid accountAccessKey");
   }
   return value;
 }
@@ -138,6 +146,12 @@ function uploadRequest(data, uid) {
   ) {
     throw new HttpsError("invalid-argument", "Invalid encryptionVersion");
   }
+  // Older Android builds did not send device-specific copies. Keep those uploads working; an
+  // updated authorized device can add its per-device copies after the record is published.
+  const deviceWrappedKeys = data?.deviceWrappedKeys == null
+    ? {}
+    : validateDeviceWrappedKeys(data.deviceWrappedKeys, uid);
+  const recoveryKey = accountAccessKey(data?.accountAccessKey);
   return {
     jobId,
     size,
@@ -146,7 +160,23 @@ function uploadRequest(data, uid) {
     allowedUsers,
     wrappedKeys,
     encryptionVersion,
+    deviceWrappedKeys,
+    accountAccessKey: recoveryKey,
   };
+}
+
+/** Validates wrapped AES keys whose private halves stay on one account's devices. */
+function validateDeviceWrappedKeys(value, uid) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  const entries = Object.entries(value);
+  if (entries.length < 1 || entries.length > 50 || entries.some(([id, wrapped]) =>
+    !id.startsWith(`${uid}--`) || id.length > 300 || typeof wrapped !== "string" ||
+    wrapped.length < 1 || wrapped.length > 2048)) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  return Object.fromEntries(entries);
 }
 
 /** Validates a complete replacement access list for an already-published encrypted object. */
@@ -175,7 +205,34 @@ function accessRequest(data, uid) {
   ) {
     throw new HttpsError("invalid-argument", "Invalid wrappedKeys");
   }
-  return { wrappedKeys, allowedUsers };
+  const deviceWrappedKeys = data?.deviceWrappedKeys == null
+    ? null
+    : validateAccessDeviceWrappedKeys(data.deviceWrappedKeys, allowedUsers);
+  return {wrappedKeys, allowedUsers, deviceWrappedKeys};
+}
+
+/** Validates an exact device-key replacement and rejects wrappers for revoked accounts. */
+function validateAccessDeviceWrappedKeys(value, allowedUsers) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  const entries = Object.entries(value);
+  if (entries.length > 250 || entries.some(([id, wrapped]) => {
+    const owner = allowedUsers.find((uid) => id.startsWith(`${uid}--`));
+    return !owner || id.length <= owner.length + 2 || id.length > 300 ||
+      typeof wrapped !== "string" || wrapped.length < 1 || wrapped.length > 2048;
+  })) {
+    throw new HttpsError("invalid-argument", "Invalid deviceWrappedKeys");
+  }
+  return Object.fromEntries(entries);
+}
+
+/** Evidence updates accept only a real boolean so text and number values cannot change the label. */
+function evidenceRequest(data) {
+  if (typeof data?.evidence !== "boolean") {
+    throw new HttpsError("invalid-argument", "evidence must be true or false");
+  }
+  return data.evidence;
 }
 /** Callable-only resumable session record keyed by the client's stable job id. */
 function pendingRef(jobId) {
@@ -184,6 +241,10 @@ function pendingRef(jobId) {
 /** Published encrypted-media metadata record keyed by the server-generated media id. */
 function mediaRef(mediaId) {
   return db.collection("files").doc(mediaId);
+}
+/** Callable-only account recovery key. Firestore clients have no rule granting this collection. */
+function mediaAccessKeyRef(mediaId) {
+  return db.collection("mediaAccessKeys").doc(mediaId);
 }
 function sessionResponse(value) {
   return {
@@ -219,10 +280,12 @@ function publicRecord(snapshot) {
     objectKey: value.object_key,
     encryptedMetadata: value.encrypted_metadata,
     wrappedKeys: value.wrapped_keys,
+    deviceWrappedKeys: value.device_wrapped_keys || {},
     allowedUsers: value.allowed_users,
     ciphertextSize: value.ciphertext_size,
     ciphertextSha256: value.ciphertext_sha256,
     encryptionVersion: value.encryption_version,
+    evidence: value.evidence === true,
     createdAt: value.created_at?.toMillis?.() || Date.now(),
   };
 }
@@ -246,6 +309,9 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
       found.ciphertextSize !== value.size
     )
       throw new HttpsError("already-exists", "jobId is already in use");
+    if (!found.accountAccessKey && value.accountAccessKey) {
+      await reference.update({accountAccessKey: value.accountAccessKey});
+    }
     return sessionResponse(found);
   }
   const mediaId = crypto.randomUUID();
@@ -280,6 +346,8 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
     ciphertextSha256: value.checksum,
     encryptedMetadata: value.encryptedMetadata,
     wrappedKeys: value.wrappedKeys,
+    deviceWrappedKeys: value.deviceWrappedKeys,
+    accountAccessKey: value.accountAccessKey,
     allowedUsers: value.allowedUsers,
     encryptionVersion: value.encryptionVersion,
     status: "pending",
@@ -390,10 +458,12 @@ exports.mediaCompleteUpload = onCall(options, async (request) => {
     object_key: value.objectKey,
     encrypted_metadata: value.encryptedMetadata,
     wrapped_keys: value.wrappedKeys,
+    device_wrapped_keys: value.deviceWrappedKeys,
     allowed_users: value.allowedUsers,
     ciphertext_size: value.ciphertextSize,
     ciphertext_sha256: value.ciphertextSha256,
     encryption_version: value.encryptionVersion,
+    evidence: false,
     created_at: FieldValue.serverTimestamp(),
   };
   // Publish the media record and mark its session complete atomically.
@@ -402,6 +472,13 @@ exports.mediaCompleteUpload = onCall(options, async (request) => {
     status: "complete",
     completedAt: FieldValue.serverTimestamp(),
   });
+  if (value.accountAccessKey) {
+    batch.create(mediaAccessKeyRef(value.mediaId), {
+      owner_id: uid,
+      key: value.accountAccessKey,
+      created_at: FieldValue.serverTimestamp(),
+    });
+  }
   await batch.commit();
   return publicRecord(await mediaRef(value.mediaId).get());
 });
@@ -451,6 +528,45 @@ exports.mediaDownloadTicket = onCall(options, async (request) => {
   return { url, headers: {}, expiresAt: Date.now() + ticketSeconds * 1000 };
 });
 
+/** Returns the account recovery copy only after checking the current file access list. */
+exports.mediaAccountAccessKey = onCall(options, async (request) => {
+  const uid = caller(request);
+  const mediaId = string(request.data?.mediaId, "mediaId", 64);
+  const [media, recovery] = await Promise.all([
+    mediaRef(mediaId).get(),
+    mediaAccessKeyRef(mediaId).get(),
+  ]);
+  if (!media.exists) throw new HttpsError("not-found", "Media was not found");
+  const value = media.data();
+  if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
+    throw new HttpsError("permission-denied", "Media access was denied");
+  }
+  if (!recovery.exists) {
+    throw new HttpsError("failed-precondition", "This older document has not been upgraded for account access");
+  }
+  return {accountAccessKey: accountAccessKey(recovery.data().key, true)};
+});
+
+/** Lets an owner upgrade a legacy document after decrypting it on any previously authorized device. */
+exports.mediaStoreAccountAccessKey = onCall(options, async (request) => {
+  const uid = caller(request);
+  const mediaId = string(request.data?.mediaId, "mediaId", 64);
+  const key = accountAccessKey(request.data?.accountAccessKey, true);
+  const media = await mediaRef(mediaId).get();
+  if (!media.exists) throw new HttpsError("not-found", "Media was not found");
+  if (media.data().owner_id !== uid) {
+    throw new HttpsError("permission-denied", "Only the owner can upgrade document access");
+  }
+  await mediaAccessKeyRef(mediaId).create({
+    owner_id: uid,
+    key,
+    created_at: FieldValue.serverTimestamp(),
+  }).catch((error) => {
+    if (error?.code !== 6 && error?.code !== "already-exists") throw error;
+  });
+  return {stored: true};
+});
+
 /** Owner-only recipient update; ciphertext and encrypted display metadata remain unchanged. */
 exports.mediaUpdateAccess = onCall(options, async (request) => {
   const uid = caller(request);
@@ -484,6 +600,44 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   return publicRecord(await reference.get());
 });
 
+/** Adds key copies for new phones or browsers without changing who may access the document. */
+exports.mediaUpdateDeviceKeys = onCall(options, async (request) => {
+  const uid = caller(request);
+  const mediaId = string(request.data?.mediaId, "mediaId", 64);
+  const additions = validateDeviceWrappedKeys(request.data?.deviceWrappedKeys, uid);
+  const reference = mediaRef(mediaId);
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
+    const value = snapshot.data();
+    if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
+      throw new HttpsError("permission-denied", "Media access was denied");
+    }
+    const current = value.device_wrapped_keys || {};
+    const merged = {...current, ...additions};
+    if (Object.keys(merged).length > 250) {
+      throw new HttpsError("failed-precondition", "Too many approved devices");
+    }
+    transaction.update(reference, {device_wrapped_keys: merged});
+  });
+  return publicRecord(await reference.get());
+});
+
+/** Changes the owner's evidence label without reading or rewriting encrypted file bytes. */
+exports.mediaUpdateEvidence = onCall(options, async (request) => {
+  const uid = caller(request);
+  const mediaId = string(request.data?.mediaId, "mediaId", 64);
+  const evidence = evidenceRequest(request.data);
+  const reference = mediaRef(mediaId);
+  const snapshot = await reference.get();
+  if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
+  if (snapshot.data().owner_id !== uid) {
+    throw new HttpsError("permission-denied", "Only the owner can change evidence");
+  }
+  await reference.update({evidence});
+  return {mediaId, evidence};
+});
+
 /** Owner-only deletion that removes the R2 object before deleting its Firestore metadata. */
 exports.mediaDelete = onCall(options, async (request) => {
   const uid = caller(request);
@@ -506,12 +660,21 @@ exports.mediaDelete = onCall(options, async (request) => {
       Key: value.object_key,
     }),
   );
-  await reference.delete();
+  const batch = db.batch();
+  batch.delete(reference);
+  batch.delete(mediaAccessKeyRef(mediaId));
+  await batch.commit();
   return { deleted: true };
 });
 
 // Keep validation helpers available to Node tests without exporting another deployed endpoint.
 Object.defineProperty(exports, "_test", {
-  value: { accessRequest },
+  value: {
+    accessRequest,
+    validateDeviceWrappedKeys,
+    validateAccessDeviceWrappedKeys,
+    accountAccessKey,
+    evidenceRequest,
+  },
   enumerable: false,
 });

@@ -20,6 +20,7 @@ export const coverIcons = {
   FITNESS: Dumbbell,
   GAME: Gamepad2,
 };
+// Shows a playable preview of the selected web game cover.
 export function CoverPreview({ cover }: { cover: Cover }) {
   return (
     <div
@@ -261,11 +262,11 @@ export default function Landing() {
         <Logo small />
         <p>A familiar place. A little more room.</p>
         <a
-          href={siteHref("/download")}
+          href={siteHref("/get")}
           className="text-link"
           onClick={(event) => {
             event.preventDefault();
-            go("/download");
+            go("/get");
           }}
         >
           Download & installation

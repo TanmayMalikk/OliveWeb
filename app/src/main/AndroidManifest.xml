@@ -23,8 +23,21 @@
         android:supportsRtl="true" android:theme="@style/Theme.Olive">
         <!-- OCR runs locally. Disable ONNX's optional telemetry provider, which eagerly loads
              native code and calls telemetry JNI methods absent from the Android artifact. -->
-        <provider android:name="ai.onnxruntime.TelemetryInitializer" tools:node="remove" />
+        <!--The android:Authorities tag should not be needed, for some reason I get an error
+         when the authorities tag is not present even though the gradle build performs.
+         A linter error?-->
+        <provider android:name="ai.onnxruntime.TelemetryInitializer" tools:node="remove"
+            android:authorities="ThisShouldNotBeHere" />
+        <service
+            android:name=".data.messaging.VoipFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
         <service android:name=".location.LiveLocationService" android:exported="false"
+            android:foregroundServiceType="location" android:stopWithTask="false" />
+        <service android:name=".location.AdminLocationService" android:exported="false"
             android:foregroundServiceType="location" android:stopWithTask="false" />
         <service
             android:name=".ui.covers.fitness.FitnessWorkoutService"
