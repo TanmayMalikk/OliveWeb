@@ -13,13 +13,18 @@ then you can run the application on an emulated or physical device.
 ---------------------------------------------
 # Testing
 ## UNIX Based Systems
-To do the full test suite.
-in the Android Studio terminal
-While having an emulator or a physical device connected with USB debugging, running the Olive app.
-run the following command
+In the Android Studio terminal, run the standard suite (Android JVM/build/lint/architecture checks, web tests/build/browser accessibility checks, Cloud Functions tests/audit, and Firebase rules tests):
 ```bash
 ./test-all.sh
 ```
+
+To also run isolated Android UI tests on a disposable emulator:
+
+```bash
+./test-all.sh --with-device-tests
+```
+
+Requires Python 3, Node/npm, the Android SDK/JDK, and Chrome for Playwright. Device tests erase the emulator's Olive data and use test PIN `246810`; physical phones are rejected. See [Testing](docs/TESTING.md) for configuration, skip options, and reports.
 
 if you only want to perform unit tests.
 run command
@@ -150,25 +155,3 @@ The web portal remains **In Progress** in Jira ([SCRUM-23](https://cmpt395f26d1.
 - Offline support varies by feature. Do not assume uncached documents, message delivery, live locations, routes, news, or cloud account operations work without a connection.
 - Firebase-backed messaging, sharing, organization actions, and synchronization require the corresponding backend configuration and services.
 - Fitness data additionally depends on available sensors; camera, location, and notifications depend on device permissions.
-
-## Work still tracked in Jira
-
-The following are selected product-facing items, rather than a copy of every development task. Statuses are a snapshot from November 3, 2026; follow the linked tickets for current scope and acceptance criteria. Some areas already have code while their broader completion or verification tasks remain open.
-
-| Area | Jira status | Tracking |
-| --- | --- | --- |
-| Web portal and browser encryption | In Progress | [SCRUM-23](https://cmpt395f26d1.atlassian.net/browse/SCRUM-23), [SCRUM-219](https://cmpt395f26d1.atlassian.net/browse/SCRUM-219) |
-| Fitness/nutrition cover completion | In Progress | [SCRUM-92](https://cmpt395f26d1.atlassian.net/browse/SCRUM-92) |
-| Media/document sharing and upload/retrieval verification | In Progress | [SCRUM-82](https://cmpt395f26d1.atlassian.net/browse/SCRUM-82), [SCRUM-131](https://cmpt395f26d1.atlassian.net/browse/SCRUM-131), [SCRUM-132](https://cmpt395f26d1.atlassian.net/browse/SCRUM-132) |
-| Network synchronization completion | In Progress | [SCRUM-96](https://cmpt395f26d1.atlassian.net/browse/SCRUM-96) |
-| VoIP calling integration | In Progress | [SCRUM-105](https://cmpt395f26d1.atlassian.net/browse/SCRUM-105) |
-| Expanded game disguise | To Do; design subtasks In Progress | [SCRUM-26](https://cmpt395f26d1.atlassian.net/browse/SCRUM-26), [SCRUM-45](https://cmpt395f26d1.atlassian.net/browse/SCRUM-45) |
-| Full offline document/message support | To Do | [SCRUM-84](https://cmpt395f26d1.atlassian.net/browse/SCRUM-84) |
-| Server-side notifications | To Do | [SCRUM-66](https://cmpt395f26d1.atlassian.net/browse/SCRUM-66) |
-| Location-based hotline/EMS expansion | To Do | [SCRUM-22](https://cmpt395f26d1.atlassian.net/browse/SCRUM-22) |
-| Color-blind filters and user walkthrough | To Do | [SCRUM-60](https://cmpt395f26d1.atlassian.net/browse/SCRUM-60), [SCRUM-79](https://cmpt395f26d1.atlassian.net/browse/SCRUM-79) |
-| Digital wallet, voice commands, and email integration | To Do | [SCRUM-30](https://cmpt395f26d1.atlassian.net/browse/SCRUM-30), [SCRUM-31](https://cmpt395f26d1.atlassian.net/browse/SCRUM-31), [SCRUM-97](https://cmpt395f26d1.atlassian.net/browse/SCRUM-97) |
-| Real food-delivery integration and AI summaries | To Do | [SCRUM-75](https://cmpt395f26d1.atlassian.net/browse/SCRUM-75), [SCRUM-91](https://cmpt395f26d1.atlassian.net/browse/SCRUM-91) |
-| Deployment | To Do | [SCRUM-222](https://cmpt395f26d1.atlassian.net/browse/SCRUM-222) |
-
-For implementation structure, verification instructions, and distribution details, see [Architecture](docs/ARCHITECTURE.md), [Testing](docs/TESTING.md), [Quality](docs/QUALITY.md), and [Distribution](docs/DISTRIBUTION.md).
