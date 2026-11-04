@@ -5,7 +5,9 @@
   gap: clamp(0.8rem, 1.5vw, 1.25rem);
   position: relative;
   align-items: stretch;
-  min-height: min(38rem, calc(100svh - 13rem));
+  min-height: clamp(32rem, calc(100svh - 11rem), 48rem);
+  max-width: 86rem;
+  margin-inline: auto;
 }
 .conversation-sidebar {
   padding: clamp(1rem, 1.5vw, 1.35rem);
@@ -80,8 +82,8 @@
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: 1rem;
-  min-height: min(38rem, calc(100svh - 13rem));
-  max-height: calc(100svh - 8rem);
+  min-height: clamp(32rem, calc(100svh - 11rem), 48rem);
+  max-height: calc(100svh - 7rem);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -99,12 +101,18 @@
 }
 .chat-heading h2 {
   font-size: 1.5rem;
+  margin: 0.15rem 0 0;
+}
+.chat-heading small {
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 .chat-messages {
-  height: auto;
+  flex: 1;
+  height: 0;
   min-height: 14rem;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: clamp(1rem, 2vw, 2rem);
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -116,7 +124,7 @@
   padding: 0.8rem 1rem;
   border-radius: 1rem 1rem 1rem 0.2rem;
   width: fit-content;
-  max-width: min(78%, 34rem);
+  max-width: min(76%, 42rem);
   min-width: 6rem;
 }
 .chat-bubble.own {
@@ -134,12 +142,16 @@
   font-size: 0.6rem;
   color: var(--muted);
 }
+.chat-message-meta {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+}
 .chat-bubble time {
-  display: block;
   font-size: 0.55rem;
   color: var(--muted);
-  text-align: right;
-  margin-top: 0.5rem;
 }
 .chat-bubble .text-link {
   font-size: 0.6rem;
@@ -158,6 +170,71 @@
   max-height: 8rem;
   font-size: 0.85rem;
 }
+.chat-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  margin: auto;
+  color: var(--muted);
+  text-align: center;
+}
+.chat-empty-state svg {
+  width: 2.2rem;
+  height: 2.2rem;
+  stroke-width: 1.2;
+}
+.chat-empty-state strong {
+  color: var(--ink);
+}
+.shared-message-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  width: min(24rem, 100%);
+  margin-top: 0.4rem;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--olive) 28%, transparent);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--white) 64%, transparent);
+  text-align: left;
+}
+.shared-message-card:hover,
+.shared-message-card:focus-visible {
+  border-color: var(--olive);
+  background: var(--white);
+}
+.shared-message-card > svg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+.shared-message-card > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+}
+.shared-message-card strong,
+.shared-message-card span span {
+  overflow-wrap: anywhere;
+}
+.shared-message-card span span {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+.shared-entry-viewer {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 52rem;
+}
+.shared-entry-viewer p {
+  margin: 0;
+}
+.shared-entry-body {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--soft);
+  white-space: pre-wrap;
+}
 
 @media (max-width: 70rem) {
   .messages-layout {
@@ -165,6 +242,26 @@
   }
   .chat-bubble {
     max-width: 86%;
+  }
+}
+@media (max-width: 48rem) {
+  .messages-layout {
+    display: block;
+    min-height: 0;
+  }
+  .conversation-sidebar,
+  .chat-panel {
+    max-height: none;
+    min-height: calc(100svh - 11rem);
+  }
+  .messages-layout.chat-open .conversation-sidebar {
+    display: none;
+  }
+  .messages-layout:not(.chat-open) .chat-panel {
+    display: none;
+  }
+  .chat-bubble {
+    max-width: 92%;
   }
 }
 .chat-compose > .button {
