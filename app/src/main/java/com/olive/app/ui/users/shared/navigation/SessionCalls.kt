@@ -38,9 +38,18 @@ internal class SessionCalls(
     private val scope: CoroutineScope,
     private val manager: VoipManager = VoipManager(),
 ) {
+    private val invitationPreferences = application.getSharedPreferences(
+        "dismissed-voip-invitations",
+        android.content.Context.MODE_PRIVATE,
+    )
     private val controller = VoipSessionController.create(application, manager)
     private var invitationJob: Job? = null
     private var observedUid: String? = null
+    private val suppressedInvitationIds = invitationPreferences
+        .getStringSet(DISMISSED_INVITATIONS_KEY, emptySet())
+        .orEmpty()
+        .toMutableSet()
+    private val invitationFirstSeenAt = mutableMapOf<String, Long>()
 
     val state: StateFlow<VoipSessionState> = controller.state
     var invitations by mutableStateOf(emptyList<VoipInvitation>())
@@ -65,8 +74,16 @@ internal class SessionCalls(
                     val calls = manager.listCalls()
                     callHistory = calls
                     val now = System.currentTimeMillis()
-                    invitations = manager.getIncomingCalls(uid).filter {
-                        it.expiresAt == 0L || it.expiresAt > now
+                    val received = manager.getIncomingCalls(uid)
+                    received.forEach { invitationFirstSeenAt.putIfAbsent(it.callId, now) }
+                    val locallyExpired = received.filter { invitation ->
+                        val deadline = invitation.expiresAt.takeIf { it > 0 }
+                            ?: invitationFirstSeenAt.getValue(invitation.callId) + LOCAL_RING_TIMEOUT_MS
+                        deadline <= now
+                    }.mapTo(mutableSetOf(), VoipInvitation::callId)
+                    if (locallyExpired.isNotEmpty()) rememberSuppressed(locallyExpired)
+                    invitations = received.filter {
+                        it.callId !in suppressedInvitationIds
                     }
                     val sessionCall = when (val current = state.value) {
                         is VoipSessionState.Connecting -> current.call
@@ -118,7 +135,7 @@ internal class SessionCalls(
     // Accepts the selected invitation and joins its LiveKit audio room.
     fun accept(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
         if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) || currentUid.isBlank()) return
-        dismissInvitation(invitation.callId)
+        suppressInvitation(invitation.callId)
         scope.launch {
             runCallAction {
                 controller.acceptAndJoin(invitation.callId, currentUid)
@@ -126,10 +143,16 @@ internal class SessionCalls(
         }
     }
 
+    // Hides the invitation before Android opens its microphone permission window. This prevents
+    // the polling loop from restoring the full-screen prompt while permission is being answered.
+    fun hide(invitation: VoipInvitation) {
+        suppressInvitation(invitation.callId)
+    }
+
     // Declines the invitation without opening the microphone or joining its room.
     fun decline(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
         if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) || currentUid.isBlank()) return
-        dismissInvitation(invitation.callId)
+        suppressInvitation(invitation.callId)
         scope.launch {
             runCallAction {
                 manager.declineCall(invitation.callId, currentUid)
@@ -186,6 +209,7 @@ internal class SessionCalls(
         invitationJob = null
         observedUid = null
         invitations = emptyList()
+        invitationFirstSeenAt.clear()
     }
 
     fun historyFor(conversationId: String): List<VoipCall> =
@@ -195,9 +219,17 @@ internal class SessionCalls(
         androidx.core.app.NotificationManagerCompat.from(application).cancel(callId.hashCode())
     }
 
-    private fun dismissInvitation(callId: String) {
+    private fun suppressInvitation(callId: String) {
+        rememberSuppressed(setOf(callId))
         invitations = invitations.filterNot { it.callId == callId }
         cancelNotification(callId)
+    }
+
+    private fun rememberSuppressed(callIds: Set<String>) {
+        suppressedInvitationIds += callIds
+        invitationPreferences.edit()
+            .putStringSet(DISMISSED_INVITATIONS_KEY, suppressedInvitationIds.toSet())
+            .apply()
     }
 
     private suspend fun runCallAction(action: suspend () -> Unit) {
@@ -209,5 +241,10 @@ internal class SessionCalls(
         } catch (error: Exception) {
             message = error.message ?: "The voice call could not be completed"
         }
+    }
+
+    companion object {
+        private const val DISMISSED_INVITATIONS_KEY = "call_ids"
+        private const val LOCAL_RING_TIMEOUT_MS = 20_000L
     }
 }
