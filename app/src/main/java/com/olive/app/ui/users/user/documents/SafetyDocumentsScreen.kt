@@ -235,6 +235,10 @@ internal fun SafetyDocumentUploadFlow(
 ) {
     val controller = session.documents
     val unableUpload = stringResource(R.string.documents_upload_failed)
+    var pickerTags by remember { mutableStateOf(tags) }
+    LaunchedEffect(visible, tags) {
+        if (visible) pickerTags = tags
+    }
     fun finishSelection(uri: android.net.Uri?) {
         session.endExternalFilePicker()
         val uid = session.coverAccountId
@@ -242,7 +246,7 @@ internal fun SafetyDocumentUploadFlow(
             uri = uri,
             identity = AccountIdentity(uid, session.coverUsername),
             fallbackError = unableUpload,
-            tags = tags,
+            tags = pickerTags,
         )
     }
     val mediaPicker = rememberLauncherForActivityResult(
@@ -277,6 +281,7 @@ internal fun SafetyDocumentUploadFlow(
             )
             Button(
                 onClick = {
+                    session.pendingCameraUploadTags = tags
                     onDismiss()
                     session.navigation.openSafePage(SafePage.Camera)
                 },

@@ -484,4 +484,5 @@ Buen humor.</string>
     <string name="incident_required_fields">Add a title, incident date, and incident location before saving.</string>
     <string name="evidence_tagged">Tagged as evidence</string>
     <string name="evidence_normal_file">Normal account file</string>
+    <string name="safety_remove_attachment">Quitar archivo adjunto %1$s</string>
 </resources>

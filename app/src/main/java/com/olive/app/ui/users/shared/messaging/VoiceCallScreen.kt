@@ -71,7 +71,7 @@ internal fun IncomingCallDialog(
     invitation: VoipInvitation,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
-) = FullScreenCallDialog {
+) = FullScreenCallDialog(onBack = onDecline) {
     CallIdentity(
         name = invitation.name.ifBlank { stringResource(R.string.ui_voice_call) },
         status = stringResource(R.string.ui_incoming_call),
@@ -106,7 +106,7 @@ internal fun ActiveCallDialog(
     onMute: (Boolean) -> Unit,
     onSpeaker: (Boolean) -> Unit,
     onFinish: () -> Unit,
-) = FullScreenCallDialog {
+) = FullScreenCallDialog(onBack = onFinish) {
     val active = state as? VoipSessionState.Active
     val call = when (state) {
         is VoipSessionState.Connecting -> state.call
@@ -169,10 +169,14 @@ internal fun ActiveCallDialog(
         }
         Spacer(Modifier.height(36.dp))
     }
-    if (active != null || state is VoipSessionState.Error) {
+    if (active != null || state is VoipSessionState.Connecting || state is VoipSessionState.Error) {
         CallAction(
             label = stringResource(
-                if (call?.callerId == currentUid) R.string.ui_end_call else R.string.ui_leave_call
+                when {
+                    state is VoipSessionState.Error -> R.string.close
+                    call?.callerId == currentUid -> R.string.ui_end_call
+                    else -> R.string.ui_leave_call
+                }
             ),
             icon = { Icon(Icons.Outlined.CallEnd, null) },
             color = CallRed,
@@ -183,7 +187,10 @@ internal fun ActiveCallDialog(
 }
 
 @Composable
-private fun FullScreenCallDialog(content: @Composable ColumnScope.() -> Unit) {
+private fun FullScreenCallDialog(
+    onBack: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Dialog(
         onDismissRequest = {},
         properties = DialogProperties(
@@ -193,7 +200,7 @@ private fun FullScreenCallDialog(content: @Composable ColumnScope.() -> Unit) {
             decorFitsSystemWindows = false,
         ),
     ) {
-        BackHandler(enabled = true) {}
+        BackHandler(enabled = true, onBack = onBack)
         val view = LocalView.current
         DisposableEffect(view) {
             val previous = view.keepScreenOn

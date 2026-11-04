@@ -152,6 +152,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     // Clear the preview when the user discards the latest capture.
     DisposableEffect(Unit) {
         onDispose {
+            session.pendingCameraUploadTags = emptySet()
             viewModel.leaveCamera()
             captured?.file?.delete()
             captured?.previewFile?.takeIf { it != captured?.file }?.delete()
@@ -187,8 +188,10 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                         AccountIdentity(uid, session.coverUsername),
                         uploadError,
                         media.kind,
-                        ocr
+                        ocr,
+                        session.pendingCameraUploadTags,
                     ) {
+                        session.pendingCameraUploadTags = emptySet()
                         media.previewFile?.takeIf { it != media.file }?.delete()
                         captured = null
                         session.navigation.back()

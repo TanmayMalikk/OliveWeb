@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Attachment
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,7 +43,8 @@ internal fun SafetyChecklistSection(
     contactsEditable: Boolean = false,
     onContactsChange: ((List<SafeContact>) -> Unit)? = null,
     editable: Boolean = true,
-    onUploadDocument: (() -> Unit)? = null,
+    onUploadDocument: ((String) -> Unit)? = null,
+    documents: List<SafetyDocument> = emptyList(),
 ) {
     val field = plan.fields[fieldKey] ?: return
     val items = remember(field.value) { readSafetyChecklist(field.value) }
@@ -105,7 +107,16 @@ internal fun SafetyChecklistSection(
                     },
                     onText = { value -> update(items.map { if (it.id == item.id) it.copy(text = value) else it }) },
                     onRemove = { update(items.filterNot { it.id == item.id }) },
-                    onUploadDocument = onUploadDocument,
+                    attachments = safetyChecklistAttachments(fieldKey, item, documents),
+                    onRemoveAttachment = { document ->
+                        update(items.map {
+                            if (it.id == item.id) it.copy(
+                                excludedAttachmentIds =
+                                    (it.excludedAttachmentIds + document.id).distinct().takeLast(80),
+                            ) else it
+                        })
+                    },
+                    onUploadDocument = onUploadDocument?.let { upload -> { upload(item.id) } },
                 )
             }
         }
@@ -158,6 +169,7 @@ internal fun SafetyChecklistSection(
 private fun ChecklistRow(
     item: SafetyChecklistItem, heading: String, sectionKey: String, index: Int, editable: Boolean,
     onChecked: (Boolean) -> Unit, onText: (String) -> Unit, onRemove: () -> Unit,
+    attachments: List<SafetyDocument>, onRemoveAttachment: (SafetyDocument) -> Unit,
     onUploadDocument: (() -> Unit)?,
 ) {
     val empty = stringResource(R.string.safety_empty_item)
@@ -202,6 +214,26 @@ private fun ChecklistRow(
                         stringResource(R.string.safety_upload_document),
                         style = MaterialTheme.typography.labelMedium
                     )
+                }
+            }
+            attachments.forEach { document ->
+                Row(
+                    Modifier.fillMaxWidth().testTag("safety_attachment_${item.id}_${document.id}"),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.Attachment, null, Modifier.size(18.dp), tint = OliveGreen)
+                    Spacer(Modifier.width(8.dp))
+                    Text(document.name, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f), maxLines = 2)
+                    if (editable) IconButton(
+                        onClick = { onRemoveAttachment(document) },
+                        modifier = Modifier.testTag("safety_remove_attachment_${document.id}"),
+                    ) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            stringResource(R.string.safety_remove_attachment, document.name),
+                        )
+                    }
                 }
             }
         }
