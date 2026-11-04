@@ -11,7 +11,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
 import com.olive.app.data.SafetyDocument
@@ -261,15 +260,12 @@ internal class MediaTransferController(
             refreshOfflineCopies(viewerUid,listOf(document))
             opened.also { state=MediaTransferState.Idle }
         } catch(failure:Exception) {
-            val mapped = if (failure is FirebaseFunctionsException && failure.code in setOf(
-                    FirebaseFunctionsException.Code.PERMISSION_DENIED,
-                    FirebaseFunctionsException.Code.NOT_FOUND)) {
+            if (failure is MediaAccessException && failure.reason == MediaAccessError.ACCESS_REVOKED) {
                 offlineCache.remove(viewerUid, document.id)
-                MediaAccessException(MediaAccessError.ACCESS_REVOKED, failure)
-            } else failure
-            val message=mapped.localizedMessage ?: "Unable to download encrypted media"
+            }
+            val message=failure.localizedMessage ?: "Unable to download encrypted media"
             state=MediaTransferState.Failed(null,message,true)
-            throw mapped
+            throw failure
         }
     }
 

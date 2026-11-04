@@ -4,11 +4,14 @@ package com.olive.app.data
 import android.content.Context
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Source
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.olive.app.data.media.MediaAccessError
+import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
@@ -154,10 +157,23 @@ class SafetyDocumentRepository(
 
     // Loads the encrypted document records that this account may open.
     override suspend fun getFor(uid: String, id: String): SafetyDocument {
-        val document = documentFrom(firestore.collection("files").document(id).get(Source.SERVER).await(), uid)
-            ?: error("File is no longer available")
-        require(uid in document.allowedUsers) { "You no longer have access to this file" }
-        return document
+        try {
+            val row = firestore.collection("files").document(id).get(Source.SERVER).await()
+            val document = documentFrom(row, uid)
+                ?: throw MediaAccessException(MediaAccessError.ACCESS_REVOKED)
+            if (uid !in document.allowedUsers) {
+                throw MediaAccessException(MediaAccessError.ACCESS_REVOKED)
+            }
+            return document
+        } catch (failure: FirebaseFirestoreException) {
+            val reason = when (failure.code) {
+                FirebaseFirestoreException.Code.PERMISSION_DENIED,
+                FirebaseFirestoreException.Code.NOT_FOUND -> MediaAccessError.ACCESS_REVOKED
+                FirebaseFirestoreException.Code.UNAVAILABLE -> MediaAccessError.NETWORK_REQUIRED
+                else -> throw failure
+            }
+            throw MediaAccessException(reason, failure)
+        }
     }
 
     // Adds encrypted document access for each selected recipient.
