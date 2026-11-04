@@ -428,6 +428,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                 IncomingCallDialog(
                     invitation = invitation,
                     onAccept = {
+                        session.calls.hide(invitation)
                         withMicrophonePermission {
                             session.calls.accept(invitation, callAccountId, session.accountRole)
                         }
