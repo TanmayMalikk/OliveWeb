@@ -356,7 +356,7 @@
     <string name="no_private_notes_found">لم يتم العثور على ملاحظات.</string><string name="untitled_note">ملاحظة بلا عنوان</string><string name="no_incident_reports_found">لم يتم العثور على تقارير حوادث.</string>
 <string name="secure_shared_entry">عنصر مشترك آمن</string><string name="close_shared_entry">إغلاق العنصر المشترك</string>
     <string name="attach_secure_entry">إرفاق ملاحظة أو تقرير آمن</string><string name="encrypted_document">مستند مشفر</string><string name="shared_private_note">ملاحظة خاصة مشتركة</string><string name="shared_incident_report">تقرير حادث مشترك</string>
-    <string name="private_entry_shared">تمت مشاركة العنصر الخاص بأمان.</string><string name="unable_to_share_private_entry">تعذرت مشاركة هذا العنصر الخاص.</string><string name="unable_to_open_shared_entry">تعذر فتح هذا العنصر المشترك.</string><string name="unable_to_open_secure_conversation">تعذر فتح هذه المحادثة الآمنة. قد يحتاج الشخص الآخر إلى فتح التطبيق المحدّث أولاً.</string>
+    <string name="private_entry_shared">تمت مشاركة العنصر الخاص بأمان.</string><string name="unable_to_share_private_entry">تعذرت مشاركة هذا العنصر الخاص.</string><string name="unable_to_open_shared_entry">تعذر فتح هذا العنصر المشترك.</string><string name="unable_to_open_secure_conversation">لا يملك هذا الجهاز مفتاح تشفير هذه المحادثة. افتح المحادثة على جهاز معتمد سابقًا لهذا الحساب، ثم حاول مرة أخرى.</string>
     <string name="secure_message">رسالة آمنة</string><string name="encrypted_message_unavailable">الرسالة المشفرة غير متاحة</string>
 <string name="news_near_location">أخبار بالقرب من %1$s</string>
 <string name="accounts">الحسابات</string>

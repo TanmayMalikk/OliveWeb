@@ -367,7 +367,7 @@
     <string name="private_entry_shared">Private entry shared securely.</string>
     <string name="unable_to_share_private_entry">Unable to share this private entry.</string>
     <string name="unable_to_open_shared_entry">Unable to open this shared entry.</string>
-    <string name="unable_to_open_secure_conversation">Unable to open this secure conversation. The other person may need to open the updated app first.</string>
+    <string name="unable_to_open_secure_conversation">This device does not have this conversation’s encryption key. Open the conversation on an existing authorized device for this account, then try again.</string>
     <string name="secure_message">Secure message</string><string name="encrypted_message_unavailable">Encrypted message unavailable</string>
 <string name="news_near_location">News near %1$s</string>
 <string name="accounts">Accounts</string><string name="add_another_contact">Add another contact</string><string name="change_local_news_location">Change local news location</string><string name="city_or_region">City or region</string><string name="create">Create</string><string name="delete_account">Delete account</string><string name="reconnect">Reconnect</string><string name="refresh">Refresh</string><string name="save">Save</string><string name="save_profile">Save profile</string><string name="use_device_location">Use device location</string><string name="delete_managed_account_warning">This permanently removes the %1$s account from Firebase Authentication and deletes its account data.</string>

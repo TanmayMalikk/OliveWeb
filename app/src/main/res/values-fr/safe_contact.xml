@@ -93,7 +93,7 @@
     <string name="documents_network_required">Connectez-vous à Internet pour accéder à ce fichier.</string>
     <string name="documents_access_revoked">Vous n’avez plus accès à ce fichier. Sa copie hors ligne a été supprimée.</string>
     <string name="documents_offline_copy_corrupt">La copie hors ligne est endommagée et a été supprimée. Téléchargez-la à nouveau.</string>
-    <string name="documents_key_unavailable">Cet appareil ne peut pas déverrouiller le fichier. Reconnectez-vous pour restaurer l’accès.</string>
+    <string name="documents_key_unavailable">Cet appareil ne possède pas la clé de chiffrement de ce fichier. Ouvrez Documents sur un appareil déjà autorisé pour ce compte ou demandez au propriétaire de le partager à nouveau.</string>
     <string name="documents_account_mismatch">Cette copie hors ligne appartient à un autre compte.</string>
     <string name="documents_storage_full">L’espace de stockage est insuffisant pour cette copie hors ligne.</string>
     <string name="documents_download_failed">Le fichier chiffré n’a pas pu être téléchargé. Réessayez.</string>
