@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.security.SecureRandom
@@ -41,11 +42,12 @@ class KeyManagerInstrumentedTest {
             android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP)
         }
 
-        val restored = KeyManager.unwrapFirst(
+        val restored = KeyManager.unwrapFirstWithEnvelope(
             listOf(invalidDeviceCopy, accountWrapped),
             KeyManager.CURRENT_KEY_WRAP_VERSION,
         )
 
-        assertArrayEquals(original.encoded, restored.encoded)
+        assertEquals(accountWrapped, restored.wrappedKeyBase64)
+        assertArrayEquals(original.encoded, restored.secretKey.encoded)
     }
 }

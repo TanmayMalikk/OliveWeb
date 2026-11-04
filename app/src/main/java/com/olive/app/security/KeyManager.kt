@@ -150,17 +150,29 @@ object KeyManager {
      * contain keys wrapped at different times with different OAEP profiles, so the record-level
      * encryption version must not prevent a compatible recipient key from being considered.
      */
-    fun unwrapFirst(wrappedKeysBase64: Iterable<String>, keyWrapVersion: Int? = null): SecretKey {
+    fun unwrapFirst(wrappedKeysBase64: Iterable<String>, keyWrapVersion: Int? = null): SecretKey =
+        unwrapFirstWithEnvelope(wrappedKeysBase64, keyWrapVersion).secretKey
+
+    /** Returns both the successful envelope and its key so callers cache only usable key copies. */
+    fun unwrapFirstWithEnvelope(
+        wrappedKeysBase64: Iterable<String>,
+        keyWrapVersion: Int? = null,
+    ): UnwrappedKeyEnvelope {
         var lastFailure: Exception? = null
         wrappedKeysBase64.filter(String::isNotBlank).distinct().forEach { wrappedKey ->
             try {
-                return unwrapKey(wrappedKey, keyWrapVersion)
+                return UnwrappedKeyEnvelope(wrappedKey, unwrapKey(wrappedKey, keyWrapVersion))
             } catch (failure: Exception) {
                 lastFailure = failure
             }
         }
         throw lastFailure ?: IllegalStateException("Encryption key is unavailable")
     }
+
+    data class UnwrappedKeyEnvelope(
+        val wrappedKeyBase64: String,
+        val secretKey: SecretKey,
+    )
 
     /**
      * New Android keys use SHA-256 as the OAEP digest and SHA-1 only for MGF1. The digest parameter
