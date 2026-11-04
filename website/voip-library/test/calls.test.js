@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { FirebaseCallStore, getParticipantStatus } = require('../src/calls');
 
-function fakeDatabase(values) {
+function fakeDatabase(values, { initialTransactionNull = false } = {}) {
     function reference(path) {
         return {
             child(key) {
@@ -29,7 +29,7 @@ function fakeDatabase(values) {
                 delete values[path];
             },
             async transaction(update) {
-                const next = update(values[path] ?? null);
+                const next = update(initialTransactionNull ? null : (values[path] ?? null));
                 if (next === undefined) return { committed: false };
                 values[path] = next;
                 return { committed: true, snapshot: { val: () => next } };
@@ -100,6 +100,32 @@ test('FirebaseCallStore creates calls and tracks invitation responses', async ()
     assert.equal(await store.respondToInvitation('call-1', 'bob', false), null);
 });
 
+test('FirebaseCallStore handles a transient null on the first transaction callback', async () => {
+    const values = {
+        'calls/call-1': {
+            callId: 'call-1',
+            callerId: 'alice',
+            callerName: 'Alice',
+            name: 'Bob',
+            conversationId: 'conversation-1',
+            status: 'active',
+            participants: { bob: { status: 'pending' } },
+            createdAt: 1_000,
+            expiresAt: 21_000
+        }
+    };
+    const store = new FirebaseCallStore(
+        fakeDatabase(values, { initialTransactionNull: true }),
+        { clock: () => 5_000 }
+    );
+
+    const accepted = await store.respondToInvitation('call-1', 'bob', true);
+    assert.equal(getParticipantStatus(accepted, 'bob'), 'accepted');
+    assert.equal(accepted.acceptedAt, 5_000);
+    assert.equal(await store.endCall('call-1', 'alice', 6_000), true);
+    assert.equal((await store.getCall('call-1')).status, 'ended');
+});
+
 test('FirebaseCallStore expires unanswered calls after twenty seconds and records declines', async () => {
     const values = {};
     let now = 1_000;
@@ -134,6 +160,26 @@ test('FirebaseCallStore expires unanswered calls after twenty seconds and record
     const declined = await secondStore.respondToInvitation('call-2', 'bob', false);
     assert.equal(declined.status, 'declined');
     assert.equal(declined.endReason, 'declined');
+});
+
+test('FirebaseCallStore expires legacy pending calls that predate expiresAt', async () => {
+    const values = {
+        'calls/legacy-call': {
+            callId: 'legacy-call',
+            callerId: 'alice',
+            callerName: 'Alice',
+            name: 'Bob',
+            conversationId: 'conversation-1',
+            status: 'active',
+            participants: { bob: { status: 'pending' } },
+            createdAt: 1_000
+        }
+    };
+    const store = new FirebaseCallStore(fakeDatabase(values), { clock: () => 50_000 });
+
+    assert.deepEqual(await store.expirePendingCalls(), ['legacy-call']);
+    assert.equal((await store.getCall('legacy-call')).status, 'missed');
+    assert.equal((await store.getCall('legacy-call')).expiresAt, 21_000);
 });
 
 test('FirebaseCallStore reads FCM tokens stored as arrays or maps', async () => {

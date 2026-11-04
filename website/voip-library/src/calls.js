@@ -4,6 +4,14 @@ const { randomUUID } = require('node:crypto');
 
 const CALL_TIMEOUT_MS = 20_000;
 
+function callExpiry(call) {
+    if (Number.isFinite(call?.expiresAt) && call.expiresAt > 0) return call.expiresAt;
+    if (Number.isFinite(call?.createdAt) && call.createdAt > 0) {
+        return call.createdAt + CALL_TIMEOUT_MS;
+    }
+    return 0;
+}
+
 class FirebaseCallStore {
     constructor(database, {
         callsPath = 'calls',
@@ -65,13 +73,18 @@ class FirebaseCallStore {
                 callerId: call.callerId,
                 name: call.callerName || call.name,
                 status: 'pending',
-                expiresAt: call.expiresAt
+                expiresAt: callExpiry(call)
             }));
     }
 
     async respondToInvitation(callId, userId, accepted) {
         await this.expirePendingCalls();
-        const result = await this.callsRef.child(callId).transaction((call) => {
+        const existingCall = await this.getCall(callId);
+        const result = await this.callsRef.child(callId).transaction((current) => {
+            // Realtime Database may invoke the updater with a transient local null before it
+            // receives the server value. Seed that first pass with the snapshot we just read;
+            // Firebase will still retry with the authoritative value if it changed remotely.
+            const call = current ?? existingCall;
             if (
                 !call ||
                 call.status !== 'active' ||
@@ -101,7 +114,9 @@ class FirebaseCallStore {
     }
 
     async endCall(callId, endedBy, endedAt = this.clock()) {
-        const result = await this.callsRef.child(callId).transaction((call) => {
+        const existingCall = await this.getCall(callId);
+        const result = await this.callsRef.child(callId).transaction((current) => {
+            const call = current ?? existingCall;
             if (!call || call.status !== 'active') return;
             return { ...call, status: 'ended', endedAt, endedBy, endReason: 'ended' };
         });
@@ -113,13 +128,17 @@ class FirebaseCallStore {
         const calls = snapshot.val() || {};
         const expired = [];
         await Promise.all(Object.values(calls).map(async (call) => {
+            const expiresAt = callExpiry(call);
             if (!call || call.status !== 'active' || call.acceptedAt ||
-                !call.expiresAt || call.expiresAt > now) return;
+                !expiresAt || expiresAt > now) return;
             const result = await this.callsRef.child(call.callId).transaction((current) => {
-                if (!current || current.status !== 'active' || current.acceptedAt ||
-                    !current.expiresAt || current.expiresAt > now) return;
+                const candidate = current ?? call;
+                const currentExpiry = callExpiry(candidate);
+                if (!candidate || candidate.status !== 'active' || candidate.acceptedAt ||
+                    !currentExpiry || currentExpiry > now) return;
                 return {
-                    ...current,
+                    ...candidate,
+                    expiresAt: currentExpiry,
                     status: 'missed',
                     endedAt: now,
                     endReason: 'missed'
@@ -160,4 +179,4 @@ function getParticipantStatus(call, userId) {
     return participant?.status;
 }
 
-module.exports = { FirebaseCallStore, getParticipantStatus, CALL_TIMEOUT_MS };
+module.exports = { FirebaseCallStore, getParticipantStatus, CALL_TIMEOUT_MS, callExpiry };
