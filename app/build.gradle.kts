@@ -78,10 +78,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
+    testOptions.unitTests.all { it.jvmArgs("--enable-native-access=ALL-UNNAMED") }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    // These third-party binaries arrive without removable debug sections. Declaring that they
+    // should be packaged intact avoids a misleading strip warning on every debug/test build.
+    packaging { jniLibs.keepDebugSymbols += "**/*.so" }
 }
 val cameraxVersion = "1.6.2"
 
