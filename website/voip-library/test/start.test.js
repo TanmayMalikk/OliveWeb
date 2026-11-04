@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { configuredPort } = require('../src/start');
+const { configuredPort } = require('../src/config');
 
 // Hostinger's assigned port must take priority over a local override.
 test('uses the hosting platform port when it is available', () => {

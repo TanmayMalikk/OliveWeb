@@ -3,6 +3,7 @@
 const { initializeFirebaseAdapters } = require('./firebase');
 const { createLiveKitTokenIssuer } = require('./livekit');
 const { createApiServer } = require('./server');
+const { configuredPort } = require('./config');
 
 function listen(server, port, host) {
     return new Promise((resolve, reject) => {
@@ -18,15 +19,6 @@ function closeHttpServer(server) {
     return new Promise((resolve, reject) => {
         server.close((error) => error ? reject(error) : resolve());
     });
-}
-
-// Hostinger chooses PORT for deployed apps. VOIP_API_PORT remains useful when running locally.
-function configuredPort(environment = process.env) {
-    const port = Number(environment.PORT || environment.VOIP_API_PORT || 3000);
-    if (!Number.isInteger(port) || port < 1 || port > 65535) {
-        throw new Error('PORT or VOIP_API_PORT must be a valid port number');
-    }
-    return port;
 }
 
 async function main() {
@@ -68,11 +60,8 @@ async function main() {
     }
 }
 
-if (require.main === module) {
-    main().catch((error) => {
-        console.error('Could not start VoIP API:', error.message);
-        process.exitCode = 1;
-    });
-}
-
-module.exports = { configuredPort, main };
+// Hostinger loads this file as a module, so startup cannot be hidden behind require.main.
+main().catch((error) => {
+    console.error('Could not start VoIP API:', error.message);
+    process.exitCode = 1;
+});
