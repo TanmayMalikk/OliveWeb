@@ -25,6 +25,8 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Cameraswitch
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,6 +37,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -89,6 +95,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     val recording by viewModel.recording.collectAsState()
     val ready by viewModel.ready.collectAsState()
     val cameraError by viewModel.error.collectAsState()
+    val zoomRatio by viewModel.zoomRatio.collectAsState()
     val preview =
         remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
     val permissionLauncher =
@@ -170,34 +177,41 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
 
             else -> {
                 AndroidView(factory = { preview }, modifier = Modifier.fillMaxSize())
-                Row(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
-                        .padding(start = 12.dp, end = 12.dp, bottom = 150.dp)
-                        .background(Color.Black.copy(alpha = .5f), RoundedCornerShape(24.dp))
-                        .padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                CameraModeSelector(
+                    mode = mode,
+                    enabled = !busy && !recording,
+                    onModeSelected = { mode = it },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 150.dp),
+                )
+                Column(
+                    Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)
+                        .background(Color.Black.copy(alpha = .55f), RoundedCornerShape(24.dp))
+                        .padding(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    FilterChip(
-                        selected = mode == CameraMode.Photo,
-                        onClick = { mode = CameraMode.Photo },
-                        enabled = !busy && !recording,
-                        modifier = Modifier.weight(1f).testTag("camera_mode_photo"),
-                        label = { Text(stringResource(R.string.camera_photo)) },
-                        leadingIcon = { Icon(Icons.Outlined.PhotoCamera, null) })
-                    FilterChip(
-                        selected = mode == CameraMode.Video,
-                        onClick = { mode = CameraMode.Video },
-                        enabled = !busy && !recording,
-                        modifier = Modifier.weight(1f).testTag("camera_mode_video"),
-                        label = { Text(stringResource(R.string.camera_video)) },
-                        leadingIcon = { Icon(Icons.Outlined.Videocam, null) })
-                    FilterChip(
-                        selected = mode == CameraMode.Document,
-                        onClick = { mode = CameraMode.Document },
-                        enabled = !busy && !recording,
-                        modifier = Modifier.weight(1f).testTag("camera_mode_document"),
-                        label = { Text(stringResource(R.string.camera_document)) },
-                        leadingIcon = { Icon(Icons.Outlined.Description, null) })
+                    IconButton(
+                        onClick = viewModel::zoomIn,
+                        enabled = ready && (!busy || recording),
+                        modifier = Modifier.testTag("camera_zoom_in"),
+                    ) {
+                        Icon(Icons.Outlined.Add, stringResource(R.string.a11y_zoom_in), tint = Color.White)
+                    }
+                    Text(
+                        "%.1f×".format(zoomRatio),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    IconButton(
+                        onClick = viewModel::zoomOut,
+                        enabled = ready && (!busy || recording) && zoomRatio > 1.01f,
+                        modifier = Modifier.testTag("camera_zoom_out"),
+                    ) {
+                        Icon(Icons.Outlined.Remove, stringResource(R.string.a11y_zoom_out), tint = Color.White)
+                    }
                 }
                 IconButton(
                     onClick = session.navigation::back,
@@ -311,7 +325,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                 if (recording) Text(
                     stringResource(R.string.camera_recording),
                     Modifier.align(Alignment.BottomCenter)
-                        .navigationBarsPadding().padding(bottom = 132.dp)
+                        .navigationBarsPadding().padding(bottom = 220.dp)
                         .background(Color.Black.copy(alpha = .55f), RoundedCornerShape(16.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                         .testTag("camera_recording_active"),
@@ -319,6 +333,76 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                 )
             }
         }
+    }
+}
+
+// Keeps the three capture modes equal in size so their labels do not collide on smaller phones.
+@Composable
+private fun CameraModeSelector(
+    mode: CameraMode,
+    enabled: Boolean,
+    onModeSelected: (CameraMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier, color = Color.Black.copy(alpha = .55f), shape = RoundedCornerShape(24.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CameraModeButton(
+                label = stringResource(R.string.camera_photo),
+                selected = mode == CameraMode.Photo,
+                enabled = enabled,
+                tag = "camera_mode_photo",
+                onClick = { onModeSelected(CameraMode.Photo) },
+            )
+            CameraModeButton(
+                label = stringResource(R.string.camera_video),
+                selected = mode == CameraMode.Video,
+                enabled = enabled,
+                tag = "camera_mode_video",
+                onClick = { onModeSelected(CameraMode.Video) },
+            )
+            CameraModeButton(
+                label = stringResource(R.string.camera_document),
+                selected = mode == CameraMode.Document,
+                enabled = enabled,
+                tag = "camera_mode_document",
+                onClick = { onModeSelected(CameraMode.Document) },
+            )
+        }
+    }
+}
+
+// Shows one camera mode as a full-width text button with a clear selected state.
+@Composable
+private fun RowScope.CameraModeButton(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    if (selected) Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.weight(1f).heightIn(min = 56.dp).semantics {
+            this.selected = selected
+        }.testTag(tag),
+        contentPadding = PaddingValues(horizontal = 4.dp),
+    ) {
+        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+    }
+    else OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.weight(1f).heightIn(min = 56.dp).semantics {
+            this.selected = selected
+        }.testTag(tag),
+        contentPadding = PaddingValues(horizontal = 4.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+    ) {
+        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
 }
 // Explains why camera access is needed and lets the user request it.
