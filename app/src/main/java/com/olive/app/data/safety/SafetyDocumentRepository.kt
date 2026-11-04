@@ -39,6 +39,7 @@ data class SafetyDocument(
     val encryptionVersion: Int = 0,
     val deviceWrappedKeys: Map<String, String> = emptyMap(),
     val evidence: Boolean = false,
+    val tags: List<String> = emptyList(),
 )
 
 enum class DocumentListSource { LOCAL_INDEX, FIRESTORE_CACHE, SERVER }
@@ -77,6 +78,16 @@ internal fun documentOcrMetadataFrom(metadata: JSONObject?): DocumentOcrMetadata
     val successful = metadata.opt("ocrSuccessful") as? Boolean ?: return null
     if (text.length > MAX_OCR_TEXT_LENGTH || !confidence.isFinite() || confidence !in 0f..1f) return null
     return DocumentOcrMetadata(text, confidence, successful)
+}
+
+/** Reads small private organization tags only after the encrypted metadata is opened on-device. */
+internal fun documentTagsFrom(metadata: JSONObject?): List<String> {
+    val values = metadata?.optJSONArray("tags") ?: return emptyList()
+    return buildList {
+        for (index in 0 until minOf(values.length(), 20)) {
+            values.optString(index).trim().take(80).takeIf(String::isNotBlank)?.let(::add)
+        }
+    }.distinct()
 }
 
 interface SafetyDocumentDataSource {
@@ -454,6 +465,7 @@ class SafetyDocumentRepository(
             encryptionVersion = encryptionVersion,
             deviceWrappedKeys = deviceWrapped,
             evidence = row.getBoolean("evidence") ?: false,
+            tags = documentTagsFrom(metadata),
         )
     }
 

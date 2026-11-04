@@ -147,9 +147,10 @@ class MediaRepository(
         // sure the callable receives both the signed-in account and the required App Check proof.
         val user=auth.currentUser ?: error("Sign in again before uploading files")
         user.getIdToken(false).await()
-        // Use the fallback when call is unavailable.
+        // Ask Firebase for a fresh proof before protected media work. This is important after a
+        // debug device is approved because the SDK may still hold the rejection from its first try.
         try {
-            appCheck.getAppCheckToken(false).await()
+            appCheck.getAppCheckToken(true).await()
         } catch(error:Exception) {
             // Media functions enforce App Check. Keep that protection, but replace Firebase's vague
             // retry-limit message with the exact action needed for an unregistered debug device.
