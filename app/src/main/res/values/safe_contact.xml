@@ -93,7 +93,7 @@
     <string name="documents_network_required">Connect to the internet to access this file.</string>
     <string name="documents_access_revoked">You no longer have access to this file. Its offline copy was removed.</string>
     <string name="documents_offline_copy_corrupt">The offline copy is damaged and was removed. Download it again.</string>
-    <string name="documents_key_unavailable">This device cannot unlock the file. Reconnect to restore device access.</string>
+    <string name="documents_key_unavailable">This device does not have this file’s encryption key. Open Documents on an existing authorized device for this account, or ask the file owner to share it again.</string>
     <string name="documents_account_mismatch">This offline copy belongs to a different account.</string>
     <string name="documents_storage_full">There is not enough device storage for this offline copy.</string>
     <string name="documents_download_failed">The encrypted file could not be downloaded. Please retry.</string>
