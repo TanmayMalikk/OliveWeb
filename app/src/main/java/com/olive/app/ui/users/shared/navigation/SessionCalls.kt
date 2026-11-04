@@ -31,7 +31,7 @@ internal fun canCallFromConversation(
     conversation.participantIds.any { it != currentUid }
 
 internal class SessionCalls(
-    application: Application,
+    private val application: Application,
     private val scope: CoroutineScope,
     private val manager: VoipManager = VoipManager(),
 ) {
@@ -64,6 +64,17 @@ internal class SessionCalls(
         }
     }
 
+    fun receiveInvitation(callId: String, callerId: String, name: String) {
+        if (callId.isBlank() || callerId.isBlank()) return
+        val invitation = VoipInvitation(
+            callId = callId,
+            callerId = callerId,
+            name = name.ifBlank { "Private call" },
+            status = com.olive.app.data.messaging.VoipParticipantStatus.PENDING,
+        )
+        invitations = invitations.filterNot { it.callId == callId } + invitation
+    }
+
     // Creates a call only from a direct chat owned by a User or Safe Contact account.
     fun start(conversation: ChatConversation, callerUid: String, role: AccountRole) {
         if (!canCallFromConversation(role, conversation, callerUid)) {
@@ -90,6 +101,7 @@ internal class SessionCalls(
             runCallAction {
                 controller.acceptAndJoin(invitation.callId, currentUid)
                 invitations = invitations.filterNot { it.callId == invitation.callId }
+                cancelNotification(invitation.callId)
             }
         }
     }
@@ -101,6 +113,7 @@ internal class SessionCalls(
             runCallAction {
                 manager.declineCall(invitation.callId, currentUid)
                 invitations = invitations.filterNot { it.callId == invitation.callId }
+                cancelNotification(invitation.callId)
             }
         }
     }
@@ -108,6 +121,10 @@ internal class SessionCalls(
     // Updates whether other people in the active call can hear this device's microphone.
     fun setMuted(muted: Boolean) {
         scope.launch { runCallAction { controller.setMicrophoneMuted(muted) } }
+    }
+
+    fun setSpeakerEnabled(enabled: Boolean) {
+        scope.launch { runCallAction { controller.setSpeakerEnabled(enabled) } }
     }
 
     // The caller ends the shared call; another participant only leaves their own audio room.
@@ -145,6 +162,10 @@ internal class SessionCalls(
         invitationJob = null
         observedUid = null
         invitations = emptyList()
+    }
+
+    private fun cancelNotification(callId: String) {
+        androidx.core.app.NotificationManagerCompat.from(application).cancel(callId.hashCode())
     }
 
     private suspend fun runCallAction(action: suspend () -> Unit) {

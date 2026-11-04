@@ -97,6 +97,21 @@ class DocumentControllerMediaRoutingTest {
         )
     }
 
+    @Test
+    fun `evidence change updates the visible document and persists it`() {
+        val original = document(objectKey = "users/owner/media/r2-document")
+        val repository = FakeDocumentRepository(original, File(context.cacheDir, "legacy"))
+        val controller = SafetyDocumentsController(context, scope, repository, null)
+        controller.prepare("owner")
+        controller.load("owner", "owner_name", false)
+
+        controller.setEvidence(original, "owner", true)
+
+        assertTrue(repository.document.evidence)
+        assertTrue(controller.state.files.single().evidence)
+        assertTrue(controller.state.evidenceUpdates.isEmpty())
+    }
+
     // Builds a sample document for this test.
     private fun document(objectKey: String) = SafetyDocument(
         id = "document-id",
@@ -109,9 +124,11 @@ class DocumentControllerMediaRoutingTest {
     )
 
     private class FakeDocumentRepository(
-        private val document: SafetyDocument,
+        document: SafetyDocument,
         private val file: File,
     ) : SafetyDocumentDataSource {
+        var document = document
+            private set
         var downloadCalled = false
 
         // Checks the list for step with the test's sample data.
@@ -122,7 +139,10 @@ class DocumentControllerMediaRoutingTest {
             uid: String,
             onUpdate: (DocumentListSnapshot) -> Unit,
             onError: (String) -> Unit,
-        ) = ChatSubscription {}
+        ): ChatSubscription {
+            onUpdate(DocumentListSnapshot(listOf(document), DocumentListSource.SERVER, 1))
+            return ChatSubscription {}
+        }
         // Checks the get for step with the test's sample data.
         override suspend fun getFor(uid: String, id: String) = document
         override fun cachedFor(uid: String, id: String) = document
@@ -130,6 +150,13 @@ class DocumentControllerMediaRoutingTest {
         override suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>) = Unit
         // Checks the delete step with the test's sample data.
         override suspend fun delete(document: SafetyDocument, ownerUid: String) = Unit
+        override suspend fun setEvidence(
+            document: SafetyDocument,
+            ownerUid: String,
+            evidence: Boolean,
+        ) {
+            this.document = this.document.copy(evidence = evidence)
+        }
         // Checks the download step with the test's sample data.
         override suspend fun download(context: Context, document: SafetyDocument): File {
             downloadCalled = true

@@ -85,6 +85,8 @@
     <string name="ui_olive_branch_updates">橄榄枝更新</string>
     <string name="ui_olive_tree_updates">橄榄树更新</string>
     <string name="ui_call_invitation_notifications">通话邀请</string>
+    <string name="ui_speaker">扬声器</string>
+    <string name="ui_speaker_off">关闭扬声器</string>
     <string name="ui_incoming_call">来电</string>
     <string name="ui_voice_call">语音通话</string>
     <string name="ui_start_voice_call">开始语音通话</string>

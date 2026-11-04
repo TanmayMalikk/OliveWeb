@@ -85,6 +85,8 @@
     <string name="ui_olive_branch_updates">تحديثات غصن الزيتون</string>
     <string name="ui_olive_tree_updates">تحديثات شجرة الزيتون</string>
     <string name="ui_call_invitation_notifications">دعوات المكالمات</string>
+    <string name="ui_speaker">مكبر الصوت</string>
+    <string name="ui_speaker_off">إيقاف مكبر الصوت</string>
     <string name="ui_incoming_call">مكالمة واردة</string>
     <string name="ui_voice_call">مكالمة صوتية</string>
     <string name="ui_start_voice_call">بدء مكالمة صوتية</string>
