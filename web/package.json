@@ -10,6 +10,7 @@
     "dev": "node server/developmentServer.mjs",
     "security:check": "node scripts/check-public-secrets.mjs",
     "build": "npm run security:check && tsc -b && vite build",
+    "postinstall": "npm run build",
     "start": "node server/productionServer.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test"
