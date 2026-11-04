@@ -60,6 +60,10 @@ import java.util.Base64
 // UI sizing/color: this root fills the window; the 12dp quick-exit inset and OliveGreen button styling live in its Scaffold.
 internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
+internal fun shouldShowCallOverlay(screen: SessionScreen, role: AccountRole): Boolean =
+    (role == AccountRole.USER && screen in setOf(SessionScreen.Cover, SessionScreen.Safe)) ||
+        (role == AccountRole.SAFE_CONTACT && screen == SessionScreen.Safe)
+
 // Chooses the account, cover, onboarding, or Safe App root screen.
 @Composable
 internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int = 0) {
@@ -67,11 +71,14 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
     val callState by session.calls.state.collectAsState()
     val callAccountId = session.coverAccountId.orEmpty()
     val incomingCall = session.calls.invitations.firstOrNull()
+    val callOverlayVisible = shouldShowCallOverlay(session.screen, session.accountRole) &&
+        (incomingCall != null || callState != VoipSessionState.Idle)
     val context = LocalContext.current
     var pendingCallPermissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val microphonePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        session.endCallPermissionRequest()
         val action = pendingCallPermissionAction
         pendingCallPermissionAction = null
         if (granted) action?.invoke()
@@ -82,6 +89,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
             PackageManager.PERMISSION_GRANTED
         ) action() else {
             pendingCallPermissionAction = action
+            session.beginCallPermissionRequest()
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -89,6 +97,10 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
         if (callAccountId.isNotBlank()) {
             session.calls.observeInvitations(callAccountId, session.accountRole)
         }
+    }
+    LaunchedEffect(callOverlayVisible) {
+        if (callOverlayVisible) session.pauseIdleTimerForCall()
+        else session.resumeIdleTimerAfterCall()
     }
     val cover: OliveViewModel = com.olive.app.ui.covers.food.oliveViewModel()
     SideEffect {
@@ -398,9 +410,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                     indication = null
                 ) {}
                 .testTag("privacy_blackout"))
-        if (session.screen == SessionScreen.Safe &&
-            session.accountRole in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
-        ) {
+        if (shouldShowCallOverlay(session.screen, session.accountRole)) {
             incomingCall?.takeIf { callState == VoipSessionState.Idle }?.let { invitation ->
                 IncomingCallDialog(
                     invitation = invitation,

@@ -156,7 +156,9 @@ class OliveActivity : FragmentActivity() {
         applyScreenCaptureProtection()
         // Authentication and runtime permission dialogs temporarily own another window.
         // Home/onStop still lock the safe area; a permission result never restores a private screen.
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.navigation.background()
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
+            !session.externalFilePickerOpen && !session.callPermissionRequestOpen
+        ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onPause()
     }
@@ -165,7 +167,9 @@ class OliveActivity : FragmentActivity() {
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.navigation.background()
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
+            !session.externalFilePickerOpen && !session.callPermissionRequestOpen
+        ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onUserLeaveHint()
     }
@@ -225,7 +229,8 @@ class OliveActivity : FragmentActivity() {
 
     // Applies the privacy policy when the app is no longer visible.
     override fun onStop() {
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen && (session.deviceLockRequest != null ||
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
+            !session.callPermissionRequestOpen && (session.deviceLockRequest != null ||
                     session.screen in setOf(
                 SessionScreen.Pin,
                 SessionScreen.DevicePin,

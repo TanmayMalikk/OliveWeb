@@ -48,6 +48,7 @@ data class LiveKitConnectionDetails(
 /** Audio session interface for connecting to LiveKit. */
 interface VoipAudioSession {
     fun setOnDisconnected(listener: (String?) -> Unit)
+    fun setOnParticipantCountChanged(listener: (Int) -> Unit)
     suspend fun connect(details: LiveKitConnectionDetails)
     suspend fun setMicrophoneMuted(muted: Boolean)
     suspend fun setSpeakerEnabled(enabled: Boolean)
@@ -64,12 +65,17 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
     private var roomEventJob: Job? = null
     private var localDisconnect = false
     private var onDisconnected: (String?) -> Unit = {}
+    private var onParticipantCountChanged: (Int) -> Unit = {}
     private var previousAudioMode = AudioManager.MODE_NORMAL
     private var previousSpeakerEnabled = false
     private var audioFocusRequest: AudioFocusRequest? = null
 
     override fun setOnDisconnected(listener: (String?) -> Unit) {
         onDisconnected = listener
+    }
+
+    override fun setOnParticipantCountChanged(listener: (Int) -> Unit) {
+        onParticipantCountChanged = listener
     }
 
     override suspend fun connect(details: LiveKitConnectionDetails) = mutex.withLock {
@@ -87,10 +93,16 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
                 "LiveKit could not publish microphone audio"
             }
             room = newRoom
+            onParticipantCountChanged(newRoom.remoteParticipants.size)
             roomEventJob = eventScope.launch {
                 newRoom.events.collect { event ->
+                    if ((event is RoomEvent.ParticipantConnected ||
+                            event is RoomEvent.ParticipantDisconnected) && room === newRoom) {
+                        onParticipantCountChanged(newRoom.remoteParticipants.size)
+                    }
                     if (event is RoomEvent.Disconnected && room === newRoom) {
                         room = null
+                        onParticipantCountChanged(0)
                         restoreAudioRoute()
                         if (!localDisconnect) {
                             onDisconnected(event.error?.message)
@@ -140,6 +152,7 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
             roomEventJob?.cancel()
             roomEventJob = null
             localDisconnect = false
+            onParticipantCountChanged(0)
             restoreAudioRoute()
         }
     }
@@ -192,6 +205,7 @@ sealed interface VoipSessionState {
         val call: VoipCall,
         val microphoneMuted: Boolean,
         val speakerEnabled: Boolean = false,
+        val remoteParticipantCount: Int = 0,
     ) : VoipSessionState
     data class Leaving(val call: VoipCall) : VoipSessionState
     data class Error(val call: VoipCall?, val message: String) : VoipSessionState
@@ -204,10 +218,18 @@ class VoipSessionController(
 ) {
     private val mutex = Mutex()
     private val mutableState = MutableStateFlow<VoipSessionState>(VoipSessionState.Idle)
+    private var remoteParticipantCount = 0
 
     val state: StateFlow<VoipSessionState> = mutableState.asStateFlow()
 
     init {
+        audioSession.setOnParticipantCountChanged { count ->
+            remoteParticipantCount = count.coerceAtLeast(0)
+            val active = mutableState.value as? VoipSessionState.Active
+            if (active != null) {
+                mutableState.value = active.copy(remoteParticipantCount = remoteParticipantCount)
+            }
+        }
         audioSession.setOnDisconnected { message ->
             val call = when (val current = mutableState.value) {
                 is VoipSessionState.Connecting -> current.call
@@ -229,10 +251,11 @@ class VoipSessionController(
     suspend fun startAndJoin(
         name: String,
         callerId: String,
-        participantIds: List<String>
+        participantIds: List<String>,
+        callerName: String = name,
     ): VoipCall = mutex.withLock {
         check(mutableState.value == VoipSessionState.Idle) { "A VoIP session is already in progress" }
-        val call = voipManager.startCall(name, callerId, participantIds)
+        val call = voipManager.startCall(name, callerId, participantIds, callerName)
         joinAudio(call)
     }
 
@@ -316,14 +339,20 @@ class VoipSessionController(
         mutableState.value = VoipSessionState.Leaving(call)
         try {
             audioSession.disconnect()
-            voipManager.endCall(call.callId)
-            mutableState.value = VoipSessionState.Idle
         } catch (error: Exception) {
             mutableState.value = VoipSessionState.Error(
                 call,
-                error.message ?: "Could not end the VoIP call"
+                error.message ?: "Could not disconnect from LiveKit"
             )
             throw error
+        }
+        // Hangup is locally complete once audio is disconnected. A server cleanup failure can
+        // still be reported outside the call, but must never strand the user on a Close screen.
+        mutableState.value = VoipSessionState.Idle
+        try {
+            voipManager.endCall(call.callId)
+        } catch (error: Exception) {
+            if (error !is VoipApiException || error.statusCode != 409) throw error
         }
     }
 
@@ -335,10 +364,15 @@ class VoipSessionController(
 
     private suspend fun joinAudio(call: VoipCall): VoipCall {
         mutableState.value = VoipSessionState.Connecting(call)
+        remoteParticipantCount = 0
         try {
             val connection = voipManager.getLiveKitConnectionDetails(call.callId)
             audioSession.connect(connection)
-            mutableState.value = VoipSessionState.Active(call, microphoneMuted = false)
+            mutableState.value = VoipSessionState.Active(
+                call,
+                microphoneMuted = false,
+                remoteParticipantCount = remoteParticipantCount,
+            )
             return call
         } catch (error: Exception) {
             mutableState.value = VoipSessionState.Error(

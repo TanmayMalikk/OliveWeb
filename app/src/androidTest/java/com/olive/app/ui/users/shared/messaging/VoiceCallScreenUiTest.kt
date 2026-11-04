@@ -3,6 +3,7 @@ package com.olive.app.ui.users.shared.messaging
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.olive.app.createOliveComposeRule
 import com.olive.app.data.messaging.VoipCall
@@ -63,6 +64,28 @@ class VoiceCallScreenUiTest {
 
         compose.onNodeWithTag("finish_voice_call").assertIsDisplayed().performClick()
         compose.runOnIdle { assertTrue(finished) }
+    }
+
+    @Test
+    fun callerRemainsCallingUntilAnotherParticipantJoinsTheRoom() {
+        compose.activity.setContent {
+            OliveTheme {
+                ActiveCallDialog(
+                    state = VoipSessionState.Active(
+                        call,
+                        microphoneMuted = false,
+                        remoteParticipantCount = 0,
+                    ),
+                    currentUid = "caller-1",
+                    onMute = {},
+                    onSpeaker = {},
+                    onFinish = {},
+                )
+            }
+        }
+
+        compose.onNodeWithText("Calling…").assertIsDisplayed()
+        compose.onNodeWithTag("finish_voice_call").assertIsDisplayed()
     }
 
     companion object {

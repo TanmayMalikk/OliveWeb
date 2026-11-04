@@ -30,7 +30,12 @@ class VoipManagerTest {
             token = "user-token"
         )
 
-        val call = manager.startCall("  Support  ", "caller-1", listOf("user-2", "user-3"))
+        val call = manager.startCall(
+            "  Support  ",
+            "caller-1",
+            listOf("user-2", "user-3"),
+            callerName = "Alice",
+        )
 
         assertEquals("call-1", call.callId)
         assertEquals("Support", call.name)
@@ -39,6 +44,7 @@ class VoipManagerTest {
         val requestBody = JSONObject(Buffer().also { requests.single().body?.writeTo(it) }.readUtf8())
         assertEquals("Support", requestBody.getString("name"))
         assertEquals("caller-1", requestBody.getString("callerId"))
+        assertEquals("Alice", requestBody.getString("callerName"))
         assertEquals(listOf("user-2", "user-3"), requestBody.getJSONArray("participantIds")
             .let { array -> (0 until array.length()).map(array::getString) })
     }
