@@ -8,8 +8,6 @@ import com.olive.app.ui.users.shared.navigation.*
 
 
 import androidx.compose.foundation.BorderStroke
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,7 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.*
 import com.olive.app.R
-import com.olive.app.data.media.OcrReview
+import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -47,23 +45,10 @@ internal fun SafetyPlanScreen(
     ownerName: String = session.coverUsername, onBack: () -> Unit = session.navigation::back
 ) {
     val controller = session.safetyPlans
-    val documentController = session.documents
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    val uploadError = stringResource(R.string.documents_upload_failed)
-    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        val uid = session.coverAccountId
-        if (uri != null && uid != null) {
-            documentController.upload(
-                uri = uri,
-                identity = AccountIdentity(uid, session.coverUsername),
-                fallbackError = uploadError,
-                ocrReview = OcrReview.NOT_RUN,
-                tags = setOf("Safety Plan"),
-            )
-        }
-    }
+    var choosingDocumentUpload by rememberSaveable { mutableStateOf(false) }
     // Hides the keyboard before leaving or switching safety-plan sections.
     fun leaveEditor() {
         focus.clearFocus(force = true)
@@ -245,7 +230,7 @@ internal fun SafetyPlanScreen(
                                     onContactsChange = if (!organizationEditor && !safeContact && section == "contacts") session::saveContacts else null,
                                     editable = !safeContact,
                                     onUploadDocument = if (!organizationEditor && !safeContact && section == "documents") {
-                                        { documentPicker.launch(arrayOf("image/*", "video/*", "application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) }
+                                        { choosingDocumentUpload = true }
                                     } else null,
                                 )
                                 HorizontalDivider(
@@ -323,6 +308,12 @@ internal fun SafetyPlanScreen(
             }
         }
     }
+    SafetyDocumentUploadFlow(
+        session = session,
+        visible = choosingDocumentUpload,
+        onDismiss = { choosingDocumentUpload = false },
+        tags = setOf("Safety Plan"),
+    )
 }
 
 // Lets a trusted contact view the safety plans shared with them.

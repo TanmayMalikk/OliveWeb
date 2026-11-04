@@ -78,6 +78,7 @@ class OliveActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         OliveNotificationManager.createNotificationChannels(this)
+        receiveIncomingCallIntent(intent)
         CoverLauncher.ensureStudioLauncher(this)
         applyScreenCaptureProtection()
         window.decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
@@ -134,6 +135,19 @@ class OliveActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        receiveIncomingCallIntent(intent)
+    }
+
+    private fun receiveIncomingCallIntent(intent: Intent?) {
+        val callId = intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_ID).orEmpty()
+        val callerId = intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_CALLER_ID).orEmpty()
+        if (callId.isBlank() || callerId.isBlank()) return
+        session.calls.receiveInvitation(
+            callId,
+            callerId,
+            intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_NAME).orEmpty(),
+        )
+        intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_ID)
     }
 
     // Leaving the foreground locks the User safe area; the resource flag controls the extra native privacy cover.

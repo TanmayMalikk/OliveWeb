@@ -3,8 +3,20 @@ package com.olive.app.data.messaging
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioDeviceInfo
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import io.livekit.android.LiveKit
+import io.livekit.android.events.RoomEvent
+import io.livekit.android.events.collect
 import io.livekit.android.room.Room
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,16 +47,30 @@ data class LiveKitConnectionDetails(
 
 /** Audio session interface for connecting to LiveKit. */
 interface VoipAudioSession {
+    fun setOnDisconnected(listener: (String?) -> Unit)
     suspend fun connect(details: LiveKitConnectionDetails)
     suspend fun setMicrophoneMuted(muted: Boolean)
+    suspend fun setSpeakerEnabled(enabled: Boolean)
     suspend fun disconnect()
 }
 
 /** LiveKit-backed implementation of [VoipAudioSession]. */
 class LiveKitAudioSession(context: Context) : VoipAudioSession {
     private val appContext = context.applicationContext
+    private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val mutex = Mutex()
+    private val eventScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var room: Room? = null
+    private var roomEventJob: Job? = null
+    private var localDisconnect = false
+    private var onDisconnected: (String?) -> Unit = {}
+    private var previousAudioMode = AudioManager.MODE_NORMAL
+    private var previousSpeakerEnabled = false
+    private var audioFocusRequest: AudioFocusRequest? = null
+
+    override fun setOnDisconnected(listener: (String?) -> Unit) {
+        onDisconnected = listener
+    }
 
     override suspend fun connect(details: LiveKitConnectionDetails) = mutex.withLock {
         check(room == null) { "A LiveKit room is already connected" }
@@ -53,6 +79,7 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
                 PackageManager.PERMISSION_GRANTED
         ) { "Microphone permission is required to join a voice call" }
 
+        prepareCallAudio()
         val newRoom = LiveKit.create(appContext)
         try {
             newRoom.connect(details.serverUrl, details.token)
@@ -60,12 +87,24 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
                 "LiveKit could not publish microphone audio"
             }
             room = newRoom
+            roomEventJob = eventScope.launch {
+                newRoom.events.collect { event ->
+                    if (event is RoomEvent.Disconnected && room === newRoom) {
+                        room = null
+                        restoreAudioRoute()
+                        if (!localDisconnect) {
+                            onDisconnected(event.error?.message)
+                        }
+                    }
+                }
+            }
         } catch (error: Exception) {
             try {
                 newRoom.disconnect()
             } catch (disconnectError: Exception) {
                 error.addSuppressed(disconnectError)
             }
+            restoreAudioRoute()
             throw error
         }
     }
@@ -77,10 +116,71 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
         }
     }
 
+    override suspend fun setSpeakerEnabled(enabled: Boolean) = mutex.withLock {
+        check(room != null) { "No LiveKit room is connected" }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val type = if (enabled) AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+            else AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+            val device = audioManager.availableCommunicationDevices.firstOrNull { it.type == type }
+                ?: error(if (enabled) "Speaker is unavailable" else "Phone earpiece is unavailable")
+            check(audioManager.setCommunicationDevice(device)) { "Could not change the call audio route" }
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = enabled
+        }
+    }
+
     override suspend fun disconnect() = mutex.withLock {
         val connectedRoom = room ?: return@withLock
-        connectedRoom.disconnect()
-        room = null
+        try {
+            localDisconnect = true
+            connectedRoom.disconnect()
+            room = null
+        } finally {
+            roomEventJob?.cancel()
+            roomEventJob = null
+            localDisconnect = false
+            restoreAudioRoute()
+        }
+    }
+
+    private fun prepareCallAudio() {
+        previousAudioMode = audioManager.mode
+        @Suppress("DEPRECATION")
+        previousSpeakerEnabled = audioManager.isSpeakerphoneOn
+        val attributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(attributes)
+                .setAcceptsDelayedFocusGain(false)
+                .build()
+                .also(audioManager::requestAudioFocus)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                null,
+                AudioManager.STREAM_VOICE_CALL,
+                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
+            )
+        }
+        audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+    }
+
+    private fun restoreAudioRoute() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) audioManager.clearCommunicationDevice()
+        @Suppress("DEPRECATION")
+        runCatching { audioManager.isSpeakerphoneOn = previousSpeakerEnabled }
+        runCatching { audioManager.mode = previousAudioMode }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let(audioManager::abandonAudioFocusRequest)
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(null)
+        }
     }
 }
 
@@ -88,7 +188,11 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
 sealed interface VoipSessionState {
     data object Idle : VoipSessionState
     data class Connecting(val call: VoipCall) : VoipSessionState
-    data class Active(val call: VoipCall, val microphoneMuted: Boolean) : VoipSessionState
+    data class Active(
+        val call: VoipCall,
+        val microphoneMuted: Boolean,
+        val speakerEnabled: Boolean = false,
+    ) : VoipSessionState
     data class Leaving(val call: VoipCall) : VoipSessionState
     data class Error(val call: VoipCall?, val message: String) : VoipSessionState
 }
@@ -102,6 +206,18 @@ class VoipSessionController(
     private val mutableState = MutableStateFlow<VoipSessionState>(VoipSessionState.Idle)
 
     val state: StateFlow<VoipSessionState> = mutableState.asStateFlow()
+
+    init {
+        audioSession.setOnDisconnected { message ->
+            val call = when (val current = mutableState.value) {
+                is VoipSessionState.Connecting -> current.call
+                is VoipSessionState.Active -> current.call
+                else -> null
+            } ?: return@setOnDisconnected
+            mutableState.value = if (message.isNullOrBlank()) VoipSessionState.Idle
+            else VoipSessionState.Error(call, message)
+        }
+    }
 
     companion object {
         fun create(
@@ -150,6 +266,21 @@ class VoipSessionController(
             mutableState.value = VoipSessionState.Error(
                 active.call,
                 error.message ?: "Could not change microphone state"
+            )
+            throw error
+        }
+    }
+
+    suspend fun setSpeakerEnabled(enabled: Boolean) = mutex.withLock {
+        val active = mutableState.value as? VoipSessionState.Active
+            ?: error("No active VoIP session")
+        try {
+            audioSession.setSpeakerEnabled(enabled)
+            mutableState.value = active.copy(speakerEnabled = enabled)
+        } catch (error: Exception) {
+            mutableState.value = VoipSessionState.Error(
+                active.call,
+                error.message ?: "Could not change the call audio route"
             )
             throw error
         }

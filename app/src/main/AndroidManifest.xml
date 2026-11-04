@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING" />
     <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
@@ -21,6 +22,9 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/ic_app_info_blank" android:roundIcon="@drawable/ic_app_info_blank"
         android:supportsRtl="true" android:theme="@style/Theme.Olive">
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
         <!-- OCR runs locally. Disable ONNX's optional telemetry provider, which eagerly loads
              native code and calls telemetry JNI methods absent from the Android artifact. -->
         <!--The android:Authorities tag should not be needed, for some reason I get an error
