@@ -53,6 +53,16 @@ internal fun retainAuthorizedDeviceKeys(
     allowedUsers.any { uid -> key.startsWith("$uid--") }
 }
 
+/** Selects only this account and device's document-key copies, preferring the device envelope. */
+internal fun documentKeyCandidates(
+    document: SafetyDocument,
+    uid: String,
+    deviceId: String,
+): List<String> = listOfNotNull(
+    document.deviceWrappedKeys["$uid--$deviceId"],
+    document.wrappedKeys[uid],
+).filter(String::isNotBlank).distinct()
+
 data class DocumentOcrMetadata(val text: String, val confidence: Float, val successful: Boolean)
 
 /** Accepts OCR only after the containing metadata has been decrypted on the client. */
@@ -188,9 +198,7 @@ class SafetyDocumentRepository(
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
         val current = getFor(ownerUid, document.id)
         if (current.objectKey.isNotBlank()) {
-            val ownerWrapped = current.wrappedKeys[ownerUid]
-                ?: error("The owner encryption key is unavailable")
-            val documentKey = KeyManager.unwrapKey(ownerWrapped)
+            val documentKey = unwrapDocumentKey(current, ownerUid)
             val recipient = recipientAccess(documentKey, recipientUid, recipientUsername)
             val wrapped = current.wrappedKeys + (recipientUid to recipient.accountKey)
             val devices = retainAuthorizedDeviceKeys(current.deviceWrappedKeys, wrapped.keys) + recipient.deviceKeys
@@ -264,13 +272,8 @@ class SafetyDocumentRepository(
         username: String,
     ) {
         if (document.objectKey.isBlank() || currentUid !in document.allowedUsers) return
-        val ownDeviceKey = "$currentUid--${KeyManager.deviceId()}"
-        val wrapped = listOfNotNull(
-            document.deviceWrappedKeys[ownDeviceKey],
-            document.wrappedKeys[currentUid],
-        )
         val documentKey = runCatching {
-            KeyManager.unwrapFirst(wrapped, document.encryptionVersion)
+            unwrapDocumentKey(document, currentUid)
         }.getOrNull() ?: return
         val normalized = username.trim().lowercase()
         if (!normalized.matches(Regex("[a-z0-9_]{4,24}"))) return
@@ -322,8 +325,8 @@ class SafetyDocumentRepository(
         recipients: Map<String, String>,
     ): EncryptedAccess {
         val ownerWrapped = document.wrappedKeys[ownerUid]
-            ?: error("The owner encryption key is unavailable")
-        val documentKey = KeyManager.unwrapKey(ownerWrapped)
+            ?: error("The owner account encryption key is unavailable")
+        val documentKey = unwrapDocumentKey(document, ownerUid)
         val accountKeys = mutableMapOf(ownerUid to ownerWrapped)
         val deviceKeys = retainAuthorizedDeviceKeys(document.deviceWrappedKeys, setOf(ownerUid)).toMutableMap()
         recipients.forEach { (uid, username) ->
@@ -374,6 +377,13 @@ class SafetyDocumentRepository(
             KeyManager.wrapKey(documentKey, KeyManager.decodePublicKey(encodedAccountKey), accountDigest),
             devices.associate { it.first to it.second },
         )
+    }
+
+    /** Uses this installation's key copy before the account envelope shared across installations. */
+    private fun unwrapDocumentKey(document: SafetyDocument, uid: String): javax.crypto.SecretKey {
+        val candidates = documentKeyCandidates(document, uid, KeyManager.deviceId())
+        if (candidates.isEmpty()) error("The document encryption key is unavailable")
+        return KeyManager.unwrapFirst(candidates, document.encryptionVersion)
     }
 
     // Converts a stored document record into the model shown by the Safe App.
