@@ -85,11 +85,16 @@
     <string name="ui_olive_branch_updates">Actualizaciones de la rama de olivo</string>
     <string name="ui_olive_tree_updates">Actualizaciones del olivo</string>
     <string name="ui_call_invitation_notifications">Invitaciones de llamada</string>
+    <string name="ui_speaker">Altavoz</string>
+    <string name="ui_speaker_off">Desactivar altavoz</string>
     <string name="ui_incoming_call">Llamada entrante</string>
     <string name="ui_voice_call">Llamada de voz</string>
     <string name="ui_start_voice_call">Iniciar llamada de voz</string>
     <string name="ui_calling">Llamando…</string>
     <string name="ui_call_in_progress">Llamada en curso</string>
+    <string name="ui_missed_call">Llamada perdida</string>
+    <string name="ui_call_declined">Llamada rechazada</string>
+    <string name="ui_call_ended">Llamada finalizada</string>
     <string name="ui_mute">Silenciar</string>
     <string name="ui_unmute">Activar micrófono</string>
     <string name="ui_end_call">Finalizar llamada</string>

@@ -34,9 +34,9 @@
     <string name="safety_open_plan">فتح خطة %1$s</string>
     <string name="safety_source">إرشادات التخطيط: وكالة الصحة العامة الكندية. عدّل هذه الإرشادات مع شخص تثق به.</string>
     <string name="safety_upload_document">رفع الوثيقة</string>
-    <string name="safety_upload_for">رفع الوثيقة: %1$s. قريبًا.</string>
+    <string name="safety_upload_for">رفع مستند لـ %1$s.</string>
 <string name="safety_storage_photos">الصور</string>
     <string name="safety_storage_videos">مقاطع الفيديو</string>
     <string name="safety_storage_documents">صور الوثائق</string>
-    <string name="safety_document_upload_hint">سيتوفر الرفع قريبًا. ستظهر الملفات المرفوعة أيضًا في الوثائق.</string>
+    <string name="safety_document_upload_hint">تظهر الملفات المرفوعة أيضًا في المستندات.</string>
 </resources>

@@ -11,6 +11,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.olive.app.notification.OliveNotificationManager
@@ -28,8 +29,9 @@ object VoipPushTokenRegistration {
 
     suspend fun registerForTokenUpdates(context: Context) {
         FirebaseMessaging.getInstance().register().await()
-        val token = storedToken(context)
-        if (FirebaseAuth.getInstance().currentUser != null && token != null) {
+        val token = FirebaseInstallations.getInstance().id.await()
+        saveToken(context, token)
+        if (FirebaseAuth.getInstance().currentUser != null) {
             enqueueRegistration(context, token)
         }
     }
@@ -48,6 +50,24 @@ object VoipPushTokenRegistration {
         val deviceId = deviceId(context)
         VoipManager().unregisterPushToken(deviceId)
         Log.i(TAG, "Unregistered this device's call-invitation token")
+    }
+
+    suspend fun rotateCurrentToken(context: Context) {
+        check(FirebaseAuth.getInstance().currentUser != null) {
+            "Sign in before rotating this device's call-invitation token"
+        }
+        val messaging = FirebaseMessaging.getInstance()
+        val installations = FirebaseInstallations.getInstance()
+        val installationId = deviceId(context)
+        VoipManager().unregisterPushToken(installationId)
+        messaging.unregister().await()
+        installations.delete().await()
+        preferences(context).edit().remove(TOKEN_KEY).apply()
+        messaging.register().await()
+        val token = installations.id.await()
+        saveToken(context, token)
+        VoipManager().registerPushToken(installationId, token)
+        Log.i(TAG, "Rotated and registered this device's call-invitation token")
     }
 
     internal fun onTokenRefreshed(context: Context, token: String) {
@@ -139,14 +159,12 @@ class VoipPushTokenRegistrationWorker(
 }
 
 class VoipFirebaseMessagingService : com.google.firebase.messaging.FirebaseMessagingService() {
-    @Suppress("DEPRECATION")
-    @Deprecated("Firebase invokes this callback when the FCM registration token changes.")
-    override fun onNewToken(token: String) {
-        super.onNewToken(token)
+    override fun onRegistered(installationId: String) {
+        super.onRegistered(installationId)
         try {
-            VoipPushTokenRegistration.onTokenRefreshed(this, token)
+            VoipPushTokenRegistration.onTokenRefreshed(this, installationId)
         } catch (error: Exception) {
-            Log.e(VoipPushTokenRegistration.TAG, "Could not persist the refreshed Firebase push token", error)
+            Log.e(VoipPushTokenRegistration.TAG, "Could not persist the Firebase messaging registration", error)
         }
     }
 

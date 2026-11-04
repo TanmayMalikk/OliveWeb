@@ -38,6 +38,13 @@ class VoipSessionControllerTest {
         assertEquals(listOf(true), audio.muteChanges)
         assertEquals(VoipSessionState.Active(call, microphoneMuted = true), controller.state.value)
 
+        controller.setSpeakerEnabled(true)
+        assertEquals(listOf(true), audio.speakerChanges)
+        assertEquals(
+            VoipSessionState.Active(call, microphoneMuted = true, speakerEnabled = true),
+            controller.state.value
+        )
+
         controller.leaveCall()
         assertEquals(1, audio.disconnectCount)
         assertEquals(VoipSessionState.Idle, controller.state.value)
@@ -64,6 +71,31 @@ class VoipSessionControllerTest {
         )
         assertEquals(1, audio.disconnectCount)
         assertEquals(VoipSessionState.Idle, controller.state.value)
+    }
+
+    @Test
+    fun remoteRoomClosureReturnsTheOtherPhoneToIdle() = runBlocking {
+        val audio = FakeLiveKitAudioSession()
+        val controller = VoipSessionController(apiManager(mutableListOf()), audio)
+        controller.startAndJoin("Support", "caller-1", listOf("user-2"))
+
+        audio.disconnectRemotely()
+
+        assertEquals(VoipSessionState.Idle, controller.state.value)
+    }
+
+    @Test
+    fun remoteParticipantJoinChangesTheCallFromRingingToConnected() = runBlocking {
+        val audio = FakeLiveKitAudioSession()
+        val controller = VoipSessionController(apiManager(mutableListOf()), audio)
+        controller.startAndJoin("Support", "caller-1", listOf("user-2"))
+
+        audio.remoteParticipantCount(1)
+
+        assertEquals(
+            VoipSessionState.Active(call, microphoneMuted = false, remoteParticipantCount = 1),
+            controller.state.value,
+        )
     }
 
     // Checks the audio connection failure is visible and can be retried step with the test's sample data.
@@ -142,6 +174,21 @@ class VoipSessionControllerTest {
         assertEquals(VoipSessionState.Idle, controller.state.value)
     }
 
+    @Test
+    fun staleCallErrorCanBeDismissedLocallyWithoutAnotherServerRequest() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val audio = FakeLiveKitAudioSession(muteFailure = IllegalStateException("Call is no longer active"))
+        val controller = VoipSessionController(apiManager(requests), audio)
+        controller.startAndJoin("Support", "caller-1", listOf("user-2"))
+        runCatching { controller.setMicrophoneMuted(true) }
+
+        controller.dismiss()
+
+        assertEquals(VoipSessionState.Idle, controller.state.value)
+        assertEquals(1, audio.disconnectCount)
+        assertEquals(listOf("/api/calls", "/calls/token"), requests.map { it.url.encodedPath })
+    }
+
     // Checks the disconnect failure is visible and can be retried step with the test's sample data.
     @Test
     fun disconnectFailureIsVisibleAndCanBeRetried() = runBlocking {
@@ -193,7 +240,7 @@ class VoipSessionControllerTest {
 
     // Checks the failed end request is visible and does not report call ended step with the test's sample data.
     @Test
-    fun failedEndRequestIsVisibleAndDoesNotReportCallEnded() = runBlocking {
+    fun failedEndRequestStillClosesTheLocalCallScreen() = runBlocking {
         val requests = mutableListOf<Request>()
         val audio = FakeLiveKitAudioSession()
         val controller = VoipSessionController(apiManager(requests, deleteStatus = 503), audio)
@@ -205,10 +252,20 @@ class VoipSessionControllerTest {
 
         assertEquals(503, failure.statusCode)
         assertEquals(1, audio.disconnectCount)
-        assertEquals(
-            VoipSessionState.Error(call, "Call service unavailable"),
-            controller.state.value
-        )
+        assertEquals(VoipSessionState.Idle, controller.state.value)
+    }
+
+    @Test
+    fun endingAnAlreadyEndedCallClosesTheCallScreen() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val audio = FakeLiveKitAudioSession()
+        val controller = VoipSessionController(apiManager(requests, deleteStatus = 409), audio)
+        controller.startAndJoin("Support", "caller-1", listOf("user-2"))
+
+        controller.endCall()
+
+        assertEquals(VoipSessionState.Idle, controller.state.value)
+        assertEquals(1, audio.disconnectCount)
     }
 
     // Checks the api manager step with the test's sample data.
@@ -265,9 +322,28 @@ class VoipSessionControllerTest {
         var muteFailure: Exception? = null,
         var disconnectFailure: Exception? = null
     ) : VoipAudioSession {
+        private var disconnectedListener: (String?) -> Unit = {}
+        private var participantCountListener: (Int) -> Unit = {}
         val connections = mutableListOf<LiveKitConnectionDetails>()
         val muteChanges = mutableListOf<Boolean>()
+        val speakerChanges = mutableListOf<Boolean>()
         var disconnectCount = 0
+
+        override fun setOnDisconnected(listener: (String?) -> Unit) {
+            disconnectedListener = listener
+        }
+
+        override fun setOnParticipantCountChanged(listener: (Int) -> Unit) {
+            participantCountListener = listener
+        }
+
+        fun remoteParticipantCount(count: Int) {
+            participantCountListener(count)
+        }
+
+        fun disconnectRemotely(message: String? = null) {
+            disconnectedListener(message)
+        }
 
         override suspend fun connect(details: LiveKitConnectionDetails) {
             connectFailure?.let { throw it }
@@ -278,6 +354,10 @@ class VoipSessionControllerTest {
         override suspend fun setMicrophoneMuted(muted: Boolean) {
             muteFailure?.let { throw it }
             muteChanges += muted
+        }
+
+        override suspend fun setSpeakerEnabled(enabled: Boolean) {
+            speakerChanges += enabled
         }
 
         // Checks the disconnect step with the test's sample data.

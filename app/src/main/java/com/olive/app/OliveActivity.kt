@@ -78,6 +78,7 @@ class OliveActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         OliveNotificationManager.createNotificationChannels(this)
+        receiveIncomingCallIntent(intent)
         CoverLauncher.ensureStudioLauncher(this)
         applyScreenCaptureProtection()
         window.decorView.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
@@ -134,6 +135,18 @@ class OliveActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        receiveIncomingCallIntent(intent)
+    }
+
+    private fun receiveIncomingCallIntent(intent: Intent?) {
+        val callId = intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_ID).orEmpty()
+        val callerId = intent?.getStringExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_CALLER_ID).orEmpty()
+        if (callId.isBlank() || callerId.isBlank()) return
+        // The authenticated call poll is the source of truth. A notification may be tapped after
+        // its 20-second invitation expired, so never reconstruct a ringing screen from old extras.
+        intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_ID)
+        intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_CALLER_ID)
+        intent?.removeExtra(OliveNotificationManager.EXTRA_INCOMING_CALL_NAME)
     }
 
     // Leaving the foreground locks the User safe area; the resource flag controls the extra native privacy cover.
@@ -142,7 +155,9 @@ class OliveActivity : FragmentActivity() {
         applyScreenCaptureProtection()
         // Authentication and runtime permission dialogs temporarily own another window.
         // Home/onStop still lock the safe area; a permission result never restores a private screen.
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.navigation.background()
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
+            !session.externalFilePickerOpen && !session.callPermissionRequestOpen
+        ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onPause()
     }
@@ -151,7 +166,9 @@ class OliveActivity : FragmentActivity() {
     public override fun onUserLeaveHint() {
         showRecentPrivacyCover()
         applyScreenCaptureProtection()
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen) session.navigation.background()
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult &&
+            !session.externalFilePickerOpen && !session.callPermissionRequestOpen
+        ) session.navigation.background()
         updateRecentAppIdentity(session.coverType, session.accountRole)
         super.onUserLeaveHint()
     }
@@ -211,7 +228,8 @@ class OliveActivity : FragmentActivity() {
 
     // Applies the privacy policy when the app is no longer visible.
     override fun onStop() {
-        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen && (session.deviceLockRequest != null ||
+        if (!deviceLock.awaitingCredential && !permissions.awaitingResult && !session.externalFilePickerOpen &&
+            !session.callPermissionRequestOpen && (session.deviceLockRequest != null ||
                     session.screen in setOf(
                 SessionScreen.Pin,
                 SessionScreen.DevicePin,

@@ -5,6 +5,21 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$testRunMutex = [System.Threading.Mutex]::new($false, "Local\OliveBranch.F26_D1.TestAll")
+$ownsTestRunMutex = $false
+try {
+    try {
+        $ownsTestRunMutex = $testRunMutex.WaitOne(0)
+    } catch [System.Threading.AbandonedMutexException] {
+        $ownsTestRunMutex = $true
+    }
+    if (-not $ownsTestRunMutex) {
+        throw "Another test-all run is already active. Wait for it to finish before starting a new run."
+    }
+
+# Node warns when both color controls are inherited from the launching terminal. Keep the explicit
+# FORCE_COLOR preference and remove the contradictory opt-out for all child npm/Playwright runs.
+if ($env:FORCE_COLOR -and $env:NO_COLOR) { Remove-Item Env:NO_COLOR }
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $completedChecks = [System.Collections.Generic.List[string]]::new()
 $testReportDirectory = Join-Path $projectRoot "build\reports"
@@ -26,6 +41,25 @@ $androidJava = "C:\Program Files\Android\Android Studio\jbr"
 if (Test-Path -LiteralPath $androidJava) {
     $env:JAVA_HOME = $androidJava
     $env:Path = "$androidJava\bin;$env:Path"
+}
+
+$nodePath = "C:\Program Files\nodejs"
+if (Test-Path -LiteralPath (Join-Path $nodePath "npm.cmd")) {
+    # Firebase 13 requires Node 24.12 or newer. Prefer the supported system install even when
+    # an older Node/npm pair appears earlier in the caller's PATH.
+    $env:Path = "$nodePath;$env:Path"
+} elseif (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+    $nodeDirs = @(
+        "C:\Program Files\nodejs",
+        "${env:ProgramFiles(x86)}\nodejs",
+        "$env:APPDATA\npm",
+        "$env:LOCALAPPDATA\npm"
+    )
+    foreach ($dir in $nodeDirs) {
+        if ($dir -and (Test-Path -LiteralPath $dir)) {
+            $env:Path = "$dir;$env:Path"
+        }
+    }
 }
 
 # Firebase's bundled Storage rules runtime still calls APIs that produce
@@ -142,17 +176,26 @@ if (-not $SkipFirebaseRules) {
     Push-Location -LiteralPath "$projectRoot\firebase"
     $previousJavaHome = $env:JAVA_HOME
     $previousPath = $env:Path
+    $previousNoGceCheck = $env:NO_GCE_CHECK
+    $previousNodeNoWarnings = $env:NODE_NO_WARNINGS
     try {
         if ($firebaseJava) {
             $env:JAVA_HOME = $firebaseJava
             $env:Path = "$firebaseJava\bin;$previousPath"
             Write-Host "Using Java 21 for Firebase emulator tests: $firebaseJava" -ForegroundColor Cyan
         }
+        # Emulator tests are always local and must not probe cloud VM metadata endpoints.
+        $env:NO_GCE_CHECK = "true"
+        # The Admin SDK probes VM metadata as a fallback during intentionally offline emulator
+        # tests. Keep that expected failed probe from surfacing as a Node process warning.
+        $env:NODE_NO_WARNINGS = "1"
         if (-not (Test-Path -LiteralPath "node_modules")) { Invoke-Checked "Install Firebase test dependencies" { & npm.cmd ci } }
         Invoke-Checked "Firestore and Storage rules tests" { & npm.cmd test }
     } finally {
         $env:JAVA_HOME = $previousJavaHome
         $env:Path = $previousPath
+        $env:NO_GCE_CHECK = $previousNoGceCheck
+        $env:NODE_NO_WARNINGS = $previousNodeNoWarnings
         Pop-Location
     }
 }
@@ -355,3 +398,7 @@ Write-Host "`nAll requested Olive tests passed ($($completedChecks.Count) checks
 $completedChecks | ForEach-Object { Write-Host "  PASS  $_" -ForegroundColor Green }
 Set-Content -LiteralPath (Join-Path $testReportDirectory "completed-test-checks.txt") -Value $completedChecks
 Remove-Item -LiteralPath (Join-Path $testReportDirectory "current-test-check.txt") -Force -ErrorAction SilentlyContinue
+} finally {
+    if ($ownsTestRunMutex) { [void]$testRunMutex.ReleaseMutex() }
+    $testRunMutex.Dispose()
+}

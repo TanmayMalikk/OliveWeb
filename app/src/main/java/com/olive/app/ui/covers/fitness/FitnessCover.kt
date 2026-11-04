@@ -148,7 +148,10 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         }
     }
     // Announce the new fitness page from its heading after a navigation tab is selected.
-    LaunchedEffect(page) {
+    // coverReset changes whenever Quick Exit brings the already-composed cover back on screen.
+    // Include it so HOME receives focus even when its page enum was already HOME and therefore
+    // would not restart a page-only effect.
+    LaunchedEffect(page, session.coverReset) {
         if (page !in setOf(FitnessPage.ACCOUNT, FitnessPage.GOALS, FitnessPage.FOOD_SEARCH)) {
             withFrameNanos { }
             pageFocus.requestFocus()

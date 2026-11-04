@@ -288,20 +288,41 @@ internal fun SharedEntryViewer(session: SessionViewModel) {
                         .verticalScroll(rememberScrollState())
                         .padding(24.dp)
                 ) {
-                    Text(
-                        text = entry.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = entry.body,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
-                    )
+                    if (entry.kind == com.olive.app.data.PrivateEntryKind.Incident) {
+                        SharedIncidentField(stringResource(R.string.title), entry.title)
+                        SharedIncidentField(stringResource(R.string.incident_date), entry.incidentDate)
+                        SharedIncidentField(stringResource(R.string.incident_time), entry.incidentTime)
+                        SharedIncidentField(stringResource(R.string.incident_location), entry.incidentLocation)
+                        SharedIncidentField(stringResource(R.string.incident_body), entry.body, minLines = 5)
+                    } else {
+                        Text(
+                            text = entry.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = entry.body,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+// Shows one decrypted incident value as a familiar read-only form field inside chat.
+@Composable
+private fun SharedIncidentField(label: String, value: String, minLines: Int = 1) {
+    OutlinedTextField(
+        value = value.ifBlank { stringResource(R.string.not_provided) },
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        minLines = minLines,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+    )
 }

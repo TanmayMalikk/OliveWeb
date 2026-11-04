@@ -9,6 +9,7 @@ function createDependencies() {
         ['call-1', {
             callId: 'call-1',
             callerId: 'alice',
+            callerName: 'Alice',
             name: 'Support',
             status: 'active',
             participants: {
@@ -18,6 +19,7 @@ function createDependencies() {
         }]
     ]);
     const invitations = [];
+    const endedRooms = [];
     const deviceTokens = new Map();
     const callStore = {
         async getCall(callId) {
@@ -25,8 +27,7 @@ function createDependencies() {
         },
         async listCallsFor(userId) {
             return [...calls.values()].filter((call) =>
-                call.status === 'active' &&
-                (call.callerId === userId || call.participants[userId]?.status === 'accepted')
+                call.callerId === userId || call.participants[userId]?.status != null
             );
         },
         async listInvitations(userId) {
@@ -37,15 +38,17 @@ function createDependencies() {
                 .map(([callId, call]) => ({
                     callId,
                     callerId: call.callerId,
-                    name: call.name,
+                    name: call.callerName || call.name,
                     status: 'pending'
                 }));
         },
-        async createCall(name, { callerId, participantIds }) {
+        async createCall(name, { callerId, callerName, conversationId, participantIds }) {
             const call = {
                 callId: 'new-call',
                 name,
                 callerId,
+                callerName,
+                conversationId,
                 status: 'active',
                 participants: Object.fromEntries(
                     participantIds.map((id) => [id, { status: 'pending' }])
@@ -58,12 +61,17 @@ function createDependencies() {
             const call = calls.get(callId);
             if (!call || call.participants[userId]?.status !== 'pending') return null;
             call.participants[userId] = { status: accepted ? 'accepted' : 'declined' };
+            if (!accepted) {
+                call.status = 'declined';
+                call.endReason = 'declined';
+            }
             return call;
         },
-        async endCall(callId) {
+        async endCall(callId, endedBy) {
             const call = calls.get(callId);
             if (!call || call.status !== 'active') return false;
             call.status = 'ended';
+            call.endedBy = endedBy;
             return true;
         },
         async registerFcmToken(userId, deviceId, token) {
@@ -77,6 +85,7 @@ function createDependencies() {
     return {
         calls,
         invitations,
+        endedRooms,
         deviceTokens,
         callStore,
         verifyIdToken: async (token) => {
@@ -98,6 +107,9 @@ function createDependencies() {
                     roomName,
                     token: `signed-${identity}`
                 };
+            },
+            async endRoom(roomName) {
+                endedRooms.push(roomName);
             }
         },
         async sendInvitation(invitation) {
@@ -161,6 +173,8 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             body: JSON.stringify({
                 name: '  Product help ',
                 callerId: 'alice',
+                callerName: 'Alice',
+                conversationId: 'conversation-1',
                 participantIds: ['carol']
             })
         });
@@ -170,6 +184,14 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             callId: 'new-call',
             callerId: 'alice',
             name: 'Product help',
+            callerName: 'Alice',
+            conversationId: 'conversation-1',
+            status: 'active',
+            createdAt: 0,
+            expiresAt: 0,
+            acceptedAt: 0,
+            endedAt: 0,
+            endReason: '',
             participants: [
                 { userId: 'alice', status: 'accepted' },
                 { userId: 'carol', status: 'pending' }
@@ -180,7 +202,7 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             recipientId: 'carol',
             callId: 'new-call',
             callerId: 'alice',
-            callName: 'Product help'
+            callName: 'Alice'
         }]);
 
         const invitations = await fetch(
@@ -191,7 +213,7 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             invitations: [{
                 callId: 'new-call',
                 callerId: 'alice',
-                name: 'Product help',
+                name: 'Alice',
                 status: 'pending'
             }]
         });
@@ -207,6 +229,7 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             body: JSON.stringify({
                 name: 'Forged call',
                 callerId: 'alice',
+                conversationId: 'conversation-1',
                 participantIds: ['carol']
             })
         });
@@ -215,7 +238,8 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
     });
 
     test('legacy invitation routes accept and decline only the authenticated pending user', async (context) => {
-        const baseUrl = await startTestServer(context);
+        const dependencies = createDependencies();
+        const baseUrl = await startTestServer(context, dependencies);
         const response = await fetch(`${baseUrl}/api/calls/call-1/accept`, {
             method: 'POST',
             headers: authorized('token-carol', { 'content-type': 'application/json' }),
@@ -238,6 +262,17 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
         });
         assert.equal(forged.status, 403);
         assert.equal((await forged.json()).error.code, 'identity_mismatch');
+
+        dependencies.calls.get('call-1').participants.carol = { status: 'pending' };
+        dependencies.calls.get('call-1').status = 'active';
+        const declined = await fetch(`${baseUrl}/api/calls/call-1/decline`, {
+            method: 'POST',
+            headers: authorized('token-carol', { 'content-type': 'application/json' }),
+            body: JSON.stringify({ userId: 'carol' })
+        });
+        assert.equal(declined.status, 200);
+        assert.equal(dependencies.calls.get('call-1').status, 'declined');
+        assert.deepEqual(dependencies.endedRooms, ['call-call-1']);
     });
 
     assert.equal(response.status, 200);
@@ -256,6 +291,7 @@ test('call creation rejects participant IDs without Firebase accounts', async (c
         body: JSON.stringify({
             name: 'Invalid invite',
             callerId: 'alice',
+            conversationId: 'conversation-1',
             participantIds: ['missing-user']
         })
     });
@@ -277,6 +313,7 @@ test('call creation keeps the call and reports failed invitation delivery', asyn
         body: JSON.stringify({
             name: 'Delivery check',
             callerId: 'alice',
+            conversationId: 'conversation-1',
             participantIds: ['carol']
         })
     });
@@ -298,6 +335,7 @@ test('call creation reports partial delivery to a participant device', async (co
         body: JSON.stringify({
             name: 'Partial delivery',
             callerId: 'alice',
+            conversationId: 'conversation-1',
             participantIds: ['carol']
         })
     });
@@ -353,7 +391,7 @@ test('POST /calls/token rejects inactive calls and unknown call IDs', async (con
     assert.equal((await missing.json()).error.code, 'call_not_found');
 });
 
-test('POST /calls/end is restricted to the call owner and updates call status', async (context) => {
+test('POST /calls/end lets either accepted participant end the shared call', async (context) => {
     const dependencies = createDependencies();
     const baseUrl = await startTestServer(context, dependencies);
     const options = {
@@ -362,18 +400,12 @@ test('POST /calls/end is restricted to the call owner and updates call status', 
         body: JSON.stringify({ callId: 'call-1' })
     };
 
-    const forbidden = await fetch(`${baseUrl}/calls/end`, options);
-    assert.equal(forbidden.status, 403);
-    assert.equal((await forbidden.json()).error.code, 'not_call_owner');
-    assert.equal(dependencies.calls.get('call-1').status, 'active');
-
-    const ended = await fetch(`${baseUrl}/calls/end`, {
-        ...options,
-        headers: authorized('token-alice', { 'content-type': 'application/json' })
-    });
+    const ended = await fetch(`${baseUrl}/calls/end`, options);
     assert.equal(ended.status, 200);
     assert.deepEqual(await ended.json(), { callId: 'call-1', status: 'ended' });
     assert.equal(dependencies.calls.get('call-1').status, 'ended');
+    assert.equal(dependencies.calls.get('call-1').endedBy, 'bob');
+    assert.deepEqual(dependencies.endedRooms, ['call-call-1']);
 });
 
 test('POST /notifications/send permits the owner to invite only pending participants', async (context) => {
@@ -425,7 +457,7 @@ test('POST /notifications/send permits the owner to invite only pending particip
         recipientId: 'carol',
         callId: 'call-1',
         callerId: 'alice',
-        callName: 'Support'
+        callName: 'Alice'
     }]);
 
     const nonOwner = await request('token-bob', 'carol');

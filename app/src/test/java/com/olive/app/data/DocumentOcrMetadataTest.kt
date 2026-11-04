@@ -3,6 +3,7 @@ package com.olive.app.data
 
 import com.olive.app.security.EncryptionUtils
 import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -54,5 +55,14 @@ class DocumentOcrMetadataTest {
             .put("ocrText", "x".repeat(50_001))
             .put("ocrConfidence", 0.8)
             .put("ocrSuccessful", true)))
+    }
+
+    // Inputs: repeated, blank, and oversized encrypted tags. Expected: a small clean private tag list.
+    @Test
+    fun encryptedDocumentTagsAreBoundedAndDeduplicated() {
+        val values = JSONArray().put("Safety Plan").put(" ").put("Safety Plan").put("x".repeat(100))
+        val tags = documentTagsFrom(JSONObject().put("tags", values))
+
+        assertEquals(listOf("Safety Plan", "x".repeat(80)), tags)
     }
 }
