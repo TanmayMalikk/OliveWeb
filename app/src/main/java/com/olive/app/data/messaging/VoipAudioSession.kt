@@ -1,10 +1,8 @@
-package com.olive.app.data
+package com.olive.app.data.messaging
 
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import com.olive.app.data.messaging.VoipCall
-import com.olive.app.data.messaging.VoipManager
 import io.livekit.android.LiveKit
 import io.livekit.android.room.Room
 import kotlinx.coroutines.flow.MutableStateFlow

@@ -1,10 +1,5 @@
-package com.olive.app.data
+package com.olive.app.data.messaging
 
-import com.olive.app.data.messaging.VoipApiException
-import com.olive.app.data.messaging.VoipCall
-import com.olive.app.data.messaging.VoipManager
-import com.olive.app.data.messaging.VoipParticipant
-import com.olive.app.data.messaging.VoipParticipantStatus
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType

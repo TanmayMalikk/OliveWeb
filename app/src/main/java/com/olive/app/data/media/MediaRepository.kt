@@ -5,6 +5,7 @@ import com.olive.app.BuildConfig
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctions
+import com.google.firebase.functions.FirebaseFunctionsException
 import java.net.URI
 import kotlinx.coroutines.tasks.await
 
@@ -96,8 +97,18 @@ class MediaRepository(
 
     // Requests a protected download ticket for an encrypted media file.
     override suspend fun downloadTicket(mediaId:String):MediaDownloadTicket {
-        val result=call("mediaDownloadTicket",mapOf("mediaId" to mediaId))
-        return MediaDownloadTicket(mediaId,validateUrl(result.string("url")),result.stringMap("headers"),result.long("expiresAt"))
+        try {
+            val result=call("mediaDownloadTicket",mapOf("mediaId" to mediaId))
+            return MediaDownloadTicket(mediaId,validateUrl(result.string("url")),result.stringMap("headers"),result.long("expiresAt"))
+        } catch (failure: FirebaseFunctionsException) {
+            if (failure.code in setOf(
+                    FirebaseFunctionsException.Code.PERMISSION_DENIED,
+                    FirebaseFunctionsException.Code.NOT_FOUND,
+                )) {
+                throw MediaAccessException(MediaAccessError.ACCESS_REVOKED, failure)
+            }
+            throw failure
+        }
     }
 
     // Saves the latest encrypted-media access keys for this account.

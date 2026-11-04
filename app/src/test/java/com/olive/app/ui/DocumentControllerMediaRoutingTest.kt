@@ -10,6 +10,8 @@ import com.olive.app.data.DocumentListSnapshot
 import com.olive.app.data.DocumentListSource
 import com.olive.app.data.SafetyDocument
 import com.olive.app.data.SafetyDocumentDataSource
+import com.olive.app.data.media.MediaAccessError
+import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.OcrReview
@@ -83,6 +85,15 @@ class DocumentControllerMediaRoutingTest {
             mediaFailureResource(
                 MediaDeviceVerificationException("internal detail", IllegalStateException()),
             ),
+        )
+    }
+
+    // Checks that repository access failures reach the UI as the revoked-access message.
+    @Test
+    fun `domain access failure reports revoked document guidance`() {
+        assertEquals(
+            com.olive.app.R.string.documents_access_revoked,
+            mediaFailureResource(MediaAccessException(MediaAccessError.ACCESS_REVOKED)),
         )
     }
 

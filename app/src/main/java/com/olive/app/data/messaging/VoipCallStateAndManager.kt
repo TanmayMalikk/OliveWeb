@@ -2,7 +2,6 @@ package com.olive.app.data.messaging
 
 import com.olive.app.BuildConfig
 import com.google.firebase.auth.FirebaseAuth
-import com.olive.app.data.LiveKitConnectionDetails
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
