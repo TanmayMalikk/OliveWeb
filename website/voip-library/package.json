@@ -1,19 +1,18 @@
 {
   "name": "voip-library",
   "version": "1.0.0",
-  "description": "Authenticated HTTP API for managing Mumble voice calls over ICE",
+  "description": "Firebase-authenticated HTTP API for LiveKit calls",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/start.js",
-    "test": "node --test",
-    "generate:mumble": "mkdir -p generated && slice2js -I node_modules/@zeroc/ice/slice --output-dir generated mumble/v1.5.939/MumbleServer.ice",
-    "test:integration": "npm run generate:mumble && MUMBLE_INTEGRATION=1 node --test test/mumble.integration.test.js"
+    "test": "node --test"
   },
   "engines": {
     "node": ">=22.16.0"
   },
-  "peerDependencies": {
-    "@zeroc/ice": "^3.8.3"
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "livekit-server-sdk": "^2.19.2"
   },
   "license": "UNLICENSED"
 }

@@ -1,85 +1,122 @@
 'use strict';
 
+const { randomUUID } = require('node:crypto');
 
-const { randomUUID } = require ('node:crypto');
-
-class MumbleHandler {
-    constructor(mumbleProxy) {
-        this.mumbleServer = mumbleProxy;
-        this.calls = new Map();
+class FirebaseCallStore {
+    constructor(database, {
+        callsPath = 'calls',
+        usersPath = 'users',
+        idGenerator = randomUUID,
+        clock = Date.now
+    } = {}) {
+        if (!database) throw new TypeError('database is required');
+        this.callsRef = database.ref(callsPath);
+        this.usersRef = database.ref(usersPath);
+        this.idGenerator = idGenerator;
+        this.clock = clock;
     }
 
-    async createCall(name, { callerId = null, participantIds = [], parentChannelId = 0 } = {}) {
-        const channelId = await this.mumbleServer.addChannel(name, parentChannelId);
-        const callId = randomUUID();
-        const participants = [
-            ...(callerId ? [{ userId: callerId, status: 'accepted' }] : []),
-            ...participantIds.map((userId) => ({ userId, status: 'pending' }))
-        ];
-        const call = { callId, channelId, name, callerId, participants };
-        this.calls.set(callId, call);
+    async getCall(callId) {
+        const snapshot = await this.callsRef.child(callId).once('value');
+        return snapshot.val();
+    }
 
+    async createCall(name, { callerId, participantIds }) {
+        const callId = this.idGenerator();
+        const call = {
+            callId,
+            name,
+            callerId,
+            status: 'active',
+            participants: Object.fromEntries(
+                participantIds.map((userId) => [userId, { status: 'pending' }])
+            ),
+            createdAt: this.clock()
+        };
+        await this.callsRef.child(callId).set(call);
         return call;
     }
 
-    getCall(callId) {
-        return this.calls.get(callId);
-    }
-
-    listCalls() {
-        return [...this.calls.values()];
-    }
-
-    listInvitations(userId) {
-        return [...this.calls.values()].flatMap((call) =>
-            call.participants
-                .filter((participant) => participant.userId === userId && participant.status === 'pending')
-                .map((participant) => ({
-                    callId: call.callId,
-                    callerId: call.callerId,
-                    name: call.name,
-                    status: participant.status
-                }))
+    async listCallsFor(userId) {
+        const snapshot = await this.callsRef.once('value');
+        const calls = snapshot.val() || {};
+        return Object.values(calls).filter((call) =>
+            call?.status === 'active' &&
+            (call.callerId === userId || getParticipantStatus(call, userId) === 'accepted')
         );
     }
 
+    async listInvitations(userId) {
+        const snapshot = await this.callsRef.once('value');
+        const calls = snapshot.val() || {};
+        return Object.values(calls)
+            .filter((call) =>
+                call?.status === 'active' && getParticipantStatus(call, userId) === 'pending'
+            )
+            .map((call) => ({
+                callId: call.callId,
+                callerId: call.callerId,
+                name: call.name,
+                status: 'pending'
+            }));
+    }
+
     async respondToInvitation(callId, userId, accepted) {
-        const call = this.getCall(callId);
-        const participant = call?.participants.find((entry) => entry.userId === userId);
-        if (!participant || participant.status !== 'pending') return null;
-
-        participant.status = accepted ? 'accepted' : 'declined';
-        return call;
+        const result = await this.callsRef.child(callId).transaction((call) => {
+            if (
+                !call ||
+                call.status !== 'active' ||
+                getParticipantStatus(call, userId) !== 'pending'
+            ) {
+                return;
+            }
+            return {
+                ...call,
+                participants: {
+                    ...call.participants,
+                    [userId]: { status: accepted ? 'accepted' : 'declined' }
+                }
+            };
+        });
+        return result.committed ? result.snapshot.val() : null;
     }
 
-    async closeCall(callId) {
-        const call = this.getCall(callId);
-        if (!call) return false;
-        await this.mumbleServer.removeChannel(call.channelId);
-        this.calls.delete(callId);
-        return true;
+    async endCall(callId, endedAt = Date.now()) {
+        const result = await this.callsRef.child(callId).transaction((call) => {
+            if (!call || call.status !== 'active') return;
+            return { ...call, status: 'ended', endedAt };
+        });
+        return result.committed;
     }
 
-    async connectUser(callId, sessionId) {
-        const call = this.getCall(callId);
-        if (!call) return false;
-        const user = await this.mumbleServer.getState(sessionId);
-        user.channel = call.channelId;
-        await this.mumbleServer.setState(user);
-        return true;
+    async getFcmTokens(userId) {
+        const snapshot = await this.usersRef.child(userId).child('fcmTokens').once('value');
+        const value = snapshot.val();
+        if (Array.isArray(value)) {
+            return value.filter((token) => typeof token === 'string' && token.trim().length > 0);
+        }
+        if (value && typeof value === 'object') {
+            return Object.values(value).filter((token) =>
+                typeof token === 'string' && token.trim().length > 0
+            );
+        }
+        return [];
     }
 
-    async disconnectUser(callId, sessionId) {
-        const call = this.getCall(callId);
-        if (!call) return false;
-        const user = await this.mumbleServer.getState(sessionId);
-        const channel = await this.mumbleServer.getChannelState(call.channelId);
-        if (user.channel !== call.channelId) return false;
-        user.channel = channel.parent;
-        await this.mumbleServer.setState(user);
+    async registerFcmToken(userId, deviceId, token) {
+        await this.usersRef.child(userId).child('fcmTokens').child(deviceId).set(token);
+    }
 
-        return true;
+    async unregisterFcmToken(userId, deviceId) {
+        await this.usersRef.child(userId).child('fcmTokens').child(deviceId).remove();
     }
 }
 
-module.exports = { MumbleHandler };
+function getParticipantStatus(call, userId) {
+    if (call.callerId === userId) return 'accepted';
+    const participant = call.participants?.[userId];
+    if (typeof participant === 'string') return participant;
+    return participant?.status;
+}
+
+module.exports = { FirebaseCallStore, getParticipantStatus };

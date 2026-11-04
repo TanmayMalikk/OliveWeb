@@ -16,26 +16,21 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
     /**
      * Encrypts and uploads a Private Entry or Incident Report for multiple recipients.
      *
-     * @param entryId The unique UUID of the document.
+     * @param entry The full note or incident report that the recipient will read.
      * @param ownerUid The UID of the creator.
      * @param title The plaintext title.
      * @param body The plaintext body.
      * @param recipientPublicKeys Map of UID -> RSA PublicKey for everyone who needs access (including the owner).
      */
     suspend fun saveMultiRecipientEntry(
-        entryId: String,
+        entry: PrivateEntry,
         ownerUid: String,
-        title: String,
-        body: String,
         recipientPublicKeys: Map<String, PublicKey>
     ) {
-        // 1. Serialize the plaintext payload
-        val payload = JSONObject().apply {
-            put("title", title.trim())
-            put("body", body.trim())
-        }.toString()
+        // Encrypt the full report so chat recipients see its date, time, location, body, and links.
+        val payload = entry.toJson().toString()
 
-        val documentRef = firestore.collection("privateEntries").document(entryId)
+        val documentRef = firestore.collection("privateEntries").document(entry.id)
         // A first-time read of a missing protected document is denied by Firestore rules.
         // Treat that specific result as a new share; existing owner documents remain readable.
         val existing = try {
@@ -60,7 +55,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
         // 5. Construct the secure cloud entity
         val secureEntry = mapOf(
-            "id" to entryId,
+            "id" to entry.id,
             "ownerUid" to ownerUid,
             "ciphertext" to ciphertext,
             "wrappedKeys" to wrappedKeysMap,
@@ -146,13 +141,11 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
         // 4. Parse the JSON back into the local data model
         val jsonObject = JSONObject(plaintextJson)
-        val title = jsonObject.optString("title", "Decryption Error")
-        val body = jsonObject.optString("body", "Decryption Error")
-
-        return PrivateEntry(
+        return if (jsonObject.has("timestamp")) PrivateEntry.fromJson(jsonObject)
+        else PrivateEntry(
             id = entryId,
-            title = title,
-            body = body
+            title = jsonObject.optString("title", "Decryption Error"),
+            body = jsonObject.optString("body", "Decryption Error"),
         )
     }
 
@@ -174,6 +167,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
         val entries = mutableListOf<PrivateEntry>()
         for (doc in snapshot.documents) {
+            // Use the fallback when fetch my entries is unavailable.
             try {
                 // We reuse loadAndDecryptEntry but pass the already fetched snapshot ID
                 val decryptedEntry = loadAndDecryptEntry(doc.id, currentUid)

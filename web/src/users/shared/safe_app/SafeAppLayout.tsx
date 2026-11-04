@@ -2,15 +2,20 @@
 import { lazy, Suspense } from "react";
 import {
   History as HistoryIcon,
+  Camera,
+  FileLock2,
+  HeartHandshake,
   House,
   Leaf,
   LogOut,
   MessageCircle,
+  MapPinned,
   NotebookPen,
   Settings,
   ShieldCheck,
   UserRound,
   Users,
+  PhoneCall,
 } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
 import { Button, Modal } from "../../../components/SharedComponents";
@@ -21,6 +26,13 @@ import Profile from "./AccountProfilePage";
 import SettingsPage from "./AccountSettingsPage";
 import Contacts from "../../user/contacts_and_notes/UserContactsPage";
 import Notes from "../../user/contacts_and_notes/UserNotesPage";
+import {
+  CameraPage,
+  DocumentsPage,
+  HotlinesPage,
+  LocationPage,
+  StaffHelpPage,
+} from "./SupportAndLocationPages";
 
 const Messages = lazy(() => import("./FriendsAndMessagesPage"));
 const SafetyPlan = lazy(() => import("./SafetyPlanPage"));
@@ -29,6 +41,11 @@ const nav: { page: Page; icon: typeof House }[] = [
   { page: "Notes", icon: NotebookPen },
   { page: "Messages", icon: MessageCircle },
   { page: "SafetyPlan", icon: ShieldCheck },
+  { page: "Documents", icon: FileLock2 },
+  { page: "Camera", icon: Camera },
+  { page: "Location", icon: MapPinned },
+  { page: "Hotlines", icon: PhoneCall },
+  { page: "StaffHelp", icon: HeartHandshake },
   { page: "Contacts", icon: Users },
   { page: "Profile", icon: UserRound },
   { page: "Settings", icon: Settings },
@@ -47,7 +64,7 @@ export default function SafeApp() {
           </span>
         </a>
         <nav aria-label="Personal space navigation">
-          {nav.map(({ page, icon: Icon }) => (
+          {nav.filter(({ page }) => p.role === "USER" || !["Hotlines", "StaffHelp", "Contacts"].includes(page)).map(({ page, icon: Icon }) => (
             <button
               key={page}
               aria-current={s.page === page ? "page" : undefined}
@@ -94,6 +111,16 @@ export default function SafeApp() {
                         ? "Stay connected."
                         : s.page === "SafetyPlan"
                           ? "A plan shaped around you."
+                          : s.page === "Documents"
+                            ? "Your important files."
+                            : s.page === "Camera"
+                              ? "Capture something safely."
+                              : s.page === "Location"
+                                ? "Know where you are."
+                                : s.page === "Hotlines"
+                                  ? "Support near you."
+                                  : s.page === "StaffHelp"
+                                    ? "Connect with support."
                           : s.page === "Settings"
                             ? "Your space. Your settings."
                             : s.page === "Activity"
@@ -133,6 +160,16 @@ export default function SafeApp() {
             <Suspense fallback={<p role="status">Opening safety plan…</p>}>
               <SafetyPlan />
             </Suspense>
+          ) : s.page === "Documents" ? (
+            <DocumentsPage />
+          ) : s.page === "Camera" ? (
+            <CameraPage />
+          ) : s.page === "Location" ? (
+            <LocationPage />
+          ) : s.page === "Hotlines" ? (
+            <HotlinesPage />
+          ) : s.page === "StaffHelp" ? (
+            <StaffHelpPage />
           ) : (
             <Suspense fallback={<p role="status">Opening conversations…</p>}>
               <Messages />

@@ -4,7 +4,6 @@ package com.olive.app
 import android.app.UiAutomation
 import android.app.KeyguardManager
 import android.os.ParcelFileDescriptor
-import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -31,19 +30,39 @@ internal class DeviceCredentialTestDriver(
         }
     }
 
+    // Checks the confirm phone pin step with the test's sample data.
     fun confirmPhonePin() {
         waitForPhonePin()
         // This PIN belongs only to the disposable emulator used by this test run.
-        if (findNode(automation.rootInActiveWindow) { it.viewIdResourceName == "cred_pin_pad" } != null) {
-            // SystemUI can expose a keypad without exposing its digits as clickable nodes.
-            val keys = "246810".map { KeyEvent.KEYCODE_0 + it.digitToInt() } + KeyEvent.KEYCODE_ENTER
-            shell("input keyevent ${keys.joinToString(" ")}")
+        val digitNode: (AccessibilityNodeInfo, Char) -> Boolean = { node, digit ->
+            val label = digit.toString()
+            val resource = node.viewIdResourceName.orEmpty()
+            node.isClickable && (
+                node.text?.toString() == label ||
+                    node.contentDescription?.toString() == label ||
+                    resource.endsWith("key$label") || resource.endsWith("digit_$label")
+                )
+        }
+        val hasOnScreenKeypad = findNode(automation.rootInActiveWindow) { digitNode(it, '2') } != null
+        if (hasOnScreenKeypad) {
+            "246810".forEach { digit ->
+                compose.waitUntil(5_000) {
+                    findNode(automation.rootInActiveWindow) { digitNode(it, digit) }
+                        ?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+                }
+                automation.waitForIdle(150, 3_000)
+            }
+            compose.waitUntil(5_000) {
+                findNode(automation.rootInActiveWindow) { it.viewIdResourceName == "com.android.systemui:id/key_enter" && it.isEnabled }
+                    ?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+            }
         } else {
             shell("input text 246810")
             shell("input keyevent 66")
         }
     }
 
+    // Checks the wait for phone pin step with the test's sample data.
     fun waitForPhonePin() {
         compose.waitUntil(20_000) {
             val root = automation.rootInActiveWindow
@@ -71,6 +90,7 @@ internal class DeviceCredentialTestDriver(
     }
 
 
+    // Finds the node needed by this test.
     private fun findNode(
         node: AccessibilityNodeInfo?,
         predicate: (AccessibilityNodeInfo) -> Boolean
@@ -84,10 +104,12 @@ internal class DeviceCredentialTestDriver(
         return null
     }
 
+    // Runs a device command needed by this test.
     fun shell(command: String) {
         shellOutput(command)
     }
 
+    // Runs a device command and returns its text output to the test.
     private fun shellOutput(command: String): String {
         val fd = automation.executeShellCommand(command)
         return ParcelFileDescriptor.AutoCloseInputStream(fd).use {

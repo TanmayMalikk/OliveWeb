@@ -12,10 +12,12 @@ class HotlineDirectoryTest {
     )
         .first { it.isDirectory }
 
+    // Checks the files step with the test's sample data.
     private fun files() =
         assets.listFiles { file -> file.name.matches(Regex("Resources[A-Z]{2}\\.json")) }.orEmpty()
             .associate { it.name.removePrefix("Resources").removeSuffix(".json") to it.readText() }
 
+    // Checks the directory step with the test's sample data.
     private fun directory() = HotlineDirectory.parseProvinceFiles(files())
 
     // Inputs: the values shown below. Expected: lars datasets cover every canadian region.

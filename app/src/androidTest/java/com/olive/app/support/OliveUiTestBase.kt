@@ -3,7 +3,6 @@ package com.olive.app
 
 import androidx.compose.ui.test.*
 import android.content.Intent
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.AndroidComposeTestRule
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -37,11 +36,13 @@ internal fun createOliveComposeRule() = Intent(Intent.ACTION_MAIN).setClass(
 
 // Shared setup keeps every end-to-end UI test isolated and gives feature files the same common actions.
 abstract class OliveUiTestBase {
+    // Sends a real screen tap when a test needs to check native touch handling.
     protected fun tapOnScreen(x: Float, y: Float) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         val time = SystemClock.uptimeMillis()
         val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, x, y, 0)
         val up = MotionEvent.obtain(time, time + 32, MotionEvent.ACTION_UP, x, y, 0)
+        // Turn an unexpected tap on screen failure into a readable message.
         try {
             check(automation.injectInputEvent(down, true))
             check(automation.injectInputEvent(up, true))
@@ -53,6 +54,7 @@ abstract class OliveUiTestBase {
 
     protected val compose = createOliveComposeRule()
     private val cleanStore = object : ExternalResource() {
+        // Deletes local test data before each test so one account cannot affect another.
         override fun before() {
             check(!BuildConfig.FIREBASE_CONFIGURED) { "These tests only run against local test accounts." }
             val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -89,10 +91,14 @@ abstract class OliveUiTestBase {
         runBlocking { sessionJob.cancelAndJoin() }
     }
 
+    // Waits until a tagged control exists, even while Compose briefly rebuilds the screen.
     protected fun waitFor(tag: String) {
+        // Include the current session state when the control never appears.
         try {
             compose.waitUntil(45_000) {
-                compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+                runCatching {
+                    compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
+                }.getOrDefault(false)
             }
         } catch (e: Throwable) {
             val session =
@@ -104,16 +110,43 @@ abstract class OliveUiTestBase {
         }
     }
 
+    // Finds a tagged control and scrolls it onto the screen when needed.
     private fun visibleNode(tag: String): SemanticsNodeInteraction {
+        val editorListExists = compose.onAllNodesWithTag("private_editor_list")
+            .fetchSemanticsNodes().isNotEmpty()
+        if (editorListExists && compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()) {
+            // LazyColumn items outside the keyboard-resized viewport are not part of the
+            // semantics tree yet. Clear the previous field's bring-into-view request before
+            // asking the editor list to compose the requested item.
+            hideKeyboard()
+            compose.onNodeWithTag("private_editor_list").performScrollToNode(hasTestTag(tag))
+            compose.waitForIdle()
+        }
         val node = compose.onNodeWithTag(tag)
         if (runCatching { node.assertIsDisplayed() }.isFailure) node.performScrollTo()
         return node
     }
 
+    // Replaces all text in a tagged input field.
     protected fun fill(tag: String, text: String) {
-        visibleNode(tag).performTextReplacement(text)
+        // Focusing can resize the window and recompose a scrolling form. Let that settle, then
+        // reacquire the semantics node so text entry never targets the field instance from before
+        // the keyboard/bring-into-view transition.
+        visibleNode(tag).performClick()
+        compose.waitForIdle()
+        repeat(3) { attempt ->
+            try {
+                visibleNode(tag).performTextReplacement(text)
+                return
+            } catch (error: AssertionError) {
+                val staleNode = error.message?.contains("no longer in the tree") == true
+                if (!staleNode || attempt == 2) throw error
+                compose.waitForIdle()
+            }
+        }
     }
 
+    // Scrolls to a tagged control and clicks it.
     protected fun click(tag: String) {
         visibleNode(tag).performClick()
     }
@@ -139,10 +172,12 @@ abstract class OliveUiTestBase {
         waitFor("new_user")
     }
 
+    // Presses the next button used by onboarding tests.
     protected fun nextOnboarding() {
         click("onboarding_next")
     }
 
+    // Opens the birthday picker and chooses a valid test date.
     protected fun chooseBirthday() {
         click("dob_year")
         click("dob_year_2000")
@@ -152,6 +187,7 @@ abstract class OliveUiTestBase {
         click("dob_day_2")
     }
 
+    // Completes registration with a unique local test account.
     protected fun register(pin: String = "123456", username: String = "olive_tester") {
         openOnboarding()
         click("new_user")
@@ -174,13 +210,47 @@ abstract class OliveUiTestBase {
         advanceOnboarding("address_city", "trigger")
         fill("trigger", "moon garden")
         waitFor("profile_submit")
-        click("profile_submit")
+        submitProfile()
         chooseAppPin()
         fill("new_pin", pin)
         fill("confirm_pin", pin)
-        // Submit fixture setup even if the soft keyboard is still moving after PIN entry.
-        visibleNode("pin_setup_submit").performSemanticsAction(SemanticsActions.OnClick) { it() }
+        submitPinSetup()
         waitCover()
+    }
+
+    // Submits the final profile page and retries once if Android consumed the tap while closing
+    // the keyboard or settling the scrolling form. This mirrors the guarded page-to-page helper.
+    private fun submitProfile() {
+        hideKeyboard()
+        click("profile_submit")
+        val moved = runCatching {
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("entry_knows_pin_yes").fetchSemanticsNodes().isNotEmpty()
+            }
+        }.isSuccess
+        if (!moved) {
+            waitFor("profile_submit")
+            compose.waitForIdle()
+            click("profile_submit")
+        }
+    }
+
+    // Finishes PIN enrollment after closing the keyboard. Some emulator frames consume the first
+    // tap while bringing the off-screen Finish button into view, so retry only while DevicePin is
+    // still present and the cover has not appeared.
+    private fun submitPinSetup() {
+        hideKeyboard()
+        click("pin_setup_submit")
+        val moved = runCatching {
+            compose.waitUntil(10_000) {
+                compose.onAllNodesWithTag("cover_root").fetchSemanticsNodes().isNotEmpty()
+            }
+        }.isSuccess
+        if (!moved) {
+            waitFor("pin_setup_submit")
+            compose.waitForIdle()
+            click("pin_setup_submit")
+        }
     }
 
     // Most flows skip Android's permission dialogs so they can test their own feature directly.
@@ -196,6 +266,7 @@ abstract class OliveUiTestBase {
         ).forEach { permission ->
             instrumentation.uiAutomation.grantRuntimePermission(packageName, permission)
         }
+        // Android 10 and newer need a separate background-location test grant.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             instrumentation.uiAutomation.grantRuntimePermission(
                 packageName,
@@ -222,6 +293,7 @@ abstract class OliveUiTestBase {
         waitFor(nextTag)
     }
 
+    // Creates the backup app PIN used by private-entry tests.
     protected fun chooseAppPin() {
         waitFor("entry_knows_pin_yes")
         click("entry_knows_pin_yes")
@@ -231,12 +303,20 @@ abstract class OliveUiTestBase {
         )
     }
 
+    // Waits for the public cover after startup or a quick exit.
     protected fun waitCover() {
+        // Add the current screen and Compose tree when the cover never appears.
         try {
-            compose.waitUntil(30_000) {
-                compose.onAllNodesWithTag("cover_root").fetchSemanticsNodes().isNotEmpty()
+            compose.waitForIdle()
+            compose.waitUntil(45_000) {
+                runCatching {
+                    val covers = compose.onAllNodesWithTag("cover_root")
+                    covers.fetchSemanticsNodes().indices.any { index ->
+                        runCatching { covers[index].assertIsDisplayed() }.isSuccess
+                    }
+                }.getOrDefault(false)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             val session =
                 androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
             val hierarchy = runCatching { compose.onRoot().printToString() }
@@ -248,6 +328,7 @@ abstract class OliveUiTestBase {
         }
     }
 
+    // Types the private trigger into the active cover app.
     protected fun trigger() {
         val session =
             androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
@@ -255,11 +336,13 @@ abstract class OliveUiTestBase {
         waitFor("unlock_pin")
     }
 
+    // Enters the test PIN on the private-entry screen.
     protected fun enterPin(pin: String) {
         pin.forEach { compose.onNodeWithTag("pin_digit_$it").performClick() }
         compose.onNodeWithTag("unlock_submit").performClick()
     }
 
+    // Uses the private trigger and PIN to open the safe app.
     protected fun unlock(pin: String = "123456") {
         trigger()
         enterPin(pin)

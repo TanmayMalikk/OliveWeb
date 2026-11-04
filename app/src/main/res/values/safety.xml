@@ -34,9 +34,9 @@
     <string name="safety_open_plan">Open plan for %1$s</string>
     <string name="safety_source">Planning guidance: Public Health Agency of Canada. Adapt these prompts with someone you trust.</string>
     <string name="safety_upload_document">Upload Document</string>
-    <string name="safety_upload_for">Upload document: %1$s. Coming soon.</string>
+    <string name="safety_upload_for">Upload a document for %1$s.</string>
 <string name="safety_storage_photos">Photos</string>
     <string name="safety_storage_videos">Videos</string>
     <string name="safety_storage_documents">Document images</string>
-    <string name="safety_document_upload_hint">Uploads are coming soon. Uploaded files will also appear in Documents.</string>
+    <string name="safety_document_upload_hint">Uploaded files also appear in Documents.</string>
 </resources>

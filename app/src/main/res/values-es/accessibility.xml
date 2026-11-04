@@ -20,6 +20,7 @@
     <string name="a11y_zoom_in">Acercar</string>
     <string name="a11y_zoom_out">Alejar</string>
     <string name="a11y_reset_zoom">Restablecer zoom</string>
+    <string name="a11y_rotate_clockwise">Girar a la derecha</string>
     <string name="a11y_zoom_percent">Zoom: %1$d%%</string>
 
 

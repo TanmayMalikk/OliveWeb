@@ -99,6 +99,7 @@ internal fun LocalizedIcon(
     Icon(imageVector, contentDescription, modifier, tint)
 }
 
+// Identifies accessibility actions that should also reset the privacy timer.
 internal fun isAccessibilityUserInteraction(eventType: Int): Boolean = eventType in setOf(
     AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED,
     AccessibilityEvent.TYPE_VIEW_CLICKED,
@@ -111,6 +112,7 @@ internal fun isAccessibilityUserInteraction(eventType: Int): Boolean = eventType
 internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: () -> Unit) {
     val previous = ViewCompat.getAccessibilityDelegate(view)
     ViewCompat.setAccessibilityDelegate(view, object : AccessibilityDelegateCompat() {
+        // Resets the privacy timer before Android sends a TalkBack event.
         override fun onRequestSendAccessibilityEvent(
             host: ViewGroup,
             child: View,
@@ -122,6 +124,7 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             return accepted
         }
 
+        // Adds the whole field rule to one TalkBack event instead of reading separate pieces.
         override fun dispatchPopulateAccessibilityEvent(
             host: View,
             event: AccessibilityEvent
@@ -129,14 +132,17 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             previous?.dispatchPopulateAccessibilityEvent(host, event)
                 ?: super.dispatchPopulateAccessibilityEvent(host, event)
 
+        // Finds the Android accessibility node provider used by TalkBack.
         override fun getAccessibilityNodeProvider(host: View): AccessibilityNodeProviderCompat? =
             previous?.getAccessibilityNodeProvider(host) ?: super.getAccessibilityNodeProvider(host)
 
+        // Adds the control description to the TalkBack event.
         override fun onInitializeAccessibilityEvent(host: View, event: AccessibilityEvent) {
             if (previous != null) previous.onInitializeAccessibilityEvent(host, event)
             else super.onInitializeAccessibilityEvent(host, event)
         }
 
+        // Adds the control role and description to the TalkBack node.
         override fun onInitializeAccessibilityNodeInfo(
             host: View,
             info: AccessibilityNodeInfoCompat
@@ -145,11 +151,13 @@ internal fun observeAccessibilityInteractions(view: ViewGroup, onInteraction: ()
             else super.onInitializeAccessibilityNodeInfo(host, info)
         }
 
+        // Adds readable text when TalkBack announces this custom control.
         override fun onPopulateAccessibilityEvent(host: View, event: AccessibilityEvent) {
             if (previous != null) previous.onPopulateAccessibilityEvent(host, event)
             else super.onPopulateAccessibilityEvent(host, event)
         }
 
+        // Accessibility ui helpers: Performs accessibility action.
         override fun performAccessibilityAction(host: View, action: Int, args: Bundle?): Boolean =
             previous?.performAccessibilityAction(host, action, args)
                 ?: super.performAccessibilityAction(host, action, args)
@@ -174,6 +182,7 @@ internal fun Modifier.keepVisibleWhileTyping(): Modifier = composed {
     val requester = remember { BringIntoViewRequester() }
     var focused by remember { mutableStateOf(false) }
     val keyboardBottom = WindowInsets.ime.getBottom(LocalDensity.current)
+    // Keeps the private screen awake while an editable field has focus.
     LaunchedEffect(focused, keyboardBottom) {
         if (focused) {
             withFrameNanos { }

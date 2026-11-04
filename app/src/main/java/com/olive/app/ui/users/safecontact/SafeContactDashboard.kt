@@ -55,6 +55,7 @@ internal fun SafeContactArea(session: SessionViewModel) {
     AnimatedContent(
         session.page, label = "safe contact page",
         transitionSpec = { fadeIn(tween(180)).togetherWith(fadeOut(tween(120))) }) { page ->
+        // Opens the selected trusted-contact dashboard section.
         when (page) {
             SafePage.Home -> SafeContactHome(session)
             SafePage.Messages -> MessagesScreen(session)
@@ -71,6 +72,7 @@ internal fun SafeContactArea(session: SessionViewModel) {
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
 }
 
+// Shows the trusted contact's assigned user, alerts, and Safe App shortcuts.
 @Composable
 private fun SafeContactHome(session: SessionViewModel) {
     val uiText = rememberResourceText()
@@ -181,6 +183,7 @@ private fun SafeContactHome(session: SessionViewModel) {
     }
 }
 
+// Shows the trusted contact's own profile and account actions.
 @Composable
 private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
@@ -234,6 +237,7 @@ private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) 
     }
 }
 
+// safe contact dashboard shows this shared entry viewer view so the user can view its details and use its actions.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SharedEntryViewer(session: SessionViewModel) {
@@ -284,20 +288,41 @@ internal fun SharedEntryViewer(session: SessionViewModel) {
                         .verticalScroll(rememberScrollState())
                         .padding(24.dp)
                 ) {
-                    Text(
-                        text = entry.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = entry.body,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
-                    )
+                    if (entry.kind == com.olive.app.data.PrivateEntryKind.Incident) {
+                        SharedIncidentField(stringResource(R.string.title), entry.title)
+                        SharedIncidentField(stringResource(R.string.incident_date), entry.incidentDate)
+                        SharedIncidentField(stringResource(R.string.incident_time), entry.incidentTime)
+                        SharedIncidentField(stringResource(R.string.incident_location), entry.incidentLocation)
+                        SharedIncidentField(stringResource(R.string.incident_body), entry.body, minLines = 5)
+                    } else {
+                        Text(
+                            text = entry.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = entry.body,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+// Shows one decrypted incident value as a familiar read-only form field inside chat.
+@Composable
+private fun SharedIncidentField(label: String, value: String, minLines: Int = 1) {
+    OutlinedTextField(
+        value = value.ifBlank { stringResource(R.string.not_provided) },
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        minLines = minLines,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+    )
 }

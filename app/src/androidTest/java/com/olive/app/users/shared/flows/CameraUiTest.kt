@@ -10,6 +10,7 @@ import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import org.junit.Test
 
 class CameraUiTest : OliveUiTestBase() {
+    // Checks the embedded camera captures photos and videos for private review step with the test's sample data.
     @Test
     fun embeddedCameraCapturesPhotosAndVideosForPrivateReview() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

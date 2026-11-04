@@ -81,7 +81,9 @@ class OliveFoodViewModelTest {
         id = "pizza", name = "Olive Pizza", category = "Pizza", priceCents = 1_600,
         diet = "Vegetarian", ingredients = listOf("Tomato", "Cheese"),
     )
+    // Builds the view model with fake data for this test.
     private fun viewModel() = OliveViewModel(object : CatalogRepository {
+        // Checks the dishes step with the test's sample data.
         override fun dishes() = listOf(bowl, pizza)
     })
 

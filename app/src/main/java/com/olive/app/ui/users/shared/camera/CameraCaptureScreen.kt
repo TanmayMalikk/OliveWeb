@@ -10,6 +10,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.VideoView
+import android.view.ScaleGestureDetector
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Cameraswitch
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Videocam
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,6 +38,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -55,9 +62,11 @@ private data class CapturedMedia(
     val mimeType: String,
     val name: String,
     val kind: MediaKind,
-    val ocrResult: OcrResult? = null
+    val ocrResult: OcrResult? = null,
+    val previewFile: File? = null,
 )
 
+// Marks a document scan for review when OCR confidence is below 75 percent.
 internal fun isLowOcrConfidence(result: OcrResult) =
     !result.success || !result.confidence.isFinite() || result.confidence !in .75f..1f
 
@@ -88,24 +97,44 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     val recording by viewModel.recording.collectAsState()
     val ready by viewModel.ready.collectAsState()
     val cameraError by viewModel.error.collectAsState()
+    val zoomRatio by viewModel.zoomRatio.collectAsState()
     val preview =
         remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    val pinchDetector = remember(viewModel) {
+        ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                viewModel.zoomBy(detector.scaleFactor)
+                return true
+            }
+        })
+    }
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             permissionGranted = it
         }
     val captureFolder = remember { File(context.cacheDir, "captured-media").apply { mkdirs() } }
 
+    // Stores the new camera result so the preview can show it.
     fun newCapture(extension: String) = File(captureFolder, "${UUID.randomUUID()}.$extension")
-    fun accept(file: File, mime: String, name: String, kind: MediaKind, ocrResult: OcrResult? = null) {
+    // Accepts the captured photo, video, or document and returns its file.
+    fun accept(
+        file: File,
+        mime: String,
+        name: String,
+        kind: MediaKind,
+        ocrResult: OcrResult? = null,
+        previewFile: File? = null,
+    ) {
         pendingFile = null
         viewModel.leaveCamera()
         captured =
-            CapturedMedia(file, mime, name, kind, ocrResult)
+            CapturedMedia(file, mime, name, kind, ocrResult, previewFile)
     }
 
+    // Deletes the temporary capture when the user retakes or cancels it.
     fun discardCapture() {
         captured?.file?.delete()
+        captured?.previewFile?.takeIf { it != captured?.file }?.delete()
         pendingFile?.delete()
         captured = null
         pendingFile =
@@ -120,15 +149,18 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     LaunchedEffect(permissionGranted, captured) {
         if (permissionGranted && captured == null) viewModel.bind(lifecycleOwner, preview)
     }
+    // Clear the preview when the user discards the latest capture.
     DisposableEffect(Unit) {
         onDispose {
             viewModel.leaveCamera()
             captured?.file?.delete()
+            captured?.previewFile?.takeIf { it != captured?.file }?.delete()
             pendingFile?.delete()
         }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black).testTag("camera_screen")) {
+        // Returns to the camera or closes it based on how capture was opened.
         when {
             !permissionGranted -> CameraPermissionPrompt(
                 { permissionLauncher.launch(Manifest.permission.CAMERA) },
@@ -157,41 +189,59 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                         media.kind,
                         ocr
                     ) {
+                        media.previewFile?.takeIf { it != media.file }?.delete()
                         captured = null
                         session.navigation.back()
                     }
                 })
 
             else -> {
-                AndroidView(factory = { preview }, modifier = Modifier.fillMaxSize())
-                Row(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
-                        .padding(start = 12.dp, end = 12.dp, bottom = 150.dp)
-                        .background(Color.Black.copy(alpha = .5f), RoundedCornerShape(24.dp))
-                        .padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                AndroidView(
+                    factory = {
+                        preview.apply {
+                            setOnTouchListener { _, event ->
+                                pinchDetector.onTouchEvent(event)
+                                true
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                CameraModeSelector(
+                    mode = mode,
+                    enabled = !busy && !recording,
+                    onModeSelected = { mode = it },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 150.dp),
+                )
+                Column(
+                    Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)
+                        .background(Color.Black.copy(alpha = .55f), RoundedCornerShape(24.dp))
+                        .padding(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    FilterChip(
-                        selected = mode == CameraMode.Photo,
-                        onClick = { mode = CameraMode.Photo },
-                        enabled = !busy && !recording,
-                        modifier = Modifier.weight(1f).testTag("camera_mode_photo"),
-                        label = { Text(stringResource(R.string.camera_photo)) },
-                        leadingIcon = { Icon(Icons.Outlined.PhotoCamera, null) })
-                    FilterChip(
-                        selected = mode == CameraMode.Video,
-                        onClick = { mode = CameraMode.Video },
-                        enabled = !busy && !recording,
-                        modifier = Modifier.weight(1f).testTag("camera_mode_video"),
-                        label = { Text(stringResource(R.string.camera_video)) },
-                        leadingIcon = { Icon(Icons.Outlined.Videocam, null) })
-                    FilterChip(
-                        selected = mode == CameraMode.Document,
-                        onClick = { mode = CameraMode.Document },
-                        enabled = !busy && !recording,
-                        modifier = Modifier.weight(1f).testTag("camera_mode_document"),
-                        label = { Text(stringResource(R.string.camera_document)) },
-                        leadingIcon = { Icon(Icons.Outlined.Description, null) })
+                    IconButton(
+                        onClick = viewModel::zoomIn,
+                        enabled = ready && (!busy || recording),
+                        modifier = Modifier.testTag("camera_zoom_in"),
+                    ) {
+                        Icon(Icons.Outlined.Add, stringResource(R.string.a11y_zoom_in), tint = Color.White)
+                    }
+                    Text(
+                        "%.1f×".format(zoomRatio),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    IconButton(
+                        onClick = viewModel::zoomOut,
+                        enabled = ready && (!busy || recording) && zoomRatio > 1.01f,
+                        modifier = Modifier.testTag("camera_zoom_out"),
+                    ) {
+                        Icon(Icons.Outlined.Remove, stringResource(R.string.a11y_zoom_out), tint = Color.White)
+                    }
                 }
                 IconButton(
                     onClick = session.navigation::back,
@@ -241,15 +291,17 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     Modifier.align(Alignment.BottomCenter).navigationBarsPadding()
                         .padding(bottom = 52.dp)
                 ) {
+                    // Returns to the camera or closes it based on how capture was opened.
                     when {
                         mode == CameraMode.Photo -> {
                             val file = newCapture("jpg")
+                            val savedName = builtInCameraFileName(BuiltInCameraFile.IMAGE)
                             pendingFile = file
                             viewModel.capturePhoto(file) {
                                 accept(
                                     it,
                                     "image/jpeg",
-                                    "Olive photo.jpg",
+                                    savedName,
                                     MediaKind.IMAGE,
                                 )
                             }
@@ -257,14 +309,16 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
 
                         mode == CameraMode.Document -> {
                             val file = newCapture("jpg")
+                            val savedName = builtInCameraFileName(BuiltInCameraFile.DOCUMENT)
                             pendingFile = file
-                            viewModel.captureDocument(file) { capturedFile, result ->
+                            viewModel.captureDocument(file) { capturedFile, previewFile, result ->
                                 accept(
                                     capturedFile,
-                                    "image/jpeg",
-                                    "Olive document.jpg",
+                                    "application/pdf",
+                                    savedName,
                                     MediaKind.DOCUMENT,
                                     result,
+                                    previewFile,
                                 )
                             }
                         }
@@ -272,12 +326,13 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                         recording -> viewModel.stopVideo()
                         else -> {
                             val file = newCapture("mp4")
+                            val savedName = builtInCameraFileName(BuiltInCameraFile.VIDEO)
                             pendingFile = file
                             viewModel.startVideo(file, audioGranted) {
                                 accept(
                                     it,
                                     "video/mp4",
-                                    "Olive video.mp4",
+                                    savedName,
                                     MediaKind.VIDEO,
                                 )
                             }
@@ -304,7 +359,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                 if (recording) Text(
                     stringResource(R.string.camera_recording),
                     Modifier.align(Alignment.BottomCenter)
-                        .navigationBarsPadding().padding(bottom = 132.dp)
+                        .navigationBarsPadding().padding(bottom = 220.dp)
                         .background(Color.Black.copy(alpha = .55f), RoundedCornerShape(16.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                         .testTag("camera_recording_active"),
@@ -315,6 +370,76 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     }
 }
 
+// Keeps the three capture modes equal in size so their labels do not collide on smaller phones.
+@Composable
+private fun CameraModeSelector(
+    mode: CameraMode,
+    enabled: Boolean,
+    onModeSelected: (CameraMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(modifier, color = Color.Black.copy(alpha = .55f), shape = RoundedCornerShape(24.dp)) {
+        Row(
+            Modifier.fillMaxWidth().padding(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            CameraModeButton(
+                label = stringResource(R.string.camera_photo),
+                selected = mode == CameraMode.Photo,
+                enabled = enabled,
+                tag = "camera_mode_photo",
+                onClick = { onModeSelected(CameraMode.Photo) },
+            )
+            CameraModeButton(
+                label = stringResource(R.string.camera_video),
+                selected = mode == CameraMode.Video,
+                enabled = enabled,
+                tag = "camera_mode_video",
+                onClick = { onModeSelected(CameraMode.Video) },
+            )
+            CameraModeButton(
+                label = stringResource(R.string.camera_document),
+                selected = mode == CameraMode.Document,
+                enabled = enabled,
+                tag = "camera_mode_document",
+                onClick = { onModeSelected(CameraMode.Document) },
+            )
+        }
+    }
+}
+
+// Shows one camera mode as a full-width text button with a clear selected state.
+@Composable
+private fun RowScope.CameraModeButton(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+) {
+    if (selected) Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.weight(1f).heightIn(min = 56.dp).semantics {
+            this.selected = selected
+        }.testTag(tag),
+        contentPadding = PaddingValues(horizontal = 4.dp),
+    ) {
+        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+    }
+    else OutlinedButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.weight(1f).heightIn(min = 56.dp).semantics {
+            this.selected = selected
+        }.testTag(tag),
+        contentPadding = PaddingValues(horizontal = 4.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+    ) {
+        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+    }
+}
+// Explains why camera access is needed and lets the user request it.
 @Composable
 private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     Column(
@@ -329,6 +454,7 @@ private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
     }
 }
 
+// Draws the shutter button and gives TalkBack its action label.
 @Composable
 private fun CameraShutter(
     mode: CameraMode,
@@ -352,6 +478,7 @@ private fun CameraShutter(
                 CameraMode.Document -> Icons.Outlined.Description
             },
             stringResource(
+                // Takes a photo, starts video, or scans a document based on the selected mode.
                 when {
                     recording -> R.string.camera_stop_recording
                     mode == CameraMode.Photo -> R.string.camera_take_photo
@@ -363,7 +490,7 @@ private fun CameraShutter(
         )
     }
 }
-
+// Previews the captured file before the user saves or retakes it.
 @Composable
 private fun CameraReview(
     media: CapturedMedia,
@@ -373,8 +500,9 @@ private fun CameraReview(
     onSave: (CapturedMedia) -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
-        if (media.mimeType.startsWith("image/")) AsyncImage(
-            model = media.file, contentDescription = stringResource(R.string.captured_photo_review),
+        if (media.mimeType.startsWith("image/") || media.previewFile != null) AsyncImage(
+            model = media.previewFile ?: media.file,
+            contentDescription = stringResource(R.string.captured_photo_review),
             contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()
         )
         else AndroidView(factory = { context ->

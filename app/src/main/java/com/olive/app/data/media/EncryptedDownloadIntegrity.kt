@@ -19,7 +19,9 @@ internal suspend fun copyAndVerifyEncryptedDownload(
     val digest=MessageDigest.getInstance("SHA-256")
     val buffer=ByteArray(64*1024)
     var received=0L
+    // Use the fallback when copy and verify encrypted download is unavailable.
     try {
+        // Media: Keeps copy and verify encrypted download active while true.
         while(true) {
             currentCoroutineContext().ensureActive()
             val count=input.read(buffer)

@@ -7,6 +7,8 @@ import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
 import android.view.animation.LinearInterpolator
+import androidx.core.graphics.toColorInt
+import androidx.core.graphics.withRotation
 import kotlin.math.atan2
 import kotlin.math.sin
 
@@ -39,12 +41,12 @@ internal class OliveAnimationView @JvmOverloads constructor(
         strokeWidth = 12f
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-        color = Color.parseColor("#5D4037")
+        color = "#5D4037".toColorInt()
     }
 
     private val leafPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.parseColor("#556B2F")
+        color = "#556B2F".toColorInt()
     }
 
     private val olivePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -59,7 +61,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
     private val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 5f
-        color = Color.parseColor("#6B8E23")
+        color = "#6B8E23".toColorInt()
     }
 
     private val branchPath = Path()
@@ -67,7 +69,21 @@ internal class OliveAnimationView @JvmOverloads constructor(
     private val pathMeasure = PathMeasure()
     private val pos = FloatArray(2)
     private val tan = FloatArray(2)
+    private val leafFractions = floatArrayOf(0.18f, 0.32f, 0.46f, 0.60f, 0.74f, 0.88f)
+    private val leafPath = Path()
+    private val oliveOval = RectF()
+    private val highlightOval = RectF()
+    private val gradientMatrix = Matrix()
+    private val oliveGradient = RadialGradient(
+        -11.4f,
+        -11.4f,
+        53.2f,
+        "#7A933B".toColorInt(),
+        "#2C3E14".toColorInt(),
+        Shader.TileMode.CLAMP,
+    )
 
+    // Restarts the branch-and-olive transition from its first frame.
     fun startAnimation(durationMs: Long = 2600L) {
         animator?.cancel()
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -83,6 +99,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
         animator?.start()
     }
 
+    // Rebuilds the branch path when the animation view changes size.
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         branchPath.reset()
@@ -95,6 +112,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
         pathMeasure.setPath(branchPath, false)
     }
 
+    // Draws the growing branch, leaves, falling olive, and ripple for this frame.
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (progress <= 0f || progress >= 1f) return
@@ -127,18 +145,18 @@ internal class OliveAnimationView @JvmOverloads constructor(
             canvas.drawPath(subPath, branchPaint)
 
             // 2. Draw Leaves
-            val leafFractions = floatArrayOf(0.18f, 0.32f, 0.46f, 0.60f, 0.74f, 0.88f)
             for (i in leafFractions.indices) {
                 val frac = leafFractions[i]
+                // Draw each leaf only after the growing branch reaches its attachment point.
                 if (branchGrowth >= frac * 0.82f) {
                     val leafProgress = ((branchGrowth - frac * 0.82f) / 0.22f).coerceIn(0f, 1f)
+                    // Run this part only when path measure get pos tan total len * frac, pos, tan.
                     if (pathMeasure.getPosTan(totalLen * frac, pos, tan)) {
-                        canvas.save()
                         val baseAngle = Math.toDegrees(atan2(tan[1].toDouble(), tan[0].toDouble())).toFloat()
                         val side = if (i % 2 == 0) -1f else 1f
-                        canvas.rotate(baseAngle + side * 42f, pos[0], pos[1])
-                        drawLeaf(canvas, pos[0], pos[1], leafProgress)
-                        canvas.restore()
+                        canvas.withRotation(baseAngle + side * 42f, pos[0], pos[1]) {
+                            drawLeaf(canvas, pos[0], pos[1], leafProgress)
+                        }
                     }
                 }
             }
@@ -155,6 +173,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
             val oliveY: Float
             var rot = 12f
 
+            // Keep the olive attached to its stem until the falling stage begins.
             if (oliveDrop == 0f) {
                 oliveX = anchorX + 4f
                 oliveY = anchorY + (40f * budScale)
@@ -171,28 +190,25 @@ internal class OliveAnimationView @JvmOverloads constructor(
 
             onOlivePositionChanged?.invoke(oliveX, oliveY)
 
-            canvas.save()
-            canvas.rotate(rot, oliveX, oliveY)
-            olivePaint.shader = RadialGradient(
-                oliveX - baseRadius * 0.3f, oliveY - baseRadius * 0.3f,
-                baseRadius * 1.4f,
-                Color.parseColor("#7A933B"),
-                Color.parseColor("#2C3E14"),
-                Shader.TileMode.CLAMP
-            )
-            val oval = RectF(
+            gradientMatrix.setTranslate(oliveX, oliveY)
+            oliveGradient.setLocalMatrix(gradientMatrix)
+            olivePaint.shader = oliveGradient
+            oliveOval.set(
                 oliveX - baseRadius * 0.8f * budScale,
                 oliveY - baseRadius * 1.1f * budScale,
                 oliveX + baseRadius * 0.8f * budScale,
                 oliveY + baseRadius * 1.1f * budScale
             )
-            canvas.drawOval(oval, olivePaint)
-            // Specular highlight
-            canvas.drawOval(
-                RectF(oliveX - baseRadius * 0.4f, oliveY - baseRadius * 0.6f, oliveX, oliveY - baseRadius * 0.1f),
-                highlightPaint
+            highlightOval.set(
+                oliveX - baseRadius * 0.4f,
+                oliveY - baseRadius * 0.6f,
+                oliveX,
+                oliveY - baseRadius * 0.1f,
             )
-            canvas.restore()
+            canvas.withRotation(rot, oliveX, oliveY) {
+                drawOval(oliveOval, olivePaint)
+                drawOval(highlightOval, highlightPaint)
+            }
 
             // 4. Ground Ripple
             if (ripple > 0f) {
@@ -202,8 +218,9 @@ internal class OliveAnimationView @JvmOverloads constructor(
         }
     }
 
+    // Draws one growing leaf on the animated olive branch.
     private fun drawLeaf(canvas: Canvas, x: Float, y: Float, scale: Float) {
-        val leafPath = Path()
+        leafPath.reset()
         val len = 65f * scale
         val wid = 26f * scale
         leafPath.moveTo(x, y)

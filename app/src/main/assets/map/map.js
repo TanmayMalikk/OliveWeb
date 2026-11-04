@@ -21,16 +21,33 @@ let mapboxAttributionAdded=false;
 let points=[];
 let followEnabled=false;
 let followUid=null;
+let selectionMarker=null;
+let selectionEnabled=false;
+let detailsOnlyForSelectedPoint=false;
+let selectedPointUid=null;
+// Keeps distant markers small enough to separate while leaving them visible in an Alberta-wide view.
+function markerSize(point){
+  const closeSize=(point.live||point.lastKnown)?24:22;
+  const zoomProgress=Math.max(0,Math.min(1,(map.getZoom()-4)/10));
+  return Math.round(12+(closeSize-12)*zoomProgress);
+}
+// Map: Builds a marker at the size needed for the current zoom level.
 function markerIcon(point){
   const className=point.blue?'olive-own-live-dot':(point.live?'olive-live-dot':(point.lastKnown?'olive-last-known-dot':'olive-contact-dot'));
-  const size=(point.live||point.lastKnown)?24:22;
-  return L.divIcon({className:'olive-live-marker',html:'<div class="'+className+'"></div>',iconSize:[size,size],iconAnchor:[size/2,size/2]});
+  const size=markerSize(point);
+  const border=size>=20?3:2;
+  const centreSize=size-(border*2);
+  const style='width:'+centreSize+'px;height:'+centreSize+'px;border:'+border+'px solid #fff';
+  return L.divIcon({className:'olive-live-marker',html:'<div class="'+className+'" style="'+style+'"></div>',iconSize:[size,size],iconAnchor:[size/2,size/2]});
 }
+// Map: Chooses the map marker style. It checks the value against the rules before using it.
 function markerStyle(point){return point.blue?'blue':(point.live?'live':(point.lastKnown?'last-known':'contact'));}
+// returns the animate marker for map. It goes through the list and keeps or changes each item that is needed.
 function animateMarker(uid,marker,target,duration){
   if(markerAnimations[uid]) cancelAnimationFrame(markerAnimations[uid]);
   const start=marker.getLatLng();
   const began=performance.now();
+  // returns the frame for map. It saves the new value and refreshes what the user sees.
   function frame(now){
     const progress=Math.min(1,(now-began)/duration);
     const eased=1-Math.pow(1-progress,3);
@@ -41,31 +58,50 @@ function animateMarker(uid,marker,target,duration){
   }
   markerAnimations[uid]=requestAnimationFrame(frame);
 }
-window.oliveSetPoints=function(next,moveCamera){
+window.oliveSetPoints=function(next,moveCamera,hideUnselectedDetails){
   const firstLocation=points.length===0&&next&&next.length>0;
   points=next||[];
+  detailsOnlyForSelectedPoint=!!hideUnselectedDetails;
+  if(selectedPointUid&&!points.some(point=>(point.uid||point.name)===selectedPointUid)) selectedPointUid=null;
   const active={};
   points.forEach(point=>{
     const uid=point.uid||point.name;
     active[uid]=true;
     const target=[point.latitude,point.longitude];
     let marker=markers[uid];
+    // Only continue with marker when marker is false.
     if(!marker){
       marker=L.marker(target,{icon:markerIcon(point)}).addTo(map);
       marker._oliveStyle=markerStyle(point);
+      marker._olivePoint=point;
+      marker.on('click',function(){
+        if(!detailsOnlyForSelectedPoint)return;
+        selectedPointUid=uid;
+        window.oliveSetPoints(points,false,true);
+        marker.openPopup();
+      });
       markers[uid]=marker;
     }else{
       const style=markerStyle(point);
       if(marker._oliveStyle!==style){marker.setIcon(markerIcon(point));marker._oliveStyle=style;}
+      marker._olivePoint=point;
       const oldTarget=markerTargets[uid];
       if(!oldTarget||oldTarget[0]!==target[0]||oldTarget[1]!==target[1]) animateMarker(uid,marker,target,1800);
     }
     markerTargets[uid]=target;
     const label=point.label||point.name;
-    if(marker.getTooltip()) marker.setTooltipContent(label); else marker.bindTooltip(label,{direction:'top'});
-    if(marker.getPopup()) marker.setPopupContent(label); else marker.bindPopup(label);
+    const pointIsSelected=!detailsOnlyForSelectedPoint||selectedPointUid===uid;
+    if(pointIsSelected){
+      if(marker.getTooltip()) marker.setTooltipContent(label); else marker.bindTooltip(label,{direction:'top'});
+      if(marker.getPopup()) marker.setPopupContent(label); else marker.bindPopup(label);
+    }else{
+      marker.closePopup();
+      marker.unbindTooltip();
+      marker.unbindPopup();
+    }
     const trailPoints=(point.trail||[]).map(entry=>[entry.latitude,entry.longitude]);
-    if(trailPoints.length>1){
+    // Admins only see a trail after selecting that user's dot.
+    if(pointIsSelected&&trailPoints.length>1){
       if(trails[uid]) trails[uid].setLatLngs(trailPoints).setStyle({color:point.blue?'#1769aa':'#c52b25'});
       else trails[uid]=L.polyline(trailPoints,{color:point.blue?'#1769aa':'#c52b25',weight:4,opacity:.78,lineCap:'round',lineJoin:'round',interactive:false}).addTo(map);
       trails[uid].bringToBack();
@@ -78,7 +114,10 @@ window.oliveSetPoints=function(next,moveCamera){
     delete markerAnimations[uid];delete markerTargets[uid];map.removeLayer(markers[uid]);delete markers[uid];
     if(trails[uid]){map.removeLayer(trails[uid]);delete trails[uid];}
   }});
-  const tracked=points.find(point=>point.live&&point.accuracy);
+  const tracked=points.find(point=>
+    point.live&&point.accuracy&&(!detailsOnlyForSelectedPoint||(point.uid||point.name)===selectedPointUid)
+  );
+  // tracked is handled here by tracked.
   if(tracked){
     if(accuracyCircle) accuracyCircle.setLatLng([tracked.latitude,tracked.longitude]).setRadius(tracked.accuracy).setStyle({color:tracked.blue?'#1769aa':'#c52b25',fillColor:tracked.blue?'#1769aa':'#c52b25'});
     else accuracyCircle=L.circle([tracked.latitude,tracked.longitude],{
@@ -92,6 +131,7 @@ window.oliveSetPoints=function(next,moveCamera){
 };
 window.oliveSetRoute=function(coordinates,fitRoute){
   const line=coordinates||[];
+  // line checks whether line length>1 before continuing.
   if(line.length>1){
     if(!mapboxAttributionAdded){
       map.attributionControl.addAttribution('&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a>');
@@ -105,6 +145,12 @@ window.oliveSetRoute=function(coordinates,fitRoute){
 };
 window.oliveZoomIn=function(){map.zoomIn();};
 window.oliveZoomOut=function(){map.zoomOut();};
+// Resizes every dot after a zoom so crowded markers do not cover one another.
+map.on('zoomend',function(){
+  Object.values(markers).forEach(marker=>{
+    if(marker._olivePoint)marker.setIcon(markerIcon(marker._olivePoint));
+  });
+});
 window.oliveRecenter=function(){
   if(points.length) map.setView([points[0].latitude,points[0].longitude],14);
 };
@@ -116,3 +162,21 @@ window.oliveSetFollow=function(enabled,uid){
     if(target) map.panTo([target.latitude,target.longitude],{animate:true,duration:.5});
   }
 };
+// Incident reports: lets the user tap the map or drag one pushpin to save exact coordinates.
+window.oliveSetSelection=function(enabled,latitude,longitude){
+  selectionEnabled=!!enabled;
+  if(!selectionEnabled){if(selectionMarker){map.removeLayer(selectionMarker);selectionMarker=null;}return;}
+  if(Number.isFinite(latitude)&&Number.isFinite(longitude)&&(latitude!==0||longitude!==0)){
+    if(selectionMarker) selectionMarker.setLatLng([latitude,longitude]);
+    else{
+      selectionMarker=L.marker([latitude,longitude],{draggable:true}).addTo(map).bindTooltip('Incident location');
+      selectionMarker.on('dragend',function(){const point=selectionMarker.getLatLng();OliveLocationSelection.selected(point.lat,point.lng);});
+    }
+  }
+};
+map.on('click',function(event){
+  if(!selectionEnabled)return;
+  if(selectionMarker) selectionMarker.setLatLng(event.latlng);
+  else window.oliveSetSelection(true,event.latlng.lat,event.latlng.lng);
+  OliveLocationSelection.selected(event.latlng.lat,event.latlng.lng);
+});

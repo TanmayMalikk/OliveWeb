@@ -26,6 +26,19 @@ before(async () => {
 
 after(async () => { await env?.cleanup(); });
 
+test('VoIP call records and push-token registrations are server-only', async () => {
+  const alice = env.authenticatedContext('alice-uid').database();
+  await env.withSecurityRulesDisabled(async context => {
+    const admin = context.database();
+    await set(ref(admin, 'calls/call-1'), { callerId: 'alice-uid' });
+    await set(ref(admin, 'users/alice-uid/fcmTokens/phone'), 'fcm-token');
+  });
+  await assertFails(get(ref(alice, 'calls/call-1')));
+  await assertFails(set(ref(alice, 'calls/call-2'), { callerId: 'alice-uid' }));
+  await assertFails(get(ref(alice, 'users/alice-uid/fcmTokens/phone')));
+  await assertFails(set(ref(alice, 'users/alice-uid/fcmTokens/phone'), 'forged-token'));
+});
+
 
 
 test('owner can create/read a profile; another user and anonymous visitors cannot', async () => {
@@ -168,6 +181,12 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
 
   await assertSucceeds(getDoc(doc(alice,'messageDirectory/social_bob')));
   await assertFails(getDocs(query(collection(alice,'messageDirectory'),where('username','>=','social_b'))));
+  const aliceDevice={uid:'social-a',deviceId:'alice-web-device-1',publicKey:'alice-web-key',
+    platform:'WEB',mgf1Digest:'SHA-256',updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(alice,'messageDirectory/social_alice/devices/alice-web-device-1'),aliceDevice));
+  await assertSucceeds(getDoc(doc(bob,'messageDirectory/social_alice/devices/alice-web-device-1')));
+  await assertFails(setDoc(doc(bob,'messageDirectory/social_alice/devices/stolen-web-device'),
+    {...aliceDevice,deviceId:'stolen-web-device'}));
   const requestId='social-a--social-b';
   const friendshipId='social-a--social-b';
   const request={senderUid:'social-a',senderUsername:'social_alice',recipientUid:'social-b',
@@ -231,6 +250,13 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   await assertFails(getDocs(collection(alice,'conversations')));
   await assertFails(getDocs(query(collection(alice,'conversations'),where('participantIds','array-contains','social-b'))));
   await assertFails(getDoc(doc(charlie,'conversations/'+friendshipId)));
+  const deviceRoomKey={uid:'social-a',deviceId:'alice-web-device-1',publicKey:'alice-web-key',
+    wrappedKey:'wrapped-for-alice-browser',updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(bob,`conversations/${friendshipId}/deviceKeys/social-a--alice-web-device-1`),deviceRoomKey));
+  await assertSucceeds(getDoc(doc(alice,`conversations/${friendshipId}/deviceKeys/social-a--alice-web-device-1`)));
+  await assertFails(getDoc(doc(charlie,`conversations/${friendshipId}/deviceKeys/social-a--alice-web-device-1`)));
+  await assertFails(setDoc(doc(charlie,`conversations/${friendshipId}/deviceKeys/social-c--alice-web-device-1`),
+    {...deviceRoomKey,uid:'social-c'}));
 
   const plaintextRef=doc(alice,'conversations/'+friendshipId+'/messages/plaintext-message');
   await assertFails(setDoc(plaintextRef,{senderUid:'social-a',senderUsername:'social_alice',body:'Private hello',
@@ -358,6 +384,23 @@ test('encrypted live coordinates are overwritten by their owner and readable onl
     throw new Error('The authorized contact could not read the retained last-known location.');
   await assertSucceeds(remove(ref(owner,path)));
   await assertSucceeds(remove(ref(owner,trailPath)));
+});
+
+test('organization locations are written by users and readable only by admins', async () => {
+  const user=env.authenticatedContext('map-user',{role:'USER'}).database();
+  const admin=env.authenticatedContext('map-admin',{role:'ADMIN'}).database();
+  const staff=env.authenticatedContext('map-staff',{role:'STAFF'}).database();
+  const safeContact=env.authenticatedContext('map-safe',{role:'SAFE_CONTACT'}).database();
+  const path='adminLiveLocations/map-user';
+  const point={name:'Map User',latitude:53.5461,longitude:-113.4938,accuracy:8,
+    updatedAt:Date.now(),active:true};
+  await assertSucceeds(set(ref(user,path),point));
+  await assertSucceeds(get(ref(admin,'adminLiveLocations')));
+  await assertFails(get(ref(staff,'adminLiveLocations')));
+  await assertFails(get(ref(safeContact,'adminLiveLocations')));
+  await assertFails(set(ref(admin,path),point));
+  await assertFails(set(ref(user,path),{...point,latitude:91}));
+  await assertFails(set(ref(user,path),{...point,extra:'not allowed'}));
 });
 
 test('encrypted private entries are restricted to wrapped-key recipients', async () => {

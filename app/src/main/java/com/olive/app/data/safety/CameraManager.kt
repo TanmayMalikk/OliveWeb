@@ -1,9 +1,11 @@
 // Safe-app users and support staff: captures photos and documents for safe-app uploads.
 package com.olive.app.data
 
+import android.Manifest
 import android.content.Context
-import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.Camera
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -33,10 +35,12 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class CameraManager(private val context: Context) {
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var provider: ProcessCameraProvider? = null
+    private var boundCamera: Camera? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
 
+    // Connects CameraX to the selected lens and the Safe App preview.
     suspend fun bindCamera(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
@@ -67,7 +71,7 @@ class CameraManager(private val context: Context) {
         cameraProvider.unbindAll()
         val selector =
             if (frontFacing) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
-        cameraProvider.bindToLifecycle(
+        boundCamera = cameraProvider.bindToLifecycle(
             lifecycleOwner,
             selector,
             preview,
@@ -77,6 +81,21 @@ class CameraManager(private val context: Context) {
         provider = cameraProvider
     }
 
+    // Changes the live preview zoom and keeps the requested value inside the camera's supported range.
+    fun changeZoom(multiplier: Float): Float {
+        val activeCamera = checkNotNull(boundCamera) { "Camera not ready" }
+        val zoomState = checkNotNull(activeCamera.cameraInfo.zoomState.value) { "Camera zoom is unavailable" }
+        val requested = nextCameraZoom(
+            current = zoomState.zoomRatio,
+            minimum = zoomState.minZoomRatio,
+            maximum = zoomState.maxZoomRatio,
+            multiplier = multiplier,
+        )
+        activeCamera.cameraControl.setZoomRatio(requested)
+        return requested
+    }
+
+    // Takes a photo and saves it to the private capture file.
     suspend fun capturePhoto(file: File): File = suspendCancellableCoroutine { continuation ->
         val capture = imageCapture
         if (capture == null) {
@@ -85,12 +104,14 @@ class CameraManager(private val context: Context) {
         }
         capture.takePicture(
             ImageCapture.OutputFileOptions.Builder(file).build(), cameraExecutor,
-            // Returns the saved photo or deletes the partial file when CameraX reports an error.
+            // Runs the image saved callback when the safety plan finishes that step.
             object : ImageCapture.OnImageSavedCallback {
+                // Runs the image saved callback when the safety plan finishes that step.
                 override fun onImageSaved(result: ImageCapture.OutputFileResults) {
                     if (continuation.isActive) continuation.resume(file)
                 }
 
+                // Reports camera errors so the capture screen can explain what went wrong.
                 override fun onError(error: ImageCaptureException) {
                     file.delete()
                     if (continuation.isActive) continuation.resumeWithException(error)
@@ -99,7 +120,7 @@ class CameraManager(private val context: Context) {
         continuation.invokeOnCancellation { file.delete() }
     }
 
-    @SuppressLint("MissingPermission")
+    // Starts video recording and sends the saved file back to the Safe App.
     fun startVideo(
         file: File,
         includeAudio: Boolean,
@@ -110,7 +131,14 @@ class CameraManager(private val context: Context) {
         val capture = checkNotNull(videoCapture) { "Camera not ready" }
         val pending =
             capture.output.prepareRecording(context, FileOutputOptions.Builder(file).build())
-        recording = (if (includeAudio) pending.withAudioEnabled() else pending)
+        val audioGranted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        check(!includeAudio || audioGranted) {
+            "Microphone permission is required to record video with sound"
+        }
+        recording = (if (includeAudio && audioGranted) pending.withAudioEnabled() else pending)
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 if (event is VideoRecordEvent.Start) onStarted()
                 else if (event is VideoRecordEvent.Finalize) {
@@ -128,6 +156,7 @@ class CameraManager(private val context: Context) {
             }
     }
 
+    // Safety: Stops video.
     fun stopVideo() {
         recording?.stop()
     }
@@ -138,17 +167,33 @@ class CameraManager(private val context: Context) {
         recording = null
     }
 
+    // Stops camera recording and releases CameraX resources.
     fun unbind() {
         cancelVideo()
         provider?.unbindAll()
         provider = null
+        boundCamera = null
         imageCapture = null
         videoCapture =
             null
     }
 
+    // Safety: Releases the resources used by the feature.
     fun release() {
         unbind()
         cameraExecutor.shutdown()
     }
+}
+
+// Calculates one camera zoom step without allowing invalid or unsupported values.
+internal fun nextCameraZoom(
+    current: Float,
+    minimum: Float,
+    maximum: Float,
+    multiplier: Float,
+): Float {
+    if (!current.isFinite() || !minimum.isFinite() || !maximum.isFinite() || !multiplier.isFinite()) {
+        return minimum.coerceAtLeast(1f)
+    }
+    return (current * multiplier).coerceIn(minimum, maximum)
 }

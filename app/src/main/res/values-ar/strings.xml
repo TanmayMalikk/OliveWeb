@@ -183,7 +183,7 @@
 <string name="no_failed_attempts_recorded">لم يتم تسجيل أية محاولات فاشلة.</string>
     <string name="incorrect_pin">رقم التعريف الشخصي غير صحيح</string>
     <string name="safe_home">منزل آمن</string>
-    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">احفظ الأشخاص الموثوق بهم هنا. الزيتون لا يرسل رسائل أو يجري مكالمات.</string>
+    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">احفظ الأشخاص الموثوق بهم هنا حتى تتمكن من مراسلتهم أو الاتصال بهم بأمان.</string>
     <string name="edit">تحرير</string>
     <string name="remove">إزالة</string>
     <string name="no_contacts_yet_adding_one_is_optional">لا توجد اتصالات حتى الآن. إضافة واحدة أمر اختياري.</string>
@@ -346,12 +346,17 @@
     <string name="select_a_friend_or_conversation_to_start_messaging">حدد صديقًا أو محادثة لبدء المراسلة.</string>
     <string name="unsend_message">إلغاء إرسال الرسالة</string>
     <string name="message_unsent">لم يتم إرسال الرسالة</string>
+    <string name="message_delivery_queued">في قائمة الانتظار — بانتظار الاتصال</string>
+    <string name="message_delivery_sending">جارٍ الإرسال…</string>
+    <string name="message_delivery_retrying">لم تُرسل بعد — تتم إعادة المحاولة تلقائيًا</string>
+    <string name="message_delivery_failed_retry">لم تُرسل — اضغط لإعادة المحاولة</string>
+    <string name="message_delivery_sent">تم الإرسال</string>
 <string name="share_attachment">مشاركة مرفق</string><string name="select_attachment_category">اختيار %1$s</string>
     <string name="private_notes">ملاحظات خاصة</string><string name="incident_reports">تقارير الحوادث</string><string name="saved_media">الوسائط المحفوظة</string>
     <string name="no_private_notes_found">لم يتم العثور على ملاحظات.</string><string name="untitled_note">ملاحظة بلا عنوان</string><string name="no_incident_reports_found">لم يتم العثور على تقارير حوادث.</string>
 <string name="secure_shared_entry">عنصر مشترك آمن</string><string name="close_shared_entry">إغلاق العنصر المشترك</string>
     <string name="attach_secure_entry">إرفاق ملاحظة أو تقرير آمن</string><string name="encrypted_document">مستند مشفر</string><string name="shared_private_note">ملاحظة خاصة مشتركة</string><string name="shared_incident_report">تقرير حادث مشترك</string>
-    <string name="private_entry_shared">تمت مشاركة العنصر الخاص بأمان.</string><string name="unable_to_share_private_entry">تعذرت مشاركة هذا العنصر الخاص.</string><string name="unable_to_open_shared_entry">تعذر فتح هذا العنصر المشترك.</string><string name="unable_to_open_secure_conversation">تعذر فتح هذه المحادثة الآمنة. قد يحتاج الشخص الآخر إلى فتح التطبيق المحدّث أولاً.</string>
+    <string name="private_entry_shared">تمت مشاركة العنصر الخاص بأمان.</string><string name="unable_to_share_private_entry">تعذرت مشاركة هذا العنصر الخاص.</string><string name="unable_to_open_shared_entry">تعذر فتح هذا العنصر المشترك.</string><string name="unable_to_open_secure_conversation">لا يملك هذا الجهاز مفتاح تشفير هذه المحادثة. افتح المحادثة على جهاز معتمد سابقًا لهذا الحساب، ثم حاول مرة أخرى.</string>
     <string name="secure_message">رسالة آمنة</string><string name="encrypted_message_unavailable">الرسالة المشفرة غير متاحة</string>
 <string name="news_near_location">أخبار بالقرب من %1$s</string>
 <string name="accounts">الحسابات</string>
@@ -389,6 +394,8 @@
     <string name="organization_live_map">خريطة الموقع المباشر</string>
     <string name="organization_live_map_description">هذا العرض المحمي جاهز لإظهار المستخدمين المعيّنين كنقاط حمراء وامضة.</string>
     <string name="organization_location_feed_not_enabled">مشاركة الموقع المباشر للمؤسسة غير مفعّلة بعد. لا يتم جمع مواقع المستخدمين لهذا العرض.</string>
+    <string name="organization_live_map_admin_description">يعرض أحدث موقع مباشر أو آخر موقع معروف تم الإبلاغ عنه لكل حساب مستخدم.</string>
+    <string name="organization_location_feed_empty">لم يتم الإبلاغ عن أي موقع مستخدم حتى الآن.</string>
     <string name="support_conversations">محادثات الدعم</string>
     <string name="assigned_users_count">المستخدمون المعيّنون: %1$d</string>
     <string name="safety_plan_shared_in_chat">تمت مشاركة خطة الأمان في محادثة الدعم.</string>
@@ -402,15 +409,6 @@
     <string name="admin_accounts_description">أنشئ الحسابات وراجع عدد المستخدمين المعيّنين لكل موظف.</string>
 
     <string name="steps_today">خطوات اليوم</string>
-    <plurals name="steps_goal_value">
-        <item quantity="zero">الهدف: %1$d خطوة</item>
-        <item quantity="one">الهدف: خطوة واحدة</item>
-        <item quantity="two">الهدف: خطوتان</item>
-        <item quantity="few">الهدف: %1$d خطوات</item>
-        <item quantity="many">الهدف: %1$d خطوة</item>
-        <item quantity="other">الهدف: %1$d خطوة</item>
-    </plurals>
-
     <string name="calories">السعرات</string>
 
 
@@ -468,4 +466,22 @@
     <string name="location_finding_route">جارٍ البحث عن أفضل مسار…</string>
     <string name="location_navigating_to">التنقل إلى %1$s</string>
     <string name="location_map_view">عرض الخريطة</string>
+    <string name="evidence">Evidence</string>
+    <string name="incident_date">Date of incident</string>
+    <string name="incident_time">Approx. time</string>
+    <string name="incident_location">Location of incident</string>
+    <string name="incident_pin_title">Drop or drag the pin</string>
+    <string name="incident_pin_help">Tap the map to save exact coordinates. Your current location stays visible as a red dot when available.</string>
+    <string name="incident_show_location">Show my current location</string>
+    <string name="attachments">Attachments</string>
+    <string name="incident_attachments_help">Choose saved photos, videos, or documents. Incident attachments are automatically tagged as evidence.</string>
+    <string name="upload_new_attachment">Upload a new attachment</string>
+    <string name="attachments_empty_help">Upload files in Documents, then attach them here.</string>
+    <string name="title">Title</string>
+    <string name="incident_body">تفاصيل الحادث</string>
+    <string name="current_location">Your current location</string>
+    <string name="incident_dropped_pin">Dropped pin: %1$.5f, %2$.5f</string>
+    <string name="incident_required_fields">Add a title, incident date, and incident location before saving.</string>
+    <string name="evidence_tagged">Tagged as evidence</string>
+    <string name="evidence_normal_file">Normal account file</string>
 </resources>

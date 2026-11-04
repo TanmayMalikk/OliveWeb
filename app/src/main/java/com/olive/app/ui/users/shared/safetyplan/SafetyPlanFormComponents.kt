@@ -41,7 +41,8 @@ internal fun SafetyChecklistSection(
     contacts: List<SafeContact> = emptyList(),
     contactsEditable: Boolean = false,
     onContactsChange: ((List<SafeContact>) -> Unit)? = null,
-    editable: Boolean = true
+    editable: Boolean = true,
+    onUploadDocument: (() -> Unit)? = null,
 ) {
     val field = plan.fields[fieldKey] ?: return
     val items = remember(field.value) { readSafetyChecklist(field.value) }
@@ -78,6 +79,7 @@ internal fun SafetyChecklistSection(
             update,
             onContactsChange
         )
+        // Run this part only when section is documents.
         if (section == "documents") {
             Text(
                 stringResource(R.string.safety_document_hint),
@@ -102,7 +104,9 @@ internal fun SafetyChecklistSection(
                         })
                     },
                     onText = { value -> update(items.map { if (it.id == item.id) it.copy(text = value) else it }) },
-                    onRemove = { update(items.filterNot { it.id == item.id }) })
+                    onRemove = { update(items.filterNot { it.id == item.id }) },
+                    onUploadDocument = onUploadDocument,
+                )
             }
         }
         if (section != "contacts" && editable) {
@@ -149,10 +153,12 @@ internal fun SafetyChecklistSection(
     }
 }
 
+// shared safe app safety plan form components shows this checklist row view so the user can view its details and use its actions.
 @Composable
 private fun ChecklistRow(
     item: SafetyChecklistItem, heading: String, sectionKey: String, index: Int, editable: Boolean,
-    onChecked: (Boolean) -> Unit, onText: (String) -> Unit, onRemove: () -> Unit
+    onChecked: (Boolean) -> Unit, onText: (String) -> Unit, onRemove: () -> Unit,
+    onUploadDocument: (() -> Unit)?,
 ) {
     val empty = stringResource(R.string.safety_empty_item)
     val name = item.text.ifBlank { empty }
@@ -184,11 +190,11 @@ private fun ChecklistRow(
                         input()
                     }
                 })
-            if (sectionKey.substringAfter('_') == "documents" && editable) {
+            // Editable document rows can open the attachment picker.
+            if (sectionKey.substringAfter('_') == "documents" && editable && onUploadDocument != null) {
                 val uploadDescription = stringResource(R.string.safety_upload_for, name)
                 OutlinedButton(
-                    onClick = {},
-                    enabled = false,
+                    onClick = onUploadDocument,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                     modifier = Modifier.testTag("safety_upload_${sectionKey}_$index")
                         .semantics { contentDescription = uploadDescription }) {
@@ -199,6 +205,7 @@ private fun ChecklistRow(
                 }
             }
         }
+        // Editing controls are hidden from read-only safety-plan viewers.
         if (editable) {
             val removeLabel = stringResource(R.string.safety_remove_item, name)
             IconButton(
@@ -211,6 +218,7 @@ private fun ChecklistRow(
     }
 }
 
+// Lets the user choose which trusted contacts may view this safety plan.
 @Composable
 private fun SafetyPlanContactPicker(
     items: List<SafetyChecklistItem>,
@@ -229,6 +237,7 @@ private fun SafetyPlanContactPicker(
         style = MaterialTheme.typography.labelMedium,
         color = Muted
     )
+    // Only the plan owner can change linked trusted contacts.
     if (editable) {
         Text(
             stringResource(R.string.safety_contact_picker_help),

@@ -127,6 +127,7 @@ internal fun NewsArticleCard(
                     modifier = Modifier.weight(1f, fill = false).testTag("news_article_topic")
                 ) {
                     Text(
+                        // Shows the article photo when available, otherwise a text-only card.
                         when (topic) {
                             "News" -> uiText(R.string.ui_news)
                             "Politics" -> uiText(R.string.ui_politics)
@@ -257,6 +258,7 @@ internal fun NewsArticleReader(
         val view = browser
         if (view != null && view.canGoBack()) view.goBack() else onBack()
     }
+    // Pauses the article browser when this reader is hidden or the app is paused.
     DisposableEffect(browser, active, lifecycle) {
         val view = browser
         // Pauses the WebView off-screen and resumes it only while this article is visible.
@@ -328,11 +330,13 @@ internal fun NewsArticleReader(
                             settings.setSupportMultipleWindows(false)
                             CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
                             webChromeClient = object : WebChromeClient() {
+                                // Updates the loading bar as the publisher page loads.
                                 override fun onProgressChanged(view: WebView, newProgress: Int) {
                                     progress = newProgress
                                 }
                             }
                             webViewClient = object : WebViewClient() {
+                                // Keeps HTTPS news links in the reader and blocks unsafe link types.
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView,
                                     request: WebResourceRequest
@@ -342,6 +346,7 @@ internal fun NewsArticleReader(
                                     return blocked
                                 }
 
+                                // Resets the reader state when a new publisher page starts loading.
                                 override fun onPageStarted(
                                     view: WebView,
                                     url: String,
@@ -352,11 +357,13 @@ internal fun NewsArticleReader(
                                     progress = 0
                                 }
 
+                                // Records the final URL and completes the loading bar.
                                 override fun onPageFinished(view: WebView, url: String) {
                                     currentUrl = url
                                     progress = 100
                                 }
 
+                                // Clears only the Google News redirect from Back history.
                                 override fun doUpdateVisitedHistory(
                                     view: WebView,
                                     url: String,
@@ -371,6 +378,7 @@ internal fun NewsArticleReader(
                                     currentUrl = url
                                 }
 
+                                // Shows the reader error screen when the main page fails to load.
                                 override fun onReceivedError(
                                     view: WebView,
                                     request: WebResourceRequest,
@@ -382,6 +390,7 @@ internal fun NewsArticleReader(
                                     }
                                 }
 
+                                // Treats a failed HTTP response for the main article as a reader error.
                                 override fun onReceivedHttpError(
                                     view: WebView,
                                     request: WebResourceRequest,
@@ -393,6 +402,7 @@ internal fun NewsArticleReader(
                                     }
                                 }
 
+                                // Cancels invalid HTTPS certificates instead of opening an unsafe article.
                                 override fun onReceivedSslError(
                                     view: WebView,
                                     handler: SslErrorHandler,

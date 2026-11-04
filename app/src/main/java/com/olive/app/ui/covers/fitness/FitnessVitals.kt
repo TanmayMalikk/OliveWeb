@@ -36,6 +36,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -57,7 +61,7 @@ import java.util.Date
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
-
+// Shows daily heart-rate ranges, averages, and watch status.
 @Composable
 internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -82,6 +86,7 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
                     text = stringResource(R.string.fitness_vitals),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(
                     text = stringResource(R.string.fitness_vitals_today_description),
@@ -101,7 +106,6 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
                 },
             )
         }
-
         if (selectedVitals != null) {
             item {
                 WatchStatusCard(selectedVitals, snapshot.watchConnected)
@@ -135,6 +139,7 @@ internal fun FitnessVitalsPage(snapshot: FitnessSnapshot) {
     }
 }
 
+// Draws up to 14 days of heart-rate ranges and the selected-day summary.
 @Composable
 private fun HeartRateGraphCard(
     history: List<HeartRateVitals>,
@@ -177,11 +182,11 @@ private fun HeartRateGraphCard(
             append(stringResource(R.string.fitness_vitals_average, selectedVitals.averageBpm))
         }
     }
+    val previousDayLabel = stringResource(R.string.fitness_previous_day)
+    val nextDayLabel = stringResource(R.string.fitness_next_day)
 
     Card(
-        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) {
-            contentDescription = graphDescription
-        },
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Paper),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -190,38 +195,65 @@ private fun HeartRateGraphCard(
             modifier = Modifier.fillMaxWidth().padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text = stringResource(R.string.fitness_heart_rate_graph),
-                color = Ink,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = selectedDateText,
-                color = Muted,
-                style = MaterialTheme.typography.labelLarge,
-            )
-            if (selectedVitals != null) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.clearAndSetSemantics {
+                    contentDescription = graphDescription
+                },
+            ) {
                 Text(
-                    text = stringResource(
-                        R.string.fitness_vitals_range,
-                        selectedVitals.lowestBpm,
-                        selectedVitals.peakBpm,
-                    ),
-                    color = OliveGreen,
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = stringResource(R.string.fitness_heart_rate_graph),
+                    color = Ink,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(
-                    text = stringResource(
-                        R.string.fitness_vitals_average,
-                        selectedVitals.averageBpm,
-                    ),
+                    text = selectedDateText,
                     color = Muted,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.labelLarge,
                 )
+                if (selectedVitals != null) {
+                    Text(
+                        text = stringResource(
+                            R.string.fitness_vitals_range,
+                            selectedVitals.lowestBpm,
+                            selectedVitals.peakBpm,
+                        ),
+                        color = OliveGreen,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.fitness_vitals_average,
+                            selectedVitals.averageBpm,
+                        ),
+                        color = Muted,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
-            Box(Modifier.fillMaxWidth().height(170.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.fillMaxWidth().height(170.dp).clearAndSetSemantics {
+                    contentDescription = graphDescription
+                    customActions = listOf(
+                        CustomAccessibilityAction(previousDayLabel) {
+                            if (selectedDate > startDate) {
+                                onDateSelected(selectedDate.minusDays(1))
+                                true
+                            } else false
+                        },
+                        CustomAccessibilityAction(nextDayLabel) {
+                            if (selectedDate < endDate) {
+                                onDateSelected(selectedDate.plusDays(1))
+                                true
+                            } else false
+                        },
+                    )
+                },
+                contentAlignment = Alignment.Center,
+            ) {
                 Canvas(
                     Modifier.fillMaxSize().pointerInput(startDate, endDate) {
                         detectTapGestures { tap ->
@@ -240,7 +272,6 @@ private fun HeartRateGraphCard(
                     val bottom = size.height - 22.dp.toPx()
                     val width = right - left
                     val height = bottom - top
-
                     axisLabels.forEachIndexed { index, _ ->
                         val y = top + height * index / (axisLabels.size - 1).coerceAtLeast(1).toFloat()
                         drawLine(
@@ -265,6 +296,7 @@ private fun HeartRateGraphCard(
                         end = Offset(selectedX + dayWidth / 2f, bottom + 8.dp.toPx()),
                         strokeWidth = 3.dp.toPx(),
                     )
+                    // Draw heart-rate ranges only when the watch has sent readings.
                     if (history.isNotEmpty()) {
                         history.forEach { day ->
                             val dayIndex = java.time.temporal.ChronoUnit.DAYS
@@ -296,6 +328,7 @@ private fun HeartRateGraphCard(
                         Text(label.toString(), color = Muted, style = MaterialTheme.typography.labelSmall)
                     }
                 }
+                // Place the no-data message over an empty heart-rate chart.
                 if (history.isEmpty()) {
                     Text(
                         text = noData,
@@ -307,7 +340,10 @@ private fun HeartRateGraphCard(
                     )
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(start = 42.dp, end = 6.dp)) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 42.dp, end = 6.dp)
+                    .clearAndSetSemantics { },
+            ) {
                 (0L..13L).forEach { offset ->
                     val date = startDate.plusDays(offset)
                     val selected = date == selectedDate
@@ -318,7 +354,12 @@ private fun HeartRateGraphCard(
                                 selected = selected,
                                 role = Role.RadioButton,
                                 onClick = { onDateSelected(date) },
-                            ),
+                            ).semantics {
+                                contentDescription = date.format(
+                                    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+                                        .withLocale(locale)
+                                )
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -335,6 +376,7 @@ private fun HeartRateGraphCard(
     }
 }
 
+// Explains whether recent Wear OS heart-rate data is available.
 @Composable
 private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     val locale = LocalConfiguration.current.locales[0]
@@ -345,8 +387,24 @@ private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
             DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
         )
     }
+    val connectionText = stringResource(
+        if (watchConnected) R.string.fitness_watch_connected else R.string.fitness_watch_not_connected
+    )
+    val updatedText = stringResource(
+        R.string.fitness_vitals_updated,
+        DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(vitals.lastUpdatedAt)),
+    )
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+            .clearAndSetSemantics {
+                contentDescription = buildString {
+                    append(connectionText)
+                    append(". ")
+                    append(dateText)
+                    append(". ")
+                    append(updatedText)
+                }
+            }
             .background(PaleOlive).padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -386,6 +444,7 @@ private fun WatchStatusCard(vitals: HeartRateVitals, watchConnected: Boolean) {
     }
 }
 
+// Shows peak, lowest, resting, and average heart rate for the selected day.
 @Composable
 private fun VitalsGrid(vitals: HeartRateVitals) {
     val bpm = stringResource(R.string.fitness_bpm)
@@ -421,6 +480,7 @@ private fun VitalsGrid(vitals: HeartRateVitals) {
     }
 }
 
+// Draws one heart-rate value with its label and unit.
 @Composable
 private fun VitalsMetricCard(
     modifier: Modifier,
@@ -429,7 +489,7 @@ private fun VitalsMetricCard(
     unit: String,
 ) {
     Card(
-        modifier = modifier.semantics(mergeDescendants = true) {
+        modifier = modifier.clearAndSetSemantics {
             contentDescription = "$label, $value $unit"
         },
         shape = RoundedCornerShape(24.dp),
@@ -452,6 +512,7 @@ private fun VitalsMetricCard(
     }
 }
 
+// Shows setup help when no Wear OS data has been received.
 @Composable
 private fun WatchMessageCard(message: String) {
     Card(

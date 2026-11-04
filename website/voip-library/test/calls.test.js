@@ -2,131 +2,131 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { MumbleHandler } = require ('../src/calls');
+const { FirebaseCallStore, getParticipantStatus } = require('../src/calls');
 
-test ('createCall creates and tracks a call', async () => {
-    let requestedChannel;
+function fakeDatabase(values) {
+    function reference(path) {
+        return {
+            child(key) {
+                return reference(`${path}/${key}`);
+            },
+            async once() {
+                const nestedValues = Object.fromEntries(
+                    Object.entries(values)
+                        .filter(([key]) => key.startsWith(`${path}/`))
+                        .map(([key, value]) => [key.slice(path.length + 1), value])
+                );
+                return {
+                    val: () => values[path] ?? (
+                        Object.keys(nestedValues).length > 0 ? nestedValues : null
+                    )
+                };
+            },
+            async set(value) {
+                values[path] = value;
+            },
+            async remove() {
+                delete values[path];
+            },
+            async transaction(update) {
+                const next = update(values[path] ?? null);
+                if (next === undefined) return { committed: false };
+                values[path] = next;
+                return { committed: true, snapshot: { val: () => next } };
+            }
+        };
+    }
 
-    const fakeMumbleProxy = {
-        async addChannel (name,parentChannelId){
-            requestedChannel = {name, parentChannelId};
-            return 42;
-        }
+    return { ref: reference };
+}
+
+test('FirebaseCallStore reads call records and marks active calls ended', async () => {
+    const values = {
+        'calls/call-1': { status: 'active', callerId: 'alice' }
     };
+    const store = new FirebaseCallStore(fakeDatabase(values));
 
-    const handler = new MumbleHandler(fakeMumbleProxy);
-    const call = await handler.createCall('Support');
-    assert.deepEqual(requestedChannel, {
-        name: 'Support',
-        parentChannelId: 0
+    assert.deepEqual(await store.getCall('call-1'), values['calls/call-1']);
+    assert.equal(await store.endCall('call-1', 123), true);
+    assert.deepEqual(values['calls/call-1'], {
+        status: 'ended',
+        callerId: 'alice',
+        endedAt: 123
     });
-    assert.equal (call.channelId, 42);
-    assert.equal (call.name, 'Support');
-    assert.equal (typeof call.callId, 'string');
-    assert.equal (handler.calls.get(call.callId), call);
+    assert.equal(await store.endCall('call-1', 456), false);
 });
 
-test('getCall returns a call by its ID', async () => {
-    const fakeMumbleProxy = {
-        async addChannel() {
-            return 42;
+test('FirebaseCallStore creates calls and tracks invitation responses', async () => {
+    const values = {};
+    const store = new FirebaseCallStore(fakeDatabase(values), {
+        idGenerator: () => 'call-1',
+        clock: () => 123
+    });
+
+    const call = await store.createCall('Support', {
+        callerId: 'alice',
+        participantIds: ['bob', 'carol']
+    });
+    assert.deepEqual(call, {
+        callId: 'call-1',
+        name: 'Support',
+        callerId: 'alice',
+        status: 'active',
+        participants: {
+            bob: { status: 'pending' },
+            carol: { status: 'pending' }
+        },
+        createdAt: 123
+    });
+    assert.deepEqual(await store.listInvitations('bob'), [{
+        callId: 'call-1',
+        callerId: 'alice',
+        name: 'Support',
+        status: 'pending'
+    }]);
+    assert.deepEqual(await store.listCallsFor('bob'), []);
+
+    const accepted = await store.respondToInvitation('call-1', 'bob', true);
+    assert.equal(getParticipantStatus(accepted, 'bob'), 'accepted');
+    assert.equal((await store.listCallsFor('bob')).length, 1);
+    assert.equal(await store.respondToInvitation('call-1', 'bob', false), null);
+});
+
+test('FirebaseCallStore reads FCM tokens stored as arrays or maps', async () => {
+    const values = {
+        'users/alice/fcmTokens': ['device-a', null, 'device-b'],
+        'users/bob/fcmTokens': { one: 'device-c', invalid: 42 }
+    };
+    const store = new FirebaseCallStore(fakeDatabase(values));
+
+    assert.deepEqual(await store.getFcmTokens('alice'), ['device-a', 'device-b']);
+    assert.deepEqual(await store.getFcmTokens('bob'), ['device-c']);
+    assert.deepEqual(await store.getFcmTokens('missing'), []);
+});
+
+test('FirebaseCallStore registers and unregisters a device token under its user', async () => {
+    const values = {};
+    const store = new FirebaseCallStore(fakeDatabase(values));
+
+    await store.registerFcmToken('alice', 'device-1', 'fcm-token');
+    assert.deepEqual(await store.getFcmTokens('alice'), ['fcm-token']);
+    await store.unregisterFcmToken('alice', 'device-1');
+    assert.deepEqual(await store.getFcmTokens('alice'), []);
+});
+
+test('participant status recognizes the caller and explicit participant records', () => {
+    const call = {
+        callerId: 'alice',
+        participants: {
+            bob: { status: 'accepted' },
+            carol: { status: 'pending' },
+            dan: 'declined'
         }
     };
 
-    const handler = new MumbleHandler(fakeMumbleProxy);
-    const call = await handler.createCall('Support');
-
-    const foundCall = handler.getCall(call.callId);
-
-    assert.equal(foundCall, call);
-    assert.equal(handler.getCall('does-not-exist'), undefined);
-});
-
-test ('ListCalls returns multiple calls', async ()=> {
-    let i= 0;
-    const fakeMumbleProxy = {
-        async addChannel() {
-            i +=1;
-            return i;
-        }
-    };
-
-    const handler = new MumbleHandler(fakeMumbleProxy);
-    const call1 = await handler.createCall('1');
-    const call2 = await handler.createCall('2');
-    const listedCalls = handler.listCalls();
-    assert.equal(listedCalls.length, 2);
-    assert.equal(listedCalls[0], call1);
-    assert.equal(listedCalls[1], call2);
-});
-
-test ('closeCall drops calls',async () =>{
-    let i=0;
-    const fakeMumbleProxy = {
-        async addChannel(){
-            i +=1;
-            return i;
-        },
-        async removeChannel(channelId){
-            return true;
-        }
-    };
-    const handler = new MumbleHandler(fakeMumbleProxy);
-    const call = await handler.createCall('1');
-    assert.equal(await handler.closeCall('NaNCall'), false);
-    assert.equal(await handler.closeCall(call.callId), true);
-    assert.equal(handler.getCall(call.callId),undefined);
-});
-
-test('connectUser moves a user into the call channel', async () => {
-    const users = new Map([
-        [7, { session: 7, channel: 0, name: 'Ada' }]
-    ]);
-    const fakeMumbleProxy = {
-        async addChannel() {
-            return 42;
-        },
-        async getState(sessionId) {
-            return { ...users.get(sessionId) };
-        },
-        async setState(user) {
-            users.set(user.session, { ...user });
-        }
-    };
-    const handler = new MumbleHandler(fakeMumbleProxy);
-    const call = await handler.createCall('Support');
-
-    assert.equal(await handler.connectUser(call.callId, 7), true);
-    assert.equal(users.get(7).channel, 42);
-    assert.equal(await handler.connectUser('missing-call', 7), false);
-});
-
-test('disconnectUser returns a user to the call channel parent', async () => {
-    const users = new Map([
-        [7, { session: 7, channel: 42, name: 'Ada' }]
-    ]);
-
-    const fakeMumbleProxy = {
-        async addChannel() {
-            return 42;
-        },
-        async getState(sessionId) {
-            return { ...users.get(sessionId) };
-        },
-        async getChannelState(channelId) {
-            assert.equal(channelId, 42);
-            return { id: 42, parent: 0 };
-        },
-        async setState(user) {
-            users.set(user.session, { ...user });
-        }
-    };
-
-    const handler = new MumbleHandler(fakeMumbleProxy);
-    const call = await handler.createCall('Support');
-
-    const result = await handler.disconnectUser(call.callId, 7);
-
-    assert.equal(result, true);
-    assert.equal(users.get(7).channel, 0);
+    assert.equal(getParticipantStatus(call, 'alice'), 'accepted');
+    assert.equal(getParticipantStatus(call, 'bob'), 'accepted');
+    assert.equal(getParticipantStatus(call, 'carol'), 'pending');
+    assert.equal(getParticipantStatus(call, 'dan'), 'declined');
+    assert.equal(getParticipantStatus(call, 'eve'), undefined);
 });

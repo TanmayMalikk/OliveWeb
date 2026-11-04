@@ -41,7 +41,7 @@
     <string name="documents_preparing_upload">Preparando la carga cifrada</string>
     <string name="documents_preparing_upload_help">El archivo seleccionado se está procesando y cifrando en este dispositivo.</string>
     <string name="documents_upload_queued">Esperando una conexión</string>
-    <string name="documents_upload_waiting_retry">Esperando para volver a intentar</string>
+    <string name="documents_upload_waiting_retry">Carga en pausa — se volverá a intentar automáticamente</string>
     <string name="documents_upload_starting">Iniciando la carga segura</string>
     <string name="documents_upload_progress">Subiendo %1$d%%</string>
     <string name="documents_upload_finalizing">Finalizando la carga segura</string>
@@ -80,4 +80,23 @@
     <string name="documents_share_help">Elija hasta 10 amistades aceptadas. Solo las cuentas seleccionadas pueden abrir este archivo.</string>
     <string name="open">Abrir</string>
     <string name="share">Compartir</string>
+    <string name="documents_offline_index">Mostrando tu índice cifrado sin conexión. Los cambios se sincronizarán al conectarte.</string>
+    <string name="documents_not_available_offline">Este archivo aún no está disponible sin conexión.</string>
+    <string name="documents_make_available_offline">Hacer disponible sin conexión</string>
+    <string name="documents_remove_offline_copy">Eliminar copia sin conexión</string>
+    <string name="documents_saving_offline">Guardando copia cifrada sin conexión…</string>
+    <string name="documents_available_offline">Disponible sin conexión</string>
+    <string name="documents_recently_cached">Guardado recientemente; puede eliminarse automáticamente</string>
+    <string name="documents_recent_cache_title">Caché de archivos recientes</string>
+    <string name="documents_recent_cache_help">Conserva automáticamente sin conexión los archivos cifrados abiertos recientemente. Las copias automáticas comparten un límite de 250 MB y esta opción está desactivada de forma predeterminada.</string>
+    <string name="documents_offline_revalidation_required">Vuelve a conectarte para confirmar el acceso antes de abrir este archivo compartido.</string>
+    <string name="documents_network_required">Conéctate a Internet para acceder a este archivo.</string>
+    <string name="documents_access_revoked">Ya no tienes acceso a este archivo. Se eliminó su copia sin conexión.</string>
+    <string name="documents_offline_copy_corrupt">La copia sin conexión está dañada y se eliminó. Descárgala de nuevo.</string>
+    <string name="documents_key_unavailable">Este dispositivo no tiene la clave de cifrado de este archivo. Abre Documentos en un dispositivo ya autorizado para esta cuenta o pide al propietario que vuelva a compartirlo.</string>
+    <string name="documents_account_mismatch">Esta copia sin conexión pertenece a otra cuenta.</string>
+    <string name="documents_storage_full">No hay suficiente espacio para esta copia sin conexión.</string>
+    <string name="documents_download_failed">No se pudo descargar el archivo cifrado. Inténtalo de nuevo.</string>
+    <string name="documents_device_verification_failed">No se pudo verificar esta instalación. Vuelve a abrir la aplicación e inténtalo de nuevo.</string>
+    <string name="documents_open_failed">No se pudo abrir el archivo cifrado.</string>
 </resources>

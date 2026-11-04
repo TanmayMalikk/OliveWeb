@@ -2,6 +2,32 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "calls": {
+      ".read": false,
+      ".write": false
+    },
+    "users": {
+      "$userId": {
+        "fcmTokens": {
+          ".read": false,
+          ".write": false
+        }
+      }
+    },
+    "adminLiveLocations": {
+      ".read": "auth != null && auth.token.role === 'ADMIN'",
+      "$ownerUid": {
+        ".write": "auth != null && auth.uid === $ownerUid && auth.token.role === 'USER'",
+        ".validate": "newData.hasChildren(['name','latitude','longitude','accuracy','updatedAt','active'])",
+        "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120" },
+        "latitude": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
+        "longitude": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
+        "accuracy": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" },
+        "updatedAt": { ".validate": "newData.isNumber()" },
+        "active": { ".validate": "newData.isBoolean()" },
+        "$other": { ".validate": false }
+      }
+    },
     "liveLocations": {
       "$ownerUid": {
         ".read": "auth != null && (auth.uid === $ownerUid || data.child('authorized').child(auth.uid).val() === true)",

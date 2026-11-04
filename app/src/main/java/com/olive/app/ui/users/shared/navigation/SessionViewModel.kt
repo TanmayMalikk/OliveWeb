@@ -8,6 +8,7 @@ import com.olive.app.ui.session.SessionRuntime
 import com.olive.app.ui.users.user.documents.MediaTransferController
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.location.LocationMapController
+import com.olive.app.ui.users.admin.AdminLocationMapController
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 internal class SessionViewModel(application: Application) : AndroidViewModel(application),
@@ -16,16 +17,18 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     override val runtime = SessionRuntime(application, viewModelScope)
     val account = SessionAccountEntry(runtime)
     val messages = SessionMessages(runtime)
+    val calls = SessionCalls(application, viewModelScope)
     val navigation = SessionScreenNavigation(runtime)
 
     // Document and map screens keep their own feature controllers.
     internal val media = runtime.mediaRepository?.let {
-        MediaTransferController(application, viewModelScope, it)
+        MediaTransferController(application, viewModelScope, it, offlineCache = runtime.offlineMediaCache)
     }
     internal val documents =
         SafetyDocumentsController(application, viewModelScope, runtime.safetyDocumentRepository, media)
     internal val locationMap =
         LocationMapController(application, viewModelScope, runtime.locationSharingRepository)
+    internal val adminLocationMap = AdminLocationMapController(runtime.dataSources.adminLocations)
 
     // Root navigation, account entry, and device lock state.
     val screen get() = runtime.state.screen
@@ -89,14 +92,17 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         runtime.accountSession.load()
     }
 
+    // Opens Android's file picker for a document attachment.
     fun beginExternalFilePicker() {
         externalFilePickerOpen = true
     }
 
+    // Clears the pending file-picker request after Android returns a result.
     fun endExternalFilePicker() {
         externalFilePickerOpen = false
     }
 
+    // Shares the user's current live-location session with a chat.
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 
@@ -104,13 +110,17 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     fun signOut() {
         documents.clear()
         locationMap.clear()
+        adminLocationMap.close()
         runtime.accountSession.signOut()
     }
 
+    // Stops account listeners and background work when the session view model is removed.
     override fun onCleared() {
         documents.clear()
         locationMap.clear()
+        adminLocationMap.close()
         runtime.safety.close()
         runtime.messaging.stopMessaging()
+        calls.close()
     }
 }

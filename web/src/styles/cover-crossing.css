@@ -209,6 +209,9 @@
 .crossing-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
   gap: 0.65rem;
 }
 .crossing-round-actions {
