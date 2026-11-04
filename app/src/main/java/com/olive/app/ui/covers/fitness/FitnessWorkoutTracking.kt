@@ -311,7 +311,7 @@ internal object FitnessWorkoutController {
             .putExtra(FitnessWorkoutService.EXTRA_ACCOUNT_ID, accountId)
 }
 
-class FitnessWorkoutService : Service() {
+internal class FitnessWorkoutService : Service() {
     private var store: FitnessWorkoutStore? = null
     private var locationUpdates: DeviceLocationUpdates? = null
 
