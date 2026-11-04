@@ -4,6 +4,7 @@ package com.olive.app
 import android.app.UiAutomation
 import android.app.KeyguardManager
 import android.os.ParcelFileDescriptor
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -34,19 +35,9 @@ internal class DeviceCredentialTestDriver(
         waitForPhonePin()
         // This PIN belongs only to the disposable emulator used by this test run.
         if (findNode(automation.rootInActiveWindow) { it.viewIdResourceName == "cred_pin_pad" } != null) {
-            "246810".forEach { digit ->
-                val key =
-                    findNode(automation.rootInActiveWindow) { it.className?.toString() == "android.widget.Button" && it.text?.toString() == digit.toString() }
-                assertTrue(
-                    "Android PIN key $digit unavailable",
-                    key?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-                )
-                automation.waitForIdle(150, 3_000)
-            }
-            compose.waitUntil(5_000) {
-                findNode(automation.rootInActiveWindow) { it.viewIdResourceName == "com.android.systemui:id/key_enter" && it.isEnabled }
-                    ?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
-            }
+            // SystemUI can expose a keypad without exposing its digits as clickable nodes.
+            val keys = "246810".map { KeyEvent.KEYCODE_0 + it.digitToInt() } + KeyEvent.KEYCODE_ENTER
+            shell("input keyevent ${keys.joinToString(" ")}")
         } else {
             shell("input text 246810")
             shell("input keyevent 66")
