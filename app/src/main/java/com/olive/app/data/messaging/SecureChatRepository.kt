@@ -15,16 +15,25 @@ import javax.crypto.SecretKey
 class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
     // Opens the copy of an existing room key that was encrypted for this account.
     suspend fun existingRoomKey(conversationId: String, currentUid: String): SecretKey? {
-        return wrappedRoomKey(conversationId, currentUid)?.let(KeyManager::unwrapKey)
+        return roomKeyAccess(conversationId, currentUid)?.secretKey
     }
 
-    // Returns only this device's encrypted key envelope for protected offline retention.
+    // Returns a verified envelope for protected offline retention.
     suspend fun wrappedRoomKey(conversationId: String, currentUid: String): String? {
+        return roomKeyAccess(conversationId, currentUid)?.wrappedKeyBase64
+    }
+
+    // Tries the device envelope first, then the same account's recovery envelope.
+    private suspend fun roomKeyAccess(
+        conversationId: String,
+        currentUid: String,
+    ): KeyManager.UnwrappedKeyEnvelope? {
         val snapshot = firestore.collection("conversations").document(conversationId).get().await()
         val deviceId = KeyManager.deviceId()
         val deviceKey = snapshot.reference.collection("deviceKeys")
             .document("$currentUid--$deviceId").get().await().getString("wrappedKey")
-        return deviceKey ?: snapshot.roomKeys().orEmpty()[currentUid]
+        val candidates = listOfNotNull(deviceKey, snapshot.roomKeys().orEmpty()[currentUid])
+        return runCatching { KeyManager.unwrapFirstWithEnvelope(candidates) }.getOrNull()
     }
 
     // Creates or unwraps the encrypted room key required before this participant can read messages.
@@ -37,7 +46,8 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
             java.util.Base64.getEncoder().encodeToString(key.encoded)
         }
         val ref = firestore.collection("conversations").document(conversation.id)
-        val selected = firestore.runTransaction { transaction ->
+        val locallyAvailableKey = existingRoomKey(conversation.id, currentUid)
+        val roomKey = firestore.runTransaction { transaction ->
             val snapshot = transaction.get(ref)
             val savedKeys = snapshot.participantPublicKeys().orEmpty()
             val savedWrapped = snapshot.roomKeys().orEmpty()
@@ -52,15 +62,15 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
                 )
-                wrapped.getValue(currentUid)
+                generated
             } else {
                 val ownWrappedKey = savedWrapped[currentUid]
                     ?: error("An existing participant must open this chat to share its key.")
+                val existingKey = locallyAvailableKey ?: KeyManager.unwrapKey(ownWrappedKey)
                 if (savedKeys == encodedPublicKeys && savedWrapped.keys.containsAll(conversation.participantIds)) {
-                    ownWrappedKey
+                    existingKey
                 } else {
                     // Rewrap the same AES key for new participants and changed device keys.
-                    val existingKey = KeyManager.unwrapKey(ownWrappedKey)
                     val updatedWrapped = participantPublicKeys.mapValues { (uid, publicKey) ->
                         if (savedKeys[uid] == encodedPublicKeys[uid]) savedWrapped[uid]
                             ?: KeyManager.wrapKey(existingKey, publicKey)
@@ -73,11 +83,10 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                             "updatedAt" to FieldValue.serverTimestamp()
                         )
                     )
-                    updatedWrapped.getValue(currentUid)
+                    existingKey
                 }
             }
         }.await()
-        val roomKey = KeyManager.unwrapKey(selected)
         shareWithRegisteredDevices(conversation, roomKey)
         return roomKey
     }
