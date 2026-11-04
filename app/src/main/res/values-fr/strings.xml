@@ -182,7 +182,7 @@
 <string name="no_failed_attempts_recorded">Aucune tentative échouée enregistrée.</string>
     <string name="incorrect_pin">NIP incorrect</string>
     <string name="safe_home">Accueil sécurisé</string>
-    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">Enregistrez vos contacts de confiance ici. Olive n’envoie pas de messages et ne passe pas d’appels.</string>
+    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">Enregistrez vos contacts de confiance ici pour leur envoyer des messages ou les appeler en toute sécurité.</string>
     <string name="edit">Modifier</string>
     <string name="remove">Supprimer</string>
     <string name="no_contacts_yet_adding_one_is_optional">Aucun contact pour le moment. L’ajout est facultatif.</string>

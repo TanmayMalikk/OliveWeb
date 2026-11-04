@@ -86,6 +86,15 @@
     <string name="ui_olive_tree_updates">Olive Tree Updates</string>
     <string name="ui_call_invitation_notifications">Call invitations</string>
     <string name="ui_incoming_call">Incoming call</string>
+    <string name="ui_voice_call">Voice call</string>
+    <string name="ui_start_voice_call">Start voice call</string>
+    <string name="ui_calling">Calling…</string>
+    <string name="ui_call_in_progress">Call in progress</string>
+    <string name="ui_mute">Mute</string>
+    <string name="ui_unmute">Unmute</string>
+    <string name="ui_end_call">End call</string>
+    <string name="ui_leave_call">Leave call</string>
+    <string name="ui_microphone_permission_required">Microphone permission is required for voice calls.</string>
     <string name="ui_open_olive_to_respond_to_this_call">Open Olive to respond to this call.</string>
     <string name="ui_news">News</string>
     <string name="ui_politics">Politics</string>

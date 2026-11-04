@@ -17,6 +17,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     override val runtime = SessionRuntime(application, viewModelScope)
     val account = SessionAccountEntry(runtime)
     val messages = SessionMessages(runtime)
+    val calls = SessionCalls(application, viewModelScope)
     val navigation = SessionScreenNavigation(runtime)
 
     // Document and map screens keep their own feature controllers.
@@ -120,5 +121,6 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         adminLocationMap.close()
         runtime.safety.close()
         runtime.messaging.stopMessaging()
+        calls.close()
     }
 }

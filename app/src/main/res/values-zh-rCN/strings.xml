@@ -183,7 +183,7 @@
 <string name="no_failed_attempts_recorded">没有失败的尝试记录。</string>
     <string name="incorrect_pin">PIN 码不正确</string>
     <string name="safe_home">安全回家</string>
-    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">在这里拯救值得信赖的人。 Olive 不发送消息或打电话。</string>
+    <string name="save_trusted_people_here_olive_does_not_send_messages_or_make_calls">在这里保存可信联系人，以便安全地发送消息或拨打电话。</string>
     <string name="edit">编辑</string>
     <string name="remove">删除</string>
     <string name="no_contacts_yet_adding_one_is_optional">还没有联系方式。添加一项是可选的。</string>
