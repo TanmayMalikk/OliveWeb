@@ -159,6 +159,7 @@ class DocumentControllerMediaRoutingTest {
             uri: Uri,
             owner: AccountIdentity,
             ocrReview: OcrReview,
+            tags: Set<String>,
             onQueued: (String) -> Unit,
             onFailure: (String) -> Unit,
         ) = Unit
@@ -171,6 +172,7 @@ class DocumentControllerMediaRoutingTest {
             kind: MediaKind,
             ocrReview: OcrReview,
             ocr: DocumentOcrMetadata?,
+            tags: Set<String>,
             onQueued: (String) -> Unit,
             onFailure: (String) -> Unit,
         ) = Unit

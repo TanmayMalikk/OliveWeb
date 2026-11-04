@@ -99,10 +99,16 @@ internal class SafetyDocumentsController(
     }
 
     // Queues a file selected from Android storage for encrypted upload.
-    fun upload(uri: Uri, identity: AccountIdentity, fallbackError: String, ocrReview: OcrReview = OcrReview.NOT_RUN) {
+    fun upload(
+        uri: Uri,
+        identity: AccountIdentity,
+        fallbackError: String,
+        ocrReview: OcrReview = OcrReview.NOT_RUN,
+        tags: Set<String> = emptySet(),
+    ) {
         val transfers = media ?: return reportError(fallbackError)
         state = state.copy(loading = true, error = null)
-        transfers.queueDocument(uri, identity, ocrReview, onQueued = {
+        transfers.queueDocument(uri, identity, ocrReview, tags, onQueued = {
             state = state.copy(loading = false, error = null)
             if (subscription == null) load(identity.uid, identity.username, false)
         }, onFailure = { state = state.copy(loading = false, error = it.ifBlank { fallbackError }) })
@@ -127,7 +133,7 @@ internal class SafetyDocumentsController(
             ocr.successful -> OcrReview.PASSED
             else -> OcrReview.RETAKE_DECLINED
         }
-        transfers.queueFile(file, name, mimeType, identity, kind, review, ocr,
+        transfers.queueFile(file, name, mimeType, identity, kind, review, ocr, emptySet(),
             onQueued = {
                 file.delete()
                 state = state.copy(loading = false, error = null)

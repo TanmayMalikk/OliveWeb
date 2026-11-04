@@ -10,6 +10,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.VideoView
+import android.view.ScaleGestureDetector
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
@@ -61,7 +62,8 @@ private data class CapturedMedia(
     val mimeType: String,
     val name: String,
     val kind: MediaKind,
-    val ocrResult: OcrResult? = null
+    val ocrResult: OcrResult? = null,
+    val previewFile: File? = null,
 )
 
 // Marks a document scan for review when OCR confidence is below 75 percent.
@@ -98,6 +100,14 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     val zoomRatio by viewModel.zoomRatio.collectAsState()
     val preview =
         remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    val pinchDetector = remember(viewModel) {
+        ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                viewModel.zoomBy(detector.scaleFactor)
+                return true
+            }
+        })
+    }
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
             permissionGranted = it
@@ -107,16 +117,24 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     // Stores the new camera result so the preview can show it.
     fun newCapture(extension: String) = File(captureFolder, "${UUID.randomUUID()}.$extension")
     // Accepts the captured photo, video, or document and returns its file.
-    fun accept(file: File, mime: String, name: String, kind: MediaKind, ocrResult: OcrResult? = null) {
+    fun accept(
+        file: File,
+        mime: String,
+        name: String,
+        kind: MediaKind,
+        ocrResult: OcrResult? = null,
+        previewFile: File? = null,
+    ) {
         pendingFile = null
         viewModel.leaveCamera()
         captured =
-            CapturedMedia(file, mime, name, kind, ocrResult)
+            CapturedMedia(file, mime, name, kind, ocrResult, previewFile)
     }
 
     // Deletes the temporary capture when the user retakes or cancels it.
     fun discardCapture() {
         captured?.file?.delete()
+        captured?.previewFile?.takeIf { it != captured?.file }?.delete()
         pendingFile?.delete()
         captured = null
         pendingFile =
@@ -136,6 +154,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         onDispose {
             viewModel.leaveCamera()
             captured?.file?.delete()
+            captured?.previewFile?.takeIf { it != captured?.file }?.delete()
             pendingFile?.delete()
         }
     }
@@ -170,13 +189,24 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                         media.kind,
                         ocr
                     ) {
+                        media.previewFile?.takeIf { it != media.file }?.delete()
                         captured = null
                         session.navigation.back()
                     }
                 })
 
             else -> {
-                AndroidView(factory = { preview }, modifier = Modifier.fillMaxSize())
+                AndroidView(
+                    factory = {
+                        preview.apply {
+                            setOnTouchListener { _, event ->
+                                pinchDetector.onTouchEvent(event)
+                                true
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
                 CameraModeSelector(
                     mode = mode,
                     enabled = !busy && !recording,
@@ -265,12 +295,13 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     when {
                         mode == CameraMode.Photo -> {
                             val file = newCapture("jpg")
+                            val savedName = builtInCameraFileName(BuiltInCameraFile.IMAGE)
                             pendingFile = file
                             viewModel.capturePhoto(file) {
                                 accept(
                                     it,
                                     "image/jpeg",
-                                    "Olive photo.jpg",
+                                    savedName,
                                     MediaKind.IMAGE,
                                 )
                             }
@@ -278,14 +309,16 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
 
                         mode == CameraMode.Document -> {
                             val file = newCapture("jpg")
+                            val savedName = builtInCameraFileName(BuiltInCameraFile.DOCUMENT)
                             pendingFile = file
-                            viewModel.captureDocument(file) { capturedFile, result ->
+                            viewModel.captureDocument(file) { capturedFile, previewFile, result ->
                                 accept(
                                     capturedFile,
-                                    "image/jpeg",
-                                    "Olive document.jpg",
+                                    "application/pdf",
+                                    savedName,
                                     MediaKind.DOCUMENT,
                                     result,
+                                    previewFile,
                                 )
                             }
                         }
@@ -293,12 +326,13 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                         recording -> viewModel.stopVideo()
                         else -> {
                             val file = newCapture("mp4")
+                            val savedName = builtInCameraFileName(BuiltInCameraFile.VIDEO)
                             pendingFile = file
                             viewModel.startVideo(file, audioGranted) {
                                 accept(
                                     it,
                                     "video/mp4",
-                                    "Olive video.mp4",
+                                    savedName,
                                     MediaKind.VIDEO,
                                 )
                             }
@@ -466,8 +500,9 @@ private fun CameraReview(
     onSave: (CapturedMedia) -> Unit
 ) {
     Box(Modifier.fillMaxSize()) {
-        if (media.mimeType.startsWith("image/")) AsyncImage(
-            model = media.file, contentDescription = stringResource(R.string.captured_photo_review),
+        if (media.mimeType.startsWith("image/") || media.previewFile != null) AsyncImage(
+            model = media.previewFile ?: media.file,
+            contentDescription = stringResource(R.string.captured_photo_review),
             contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()
         )
         else AndroidView(factory = { context ->

@@ -451,13 +451,14 @@ private fun SafetyDocumentCard(
                     modifier = Modifier.testTag("document_ocr_${file.id}")
                 )
             }
-            Row(
+            // Only the owner may change evidence status; shared viewers do not see this action.
+            if (own) Row(
                 Modifier.fillMaxWidth().testTag("document_evidence_${file.id}"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Checkbox(
                     checked = file.evidence,
-                    onCheckedChange = if (own) onEvidenceChange else null,
+                    onCheckedChange = onEvidenceChange,
                 )
                 Column {
                     Text(stringResource(R.string.evidence), style = MaterialTheme.typography.titleSmall)

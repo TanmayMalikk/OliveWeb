@@ -82,10 +82,8 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                             }
                         }
                         documents.saveMultiRecipientEntry(
-                            entry.id,
+                            entry,
                             device.uid,
-                            entry.title,
-                            entry.body,
                             recipients
                         )
                         val prefix =
