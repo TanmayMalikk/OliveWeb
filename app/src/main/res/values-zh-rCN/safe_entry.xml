@@ -17,7 +17,6 @@
     <string name="entry_confirm_setup">确认您的身份以设置安全进入方式。</string>
     <string name="entry_unlock_description">通过 Android 确认您的身份以解锁安全区域。</string>
     <string name="entry_unlock">通过设备锁解锁</string>
-    <string name="entry_use_phone_lock">使用手机屏幕锁定</string>
     <string name="entry_auth_failed">无法验证 Android 身份认证。访问仍被锁定。请重试，或登录以重新设置安全进入方式。</string>
     <string name="entry_auth_cancelled">身份认证已取消或不可用。访问仍被锁定。</string>
 <string name="entry_verify_trigger">通过设备锁确认身份以更改触发词。</string>

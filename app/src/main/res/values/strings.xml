@@ -380,6 +380,8 @@
     <string name="organization_live_map">Live location map</string>
     <string name="organization_live_map_description">This protected view is ready to show assigned users as blinking red points.</string>
     <string name="organization_location_feed_not_enabled">Live organization location sharing is not enabled yet. No user location is being collected for this view.</string>
+    <string name="organization_live_map_admin_description">Shows the latest live or last-known location reported by every user account.</string>
+    <string name="organization_location_feed_empty">No user location has been reported yet.</string>
     <string name="support_conversations">Support chats</string>
     <string name="assigned_users_count">Assigned users: %1$d</string>
     <string name="safety_plan_shared_in_chat">Safety plan shared in the support chat.</string>
@@ -450,4 +452,21 @@
     <string name="location_finding_route">Finding the best route…</string>
     <string name="location_navigating_to">Navigating to %1$s</string>
     <string name="location_map_view">Map view</string>
+    <string name="evidence">Evidence</string>
+    <string name="incident_date">Date of incident</string>
+    <string name="incident_time">Approx. time</string>
+    <string name="incident_location">Location of incident</string>
+    <string name="incident_pin_title">Drop or drag the pin</string>
+    <string name="incident_pin_help">Tap the map to save exact coordinates. Your current location stays visible as a red dot when available.</string>
+    <string name="incident_show_location">Show my current location</string>
+    <string name="attachments">Attachments</string>
+    <string name="incident_attachments_help">Choose saved photos, videos, or documents. Incident attachments are automatically tagged as evidence.</string>
+    <string name="upload_new_attachment">Upload a new attachment</string>
+    <string name="attachments_empty_help">Upload files in Documents, then attach them here.</string>
+    <string name="title">Title</string>
+    <string name="current_location">Your current location</string>
+    <string name="incident_dropped_pin">Dropped pin: %1$.5f, %2$.5f</string>
+    <string name="incident_required_fields">Add a title, incident date, and incident location before saving.</string>
+    <string name="evidence_tagged">Tagged as evidence</string>
+    <string name="evidence_normal_file">Normal account file</string>
 </resources>

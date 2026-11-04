@@ -119,14 +119,11 @@ export class Accounts {
             )
           ).user;
         } catch (error) {
-          if (
-            (role === "STAFF" || role === "ADMIN") &&
-            username.includes("@")
-          ) {
+          if (role === "STAFF" || role === "ADMIN") {
             const result = await httpsCallable(
               functions,
               "resolveOrganizationLogin",
-            )({ email: username.trim().toLowerCase(), role });
+            )({ identifier: username.trim().toLowerCase(), role });
             user = (
               await sdk.signInWithEmailAndPassword(
                 auth,

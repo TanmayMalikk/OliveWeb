@@ -2,16 +2,19 @@
 package com.olive.app.ui.users.user.notes
 
 
+import android.Manifest
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,6 +33,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalIconButton
@@ -40,22 +44,38 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.PrivateEntry
 import com.olive.app.data.PrivateEntryKind
+import com.olive.app.data.AddressSuggestion
+import com.olive.app.data.GeoapifyClient
+import com.olive.app.data.AccountIdentity
+import com.olive.app.data.DeviceLocation
+import com.olive.app.data.MapLocationPoint
+import com.olive.app.ui.users.user.location.InteractiveLocationMap
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.keepVisibleWhileTyping
@@ -78,12 +98,27 @@ internal fun PrivateNotes(session: SessionViewModel) {
     val uiText = rememberResourceText()
     var editorOpen by remember { mutableStateOf(false) }
     var editingId by remember { mutableStateOf<String?>(null) }
-    var kind by remember { mutableStateOf<PrivateEntryKind?>(null) }
+    var kind by remember { mutableStateOf(PrivateEntryKind.Note) }
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
+    var incidentDate by remember { mutableStateOf("") }
+    var incidentTime by remember { mutableStateOf("") }
+    var incidentLocation by remember { mutableStateOf("") }
+    var incidentLatitude by remember { mutableStateOf<Double?>(null) }
+    var incidentLongitude by remember { mutableStateOf<Double?>(null) }
+    var incidentMapOpen by remember { mutableStateOf(false) }
+    var selectedAttachments by remember { mutableStateOf(emptySet<String>()) }
+    var locationSuggestions by remember { mutableStateOf(emptyList<AddressSuggestion>()) }
+    var attachAfterUpload by remember { mutableStateOf(false) }
+    var filesBeforeUpload by remember { mutableStateOf(emptySet<String>()) }
+    var currentLocationPoint by remember { mutableStateOf<MapLocationPoint?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var search by rememberSaveable { mutableStateOf("") }
     var logEntryId by remember { mutableStateOf<String?>(null) }
     var trashOpen by remember { mutableStateOf(false) }
+    val editorTitleFocus = remember { FocusRequester() }
+    val mapTitleFocus = remember { FocusRequester() }
     val formatter = remember {
         DateTimeFormatter.ofPattern(
             "MMM d, yyyy · HH:mm z",
@@ -95,15 +130,78 @@ internal fun PrivateNotes(session: SessionViewModel) {
     fun openEditor(entry: PrivateEntry?) {
         session.clearPrivateEntryStatus()
         editingId = entry?.id
-        kind = entry?.kind
+        kind = entry?.kind ?: PrivateEntryKind.Note
         title = entry?.title.orEmpty()
         body =
             entry?.body.orEmpty()
+        incidentDate = entry?.incidentDate.orEmpty()
+        incidentTime = entry?.incidentTime.orEmpty()
+        incidentLocation = entry?.incidentLocation.orEmpty()
+        incidentLatitude = entry?.incidentLatitude
+        incidentLongitude = entry?.incidentLongitude
+        incidentMapOpen = false
+        selectedAttachments = entry?.attachmentIds.orEmpty().toSet()
         editorOpen = true
+    }
+    val uid = session.coverAccountId
+    val unableUpload = stringResource(R.string.documents_upload_failed)
+    val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        session.endExternalFilePicker()
+        if (uri != null && uid != null) {
+            filesBeforeUpload = session.documents.state.files.mapTo(mutableSetOf()) { it.id }
+            attachAfterUpload = true
+            session.documents.upload(uri, AccountIdentity(uid, session.coverUsername), unableUpload)
+        }
+    }
+    val locationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { permissions ->
+        if (permissions.values.any { it }) scope.launch {
+            DeviceLocation.currentCoordinates(context)?.let { fix ->
+                currentLocationPoint = MapLocationPoint(
+                    uid ?: "current", uiText(R.string.current_location), fix.latitude, fix.longitude,
+                    fix.timestamp, true, fix.accuracy,
+                )
+            }
+        }
+    }
+    LaunchedEffect(uid, session.coverUsername, session.localMode) {
+        if (uid != null) session.documents.load(uid, session.coverUsername, session.localMode)
+    }
+    LaunchedEffect(incidentLocation, kind) {
+        locationSuggestions = emptyList()
+        if (kind != PrivateEntryKind.Incident || incidentLocation.trim().length < 3 || !GeoapifyClient.configured) return@LaunchedEffect
+        delay(300)
+        locationSuggestions = runCatching {
+            GeoapifyClient.autocomplete(incidentLocation, false)
+        }.getOrDefault(emptyList())
+    }
+    LaunchedEffect(session.documents.state.files, attachAfterUpload) {
+        if (!attachAfterUpload) return@LaunchedEffect
+        val added = session.documents.state.files.firstOrNull { it.id !in filesBeforeUpload }
+        if (added != null) {
+            selectedAttachments = selectedAttachments + added.id
+            attachAfterUpload = false
+        }
+    }
+    // Move TalkBack to the editor title so opening a note or incident is announced immediately.
+    LaunchedEffect(editorOpen, editingId) {
+        if (editorOpen) {
+            withFrameNanos { }
+            editorTitleFocus.requestFocus()
+        }
+    }
+    // Announce the map panel only after the user opens it from the location field.
+    LaunchedEffect(incidentMapOpen) {
+        if (incidentMapOpen) {
+            withFrameNanos { }
+            mapTitleFocus.requestFocus()
+        }
     }
     BackHandler(editorOpen || logEntryId != null || trashOpen) {
         when {
             logEntryId != null -> logEntryId = null
+            incidentMapOpen -> incidentMapOpen = false
             editorOpen -> editorOpen = false
             else -> trashOpen = false
         }
@@ -137,7 +235,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     Text(
                         if (editingId == null) uiText(R.string.new_private_entry) else uiText(R.string.edit_private_entry),
                         style = MaterialTheme.typography.titleLarge,
-                        modifier = (Modifier.weight(1f)).semantics { heading() })
+                        modifier = Modifier.weight(1f).testTag("private_editor_title")
+                            .focusRequester(editorTitleFocus).focusable()
+                            .semantics {
+                                heading()
+                                paneTitle = if (editingId == null) uiText(R.string.new_private_entry)
+                                else uiText(R.string.edit_private_entry)
+                            })
                     if (entry != null) IconButton(
                         onClick = { session.togglePrivateEntryPin(entry.id) },
                         enabled = !session.busy,
@@ -167,7 +271,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     ).forEach { (value, label) ->
                         FilterChip(
                             selected = kind == value,
-                            onClick = { kind = if (kind == value) null else value },
+                            onClick = { kind = value },
                             label = { Text(label) },
                             modifier = Modifier.weight(1f)
                                 .testTag("private_kind_${value.name.lowercase()}")
@@ -177,11 +281,94 @@ internal fun PrivateNotes(session: SessionViewModel) {
             }
             item {
                 Field(
-                    uiText(R.string.title_optional),
+                    if (kind == PrivateEntryKind.Incident) uiText(R.string.title) else uiText(R.string.title_optional),
                     title,
                     "private_entry_title",
                     enabled = !session.busy
                 ) { title = it.take(120) }
+            }
+            if (kind == PrivateEntryKind.Incident) {
+                item {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Field(stringResource(R.string.incident_date), incidentDate, "incident_date", enabled = !session.busy) {
+                            incidentDate = it.take(40)
+                        }
+                        Field(stringResource(R.string.incident_time), incidentTime, "incident_time", enabled = !session.busy) {
+                            incidentTime = it.take(40)
+                        }
+                    }
+                }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedTextField(
+                            value = incidentLocation,
+                            onValueChange = { incidentLocation = it.take(240) },
+                            label = { Text(stringResource(R.string.incident_location)) },
+                            enabled = !session.busy,
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { incidentMapOpen = !incidentMapOpen },
+                                    enabled = !session.busy,
+                                    modifier = Modifier.testTag("incident_location_pin"),
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.PushPin,
+                                        stringResource(R.string.incident_pin_title),
+                                    )
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                                .testTag("incident_location")
+                                .keepVisibleWhileTyping(),
+                        )
+                        locationSuggestions.forEach { suggestion ->
+                            TextButton(
+                                onClick = {
+                                    incidentLocation = listOf(suggestion.primary, suggestion.secondary)
+                                        .filter(String::isNotBlank).joinToString(", ")
+                                    incidentLatitude = suggestion.address.latitude
+                                    incidentLongitude = suggestion.address.longitude
+                                    locationSuggestions = emptyList()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(listOf(suggestion.primary, suggestion.secondary).filter(String::isNotBlank).joinToString(", "))
+                            }
+                        }
+                    }
+                }
+                if (incidentMapOpen) item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            stringResource(R.string.incident_pin_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.testTag("incident_map_title")
+                                .focusRequester(mapTitleFocus).focusable().semantics {
+                                heading()
+                                paneTitle = uiText(R.string.incident_pin_title)
+                            },
+                        )
+                        Text(stringResource(R.string.incident_pin_help), color = Muted)
+                        TextButton(onClick = {
+                            locationPermission.launch(arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            ))
+                        }) { Text(stringResource(R.string.incident_show_location)) }
+                        InteractiveLocationMap(
+                            points = currentLocationPoint?.let(::listOf)
+                                ?: session.locationMap.state.displayedOwn(session.accountRole)?.let(::listOf).orEmpty(),
+                            selectedLocation = incidentLatitude?.let { latitude -> incidentLongitude?.let { latitude to it } },
+                            onSelectedLocationChange = { latitude, longitude ->
+                                incidentLatitude = latitude
+                                incidentLongitude = longitude
+                                if (incidentLocation.isBlank()) incidentLocation = uiText(R.string.incident_dropped_pin, latitude, longitude)
+                            },
+                            modifier = Modifier.fillMaxWidth().height(300.dp).testTag("incident_location_map"),
+                        )
+                    }
+                }
             }
             item {
                 OutlinedTextField(
@@ -194,12 +381,50 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 )
             }
             item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(stringResource(R.string.attachments), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.incident_attachments_help), color = Muted)
+                    TextButton(
+                        onClick = {
+                            session.beginExternalFilePicker()
+                            attachmentPicker.launch(arrayOf("image/*", "video/*", "application/pdf", "text/*"))
+                        },
+                        enabled = uid != null && !session.busy,
+                    ) { Text(stringResource(R.string.upload_new_attachment)) }
+                    session.documents.state.files.forEach { document ->
+                        Row(
+                            Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = document.id in selectedAttachments,
+                                onCheckedChange = { checked ->
+                                    selectedAttachments = if (checked) selectedAttachments + document.id else selectedAttachments - document.id
+                                },
+                            )
+                            Text(document.name, modifier = Modifier.weight(1f))
+                            if (document.evidence) Text(stringResource(R.string.evidence), color = OliveGreen)
+                        }
+                    }
+                    if (session.documents.state.files.isEmpty()) Text(stringResource(R.string.attachments_empty_help), color = Muted)
+                }
+            }
+            item {
                 Button(
                     onClick = {
-                        session.savePrivateEntry(editingId, kind, title, body)
+                        if (kind == PrivateEntryKind.Incident && uid != null) {
+                            session.documents.state.files.filter { it.id in selectedAttachments && !it.evidence }
+                                .forEach { session.documents.setEvidence(it, uid, true) }
+                        }
+                        session.savePrivateEntry(
+                            editingId, kind, title, body, incidentDate, incidentTime,
+                            incidentLocation, incidentLatitude, incidentLongitude,
+                            selectedAttachments.toList(),
+                        )
                         if (body.isNotBlank()) editorOpen = false
                     },
-                    enabled = !session.busy && body.isNotBlank(),
+                    enabled = !session.busy && body.isNotBlank() &&
+                        (kind == PrivateEntryKind.Note || (title.isNotBlank() && incidentDate.isNotBlank() && incidentLocation.isNotBlank())),
                     modifier = Modifier.fillMaxWidth().testTag("save_private_entry")
                 ) {
                     Text(if (editingId == null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry))
@@ -362,7 +587,7 @@ private fun PrivateNoteCard(
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                entry.kind?.let {
+                entry.kind.let {
                     Text(
                         if (it == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
                             R.string.note
@@ -372,7 +597,6 @@ private fun PrivateNoteCard(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                    ?: Spacer(Modifier.weight(1f))
                 IconButton(
                     onClick = pin,
                     modifier = Modifier.size(34.dp).testTag("private_pin")

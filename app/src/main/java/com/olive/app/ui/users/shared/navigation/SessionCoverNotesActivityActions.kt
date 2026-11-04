@@ -46,8 +46,15 @@ internal interface SessionCoverNotesActivityActions {
     // Clears the note editor's success or error message before the next action.
     fun clearPrivateEntryStatus() = runtime.notes.clearPrivateEntryStatus()
     // Creates a private note or updates the note with the matching ID.
-    fun savePrivateEntry(id: String?, kind: PrivateEntryKind?, title: String, body: String) =
-        runtime.notes.savePrivateEntry(id, kind, title, body)
+    fun savePrivateEntry(
+        id: String?, kind: PrivateEntryKind, title: String, body: String,
+        incidentDate: String = "", incidentTime: String = "", incidentLocation: String = "",
+        incidentLatitude: Double? = null, incidentLongitude: Double? = null,
+        attachmentIds: List<String> = emptyList(),
+    ) = runtime.notes.savePrivateEntry(
+        id, kind, title, body, incidentDate, incidentTime, incidentLocation,
+        incidentLatitude, incidentLongitude, attachmentIds,
+    )
 
     // Pins or unpins a private note so important notes stay easy to find.
     fun togglePrivateEntryPin(id: String) = runtime.notes.togglePrivateEntryPin(id)

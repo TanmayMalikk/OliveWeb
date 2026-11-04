@@ -96,7 +96,9 @@ Partial Firebase configuration must be completed before enabling shared mode.
 The web adapter preserves mobile contracts:
 
 - Role aliases: `username@users.olive.invalid`, `@safe.olive.invalid`,
-  `@staff.olive.invalid`, and `@admin.olive.invalid`.
+  `@yourolivebranch.ca` for staff and admin accounts unless an admin chose a
+  different login email when creating the account. That login email is locked
+  after creation; later profile email changes are contact details only.
 - Profiles: Storage `accounts/{uid}/profile.json`, with the same profile fields.
 - History: Storage `accounts/{uid}/history/{settings,triggers,checkouts,private_entries}/{id}.json`.
 - Messages/friends: existing Firestore directory, request, friendship, friend-list,

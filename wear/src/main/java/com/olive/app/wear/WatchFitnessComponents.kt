@@ -39,7 +39,12 @@ import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -143,7 +148,11 @@ internal fun WatchTabs(selectedPage: WatchPage, onSelected: (WatchPage) -> Unit)
             val selected = page == selectedPage
             Button(
                 onClick = { onSelected(page) },
-                modifier = Modifier.weight(1f).height(40.dp),
+                modifier = Modifier.weight(1f).height(40.dp).semantics {
+                    role = Role.Tab
+                    this.selected = selected
+                    contentDescription = "${page.label} tab"
+                },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (selected) WatchAccent else Color.Transparent,
                     contentColor = if (selected) WatchSurface else WatchAccent,
@@ -159,11 +168,14 @@ internal fun WatchTabs(selectedPage: WatchPage, onSelected: (WatchPage) -> Unit)
 
 // Lets the crown scroll long pages while preventing sideways movement.
 @Composable
-internal fun ScrollableWatchPage(content: @Composable ColumnScope.() -> Unit) {
+internal fun ScrollableWatchPage(pageTitle: String, content: @Composable ColumnScope.() -> Unit) {
     val scrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(pageTitle) {
+        scrollState.scrollTo(0)
+        focusRequester.requestFocus()
+    }
     Column(
         modifier = Modifier.fillMaxSize().clipToBounds()
             .onRotaryScrollEvent {
@@ -171,6 +183,10 @@ internal fun ScrollableWatchPage(content: @Composable ColumnScope.() -> Unit) {
                 true
             }
             .focusRequester(focusRequester).focusable().verticalScroll(scrollState)
+            .semantics {
+                paneTitle = pageTitle
+                contentDescription = "$pageTitle fitness summary"
+            }
             .padding(top = 6.dp, bottom = 30.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         content = content,
@@ -191,7 +207,13 @@ internal fun WatchSummaryCard(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (title != null) {
-            Text(title, color = WatchText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text(
+                title,
+                color = WatchText,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
         }
         content()
     }
@@ -220,7 +242,12 @@ internal fun MacroProgressRow(label: String, value: Float, goal: Int) {
 // Displays one small value and label without crowding the round screen.
 @Composable
 internal fun TinyMetric(value: String, label: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = "$label, $value"
+        },
+    ) {
         Text(value, color = WatchText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Text(label, color = WatchSubtle, fontSize = 11.sp)
     }

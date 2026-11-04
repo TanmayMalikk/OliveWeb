@@ -88,7 +88,7 @@ internal class DeviceActivityStore(private val activityVault: EncryptedVault) {
                 if (entry.purgedAt == null && entry.trashExpired(now)) {
                     val tombstone = entry.copy(
                         updatedAt = now,
-                        kind = null,
+                        kind = PrivateEntryKind.Note,
                         title = "",
                         body = "",
                         pinned = false,
