@@ -9,6 +9,7 @@ function createDependencies() {
         ['call-1', {
             callId: 'call-1',
             callerId: 'alice',
+            callerName: 'Alice',
             name: 'Support',
             status: 'active',
             participants: {
@@ -38,15 +39,16 @@ function createDependencies() {
                 .map(([callId, call]) => ({
                     callId,
                     callerId: call.callerId,
-                    name: call.name,
+                    name: call.callerName || call.name,
                     status: 'pending'
                 }));
         },
-        async createCall(name, { callerId, participantIds }) {
+        async createCall(name, { callerId, callerName, participantIds }) {
             const call = {
                 callId: 'new-call',
                 name,
                 callerId,
+                callerName,
                 status: 'active',
                 participants: Object.fromEntries(
                     participantIds.map((id) => [id, { status: 'pending' }])
@@ -166,6 +168,7 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             body: JSON.stringify({
                 name: '  Product help ',
                 callerId: 'alice',
+                callerName: 'Alice',
                 participantIds: ['carol']
             })
         });
@@ -175,6 +178,7 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             callId: 'new-call',
             callerId: 'alice',
             name: 'Product help',
+            callerName: 'Alice',
             participants: [
                 { userId: 'alice', status: 'accepted' },
                 { userId: 'carol', status: 'pending' }
@@ -185,7 +189,7 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             recipientId: 'carol',
             callId: 'new-call',
             callerId: 'alice',
-            callName: 'Product help'
+            callName: 'Alice'
         }]);
 
         const invitations = await fetch(
@@ -196,7 +200,7 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
             invitations: [{
                 callId: 'new-call',
                 callerId: 'alice',
-                name: 'Product help',
+                name: 'Alice',
                 status: 'pending'
             }]
         });
@@ -431,7 +435,7 @@ test('POST /notifications/send permits the owner to invite only pending particip
         recipientId: 'carol',
         callId: 'call-1',
         callerId: 'alice',
-        callName: 'Support'
+        callName: 'Alice'
     }]);
 
     const nonOwner = await request('token-bob', 'carol');

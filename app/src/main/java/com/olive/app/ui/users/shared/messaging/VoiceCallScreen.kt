@@ -51,6 +51,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
 import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipSessionState
+import com.olive.app.data.messaging.otherPartyName
 import kotlinx.coroutines.delay
 
 private val CallBackground = Color(0xFF101A17)
@@ -116,8 +117,10 @@ internal fun ActiveCallDialog(
         VoipSessionState.Idle -> null
     }
     var elapsedSeconds by remember(call?.callId, active != null) { mutableLongStateOf(0) }
-    LaunchedEffect(active?.call?.callId) {
-        if (active == null) return@LaunchedEffect
+    val remoteJoined = active != null &&
+        (active.call.callerId != currentUid || active.remoteParticipantCount > 0)
+    LaunchedEffect(active?.call?.callId, remoteJoined) {
+        if (!remoteJoined) return@LaunchedEffect
         while (true) {
             delay(1_000)
             elapsedSeconds++
@@ -125,13 +128,15 @@ internal fun ActiveCallDialog(
     }
     val status = when (state) {
         is VoipSessionState.Connecting -> stringResource(R.string.ui_calling)
-        is VoipSessionState.Active -> formatCallDuration(elapsedSeconds)
+        is VoipSessionState.Active -> if (remoteJoined) formatCallDuration(elapsedSeconds)
+            else stringResource(R.string.ui_calling)
         is VoipSessionState.Leaving -> stringResource(R.string.ui_end_call)
         is VoipSessionState.Error -> state.message
         VoipSessionState.Idle -> ""
     }
     CallIdentity(
-        name = call?.name.orEmpty().ifBlank { stringResource(R.string.ui_voice_call) },
+        name = call?.otherPartyName(currentUid).orEmpty()
+            .ifBlank { stringResource(R.string.ui_voice_call) },
         status = status,
         isError = state is VoipSessionState.Error,
     )

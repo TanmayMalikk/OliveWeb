@@ -85,6 +85,7 @@ function toApiCall(call) {
         callId: call.callId,
         callerId: call.callerId,
         name: call.name,
+        callerName: call.callerName || call.name,
         participants: [
             { userId: call.callerId, status: 'accepted' },
             ...Object.entries(call.participants || {}).map(([userId, participant]) => ({
@@ -144,6 +145,7 @@ function createApiServer({
                 const body = await readJson(request);
                 const callerId = requireIdentifier(body.callerId, 'callerId');
                 const name = requireIdentifier(body.name, 'name');
+                const callerName = requireIdentifier(body.callerName || body.name, 'callerName');
                 if (callerId !== identity.uid) {
                     throw new ApiError(403, 'identity_mismatch', 'callerId must match the authenticated user');
                 }
@@ -173,6 +175,7 @@ function createApiServer({
 
                 const call = await callStore.createCall(name, {
                     callerId: identity.uid,
+                    callerName,
                     participantIds
                 });
                 const notificationFailures = [];
@@ -181,7 +184,7 @@ function createApiServer({
                         recipientId,
                         callId: call.callId,
                         callerId: identity.uid,
-                        callName: call.name
+                        callName: call.callerName || call.name
                     })
                 ));
                 deliveries.forEach((result, index) => {
@@ -299,7 +302,7 @@ function createApiServer({
                     recipientId,
                     callId,
                     callerId: identity.uid,
-                    callName: call.name,
+                    callName: call.callerName || call.name,
                     recipientId
                 });
                 return sendJson(response, 200, { callId, recipientId, delivery });

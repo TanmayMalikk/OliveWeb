@@ -38,6 +38,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 operationJob = null
                 idleJob?.cancel()
                 idleJob = null
+                idlePausedForCall = false
                 idleCountdownSeconds = null
                 busy = false
                 checkoutActive = false
