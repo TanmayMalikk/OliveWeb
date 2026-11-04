@@ -5,6 +5,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.Camera
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -34,6 +35,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class CameraManager(private val context: Context) {
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private var provider: ProcessCameraProvider? = null
+    private var boundCamera: Camera? = null
     private var imageCapture: ImageCapture? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var recording: Recording? = null
@@ -69,7 +71,7 @@ class CameraManager(private val context: Context) {
         cameraProvider.unbindAll()
         val selector =
             if (frontFacing) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
-        cameraProvider.bindToLifecycle(
+        boundCamera = cameraProvider.bindToLifecycle(
             lifecycleOwner,
             selector,
             preview,
@@ -77,6 +79,20 @@ class CameraManager(private val context: Context) {
             videoCapture
         )
         provider = cameraProvider
+    }
+
+    // Changes the live preview zoom and keeps the requested value inside the camera's supported range.
+    fun changeZoom(multiplier: Float): Float {
+        val activeCamera = checkNotNull(boundCamera) { "Camera not ready" }
+        val zoomState = checkNotNull(activeCamera.cameraInfo.zoomState.value) { "Camera zoom is unavailable" }
+        val requested = nextCameraZoom(
+            current = zoomState.zoomRatio,
+            minimum = zoomState.minZoomRatio,
+            maximum = zoomState.maxZoomRatio,
+            multiplier = multiplier,
+        )
+        activeCamera.cameraControl.setZoomRatio(requested)
+        return requested
     }
 
     // Takes a photo and saves it to the private capture file.
@@ -156,6 +172,7 @@ class CameraManager(private val context: Context) {
         cancelVideo()
         provider?.unbindAll()
         provider = null
+        boundCamera = null
         imageCapture = null
         videoCapture =
             null
@@ -166,4 +183,17 @@ class CameraManager(private val context: Context) {
         unbind()
         cameraExecutor.shutdown()
     }
+}
+
+// Calculates one camera zoom step without allowing invalid or unsupported values.
+internal fun nextCameraZoom(
+    current: Float,
+    minimum: Float,
+    maximum: Float,
+    multiplier: Float,
+): Float {
+    if (!current.isFinite() || !minimum.isFinite() || !maximum.isFinite() || !multiplier.isFinite()) {
+        return minimum.coerceAtLeast(1f)
+    }
+    return (current * multiplier).coerceIn(minimum, maximum)
 }

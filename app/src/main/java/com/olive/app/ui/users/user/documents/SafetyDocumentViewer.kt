@@ -21,6 +21,8 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.NavigateBefore
 import androidx.compose.material.icons.automirrored.outlined.NavigateNext
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -28,18 +30,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
 import androidx.core.graphics.createBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.R
 import com.olive.app.data.SafetyDocument
@@ -158,6 +164,16 @@ private fun ImageViewer(file: File, name: String) {
                 translationY = offsetY
             )
         )
+        ZoomControls(
+            scale = scale,
+            onZoomOut = {
+                scale = (scale / 1.25f).coerceAtLeast(1f)
+                if (scale == 1f) { offsetX = 0f; offsetY = 0f }
+            },
+            onReset = { scale = 1f; offsetX = 0f; offsetY = 0f },
+            onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
+            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+        )
     }
 }
 
@@ -166,9 +182,10 @@ private fun ImageViewer(file: File, name: String) {
 private fun VideoViewer(file: File) {
     val context = LocalContext.current
     var player by remember { mutableStateOf<VideoView?>(null) }
+    var scale by rememberSaveable(file.absolutePath) { mutableFloatStateOf(1f) }
     // Prepare and release video playback with the viewer lifecycle.
     DisposableEffect(Unit) { onDispose { player?.stopPlayback() } }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().clipToBounds(), contentAlignment = Alignment.Center) {
         AndroidView(factory = {
             VideoView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
@@ -188,7 +205,14 @@ private fun VideoViewer(file: File) {
                 }
                 player = this
             }
-        }, modifier = Modifier.fillMaxSize())
+        }, modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = scale, scaleY = scale))
+        ZoomControls(
+            scale = scale,
+            onZoomOut = { scale = (scale / 1.25f).coerceAtLeast(1f) },
+            onReset = { scale = 1f },
+            onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
+            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+        )
     }
 }
 
@@ -198,8 +222,16 @@ private data class PdfPage(val bitmap: Bitmap, val count: Int)
 @Composable
 private fun PdfViewer(file: File) {
     var page by rememberSaveable(file.absolutePath) { mutableIntStateOf(0) }
+    var scale by rememberSaveable(file.absolutePath) { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
     val rendered by produceState<PdfPage?>(null, file, page) {
         value = withContext(Dispatchers.IO) { renderPdfPage(file, page) }
+    }
+    LaunchedEffect(page) {
+        scale = 1f
+        offsetX = 0f
+        offsetY = 0f
     }
     val result = rendered
     if (result == null) Box(
@@ -207,16 +239,43 @@ private fun PdfViewer(file: File) {
         contentAlignment = Alignment.Center
     ) { CircularProgressIndicator() }
     else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Image(
-            result.bitmap.asImageBitmap(),
-            contentDescription = stringResource(
-                R.string.documents_pdf_page,
-                page + 1,
-                result.count
-            ),
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp)
-        )
+        Box(
+            Modifier.weight(1f).fillMaxWidth().clipToBounds().pointerInput(page) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(1f, 5f)
+                    offsetX += pan.x
+                    offsetY += pan.y
+                    if (scale == 1f) { offsetX = 0f; offsetY = 0f }
+                }
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                result.bitmap.asImageBitmap(),
+                contentDescription = stringResource(
+                    R.string.documents_pdf_page,
+                    page + 1,
+                    result.count
+                ),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(8.dp).graphicsLayer(
+                    scaleX = scale,
+                    scaleY = scale,
+                    translationX = offsetX,
+                    translationY = offsetY,
+                )
+            )
+            ZoomControls(
+                scale = scale,
+                onZoomOut = {
+                    scale = (scale / 1.25f).coerceAtLeast(1f)
+                    if (scale == 1f) { offsetX = 0f; offsetY = 0f }
+                },
+                onReset = { scale = 1f; offsetX = 0f; offsetY = 0f },
+                onZoomIn = { scale = (scale * 1.25f).coerceAtMost(5f) },
+                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+            )
+        }
         Row(
             Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -259,6 +318,7 @@ private fun renderPdfPage(file: File, index: Int): PdfPage {
 // user safety document viewer shows this text viewer view so the user can view its details and use its actions.
 @Composable
 private fun TextViewer(file: File, docx: Boolean) {
+    var scale by rememberSaveable(file.absolutePath) { mutableFloatStateOf(1f) }
     val content by produceState<String?>(null, file) {
         value = withContext(Dispatchers.IO) {
             runCatching {
@@ -270,11 +330,51 @@ private fun TextViewer(file: File, docx: Boolean) {
         Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) { CircularProgressIndicator() }
-    else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp)) {
-        item {
-            Text(
-                content!!
-            )
+    else Column(Modifier.fillMaxSize()) {
+        ZoomControls(
+            scale = scale,
+            onZoomOut = { scale = (scale / 1.2f).coerceAtLeast(1f) },
+            onReset = { scale = 1f },
+            onZoomIn = { scale = (scale * 1.2f).coerceAtMost(3f) },
+            modifier = Modifier.align(Alignment.End).padding(8.dp),
+        )
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(20.dp)) {
+            item {
+                Text(content!!, fontSize = (16f * scale).sp)
+            }
+        }
+    }
+}
+
+// Gives every saved-media viewer the same visible zoom buttons and current zoom level.
+@Composable
+private fun ZoomControls(
+    scale: Float,
+    onZoomOut: () -> Unit,
+    onReset: () -> Unit,
+    onZoomIn: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val resetDescription = stringResource(R.string.a11y_reset_zoom)
+    Surface(modifier, shape = MaterialTheme.shapes.extraLarge, tonalElevation = 4.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = onZoomOut,
+                enabled = scale > 1.01f,
+                modifier = Modifier.testTag("media_zoom_out"),
+            ) { Icon(Icons.Outlined.Remove, stringResource(R.string.a11y_zoom_out)) }
+            TextButton(
+                onClick = onReset,
+                modifier = Modifier.semantics { contentDescription = resetDescription }
+                    .testTag("media_zoom_reset"),
+            ) {
+                Text("${(scale * 100).toInt()}%")
+            }
+            IconButton(
+                onClick = onZoomIn,
+                enabled = scale < 4.99f,
+                modifier = Modifier.testTag("media_zoom_in"),
+            ) { Icon(Icons.Outlined.Add, stringResource(R.string.a11y_zoom_in)) }
         }
     }
 }
