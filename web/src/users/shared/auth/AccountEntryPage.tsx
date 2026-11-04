@@ -176,7 +176,7 @@ export function AuthPage({
           )}
           {!organizationOnly && (
             <div className="account-utility-links">
-              <a className="text-link" href={siteHref("/download")}>
+              <a className="text-link" href={siteHref("/get")}>
                 Download & installation <ArrowRight size={15} />
               </a>
               {!create && (

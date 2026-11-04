@@ -30,21 +30,21 @@ Firebase rule checks remain in `../firebase` (`npm test` there starts demo emula
 
 ## Production structure
 
-| Address                    | Build command            | Behavior                                                                                                                                                                                                           |
-| -------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `yourolivebranch.ca`       | `npm run build:user`     | A pathless user SPA. `/` shows the cover saved for this browser: Game, News, Food, or Fitness. Game is the default. Login, onboarding, PIN entry, and Safe App are in-memory screens and the address stays `/`. |
-| `get.yourolivebranch.ca`   | `npm run build:download` | Download and installation instructions at `/`.                                                                                                                                                                     |
-| `admin.yourolivebranch.ca` | `npm run build:admin`    | Staff and administrator sign-in and workspace at `/`. Personal and safe-contact roles are rejected here.                                                                                                           |
+| Address                    | Behavior                                       |
+| -------------------------- | ---------------------------------------------- |
+| `yourolivebranch.ca/`      | Cover apps and private user entry.             |
+| `yourolivebranch.ca/get`   | Download and installation instructions.        |
+| `yourolivebranch.ca/admin` | Staff and administrator sign-in and workspace. |
+| `voip.yourolivebranch.ca`  | Separate Firebase-authenticated VoIP API.      |
 
-The production setup uses three Hostinger Node.js Web Apps from this repository,
-one build command and domain per row. Hostinger supports this monorepo layout: set
-the **Root directory** to `web`, **Output directory** to `dist`, **Entry file** to
-`server/productionServer.mjs`, and Node.js to version 22 or 24. Use the matching
-build command from the table. The Express entry file supplies SPA fallback,
-security headers, dynamic manifests, and the same-origin news API.
+The website uses one Hostinger Node.js Web App. Set the **Root directory** to
+`web`, **Output directory** to `dist`, **Entry file** to
+`server/productionServer.mjs`, Node.js to version 22 or 24, and the build command
+to `npm run build`. The Express entry file supplies SPA fallback, security
+headers, dynamic manifests, and the same-origin APIs.
 
-All three deployments use the same Firebase project and public web configuration.
-Add the values from `.env.example` in each Hostinger Web App's **Environment
+The main deployment uses the shared Firebase project and public web configuration.
+Add the values from `.env.example` in its Hostinger **Environment
 variables** screen. Variables beginning with `VITE_` are intentionally compiled
 into browser JavaScript and must never contain service-account JSON, private keys,
 FatSecret credentials, signing keys, passwords, or other server authorization.
@@ -54,10 +54,9 @@ the public web source.
 
 Hostinger Business/Unlimited or Cloud hosting is required for this Node.js setup.
 A static-only plan can display the built React pages, but the News cover API and
-dynamic manifests will not work. Add `yourolivebranch.ca`,
-`get.yourolivebranch.ca`, and `admin.yourolivebranch.ca` as separate Web Apps;
-each counts as one Hostinger Node.js website. Enable automatic GitHub deployment
-only after the production branch and environment variables are confirmed.
+dynamic manifests will not work. Create one additional Node app rooted at
+`website/voip-library` for `voip.yourolivebranch.ca`. Enable automatic GitHub
+deployment only after the production branch and environment variables are confirmed.
 
 The four user covers are states of the first SPA, rather than pages or subdomains.
 The chosen cover is saved in the browser enrollment/profile. Two people can open
@@ -72,15 +71,13 @@ removed from the address bar. Personal entry links arrive as
 `https://yourolivebranch.ca/entry#<random-token>`; both the path and fragment are
 replaced with `/` as soon as the app reads them.
 
-### Shared code, multiple website addresses
+### Shared code, one website address
 
-`site.config.json` is the address map shared by the three builds, Quick Exit,
-personal links, and PWA manifests. `VITE_SITE_MODE` is committed through
-`.env.user`, `.env.download`, and `.env.admin`; Hostinger may also set it explicitly.
-Configure all three domains as Firebase authorized domains and configure Storage
-CORS before enabling them. Browser storage stays origin-specific, so account
-enrollment lives on the main domain while the public download and admin sites keep
-their own sessions/storage.
+`site.config.json` keeps the main origin, `/get`, `/admin`, VoIP origin, cover
+paths, Quick Exit, personal links, and PWA manifests together. No
+`VITE_SITE_MODE` variable is used. Configure `yourolivebranch.ca` as the Firebase
+authorized web domain and Storage/R2 CORS origin. All browser pages share the
+same origin, Firebase session, and browser storage.
 
 The Android UI remains Kotlin in `app`; shared web UI is React in `web/src`.
 There are no duplicated React applications or separate cover repositories.

@@ -146,13 +146,14 @@ function Cover() {
   const s = useSession();
   const [accountOpen, setAccountOpen] = useState(false);
   const lastOliveTap = useRef(0);
-  const coverLabel = s.cover === "FOOD"
-    ? "Olive"
-    : s.cover === "NEWS"
-      ? "Daily Digest"
-      : s.cover === "FITNESS"
-        ? "Fitness"
-        : "Game";
+  const coverLabel =
+    s.cover === "FOOD"
+      ? "Olive"
+      : s.cover === "NEWS"
+        ? "Daily Digest"
+        : s.cover === "FITNESS"
+          ? "Fitness"
+          : "Game";
   const tapOlive = () => {
     const now = Date.now();
     if (now - lastOliveTap.current > 1500) {
@@ -167,15 +168,36 @@ function Cover() {
       id="main"
       className={`cover-container ${s.cover.toLowerCase()}-cover`}
     >
-      <nav className="cover-account-tabs" role="tablist" aria-label={`${coverLabel} app pages`}>
-        <button type="button" role="tab" aria-selected={!accountOpen} aria-controls="cover-display-panel" onClick={() => setAccountOpen(false)}>
+      <nav
+        className="cover-account-tabs"
+        role="tablist"
+        aria-label={`${coverLabel} app pages`}
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={!accountOpen}
+          aria-controls="cover-display-panel"
+          onClick={() => setAccountOpen(false)}
+        >
           {coverLabel}
         </button>
-        <button type="button" role="tab" aria-selected={accountOpen} aria-controls="cover-account-panel" onClick={() => setAccountOpen(true)}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={accountOpen}
+          aria-controls="cover-account-panel"
+          onClick={() => setAccountOpen(true)}
+        >
           Account
         </button>
       </nav>
-      <div id="cover-display-panel" className="cover-tab-panel" role="tabpanel" hidden={accountOpen}>
+      <div
+        id="cover-display-panel"
+        className="cover-tab-panel"
+        role="tabpanel"
+        hidden={accountOpen}
+      >
         {s.cover === "FOOD" ? (
           <Food />
         ) : s.cover === "NEWS" ? (
@@ -186,13 +208,24 @@ function Cover() {
           <Game />
         )}
       </div>
-      <section id="cover-account-panel" className="cover-account-panel" role="tabpanel" aria-label="Account" hidden={!accountOpen}>
-          <span className="eyebrow">ACCOUNT</span>
-          <h1>Your account.</h1>
-          <p>Account access and private settings.</p>
-          <button type="button" className="cover-hidden-olive" aria-label="olive icon" onClick={tapOlive}>
-            <Leaf aria-hidden="true" />
-          </button>
+      <section
+        id="cover-account-panel"
+        className="cover-account-panel"
+        role="tabpanel"
+        aria-label="Account"
+        hidden={!accountOpen}
+      >
+        <span className="eyebrow">ACCOUNT</span>
+        <h1>Your account.</h1>
+        <p>Account access and private settings.</p>
+        <button
+          type="button"
+          className="cover-hidden-olive"
+          aria-label="olive icon"
+          onClick={tapOlive}
+        >
+          <Leaf aria-hidden="true" />
+        </button>
       </section>
     </main>
   );
@@ -241,7 +274,7 @@ function Routes({ mode }: { mode: SiteMode }) {
   else if (s.phase === "setup") content = <Setup />;
   else if (s.phase === "link") content = <EntryLink />;
   else if (s.phase === "pin") content = <PinGate />;
-  else if (s.path === "/download") content = <Download />;
+  else if (s.path === "/get") content = <Download />;
   else if (s.path.startsWith("/account")) content = <AuthPage />;
   else content = <Cover />;
   return (
@@ -301,7 +334,11 @@ const hostedSetupProblems = [
     "VITE_USE_FIREBASE_EMULATORS must be false",
 ].filter(Boolean);
 // Hosted private sites must use shared Firebase accounts; local browser accounts cannot sync to phones.
-if (import.meta.env.PROD && mode !== "download" && hostedSetupProblems.length > 0) {
+if (
+  import.meta.env.PROD &&
+  mode !== "download" &&
+  hostedSetupProblems.length > 0
+) {
   createRoot(document.getElementById("root")!).render(
     <main className="error-page" id="main">
       <h1>Account service needs setup.</h1>

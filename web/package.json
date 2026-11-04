@@ -10,10 +10,6 @@
     "dev": "node server/developmentServer.mjs",
     "security:check": "node scripts/check-public-secrets.mjs",
     "build": "npm run security:check && tsc -b && vite build",
-    "build:user": "npm run security:check && tsc -b && vite build --mode user",
-    "build:download": "npm run security:check && tsc -b && vite build --mode download",
-    "build:admin": "npm run security:check && tsc -b && vite build --mode admin",
-    "postinstall": "npm run build:user",
     "start": "node server/productionServer.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test"

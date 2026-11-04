@@ -1,7 +1,8 @@
 {
   "publicOrigin": "https://yourolivebranch.ca",
-  "downloadOrigin": "https://get.yourolivebranch.ca",
-  "adminOrigin": "https://admin.yourolivebranch.ca",
+  "downloadPath": "/get",
+  "adminPath": "/admin",
+  "voipOrigin": "https://voip.yourolivebranch.ca",
   "covers": [
     {
       "id": "FOOD",

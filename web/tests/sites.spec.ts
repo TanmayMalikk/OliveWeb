@@ -1,6 +1,23 @@
 // Tests domain routing for public visitors and signed-in users.
 import { expect, test } from "@playwright/test";
 
+// The download and organization pages use paths on the main website instead of separate subdomains.
+test("download and organization pages open from the main website", async ({
+  page,
+}) => {
+  await page.goto("/get");
+  await expect(
+    page.getByRole("heading", { name: "Make a little room on your screen." }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/get$/);
+
+  await page.goto("/admin");
+  await expect(
+    page.getByRole("option", { name: "Organization staff" }),
+  ).toBeAttached();
+  await expect(page).toHaveURL(/\/admin$/);
+});
+
 // Inputs: the values in this case. Expected: short cover URLs and legacy bookmarks open the same cover with the right install identity.
 test("short cover URLs and legacy bookmarks open the same cover with the right install identity", async ({
   page,
@@ -37,9 +54,9 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
   await expect(
     page.getByRole("button", { name: "Nature Pairs", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.locator('a[href$="/account"],a[href$="/download"]'),
-  ).toHaveCount(0);
+  await expect(page.locator('a[href$="/account"],a[href$="/get"]')).toHaveCount(
+    0,
+  );
   await page.getByRole("tab", { name: "Account", exact: true }).click();
   await page.getByRole("button", { name: "olive icon", exact: true }).click({
     clickCount: 2,
