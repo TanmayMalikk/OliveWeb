@@ -27,10 +27,8 @@ These values last only for the current PowerShell window.
 $env:OLIVE_LOAD_TEST_PROJECT_ID="olive-21239"
 $env:OLIVE_LOAD_TEST_CONFIRM_PROJECT="olive-21239"
 $env:OLIVE_LOAD_TEST_DATABASE_URL="https://olive-21239-default-rtdb.firebaseio.com"
-$env:OLIVE_LOAD_TEST_PASSWORD="YOUR_TEST_PASSWORD"
+$env:OLIVE_LOAD_TEST_PASSWORD="demopass1!"
 ```
-
-Use quotation marks around the password. Replace `YOUR_TEST_PASSWORD` with the shared password for the fictional accounts.
 
 ## 4. Deploy the Admin map permissions
 

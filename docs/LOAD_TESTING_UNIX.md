@@ -37,10 +37,8 @@ These values last only for the current terminal window.
 export OLIVE_LOAD_TEST_PROJECT_ID="olive-21239"
 export OLIVE_LOAD_TEST_CONFIRM_PROJECT="olive-21239"
 export OLIVE_LOAD_TEST_DATABASE_URL="https://olive-21239-default-rtdb.firebaseio.com"
-export OLIVE_LOAD_TEST_PASSWORD="YOUR_TEST_PASSWORD"
+export OLIVE_LOAD_TEST_PASSWORD="demopass1!"
 ```
-
-Keep quotation marks around the password. Replace `YOUR_TEST_PASSWORD` with the shared password for the fictional accounts.
 
 ## 5. Deploy the Admin map permissions
 
