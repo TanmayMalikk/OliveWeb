@@ -17,7 +17,6 @@
     <string name="entry_confirm_setup">Confirma tu identidad para configurar el acceso seguro.</string>
     <string name="entry_unlock_description">Confirma tu identidad con Android para desbloquear el área segura.</string>
     <string name="entry_unlock">Desbloquear con el dispositivo</string>
-    <string name="entry_use_phone_lock">Usar bloqueo del teléfono</string>
     <string name="entry_auth_failed">No se pudo verificar la autenticación de Android. El acceso sigue bloqueado. Inténtalo de nuevo o inicia sesión para configurar otra vez el acceso seguro.</string>
     <string name="entry_auth_cancelled">Autenticación cancelada o no disponible. El acceso sigue bloqueado.</string>
 <string name="entry_verify_trigger">Confirma con el bloqueo del dispositivo para cambiar la palabra de acceso.</string>

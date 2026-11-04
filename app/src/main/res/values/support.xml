@@ -23,6 +23,9 @@
     <string name="support_staff_search_help">Olive Branch will securely connect you with an available staff member.</string>
     <string name="support_cancel_staff_request">Cancel request</string>
     <string name="support_emergency">Emergency</string>
+    <string name="emergency_report_creating">Creating emergency PDF…</string>
+    <string name="emergency_report_saved">Emergency PDF added to Documents for secure upload.</string>
+    <string name="emergency_report_failed">The emergency PDF could not be created. Check your connection and try again.</string>
     <string name="support_hotlines">Hotline resources</string>
     <string name="support_coming_soon">%1$s · Coming soon</string>
     <string name="support_safety_plan">Safety plan</string>

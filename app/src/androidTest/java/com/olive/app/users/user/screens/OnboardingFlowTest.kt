@@ -226,6 +226,9 @@ class OnboardingFlowTest : OliveUiTestBase() {
                 PrivateEntryKind.Incident,
                 "Private incident",
                 "Updated private incident details",
+                "2026-11-02",
+                "about 13:00",
+                "Edmonton, Alberta",
             )
         }
         compose.waitUntil(30_000) {

@@ -25,12 +25,19 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
     }
 
     // Creates or updates one encrypted private note.
-    fun savePrivateEntry(id: String?, kind: PrivateEntryKind?, title: String, body: String) {
+    fun savePrivateEntry(
+        id: String?, kind: PrivateEntryKind, title: String, body: String,
+        incidentDate: String, incidentTime: String, incidentLocation: String,
+        incidentLatitude: Double?, incidentLongitude: Double?, attachmentIds: List<String>,
+    ) {
         with(runtime) {
             with(state) {
                 if (screen != SessionScreen.Safe || page != SafePage.Notes || busy) return
                 val cleanTitle = title.trim()
                 val cleanBody = body.trim()
+                val cleanDate = incidentDate.trim()
+                val cleanTime = incidentTime.trim()
+                val cleanLocation = incidentLocation.trim()
                 if (cleanBody.isBlank()) {
                     message =
                         runtime.application.getString(R.string.write_something_before_saving)
@@ -39,6 +46,11 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                 if (cleanTitle.length > 120 || cleanBody.length > 10_000) {
                     message =
                         runtime.application.getString(R.string.use_up_to_120_title_characters_and_10_000_detail_characters)
+                    return
+                }
+                if (kind == PrivateEntryKind.Incident &&
+                    (cleanTitle.isBlank() || cleanDate.isBlank() || cleanLocation.isBlank())) {
+                    message = runtime.application.getString(R.string.incident_required_fields)
                     return
                 }
                 val uid = enrollment?.uid ?: return
@@ -50,9 +62,13 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                         fun changed(field: String, before: String, after: String) {
                             if (before != after) add(FieldChange(field, before, after))
                         }
-                        changed("Tag", old.kind?.name ?: "No tag", kind?.name ?: "No tag")
+                        changed("Tag", old.kind.name, kind.name)
                         changed("Title", old.title, cleanTitle)
                         changed("Details", old.body, cleanBody)
+                        changed("Incident date", old.incidentDate, cleanDate)
+                        changed("Approximate time", old.incidentTime, cleanTime)
+                        changed("Incident location", old.incidentLocation, cleanLocation)
+                        changed("Attachments", old.attachmentIds.joinToString(), attachmentIds.distinct().joinToString())
                     }
                 }.orEmpty()
                 if (existing != null && changes.isEmpty()) {
@@ -67,6 +83,12 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                     kind = kind,
                     title = cleanTitle,
                     body = cleanBody,
+                    incidentDate = if (kind == PrivateEntryKind.Incident) cleanDate else "",
+                    incidentTime = if (kind == PrivateEntryKind.Incident) cleanTime else "",
+                    incidentLocation = if (kind == PrivateEntryKind.Incident) cleanLocation else "",
+                    incidentLatitude = if (kind == PrivateEntryKind.Incident) incidentLatitude else null,
+                    incidentLongitude = if (kind == PrivateEntryKind.Incident) incidentLongitude else null,
+                    attachmentIds = attachmentIds.distinct().take(20),
                     pinned = existing?.pinned ?: false,
                     edits = existing?.edits.orEmpty() + if (existing == null) emptyList() else listOf(
                         PrivateEntryEdit(timestamp = now, changes = changes)

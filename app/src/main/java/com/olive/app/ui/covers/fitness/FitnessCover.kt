@@ -8,6 +8,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
@@ -50,14 +52,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -97,6 +110,16 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     var snapshot by remember(store) { mutableStateOf(store.snapshot()) }
     val history = remember(store, snapshot) { store.history(days = 14) }
     var page by remember { mutableStateOf(FitnessPage.HOME) }
+    val pageFocus = remember { FocusRequester() }
+    val pageLabel = when (page) {
+        FitnessPage.HOME -> stringResource(R.string.home)
+        FitnessPage.ACTIVITY -> stringResource(R.string.activity)
+        FitnessPage.VITALS -> stringResource(R.string.fitness_vitals)
+        FitnessPage.NUTRITION -> stringResource(R.string.nutrition)
+        FitnessPage.FOOD_SEARCH -> stringResource(R.string.find_food)
+        FitnessPage.GOALS -> stringResource(R.string.fitness_goals)
+        FitnessPage.ACCOUNT -> stringResource(R.string.settings)
+    }
 
     FitnessStepSensor(store) { snapshot = it }
     // Load fitness history and watch data when the cover becomes active.
@@ -116,6 +139,21 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         snapshot = store.snapshot()
         page = FitnessPage.HOME
     }
+    // Back returns from a fitness submenu or section before it is allowed to leave the cover app.
+    BackHandler(enabled = interactive) {
+        page = when (page) {
+            FitnessPage.FOOD_SEARCH -> FitnessPage.NUTRITION
+            FitnessPage.HOME -> FitnessPage.HOME
+            else -> FitnessPage.HOME
+        }
+    }
+    // Announce the new fitness page from its heading after a navigation tab is selected.
+    LaunchedEffect(page) {
+        if (page !in setOf(FitnessPage.ACCOUNT, FitnessPage.GOALS, FitnessPage.FOOD_SEARCH)) {
+            withFrameNanos { }
+            pageFocus.requestFocus()
+        }
+    }
 
     if (page == FitnessPage.ACCOUNT) {
         CoverSettingsPage(session) { page = FitnessPage.HOME }
@@ -129,6 +167,8 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         ) {
             FitnessHeader(
                 page = page,
+                pageLabel = pageLabel,
+                pageFocus = pageFocus,
                 enabled = interactive,
                 onPage = { page = it },
                 onSettings = { page = FitnessPage.ACCOUNT },
@@ -180,10 +220,13 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
 @Composable
 private fun FitnessHeader(
     page: FitnessPage,
+    pageLabel: String,
+    pageFocus: FocusRequester,
     enabled: Boolean,
     onPage: (FitnessPage) -> Unit,
     onSettings: () -> Unit,
 ) {
+    val trackerLabel = stringResource(R.string.fitness_tracker)
     Column(Modifier.padding(horizontal = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             Modifier.fillMaxWidth(),
@@ -191,9 +234,14 @@ private fun FitnessHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                stringResource(R.string.fitness_tracker),
+                trackerLabel,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("fitness_page_title").focusRequester(pageFocus).focusable().semantics {
+                    heading()
+                    paneTitle = pageLabel
+                    contentDescription = "$pageLabel, $trackerLabel"
+                },
             )
             Box(
                 Modifier.size(44.dp).clip(CircleShape).background(PaleOlive),
@@ -261,7 +309,15 @@ private fun FitnessTab(
                 enabled = enabled,
                 role = Role.Tab,
                 onClick = onClick,
-            ).padding(vertical = 8.dp),
+            ).clearAndSetSemantics {
+                contentDescription = label
+                role = Role.Tab
+                this.selected = selected
+                onClick(label) {
+                    onClick()
+                    true
+                }
+            }.padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -339,6 +395,7 @@ private fun FitnessActivityPage(
                     stringResource(R.string.activity),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(
                     stringResource(R.string.activity_message),
@@ -361,6 +418,7 @@ private fun FitnessGoalsPage(
     padding: PaddingValues,
     onSave: (FitnessProfile) -> Unit,
 ) {
+    val headingFocus = remember { FocusRequester() }
     var weight by remember(profile) { mutableStateOf(profile.weightKg.roundToInt().toString()) }
     var height by remember(profile) { mutableStateOf(profile.heightCm.roundToInt().toString()) }
     var steps by remember(profile) { mutableStateOf(profile.stepGoal.toString()) }
@@ -368,6 +426,11 @@ private fun FitnessGoalsPage(
     var protein by remember(profile) { mutableStateOf(profile.proteinGoal.toString()) }
     var carbohydrates by remember(profile) { mutableStateOf(profile.carbohydrateGoal.toString()) }
     var fat by remember(profile) { mutableStateOf(profile.fatGoal.toString()) }
+    // Move TalkBack to the goals heading after the submenu opens.
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        headingFocus.requestFocus()
+    }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     LazyColumn(
         Modifier.fillMaxSize().padding(padding).oliveScrollbar(listState),
@@ -375,7 +438,13 @@ private fun FitnessGoalsPage(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { Text(stringResource(R.string.fitness_goals), style = MaterialTheme.typography.headlineSmall) }
+        item {
+            Text(
+                stringResource(R.string.fitness_goals),
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.focusRequester(headingFocus).focusable().semantics { heading() },
+            )
+        }
         item { GoalField(weight, { weight = it }, stringResource(R.string.weight_kg), enabled) }
         item { GoalField(height, { height = it }, stringResource(R.string.height_cm), enabled) }
         item { GoalField(steps, { steps = it }, stringResource(R.string.daily_step_goal), enabled) }

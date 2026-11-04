@@ -85,7 +85,7 @@ function normalizedRole(value) {
   return role;
 }
 
-// Chooses a real organization email or creates an internal Firebase sign-in alias.
+// Uses the alias chosen by an admin, or gives staff and admins the standard Olive Branch alias.
 function signInEmail(username, role, suppliedEmail = "") {
   const email = text(suppliedEmail, 254).toLowerCase();
   if ((role === "STAFF" || role === "ADMIN") && email) {
@@ -97,9 +97,12 @@ function signInEmail(username, role, suppliedEmail = "") {
   const domain = {
     USER: "users",
     SAFE_CONTACT: "safe",
-    STAFF: "staff",
-    ADMIN: "admin",
+    STAFF: null,
+    ADMIN: null,
   }[role];
+  if (role === "STAFF" || role === "ADMIN") {
+    return `${username}@yourolivebranch.ca`;
+  }
   return `${username}@${domain}.olive.invalid`;
 }
 

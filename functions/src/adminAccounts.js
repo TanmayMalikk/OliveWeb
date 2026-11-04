@@ -32,19 +32,32 @@ exports.adminCreateAccount = onCall(async (request) => {
   const role = normalizedRole(input.role);
   const password = String(input.password || "");
   if (!validPassword(password, username)) throw new HttpsError("invalid-argument", "Temporary password must use 8–24 characters with a letter, number, and special character and must not contain the username.");
-  // Staff and Admin always keep their username alias in Firebase Auth. Their real email belongs in the private profile.
-  const authEmail = signInEmail(username, role);
-  const profileEmail = (role === "STAFF" || role === "ADMIN") && text(input.email, 254) ? signInEmail(username, role, input.email) : authEmail;
+  // An admin may choose an organization login alias only while creating the account.
+  const requestedAlias = role === "STAFF" || role === "ADMIN" ? text(input.email, 254) : "";
+  const authEmail = signInEmail(username, role, requestedAlias);
+  const profileEmail = requestedAlias ? authEmail : "";
   const directory = db.collection("accountDirectory").doc(username);
   if (await usernameExistsGlobally(username)) throw new HttpsError("already-exists", "That username is already in use.");
   let created;
   try {
-    created = await auth.createUser({email: authEmail, password, displayName: username, emailVerified: isTemporaryEmail(authEmail)});
+    // Managed aliases are approved by the creating admin, so support assignment can use the account immediately.
+    created = await auth.createUser({
+      email: authEmail,
+      password,
+      displayName: username,
+      emailVerified: role === "STAFF" || role === "ADMIN" || isTemporaryEmail(authEmail),
+    });
     await auth.setCustomUserClaims(created.uid, {role});
     const profile = defaultProfile(username, role, input, profileEmail);
     await writeProfile(created.uid, profile);
-    await directory.create({uid: created.uid, username, role, createdAt: FieldValue.serverTimestamp()});
-    await saveOrganizationLogin(created.uid, username, role, profile.email);
+    await directory.create({
+      uid: created.uid,
+      username,
+      role,
+      ...(role === "STAFF" || role === "ADMIN" ? {loginAlias: authEmail} : {}),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    await saveOrganizationLogin(created.uid, username, role, profile.email, authEmail);
     return {uid: created.uid, username, role, email: authEmail, profileComplete: profileComplete(role, profile)};
   } catch (error) {
     const directoryOwner = await directory.get().catch(() => null);

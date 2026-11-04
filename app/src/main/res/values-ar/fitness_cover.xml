@@ -57,6 +57,7 @@
         <item quantity="other">مخطط %1$s لمدة %2$d يوم.</item>
     </plurals>
     <string name="fitness_chart_latest">أحدث قيمة لـ %1$s هي %2$s %3$s.</string>
+    <string name="fitness_chart_average">متوسط %1$s هو %2$s %3$s.</string>
     <string name="fitness_calories_burned">المحروقة</string>
     <string name="fitness_calories_eaten">المتناولة</string>
     <string name="fitness_macros">العناصر الكبرى</string>
@@ -93,6 +94,8 @@
     <string name="fitness_vitals_no_data">— لا توجد بيانات —</string>
     <string name="fitness_vitals_range">%1$d–%2$d نبضة/دقيقة</string>
     <string name="fitness_vitals_average">متوسط معدل نبض القلب %1$d نبضة/دقيقة</string>
+    <string name="fitness_previous_day">عرض اليوم السابق</string>
+    <string name="fitness_next_day">عرض اليوم التالي</string>
     <string name="fitness_outdoor_workout">تمرين خارجي</string>
     <string name="fitness_outdoor_workout_description">تتبّع مسار GPS والمسافة والوقت والوتيرة بشكل خاص.</string>
     <string name="fitness_start_outdoor_workout">بدء تمرين خارجي</string>

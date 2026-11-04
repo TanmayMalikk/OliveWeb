@@ -17,7 +17,6 @@
     <string name="entry_confirm_setup">أكد هويتك لإعداد الدخول الآمن.</string>
     <string name="entry_unlock_description">أكد هويتك باستخدام Android لفتح المساحة الآمنة.</string>
     <string name="entry_unlock">فتح باستخدام قفل الجهاز</string>
-    <string name="entry_use_phone_lock">استخدام قفل شاشة الهاتف</string>
     <string name="entry_auth_failed">تعذر التحقق من مصادقة Android. يظل الدخول مقفلًا. حاول مجددًا أو سجل الدخول لإعداد الدخول الآمن من جديد.</string>
     <string name="entry_auth_cancelled">ألغيت المصادقة أو إنها غير متاحة. يظل الدخول مقفلًا.</string>
 <string name="entry_verify_trigger">أكد هويتك بقفل الجهاز لتغيير كلمة الدخول.</string>

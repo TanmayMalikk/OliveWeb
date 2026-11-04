@@ -50,9 +50,15 @@ export interface Entry {
   id: string;
   timestamp: number;
   updatedAt: number;
-  kind: "Note" | "Incident" | null;
+  kind: "Note" | "Incident";
   title: string;
   body: string;
+  incidentDate?: string;
+  incidentTime?: string;
+  incidentLocation?: string;
+  incidentLatitude?: number;
+  incidentLongitude?: number;
+  attachmentIds?: string[];
   pinned: boolean;
   edits: {
     id: string;
@@ -180,7 +186,9 @@ export const validPin = (v: string) => /^\d{4,6}$/.test(v);
 export function signInEmail(username: string, role: Role) {
   if ((role === "STAFF" || role === "ADMIN") && username.includes("@"))
     return username.trim().toLowerCase();
-  return `${normalizeUsername(username)}@${{ USER: "users", SAFE_CONTACT: "safe", STAFF: "staff", ADMIN: "admin" }[role]}.olive.invalid`;
+  if (role === "STAFF" || role === "ADMIN")
+    return `${normalizeUsername(username)}@yourolivebranch.ca`;
+  return `${normalizeUsername(username)}@${{ USER: "users", SAFE_CONTACT: "safe" }[role]}.olive.invalid`;
 }
 export const emptyHistory = (): History => ({
   settings: [],

@@ -35,7 +35,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
@@ -49,6 +49,12 @@ import kotlin.math.roundToInt
 @Composable
 internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val summaryDescription = buildString {
+        append(stringResource(R.string.today_summary))
+        append(". ${snapshot.stepsToday} ${stringResource(R.string.steps_today)}. ")
+        append("${snapshot.nutrition.calories.displayAmount()} ${stringResource(R.string.calories)}. ")
+        append("${snapshot.nutrition.proteinGrams.displayAmount()} ${stringResource(R.string.protein)}.")
+    }
     LazyColumn(
         Modifier.fillMaxSize().oliveScrollbar(listState).testTag("fitness_home"),
         state = listState,
@@ -66,6 +72,7 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
             Box(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
                     .background(Brush.linearGradient(listOf(FitnessAccent, FitnessHeroEnd)))
+                    .clearAndSetSemantics { contentDescription = summaryDescription }
                     .padding(22.dp),
             ) {
                 Column(
@@ -130,7 +137,16 @@ private fun RowScope.HeroMetric(value: String, label: String) {
 @Composable
 private fun StepSummaryCard(snapshot: FitnessSnapshot) {
     val progress = (snapshot.stepsToday.toFloat() / snapshot.profile.stepGoal).coerceIn(0f, 1f)
+    val description = buildString {
+        append("${stringResource(R.string.steps_today)}, ${snapshot.stepsToday}. ")
+        append("${stringResource(R.string.daily_step_goal)}, ${snapshot.profile.stepGoal}. ")
+        append("${stringResource(R.string.distance)}, ")
+        append("${FitnessMath.distanceKm(snapshot.stepsToday, snapshot.profile.heightCm).displayAmount()} km. ")
+        append("${stringResource(R.string.active_calories)}, ")
+        append("${FitnessMath.walkingCalories(snapshot.stepsToday, snapshot.profile).displayAmount()} kcal.")
+    }
     Card(
+        modifier = Modifier.clearAndSetSemantics { contentDescription = description },
         shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = FitnessSurface),
     ) {
@@ -191,7 +207,7 @@ private fun StepSummaryCard(snapshot: FitnessSnapshot) {
 private fun RowScope.ActivityMiniMetric(value: String, label: String) {
     Column(
         Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(FitnessWarmCard)
-            .semantics(mergeDescendants = true) { contentDescription = "$label, $value" }
+            .clearAndSetSemantics { contentDescription = "$label, $value" }
             .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

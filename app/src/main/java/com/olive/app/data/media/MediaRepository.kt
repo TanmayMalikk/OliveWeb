@@ -34,6 +34,8 @@ interface MediaTicketDataSource {
     ):CloudMediaRecord
     /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
     suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
+    /** Changes the owner's evidence label without changing or decrypting file contents. */
+    suspend fun updateEvidence(mediaId:String,evidence:Boolean)
     /** Deletes both the owner's R2 object and its Firestore metadata through trusted code. */
     suspend fun deleteMedia(mediaId:String)
 }
@@ -118,6 +120,11 @@ class MediaRepository(
         require(deviceWrappedKeys.isNotEmpty() && deviceWrappedKeys.size<=50)
         return call("mediaUpdateDeviceKeys",mapOf("mediaId" to mediaId,
             "deviceWrappedKeys" to deviceWrappedKeys)).record()
+    }
+
+    // Updates the evidence label through the owner-only media function.
+    override suspend fun updateEvidence(mediaId:String,evidence:Boolean) {
+        call("mediaUpdateEvidence", mapOf("mediaId" to mediaId, "evidence" to evidence))
     }
 
     // Removes media for media.

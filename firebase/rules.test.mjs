@@ -386,6 +386,23 @@ test('encrypted live coordinates are overwritten by their owner and readable onl
   await assertSucceeds(remove(ref(owner,trailPath)));
 });
 
+test('organization locations are written by users and readable only by admins', async () => {
+  const user=env.authenticatedContext('map-user',{role:'USER'}).database();
+  const admin=env.authenticatedContext('map-admin',{role:'ADMIN'}).database();
+  const staff=env.authenticatedContext('map-staff',{role:'STAFF'}).database();
+  const safeContact=env.authenticatedContext('map-safe',{role:'SAFE_CONTACT'}).database();
+  const path='adminLiveLocations/map-user';
+  const point={name:'Map User',latitude:53.5461,longitude:-113.4938,accuracy:8,
+    updatedAt:Date.now(),active:true};
+  await assertSucceeds(set(ref(user,path),point));
+  await assertSucceeds(get(ref(admin,'adminLiveLocations')));
+  await assertFails(get(ref(staff,'adminLiveLocations')));
+  await assertFails(get(ref(safeContact,'adminLiveLocations')));
+  await assertFails(set(ref(admin,path),point));
+  await assertFails(set(ref(user,path),{...point,latitude:91}));
+  await assertFails(set(ref(user,path),{...point,extra:'not allowed'}));
+});
+
 test('encrypted private entries are restricted to wrapped-key recipients', async () => {
   const owner=env.authenticatedContext('entry-owner').firestore();
   const recipient=env.authenticatedContext('entry-recipient').firestore();
