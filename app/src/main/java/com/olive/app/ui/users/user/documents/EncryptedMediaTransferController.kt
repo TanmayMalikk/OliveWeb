@@ -48,6 +48,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import org.json.JSONArray
 
 internal interface MediaTransferOperations {
     // Watches pending uploads for this account and reports progress to the screen.
@@ -57,12 +58,14 @@ internal interface MediaTransferOperations {
     // Adds document metadata to the user's encrypted document list.
     fun queueDocument(
         uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
+        tags:Set<String> = emptySet(),
         onQueued:(String)->Unit,onFailure:(String)->Unit,
     )
     // Encrypts the selected file and queues its upload.
     fun queueFile(
         file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
         ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
+        tags:Set<String> = emptySet(),
         onQueued:(String)->Unit,onFailure:(String)->Unit,
     )
     // Downloads, checks, and decrypts one allowed media file.
@@ -178,6 +181,7 @@ internal class MediaTransferController(
      */
     override fun queueDocument(
         uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
+        tags:Set<String>,
         onQueued:(String)->Unit,onFailure:(String)->Unit,
     ) {
         // Do not upload a low-confidence scan until the user chooses Retake or Save anyway.
@@ -189,7 +193,7 @@ internal class MediaTransferController(
         }
         scope.launch {
             state=MediaTransferState.Preparing("encrypting")
-            runCatching { withContext(Dispatchers.IO) { prepareUri(uri,owner,ocrReview) } }
+            runCatching { withContext(Dispatchers.IO) { prepareUri(uri,owner,ocrReview,tags) } }
                 .onSuccess { job ->
                     store.write(job)
                     MediaUploadWorker.enqueue(applicationContext,job.id)
@@ -209,6 +213,7 @@ internal class MediaTransferController(
     override fun queueFile(
         file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
         ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
+        tags:Set<String>,
         onQueued:(String)->Unit,onFailure:(String)->Unit,
     ) {
         if(ocrReview==OcrReview.RETAKE_RECOMMENDED) {
@@ -221,7 +226,7 @@ internal class MediaTransferController(
             state=MediaTransferState.Preparing("encrypting")
             runCatching { withContext(Dispatchers.IO) {
                 require(file.isFile && file.length()>0) { "Media source is empty" }
-                prepare(file.inputStream(),name,mimeType,owner,kind,ocrReview,ocr)
+                prepare(file.inputStream(),name,mimeType,owner,kind,ocrReview,ocr,tags)
             } }.onSuccess { job ->
                 store.write(job)
                 MediaUploadWorker.enqueue(applicationContext,job.id)
@@ -424,7 +429,9 @@ internal class MediaTransferController(
     }
 
     /** Resolves picker metadata, then hands the stream to the shared preparation pipeline. */
-    private fun prepareUri(uri:Uri,owner:AccountIdentity,ocrReview:OcrReview):MediaUploadJob {
+    private fun prepareUri(
+        uri:Uri, owner:AccountIdentity, ocrReview:OcrReview, tags:Set<String>
+    ):MediaUploadJob {
         val resolver=applicationContext.contentResolver
         val mime=resolver.getType(uri)?.take(120)?.ifBlank { null } ?: "application/octet-stream"
         val name=resolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use { cursor ->
@@ -433,7 +440,10 @@ internal class MediaTransferController(
         // This entry point is domain-specific: an image selected here represents a
         // photographed/scanned document and therefore participates in OCR review.
         val kind=MediaKind.DOCUMENT
-        return prepare(resolver.openInputStream(uri) ?: error("Unable to read the selected file"),name,mime,owner,kind,ocrReview)
+        return prepare(
+            resolver.openInputStream(uri) ?: error("Unable to read the selected file"),
+            name,mime,owner,kind,ocrReview,tags=tags
+        )
     }
 
     /**
@@ -443,6 +453,7 @@ internal class MediaTransferController(
     private fun prepare(
         input:InputStream,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,ocrReview:OcrReview,
         ocr:DocumentOcrMetadata?=null,
+        tags:Set<String> = emptySet(),
     ):MediaUploadJob {
         val jobId=UUID.randomUUID().toString()
         val folder=File(applicationContext.noBackupFilesDir,"media-outbox").apply { mkdirs() }
@@ -463,6 +474,8 @@ internal class MediaTransferController(
                 put("mimeType", processedMimeType.take(120))
                 put("kind", kind.name)
                 put("ocrReview", ocrReview.name)
+                put("tags", JSONArray(tags.map(String::trim).filter(String::isNotBlank)
+                    .map { it.take(80) }.distinct().take(20)))
                 ocr?.let {
                     put("ocrText",it.text.take(MAX_OCR_TEXT))
                     put("ocrConfidence",it.confidence.coerceIn(0f,1f).toDouble())

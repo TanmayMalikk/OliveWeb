@@ -95,6 +95,8 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
         .put("ciphertextSize", ciphertextSize)
         .put("ciphertextSha256", ciphertextSha256.lowercase())
         .put("encryptionVersion", encryptionVersion)
+        .put("evidence", evidence)
+        .put("tags", JSONArray(tags.distinct().take(20)))
         .apply {
             ocrText?.take(MAX_OCR_TEXT)?.let { put("ocrText", it) }
             ocrConfidence?.takeIf { it.isFinite() && it in 0f..1f }?.let { put("ocrConfidence", it.toDouble()) }
@@ -115,6 +117,11 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
     }.orEmpty()
     val size = optLong("ciphertextSize")
     val checksum = optString("ciphertextSha256")
+    val tags = optJSONArray("tags")?.let { values ->
+        (0 until minOf(values.length(), 20)).mapNotNull {
+            values.optString(it).trim().take(80).takeIf(String::isNotBlank)
+        }
+    }.orEmpty().distinct()
     require(size in 0..MAX_CIPHERTEXT_BYTES)
     require(checksum.isBlank() || checksum.matches(SHA_256_LOWER))
     return SafetyDocument(
@@ -135,6 +142,8 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
         ciphertextSha256 = checksum,
         encryptionVersion = optInt("encryptionVersion"),
         deviceWrappedKeys = deviceKeys,
+        evidence = optBoolean("evidence"),
+        tags = tags,
     )
 }
 

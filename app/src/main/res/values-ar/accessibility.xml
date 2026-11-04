@@ -20,6 +20,7 @@
     <string name="a11y_zoom_in">تكبير</string>
     <string name="a11y_zoom_out">تصغير</string>
     <string name="a11y_reset_zoom">إعادة ضبط التكبير</string>
+    <string name="a11y_rotate_clockwise">تدوير باتجاه عقارب الساعة</string>
     <string name="a11y_zoom_percent">التكبير: %1$d%%</string>
 
 
