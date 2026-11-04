@@ -21,12 +21,13 @@ class FirebaseCallStore {
         return snapshot.val();
     }
 
-    async createCall(name, { callerId, participantIds }) {
+    async createCall(name, { callerId, callerName, participantIds }) {
         const callId = this.idGenerator();
         const call = {
             callId,
             name,
             callerId,
+            callerName: callerName || name,
             status: 'active',
             participants: Object.fromEntries(
                 participantIds.map((userId) => [userId, { status: 'pending' }])
@@ -56,7 +57,7 @@ class FirebaseCallStore {
             .map((call) => ({
                 callId: call.callId,
                 callerId: call.callerId,
-                name: call.name,
+                name: call.callerName || call.name,
                 status: 'pending'
             }));
     }

@@ -44,8 +44,12 @@ data class VoipCall(
     val name: String,
     val callerId: String,
     val participants: List<VoipParticipant>,
+    val callerName: String = "",
     val undeliveredInviteeIds: List<String> = emptyList()
 )
+
+internal fun VoipCall.otherPartyName(currentUid: String): String =
+    if (callerId == currentUid) name else callerName.ifBlank { name }
 
 // VoipInvitation is a class that is responsible for accepting calls.
 // When a user is 'dialed' the server will ping that user to make a VoipInvitation object to handle connecting to the call.
@@ -107,11 +111,13 @@ class VoipManager(
     suspend fun startCall(
         name: String,
         callerId: String,
-        participantIds: List<String>
+        participantIds: List<String>,
+        callerName: String = name,
     ): VoipCall {
         // Stops incomplete or conflicting call details from reaching the server.
         require(name.isNotBlank()) { "Call name must not be blank" }
         require(callerId.isNotBlank()) { "Caller ID must not be blank" }
+        require(callerName.isNotBlank()) { "Caller name must not be blank" }
         require(participantIds.isNotEmpty()) { "At least one participant is required" }
         require(participantIds.all(String::isNotBlank)) { "Participant IDs must not be blank" }
         require(participantIds.distinct().size == participantIds.size) { "Participant IDs must be unique" }
@@ -121,6 +127,7 @@ class VoipManager(
         val body = JSONObject()
             .put("name", name.trim())
             .put("callerId", callerId)
+            .put("callerName", callerName.trim())
             .put("participantIds", JSONArray(participantIds))
         return parseCall(request("POST", "/api/calls", body))
     }
@@ -260,6 +267,7 @@ class VoipManager(
             name = json.getString("name"),
             callerId = json.getString("callerId"),
             participants = json.getJSONArray("participants").toParticipantList(),
+            callerName = json.optString("callerName"),
             undeliveredInviteeIds = json.optJSONArray("notificationFailures")
                 ?.let { failures -> (0 until failures.length()).map(failures::getString) }
                 .orEmpty()

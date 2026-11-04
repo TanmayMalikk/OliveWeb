@@ -65,12 +65,14 @@ test('FirebaseCallStore creates calls and tracks invitation responses', async ()
 
     const call = await store.createCall('Support', {
         callerId: 'alice',
+        callerName: 'Alice',
         participantIds: ['bob', 'carol']
     });
     assert.deepEqual(call, {
         callId: 'call-1',
         name: 'Support',
         callerId: 'alice',
+        callerName: 'Alice',
         status: 'active',
         participants: {
             bob: { status: 'pending' },
@@ -81,7 +83,7 @@ test('FirebaseCallStore creates calls and tracks invitation responses', async ()
     assert.deepEqual(await store.listInvitations('bob'), [{
         callId: 'call-1',
         callerId: 'alice',
-        name: 'Support',
+        name: 'Alice',
         status: 'pending'
     }]);
     assert.deepEqual(await store.listCallsFor('bob'), []);

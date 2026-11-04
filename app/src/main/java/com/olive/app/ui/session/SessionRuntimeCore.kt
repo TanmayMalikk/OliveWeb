@@ -68,6 +68,7 @@ internal class SessionRuntime(
     var triggerJob: Job? = null
     var historySyncJob: Job? = null
     var idleJob: Job? = null
+    var idlePausedForCall = false
     var socialSubscription: ChatSubscription? = null
     var accountSyncSubscription: ChatSubscription? = null
     var conversationSubscription: ChatSubscription? = null

@@ -87,9 +87,12 @@ internal class SessionCalls(
             ?.value
             .orEmpty()
             .ifBlank { "Private call" }
+        val callerName = conversation.participantUsernames[callerUid]
+            .orEmpty()
+            .ifBlank { "Private call" }
         scope.launch {
             runCallAction {
-                controller.startAndJoin(recipientName, callerUid, recipients)
+                controller.startAndJoin(recipientName, callerUid, recipients, callerName)
             }
         }
     }
