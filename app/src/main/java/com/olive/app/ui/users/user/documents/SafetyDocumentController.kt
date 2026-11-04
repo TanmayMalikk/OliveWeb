@@ -5,7 +5,6 @@ package com.olive.app.ui.users.user.documents
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import com.google.firebase.firestore.FirebaseFirestoreException
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -369,15 +368,7 @@ internal fun mediaFailureResource(failure: Throwable): Int {
     if (failure is MediaDeviceVerificationException) {
         return R.string.documents_device_verification_failed
     }
-    val reason = (failure as? MediaAccessException)?.reason ?: when (failure) {
-            is FirebaseFirestoreException -> when (failure.code) {
-                FirebaseFirestoreException.Code.PERMISSION_DENIED,
-                FirebaseFirestoreException.Code.NOT_FOUND -> MediaAccessError.ACCESS_REVOKED
-                FirebaseFirestoreException.Code.UNAVAILABLE -> MediaAccessError.NETWORK_REQUIRED
-                else -> null
-            }
-            else -> null
-        }
+    val reason = (failure as? MediaAccessException)?.reason
     return when (reason) {
         MediaAccessError.NOT_CACHED -> R.string.documents_not_available_offline
         MediaAccessError.NETWORK_REQUIRED -> R.string.documents_network_required
