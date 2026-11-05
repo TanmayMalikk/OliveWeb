@@ -135,16 +135,8 @@ function createApiServer({
             }
 
             const identity = await authenticate(request, verifyIdToken);
-            const expireCalls = async () => {
-                if (typeof callStore.expirePendingCalls !== 'function') return;
-                const expired = await callStore.expirePendingCalls();
-                if (typeof liveKit.endRoom === 'function') {
-                    await Promise.all(expired.map((callId) =>
-                        liveKit.endRoom(`call-${callId}`).catch((error) =>
-                            logger.warn?.('Could not close an expired LiveKit room:', error)
-                        )
-                    ));
-                }
+            const expireCall = async (callId) => {
+                if (typeof callStore.expireCall === 'function') await callStore.expireCall(callId);
             };
 
             if (request.method === 'POST' && url.pathname === '/auth/verify') {
@@ -155,7 +147,6 @@ function createApiServer({
             }
 
             if (request.method === 'GET' && url.pathname === '/api/calls') {
-                await expireCalls();
                 const calls = await callStore.listCallsFor(identity.uid);
                 return sendJson(response, 200, { calls: calls.map(toApiCall) });
             }
@@ -226,7 +217,6 @@ function createApiServer({
             }
 
             if (request.method === 'GET' && url.pathname === '/api/calls/invitations') {
-                await expireCalls();
                 const userId = requireIdentifier(url.searchParams.get('userId'), 'userId');
                 if (userId !== identity.uid) {
                     throw new ApiError(403, 'identity_mismatch', 'userId must match the authenticated user');
@@ -238,7 +228,6 @@ function createApiServer({
 
             const invitationMatch = url.pathname.match(/^\/api\/calls\/([^/]+)\/(accept|decline)$/);
             if (request.method === 'POST' && invitationMatch) {
-                await expireCalls();
                 const callId = decodeCallId(invitationMatch[1]);
                 const body = await readJson(request);
                 const userId = requireIdentifier(body.userId, 'userId');
@@ -268,7 +257,7 @@ function createApiServer({
             if (request.method === 'POST' && url.pathname === '/calls/token') {
                 const body = await readJson(request);
                 const callId = requireIdentifier(body.callId, 'callId');
-                await expireCalls();
+                await expireCall(callId);
                 const currentCall = await callStore.getCall(callId);
                 requireActiveCall(currentCall);
 
@@ -288,10 +277,10 @@ function createApiServer({
                 (request.method === 'POST' && url.pathname === '/calls/end') ||
                 (request.method === 'DELETE' && legacyEndMatch)
             ) {
-                await expireCalls();
                 const callId = request.method === 'DELETE'
                     ? decodeCallId(legacyEndMatch[1])
                     : requireIdentifier((await readJson(request)).callId, 'callId');
+                await expireCall(callId);
                 const call = await callStore.getCall(callId);
                 requireActiveCall(call);
                 if (getParticipantStatus(call, identity.uid) !== 'accepted') {
@@ -316,9 +305,9 @@ function createApiServer({
             }
 
             if (request.method === 'POST' && url.pathname === '/notifications/send') {
-                await expireCalls();
                 const body = await readJson(request);
                 const callId = requireIdentifier(body.callId, 'callId');
+                await expireCall(callId);
                 const recipientId = requireIdentifier(body.recipientId, 'recipientId');
                 const call = await callStore.getCall(callId);
                 requireActiveCall(call);

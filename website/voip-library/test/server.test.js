@@ -163,7 +163,14 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
         headers: authorized('token-alice')
     });
 
-    test('legacy call-signaling routes persist calls and bind user IDs to Firebase identity', async (context) => {
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+        uid: 'alice',
+        email: 'alice@example.test'
+    });
+});
+
+test('legacy call-signaling routes persist calls and bind user IDs to Firebase identity', async (context) => {
         const dependencies = createDependencies();
         dependencies.calls.clear();
         const baseUrl = await startTestServer(context, dependencies);
@@ -235,9 +242,9 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
         });
         assert.equal(forgedIdentity.status, 403);
         assert.equal((await forgedIdentity.json()).error.code, 'identity_mismatch');
-    });
+});
 
-    test('legacy invitation routes accept and decline only the authenticated pending user', async (context) => {
+test('legacy invitation routes accept and decline only the authenticated pending user', async (context) => {
         const dependencies = createDependencies();
         const baseUrl = await startTestServer(context, dependencies);
         const response = await fetch(`${baseUrl}/api/calls/call-1/accept`, {
@@ -273,13 +280,6 @@ test('POST /auth/verify returns verified Firebase identity claims', async (conte
         assert.equal(declined.status, 200);
         assert.equal(dependencies.calls.get('call-1').status, 'declined');
         assert.deepEqual(dependencies.endedRooms, ['call-call-1']);
-    });
-
-    assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), {
-        uid: 'alice',
-        email: 'alice@example.test'
-    });
 });
 
 test('call creation rejects participant IDs without Firebase accounts', async (context) => {
@@ -417,36 +417,6 @@ test('POST /notifications/send permits the owner to invite only pending particip
         body: JSON.stringify({ callId: 'call-1', recipientId })
     });
 
-    test('push tokens are registered and removed only for the authenticated Firebase user', async (context) => {
-        const dependencies = createDependencies();
-        const baseUrl = await startTestServer(context, dependencies);
-        const register = await fetch(`${baseUrl}/notifications/register`, {
-            method: 'POST',
-            headers: authorized('token-bob', { 'content-type': 'application/json' }),
-            body: JSON.stringify({ deviceId: 'install-123', token: 'fcm-device-token' })
-        });
-
-        assert.equal(register.status, 200);
-        assert.deepEqual(await register.json(), { registered: true });
-        assert.equal(dependencies.deviceTokens.get('bob/install-123'), 'fcm-device-token');
-
-        const unregister = await fetch(`${baseUrl}/notifications/register`, {
-            method: 'DELETE',
-            headers: authorized('token-bob', { 'content-type': 'application/json' }),
-            body: JSON.stringify({ deviceId: 'install-123' })
-        });
-        assert.equal(unregister.status, 200);
-        assert.deepEqual(await unregister.json(), { registered: false });
-        assert.equal(dependencies.deviceTokens.has('bob/install-123'), false);
-
-        const invalid = await fetch(`${baseUrl}/notifications/register`, {
-            method: 'POST',
-            headers: authorized('token-bob', { 'content-type': 'application/json' }),
-            body: JSON.stringify({ deviceId: '../alice', token: 'fcm-device-token' })
-        });
-        assert.equal(invalid.status, 400);
-    });
-
     const acceptedParticipant = await request('token-alice', 'bob');
     assert.equal(acceptedParticipant.status, 403);
     assert.equal((await acceptedParticipant.json()).error.code, 'invalid_recipient');
@@ -463,6 +433,36 @@ test('POST /notifications/send permits the owner to invite only pending particip
     const nonOwner = await request('token-bob', 'carol');
     assert.equal(nonOwner.status, 403);
     assert.equal((await nonOwner.json()).error.code, 'not_call_owner');
+});
+
+test('push tokens are registered and removed only for the authenticated Firebase user', async (context) => {
+    const dependencies = createDependencies();
+    const baseUrl = await startTestServer(context, dependencies);
+    const register = await fetch(`${baseUrl}/notifications/register`, {
+        method: 'POST',
+        headers: authorized('token-bob', { 'content-type': 'application/json' }),
+        body: JSON.stringify({ deviceId: 'install-123', token: 'fcm-device-token' })
+    });
+
+    assert.equal(register.status, 200);
+    assert.deepEqual(await register.json(), { registered: true });
+    assert.equal(dependencies.deviceTokens.get('bob/install-123'), 'fcm-device-token');
+
+    const unregister = await fetch(`${baseUrl}/notifications/register`, {
+        method: 'DELETE',
+        headers: authorized('token-bob', { 'content-type': 'application/json' }),
+        body: JSON.stringify({ deviceId: 'install-123' })
+    });
+    assert.equal(unregister.status, 200);
+    assert.deepEqual(await unregister.json(), { registered: false });
+    assert.equal(dependencies.deviceTokens.has('bob/install-123'), false);
+
+    const invalid = await fetch(`${baseUrl}/notifications/register`, {
+        method: 'POST',
+        headers: authorized('token-bob', { 'content-type': 'application/json' }),
+        body: JSON.stringify({ deviceId: '../alice', token: 'fcm-device-token' })
+    });
+    assert.equal(invalid.status, 400);
 });
 
 test('malformed JSON requests receive a client error', async (context) => {
