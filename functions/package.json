@@ -9,6 +9,7 @@
     "test": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/functions-tests.xml",
     "provision-demo-accounts": "node scripts/provision-demo-accounts.js",
     "provision-load-test-accounts": "node scripts/provision-load-test-accounts.js",
+    "seed-load-test-support": "node scripts/seed-load-test-support.js",
     "seed-load-test-locations": "node scripts/seed-load-test-locations.js",
     "simulate-load-test-locations": "node scripts/simulate-load-test-locations.js",
     "delete-load-test-accounts": "node scripts/delete-load-test-accounts.js",

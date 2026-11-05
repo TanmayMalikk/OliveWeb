@@ -62,7 +62,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 }
                 messagingNeedsReconnect = false
                 val identity = AccountIdentity(device.uid, coverUsername)
-                LocalNotificationEventHandler.pauseForegroundListeners()
+                // Organization accounts stay in the portal, so keep their notification listener
+                // active while the message list listener drives unread badges on the dashboard.
+                if (accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
+                    LocalNotificationEventHandler.pauseForegroundListeners()
+                }
                 val token = epoch
                 messagingBusy = true
                 if (showFeedback) message = null
