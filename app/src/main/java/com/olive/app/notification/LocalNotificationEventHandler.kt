@@ -87,8 +87,7 @@ object LocalNotificationEventHandler {
     // Keep this value for future testing only; production periodic work must use a 15+ minute interval.
     internal const val BACKGROUND_CHECK_DELAY_SECONDS = 5L
     private var activeUid: String? = null
-    private var friendListListener: ListenerRegistration? = null
-    private val conversationListeners = mutableMapOf<String, ListenerRegistration>()
+    private var conversationIndexListener: ListenerRegistration? = null
 
     // Starts listening for account events that should create local notifications.
     fun start(context: Context, coverType: CoverType, role: AccountRole) {
@@ -152,33 +151,25 @@ object LocalNotificationEventHandler {
     // Live listeners detect updates while the process runs; background polling stays off unless explicitly enabled above.
     private fun startForegroundListeners(context: Context) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        if (activeUid == uid && friendListListener != null) return
+        if (activeUid == uid && conversationIndexListener != null) return
         stopForegroundListeners()
         activeUid = uid
         val firestore = FirebaseFirestore.getInstance()
-        friendListListener = firestore.collection("friendLists").document(uid).collection("friends")
+        // Watch every conversation containing this account. Unlike the friend-list-only listener,
+        // this also covers staff/admin support assignments and their three support inbox tabs.
+        conversationIndexListener = firestore.collection("conversations")
+            .whereArrayContains("participantIds", uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null || snapshot == null || activeUid != uid) return@addSnapshotListener
-                val conversationIds =
-                    snapshot.documents.mapNotNull { it.getString("friendshipId") }.toSet()
-                conversationListeners.keys.filterNot(conversationIds::contains)
-                    .forEach { removedId ->
-                        conversationListeners.remove(removedId)?.remove()
-                    }
-                conversationIds.filterNot(conversationListeners::containsKey)
-                    .forEach { conversationId ->
-                        conversationListeners[conversationId] =
-                            firestore.collection("conversations").document(conversationId)
-                                .addSnapshotListener { conversation, conversationError ->
-                                    if (conversationError != null || conversation == null || !conversation.exists() || activeUid != uid)
-                                        return@addSnapshotListener
-                                    recordConversationMarker(
-                                        context, uid, conversationId,
-                                        conversation.getString("lastMessageId").orEmpty(),
-                                        conversation.getString("lastSenderUid").orEmpty()
-                                    )
-                                }
-                    }
+                snapshot.documents.forEach { conversation ->
+                    recordConversationMarker(
+                        context,
+                        uid,
+                        conversation.id,
+                        conversation.getString("lastMessageId").orEmpty(),
+                        conversation.getString("lastSenderUid").orEmpty(),
+                    )
+                }
             }
     }
 
@@ -209,10 +200,8 @@ object LocalNotificationEventHandler {
 
     // Removes account and message listeners when notification monitoring stops.
     private fun stopForegroundListeners() {
-        friendListListener?.remove()
-        friendListListener = null
-        conversationListeners.values.forEach(ListenerRegistration::remove)
-        conversationListeners.clear()
+        conversationIndexListener?.remove()
+        conversationIndexListener = null
         activeUid = null
     }
 }

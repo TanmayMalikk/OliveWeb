@@ -114,20 +114,20 @@ internal class SessionRuntime(
     val setupUsername get() = pendingIdentity?.username.orEmpty()
     val setupProfile get() = pendingProfile
     val usesCover get() = state.accountRole == AccountRole.USER
+    fun isConversationUnread(conversation: ChatConversation): Boolean {
+        state.readMessageVersion
+        val uid = enrollment?.uid ?: return false
+        return conversation.lastMessageId.isNotBlank() &&
+                conversation.lastSenderUid.isNotBlank() &&
+                conversation.lastSenderUid != uid &&
+                messageReadState.getString(
+                    conversationActions.readMessageKey(uid, conversation.id),
+                    null,
+                ) != conversation.lastMessageId
+    }
     val unreadMessageCount: Int
         get() {
-            state.readMessageVersion
-            val uid = enrollment?.uid ?: return 0
-            return state.conversations.count { conversation ->
-                conversation.lastMessageId.isNotBlank() && conversation.lastSenderUid.isNotBlank() &&
-                        conversation.lastSenderUid != uid &&
-                        messageReadState.getString(
-                            conversationActions.readMessageKey(
-                                uid,
-                                conversation.id
-                            ), null
-                        ) != conversation.lastMessageId
-            }
+            return state.conversations.count(::isConversationUnread)
         }
     val pendingMessageActionCount get() = state.incomingFriendRequests.size + unreadMessageCount
 
