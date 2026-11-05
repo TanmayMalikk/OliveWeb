@@ -25,6 +25,13 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     val busy get() = runtime.state.messagingBusy
     val needsReconnect get() = runtime.state.messagingNeedsReconnect
     val pendingActionCount get() = runtime.pendingMessageActionCount
+    fun isUnread(conversation: ChatConversation) = runtime.isConversationUnread(conversation)
+    fun unreadCountForSupportTag(tag: String) = runtime.state.conversations.count { conversation ->
+        conversation.type == "SUPPORT" && conversation.supportTag == tag &&
+                conversation.closedAt == 0L &&
+                conversation.id !in runtime.state.archivedConversationIds &&
+                runtime.isConversationUnread(conversation)
+    }
 
     // Starts chat listeners when the current screen needs messaging.
     fun ensureMessagingObservation(showFeedback: Boolean = false) =

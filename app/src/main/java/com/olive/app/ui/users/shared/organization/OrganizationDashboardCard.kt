@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material3.Card
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +28,7 @@ internal fun OrganizationDashboardCard(
     title: String,
     description: String,
     onClick: () -> Unit,
+    badgeCount: Int = 0,
 ) {
     Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -33,7 +36,13 @@ internal fun OrganizationDashboardCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+            BadgedBox(badge = {
+                if (badgeCount > 0) Badge {
+                    Text(if (badgeCount > 99) "99+" else badgeCount.toString())
+                }
+            }) {
+                Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(description, style = MaterialTheme.typography.bodySmall, color = Muted)

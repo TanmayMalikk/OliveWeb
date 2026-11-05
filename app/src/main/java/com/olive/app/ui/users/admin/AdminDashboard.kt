@@ -150,6 +150,7 @@ private fun AdminDashboard(
             stringResource(R.string.support_conversations),
             stringResource(R.string.staff_conversations_assigned_help),
             onMessages,
+            session.messages.pendingActionCount,
         )
         OrganizationDashboardCard(
             Icons.Outlined.LocationOn,
