@@ -74,6 +74,19 @@ The command should finish with:
 Seeded 40 admin-map locations: 20 active and 20 last-known.
 ```
 
+## 7a. Add staff support and shared safety-plan test data
+
+Create one plan consultation and one regular support request for every load-test user:
+
+```powershell
+npm run seed-load-test-support
+```
+
+This gives each of the eight load-test staff accounts five plan consultations and five support
+requests. Every fictional user's populated safety plan is assigned to staff and shared with a
+rotating load-test safe contact. The conversation summaries are initially unread so notification
+badges can be tested. The command is deterministic and can safely be rerun to restore the fixtures.
+
 ## 8. Simulate 10 moving users
 
 ```powershell
