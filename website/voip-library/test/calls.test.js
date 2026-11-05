@@ -85,6 +85,9 @@ test('FirebaseCallStore creates calls and tracks invitation responses', async ()
         createdAt: 123,
         expiresAt: 20_123
     });
+    assert.equal(values['callIdsByUser/alice/call-1'], 123);
+    assert.equal(values['callIdsByUser/bob/call-1'], 123);
+    assert.equal(values['callIdsByUser/carol/call-1'], 123);
     assert.deepEqual(await store.listInvitations('bob'), [{
         callId: 'call-1',
         callerId: 'alice',
