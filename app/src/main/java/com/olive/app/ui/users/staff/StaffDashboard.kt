@@ -108,6 +108,7 @@ private fun StaffDashboard(
             stringResource(R.string.support_conversations),
             stringResource(R.string.staff_conversations_assigned_help),
             onMessages,
+            session.messages.pendingActionCount,
         )
         Status(session)
         OutlinedButton(

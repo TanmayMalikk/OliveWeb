@@ -13,6 +13,7 @@ import com.olive.app.data.messaging.VoipSessionController
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipCallStatus
+import com.olive.app.data.messaging.VoipParticipantStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -74,7 +75,20 @@ internal class SessionCalls(
                     val calls = manager.listCalls()
                     callHistory = calls
                     val now = System.currentTimeMillis()
-                    val received = manager.getIncomingCalls(uid)
+                    val received = calls.filter { call ->
+                        call.status == VoipCallStatus.ACTIVE && call.callerId != uid &&
+                            call.participants.any {
+                                it.userId == uid && it.status == VoipParticipantStatus.PENDING
+                            }
+                    }.map { call ->
+                        VoipInvitation(
+                            callId = call.callId,
+                            callerId = call.callerId,
+                            name = call.callerName.ifBlank { call.name },
+                            status = VoipParticipantStatus.PENDING,
+                            expiresAt = call.expiresAt,
+                        )
+                    }
                     received.forEach { invitationFirstSeenAt.putIfAbsent(it.callId, now) }
                     val locallyExpired = received.filter { invitation ->
                         val deadline = invitation.expiresAt.takeIf { it > 0 }
@@ -99,7 +113,9 @@ internal class SessionCalls(
                 } catch (error: Exception) {
                     message = error.message ?: "Could not check incoming calls"
                 }
-                delay(1_000)
+                val callIsOpen = state.value is VoipSessionState.Connecting ||
+                    state.value is VoipSessionState.Active || invitations.isNotEmpty()
+                delay(if (callIsOpen) ACTIVE_CALL_POLL_MS else IDLE_CALL_POLL_MS)
             }
         }
     }
@@ -246,5 +262,7 @@ internal class SessionCalls(
     companion object {
         private const val DISMISSED_INVITATIONS_KEY = "call_ids"
         private const val LOCAL_RING_TIMEOUT_MS = 20_000L
+        private const val ACTIVE_CALL_POLL_MS = 1_000L
+        private const val IDLE_CALL_POLL_MS = 5_000L
     }
 }

@@ -197,10 +197,21 @@ private fun MessagingSidebar(
                     SUPPORT_TAG_SUPPORT to stringResource(R.string.support_filter_support),
                     SUPPORT_TAG_NEEDS_ADMIN to stringResource(R.string.support_filter_needs_admin),
                 ).forEach { (tag, label) ->
+                    val unreadCount = session.messages.unreadCountForSupportTag(tag)
                     FilterChip(
                         selected = supportFilter == tag,
                         onClick = { supportFilter = tag },
-                        label = { Text(label) },
+                        label = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(label)
+                                if (unreadCount > 0) Badge {
+                                    Text(if (unreadCount > 99) "99+" else unreadCount.toString())
+                                }
+                            }
+                        },
                         modifier = Modifier.testTag("support_filter_$tag"),
                     )
                 }
@@ -259,6 +270,7 @@ private fun MessagingSidebar(
             ConversationRow(
                 conversation, currentUid, session.accountRole,
                 Modifier.animateItem().fillMaxWidth().testTag("conversation_${conversation.id}"),
+                unread = session.messages.isUnread(conversation),
                 onOpen = { session.messages.openConversation(conversation) },
                 onActions = { conversationActions = conversation },
             )
@@ -277,6 +289,7 @@ private fun MessagingSidebar(
                 ConversationRow(
                     conversation, currentUid, session.accountRole,
                     Modifier.animateItem().fillMaxWidth().testTag("conversation_${conversation.id}"),
+                    unread = session.messages.isUnread(conversation),
                     onOpen = { session.messages.openConversation(conversation) },
                     onActions = { conversationActions = conversation },
                 )
@@ -328,6 +341,7 @@ private fun ConversationRow(
     currentUid: String,
     viewerRole: AccountRole,
     modifier: Modifier,
+    unread: Boolean,
     onOpen: () -> Unit,
     onActions: () -> Unit,
 ) {
@@ -345,7 +359,7 @@ private fun ConversationRow(
                 contentDescription = null,
                 modifier = Modifier.size(22.dp),
             )
-            Column {
+            Column(Modifier.weight(1f)) {
                 if (organizationAccount) Text(
                     supportTagLabel(conversation.supportTag),
                     style = MaterialTheme.typography.labelMedium,
@@ -374,6 +388,7 @@ private fun ConversationRow(
                     color = Muted,
                 )
             }
+            if (unread) Badge { Text("1") }
         }
     }
 }
