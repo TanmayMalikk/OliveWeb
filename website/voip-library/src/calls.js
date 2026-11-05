@@ -3,6 +3,7 @@
 const { randomUUID } = require('node:crypto');
 
 const CALL_TIMEOUT_MS = 20_000;
+const MAX_INDEXED_CALLS = 100;
 
 function callExpiry(call) {
     if (Number.isFinite(call?.expiresAt) && call.expiresAt > 0) return call.expiresAt;
@@ -15,12 +16,14 @@ function callExpiry(call) {
 class FirebaseCallStore {
     constructor(database, {
         callsPath = 'calls',
+        callIdsByUserPath = 'callIdsByUser',
         usersPath = 'users',
         idGenerator = randomUUID,
         clock = Date.now
     } = {}) {
         if (!database) throw new TypeError('database is required');
         this.callsRef = database.ref(callsPath);
+        this.callIdsByUserRef = database.ref(callIdsByUserPath);
         this.usersRef = database.ref(usersPath);
         this.idGenerator = idGenerator;
         this.clock = clock;
@@ -48,23 +51,26 @@ class FirebaseCallStore {
             expiresAt: createdAt + CALL_TIMEOUT_MS
         };
         await this.callsRef.child(callId).set(call);
+        await Promise.all([callerId, ...participantIds].map((userId) =>
+            this.callIdsByUserRef.child(userId).child(callId).set(createdAt)
+        ));
         return call;
     }
 
     async listCallsFor(userId) {
-        await this.expirePendingCalls();
-        const snapshot = await this.callsRef.once('value');
-        const calls = snapshot.val() || {};
-        return Object.values(calls).filter((call) =>
+        const calls = await this.getIndexedCalls(userId);
+        const now = this.clock();
+        const currentCalls = await Promise.all(calls.map((call) =>
+            this.expireCall(call.callId, now, call)
+        ));
+        return currentCalls.filter((call) =>
             call && (call.callerId === userId || getParticipantStatus(call, userId) != null)
         ).sort((left, right) => (right.createdAt || 0) - (left.createdAt || 0));
     }
 
     async listInvitations(userId) {
-        await this.expirePendingCalls();
-        const snapshot = await this.callsRef.once('value');
-        const calls = snapshot.val() || {};
-        return Object.values(calls)
+        const calls = await this.listCallsFor(userId);
+        return calls
             .filter((call) =>
                 call?.status === 'active' && getParticipantStatus(call, userId) === 'pending'
             )
@@ -78,7 +84,7 @@ class FirebaseCallStore {
     }
 
     async respondToInvitation(callId, userId, accepted) {
-        await this.expirePendingCalls();
+        await this.expireCall(callId);
         const existingCall = await this.getCall(callId);
         const result = await this.callsRef.child(callId).transaction((current) => {
             // Realtime Database may invoke the updater with a transient local null before it
@@ -123,6 +129,47 @@ class FirebaseCallStore {
         return result.committed;
     }
 
+    async getIndexedCalls(userId) {
+        const snapshot = await this.callIdsByUserRef.child(userId).once('value');
+        const index = snapshot.val() || {};
+        const sortedCallIds = Object.entries(index)
+            .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0))
+            .map(([callId]) => callId);
+        const callIds = sortedCallIds.slice(0, MAX_INDEXED_CALLS);
+        const staleCallIds = sortedCallIds.slice(MAX_INDEXED_CALLS);
+        await Promise.all(staleCallIds.map((callId) =>
+            this.callIdsByUserRef.child(userId).child(callId).remove()
+        ));
+        const calls = await Promise.all(callIds.map((callId) => this.getCall(callId)));
+        const missing = callIds.filter((callId, index) => !calls[index]);
+        await Promise.all(missing.map((callId) =>
+            this.callIdsByUserRef.child(userId).child(callId).remove()
+        ));
+        return calls.filter(Boolean);
+    }
+
+    async expireCall(callId, now = this.clock(), indexedCall = null) {
+        const existingCall = indexedCall || await this.getCall(callId);
+        const expiresAt = callExpiry(existingCall);
+        if (!existingCall || existingCall.status !== 'active' || existingCall.acceptedAt ||
+            !expiresAt || expiresAt > now) return existingCall;
+        const result = await this.callsRef.child(callId).transaction((current) => {
+            const candidate = current ?? existingCall;
+            const currentExpiry = callExpiry(candidate);
+            if (!candidate || candidate.status !== 'active' || candidate.acceptedAt ||
+                !currentExpiry || currentExpiry > now) return;
+            return {
+                ...candidate,
+                expiresAt: currentExpiry,
+                status: 'missed',
+                endedAt: now,
+                endReason: 'missed'
+            };
+        });
+        return result.committed ? result.snapshot.val() : await this.getCall(callId);
+    }
+
+    // Maintenance-only compatibility helper. Request handlers use the per-user index instead.
     async expirePendingCalls(now = this.clock()) {
         const snapshot = await this.callsRef.once('value');
         const calls = snapshot.val() || {};
@@ -131,20 +178,8 @@ class FirebaseCallStore {
             const expiresAt = callExpiry(call);
             if (!call || call.status !== 'active' || call.acceptedAt ||
                 !expiresAt || expiresAt > now) return;
-            const result = await this.callsRef.child(call.callId).transaction((current) => {
-                const candidate = current ?? call;
-                const currentExpiry = callExpiry(candidate);
-                if (!candidate || candidate.status !== 'active' || candidate.acceptedAt ||
-                    !currentExpiry || currentExpiry > now) return;
-                return {
-                    ...candidate,
-                    expiresAt: currentExpiry,
-                    status: 'missed',
-                    endedAt: now,
-                    endReason: 'missed'
-                };
-            });
-            if (result.committed) expired.push(call.callId);
+            const updated = await this.expireCall(call.callId, now);
+            if (updated?.status === 'missed' && updated.endedAt === now) expired.push(call.callId);
         }));
         return expired;
     }
