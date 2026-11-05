@@ -9,16 +9,34 @@ import com.google.android.gms.wearable.Wearable
 internal object FitnessWatchSync {
     const val DAILY_DATA_PATH = "/olive/fitness/daily"
     const val WATCH_ACTIVITY_PATH = "/olive/fitness/watch-activity"
+    const val ACCOUNT_SESSION_PATH = "/olive/account/session"
     const val SYNC_PREFERENCES = "fitness_watch_sync"
     const val ACTIVE_ACCOUNT_ID = "active_account_id"
 
+    // Tells the paired watch which phone account owns future fitness readings.
+    fun bindAccount(context: Context, accountId: String?) {
+        val safeAccountId = accountId.orEmpty().trim()
+        context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE).edit {
+            if (safeAccountId.isBlank()) remove(ACTIVE_ACCOUNT_ID)
+            else putString(ACTIVE_ACCOUNT_ID, safeAccountId)
+        }
+        val request = PutDataMapRequest.create(ACCOUNT_SESSION_PATH).apply {
+            dataMap.putBoolean("signedIn", safeAccountId.isNotBlank())
+            dataMap.putString("accountId", safeAccountId)
+            dataMap.putLong("updatedAt", System.currentTimeMillis())
+        }.asPutDataRequest().setUrgent()
+        Wearable.getDataClient(context).putDataItem(request)
+    }
+
     // Sends the latest phone fitness summary to the paired Wear OS app.
     fun publish(context: Context, accountId: String, snapshot: FitnessSnapshot) {
+        if (accountId.isBlank() || accountId == "guest") return
         context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE).edit {
             putString(ACTIVE_ACCOUNT_ID, accountId)
         }
         val nutrition = snapshot.nutrition
         val request = PutDataMapRequest.create(DAILY_DATA_PATH).apply {
+            dataMap.putString("accountId", accountId)
             dataMap.putLong("updatedAt", System.currentTimeMillis())
             dataMap.putInt("phoneSteps", snapshot.stepsToday.coerceAtLeast(0))
             dataMap.putInt("stepGoal", snapshot.profile.stepGoal)

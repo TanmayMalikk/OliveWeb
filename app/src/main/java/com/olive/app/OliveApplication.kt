@@ -5,6 +5,7 @@ import android.app.Application
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.olive.app.data.messaging.VoipPushTokenRegistration
+import com.olive.app.ui.covers.fitness.FitnessWatchSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,6 +27,8 @@ class OliveApplication : Application() {
                 }
             }
             FirebaseAuth.getInstance().addAuthStateListener { auth ->
+                // The watch follows the account currently authenticated on this phone.
+                FitnessWatchSync.bindAccount(this@OliveApplication, auth.currentUser?.uid)
                 if (auth.currentUser != null) {
                     backgroundScope.launch {
                         try {
