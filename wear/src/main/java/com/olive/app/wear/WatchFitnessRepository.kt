@@ -154,8 +154,11 @@ internal class WatchFitnessRepository(
     // Applies new daily fitness totals received from the connected Android phone.
     override fun onDataChanged(events: DataEventBuffer) {
         events.forEach { event ->
-            if (event.type == DataEvent.TYPE_CHANGED && event.dataItem.uri.path == DAILY_DATA_PATH) {
-                applyPhoneData(DataMapItem.fromDataItem(event.dataItem).dataMap)
+            if (event.type != DataEvent.TYPE_CHANGED) return@forEach
+            val data = DataMapItem.fromDataItem(event.dataItem).dataMap
+            when (event.dataItem.uri.path) {
+                ACCOUNT_SESSION_PATH -> applyAccountSession(data)
+                DAILY_DATA_PATH -> applyPhoneData(data)
             }
         }
     }
@@ -165,6 +168,9 @@ internal class WatchFitnessRepository(
         dataClient.dataItems.addOnSuccessListener { items ->
             // Always releases the wearable data buffer after reading its newest snapshot.
             try {
+                items.firstOrNull { it.uri.path == ACCOUNT_SESSION_PATH }?.let {
+                    applyAccountSession(DataMapItem.fromDataItem(it).dataMap)
+                }
                 items.firstOrNull { it.uri.path == DAILY_DATA_PATH }?.let {
                     applyPhoneData(DataMapItem.fromDataItem(it).dataMap)
                 }
@@ -174,8 +180,46 @@ internal class WatchFitnessRepository(
         }
     }
 
+    // Switches watch syncing when the paired phone signs in, signs out, or changes account.
+    private fun applyAccountSession(data: DataMap) {
+        val accountId = data.getString("accountId").orEmpty().trim()
+        val signedIn = data.getBoolean("signedIn", false) && accountId.isNotBlank()
+        val previousAccountId = preferences.getString(ACTIVE_ACCOUNT_ID, null)
+        val nextAccountId = accountId.takeIf { signedIn }
+        if (previousAccountId == nextAccountId) return
+        preferences.edit {
+            if (nextAccountId == null) remove(ACTIVE_ACCOUNT_ID)
+            else putString(ACTIVE_ACCOUNT_ID, nextAccountId)
+            remove("phone_steps")
+            remove("calories")
+            remove("step_goal")
+            remove("calorie_goal")
+        }
+        update(
+            state.copy(
+                phoneSteps = 0,
+                stepGoal = 8_000,
+                calories = 0f,
+                calorieGoal = 2_000,
+                protein = 0f,
+                proteinGoal = 120,
+                carbohydrates = 0f,
+                carbohydrateGoal = 250,
+                fat = 0f,
+                fatGoal = 65,
+                fiber = 0f,
+                sugar = 0f,
+                sodium = 0f,
+                phoneConnected = nextAccountId != null,
+                updatedAt = data.getLong("updatedAt"),
+            )
+        )
+    }
+
     // Saves phone metrics and combines them with watch measurements for the current display.
     private fun applyPhoneData(data: DataMap) {
+        val activeAccountId = preferences.getString(ACTIVE_ACCOUNT_ID, null) ?: return
+        if (data.getString("accountId") != activeAccountId) return
         preferences.edit {
             putInt("phone_steps", data.getInt("phoneSteps").coerceAtLeast(0))
             putInt("step_goal", data.getInt("stepGoal", 8_000).coerceAtLeast(1))
@@ -275,10 +319,12 @@ internal class WatchFitnessRepository(
 
     // Watch fitness users: sends a heartbeat even when BPM and steps stay unchanged.
     private fun publishWatchActivity(force: Boolean) {
+        val accountId = preferences.getString(ACTIVE_ACCOUNT_ID, null) ?: return
         val now = System.currentTimeMillis()
         val stepChanged = state.watchSteps != lastPublishedSteps
         if (!force && !stepChanged && now - lastPublishedAt < WATCH_HEARTBEAT_MS) return
         val request = PutDataMapRequest.create(WATCH_ACTIVITY_PATH).apply {
+            dataMap.putString("accountId", accountId)
             dataMap.putInt("watchSteps", state.watchSteps.coerceAtLeast(0))
             dataMap.putInt("heartRate", state.heartRate ?: 0)
             dataMap.putLong("updatedAt", now)
@@ -291,6 +337,8 @@ internal class WatchFitnessRepository(
     private companion object {
         const val DAILY_DATA_PATH = "/olive/fitness/daily"
         const val WATCH_ACTIVITY_PATH = "/olive/fitness/watch-activity"
+        const val ACCOUNT_SESSION_PATH = "/olive/account/session"
+        const val ACTIVE_ACCOUNT_ID = "active_account_id"
         const val WATCH_HEARTBEAT_MS = 15_000L
         const val HEART_RATE_DATE_KEY = "heart_rate_date"
         const val TILE_UPDATE_INTERVAL_MS = 15_000L
