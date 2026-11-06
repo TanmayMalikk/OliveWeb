@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const password = "Test-password1!";
-async function onboard(page: Page, cover = "Daily Digest") {
+async function onboard(page: Page, cover = "Fitness Tracker") {
   await page.goto("/account/create");
   await page.getByLabel("Username", { exact: true }).fill("website_tester");
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -100,23 +100,19 @@ test("account creation enforces current credential rules before onboarding", asy
     page.getByRole("heading", { name: "Choose your familiar." }),
   ).toBeVisible();
 });
-// Inputs: the values in this case. Expected: plain domain and guessed private paths show the game, never a private workspace.
-test("plain domain and guessed private paths show the game, never a private workspace", async ({
+// Inputs: the values in this case. Expected: plain domain and guessed private paths show Fitness, never a private workspace.
+test("plain domain and guessed private paths show Fitness, never a private workspace", async ({
   page,
 }) => {
   for (const path of ["/", "/safe", "/entry"]) {
     await page.goto(path);
     await expect(
-      page.getByRole("heading", {
-        name: "A little less rush. A little more play.",
-      }),
+      page.getByRole("heading", { name: "Fitness Tracker" }),
     ).toBeVisible();
     await expect(
       page.getByText("Your personal entry", { exact: true }),
     ).toHaveCount(0);
   }
-  await page.getByRole("button", { name: "Turn card 1", exact: true }).click();
-  await expect(page.getByRole("button", { name: /Card 1: / })).toBeVisible();
 });
 // Inputs: the values in this case. Expected: account onboarding, unique-link gate, encrypted notes, contact CRUD, settings, exit and re-entry.
 test("account onboarding, unique-link gate, encrypted notes, contact CRUD, settings, exit and re-entry", async ({
@@ -126,7 +122,7 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await page.getByRole("button", { name: "Continue to my cover" }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Daily Digest" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fitness Tracker" })).toBeVisible();
   await unlock(page, link);
   await page.getByRole("button", { name: "Notes", exact: true }).click();
   await page.getByRole("button", { name: "New entry", exact: true }).click();
@@ -385,13 +381,13 @@ for (const size of [
       expect(overflow, `${path} overflows ${size.width}px`).toBe(false);
       if (path === "/" || path === "/account")
         await page.screenshot({
-          path: `test-results/${size.width}-${path === "/" ? "game" : "account"}.png`,
+          path: `test-results/${size.width}-${path === "/" ? "fitness" : "account"}.png`,
           fullPage: true,
         });
     }
   });
-// Inputs: the values in this case. Expected: public game and account screens meet core accessibility checks.
-test("public game and account screens meet core accessibility checks", async ({
+// Inputs: the values in this case. Expected: public Fitness and account screens meet core accessibility checks.
+test("public Fitness and account screens meet core accessibility checks", async ({
   page,
 }) => {
   for (const path of ["/", "/account/create", "/get"]) {

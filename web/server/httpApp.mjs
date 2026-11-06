@@ -100,11 +100,11 @@ export function createServerApp({ development = false } = {}) {
         : hostSite;
       if (req.params.slug && !site) return res.status(404).end();
       const start = "/";
-      const icon = site?.slug ?? "game";
+      const icon = site?.slug ?? "fitness";
       res.type("application/manifest+json").json({
         id: start,
-        name: site?.name ?? "Little Grove",
-        short_name: site?.name ?? "Little Grove",
+        name: site?.name ?? "Fitness Tracker",
+        short_name: site?.name ?? "Fitness Tracker",
         start_url: start,
         scope: "/",
         display: "standalone",

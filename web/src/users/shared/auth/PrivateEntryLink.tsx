@@ -16,7 +16,7 @@ export default function EntryLink() {
         <h1>Your own doorway.</h1>
         <p>
           This link opens your account’s entry screen. You’ll still need to sign
-          in or enter your browser PIN. The plain website opens Little Grove.
+          in or enter your browser PIN. The plain website opens Fitness Tracker.
         </p>
         <label className="field">
           <span>Your personal link</span>

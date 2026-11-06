@@ -31,8 +31,8 @@ describe("recent web domain boundaries", () => {
   // Input: an invalid saved value. Expected: old accounts fall back safely without crashing the public page.
   it("normalizes invalid saved cover values", () => {
     expect(normalizeCover("FITNESS")).toBe("FITNESS");
-    expect(normalizeCover("unknown-cover")).toBe("NEWS");
-    expect(normalizeCover(null)).toBe("NEWS");
+    expect(normalizeCover("unknown-cover")).toBe("FITNESS");
+    expect(normalizeCover(null)).toBe("FITNESS");
   });
 
   // Input: exact username boundaries and non-letter lookalikes. Expected: web validation matches Android and Cloud rules.

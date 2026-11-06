@@ -98,7 +98,7 @@ export function useSessionSecurity({
           ? "/account/sign-in"
           : mode === "download"
             ? "/get"
-            : coverPath(enrollment?.cover ?? "GAME"),
+            : coverPath(enrollment?.cover ?? "FITNESS"),
       );
       window.history.replaceState(
         {},

@@ -508,7 +508,7 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var coverDob by mutableStateOf("")
     var coverFullName by mutableStateOf("")
     var coverUsername by mutableStateOf("")
-    var coverType by mutableStateOf(CoverType.NEWS)
+    var coverType by mutableStateOf(CoverType.FITNESS)
     var accountRole by mutableStateOf(AccountRole.USER)
     var adminCounts by mutableStateOf(AccountCounts())
     var adminAccounts by mutableStateOf(emptyList<AdminAccountSummary>())

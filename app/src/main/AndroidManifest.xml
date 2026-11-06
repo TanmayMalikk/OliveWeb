@@ -80,7 +80,7 @@
             </intent-filter>
         </activity-alias>
         <activity-alias android:name=".NewsLauncher" android:targetActivity=".OliveActivity"
-            android:exported="true" android:enabled="true" android:label="Daily Digest"
+            android:exported="true" android:enabled="false" android:label="Daily Digest"
             android:icon="@mipmap/ic_launcher_news" android:roundIcon="@mipmap/ic_launcher_news">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -88,7 +88,7 @@
             </intent-filter>
         </activity-alias>
         <activity-alias android:name=".FitnessLauncher" android:targetActivity=".OliveActivity"
-            android:exported="true" android:enabled="false" android:label="Fitness Tracker"
+            android:exported="true" android:enabled="true" android:label="Fitness Tracker"
             android:icon="@mipmap/ic_launcher_fitness" android:roundIcon="@mipmap/ic_launcher_fitness">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

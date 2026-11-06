@@ -41,7 +41,7 @@ export default function DownloadPage() {
       </header>
       <main id="main">
         <button className="text-link" onClick={() => go("/")}>
-          <ArrowLeft size={16} /> Back to Little Grove
+          <ArrowLeft size={16} /> Back to Fitness Tracker
         </button>
         <div className="download-heading">
           <span className="eyebrow">A FAMILIAR PLACE, WHEREVER YOU GO</span>

@@ -308,7 +308,7 @@ class ErrorBoundary extends Component<
         <p>
           This page could not open. Your stored account has not been deleted.
         </p>
-        <a href="/">Return to Little Grove</a>
+        <a href="/">Return to Fitness Tracker</a>
       </main>
     ) : (
       this.props.children

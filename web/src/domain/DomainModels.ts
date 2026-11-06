@@ -149,7 +149,7 @@ export const covers: {
 ];
 // Cover apps: converts removed or damaged saved cover values to a supported cover.
 export function normalizeCover(value: unknown): Cover {
-  return covers.some((cover) => cover.id === value) ? (value as Cover) : "NEWS";
+  return covers.some((cover) => cover.id === value) ? (value as Cover) : "FITNESS";
 }
 // Creates the title, description, and icon details for one cover app.
 export const coverInfo = (id: Cover) =>
@@ -206,7 +206,7 @@ export const emptyProfile = (
     postalCode: "",
     country: "Canada",
   },
-  coverType: "GAME",
+  coverType: "FITNESS",
   email: "",
   phone: "",
 });

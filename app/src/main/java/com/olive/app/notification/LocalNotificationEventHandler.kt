@@ -336,7 +336,7 @@ object OliveNotificationManager {
         context: Context,
         title: String?,
         body: String?,
-        coverType: CoverType = CoverType.NEWS,
+        coverType: CoverType = CoverType.FITNESS,
         role: AccountRole = AccountRole.USER,
         notificationId: Int = (System.currentTimeMillis() % 100000).toInt()
     ) {

@@ -44,7 +44,7 @@ enum class CoverType(val title: String) {
 
     companion object {
         // Rebuilds an account profile from its stored JSON fields.
-        fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: NEWS
+        fun fromStored(value: String) = entries.firstOrNull { it.name == value } ?: FITNESS
     }
 }
 
@@ -61,7 +61,7 @@ data class UserProfile(
     val triggerHash: String,
     val contacts: List<SafeContact> = emptyList(),
     val address: DeliveryAddress = DeliveryAddress(),
-    val coverType: CoverType = CoverType.NEWS,
+    val coverType: CoverType = CoverType.FITNESS,
     val role: AccountRole = AccountRole.USER,
     val email: String = "",
     val phone: String = "",
