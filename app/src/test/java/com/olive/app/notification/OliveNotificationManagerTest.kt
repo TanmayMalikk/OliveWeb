@@ -78,7 +78,7 @@ class OliveNotificationManagerTest {
             OliveNotificationManager.iconFor(CoverType.GAME)
         )
         assertEquals(
-            R.drawable.ic_notification_olive_branch,
+            R.drawable.ic_notification_olive,
             OliveNotificationManager.iconFor(CoverType.NEWS, AccountRole.SAFE_CONTACT)
         )
         assertEquals(
