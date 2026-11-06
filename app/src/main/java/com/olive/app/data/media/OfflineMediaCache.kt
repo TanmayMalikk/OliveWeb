@@ -5,9 +5,18 @@ import com.olive.app.data.SafetyDocument
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.JsonVault
 import com.olive.app.security.KeyManager
+import com.olive.app.security.child
 import java.io.File
 import java.security.MessageDigest
 import org.json.JSONObject
+import java.io.InputStream
+import java.io.OutputStream
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
 
 enum class OfflineMediaAvailability {
     NOT_CACHED, SAVING, AVAILABLE, REVALIDATION_REQUIRED,
@@ -164,7 +173,7 @@ class OfflineMediaCache internal constructor(
     @Synchronized
     fun setRecentCachingEnabled(uid: String, enabled: Boolean) {
         requireIdentity(uid)
-        vault.update { account(it, uid).put(RECENT_CACHING_ENABLED, enabled) }
+        vault.update { it.child(ACCOUNTS).child(uid).put(RECENT_CACHING_ENABLED, enabled) }
         if (!enabled) removeRecentEntries(uid) else enforceAutomaticLimit(uid)
     }
 
@@ -349,7 +358,7 @@ class OfflineMediaCache internal constructor(
                 if (item.candidate) candidates.remove(item.id) else entries.remove(item.id)
                 total -= item.size
             }
-        vault.update { root -> account(root, uid).put(ENTRIES, entries).put(CANDIDATES, candidates) }
+        vault.update { root -> root.child(ACCOUNTS).child(uid).put(ENTRIES, entries).put(CANDIDATES, candidates) }
     }
 
     private fun safeRoot(): JSONObject = try { vault.read() } catch (_: Exception) {
@@ -358,16 +367,11 @@ class OfflineMediaCache internal constructor(
         JSONObject()
     }
 
-    private fun account(rootJson: JSONObject, uid: String): JSONObject {
-        val accounts = rootJson.optJSONObject(ACCOUNTS) ?: JSONObject().also { rootJson.put(ACCOUNTS, it) }
-        return accounts.optJSONObject(uid) ?: JSONObject().also { accounts.put(uid, it) }
-    }
-
     private fun entries(rootJson: JSONObject, uid: String): JSONObject =
-        account(rootJson, uid).optJSONObject(ENTRIES) ?: JSONObject().also { account(rootJson, uid).put(ENTRIES, it) }
+        rootJson.child(ACCOUNTS).child(uid).child(ENTRIES)
 
     private fun candidates(rootJson: JSONObject, uid: String): JSONObject =
-        account(rootJson, uid).optJSONObject(CANDIDATES) ?: JSONObject().also { account(rootJson, uid).put(CANDIDATES, it) }
+        rootJson.child(ACCOUNTS).child(uid).child(CANDIDATES)
 
     private fun accountDirectory(uid: String) = File(root, opaqueName(uid))
     private fun cachedFile(uid: String, fileName: String): File =
@@ -439,4 +443,100 @@ class OfflineMediaCache internal constructor(
 private fun requireIdentity(uid: String, documentId: String? = null) {
     require(uid.isNotBlank() && uid.length <= 160)
     documentId?.let { require(it.isNotBlank() && it.length <= 160) }
+}
+
+// Safe-app users: saves pending encrypted uploads across app restarts.
+
+/**
+ * Keystore-encrypted persistence adapter for restartable [MediaUploadJob] state.
+ *
+ * `MediaTransferController` creates jobs here before scheduling work. [MediaUploadWorker] then reads
+ * and atomically rewrites the same records as parts complete. Only paths, encrypted metadata, wrapped
+ * keys, and transfer bookkeeping live in the vault; bulk ciphertext remains in app-private files.
+ *
+ * This class is the process-death boundary: neither Compose state nor a ViewModel is required for an
+ * upload to resume after Android recreates the application.
+ */
+class MediaTransferStore(context:Context) {
+    private val vault=EncryptedVault(context,"media-transfers")
+
+    /** Reads one job by its client-generated idempotency key. */
+    fun get(id:String):MediaUploadJob?=vault.read().optJSONObject(JOBS)?.optJSONObject(id)?.let(MediaUploadJob::fromJson)
+
+    /** Returns all durable jobs, including completed/failed records available for diagnostics. */
+    fun all():List<MediaUploadJob> {
+        val jobs=vault.read().optJSONObject(JOBS) ?: return emptyList()
+        return jobs.keys().asSequence().mapNotNull { jobs.optJSONObject(it)?.let(MediaUploadJob::fromJson) }.toList()
+    }
+
+    /** Inserts or replaces one complete job snapshot in a single encrypted-vault update. */
+    fun write(job:MediaUploadJob) { vault.update { root -> jobs(root).put(job.id,job.toJson()) } }
+
+    /** Atomically derives and persists the next state from the current state. */
+    fun update(id:String,change:(MediaUploadJob)->MediaUploadJob):MediaUploadJob {
+        var result:MediaUploadJob?=null
+        vault.update { root ->
+            val collection=jobs(root)
+            val current=collection.optJSONObject(id)?.let(MediaUploadJob::fromJson) ?: error("Media transfer was not found")
+            result=change(current);collection.put(id,checkNotNull(result).toJson())
+        }
+        return checkNotNull(result)
+    }
+
+    /** Removes bookkeeping only; callers must separately decide whether ciphertext should be deleted. */
+    fun remove(id:String) { vault.update { it.optJSONObject(JOBS)?.remove(id) } }
+
+    // Loads pending media-transfer jobs that belong to this account.
+    private fun jobs(root:JSONObject)=root.optJSONObject(JOBS) ?: JSONObject().also { root.put(JOBS,it) }
+    private companion object { const val JOBS="jobs" }
+}
+
+// Approved viewers: checks encrypted download size and checksum before decryption.
+
+/** Streams ciphertext once while enforcing its immutable byte count and SHA-256 digest. */
+internal suspend fun copyAndVerifyEncryptedDownload(
+    input:InputStream,
+    output:OutputStream,
+    expectedSize:Long,
+    expectedSha256:String,
+):Long {
+    require(expectedSize>0) { "Encrypted download size is invalid" }
+    require(expectedSha256.matches(Regex("[0-9a-fA-F]{64}"))) { "Encrypted download checksum is invalid" }
+    val digest=MessageDigest.getInstance("SHA-256")
+    val buffer=ByteArray(64*1024)
+    var received=0L
+    // Use the fallback when copy and verify encrypted download is unavailable.
+    try {
+        // Media: Keeps copy and verify encrypted download active while true.
+        while(true) {
+            currentCoroutineContext().ensureActive()
+            val count=input.read(buffer)
+            if(count<0) break
+            if(count==0) continue
+            received+=count
+            require(received<=expectedSize) {
+                "Encrypted download size does not match (expected $expectedSize bytes, received more than $expectedSize bytes)"
+            }
+            digest.update(buffer,0,count)
+            output.write(buffer,0,count)
+        }
+    } finally {
+        buffer.fill(0)
+    }
+    require(received==expectedSize) {
+        "Encrypted download size does not match (expected $expectedSize bytes, received $received bytes)"
+    }
+    val actual=digest.digest().joinToString("") { "%02x".format(it) }
+    require(actual.equals(expectedSha256,true)) { "Encrypted download checksum does not match" }
+    return received
+}
+
+// Approved viewers: serializes document opens so downloads cannot overwrite each other.
+
+/** Prevents two opens of the same document from racing over its decrypted output. */
+internal class DocumentDownloadGate {
+    private val locks=ConcurrentHashMap<String,Mutex>()
+
+    suspend fun <T> withDocumentLock(documentId:String,block:suspend ()->T):T =
+        locks.computeIfAbsent(documentId) { Mutex() }.withLock { block() }
 }

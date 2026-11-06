@@ -128,15 +128,6 @@
     <string name="ui_paywall">Muro de pago</string>
     <string name="ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag">Este artículo no se pudo cargar. Comprueba tu conexión y vuelve a intentarlo.</string>
     <string name="ui_this_changes_the_local_news_search_on_this_device">Esto cambia la búsqueda de noticias locales en este dispositivo.</string>
-    <string name="ui_unsave_value">Anular guardar %1$s</string>
-    <string name="ui_save_value">Guardar %1$s</string>
-    <string name="ui_value_value">%1$s  ·  %2$s</string>
-    <string name="ui_value_value_min">★ %1$s · %2$s min</string>
-    <string name="ui_value_value_min_fe5b84">★ %1$s · %2$s min</string>
-    <string name="ui_add_another_value_in_cart">Añade otro · %1$s al carrito</string>
-    <string name="ui_remove_one_value">Quitar un %1$s</string>
-    <string name="ui_add_one_value">Añade un %1$s</string>
-    <string name="ui_value_dishes">%1$s platos</string>
     <string name="ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required">Se requieren nombre completo, fecha de nacimiento válida y correo electrónico real.</string>
     <string name="ui_unable_to_finish_the_organization_profile_check_the_email_and_try">No se puede finalizar el perfil de la organización. Revisa el correo electrónico y vuelve a intentarlo.</string>
     <string name="ui_unable_to_update_your_olive_tree_profile">No se puede actualizar su perfil de Olive Tree.</string>
@@ -174,7 +165,4 @@
 
 
 
-    <string name="ui_garden_harvest_bowl">Cuenco de cosecha de jardín</string>
-    <string name="ui_quinoa_roasted_vegetables_and_lemon_tahini">Quinoa, verduras asadas y tahini de limón.</string>
-    <string name="ui_olive_kitchen">Olive Kitchen</string>
 </resources>

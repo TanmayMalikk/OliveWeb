@@ -71,11 +71,10 @@ This inventory describes the implementation on the `readme-update` branch, revie
 
 ## Cover apps and discreet entry
 
-Users can choose between four Android cover apps. The selected cover controls the visible interface and launcher identity.
+Users can choose between three Android cover apps. The selected cover controls the visible interface and launcher identity.
 
 | Cover | Features present in the Android implementation |
 | --- | --- |
-| **Olive** (default) | Food-delivery-style menu, dish details and ingredient choices, search, cart, delivery-address entry, checkout screens, and account settings. The menu is a demo catalog; a real delivery-service integration is not included. |
 | **Daily Digest** | News feed and article reader, with cover settings and private-entry controls. Fetching new articles requires connectivity. |
 | **Fitness Tracker** | Fitness profile, food and meal logging, calorie and nutrient totals, workout tracking, history charts, and phone/watch fitness summaries. Sensor data depends on hardware and permissions. |
 | **Game** | A simple interactive score-based game, nickname field, and cover settings. The Android game is a basic cover; expanded gameplay remains backlog work. |
@@ -158,7 +157,7 @@ Security implementation and verification are ongoing. These controls are impleme
 
 ## Web portal
 
-- A companion React/TypeScript application contains Food, News, Fitness, and Game covers, private account views, and separate staff/administrator workspaces.
+- A companion React/TypeScript application contains News, Fitness, and Game covers, private account views, and separate staff/administrator workspaces.
 - Browser enrollment, personal entry links, private-entry checks, Quick Exit, background locking, and an encrypted browser vault are implemented.
 - Firebase configuration connects the portal to shared account, messaging, organization, and safety-plan services. Without it, local registration creates a browser-only account that is separate from Android local accounts.
 - Responsive layouts and PWA installation support mobile browsers. Android-specific screenshot protection and Keystore behavior do not carry over to the browser.

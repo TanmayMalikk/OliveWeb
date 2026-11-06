@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const password = "Test-password1!";
-async function onboard(page: Page, cover = "Olive") {
+async function onboard(page: Page, cover = "Daily Digest") {
   await page.goto("/account/create");
   await page.getByLabel("Username", { exact: true }).fill("website_tester");
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -126,11 +126,7 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await page.getByRole("button", { name: "Continue to my cover" }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", {
-      name: "Good food. Better together.",
-    }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daily Digest" })).toBeVisible();
   await unlock(page, link);
   await page.getByRole("button", { name: "Notes", exact: true }).click();
   await page.getByRole("button", { name: "New entry", exact: true }).click();
@@ -256,40 +252,6 @@ test("personal links can be rotated and wrong PINs do not reveal private data", 
   await expect(page.getByRole("alert")).toContainText("current personal link");
   await unlock(page, replacement);
 });
-// Inputs: the values in this case. Expected: food menu customizations, favourites, cart quantities and payment data stay inside their intended flows.
-test("food menu customizations, favourites, cart quantities and payment data stay inside their intended flows", async ({
-  page,
-}) => {
-  await page.goto("/cover/olive");
-  await page
-    .getByRole("button", { name: "Save Garden harvest bowl", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Saved", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Garden harvest bowl", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Garden harvest bowl", exact: true })
-    .click();
-  await page.getByRole("checkbox", { name: "Quinoa", exact: true }).uncheck();
-  await page.getByRole("button", { name: /Add to bag ·/ }).click();
-  await page.getByRole("button", { name: "Cart (1)", exact: true }).click();
-  await expect(page.getByText("$14.95", { exact: true }).first()).toBeVisible();
-  await page
-    .getByRole("button", { name: "Add one Garden harvest bowl" })
-    .click();
-  await expect(page.getByText("$29.90", { exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Continue to checkout" }).click();
-  await expect(
-    page.getByRole("checkbox", { name: "Use shipping address for billing" }),
-  ).toBeChecked();
-  await page
-    .getByRole("checkbox", { name: "Use shipping address for billing" })
-    .uncheck();
-  await expect(
-    page.getByLabel("Billing address", { exact: true }),
-  ).toBeVisible();
-});
 // Inputs: the values in this case. Expected: Quick Exit cancels an in-flight PIN operation and idle dialog autofocus does not extend the timeout.
 test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus does not extend the timeout", async ({
   page,
@@ -367,11 +329,11 @@ test("PWA manifests use cover-specific identities and the download page offers t
   request,
 }) => {
   const manifest = await (
-    await request.get("/cover/olive/manifest.webmanifest")
+    await request.get("/cover/daily-digest/manifest.webmanifest")
   ).json();
-  expect(manifest.name).toBe("Olive");
+  expect(manifest.name).toBe("Daily Digest");
   expect(manifest.start_url).toBe("/");
-  expect(manifest.icons[0].src).toContain("olive-192");
+  expect(manifest.icons[0].src).toContain("daily-digest-192");
   await page.goto("/get");
   await expect(
     page.getByRole("heading", { name: "A place on your Home Screen." }),
@@ -411,7 +373,6 @@ for (const size of [
       "/",
       "/account",
       "/get",
-      "/cover/olive",
       "/cover/daily-digest",
       "/cover/fitness",
     ]) {

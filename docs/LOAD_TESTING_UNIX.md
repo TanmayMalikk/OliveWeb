@@ -20,14 +20,14 @@ java --version
 
 The Functions project expects Node.js 22. The Android project also needs the Java version configured for the project in Android Studio.
 
-## 3. Sign in to Firebase
+## 3. Configure Firebase Admin credentials
 
 ```bash
-npx firebase-tools login --reauth
-npx firebase-tools projects:list
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/private_credentials/olive-firebase-admin.json.json"
 ```
 
-Make sure `olive-21239` appears in the project list.
+The scripts use Firebase Admin's Application Default Credentials. Keep the service-account file in
+the ignored `private_credentials` directory and never commit it.
 
 ## 4. Set the test configuration
 

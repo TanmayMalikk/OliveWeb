@@ -62,8 +62,6 @@
 
 
 
-    <string name="ui_olive_order_update">Mise à jour de la commande d\'olives</string>
-    <string name="ui_your_order_is_being_prepared">Votre commande est en cours de préparation.</string>
     <string name="ui_new_headlines_are_available">De nouveaux titres sont disponibles.</string>
     <string name="ui_a_new_update_is_available">Une nouvelle mise à jour est disponible.</string>
     <string name="ui_an_account_update_is_available">Une mise à jour du compte est disponible.</string>
@@ -75,7 +73,6 @@
 
     <string name="ui_open_the_app_to_see_what_s_new">Ouvrez l\'application pour voir les nouveautés.</string>
     <string name="ui_new_activity_is_waiting">Une nouvelle activité vous attend.</string>
-    <string name="ui_olive_order_updates">Mises à jour de la commande d\'olives</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">État de la commande et notifications de livraison pour Olive</string>
     <string name="ui_daily_digest_briefings">Briefings quotidiens</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">Titres quotidiens et notifications de résumés d\'actualités</string>

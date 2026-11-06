@@ -2,15 +2,11 @@
 package com.olive.app.ui.users.staff
 
 import com.olive.app.ui.shared.*
-
-
 import com.olive.app.ui.users.shared.navigation.*
-
 import com.olive.app.ui.users.shared.organization.OrganizationSettings
 import com.olive.app.ui.users.shared.organization.OrganizationDashboardCard
 import com.olive.app.ui.users.shared.messaging.MessagesScreen
 import com.olive.app.ui.users.safecontact.SharedEntryViewer
-
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -31,6 +27,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.users.shared.safetyplan.SafetyPlanScreen
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import com.olive.app.data.SafetyConsultation
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
+
 
 private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages }
 
@@ -116,5 +119,58 @@ private fun StaffDashboard(
             enabled = !session.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.sign_out)) }
+    }
+}
+
+// Staff: shows safety-plan consultation requests to staff.
+// Lists the plan-consult tickets assigned to this staff member.
+@Composable
+internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) {
+    var selected by remember { mutableStateOf<SafetyConsultation?>(null) }
+    val controller = session.safetyPlans
+    DisposableEffect(Unit) { onDispose { controller.close() } }
+    BackHandler { if (selected != null) selected = null else onBack() }
+    val plan = selected
+    if (plan != null) {
+        SafetyPlanScreen(session, plan.ownerUid, plan.ownerName) { selected = null }
+        return
+    }
+    // Reload assigned plan consultations when staff return to this screen.
+    LaunchedEffect(Unit) {
+        while (true) {
+            controller.refreshConsultations()
+            delay(15.seconds)
+        }
+    }
+    FormColumn {
+        TextButton(onClick = onBack) { Text(stringResource(R.string.safety_back)) }
+        Heading(
+            stringResource(R.string.safety_inbox),
+            stringResource(if (session.accountRole == com.olive.app.data.AccountRole.ADMIN) R.string.safety_admin_intro else R.string.safety_staff_intro),
+            stringResource(R.string.olive_tree),
+        )
+        if (session.accountRole == com.olive.app.data.AccountRole.STAFF) {
+            val availabilityLabel = stringResource(R.string.safety_available)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(availabilityLabel, Modifier.weight(1f))
+                Switch(
+                    checked = controller.available,
+                    onCheckedChange = controller::changeAvailability,
+                    modifier = Modifier.testTag("safety_staff_available")
+                        .semantics { contentDescription = availabilityLabel },
+                )
+            }
+        }
+        controller.error?.let { AccessibleMessage(stringResource(it)) }
+        if (controller.consultations.isEmpty()) Text(stringResource(R.string.safety_inbox_empty))
+        controller.consultations.forEach { consultation ->
+            OutlinedButton(
+                onClick = { selected = consultation },
+                modifier = Modifier.fillMaxWidth()
+                    .testTag("safety_consultation_${consultation.ownerUid}"),
+            ) {
+                Text(stringResource(R.string.safety_open_plan, consultation.ownerName))
+            }
+        }
     }
 }

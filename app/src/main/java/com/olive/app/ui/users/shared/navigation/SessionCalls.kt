@@ -21,6 +21,68 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.error
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.olive.app.R
+import com.olive.app.ui.shared.AccessibleMessage
+import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.keepVisibleWhileTyping
+import com.olive.app.ui.shared.oliveScrollbar
+import com.olive.app.ui.shared.rememberResourceText
+import com.olive.app.data.DeliveryAddress
+import com.olive.app.data.NewsArticle
+import com.olive.app.data.PrivateEntryKind
+import com.olive.app.ui.session.SessionRuntime
+
 
 // Calls are private-account features. Support tickets can include staff or admins and never qualify.
 internal fun canCallFromConversation(
@@ -265,4 +327,212 @@ internal class SessionCalls(
         private const val ACTIVE_CALL_POLL_MS = 1_000L
         private const val IDLE_CALL_POLL_MS = 5_000L
     }
+}
+
+// All safe-app roles: draws shared fields and buttons for account forms.
+
+// Gives every long form the same spacing, scrolling, and room above Quick exit.
+@Composable
+internal fun FormColumn(
+    scrollResetKey: Any? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val scrollState = rememberScrollState()
+    LaunchedEffect(scrollResetKey) {
+        if (scrollResetKey != null) scrollState.scrollTo(0)
+    }
+    Column(
+        Modifier.fillMaxSize().oliveScrollbar(scrollState).verticalScroll(scrollState)
+            .padding(horizontal = 24.dp).padding(top = 24.dp, bottom = 112.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp), content = content
+    )
+}
+
+// Shows the app name, page title, and help text, then moves TalkBack focus to the new page title.
+@Composable
+internal fun Heading(
+    title: String,
+    subtitle: String,
+    appName: String = stringResource(R.string.olive_branch),
+    focusKey: Any? = title,
+) {
+    val focusRequester = remember { FocusRequester() }
+    // Moves TalkBack focus to the new form heading after the account step changes.
+    LaunchedEffect(focusKey) {
+        if (focusKey != null) {
+            withFrameNanos { }
+            focusRequester.requestFocus()
+        }
+    }
+    Text(appName, fontFamily = FontFamily.Serif, fontSize = 30.sp, color = OliveGreen)
+    Text(
+        title,
+        modifier = Modifier.focusRequester(focusRequester).focusable().semantics { heading() },
+        style = MaterialTheme.typography.headlineMedium
+    )
+    Text(subtitle, color = Muted)
+}
+
+// Warns testers when data is only being saved on the current device.
+@Composable
+internal fun ModeNotice(session: SessionViewModel) {
+    if (session.localMode) Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Text(
+            stringResource(R.string.local_test_mode_accounts_stay_on_this_installation_firebase_is_not_connected_use_fictional_information_while_testing),
+            Modifier.padding(14.dp),
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+// Announces status changes to TalkBack and shows when the app is busy.
+@Composable
+internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
+    // Shows the account form message only when there is text to explain.
+    if (showMessage) session.message?.let {
+        AccessibleMessage(
+            it,
+            modifier = Modifier.testTag("session_message")
+                .semantics { liveRegion = LiveRegionMode.Polite },
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+    AnimatedVisibility(
+        session.busy,
+        enter = fadeIn(tween(120)) + expandVertically(),
+        exit = fadeOut(tween(100)) + shrinkVertically()
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 3.dp)
+        }
+    }
+}
+
+// Builds a text field with consistent validation, password controls, and keyboard behavior.
+@Composable
+internal fun Field(
+    label: String,
+    value: String,
+    tag: String,
+    secret: Boolean = false,
+    numeric: Boolean = false,
+    showSecretToggle: Boolean = false,
+    multiline: Boolean = false,
+    enabled: Boolean = true,
+    error: String? = null,
+    onFocus: (() -> Unit)? = null,
+    onChange: (String) -> Unit
+) {
+    val uiText = rememberResourceText()
+    var secretVisible by rememberSaveable(tag) { mutableStateOf(false) }
+    val secretDescription = when {
+        numeric -> uiText(R.string.a11y_pin)
+        tag.contains("trigger", ignoreCase = true) -> uiText(R.string.a11y_trigger_word)
+        else -> uiText(R.string.a11y_password)
+    }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth().testTag(tag).semantics { error?.let { error(it) } }
+            .onFocusChanged { if (it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
+        enabled = enabled,
+        singleLine = !multiline,
+        minLines = if (multiline) 3 else 1,
+        isError = error != null,
+        supportingText = error?.let { message ->
+            {
+                AccessibleMessage(
+                    message,
+                    modifier = Modifier.testTag("${tag}_error"),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        visualTransformation = if (secret && !secretVisible) PasswordVisualTransformation()
+        else VisualTransformation.None,
+        trailingIcon = if (secret && showSecretToggle) {
+            {
+                IconButton(
+                    onClick = { secretVisible = !secretVisible },
+                    modifier = Modifier.testTag("${tag}_visibility")
+                ) {
+                    Icon(
+                        if (secretVisible) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
+                        contentDescription = if (secretVisible) uiText(
+                            R.string.ui_hide_value,
+                            secretDescription
+                        ) else uiText(R.string.ui_show_value, secretDescription)
+                    )
+                }
+            }
+        } else null,
+        keyboardOptions = KeyboardOptions(
+            autoCorrectEnabled = false, keyboardType = when {
+                numeric -> KeyboardType.NumberPassword
+                secret -> KeyboardType.Password
+                else -> KeyboardType.Text
+            }
+        )
+    )
+}
+
+// Signed-in users: connects cover, private note, activity, and privacy screens to their workflows.
+
+internal interface SessionCoverNotesActivityActions {
+    val runtime: SessionRuntime
+
+    // Passes the private-note button action to the session privacy controller.
+    fun noteInteraction() = runtime.privacy.noteInteraction()
+    // Records that Android detected a screenshot or screen recording.
+    fun captureDetected(kind: String) = runtime.privacy.captureDetected(kind)
+    // Records when Android reports that screen recording has stopped.
+    fun recordingStopped() = runtime.privacy.recordingStopped()
+    // Adds a settings change to the user's private activity history.
+    fun recordSettingsInteraction(area: String, action: String) =
+        runtime.history.recordSettingsInteraction(area, action)
+
+    // Adds or removes an article from the news cover's bookmarks.
+    fun toggleNewsBookmark(article: NewsArticle) = runtime.covers.toggleNewsBookmark(article)
+
+    // Opens one category in the private activity-history screen.
+    fun showActivityCategory(value: ActivityCategory) = runtime.history.showActivityCategory(value)
+    // Returns from an activity category to the full history list.
+    fun activityBack() = runtime.history.activityBack()
+
+    // Clears the note editor's success or error message before the next action.
+    fun clearPrivateEntryStatus() = runtime.notes.clearPrivateEntryStatus()
+    // Creates a private note or updates the note with the matching ID.
+    fun savePrivateEntry(
+        id: String?, kind: PrivateEntryKind, title: String, body: String,
+        incidentDate: String = "", incidentTime: String = "", incidentLocation: String = "",
+        incidentLatitude: Double? = null, incidentLongitude: Double? = null,
+        attachmentIds: List<String> = emptyList(),
+    ) = runtime.notes.savePrivateEntry(
+        id, kind, title, body, incidentDate, incidentTime, incidentLocation,
+        incidentLatitude, incidentLongitude, attachmentIds,
+    )
+
+    // Pins or unpins a private note so important notes stay easy to find.
+    fun togglePrivateEntryPin(id: String) = runtime.notes.togglePrivateEntryPin(id)
+    // Moves a private note into the note trash.
+    fun trashPrivateEntry(id: String) = runtime.notes.trashPrivateEntry(id)
+    // Restores a private note from the note trash.
+    fun restorePrivateEntry(id: String) = runtime.notes.restorePrivateEntry(id)
+}
+
+// All app roles: opens and closes the app's root screens and safe-app pages.
+
+internal class SessionScreenNavigation(private val runtime: SessionRuntime) {
+    // Gives navigation screens the same quick-exit action from the current session.
+    fun quickExit() = runtime.navigation.quickExit()
+    // Sends the app to the background when the user presses Quick Exit.
+    fun background() = runtime.navigation.background()
+    // Returns to the previous Safe App screen.
+    fun back() = runtime.navigation.back()
+    // Opens the requested Safe App page from shared navigation.
+    fun openSafePage(page: SafePage) = runtime.navigation.navigate(page)
 }

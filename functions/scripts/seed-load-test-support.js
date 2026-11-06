@@ -1,11 +1,9 @@
 // Seeds deterministic support work for the fictional load-test accounts.
-const path = require("node:path");
-const fs = require("node:fs");
-const os = require("node:os");
-const {initializeApp} = require("firebase-admin/app");
 const {getAuth} = require("firebase-admin/auth");
+const {getFirestore} = require("firebase-admin/firestore");
 const {signInEmail} = require("../src/accountPolicy");
 const {accounts} = require("./load-test-account-fixtures");
+const {initializeOliveAdminApp} = require("./firebase-admin-app");
 
 const projectId = String(process.env.OLIVE_LOAD_TEST_PROJECT_ID || "").trim();
 const confirmation = String(process.env.OLIVE_LOAD_TEST_CONFIRM_PROJECT || "").trim();
@@ -13,83 +11,35 @@ if (!projectId || confirmation !== projectId) {
   throw new Error("Set OLIVE_LOAD_TEST_PROJECT_ID and OLIVE_LOAD_TEST_CONFIRM_PROJECT to the same project ID.");
 }
 
-const cliConfigPaths = [
-  path.join(os.homedir(), ".config", "configstore", "firebase-tools.json"),
-  process.env.APPDATA && path.join(process.env.APPDATA, "configstore", "firebase-tools.json"),
-].filter(Boolean);
-
-function cliToken() {
-  const configPath = cliConfigPaths.find(candidate => fs.existsSync(candidate));
-  const tokens = configPath && JSON.parse(fs.readFileSync(configPath, "utf8")).tokens;
-  if (!tokens?.access_token || Number(tokens.expires_at || 0) <= Date.now() + 60_000) {
-    throw new Error("Firebase CLI login is missing or expired. Run: npx firebase-tools projects:list");
-  }
-  return tokens;
-}
-
-const credential = {
-  getAccessToken: async () => {
-    const tokens = cliToken();
-    return {
-      access_token: tokens.access_token,
-      expires_in: Math.max(60, Math.floor((Number(tokens.expires_at) - Date.now()) / 1000)),
-    };
-  },
-};
-const app = initializeApp({credential, projectId}, "load-test-support");
+const app = initializeOliveAdminApp({projectId}, "load-test-support");
 const auth = getAuth(app);
-
-function firestoreValue(value) {
-  if (value instanceof Date) return {timestampValue: value.toISOString()};
-  if (Array.isArray(value)) return {arrayValue: {values: value.map(firestoreValue)}};
-  if (value !== null && typeof value === "object") {
-    return {mapValue: {fields: Object.fromEntries(
-        Object.entries(value).map(([key, item]) => [key, firestoreValue(item)]),
-    )}};
-  }
-  if (typeof value === "string") return {stringValue: value};
-  if (typeof value === "boolean") return {booleanValue: value};
-  if (Number.isInteger(value)) return {integerValue: String(value)};
-  if (typeof value === "number") return {doubleValue: value};
-  if (value === null) return {nullValue: null};
-  throw new Error(`Unsupported Firestore value: ${typeof value}`);
-}
+const firestore = getFirestore(app);
 
 function documentWrite(collection, documentId, value, mergeFields = []) {
-  const update = {
-    name: `projects/${projectId}/databases/(default)/documents/${collection}/${documentId}`,
-    fields: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, firestoreValue(item)])),
+  return {
+    reference: firestore.collection(collection).doc(documentId),
+    value,
+    options: mergeFields.length ? {mergeFields} : undefined,
   };
-  return mergeFields.length ? {update, updateMask: {fieldPaths: mergeFields}} : {update};
 }
 
 async function commit(writes) {
-  const response = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:batchWrite`,
-      {
-        method: "POST",
-        headers: {Authorization: `Bearer ${cliToken().access_token}`, "Content-Type": "application/json"},
-        body: JSON.stringify({writes}),
-      },
-  );
-  if (!response.ok) throw new Error(`Firestore seed failed: ${response.status} ${await response.text()}`);
-  const result = await response.json();
-  if (result.status?.some(status => status.code && status.code !== 0)) {
-    throw new Error(`Firestore seed returned write errors: ${JSON.stringify(result.status)}`);
+  for (let index = 0; index < writes.length; index += 500) {
+    const batch = firestore.batch();
+    writes.slice(index, index + 500).forEach(({reference, value, options}) => {
+      if (options) batch.set(reference, value, options);
+      else batch.set(reference, value);
+    });
+    await batch.commit();
   }
 }
 
-async function batchGet(documentNames) {
-  const response = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:batchGet`,
-      {
-        method: "POST",
-        headers: {Authorization: `Bearer ${cliToken().access_token}`, "Content-Type": "application/json"},
-        body: JSON.stringify({documents: documentNames}),
-      },
-  );
-  if (!response.ok) throw new Error(`Firestore verification failed: ${response.status} ${await response.text()}`);
-  return response.json();
+async function batchGet(references) {
+  const snapshots = [];
+  for (let index = 0; index < references.length; index += 100) {
+    snapshots.push(...await firestore.getAll(...references.slice(index, index + 100)));
+  }
+  return snapshots;
 }
 
 async function accountRecord(fixture) {
@@ -207,29 +157,24 @@ async function seed() {
   }, ["available", "activeCount"])));
   await commit(writes);
 
-  const documentRoot = `projects/${projectId}/databases/(default)/documents`;
-  const expectedNames = [
+  const expectedPaths = [
     ...users.flatMap(owner => [
-      `${documentRoot}/safetyPlans/${owner.uid}`,
-      `${documentRoot}/supportRequests/${owner.uid}`,
-      `${documentRoot}/conversations/plan-consult-${owner.uid}-load-test`,
-      `${documentRoot}/conversations/support-${owner.uid}-load-test`,
+      `safetyPlans/${owner.uid}`,
+      `supportRequests/${owner.uid}`,
+      `conversations/plan-consult-${owner.uid}-load-test`,
+      `conversations/support-${owner.uid}-load-test`,
     ]),
-    ...staff.map(value => `${documentRoot}/safetyStaff/${value.uid}`),
+    ...staff.map(value => `safetyStaff/${value.uid}`),
   ];
-  const results = [];
-  for (let index = 0; index < expectedNames.length; index += 100) {
-    results.push(...await batchGet(expectedNames.slice(index, index + 100)));
-  }
-  const found = new Map(results.filter(value => value.found).map(value => [value.found.name, value.found]));
-  const missing = expectedNames.filter(name => !found.has(name));
+  const results = await batchGet(expectedPaths.map(path => firestore.doc(path)));
+  const found = new Map(results.filter(snapshot => snapshot.exists).map(snapshot => [snapshot.ref.path, snapshot]));
+  const missing = expectedPaths.filter(path => !found.has(path));
   if (missing.length) throw new Error(`Seed verification is missing ${missing.length} documents.`);
   const badStaff = staff.filter(value =>
-    found.get(`${documentRoot}/safetyStaff/${value.uid}`)?.fields?.activeCount?.integerValue !== "10");
+    found.get(`safetyStaff/${value.uid}`)?.get("activeCount") !== 10);
   const badPlans = users.filter(owner => {
-    const fields = found.get(`${documentRoot}/safetyPlans/${owner.uid}`)?.fields;
-    return fields?.consultationRequested?.booleanValue !== true ||
-      fields?.safeContactUids?.arrayValue?.values?.length !== 1;
+    const plan = found.get(`safetyPlans/${owner.uid}`)?.data();
+    return plan?.consultationRequested !== true || plan?.safeContactUids?.length !== 1;
   });
   if (badStaff.length || badPlans.length) {
     throw new Error(`Seed verification failed for ${badStaff.length} staff records and ${badPlans.length} plans.`);
@@ -237,7 +182,7 @@ async function seed() {
   console.log(`Seeded ${users.length} plan consultations and ${users.length} support requests.`);
   console.log(`Shared ${users.length} safety plans with staff and rotating safe contacts.`);
   console.log(`Each of ${staff.length} staff accounts has 5 plan consultations and 5 support requests.`);
-  console.log(`Verified ${expectedNames.length} persisted Firestore documents.`);
+  console.log(`Verified ${expectedPaths.length} persisted Firestore documents.`);
 }
 
 seed().catch(error => {

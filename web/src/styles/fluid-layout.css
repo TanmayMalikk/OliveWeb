@@ -17,14 +17,12 @@ html { font-size: 100%; }
 
 .landing-hero,
 .grove-main,
-.food-hero,
 .account-layout,
 .messages-layout {
   column-gap: var(--fluid-section-gap);
 }
 
-.landing-hero,
-.food-hero {
+.landing-hero {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
@@ -126,7 +124,6 @@ html { font-size: 100%; }
 @media (max-width: 48rem) {
   .landing-hero,
   .grove-main,
-  .food-hero,
   .account-layout,
   .messages-layout {
     grid-template-columns: minmax(0, 1fr);

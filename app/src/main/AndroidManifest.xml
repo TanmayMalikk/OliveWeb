@@ -71,16 +71,16 @@
         <activity android:name=".OliveLauncher" android:exported="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
             android:windowSoftInputMode="adjustResize" />
-        <activity-alias android:name=".FoodLauncher" android:targetActivity=".OliveActivity"
-            android:exported="true" android:enabled="true" android:label="Olive"
-            android:icon="@mipmap/ic_launcher_food" android:roundIcon="@mipmap/ic_launcher_food">
+        <activity-alias android:name=".GameLauncher" android:targetActivity=".OliveActivity"
+            android:exported="true" android:enabled="false" android:label="Olive Games"
+            android:icon="@mipmap/ic_launcher_game" android:roundIcon="@mipmap/ic_launcher_game">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
         <activity-alias android:name=".NewsLauncher" android:targetActivity=".OliveActivity"
-            android:exported="true" android:enabled="false" android:label="Daily Digest"
+            android:exported="true" android:enabled="true" android:label="Daily Digest"
             android:icon="@mipmap/ic_launcher_news" android:roundIcon="@mipmap/ic_launcher_news">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

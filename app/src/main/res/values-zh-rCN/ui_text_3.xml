@@ -62,8 +62,6 @@
 
 
 
-    <string name="ui_olive_order_update">橄榄订单更新</string>
-    <string name="ui_your_order_is_being_prepared">您的订单正在准备中。</string>
     <string name="ui_new_headlines_are_available">新的头条新闻可用。</string>
     <string name="ui_a_new_update_is_available">有新的更新可用。</string>
     <string name="ui_an_account_update_is_available">帐户更新可用。</string>
@@ -75,7 +73,6 @@
 
     <string name="ui_open_the_app_to_see_what_s_new">打开应用程序查看新内容。</string>
     <string name="ui_new_activity_is_waiting">新活动正在等待。</string>
-    <string name="ui_olive_order_updates">橄榄订单更新</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">Olive 的订单状态和交货通知</string>
     <string name="ui_daily_digest_briefings">每日摘要简报</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">每日头条新闻和新闻摘要通知</string>
