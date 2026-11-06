@@ -46,7 +46,6 @@ export default function Settings() {
           <label className="field">
             <span>Cover app</span>
             <select name="cover" defaultValue={p.coverType}>
-              <option value="FOOD">Olive</option>
               <option value="NEWS">Daily Digest</option>
               <option value="FITNESS">Fitness Tracker</option>
               <option value="GAME">Little Grove</option>

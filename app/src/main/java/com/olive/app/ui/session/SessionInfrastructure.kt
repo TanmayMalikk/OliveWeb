@@ -38,7 +38,6 @@ internal class SessionLocalStorage(application: Application, localMode: Boolean)
     val deviceStore = DeviceStore(vault, activityVault)
     val coverStore = CoverStateStore(EncryptedVault(application, "cover"))
     val coverSaveMutex = Mutex()
-    val foodRevisions = mutableMapOf<String, Long>()
     val newsRevisions = mutableMapOf<String, Long>()
     val messageReadState: SharedPreferences = application.getSharedPreferences(
         "olive_message_read_state",

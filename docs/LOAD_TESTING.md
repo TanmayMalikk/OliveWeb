@@ -10,14 +10,14 @@ Run this in PowerShell:
 cd C:\Users\Tanma\StudioProjects\F26_D1
 ```
 
-## 2. Sign in to Firebase
+## 2. Configure Firebase Admin credentials
 
 ```powershell
-npx firebase-tools login --reauth
-npx firebase-tools projects:list
+$env:GOOGLE_APPLICATION_CREDENTIALS="C:\Users\Tan\private_credentials\olive-firebase-admin.json.json"
 ```
 
-Make sure `olive-21239` appears in the project list.
+The scripts use Firebase Admin's Application Default Credentials. Keep the service-account file in
+the ignored `private_credentials` directory and never commit it.
 
 ## 3. Set the test configuration
 

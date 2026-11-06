@@ -30,7 +30,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         register(username = "cover_switch_tester")
         unlock()
         click("safe_settings")
-        listOf("food", "news", "fitness", "game").forEach {
+        listOf("news", "fitness", "game").forEach {
             compose.onNodeWithTag("cover_choice_icon_$it", useUnmergedTree = true).assertExists()
         }
         click("cover_choice_news")

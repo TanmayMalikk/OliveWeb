@@ -10,6 +10,12 @@ import kotlinx.coroutines.tasks.await
 import java.security.PublicKey
 import java.security.spec.MGF1ParameterSpec
 import javax.crypto.SecretKey
+import android.content.Context
+import com.olive.app.security.EncryptedVault
+import com.olive.app.security.child
+import org.json.JSONArray
+import org.json.JSONObject
+
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
 class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
@@ -244,3 +250,268 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     private fun com.google.firebase.firestore.DocumentSnapshot.participantPublicKeys() =
         get("participantPublicKeys") as? Map<String, String>
 }
+
+// All chat roles: retains only encrypted chat material for offline cold starts.
+
+internal interface ChatCacheVault {
+    fun read(): JSONObject
+    fun update(change: (JSONObject) -> Unit)
+}
+
+private class EncryptedChatCacheVault(context: Context) : ChatCacheVault {
+    private val vault = EncryptedVault(context, "chat-cache")
+    override fun read() = vault.read()
+    override fun update(change: (JSONObject) -> Unit) = vault.update(change)
+}
+
+class ChatCacheException(message: String) : IllegalStateException(message)
+
+/** Account-isolated encrypted index, wrapped room keys, and ciphertext message cache. */
+class ChatCacheStore internal constructor(
+    private val vault: ChatCacheVault,
+    private val maxAccountBytes: Int = MAX_ACCOUNT_BYTES,
+) {
+    constructor(context: Context) : this(EncryptedChatCacheVault(context.applicationContext))
+
+    fun conversations(ownerUid: String): List<ChatConversation> {
+        val entries = vault.read().optJSONObject(ACCOUNTS)?.optJSONObject(ownerUid)
+            ?.optJSONObject(CONVERSATIONS) ?: return emptyList()
+        return entries.keys().asSequence().mapNotNull { id ->
+            runCatching {
+                conversationFromCacheJson(entries.getJSONObject(id).getJSONObject(CONVERSATION))
+            }.getOrNull()
+        }.filter { ownerUid in it.participantIds }
+            .sortedByDescending(ChatConversation::updatedAt)
+            .toList()
+    }
+
+    /** A server-confirmed list is authoritative, so absent conversations and their keys are purged. */
+    fun replaceIndex(ownerUid: String, authoritative: List<ChatConversation>, now: Long) {
+        require(authoritative.all { ownerUid in it.participantIds })
+        vault.update { root ->
+            val account = root.child(ACCOUNTS).child(ownerUid)
+            val entries = conversations(account)
+            val retained = authoritative.associateBy(ChatConversation::id)
+            entries.keys().asSequence().toList().filterNot(retained::containsKey).forEach(entries::remove)
+            authoritative.forEach { conversation ->
+                val entry = entries.optJSONObject(conversation.id) ?: JSONObject().also {
+                    entries.put(conversation.id, it)
+                }
+                entry.put(CONVERSATION, conversation.toCacheJson())
+                if (!entry.has(LAST_ACCESSED_AT)) entry.put(LAST_ACCESSED_AT, now)
+            }
+            trim(account)
+        }
+    }
+
+    fun saveAccess(
+        ownerUid: String,
+        conversation: ChatConversation,
+        wrappedRoomKey: String,
+        deviceId: String,
+        validatedAt: Long,
+    ) {
+        require(ownerUid in conversation.participantIds)
+        require(wrappedRoomKey.isNotBlank() && deviceId.isNotBlank())
+        vault.update { root ->
+            val account = root.child(ACCOUNTS).child(ownerUid)
+            val entry = conversations(account).optJSONObject(conversation.id) ?: JSONObject().also {
+                conversations(account).put(conversation.id, it)
+            }
+            entry.put(CONVERSATION, conversation.toCacheJson())
+            entry.put(WRAPPED_ROOM_KEY, wrappedRoomKey)
+            entry.put(DEVICE_ID, deviceId)
+            entry.put(VALIDATED_AT, validatedAt)
+            entry.put(LAST_ACCESSED_AT, validatedAt)
+            if (!entry.has(MESSAGES)) entry.put(MESSAGES, JSONArray())
+            trim(account)
+        }
+    }
+
+    fun saveMessages(ownerUid: String, conversationId: String, messages: List<EncryptedChatMessage>, now: Long) {
+        vault.update { root ->
+            val account = root.child(ACCOUNTS).child(ownerUid)
+            val entry = conversations(account).optJSONObject(conversationId)
+                ?: throw ChatCacheException("Conversation access is not cached")
+            val retained = messages.takeLast(MAX_MESSAGES_PER_CONVERSATION)
+            entry.put(MESSAGES, JSONArray().apply { retained.forEach { put(it.toCacheJson()) } })
+            entry.put(LAST_ACCESSED_AT, now)
+            trim(account)
+        }
+    }
+
+    fun open(ownerUid: String, conversationId: String, deviceId: String, now: Long): CachedChatAccess {
+        val entry = vault.read().optJSONObject(ACCOUNTS)?.optJSONObject(ownerUid)
+            ?.optJSONObject(CONVERSATIONS)?.optJSONObject(conversationId)
+            ?: throw ChatCacheException("Conversation is not available offline")
+        return try {
+            val conversation = conversationFromCacheJson(entry.getJSONObject(CONVERSATION))
+            if (ownerUid !in conversation.participantIds) throw ChatCacheException("Cached access was revoked")
+            if (entry.getString(DEVICE_ID) != deviceId) throw ChatCacheException("Cached key belongs to another device")
+            val validatedAt = entry.getLong(VALIDATED_AT)
+            if (now < validatedAt || now - validatedAt > REVALIDATION_LEASE_MILLIS) {
+                throw ChatCacheException("Offline access requires online revalidation")
+            }
+            val messages = entry.optJSONArray(MESSAGES)?.let { array ->
+                List(array.length()) { index -> encryptedMessageFromCacheJson(array.getJSONObject(index)) }
+            }.orEmpty().takeLast(MAX_MESSAGES_PER_CONVERSATION)
+            CachedChatAccess(conversation, entry.getString(WRAPPED_ROOM_KEY), messages)
+        } catch (expected: ChatCacheException) {
+            throw expected
+        } catch (_: Exception) {
+            throw ChatCacheException("Cached conversation is corrupt")
+        }
+    }
+
+    fun remove(ownerUid: String, conversationId: String) {
+        vault.update { root ->
+            root.optJSONObject(ACCOUNTS)?.optJSONObject(ownerUid)
+                ?.optJSONObject(CONVERSATIONS)?.remove(conversationId)
+        }
+    }
+
+    fun purge(ownerUid: String) {
+        vault.update { root -> root.optJSONObject(ACCOUNTS)?.remove(ownerUid) }
+    }
+
+    private fun conversations(account: JSONObject): JSONObject =
+        account.child(CONVERSATIONS)
+
+    /** Evicts the least recently used ciphertext first, then metadata only if the account is still oversized. */
+    private fun trim(account: JSONObject) {
+        val entries = conversations(account)
+        val oldest = entries.keys().asSequence().mapNotNull { id ->
+            entries.optJSONObject(id)?.let { id to it.optLong(LAST_ACCESSED_AT) }
+        }.sortedBy(Pair<String, Long>::second).map(Pair<String, Long>::first).toList()
+        oldest.forEach { id ->
+            if (sizeOf(account) <= maxAccountBytes) return
+            entries.optJSONObject(id)?.put(MESSAGES, JSONArray())
+        }
+        oldest.forEach { id ->
+            if (sizeOf(account) <= maxAccountBytes) return
+            entries.remove(id)
+        }
+    }
+
+    private fun sizeOf(value: JSONObject) = value.toString().toByteArray(Charsets.UTF_8).size
+
+    companion object {
+        const val MAX_MESSAGES_PER_CONVERSATION = 250
+        const val REVALIDATION_LEASE_MILLIS = 24 * 60 * 60 * 1_000L
+        const val MAX_ACCOUNT_BYTES = 25 * 1024 * 1024
+        private const val ACCOUNTS = "accounts"
+        private const val CONVERSATIONS = "conversations"
+        private const val CONVERSATION = "conversation"
+        private const val WRAPPED_ROOM_KEY = "wrappedRoomKey"
+        private const val DEVICE_ID = "deviceId"
+        private const val VALIDATED_AT = "validatedAt"
+        private const val LAST_ACCESSED_AT = "lastAccessedAt"
+        private const val MESSAGES = "messages"
+    }
+}
+
+// All chat roles: defines friends, conversations, and message records.
+
+data class DirectoryUser(val uid: String, val username: String, val publicKey: String = "")
+
+data class FriendRequest(
+    val id: String,
+    val senderUid: String,
+    val senderUsername: String,
+    val recipientUid: String,
+    val recipientUsername: String,
+    val createdAt: Long,
+)
+
+data class Friend(val friendshipId: String, val uid: String, val username: String)
+
+// A private note belongs only to the signed-in account on this device.
+data class PrivateContactNote(val uid: String, val username: String, val body: String)
+
+data class SocialSnapshot(
+    val friends: List<Friend> = emptyList(),
+    val incoming: List<FriendRequest> = emptyList(),
+    val outgoing: List<FriendRequest> = emptyList(),
+)
+
+enum class FriendRelationship { AddFriend, RequestSent, IncomingRequest, Friends }
+
+data class ChatConversation(
+    val id: String,
+    val friendshipId: String,
+    val participantIds: List<String>,
+    val participantUsernames: Map<String, String>,
+    val lastMessage: String = "",
+    val updatedAt: Long = 0L,
+    val lastMessageId: String = "",
+    val lastSenderUid: String = "",
+    val type: String = "DIRECT",
+    val ownerUid: String = "",
+    val staffUid: String = "",
+    val adminUid: String = "",
+    val supportOrigin: String = "",
+    val supportTag: String = "",
+    val closedAt: Long = 0L,
+) {
+    // Chooses the private display name shown for this conversation.
+    fun displayName(
+        currentUid: String,
+        viewerRole: AccountRole,
+        anonymousStaffName: String = "Your Olive Branch",
+    ) = if (type == "SUPPORT") {
+        if (viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
+            participantUsernames[ownerUid].orEmpty().ifBlank { "User" }
+        } else anonymousStaffName
+    } else participantUsernames.entries.firstOrNull { it.key != currentUid }?.value ?: "Conversation"
+
+    // Personal accounts see why the anonymous Olive Staff conversation was opened.
+    fun anonymousStaffDisplayName(
+        staffName: String,
+        consultationName: String,
+        supportName: String,
+        escalationName: String,
+    ): String {
+        val ticketName = when {
+            supportTag == SUPPORT_TAG_NEEDS_ADMIN -> escalationName
+            supportOrigin == SUPPORT_TAG_PLAN_CONSULT || supportTag == SUPPORT_TAG_PLAN_CONSULT -> consultationName
+            else -> supportName
+        }
+        return "$staffName • $ticketName"
+    }
+
+    // Personal accounts see a role label instead of an organization member's account name.
+    fun senderDisplayName(
+        senderUid: String,
+        senderUsername: String,
+        viewerRole: AccountRole,
+        anonymousStaffName: String,
+    ) = if (
+        type == "SUPPORT" &&
+        viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+        senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() }
+    ) anonymousStaffName else senderUsername
+
+}
+
+internal const val SUPPORT_TAG_PLAN_CONSULT = "PLAN_CONSULT"
+internal const val SUPPORT_TAG_SUPPORT = "SUPPORT"
+internal const val SUPPORT_TAG_NEEDS_ADMIN = "NEEDS_ADMIN"
+
+data class ChatMessage(
+    val id: String,
+    val senderUid: String,
+    val senderUsername: String,
+    val body: String,
+    val sentAt: Long,
+    val unsent: Boolean = false,
+    val deliveryStatus: MessageDeliveryStatus = MessageDeliveryStatus.SENT,
+    val deliveryFailureCode: String? = null,
+)
+
+// Messaging: Represents a live chat listener. It gives each screen one operation for stopping that listener safely.
+fun interface ChatSubscription {
+    // Removes the Firebase listener that was delivering live chat updates.
+    fun close()
+}
+
+// Firestore handles friend state and live DMs while message bodies stay out of its on-device disk cache.

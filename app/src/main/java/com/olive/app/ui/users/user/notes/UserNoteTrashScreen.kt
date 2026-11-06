@@ -1,7 +1,6 @@
 // Safe-app users: shows deleted notes that a user can restore.
 package com.olive.app.ui.users.user.notes
 
-
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,6 +56,53 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration.Companion.milliseconds
 import com.olive.app.ui.shared.LocalizedIcon as Icon
+import android.Manifest
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.paneTitle
+import com.olive.app.data.AddressSuggestion
+import com.olive.app.data.GeoapifyClient
+import com.olive.app.data.AccountIdentity
+import com.olive.app.data.DeviceLocation
+import com.olive.app.data.MapLocationPoint
+import com.olive.app.ui.users.user.location.InteractiveLocationMap
+import kotlinx.coroutines.launch
+import com.olive.app.ui.shared.keepVisibleWhileTyping
+import com.olive.app.ui.users.shared.navigation.Field
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import com.olive.app.ui.users.shared.navigation.Status
+import java.time.ZoneId
+import java.util.Locale
+import androidx.compose.foundation.lazy.grid.items as gridItems
+
 
 
 // Shows trashed notes with restore and permanent-delete actions.
@@ -266,3 +312,69 @@ internal fun PrivateEntryEditLog(
 }
 
 // UI sizing/color: note cards use a 1dp outline, warm paper fill, 14dp padding, and up to three title lines.
+
+// Safe-app users: shows the user’s private notes.
+
+
+// UI sizing/color: Trash cards use a 1dp black outline, warm paper fill, 16dp padding, and Material text sizes.
+@Composable
+internal fun PrivateNoteCard(
+    entry: PrivateEntry, formatter: DateTimeFormatter,
+    open: () -> Unit, pin: () -> Unit, openLog: () -> Unit, modifier: Modifier = Modifier
+) {
+    val uiText = rememberResourceText()
+    Card(
+        onClick = open,
+        modifier = modifier.fillMaxWidth().testTag("private_entry_row"),
+        border = BorderStroke(1.dp, Color.Black),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF4))
+    ) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                entry.kind.let {
+                    Text(
+                        if (it == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
+                            R.string.note
+                        ),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = OliveGreen,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                IconButton(
+                    onClick = pin,
+                    modifier = Modifier.size(34.dp).testTag("private_pin")
+                ) {
+                    Icon(
+                        Icons.Outlined.PushPin,
+                        if (entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry),
+                        tint = if (entry.pinned) Color(0xFFFFC107) else Muted
+                    )
+                }
+            }
+            if (entry.title.isNotBlank()) Text(
+                entry.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 3,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            Text(
+                entry.body,
+                maxLines = 8,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            Text(
+                (if (entry.edits.isNotEmpty()) "${stringResource(R.string.edited)} · " else "") + formatter.format(
+                    Instant.ofEpochMilli(entry.updatedAt)
+                ), style = MaterialTheme.typography.bodySmall, color = Muted
+            )
+            if (entry.edits.isNotEmpty()) TextButton(
+                onClick = openLog,
+                modifier = Modifier.testTag("private_edit_log"),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Text("${stringResource(R.string.edit_log)} (${entry.edits.size})")
+            }
+        }
+    }
+}

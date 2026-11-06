@@ -11,9 +11,7 @@ export const formatDateTime = (time: number) =>
 
 export default function Activity() {
   const s = useSession();
-  const [category, setCategory] = useState<
-    "settings" | "triggers" | "checkouts"
-  >("settings");
+  const [category, setCategory] = useState<"settings" | "triggers">("settings");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const rows = s.history[category]
@@ -27,7 +25,7 @@ export default function Activity() {
     <>
       <div className="page-toolbar">
         <div className="filter-row">
-          {(["settings", "triggers", "checkouts"] as const).map((c) => (
+          {(["settings", "triggers"] as const).map((c) => (
             <button
               key={c}
               aria-pressed={category === c}
@@ -65,9 +63,7 @@ export default function Activity() {
                 {row.action || row.source || row.error || "Account activity"}
               </h3>
               <p>
-                {row.area ??
-                  row.lastResult ??
-                  row.foods?.map((f) => `${f.quantity} × ${f.food}`).join(", ")}
+                {row.area ?? row.lastResult}
               </p>
               {row.changes?.map((change) => (
                 <p key={change.field}>
@@ -75,9 +71,6 @@ export default function Activity() {
                   {change.after || "Empty"}
                 </p>
               ))}
-              {row.totalCents !== undefined && (
-                <strong>${(row.totalCents / 100).toFixed(2)}</strong>
-              )}
             </div>
             <time>{formatDateTime(row.timestamp)}</time>
           </article>

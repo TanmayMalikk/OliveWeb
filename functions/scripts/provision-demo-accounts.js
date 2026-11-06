@@ -1,72 +1,28 @@
 // Creates or repairs the four school-demo accounts without storing their password in source control.
-const path = require("node:path");
-const fs = require("node:fs");
-const os = require("node:os");
-const {initializeApp} = require("firebase-admin/app");
 const {getAuth} = require("firebase-admin/auth");
+const {getFirestore} = require("firebase-admin/firestore");
+const {getStorage} = require("firebase-admin/storage");
 const {defaultProfile, organizationEmailKey, signInEmail} = require("../src/accountPolicy");
+const {initializeOliveAdminApp} = require("./firebase-admin-app");
 
 const PROJECT_ID = "olive-21239";
-const APP_ROOT = path.resolve(__dirname, "../..");
-const cliConfigPaths = [
-  path.join(os.homedir(), ".config", "configstore", "firebase-tools.json"),
-  process.env.APPDATA && path.join(process.env.APPDATA, "configstore", "firebase-tools.json"),
-].filter(Boolean);
-
-function cliToken() {
-  const configPath = cliConfigPaths.find((candidate) => fs.existsSync(candidate));
-  const tokens = configPath && JSON.parse(fs.readFileSync(configPath, "utf8")).tokens;
-  if (!tokens?.access_token || Number(tokens.expires_at || 0) <= Date.now() + 60_000) {
-    throw new Error(`Firebase CLI login is missing or expired for ${APP_ROOT}. Run: npx firebase-tools projects:list`);
-  }
-  return tokens;
-}
-
-const credential = {
-  getAccessToken: async () => {
-    const tokens = cliToken();
-    return {
-      access_token: tokens.access_token,
-      expires_in: Math.max(60, Math.floor((Number(tokens.expires_at) - Date.now()) / 1000)),
-    };
-  },
-};
-const app = initializeApp({
-  credential,
+const app = initializeOliveAdminApp({
   projectId: PROJECT_ID,
   storageBucket: `${PROJECT_ID}.firebasestorage.app`,
 }, "demo-provisioning");
 const auth = getAuth(app);
-
-async function accessToken() {
-  return cliToken().access_token;
-}
+const firestore = getFirestore(app);
+const bucket = getStorage(app).bucket();
 
 async function writeProfile(uid, profile) {
-  const objectName = encodeURIComponent(`accounts/${uid}/profile.json`);
-  const response = await fetch(
-      `https://storage.googleapis.com/upload/storage/v1/b/${PROJECT_ID}.firebasestorage.app/o?uploadType=media&name=${objectName}`,
-      {
-        method: "POST",
-        headers: {Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json"},
-        body: JSON.stringify(profile, null, 2),
-      },
-  );
-  if (!response.ok) {
-    throw new Error(`Profile upload failed: ${response.status} ${await response.text()}`);
-  }
+  await bucket.file(`accounts/${uid}/profile.json`).save(JSON.stringify(profile, null, 2), {
+    contentType: "application/json",
+    resumable: false,
+  });
 }
 
-async function writeFirestoreDocument(collection, documentId, fields) {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${collection}/${documentId}`;
-  const response = await fetch(url, {
-    method: "PATCH",
-    headers: {Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json"},
-    body: JSON.stringify({fields}),
-  });
-  if (!response.ok) {
-    throw new Error(`${collection} update failed: ${response.status} ${await response.text()}`);
-  }
+async function writeFirestoreDocument(collection, documentId, value) {
+  await firestore.collection(collection).doc(documentId).set(value);
 }
 
 const password = process.env.OLIVE_DEMO_PASSWORD;
@@ -94,33 +50,33 @@ const accounts = [
 async function writeAccountDirectory(user, account) {
   const authEmail = signInEmail(account.username, account.role, account.email);
   await writeFirestoreDocument("accountDirectory", account.username, {
-    uid: {stringValue: user.uid},
-    username: {stringValue: account.username},
-    role: {stringValue: account.role},
-    protected: {booleanValue: account.protected},
+    uid: user.uid,
+    username: account.username,
+    role: account.role,
+    protected: account.protected,
     ...(account.role === "STAFF" || account.role === "ADMIN" ? {
-      loginAlias: {stringValue: authEmail},
+      loginAlias: authEmail,
     } : {}),
-    createdAt: {timestampValue: new Date().toISOString()},
+    createdAt: new Date(),
   });
 }
 
 async function writeOrganizationLogin(user, account, authEmail) {
   if (!account.email) return;
   await writeFirestoreDocument("organizationLoginAliases", organizationEmailKey(account.email), {
-    uid: {stringValue: user.uid},
-    username: {stringValue: account.username},
-    role: {stringValue: account.role},
-    authEmail: {stringValue: authEmail},
-    updatedAt: {timestampValue: new Date().toISOString()},
+    uid: user.uid,
+    username: account.username,
+    role: account.role,
+    authEmail,
+    updatedAt: new Date(),
   });
 }
 
 async function writeStaffSettings(user, account) {
   if (account.role !== "STAFF") return;
   await writeFirestoreDocument("safetyStaff", user.uid, {
-    available: {booleanValue: true},
-    activeCount: {integerValue: "0"},
+    available: true,
+    activeCount: 0,
   });
 }
 

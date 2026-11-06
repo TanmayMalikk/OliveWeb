@@ -9,6 +9,20 @@ import com.olive.app.ui.users.user.documents.MediaTransferController
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.location.LocationMapController
 import com.olive.app.ui.users.admin.AdminLocationMapController
+import com.olive.app.data.ChatConversation
+import com.olive.app.data.ChatMessage
+import com.olive.app.data.DirectoryUser
+import com.olive.app.data.Friend
+import com.olive.app.data.FriendRelationship
+import com.olive.app.data.FriendRequest
+import com.olive.app.data.PrivateEntry
+import com.olive.app.data.SafetyDocument
+import com.olive.app.data.AdminAccountDraft
+import com.olive.app.data.AdminAccountSummary
+import com.olive.app.data.CoverType
+import com.olive.app.data.DeliveryAddress
+import com.olive.app.data.SafeContact
+
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
 internal class SessionViewModel(application: Application) : AndroidViewModel(application),
@@ -47,7 +61,6 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val settingsHistory get() = runtime.state.settingsHistory
     val privacyHistory get() = runtime.state.privacyHistory
     val triggerHistory get() = runtime.state.triggerHistory
-    val checkoutHistory get() = runtime.state.checkoutHistory
     val privateEntries get() = runtime.state.privateEntries
     val viewedSharedEntry get() = runtime.state.viewedSharedEntry
     internal val safetyPlans get() = runtime.safety
@@ -56,8 +69,6 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     // Cover, organization account, and sync state.
     val pendingSync get() = runtime.state.pendingSync
     val deliveryAddress get() = runtime.state.deliveryAddress
-    val addressPrompt get() = runtime.state.addressPrompt
-    val addressSaveVersion get() = runtime.state.addressSaveVersion
     val language get() = runtime.state.language
     val coverDob get() = runtime.state.coverDob
     val coverFullName get() = runtime.state.coverFullName
@@ -66,16 +77,8 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val accountRole get() = runtime.state.accountRole
     val adminCounts get() = runtime.state.adminCounts
     val adminAccounts get() = runtime.state.adminAccounts
-    val foodCart get() = runtime.state.foodCart
-    val foodFavorites get() = runtime.state.foodFavorites
-    val foodCustomizations get() = runtime.state.foodCustomizations
     val savedNews get() = runtime.state.savedNews
     val coverDataVersion get() = runtime.state.coverDataVersion
-    var checkoutActive: Boolean
-        get() = runtime.state.checkoutActive
-        set(value) {
-            runtime.state.checkoutActive = value
-        }
     val idleCountdownSeconds get() = runtime.state.idleCountdownSeconds
     val privacyBlackout get() = runtime.state.privacyBlackout
     val coverReset get() = runtime.state.coverReset
@@ -143,4 +146,145 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         runtime.messaging.stopMessaging()
         calls.close()
     }
+}
+
+// Users, safe contacts, staff, and admins: keeps message screen state and chat actions together.
+
+internal class SessionMessages(private val runtime: SessionRuntime) {
+    val userSearchResults get() = runtime.state.userSearchResults
+    val friends get() = runtime.state.friends
+    val incomingFriendRequests get() = runtime.state.incomingFriendRequests
+    val outgoingFriendRequests get() = runtime.state.outgoingFriendRequests
+    val conversations get() = runtime.state.conversations
+    val archivedConversationIds get() = runtime.state.archivedConversationIds
+    val privateContactNotes get() = runtime.state.privateContactNotes
+    val activeConversation get() = runtime.state.activeConversation
+    val chatQuickExitHintVisible get() = runtime.state.chatQuickExitHintVisible
+    val chatMessages get() = runtime.state.chatMessages
+    val busy get() = runtime.state.messagingBusy
+    val needsReconnect get() = runtime.state.messagingNeedsReconnect
+    val pendingActionCount get() = runtime.pendingMessageActionCount
+    fun isUnread(conversation: ChatConversation) = runtime.isConversationUnread(conversation)
+    fun unreadCountForSupportTag(tag: String) = runtime.state.conversations.count { conversation ->
+        conversation.type == "SUPPORT" && conversation.supportTag == tag &&
+                conversation.closedAt == 0L &&
+                conversation.id !in runtime.state.archivedConversationIds &&
+                runtime.isConversationUnread(conversation)
+    }
+
+    // Starts chat listeners when the current screen needs messaging.
+    fun ensureMessagingObservation(showFeedback: Boolean = false) =
+        runtime.messaging.ensureMessagingObservation(showFeedback)
+
+    // Reconnects chat listeners after a network or account change.
+    fun reconnectMessaging(password: String, onConnected: () -> Unit = {}) =
+        runtime.messaging.reconnectMessaging(password, onConnected)
+
+    // Searches the account directory for an exact username.
+    fun searchUsers(query: String) = runtime.friendActions.searchUsers(query)
+    // Returns the current friend relationship with this account.
+    fun relationshipFor(uid: String): FriendRelationship = runtime.friendActions.relationshipFor(uid)
+    // Sends a friend request to the selected account.
+    fun sendFriendRequest(user: DirectoryUser) = runtime.friendActions.sendFriendRequest(user)
+    // Accepts an incoming friend request.
+    fun acceptFriendRequest(request: FriendRequest) = runtime.friendActions.acceptFriendRequest(request)
+    // Declines an incoming friend request.
+    fun declineFriendRequest(request: FriendRequest) = runtime.friendActions.declineFriendRequest(request)
+    // Returns true when the outgoing friend request may still be cancelled.
+    fun cancelFriendRequest(request: FriendRequest) = runtime.friendActions.cancelFriendRequest(request)
+    // Opens an existing conversation by its ID.
+    fun startConversation(friend: Friend) = runtime.friendActions.startConversation(friend)
+
+    // Creates or opens a direct conversation with this account.
+    fun openConversation(conversation: ChatConversation) =
+        runtime.conversationActions.openConversation(conversation)
+
+    // Closes the current conversation and returns to the chat list.
+    fun closeConversation() = runtime.conversationActions.closeConversation()
+    // Archives or restores the selected conversation for this account.
+    fun setConversationArchived(conversation: ChatConversation, archived: Boolean) =
+        runtime.conversationActions.setArchived(conversation, archived)
+
+    // Saves a private note about this friend or supported user.
+    fun appendPrivateContactNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) =
+        runtime.conversationActions.appendPrivateNote(target, text, onSaved)
+
+    // Encrypts and sends the typed message to the current conversation.
+    fun sendMessage(text: String, onSent: () -> Unit = {}) =
+        runtime.conversationActions.sendMessage(text, onSent)
+
+    // Retries the failed encrypted queue head without bypassing message order.
+    fun retryMessage(chat: ChatMessage) = runtime.conversationActions.retryMessage(chat)
+    // Un-sends a message when the signed-in account is allowed to remove it.
+    fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
+    // Dismisses the quick-exit tip shown inside a chat.
+    fun dismissChatQuickExitHint() = runtime.conversationActions.dismissChatQuickExitHint()
+
+    // Encrypts a private note and shares it with the current chat.
+    fun sharePrivateEntryInChat(entry: PrivateEntry) = runtime.secureSharing.share(entry)
+    // Gives the current chat encrypted access to a safety document.
+    fun shareSafetyDocumentInChat(document: SafetyDocument) = runtime.secureSharing.share(document)
+    // Shares the safety plan and starts a separate plan-consult ticket.
+    fun shareSafetyPlanInChat() = runtime.secureSharing.shareSafetyPlan()
+    // Opens a private note that was shared in this conversation.
+    fun openSharedPrivateEntry(entryId: String) = runtime.secureSharing.open(entryId)
+    // Closes the shared-note viewer and releases its live listener.
+    fun closeSharedPrivateEntry() = runtime.secureSharing.close()
+
+    // Escalates this support ticket by adding an available admin.
+    fun requestAdminHelp(conversationId: String) = runtime.staffSupport.requestAdmin(conversationId)
+    // Closes the support ticket and archives it for every participant.
+    fun closeSupportChat(conversationId: String) = runtime.staffSupport.close(conversationId)
+}
+
+// Signed-in accounts and admins: connects profile, cover settings, and account management screens.
+
+internal interface SessionAccountManagementActions {
+    val runtime: SessionRuntime
+
+    // Saves the staff or admin details entered during account setup.
+    fun saveOrganizationProfile(fullName: String, dob: String, email: String, phone: String) =
+        runtime.organization.saveOrganizationProfile(fullName, dob, email, phone)
+
+    // Updates the signed-in staff or admin profile after setup.
+    fun updateOrganizationProfile(fullName: String, dob: String, email: String, phone: String) =
+        runtime.organization.updateOrganizationProfile(fullName, dob, email, phone)
+
+    // Reloads the account list shown in the admin portal.
+    fun refreshAdminAccounts() = runtime.organization.refreshAdminAccounts()
+    // Creates a staff or admin account from the admin form.
+    fun createManagedAccount(value: AdminAccountDraft) = runtime.organization.createManagedAccount(value)
+    // Deletes a staff or admin account selected in the admin portal.
+    fun deleteManagedAccount(value: AdminAccountSummary) = runtime.organization.deleteManagedAccount(value)
+
+    // Saves the user profile and situation details from Safe App settings.
+    fun saveSettings(
+        fullName: String,
+        affected: String,
+        abuserName: String,
+        dob: String,
+        situation: String,
+        address: DeliveryAddress,
+    ) = runtime.settings.saveSettings(fullName, affected, abuserName, dob, situation, address)
+
+    // Saves the public profile details used by the selected cover app.
+    fun saveCoverSettings(
+        fullName: String,
+        dob: String = runtime.state.coverDob,
+        address: DeliveryAddress = runtime.state.deliveryAddress,
+    ) = runtime.settings.saveCoverSettings(fullName, dob, address)
+
+    // Changes which cover app opens before the private Safe App.
+    fun changeCover(type: CoverType) = runtime.settings.changeCover(type)
+    // Changes the hidden phrase that opens private entry from a cover app.
+    fun changeTrigger(trigger: String, pin: String) = runtime.settings.changeTrigger(trigger, pin)
+    // Saves the trusted contacts entered during setup or in settings.
+    fun saveContacts(value: List<SafeContact>) = runtime.settings.saveContacts(value)
+    // Sends local setting changes to the account and downloads newer changes.
+    fun sync() = runtime.settings.sync()
+    // Restarts account notification listeners after the signed-in account changes.
+    fun syncLocalNotificationHandler() = runtime.messaging.syncLocalNotificationHandler()
+    // Checks the current password before replacing it with the new password.
+    fun changePassword(currentPassword: String, newPassword: String, confirmation: String) =
+        runtime.settings.changePassword(currentPassword, newPassword, confirmation)
 }

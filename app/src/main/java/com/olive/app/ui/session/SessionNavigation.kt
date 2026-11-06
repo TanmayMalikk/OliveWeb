@@ -2,8 +2,19 @@
 package com.olive.app.ui.session
 
 import com.olive.app.ui.users.shared.navigation.*
-
 import com.olive.app.data.*
+import com.olive.app.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
+import androidx.compose.runtime.*
+import com.olive.app.data.AccountRole
+import com.olive.app.data.SupportRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
+
 
 // Owns navigation history and background locking; quick exit clears PIN authorization and invalidates pending operations.
 internal class SessionNavigation(private val runtime: SessionRuntime) {
@@ -41,9 +52,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 idlePausedForCall = false
                 idleCountdownSeconds = null
                 busy = false
-                checkoutActive = false
                 coverReset++
-                addressPrompt = false
                 viewedSharedEntry = null
                 profile?.coverType?.let { coverType = it }
                 // Safe contacts return to account entry because they do not use a cover app.
@@ -105,7 +114,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     pendingIdentity = null
                     pendingProfile = null
                     accountRole = AccountRole.USER
-                    coverType = CoverType.FOOD
+                    coverType = CoverType.NEWS
                     screenHistory.clear()
                     screen = SessionScreen.Cover
                     message = null
@@ -133,7 +142,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     val previousScreen = screenHistory.removeAt(screenHistory.lastIndex)
                     if (enrollment == null && previousScreen == SessionScreen.Cover) {
                         accountRole = AccountRole.USER
-                        coverType = CoverType.FOOD
+                        coverType = CoverType.NEWS
                     }
                     screen = previousScreen
                     message = null
@@ -167,6 +176,233 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                             showFeedback = true
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+// Signed-in users: stores the selected discreet cover.
+
+// Owns account-scoped cover persistence.
+internal class SessionCoverState(private val runtime: SessionRuntime) {
+    // Loads the signed-in account's saved news state.
+    suspend fun restoreCoverData(uid: String) {
+        with(runtime) {
+            with(state) {
+                val saved = withContext(Dispatchers.IO) { coverStore.restore(uid) }
+                savedNews = saved
+                coverDataVersion++
+            }
+        }
+    }
+
+    // Switches news bookmark on or off.
+    fun toggleNewsBookmark(article: NewsArticle) {
+        with(runtime) {
+            with(state) {
+                val uid = enrollment?.uid ?: return
+                savedNews =
+                    if (savedNews.any { it.link == article.link }) savedNews.filterNot { it.link == article.link }
+                    else (listOf(article) + savedNews).take(100)
+                val latest = savedNews
+                val revision = (newsRevisions[uid] ?: 0L) + 1L
+                newsRevisions[uid] = revision
+                scope.launch {
+                    coverSaveMutex.withLock {
+                        if (newsRevisions[uid] != revision) return@withLock
+                        withContext(Dispatchers.IO) { coverStore.saveNews(uid, latest) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Users and staff: manages support tickets separately from safety-plan consultations.
+
+internal class StaffSupportController(private val runtime: SessionRuntime) {
+    private val repository by lazy { SupportRepository() }
+
+    var requested by mutableStateOf(false)
+        private set
+    var staffUid by mutableStateOf("")
+        private set
+    var conversationId by mutableStateOf("")
+        private set
+    var saving by mutableIntStateOf(0)
+        private set
+    var error by mutableStateOf<Int?>(null)
+        private set
+
+    // Requests help for staff support controller.
+    fun requestHelp() = updateRequest(cancel = false)
+
+    // Returns true while a staff-help request is waiting and may be cancelled.
+    fun cancelRequest() = updateRequest(cancel = true)
+
+    // Keep the current account's ticket on screen; responses from a previous account are ignored.
+    private fun updateRequest(cancel: Boolean) {
+        if (runtime.localMode) {
+            error = R.string.safety_account_required
+            return
+        }
+        if (runtime.state.accountRole != AccountRole.USER) return
+        val actor = runtime.coverAccountId ?: return
+        saving++
+        error = null
+        runtime.scope.launch {
+            // Use the fallback when update request is unavailable.
+            try {
+                val ticket = withTimeout(35.seconds) {
+                    withContext(Dispatchers.IO) {
+                        if (cancel) repository.cancelRequest() else repository.requestHelp()
+                    }
+                }
+                if (runtime.coverAccountId == actor) {
+                    requested = ticket.requested
+                    staffUid = ticket.staffUid
+                    conversationId = ticket.conversationId
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) { // Keep the existing ticket state and show that the support request failed.
+                if (runtime.coverAccountId == actor) error = R.string.support_request_error
+            } finally {
+                if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
+    // Staff support controller: Requests admin.
+    fun requestAdmin(conversationId: String) {
+        if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || conversationId.isBlank()) return
+        saving++
+        error = null
+        runtime.scope.launch {
+            // Use the fallback when request admin is unavailable.
+            try {
+                withContext(Dispatchers.IO) { repository.requestAdmin(conversationId) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) { // Do not change the ticket category unless the admin escalation succeeds.
+                error = R.string.support_admin_request_error
+            } finally {
+                saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
+    // Staff support controller: Closes the active feature.
+    fun close(conversationId: String) {
+        if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || conversationId.isBlank() || saving > 0) return
+        val actor = runtime.coverAccountId ?: return
+        saving++
+        error = null
+        runtime.scope.launch {
+            // Use the fallback when close is unavailable.
+            try {
+                withContext(Dispatchers.IO) { repository.close(conversationId) }
+                if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
+                    runtime.conversationActions.closeConversation()
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) { // Leave the chat active when the server cannot archive it for every participant.
+                if (runtime.coverAccountId == actor) error = R.string.support_close_error
+            } finally {
+                if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+}
+
+// Signed-in users: sends and accepts friend requests.
+
+// Searches the directory and manages friend requests.
+internal class FriendActions(private val runtime: SessionRuntime) {
+    // Finds users for the signed-in session.
+    fun searchUsers(query: String) {
+        with(runtime) {
+            with(state) {
+                return messaging.runMessagingAction("Unable to search for users.") { repository, device, token ->
+                    val rows = repository.searchUsers(query, device.uid)
+                    if (epoch == token) {
+                        userSearchResults = rows
+                        message =
+                            if (rows.isEmpty()) runtime.application.getString(R.string.no_user_found_for_that_exact_username) else null
+                    }
+                }
+            }
+        }
+    }
+
+    // Loads the current friend relationship before changing it.
+    fun relationshipFor(uid: String): FriendRelationship {
+        with(runtime) {
+            with(state) {
+                return when {
+                    friends.any { it.uid == uid } -> FriendRelationship.Friends
+                    incomingFriendRequests.any { it.senderUid == uid } -> FriendRelationship.IncomingRequest
+                    outgoingFriendRequests.any { it.recipientUid == uid } -> FriendRelationship.RequestSent
+                    else -> FriendRelationship.AddFriend
+                }
+            }
+        }
+    }
+
+    // Sends a request to the selected directory account and refreshes the social list on success.
+    fun sendFriendRequest(user: DirectoryUser) {
+        with(runtime) {
+            with(state) {
+                return messaging.runMessagingAction("Unable to send this friend request.") { repository, device, _ ->
+                    repository.sendFriendRequest(AccountIdentity(device.uid, coverUsername), user)
+                }
+            }
+        }
+    }
+
+    // Session friend actions: Accepts friend request. It runs the repository request through the shared messaging error handler.
+    fun acceptFriendRequest(request: FriendRequest) {
+        with(runtime) {
+            with(state) {
+                return messaging.runMessagingAction("Unable to accept this friend request.") { repository, device, _ ->
+                    repository.acceptRequest(AccountIdentity(device.uid, coverUsername), request)
+                }
+            }
+        }
+    }
+
+    // Session friend actions: Declines friend request. It runs the repository request through the shared messaging error handler.
+    fun declineFriendRequest(request: FriendRequest) {
+        with(runtime) {
+            return messaging.runMessagingAction("Unable to decline this friend request.") { repository, device, _ ->
+                repository.declineRequest(device.uid, request)
+            }
+        }
+    }
+
+    // Cancels friend request.
+    fun cancelFriendRequest(request: FriendRequest) {
+        with(runtime) {
+            return messaging.runMessagingAction("Unable to cancel this friend request.") { repository, device, _ ->
+                repository.cancelRequest(device.uid, request)
+            }
+        }
+    }
+
+    // Creates or opens a direct message after confirming the friend relationship.
+    fun startConversation(friend: Friend) {
+        with(runtime) {
+            with(state) {
+                return messaging.runMessagingAction("Unable to open this conversation.") { repository, device, token ->
+                    val conversation = repository.conversationWith(
+                        AccountIdentity(device.uid, coverUsername),
+                        friend
+                    )
+                    if (epoch == token && screen == SessionScreen.Safe && page == SafePage.Messages) conversationActions.openConversation(
+                        conversation
+                    )
                 }
             }
         }

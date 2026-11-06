@@ -93,26 +93,6 @@ class AccessibilityUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("quick_exit").assertDoesNotExist()
     }
 
-    // Checks the food card details are merged while favourite and quantity actions stay available step with the test's sample data.
-    @Test
-    fun foodCardDetailsAreMergedWhileFavouriteAndQuantityActionsStayAvailable() {
-        register()
-        compose.onNodeWithTag("dish_card_bowl").performScrollTo()
-            .assertTextContains("Garden harvest bowl", substring = true)
-            .assertTextContains("$14.95", substring = true)
-            .assertHasClickAction()
-        compose.onNodeWithContentDescription("Save Garden harvest bowl").assertHasClickAction()
-        compose.onNodeWithTag("dish_card_bowl").performClick()
-        compose.onNodeWithText("Add to cart").performScrollTo().performClick()
-        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        compose.onNodeWithText("Cart").performClick()
-        compose.onNodeWithTag("cart_row_bowl")
-            .assertTextContains("Garden harvest bowl", substring = true)
-        compose.onNodeWithContentDescription("Remove one Garden harvest bowl")
-            .assertHasClickAction()
-        compose.onNodeWithContentDescription("Add one Garden harvest bowl").assertHasClickAction()
-    }
-
     // Checks the native accessibility events reach the interaction observer step with the test's sample data.
     @Test
     fun nativeAccessibilityEventsReachTheInteractionObserver() {

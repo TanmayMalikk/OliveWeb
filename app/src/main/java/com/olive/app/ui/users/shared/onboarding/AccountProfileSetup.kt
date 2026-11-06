@@ -27,7 +27,7 @@ import com.olive.app.data.*
 import com.olive.app.data.DeliveryAddress
 import com.olive.app.R
 import com.olive.app.security.InputPolicy
-import com.olive.app.ui.covers.food.AddressFields
+import com.olive.app.ui.shared.AddressFields
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import java.util.UUID
 
@@ -51,7 +51,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
     var contactDetails by remember { mutableStateOf("") }
     val contacts =
         remember(existing) { mutableStateListOf<SafeContact>().also { it.addAll(existing?.contacts.orEmpty()) } }
-    var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FOOD) }
+    var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.NEWS) }
     val pages = if (safeContact) listOf(
         uiText(R.string.ui_personal_details),
         uiText(R.string.location)

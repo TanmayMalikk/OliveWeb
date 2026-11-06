@@ -62,8 +62,6 @@
 
 
 
-    <string name="ui_olive_order_update">تحديث طلب الزيتون</string>
-    <string name="ui_your_order_is_being_prepared">طلبك قيد الإعداد.</string>
     <string name="ui_new_headlines_are_available">عناوين جديدة متاحة.</string>
     <string name="ui_a_new_update_is_available">تحديث جديد متاح.</string>
     <string name="ui_an_account_update_is_available">تحديث الحساب متاح.</string>
@@ -75,7 +73,6 @@
 
     <string name="ui_open_the_app_to_see_what_s_new">افتح التطبيق لمعرفة الجديد.</string>
     <string name="ui_new_activity_is_waiting">نشاط جديد في انتظارك.</string>
-    <string name="ui_olive_order_updates">تحديثات طلب الزيتون</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">حالة الطلب وإخطارات التسليم للزيتون</string>
     <string name="ui_daily_digest_briefings">ملخصات الملخص اليومي</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">العناوين اليومية وإخطارات ملخص الأخبار</string>

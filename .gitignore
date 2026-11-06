@@ -25,6 +25,7 @@ functions/.env
 functions/.env.*
 !functions/.env.example
 functions/.secret.local
+private_credentials/
 
 distribution/
 web/*.tsbuildinfo

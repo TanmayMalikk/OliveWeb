@@ -1,11 +1,8 @@
 // Deletes the 53 known load-test accounts through Olive's normal full account-cleanup function.
-const path = require("node:path");
-const fs = require("node:fs");
-const os = require("node:os");
-const {initializeApp} = require("firebase-admin/app");
 const {getAuth} = require("firebase-admin/auth");
 const {signInEmail} = require("../src/accountPolicy");
 const {accounts} = require("./load-test-account-fixtures");
+const {initializeOliveAdminApp} = require("./firebase-admin-app");
 
 const projectId = String(process.env.OLIVE_LOAD_TEST_PROJECT_ID || "").trim();
 const confirmation = String(process.env.OLIVE_LOAD_TEST_DELETE_CONFIRM || "").trim();
@@ -19,28 +16,7 @@ if (!apiKey || !adminEmail || !adminPassword) {
   throw new Error("Set the Firebase API key and a protected admin email/password for the cleanup call.");
 }
 
-const appRoot = path.resolve(__dirname, "../..");
-const cliConfigPaths = [
-  path.join(os.homedir(), ".config", "configstore", "firebase-tools.json"),
-  process.env.APPDATA && path.join(process.env.APPDATA, "configstore", "firebase-tools.json"),
-].filter(Boolean);
-
-// Uses the Firebase CLI session only to find each generated account UID.
-function cliToken() {
-  const configPath = cliConfigPaths.find(candidate => fs.existsSync(candidate));
-  const tokens = configPath && JSON.parse(fs.readFileSync(configPath, "utf8")).tokens;
-  if (!tokens?.access_token || Number(tokens.expires_at || 0) <= Date.now() + 60_000) {
-    throw new Error(`Firebase CLI login is missing or expired for ${appRoot}. Run: npx firebase-tools projects:list`);
-  }
-  return tokens;
-}
-
-const credential = {getAccessToken: async () => {
-  const tokens = cliToken();
-  return {access_token: tokens.access_token,
-    expires_in: Math.max(60, Math.floor((Number(tokens.expires_at) - Date.now()) / 1000))};
-}};
-const app = initializeApp({credential, projectId}, "load-test-cleanup");
+const app = initializeOliveAdminApp({projectId}, "load-test-cleanup");
 const auth = getAuth(app);
 
 // Signs in as an administrator so the deployed cleanup function applies every normal deletion rule.

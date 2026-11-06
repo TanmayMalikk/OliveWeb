@@ -80,17 +80,11 @@
   border: 1px solid #e1e3d6;
   background: var(--paper);
 }
-.hero-food {
-  width: 61%;
-  top: 17%;
-  left: 0;
-  transform: rotate(-7deg);
-}
 .hero-news {
-  width: 48%;
-  right: -1%;
-  top: 36%;
-  transform: rotate(8deg);
+  width: 61%;
+  left: 10%;
+  top: 24%;
+  transform: rotate(-4deg);
 }
 .art-caption {
   position: absolute;
@@ -128,23 +122,6 @@
   font: 500 0.37rem system-ui;
   letter-spacing: 0.04em;
   max-width: 4rem;
-}
-.preview-food {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  gap: 0.8rem;
-  margin-top: 1rem;
-}
-.preview-food img {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  object-fit: cover;
-}
-.preview-food > span {
-  font: 1.3rem/1.1 var(--serif);
-  letter-spacing: -0.04em;
 }
 .preview-masthead.newspaper {
   font-size: 1.1rem;

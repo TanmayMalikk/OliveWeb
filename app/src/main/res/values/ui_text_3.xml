@@ -62,8 +62,6 @@
 
 
 
-    <string name="ui_olive_order_update">Olive Order Update</string>
-    <string name="ui_your_order_is_being_prepared">Your order is being prepared.</string>
     <string name="ui_new_headlines_are_available">New headlines are available.</string>
     <string name="ui_a_new_update_is_available">A new update is available.</string>
     <string name="ui_an_account_update_is_available">An account update is available.</string>
@@ -75,7 +73,6 @@
 
     <string name="ui_open_the_app_to_see_what_s_new">Open the app to see what\'s new.</string>
     <string name="ui_new_activity_is_waiting">New activity is waiting.</string>
-    <string name="ui_olive_order_updates">Olive Order Updates</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">Order status and delivery notifications for Olive</string>
     <string name="ui_daily_digest_briefings">Daily Digest Briefings</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">Daily headlines and news digest notifications</string>

@@ -1,11 +1,9 @@
-// Tests translated strings, placeholders, and food-menu labels.
+// Tests translated strings and placeholders.
 package com.olive.app.ui
 
 import com.olive.app.R
-import com.olive.app.data.DemoCatalogRepository
 import com.olive.app.data.CoverType
 import com.olive.app.notification.AppNotifications
-import com.olive.app.ui.covers.food.*
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
@@ -51,33 +49,12 @@ class ResourceLocalizationTest {
         }
     }
 
-    // Inputs: the values shown below. Expected: translating menu labels preserves ingredients and cart identity.
-    @Test
-    fun translatingMenuLabelsPreservesIngredientsAndCartIdentity() {
-        val english = testResourceText()
-        val french = testResourceText("values-fr")
-        val vm = OliveViewModel(DemoCatalogRepository(english::invoke))
-        val dish = vm.dishes.first()
-        vm.changeQuantity(dish.id, 1)
-        val ingredient = dish.ingredients.first()
-        vm.toggleIngredient(dish, ingredient)
-        val choices = vm.selectedIngredients(dish)
-        assertNotEquals(english.dishName(dish), french.dishName(dish))
-        vm.updateSearchLabels(vm.dishes.associate { it.id to french.dishName(it) })
-        vm.search(french.dishName(dish))
-        assertEquals(listOf(dish.id), vm.results.map { it.id })
-        assertEquals(choices, vm.selectedIngredients(dish))
-        assertEquals(1, vm.cart[dish.id])
-        assertFalse(vm.selectedIngredients(dish).contains(ingredient))
-    }
-
     // Inputs: the values shown below. Expected: notification defaults use resources and preserve supplied content.
     @Test
     fun notificationDefaultsUseResourcesAndPreserveSuppliedContent() {
         val french = testResourceText("values-fr")
-        val defaults = AppNotifications.contentFor(null, null, CoverType.FOOD, text = french)
-        assertEquals(french(R.string.ui_olive_order_update), defaults.title)
-        assertNotEquals("Your order is being prepared.", defaults.body)
+        val defaults = AppNotifications.contentFor(null, null, CoverType.NEWS, text = french)
+        assertEquals(french(R.string.ui_daily_digest), defaults.title)
         val custom = AppNotifications.contentFor(
             "Publisher title",
             "Original content",

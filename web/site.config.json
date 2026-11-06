@@ -5,13 +5,6 @@
   "voipOrigin": "https://voip.yourolivebranch.ca",
   "covers": [
     {
-      "id": "FOOD",
-      "slug": "olive",
-      "name": "Olive",
-      "path": "/olive",
-      "origin": ""
-    },
-    {
       "id": "NEWS",
       "slug": "daily-digest",
       "name": "Daily Digest",

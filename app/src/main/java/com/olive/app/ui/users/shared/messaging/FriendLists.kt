@@ -18,7 +18,6 @@ import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -44,6 +43,57 @@ import com.olive.app.data.FriendRequest
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.shared.camera.AttachmentPicker
+import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.paneTitle
+import com.olive.app.ui.shared.LocalizedIcon as Icon
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Warning
+import androidx.compose.material.icons.outlined.NorthEast
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.HealthAndSafety
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import com.olive.app.data.SafetyDocument
+import com.olive.app.data.MessageDeliveryStatus
+import com.olive.app.data.media.OfflineMediaAvailability
+import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
+import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
+import com.olive.app.data.messaging.VoipSessionState
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallStatus
+import androidx.core.content.ContextCompat
+import java.io.File
+
 
 // Keeps the four friend-related lists together while the parent screen handles chat lists.
 internal fun LazyListScope.friendLists(
@@ -298,5 +348,182 @@ private fun LazyItemScope.FriendRow(
         TextButton(onClick = {
             onNoteTargets(listOf(DirectoryUser(friend.uid, friend.username)))
         }) { Text(stringResource(R.string.private_note)) }
+    }
+}
+
+// All safe-app roles: shows messages, attachments, and chat actions.
+
+
+// Shows text or the correct viewer button for one chat message.
+@Composable
+internal fun ChatMessageBody(
+    chat: com.olive.app.data.ChatMessage, session: SessionViewModel, mine: Boolean,
+    onOpenMedia: (SafetyDocument, File) -> Unit
+) {
+    val parts = chat.body.split(":", limit = 3)
+    if (!chat.unsent && parts.firstOrNull() == "SHARED_MEDIA" && parts.size >= 2) {
+        SharedMediaMessage(parts[1], parts.getOrNull(2).orEmpty(), session, mine, onOpenMedia)
+        return
+    }
+    // An unsent location card can still be removed before it reaches the chat.
+    if (!chat.unsent && parts.firstOrNull() == "SHARED_LOCATION") {
+        Surface(
+            onClick = { session.navigation.openSafePage(SafePage.Location) }, shape = MaterialTheme.shapes.medium,
+            color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                .testTag("shared_live_location")
+        ) {
+            Row(
+                Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Outlined.LocationOn, stringResource(R.string.shared_live_location))
+                Column {
+                    Text(
+                        stringResource(R.string.shared_live_location),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                    Text(
+                        stringResource(R.string.open_location_map),
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    )
+                }
+            }
+        }
+        return
+    }
+    // An unsent safety-plan card can still be removed before it reaches the chat.
+    if (!chat.unsent && parts.firstOrNull() == "SHARED_SAFETY_PLAN") {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        ) {
+            Row(
+                Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(Icons.Outlined.HealthAndSafety, stringResource(R.string.shared_safety_plan))
+                Text(stringResource(R.string.shared_safety_plan), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+            }
+        }
+        return
+    }
+    val shared = parts.firstOrNull() in setOf("SHARED_NOTE", "SHARED_INCIDENT") && parts.size >= 2
+    if (chat.unsent || !shared) {
+        Text(
+            when {
+                chat.unsent -> stringResource(R.string.message_unsent)
+                chat.body.isBlank() -> stringResource(R.string.encrypted_message_unavailable)
+                else -> chat.body
+            }, fontStyle = if (chat.unsent) androidx.compose.ui.text.font.FontStyle.Italic else null
+        )
+        return
+    }
+    val incident = parts[0] == "SHARED_INCIDENT"
+    val title = parts.getOrNull(2).orEmpty().ifBlank { stringResource(R.string.encrypted_document) }
+    Surface(
+        onClick = { session.messages.openSharedPrivateEntry(parts[1]) }, shape = MaterialTheme.shapes.medium,
+        color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    ) {
+        Row(
+            Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                if (incident) Icons.Outlined.Warning else Icons.Outlined.Lock,
+                stringResource(if (incident) R.string.shared_incident_report else R.string.shared_private_note)
+            )
+            Column {
+                Text(
+                    stringResource(if (incident) R.string.shared_incident_report else R.string.shared_private_note),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    title, style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+// shared safe app conversation screen shows this shared media message view so the user can view its details and use its actions.
+@Composable
+internal fun SharedMediaMessage(
+    id: String, name: String, session: SessionViewModel, mine: Boolean,
+    onOpen: (SafetyDocument, File) -> Unit
+) {
+    var opening by remember(id) { mutableStateOf(false) }
+    val document = session.documents.state.files.firstOrNull { it.id == id }
+    val offline = session.media?.offlineCopies?.get(id) ?: OfflineMediaAvailability.NOT_CACHED
+    val error = session.documents.state.attachmentErrors[id]
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Surface(
+        onClick = {
+            val uid = session.coverAccountId ?: return@Surface
+            if (opening) return@Surface
+            opening = true
+            session.documents.openShared(
+                uid,
+                id,
+                { document, local -> onOpen(document, local) },
+                { opening = false })
+        }, enabled = !opening, shape = MaterialTheme.shapes.medium,
+        color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
+    ) {
+        Row(
+            Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (opening) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+            else Icon(Icons.Outlined.AttachFile, stringResource(R.string.shared_secure_file))
+            Column {
+                Text(
+                    stringResource(R.string.shared_secure_file),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Text(
+                    name.ifBlank { stringResource(R.string.encrypted_document) },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    maxLines = 2
+                )
+            }
+        }
+    }
+    if (document?.objectKey?.isNotBlank() == true) {
+        val cached = offline in setOf(
+            OfflineMediaAvailability.AVAILABLE,
+            OfflineMediaAvailability.REVALIDATION_REQUIRED,
+        )
+        TextButton(
+            onClick = {
+                if (cached) session.documents.removeOfflineCopy(document)
+                else session.documents.makeAvailableOffline(document)
+            },
+            enabled = offline != OfflineMediaAvailability.SAVING,
+            modifier = Modifier.testTag("shared_media_offline_$id"),
+        ) {
+            Text(stringResource(when {
+                offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
+                cached -> R.string.documents_remove_offline_copy
+                else -> R.string.documents_make_available_offline
+            }))
+        }
+        if (offline == OfflineMediaAvailability.RECENT_AVAILABLE) Text(
+            stringResource(R.string.documents_recently_cached),
+            style = MaterialTheme.typography.bodySmall,
+        )
+    }
+    error?.let {
+        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                .testTag("shared_media_error_$id"))
+    }
     }
 }

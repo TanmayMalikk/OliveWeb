@@ -158,7 +158,6 @@ internal fun ActivityHistory(session: SessionViewModel) {
     val settings = session.settingsHistory.filter { inRange(it.timestamp) }
     val triggers = session.triggerHistory.filter { inRange(it.timestamp) }
     val attempts = session.attempts.filter { inRange(it.timestamp) }
-    val checkouts = session.checkoutHistory.filter { inRange(it.timestamp) }
     val privacy = session.privacyHistory.filter { inRange(it.timestamp) }
     val selected = session.activityCategory
     fun <T> visible(category: ActivityCategory, rows: List<T>) =
@@ -190,10 +189,6 @@ internal fun ActivityHistory(session: SessionViewModel) {
                     )
 
                     ActivityCategory.PinAttempts -> uiText(R.string.pin_attempt_history)
-                    ActivityCategory.Checkouts -> uiText(
-                        R.string.checkout_attempts
-                    )
-
                     ActivityCategory.Privacy -> uiText(R.string.privacy_events)
                 }, uiText(R.string.search_activity_between_optional_local_date_and_time_values)
             )
@@ -324,41 +319,6 @@ internal fun ActivityHistory(session: SessionViewModel) {
                 TextButton(onClick = {
                     session.showActivityCategory(
                         ActivityCategory.PinAttempts
-                    )
-                }) { Text(stringResource(R.string.see_more)) }
-            }
-        }
-        if (selected == null || selected == ActivityCategory.Checkouts) {
-            item {
-                HorizontalDivider()
-                Text(
-                    stringResource(R.string.checkout_attempts),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.semantics { heading() })
-            }
-            // Tell the user when the food cover has no checkout history.
-            if (checkouts.isEmpty()) item { Text(stringResource(R.string.no_checkout_attempts_yet)) }
-            items(visible(ActivityCategory.Checkouts, checkouts), key = { it.id }) { event ->
-                Card(Modifier.fillMaxWidth().testTag("safe_checkout_history_row")) {
-                    Column(
-                        Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Text(
-                            formatter.format(Instant.ofEpochMilli(event.timestamp)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Muted
-                        )
-                        event.foods.forEach { Text("${it.quantity} × ${it.food}") }
-                        Text(event.error)
-                    }
-                }
-            }
-            // The summary shows only the five newest checkout events.
-            if (selected == null && checkouts.size > 5) item {
-                TextButton(onClick = {
-                    session.showActivityCategory(
-                        ActivityCategory.Checkouts
                     )
                 }) { Text(stringResource(R.string.see_more)) }
             }

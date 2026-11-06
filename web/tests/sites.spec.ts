@@ -26,7 +26,6 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   for (const [slug, title, landmark] of [
-    ["olive", "Olive", 'button:has-text("Saved")'],
     ["daily-digest", "Daily Digest", ".news-page"],
     ["fitness", "Fitness Tracker", ".fitness-page"],
     ["game", "Game", ".grove-games"],

@@ -6,7 +6,6 @@ import {
   LockKeyhole,
   Newspaper,
   Dumbbell,
-  Utensils,
   Gamepad2,
   MoveUpRight,
 } from "lucide-react";
@@ -15,7 +14,6 @@ import { covers, coverPath, type Cover } from "../domain/DomainModels";
 import { useSession } from "../session/SessionProvider";
 import { siteHref } from "../sites/SiteRouting";
 export const coverIcons = {
-  FOOD: Utensils,
   NEWS: Newspaper,
   FITNESS: Dumbbell,
   GAME: Gamepad2,
@@ -27,21 +25,7 @@ export function CoverPreview({ cover }: { cover: Cover }) {
       className={`cover-preview preview-theme-${cover.toLowerCase()}`}
       aria-hidden="true"
     >
-      {cover === "FOOD" ? (
-        <>
-          <div className="preview-masthead">
-            olive<span>GOOD FOOD, EVERY DAY.</span>
-          </div>
-          <div className="preview-food">
-            <img src="/images/menu_bowl.jpg" alt="" />
-            <span>
-              Made for
-              <br />
-              <em>your kind of day.</em>
-            </span>
-          </div>
-        </>
-      ) : cover === "NEWS" ? (
+      {cover === "NEWS" ? (
         <>
           <div className="preview-masthead newspaper">DAILY DIGEST</div>
           <div className="preview-news">
@@ -139,9 +123,6 @@ export default function Landing() {
             <div className="art-label">
               <span className="status-dot" /> SOMETHING GOOD IS GROWING
             </div>
-            <div className="floating-cover hero-food">
-              <CoverPreview cover="FOOD" />
-            </div>
             <div className="floating-cover hero-news">
               <CoverPreview cover="NEWS" />
             </div>
@@ -150,7 +131,7 @@ export default function Landing() {
               <br />
               <em>A place that’s yours.</em>
             </div>
-            <span className="art-index">01 — 04</span>
+            <span className="art-index">01 — 03</span>
           </div>
         </section>
         <div className="values-strip">
@@ -173,7 +154,7 @@ export default function Landing() {
               </h2>
             </div>
             <p>
-              Good food, a fresh perspective, or a little clarity. Choose the
+              A fresh perspective, a fitness routine, or a quiet game. Choose the
               everyday app you’d like to come back to.
             </p>
           </div>

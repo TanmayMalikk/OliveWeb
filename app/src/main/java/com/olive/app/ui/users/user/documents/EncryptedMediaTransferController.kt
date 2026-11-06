@@ -2,8 +2,6 @@
 package com.olive.app.ui.users.user.documents
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.runtime.getValue
@@ -14,6 +12,7 @@ import androidx.work.WorkManager
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
 import com.olive.app.data.SafetyDocument
+import com.olive.app.data.hasValidatedInternetConnection
 import com.olive.app.data.media.DocumentDownloadGate
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.copyAndVerifyEncryptedDownload
@@ -50,32 +49,6 @@ import okhttp3.Request
 import org.json.JSONObject
 import org.json.JSONArray
 
-internal interface MediaTransferOperations {
-    // Watches pending uploads for this account and reports progress to the screen.
-    fun observeUploads(ownerUid:String)
-    // Marks an uploaded encrypted file as published after the server accepts it.
-    fun acknowledgePublished(mediaIds:Set<String>)
-    // Adds document metadata to the user's encrypted document list.
-    fun queueDocument(
-        uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
-        tags:Set<String> = emptySet(),
-        onQueued:(String)->Unit,onFailure:(String)->Unit,
-    )
-    // Encrypts the selected file and queues its upload.
-    fun queueFile(
-        file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
-        ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
-        tags:Set<String> = emptySet(),
-        onQueued:(String)->Unit,onFailure:(String)->Unit,
-    )
-    // Downloads, checks, and decrypts one allowed media file.
-    suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File
-    suspend fun makeAvailableOffline(document:SafetyDocument,viewerUid:String)
-    suspend fun removeOfflineCopy(document:SafetyDocument,viewerUid:String)
-    fun onDocumentSnapshot(viewerUid:String,documents:List<SafetyDocument>,serverConfirmed:Boolean)
-    // Clears upload progress and errors when the document screen closes.
-    fun clearState()
-}
 
 /**
  * Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
@@ -609,10 +582,7 @@ internal class MediaTransferController(
     }
 
     private fun requireNetwork(reason:MediaAccessError) {
-        val manager=applicationContext.getSystemService(ConnectivityManager::class.java)
-        val capabilities=manager.getNetworkCapabilities(manager.activeNetwork)
-        if(capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)!=true ||
-            !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
+        if (!hasValidatedInternetConnection(applicationContext)) {
             throw MediaAccessException(reason)
         }
     }

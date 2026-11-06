@@ -20,7 +20,6 @@ import {
   verifyEntryLink,
   validEntryToken,
 } from "../services/PrivateEntryLinks";
-import { readCover, writeCover } from "../services/CoverStateStore";
 import {
   canonicalPath,
   coverForRoute,
@@ -486,16 +485,10 @@ export function SessionProvider({
     };
     await accounts.saveRecord("triggers", event);
     if (token !== epoch.current) return;
-    const pending = await readCover<Event[]>(`${enrollment.uid}:checkouts`, []);
-    for (const checkout of pending)
-      await accounts.saveRecord("checkouts", checkout);
-    await writeCover(`${enrollment.uid}:checkouts`, []);
-    if (token !== epoch.current) return;
     setProfile(loaded.profile);
     setHistory({
       ...loaded.history,
       triggers: [event, ...loaded.history.triggers],
-      checkouts: [...pending, ...loaded.history.checkouts],
     });
     setPhase("safe");
     setPage("Home");

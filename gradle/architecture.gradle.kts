@@ -31,6 +31,15 @@ tasks.register("checkArchitecture") {
             file("app/src/main/java/com/olive/app/ui") to "Android UI",
             file("app/src/main/java/com/olive/app/data") to "Android data",
         )
+        val productionKotlin=fileTree("app/src/main/java") { include("**/*.kt") }.files
+        val sourceLayoutViolations=buildList {
+            if(productionKotlin.size>100) add(
+                "Android production source has ${productionKotlin.size} Kotlin files; keep the consolidated layout at 100 or fewer"
+            )
+            productionKotlin.filter { it.readLines().size>600 }.forEach { source ->
+                add("Android source ${source.relativeTo(rootDir)} exceeds the 600-line limit")
+            }
+        }
         val layoutViolations=androidRoots.flatMap { (directory,label) ->
             directory.listFiles().orEmpty()
                 .filter { it.isFile && it.extension=="kt" }
@@ -104,7 +113,7 @@ tasks.register("checkArchitecture") {
         layoutViolations += file("web/src").listFiles().orEmpty()
             .filter { it.isFile && it.name !in allowedWebRootFiles }
             .map { "Web source file ${it.relativeTo(rootDir)} must live in a feature folder" }
-        val violations=dependencyViolations+layoutViolations
+        val violations=dependencyViolations+layoutViolations+sourceLayoutViolations
         if(violations.isNotEmpty()) throw GradleException(violations.joinToString("\n",
             prefix="Architecture boundary violations:\n"))
         logger.lifecycle("Architecture check passed: feature folders are enforced and screens depend on controllers rather than data implementations.")
