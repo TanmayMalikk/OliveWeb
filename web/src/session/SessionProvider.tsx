@@ -103,7 +103,7 @@ export function SessionProvider({
   const routeCover = coverForRoute(path, location.origin)?.id as
     Cover | undefined;
   const cover = normalizeCover(
-    routeCover ?? enrollment?.cover ?? profile?.coverType ?? "GAME",
+    routeCover ?? enrollment?.cover ?? profile?.coverType ?? "FITNESS",
   );
   // Reloads account files when another phone or browser changes this account.
   useEffect(() => {

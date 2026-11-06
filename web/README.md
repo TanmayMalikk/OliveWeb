@@ -61,7 +61,7 @@ deployment only after the production branch and environment variables are confir
 The four user covers are states of the first SPA, rather than pages or subdomains.
 The chosen cover is saved in the browser enrollment/profile. Two people can open
 the same `https://yourolivebranch.ca/` address and see different covers. The Game
-cover exposes no login or download links. Five quick taps on its Little Grove
+cover exposes no login or download links. Five quick taps on its Fitness Tracker
 brand starts private entry. News and Fitness retain their configured
 trigger input. Quick Exit returns to the saved cover at `/`.
 

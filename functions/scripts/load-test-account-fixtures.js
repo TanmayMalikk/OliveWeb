@@ -17,7 +17,7 @@ const firstNames = [
   "Rowan", "Skyler", "Reese", "Hayden", "Emerson", "Finley", "Dakota", "Charlie", "Robin",
 ];
 const lastNames = ["Maple", "Cedar", "Aurora", "Harbour", "Prairie", "Glacier"];
-const coverTypes = ["NEWS", "FITNESS", "GAME"];
+const coverTypes = ["FITNESS", "NEWS", "GAME"];
 const TEST_TRIGGER = "help";
 
 // Approximate community-centre points spread the test markers across Alberta without using home coordinates.

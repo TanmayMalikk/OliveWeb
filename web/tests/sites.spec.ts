@@ -50,9 +50,7 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
     expect(legacy).toEqual(manifest);
   }
   await page.goto("/");
-  await expect(
-    page.getByRole("button", { name: "Nature Pairs", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fitness Tracker" })).toBeVisible();
   await expect(page.locator('a[href$="/account"],a[href$="/get"]')).toHaveCount(
     0,
   );

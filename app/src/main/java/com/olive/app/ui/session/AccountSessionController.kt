@@ -103,7 +103,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         val state = runtime.state
         if (state.busy || runtime.enrollment != null || state.screen != SessionScreen.Cover) return
         state.accountRole = AccountRole.USER
-        state.coverType = CoverType.NEWS
+        state.coverType = CoverType.FITNESS
         state.creatingAccount = false
         state.message = null
         runtime.navigation.openScreen(SessionScreen.Welcome)
@@ -320,7 +320,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         coverDob = ""
                         coverFullName = ""
                         coverUsername = ""
-                        coverType = CoverType.NEWS
+                        coverType = CoverType.FITNESS
                         accountRole = AccountRole.USER
                         profile = null
                         savedNews = emptyList()

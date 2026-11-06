@@ -114,7 +114,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     pendingIdentity = null
                     pendingProfile = null
                     accountRole = AccountRole.USER
-                    coverType = CoverType.NEWS
+                    coverType = CoverType.FITNESS
                     screenHistory.clear()
                     screen = SessionScreen.Cover
                     message = null
@@ -142,7 +142,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     val previousScreen = screenHistory.removeAt(screenHistory.lastIndex)
                     if (enrollment == null && previousScreen == SessionScreen.Cover) {
                         accountRole = AccountRole.USER
-                        coverType = CoverType.NEWS
+                        coverType = CoverType.FITNESS
                     }
                     screen = previousScreen
                     message = null

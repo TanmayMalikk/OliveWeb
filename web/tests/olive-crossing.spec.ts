@@ -6,7 +6,7 @@ import AxeBuilder from "@axe-core/playwright";
 test("Olive Crossing supports keyboard play, pausing and restarting", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/game");
   await page
     .getByRole("button", { name: "Olive Crossing", exact: true })
     .click();
@@ -55,7 +55,7 @@ test("Olive Crossing shows the complete world width without side panning on PC",
   page,
 }) => {
   await page.setViewportSize({ width: 1366, height: 768 });
-  await page.goto("/");
+  await page.goto("/game");
   await page.getByRole("button", { name: "Olive Crossing", exact: true }).click();
 
   const board = page.locator(".crossing-stage > svg");
@@ -83,7 +83,7 @@ test("Olive Crossing has touch controls and fits a phone", async ({
     hasTouch: true,
   });
   const page = await context.newPage();
-  await page.goto("http://127.0.0.1:5173/");
+  await page.goto("http://127.0.0.1:5173/game");
   await page.getByRole("button", { name: "Olive Crossing", exact: true }).tap();
   await page.getByRole("button", { name: "Start Olive Crossing" }).tap();
   await page.getByRole("button", { name: "Move up" }).tap();

@@ -51,7 +51,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
     var contactDetails by remember { mutableStateOf("") }
     val contacts =
         remember(existing) { mutableStateListOf<SafeContact>().also { it.addAll(existing?.contacts.orEmpty()) } }
-    var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.NEWS) }
+    var coverType by remember(existing) { mutableStateOf(existing?.coverType ?: CoverType.FITNESS) }
     val pages = if (safeContact) listOf(
         uiText(R.string.ui_personal_details),
         uiText(R.string.location)
