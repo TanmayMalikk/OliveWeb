@@ -376,7 +376,7 @@ object OliveNotificationManager {
 
     // Chooses the notification icon that matches this event.
     internal fun iconFor(coverType: CoverType, role: AccountRole = AccountRole.USER) = when {
-        role == AccountRole.SAFE_CONTACT -> R.drawable.ic_notification_olive_branch
+        role == AccountRole.SAFE_CONTACT -> R.drawable.ic_notification_olive
         role == AccountRole.STAFF || role == AccountRole.ADMIN -> R.drawable.ic_notification_olive_tree
         coverType == CoverType.NEWS -> R.drawable.ic_notification_daily_digest
         coverType == CoverType.FITNESS -> R.drawable.ic_notification_fitness
