@@ -72,9 +72,10 @@ function createDependencies() {
             else call.participants[userId] = { status: 'declined' };
             const acceptedInvitees = Object.values(call.participants)
                 .filter(({ status }) => status === 'accepted').length;
-            if (call.callerLeftAt && acceptedInvitees === 0) {
+            const connectedCount = (call.callerLeftAt ? 0 : 1) + acceptedInvitees;
+            if (connectedCount <= 1) {
                 call.status = 'ended';
-                call.endReason = 'all_left';
+                call.endReason = 'not_enough_participants';
             }
             return call;
         },
@@ -415,9 +416,10 @@ test('POST /calls/token rejects inactive calls and unknown call IDs', async (con
     assert.equal((await missing.json()).error.code, 'call_not_found');
 });
 
-test('a connected group ends only after every member leaves', async (context) => {
+test('a connected group ends when only one member remains', async (context) => {
     const dependencies = createDependencies();
     const baseUrl = await startTestServer(context, dependencies);
+    dependencies.calls.get('call-1').participants.carol = { status: 'accepted' };
     const memberEnd = await fetch(`${baseUrl}/calls/end`, {
         method: 'POST',
         headers: authorized('token-bob', { 'content-type': 'application/json' }),
@@ -436,7 +438,6 @@ test('a connected group ends only after every member leaves', async (context) =>
     assert.equal(dependencies.calls.get('call-1').participants.bob.status, 'declined');
     assert.deepEqual(dependencies.endedRooms, []);
 
-    dependencies.calls.get('call-1').participants.carol = { status: 'accepted' };
     const rejoined = await fetch(`${baseUrl}/api/calls/call-1/rejoin`, {
         method: 'POST',
         headers: authorized('token-bob', { 'content-type': 'application/json' }),
@@ -456,17 +457,8 @@ test('a connected group ends only after every member leaves', async (context) =>
         body: '{}'
     });
     assert.equal(callerLeft.status, 200);
-    assert.equal(dependencies.calls.get('call-1').status, 'active');
-    assert.deepEqual(dependencies.endedRooms, []);
-
-    const lastMemberLeft = await fetch(`${baseUrl}/api/calls/call-1/leave`, {
-        method: 'POST',
-        headers: authorized('token-carol', { 'content-type': 'application/json' }),
-        body: '{}'
-    });
-    assert.equal(lastMemberLeft.status, 200);
     assert.equal(dependencies.calls.get('call-1').status, 'ended');
-    assert.equal(dependencies.calls.get('call-1').endReason, 'all_left');
+    assert.equal(dependencies.calls.get('call-1').endReason, 'not_enough_participants');
     assert.deepEqual(dependencies.endedRooms, ['call-call-1']);
 });
 

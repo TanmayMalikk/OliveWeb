@@ -137,12 +137,14 @@ class FirebaseCallStore {
                 Object.values(updated.participants || {}).filter((participant) =>
                     (typeof participant === 'string' ? participant : participant?.status) === 'accepted'
                 ).length;
-            return connectedCount === 0 ? {
+            // Once a call has connected, one person must never be left alone in the room.
+            // Ending at one remaining member also updates every phone's active-call log.
+            return connectedCount <= 1 ? {
                 ...updated,
                 status: 'ended',
                 endedAt: now,
                 endedBy: userId,
-                endReason: 'all_left'
+                endReason: 'not_enough_participants'
             } : updated;
         });
         return result.committed ? result.snapshot.val() : null;

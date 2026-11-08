@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.CallEnd
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
@@ -45,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -113,7 +115,24 @@ internal fun ActiveCallDialog(
     onFinish: () -> Unit,
     onQuickExit: () -> Unit,
 ) = FullScreenCallDialog(onBack = onFinish) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_notification_olive_branch),
+            contentDescription = null,
+            tint = CallGreen,
+            modifier = Modifier.size(34.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            stringResource(R.string.olive_branch),
+            color = Color.White,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Spacer(Modifier.weight(1f))
         Button(
             onClick = onQuickExit,
             colors = ButtonDefaults.buttonColors(containerColor = CallRed),
@@ -143,72 +162,84 @@ internal fun ActiveCallDialog(
             elapsedSeconds++
         }
     }
+    val isGroupCall = (call?.participants?.size ?: 0) > 2
+    val connectedPeople = if (active == null) 1 else active.remoteParticipantCount + 1
     val status = when (state) {
         is VoipSessionState.Connecting -> stringResource(R.string.ui_calling)
-        is VoipSessionState.Active -> if (remoteJoined) formatCallDuration(elapsedSeconds)
-            else stringResource(R.string.ui_calling)
+        is VoipSessionState.Active -> if (remoteJoined) {
+            if (isGroupCall) stringResource(
+                R.string.ui_group_call_status,
+                connectedPeople,
+                formatCallDuration(elapsedSeconds),
+            ) else formatCallDuration(elapsedSeconds)
+        } else stringResource(R.string.ui_calling)
         is VoipSessionState.Leaving -> stringResource(R.string.ui_end_call)
         is VoipSessionState.Error -> state.message
         VoipSessionState.Idle -> ""
     }
     CallIdentity(
-        name = call?.otherPartyName(currentUid).orEmpty()
-            .ifBlank { stringResource(R.string.ui_voice_call) },
+        name = if (isGroupCall) {
+            call?.name.orEmpty().ifBlank { stringResource(R.string.ui_group_voice_call) }
+        } else {
+            call?.otherPartyName(currentUid).orEmpty()
+                .ifBlank { stringResource(R.string.ui_voice_call) }
+        },
         status = status,
         isError = state is VoipSessionState.Error,
+        isGroup = isGroupCall,
     )
-    if (active != null) {
+    if (active != null && isGroupCall) {
         Spacer(Modifier.height(28.dp))
         AudioWaveform()
     }
     Spacer(Modifier.weight(1f))
-    if (active != null) {
+    if (active != null || state is VoipSessionState.Connecting || state is VoipSessionState.Error) {
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            CallAction(
-                label = stringResource(if (active.microphoneMuted) R.string.ui_unmute else R.string.ui_mute),
-                icon = {
-                    Icon(if (active.microphoneMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, null)
-                },
-                selected = active.microphoneMuted,
-                tag = "mute_voice_call",
-                onClick = { onMute(!active.microphoneMuted) },
-            )
+            if (active != null) {
+                CallAction(
+                    label = stringResource(if (active.microphoneMuted) R.string.ui_unmute else R.string.ui_mute),
+                    icon = {
+                        Icon(if (active.microphoneMuted) Icons.Outlined.MicOff else Icons.Outlined.Mic, null)
+                    },
+                    selected = active.microphoneMuted,
+                    tag = "mute_voice_call",
+                    onClick = { onMute(!active.microphoneMuted) },
+                )
+                CallAction(
+                    label = stringResource(
+                        if (active.speakerEnabled) R.string.ui_speaker_off else R.string.ui_speaker
+                    ),
+                    icon = {
+                        Icon(
+                            if (active.speakerEnabled) Icons.AutoMirrored.Outlined.VolumeUp
+                            else Icons.AutoMirrored.Outlined.VolumeOff,
+                            null,
+                        )
+                    },
+                    selected = active.speakerEnabled,
+                    tag = "speaker_voice_call",
+                    onClick = { onSpeaker(!active.speakerEnabled) },
+                )
+            }
             CallAction(
                 label = stringResource(
-                    if (active.speakerEnabled) R.string.ui_speaker_off else R.string.ui_speaker
+                    when {
+                        state is VoipSessionState.Error -> R.string.close
+                        isGroupCall && remoteJoined -> R.string.ui_leave_call
+                        call?.callerId == currentUid -> R.string.ui_end_call
+                        else -> R.string.ui_leave_call
+                    }
                 ),
-                icon = {
-                    Icon(
-                        if (active.speakerEnabled) Icons.AutoMirrored.Outlined.VolumeUp
-                        else Icons.AutoMirrored.Outlined.VolumeOff,
-                        null,
-                    )
-                },
-                selected = active.speakerEnabled,
-                tag = "speaker_voice_call",
-                onClick = { onSpeaker(!active.speakerEnabled) },
+                icon = { Icon(Icons.Outlined.CallEnd, null) },
+                color = CallRed,
+                tag = "finish_voice_call",
+                onClick = onFinish,
             )
         }
-        Spacer(Modifier.height(36.dp))
-    }
-    if (active != null || state is VoipSessionState.Connecting || state is VoipSessionState.Error) {
-        CallAction(
-            label = stringResource(
-                when {
-                    state is VoipSessionState.Error -> R.string.close
-                    call?.callerId == currentUid -> R.string.ui_end_call
-                    else -> R.string.ui_leave_call
-                }
-            ),
-            icon = { Icon(Icons.Outlined.CallEnd, null) },
-            color = CallRed,
-            tag = "finish_voice_call",
-            onClick = onFinish,
-        )
     }
 }
 
@@ -247,7 +278,12 @@ private fun FullScreenCallDialog(
 }
 
 @Composable
-private fun CallIdentity(name: String, status: String, isError: Boolean = false) {
+private fun CallIdentity(
+    name: String,
+    status: String,
+    isError: Boolean = false,
+    isGroup: Boolean = false,
+) {
     Box(
         Modifier.size(132.dp)
             .background(CallGreen.copy(alpha = .14f), CircleShape)
@@ -255,7 +291,7 @@ private fun CallIdentity(name: String, status: String, isError: Boolean = false)
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Outlined.Headphones,
+            if (isGroup) Icons.Outlined.Group else Icons.Outlined.Headphones,
             null,
             tint = Color.White,
             modifier = Modifier.size(62.dp),

@@ -78,8 +78,7 @@ import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipCallStatus
-import com.olive.app.data.messaging.canBeRejoinedBy
-import com.olive.app.data.messaging.connectedParticipantCount
+import com.olive.app.data.messaging.canBeJoinedBy
 import androidx.core.content.ContextCompat
 import java.io.File
 
@@ -123,9 +122,6 @@ internal fun ChatPane(
     val keyboardVisible = imeBottom > 0
     val context = LocalContext.current
     val callHistory = session.calls.historyFor(active.id)
-        .filter {
-            it.status != VoipCallStatus.ACTIVE || it.connectedParticipantCount() >= 2
-        }
     val timeline = remember(session.messages.chatMessages, callHistory) {
         (session.messages.chatMessages.map(ConversationTimelineItem::Message) +
             callHistory.map(ConversationTimelineItem::Call))
@@ -302,10 +298,10 @@ internal fun ChatPane(
                             CallHistoryRow(
                                 call = call,
                                 canJoin = callState == VoipSessionState.Idle &&
-                                    call.canBeRejoinedBy(currentUid),
+                                    call.canBeJoinedBy(currentUid),
                                 onJoin = {
                                     withMicrophonePermission {
-                                        session.calls.rejoin(
+                                        session.calls.joinActive(
                                             call,
                                             currentUid,
                                             session.accountRole,
@@ -564,11 +560,16 @@ internal fun CallHistoryRow(
             VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
         }
     )
+    val activeColor = MaterialTheme.colorScheme.primaryContainer
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = if (call.status == VoipCallStatus.ACTIVE) activeColor
+        else MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
-            .testTag("call_history_${call.callId}"),
+            .testTag("call_history_${call.callId}")
+            .then(if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                Modifier.clickable(onClick = onJoin)
+            } else Modifier),
     ) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

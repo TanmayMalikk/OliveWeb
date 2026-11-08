@@ -6,6 +6,7 @@ import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipParticipant
 import com.olive.app.data.messaging.VoipParticipantStatus
 import com.olive.app.data.messaging.canBeRejoinedBy
+import com.olive.app.data.messaging.canBeJoinedBy
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -99,6 +100,24 @@ class SessionCallsTest {
                 .canBeRejoinedBy("safe-1")
         )
         assertFalse(call.canBeRejoinedBy("user-2"))
+    }
+
+    // The active call card lets a pending member accept and a connected member restore audio.
+    @Test
+    fun activeCallCardAllowsInvitedAndConnectedMembersToJoin() {
+        val call = VoipCall(
+            callId = "call-1",
+            name = "Group",
+            callerId = "user-1",
+            participants = listOf(
+                VoipParticipant("user-1", VoipParticipantStatus.ACCEPTED),
+                VoipParticipant("safe-1", VoipParticipantStatus.ACCEPTED),
+                VoipParticipant("user-2", VoipParticipantStatus.PENDING),
+            ),
+        )
+        assertTrue(call.canBeJoinedBy("user-1"))
+        assertTrue(call.canBeJoinedBy("user-2"))
+        assertFalse(call.canBeJoinedBy("outsider"))
     }
 
     private fun directConversation() = ChatConversation(
