@@ -166,7 +166,7 @@ test('FirebaseCallStore expires unanswered calls and keeps the room open after o
     assert.equal(declined.endReason, undefined);
 });
 
-test('FirebaseCallStore lets one accepted group member leave without ending the call', async () => {
+test('FirebaseCallStore keeps two members connected and ends when only one remains', async () => {
     const values = {
         'calls/call-1': {
             callId: 'call-1',
@@ -190,12 +190,9 @@ test('FirebaseCallStore lets one accepted group member leave without ending the 
     assert.equal(getParticipantStatus(rejoined, 'bob'), 'accepted');
     await store.leaveCall('call-1', 'bob');
     const callerLeft = await store.leaveCall('call-1', 'alice');
-    assert.equal(callerLeft.status, 'active');
+    assert.equal(callerLeft.status, 'ended');
     assert.equal(getParticipantStatus(callerLeft, 'alice'), 'declined');
-
-    const lastMemberLeft = await store.leaveCall('call-1', 'carol');
-    assert.equal(lastMemberLeft.status, 'ended');
-    assert.equal(lastMemberLeft.endReason, 'all_left');
+    assert.equal(callerLeft.endReason, 'not_enough_participants');
     assert.equal(await store.rejoinCall('call-1', 'bob'), null);
 });
 

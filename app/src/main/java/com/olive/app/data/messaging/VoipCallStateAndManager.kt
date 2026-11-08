@@ -81,6 +81,17 @@ fun VoipCall.canBeRejoinedBy(userId: String): Boolean =
         connectedParticipantCount() >= 2 &&
         participants.any { it.userId == userId && it.status == VoipParticipantStatus.DECLINED }
 
+// Lets an invited chat member enter an active call from its chat log.
+// Pending members accept the invitation, while disconnected members rejoin an established room.
+fun VoipCall.canBeJoinedBy(userId: String): Boolean {
+    if (status != VoipCallStatus.ACTIVE) return false
+    return when (participants.firstOrNull { it.userId == userId }?.status) {
+        VoipParticipantStatus.PENDING, VoipParticipantStatus.ACCEPTED -> true
+        VoipParticipantStatus.DECLINED -> connectedParticipantCount() >= 2
+        null -> false
+    }
+}
+
 internal fun VoipCall.otherPartyName(currentUid: String): String =
     if (callerId == currentUid) name else callerName.ifBlank { name }
 

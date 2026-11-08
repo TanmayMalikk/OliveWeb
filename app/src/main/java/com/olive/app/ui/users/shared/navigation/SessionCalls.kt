@@ -14,7 +14,7 @@ import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipCallStatus
 import com.olive.app.data.messaging.VoipParticipantStatus
-import com.olive.app.data.messaging.canBeRejoinedBy
+import com.olive.app.data.messaging.canBeJoinedBy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -198,10 +198,11 @@ internal class SessionCalls(
             return
         }
         val recipients = conversation.participantIds.filterNot { it == callerUid }.distinct()
-        val recipientName = conversation.participantUsernames.entries
-            .firstOrNull { it.key != callerUid }
-            ?.value
-            .orEmpty()
+        val recipientName = conversation.participantIds
+            .filterNot { it == callerUid }
+            .mapNotNull(conversation.participantUsernames::get)
+            .filter(String::isNotBlank)
+            .joinToString(", ")
             .ifBlank { "Private call" }
         val callerName = conversation.participantUsernames[callerUid]
             .orEmpty()
@@ -247,13 +248,20 @@ internal class SessionCalls(
         }
     }
 
-    // Reopens an active group call from the call event shown inside its chat.
-    fun rejoin(call: VoipCall, currentUid: String, role: AccountRole) {
+    // Joins an active call from the event shown in chat, using the member's current call status.
+    fun joinActive(call: VoipCall, currentUid: String, role: AccountRole) {
         if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) ||
-            !call.canBeRejoinedBy(currentUid)
+            !call.canBeJoinedBy(currentUid)
         ) return
         scope.launch {
-            runCallAction { controller.rejoinCall(call.callId) }
+            runCallAction {
+                when (call.participants.firstOrNull { it.userId == currentUid }?.status) {
+                    VoipParticipantStatus.PENDING -> controller.acceptAndJoin(call.callId, currentUid)
+                    VoipParticipantStatus.DECLINED -> controller.rejoinCall(call.callId)
+                    VoipParticipantStatus.ACCEPTED -> controller.joinCall(call)
+                    null -> Unit
+                }
+            }
         }
     }
 
