@@ -406,4 +406,21 @@
     <string name="evidence_tagged">Tagged as evidence</string>
     <string name="evidence_normal_file">Normal account file</string>
     <string name="safety_remove_attachment">Quitar archivo adjunto %1$s</string>
+    <string name="chat_info">Información del chat</string>
+    <string name="chat_members">Personas en este chat</string>
+    <string name="chat_header_member_count">%1$d miembros</string>
+    <string name="chat_member_count">%1$d personas</string>
+    <string name="chat_shared_items">Elementos compartidos</string>
+    <string name="chat_no_shared_items">Todavía no se compartieron archivos ni elementos de seguridad.</string>
+    <string name="chat_add_people">Agregar personas</string>
+    <string name="chat_add_person">Agregar a %1$s</string>
+    <string name="chat_remove_person">Quitar a %1$s de este grupo</string>
+    <string name="chat_add_participant_error">No se pudo agregar a esta persona. Debe ser un contacto aceptado con mensajería segura configurada.</string>
+    <string name="chat_request_staff_title">Apoyo del personal</string>
+    <string name="chat_request_staff_description">Crea un chat de apoyo separado con todas las personas de esta conversación.</string>
+    <string name="chat_request_staff_button">Solicitar personal</string>
+    <string name="chat_organization_member">Equipo de apoyo de Olive</string>
+    <string name="chat_open_info">Abrir información del chat</string>
+    <string name="shared_location_active_until">Ubicación en vivo compartida hasta las %1$s</string>
+    <string name="shared_location_ended">Terminó el uso compartido de la ubicación en vivo</string>
 </resources>

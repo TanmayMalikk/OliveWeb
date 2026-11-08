@@ -61,10 +61,33 @@ function createDependencies() {
             const call = calls.get(callId);
             if (!call || call.participants[userId]?.status !== 'pending') return null;
             call.participants[userId] = { status: accepted ? 'accepted' : 'declined' };
-            if (!accepted) {
-                call.status = 'declined';
-                call.endReason = 'declined';
+            return call;
+        },
+        async leaveCall(callId, userId) {
+            const call = calls.get(callId);
+            const isCaller = call?.callerId === userId && !call?.callerLeftAt;
+            const isAcceptedInvitee = call?.participants[userId]?.status === 'accepted';
+            if (!call || call.status !== 'active' || (!isCaller && !isAcceptedInvitee)) return null;
+            if (isCaller) call.callerLeftAt = Date.now();
+            else call.participants[userId] = { status: 'declined' };
+            const acceptedInvitees = Object.values(call.participants)
+                .filter(({ status }) => status === 'accepted').length;
+            if (call.callerLeftAt && acceptedInvitees === 0) {
+                call.status = 'ended';
+                call.endReason = 'all_left';
             }
+            return call;
+        },
+        async rejoinCall(callId, userId) {
+            const call = calls.get(callId);
+            if (!call || call.status !== 'active') return null;
+            const connectedCount = (call.callerLeftAt ? 0 : 1) +
+                Object.values(call.participants).filter(({ status }) => status === 'accepted').length;
+            if (connectedCount < 2) return null;
+            if (call.callerId === userId && call.callerLeftAt) delete call.callerLeftAt;
+            else if (call.participants[userId]?.status === 'declined') {
+                call.participants[userId] = { status: 'accepted' };
+            } else return null;
             return call;
         },
         async endCall(callId, endedBy) {
@@ -278,8 +301,9 @@ test('legacy invitation routes accept and decline only the authenticated pending
             body: JSON.stringify({ userId: 'carol' })
         });
         assert.equal(declined.status, 200);
-        assert.equal(dependencies.calls.get('call-1').status, 'declined');
-        assert.deepEqual(dependencies.endedRooms, ['call-call-1']);
+        assert.equal(dependencies.calls.get('call-1').status, 'active');
+        assert.equal(dependencies.calls.get('call-1').participants.carol.status, 'declined');
+        assert.deepEqual(dependencies.endedRooms, []);
 });
 
 test('call creation rejects participant IDs without Firebase accounts', async (context) => {
@@ -391,20 +415,58 @@ test('POST /calls/token rejects inactive calls and unknown call IDs', async (con
     assert.equal((await missing.json()).error.code, 'call_not_found');
 });
 
-test('POST /calls/end lets either accepted participant end the shared call', async (context) => {
+test('a connected group ends only after every member leaves', async (context) => {
     const dependencies = createDependencies();
     const baseUrl = await startTestServer(context, dependencies);
-    const options = {
+    const memberEnd = await fetch(`${baseUrl}/calls/end`, {
         method: 'POST',
         headers: authorized('token-bob', { 'content-type': 'application/json' }),
         body: JSON.stringify({ callId: 'call-1' })
-    };
+    });
+    assert.equal(memberEnd.status, 409);
+    assert.equal((await memberEnd.json()).error.code, 'group_member_must_leave');
 
-    const ended = await fetch(`${baseUrl}/calls/end`, options);
-    assert.equal(ended.status, 200);
-    assert.deepEqual(await ended.json(), { callId: 'call-1', status: 'ended' });
+    const left = await fetch(`${baseUrl}/api/calls/call-1/leave`, {
+        method: 'POST',
+        headers: authorized('token-bob', { 'content-type': 'application/json' }),
+        body: '{}'
+    });
+    assert.equal(left.status, 200);
+    assert.equal(dependencies.calls.get('call-1').status, 'active');
+    assert.equal(dependencies.calls.get('call-1').participants.bob.status, 'declined');
+    assert.deepEqual(dependencies.endedRooms, []);
+
+    dependencies.calls.get('call-1').participants.carol = { status: 'accepted' };
+    const rejoined = await fetch(`${baseUrl}/api/calls/call-1/rejoin`, {
+        method: 'POST',
+        headers: authorized('token-bob', { 'content-type': 'application/json' }),
+        body: '{}'
+    });
+    assert.equal(rejoined.status, 200);
+    assert.equal(dependencies.calls.get('call-1').participants.bob.status, 'accepted');
+    await fetch(`${baseUrl}/api/calls/call-1/leave`, {
+        method: 'POST',
+        headers: authorized('token-bob', { 'content-type': 'application/json' }),
+        body: '{}'
+    });
+
+    const callerLeft = await fetch(`${baseUrl}/api/calls/call-1/leave`, {
+        method: 'POST',
+        headers: authorized('token-alice', { 'content-type': 'application/json' }),
+        body: '{}'
+    });
+    assert.equal(callerLeft.status, 200);
+    assert.equal(dependencies.calls.get('call-1').status, 'active');
+    assert.deepEqual(dependencies.endedRooms, []);
+
+    const lastMemberLeft = await fetch(`${baseUrl}/api/calls/call-1/leave`, {
+        method: 'POST',
+        headers: authorized('token-carol', { 'content-type': 'application/json' }),
+        body: '{}'
+    });
+    assert.equal(lastMemberLeft.status, 200);
     assert.equal(dependencies.calls.get('call-1').status, 'ended');
-    assert.equal(dependencies.calls.get('call-1').endedBy, 'bob');
+    assert.equal(dependencies.calls.get('call-1').endReason, 'all_left');
     assert.deepEqual(dependencies.endedRooms, ['call-call-1']);
 });
 

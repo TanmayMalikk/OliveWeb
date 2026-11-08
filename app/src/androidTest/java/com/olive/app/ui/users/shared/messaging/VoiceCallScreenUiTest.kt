@@ -25,6 +25,7 @@ class VoiceCallScreenUiTest {
         var muted = false
         var speaker = false
         var finished = false
+        var quickExited = false
         compose.activity.setContent {
             OliveTheme {
                 ActiveCallDialog(
@@ -33,17 +34,20 @@ class VoiceCallScreenUiTest {
                     onMute = { muted = it },
                     onSpeaker = { speaker = it },
                     onFinish = { finished = true },
+                    onQuickExit = { quickExited = true },
                 )
             }
         }
 
         compose.onNodeWithTag("mute_voice_call").assertIsDisplayed().performClick()
         compose.onNodeWithTag("speaker_voice_call").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("call_quick_exit").assertIsDisplayed().performClick()
         compose.onNodeWithTag("finish_voice_call").assertIsDisplayed().performClick()
 
         compose.runOnIdle {
             assertTrue(muted)
             assertTrue(speaker)
+            assertTrue(quickExited)
             assertTrue(finished)
         }
     }
@@ -59,6 +63,7 @@ class VoiceCallScreenUiTest {
                     onMute = {},
                     onSpeaker = {},
                     onFinish = { finished = true },
+                    onQuickExit = {},
                 )
             }
         }
@@ -81,6 +86,7 @@ class VoiceCallScreenUiTest {
                     onMute = {},
                     onSpeaker = {},
                     onFinish = {},
+                    onQuickExit = {},
                 )
             }
         }

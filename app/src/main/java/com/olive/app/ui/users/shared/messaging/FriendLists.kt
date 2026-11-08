@@ -367,22 +367,43 @@ internal fun ChatMessageBody(
     }
     // An unsent location card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_LOCATION") {
+        val expiresAt = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+        val active = expiresAt > System.currentTimeMillis()
+        val status = if (active) {
+            stringResource(
+                R.string.shared_location_active_until,
+                DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
+                    .format(Instant.ofEpochMilli(expiresAt)),
+            )
+        } else stringResource(R.string.shared_location_ended)
         Surface(
             onClick = { session.navigation.openSafePage(SafePage.Location) }, shape = MaterialTheme.shapes.medium,
             color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 .testTag("shared_live_location")
         ) {
-            Row(
-                Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Outlined.LocationOn, stringResource(R.string.shared_live_location))
-                Column {
+            Column {
+                Surface(
+                    color = OliveGreen.copy(alpha = if (mine) .55f else .16f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(Icons.Outlined.LocationOn, null)
+                        Text(
+                            stringResource(R.string.shared_live_location),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        )
+                    }
+                }
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        stringResource(R.string.shared_live_location),
-                        style = MaterialTheme.typography.labelSmall
+                        status,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
                         stringResource(R.string.open_location_map),

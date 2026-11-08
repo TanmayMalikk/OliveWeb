@@ -2,6 +2,10 @@ package com.olive.app.ui.users.shared.navigation
 
 import com.olive.app.data.AccountRole
 import com.olive.app.data.ChatConversation
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipParticipant
+import com.olive.app.data.messaging.VoipParticipantStatus
+import com.olive.app.data.messaging.canBeRejoinedBy
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,6 +15,16 @@ class SessionCallsTest {
     @Test
     fun userCanCallFromDirectConversation() {
         assertTrue(canCallFromConversation(AccountRole.USER, directConversation(), "user-1"))
+    }
+
+    // A personal group call includes every User and Safe Contact already in the chat.
+    @Test
+    fun userCanCallFromGroupConversation() {
+        val group = directConversation().copy(
+            type = "GROUP",
+            participantIds = listOf("user-1", "safe-1", "user-2"),
+        )
+        assertTrue(canCallFromConversation(AccountRole.USER, group, "user-1"))
     }
 
     // A Safe Contact gets the same direct-call access as a User.
@@ -39,6 +53,52 @@ class SessionCallsTest {
     fun closedOrUnrelatedConversationCannotStartCall() {
         assertFalse(canCallFromConversation(AccountRole.USER, directConversation().copy(closedAt = 1L), "user-1"))
         assertFalse(canCallFromConversation(AccountRole.USER, directConversation(), "outsider"))
+    }
+
+    // A guest leaving a group only disconnects that guest; the caller still owns the room.
+    @Test
+    fun onlyNonCallerGroupMembersLeaveWithoutEndingRoom() {
+        val groupCall = VoipCall(
+            callId = "call-1",
+            name = "Group",
+            callerId = "user-1",
+            participants = listOf(
+                VoipParticipant("user-1", VoipParticipantStatus.ACCEPTED),
+                VoipParticipant("safe-1", VoipParticipantStatus.ACCEPTED),
+                VoipParticipant("user-2", VoipParticipantStatus.ACCEPTED),
+            ),
+        )
+        assertTrue(shouldLeaveGroupCall(groupCall, "safe-1", remoteParticipantCount = 2))
+        assertTrue(shouldLeaveGroupCall(groupCall, "user-1", remoteParticipantCount = 1))
+        assertFalse(shouldLeaveGroupCall(groupCall, "user-1", remoteParticipantCount = 0))
+        assertFalse(
+            shouldLeaveGroupCall(
+                groupCall.copy(participants = groupCall.participants.take(2)),
+                "safe-1",
+                remoteParticipantCount = 1,
+            )
+        )
+    }
+
+    // The chat offers rejoin only to someone who left while two members remain connected.
+    @Test
+    fun rejoinRequiresTwoConnectedMembers() {
+        val call = VoipCall(
+            callId = "call-1",
+            name = "Group",
+            callerId = "user-1",
+            participants = listOf(
+                VoipParticipant("user-1", VoipParticipantStatus.ACCEPTED),
+                VoipParticipant("safe-1", VoipParticipantStatus.DECLINED),
+                VoipParticipant("user-2", VoipParticipantStatus.ACCEPTED),
+            ),
+        )
+        assertTrue(call.canBeRejoinedBy("safe-1"))
+        assertFalse(
+            call.copy(participants = call.participants.dropLast(1))
+                .canBeRejoinedBy("safe-1")
+        )
+        assertFalse(call.canBeRejoinedBy("user-2"))
     }
 
     private fun directConversation() = ChatConversation(

@@ -54,6 +54,23 @@
 
 
     <string name="close">Close</string>
+    <string name="chat_info">Chat info</string>
+    <string name="chat_members">People in this chat</string>
+    <string name="chat_header_member_count">%1$d members</string>
+    <string name="chat_member_count">%1$d people</string>
+    <string name="chat_shared_items">Shared items</string>
+    <string name="chat_no_shared_items">No files or safety items have been shared yet.</string>
+    <string name="chat_add_people">Add people</string>
+    <string name="chat_add_person">Add %1$s</string>
+    <string name="chat_remove_person">Remove %1$s from this group</string>
+    <string name="chat_add_participant_error">This person could not be added. They must be an accepted contact with secure messaging set up.</string>
+    <string name="chat_request_staff_title">Staff support</string>
+    <string name="chat_request_staff_description">Create a separate support chat with everyone already in this conversation.</string>
+    <string name="chat_request_staff_button">Request staff</string>
+    <string name="chat_organization_member">Olive support team</string>
+    <string name="chat_open_info">Open chat information</string>
+    <string name="shared_location_active_until">Live location shared until %1$s</string>
+    <string name="shared_location_ended">Live location sharing ended</string>
 <string name="city">City</string>
 <string name="password">Password</string>
 <string name="safe_contacts">Safe contacts</string>

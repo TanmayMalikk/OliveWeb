@@ -406,4 +406,21 @@
     <string name="evidence_tagged">Tagged as evidence</string>
     <string name="evidence_normal_file">Normal account file</string>
     <string name="safety_remove_attachment">Supprimer la pièce jointe %1$s</string>
+    <string name="chat_info">Infos sur la discussion</string>
+    <string name="chat_members">Personnes dans cette discussion</string>
+    <string name="chat_header_member_count">%1$d membres</string>
+    <string name="chat_member_count">%1$d personnes</string>
+    <string name="chat_shared_items">Éléments partagés</string>
+    <string name="chat_no_shared_items">Aucun fichier ni élément de sécurité n’a encore été partagé.</string>
+    <string name="chat_add_people">Ajouter des personnes</string>
+    <string name="chat_add_person">Ajouter %1$s</string>
+    <string name="chat_remove_person">Retirer %1$s de ce groupe</string>
+    <string name="chat_add_participant_error">Cette personne n’a pas pu être ajoutée. Elle doit être un contact accepté avec la messagerie sécurisée configurée.</string>
+    <string name="chat_request_staff_title">Soutien du personnel</string>
+    <string name="chat_request_staff_description">Créer une discussion de soutien séparée avec toutes les personnes déjà présentes.</string>
+    <string name="chat_request_staff_button">Demander du personnel</string>
+    <string name="chat_organization_member">Équipe de soutien Olive</string>
+    <string name="chat_open_info">Ouvrir les infos sur la discussion</string>
+    <string name="shared_location_active_until">Position en direct partagée jusqu’à %1$s</string>
+    <string name="shared_location_ended">Le partage de position en direct est terminé</string>
 </resources>

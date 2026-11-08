@@ -106,15 +106,73 @@ class FirebaseCallStore {
                     [userId]: { status: accepted ? 'accepted' : 'declined' }
                 }
             };
-            return accepted
-                ? { ...updated, acceptedAt: now }
-                : {
-                    ...updated,
-                    status: 'declined',
-                    endedAt: now,
-                    endedBy: userId,
-                    endReason: 'declined'
-                };
+            // One person declining a group invitation must not close the shared room for
+            // everyone else. The call stays active so the other invitees can still join.
+            return accepted ? { ...updated, acceptedAt: now } : updated;
+        });
+        return result.committed ? result.snapshot.val() : null;
+    }
+
+    async leaveCall(callId, userId) {
+        const existingCall = await this.getCall(callId);
+        const result = await this.callsRef.child(callId).transaction((current) => {
+            const call = current ?? existingCall;
+            if (
+                !call ||
+                call.status !== 'active' ||
+                getParticipantStatus(call, userId) !== 'accepted'
+            ) return;
+            const now = this.clock();
+            const updated = call.callerId === userId ? {
+                ...call,
+                callerLeftAt: now
+            } : {
+                ...call,
+                participants: {
+                    ...call.participants,
+                    [userId]: { status: 'declined' }
+                }
+            };
+            const connectedCount = (updated.callerLeftAt ? 0 : 1) +
+                Object.values(updated.participants || {}).filter((participant) =>
+                    (typeof participant === 'string' ? participant : participant?.status) === 'accepted'
+                ).length;
+            return connectedCount === 0 ? {
+                ...updated,
+                status: 'ended',
+                endedAt: now,
+                endedBy: userId,
+                endReason: 'all_left'
+            } : updated;
+        });
+        return result.committed ? result.snapshot.val() : null;
+    }
+
+    async rejoinCall(callId, userId) {
+        const existingCall = await this.getCall(callId);
+        const result = await this.callsRef.child(callId).transaction((current) => {
+            const call = current ?? existingCall;
+            if (!call || call.status !== 'active') return;
+            const connectedCount = (call.callerLeftAt ? 0 : 1) +
+                Object.values(call.participants || {}).filter((participant) =>
+                    (typeof participant === 'string' ? participant : participant?.status) === 'accepted'
+                ).length;
+            if (connectedCount < 2) return;
+
+            if (call.callerId === userId) {
+                if (!call.callerLeftAt) return;
+                const updated = { ...call };
+                delete updated.callerLeftAt;
+                return updated;
+            }
+            if (getParticipantStatus(call, userId) !== 'declined') return;
+            return {
+                ...call,
+                participants: {
+                    ...call.participants,
+                    [userId]: { status: 'accepted' }
+                }
+            };
         });
         return result.committed ? result.snapshot.val() : null;
     }
@@ -208,7 +266,7 @@ class FirebaseCallStore {
 }
 
 function getParticipantStatus(call, userId) {
-    if (call.callerId === userId) return 'accepted';
+    if (call.callerId === userId) return call.callerLeftAt ? 'declined' : 'accepted';
     const participant = call.participants?.[userId];
     if (typeof participant === 'string') return participant;
     return participant?.status;

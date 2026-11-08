@@ -41,8 +41,10 @@ class VoipManagerTest {
         assertEquals("call-1", call.callId)
         assertEquals("Support", call.name)
         assertEquals(listOf("user-2", "user-3"), call.participants.drop(1).map { it.userId })
-        assertEquals("Bearer user-token", requests.single().header("Authorization"))
-        val requestBody = JSONObject(Buffer().also { requests.single().body?.writeTo(it) }.readUtf8())
+        val createRequest = requests.single { it.url.encodedPath == "/api/calls" }
+        assertEquals("Bearer user-token", createRequest.header("Authorization"))
+        assertEquals(listOf("/api/calls"), requests.map { it.url.encodedPath })
+        val requestBody = JSONObject(Buffer().also { createRequest.body?.writeTo(it) }.readUtf8())
         assertEquals("Support", requestBody.getString("name"))
         assertEquals("caller-1", requestBody.getString("callerId"))
         assertEquals("Alice", requestBody.getString("callerName"))

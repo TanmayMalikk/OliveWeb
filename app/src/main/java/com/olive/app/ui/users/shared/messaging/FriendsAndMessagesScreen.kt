@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -352,8 +353,11 @@ private fun ConversationRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
-                if (conversation.type == "SUPPORT") Icons.Outlined.SupportAgent
-                else Icons.Outlined.PersonOutline,
+                when {
+                    conversation.type == "SUPPORT" -> Icons.Outlined.SupportAgent
+                    conversation.type == "GROUP" || conversation.participantIds.size > 2 -> Icons.Outlined.Group
+                    else -> Icons.Outlined.PersonOutline
+                },
                 contentDescription = null,
                 modifier = Modifier.size(22.dp),
             )

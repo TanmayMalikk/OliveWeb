@@ -14,6 +14,7 @@ import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipCallStatus
 import com.olive.app.data.messaging.VoipParticipantStatus
+import com.olive.app.data.messaging.canBeRejoinedBy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -65,6 +66,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -84,17 +86,24 @@ import com.olive.app.data.PrivateEntryKind
 import com.olive.app.ui.session.SessionRuntime
 
 
-// Calls are private-account features. Support tickets can include staff or admins and never qualify.
+// Calls are private-account features. Direct and personal group chats can call; support chats cannot.
 internal fun canCallFromConversation(
     role: AccountRole,
     conversation: ChatConversation,
     currentUid: String,
 ): Boolean = role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) &&
-    conversation.type == "DIRECT" &&
+    conversation.type in setOf("DIRECT", "GROUP") &&
     conversation.closedAt == 0L &&
     currentUid.isNotBlank() &&
     currentUid in conversation.participantIds &&
     conversation.participantIds.any { it != currentUid }
+
+internal fun shouldLeaveGroupCall(
+    call: VoipCall,
+    currentUid: String,
+    remoteParticipantCount: Int,
+): Boolean = call.participants.size > 2 && currentUid.isNotBlank() &&
+    (call.callerId != currentUid || remoteParticipantCount > 0)
 
 internal class SessionCalls(
     private val application: Application,
@@ -182,10 +191,10 @@ internal class SessionCalls(
         }
     }
 
-    // Creates a call only from a direct chat owned by a User or Safe Contact account.
+    // Starts a call with every other person in a direct or personal group chat.
     fun start(conversation: ChatConversation, callerUid: String, role: AccountRole) {
         if (!canCallFromConversation(role, conversation, callerUid)) {
-            message = "Voice calls are available only in direct User and Safe Contact chats"
+            message = "Voice calls are available only in personal User and Safe Contact chats"
             return
         }
         val recipients = conversation.participantIds.filterNot { it == callerUid }.distinct()
@@ -238,6 +247,16 @@ internal class SessionCalls(
         }
     }
 
+    // Reopens an active group call from the call event shown inside its chat.
+    fun rejoin(call: VoipCall, currentUid: String, role: AccountRole) {
+        if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) ||
+            !call.canBeRejoinedBy(currentUid)
+        ) return
+        scope.launch {
+            runCallAction { controller.rejoinCall(call.callId) }
+        }
+    }
+
     // Updates whether other people in the active call can hear this device's microphone.
     fun setMuted(muted: Boolean) {
         scope.launch { runCallAction { controller.setMicrophoneMuted(muted) } }
@@ -247,8 +266,8 @@ internal class SessionCalls(
         scope.launch { runCallAction { controller.setSpeakerEnabled(enabled) } }
     }
 
-    // Either participant ends the one shared room for both phones.
-    fun finish(@Suppress("UNUSED_PARAMETER") currentUid: String) {
+    // A caller ends the room. A member leaving a group only disconnects their own phone.
+    fun finish(currentUid: String) {
         scope.launch {
             runCallAction {
                 val active = state.value
@@ -258,8 +277,13 @@ internal class SessionCalls(
                     is VoipSessionState.Error -> active.call
                     else -> null
                 } ?: return@runCallAction
+                val remoteParticipantCount = (active as? VoipSessionState.Active)
+                    ?.remoteParticipantCount
+                    ?: 0
                 when {
                     active is VoipSessionState.Error -> controller.dismiss()
+                    shouldLeaveGroupCall(call, currentUid, remoteParticipantCount) ->
+                        controller.leaveCall()
                     else -> controller.endCall()
                 }
             }
@@ -395,9 +419,11 @@ internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
     if (showMessage) session.message?.let {
         AccessibleMessage(
             it,
-            modifier = Modifier.testTag("session_message")
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 6.dp)
+                .testTag("session_message")
                 .semantics { liveRegion = LiveRegionMode.Polite },
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center),
         )
     }
     AnimatedVisibility(

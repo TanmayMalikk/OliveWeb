@@ -16,9 +16,23 @@ test("deployment keeps the existing callable endpoint names", () => {
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
     "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
-    "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
+    "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant", "conversationRemoveParticipant",
+    "conversationRequestStaff", "staffSupportClose",
+    "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+// Inputs: a three-person group, its owner, and one other member. Expected: only the owner can
+// remove that member, while two-person groups and unrelated accounts are rejected.
+test("group member removal keeps an owner and at least two people", () => {
+  const group = {type:"GROUP", ownerUid:"owner", participantIds:["owner", "friend", "safe"]};
+  assert.deepEqual(supportGroups.validateGroupRemoval(group, "owner", "safe"), ["owner", "friend"]);
+  assert.throws(() => supportGroups.validateGroupRemoval(group, "friend", "safe"));
+  assert.throws(() => supportGroups.validateGroupRemoval(group, "owner", "missing"));
+  assert.throws(() => supportGroups.validateGroupRemoval(
+    {...group, participantIds:["owner", "friend"]}, "owner", "friend",
+  ));
 });
 
 // Inputs: one device key for the caller and one forged key for another UID. Expected: only caller-owned device IDs pass.

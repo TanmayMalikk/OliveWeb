@@ -419,6 +419,10 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                 onMute = session.calls::setMuted,
                 onSpeaker = session.calls::setSpeakerEnabled,
                 onFinish = { session.calls.finish(callAccountId) },
+                onQuickExit = {
+                    session.calls.finish(callAccountId)
+                    session.navigation.quickExit()
+                },
             )
         }
     }

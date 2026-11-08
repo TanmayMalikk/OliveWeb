@@ -89,6 +89,7 @@
     <string name="ui_start_voice_call">بدء مكالمة صوتية</string>
     <string name="ui_calling">جارٍ الاتصال…</string>
     <string name="ui_call_in_progress">المكالمة جارية</string>
+    <string name="ui_join_call">الانضمام إلى المكالمة</string>
     <string name="ui_missed_call">مكالمة فائتة</string>
     <string name="ui_call_declined">تم رفض المكالمة</string>
     <string name="ui_call_ended">انتهت المكالمة</string>

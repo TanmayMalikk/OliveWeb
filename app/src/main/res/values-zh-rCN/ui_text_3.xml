@@ -89,6 +89,7 @@
     <string name="ui_start_voice_call">开始语音通话</string>
     <string name="ui_calling">正在呼叫…</string>
     <string name="ui_call_in_progress">通话中</string>
+    <string name="ui_join_call">加入通话</string>
     <string name="ui_missed_call">未接来电</string>
     <string name="ui_call_declined">通话已拒绝</string>
     <string name="ui_call_ended">通话已结束</string>
