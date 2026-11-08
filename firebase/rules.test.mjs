@@ -266,19 +266,28 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   const participantPublicKeys={'social-a':'alice-key','social-b':'bob-key'};
   await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),
     {roomKeys,participantPublicKeys,updatedAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),
-    {roomKeys:{'social-a':'replacement','social-b':'replacement'},updatedAt:serverTimestamp()}));
+  // An empty conversation may repair stale wrapped keys because no message history can be lost.
+  await assertSucceeds(updateDoc(doc(bob,'conversations/'+friendshipId),
+    {roomKeys:{'social-a':'replacement','social-b':'replacement'},
+      participantPublicKeys,updatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(alice,'messageDirectory/social_alice'),
     {publicKey:'alice-key-rotated',updatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),{
     roomKeys:{'social-a':'wrapped-a-rotated','social-b':'wrapped-b-rotated'},
     participantPublicKeys:{'social-a':'alice-key-rotated','social-b':'bob-key'},updatedAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),{
+  // A second participant can also repair this still-empty conversation with the current public keys.
+  await assertSucceeds(updateDoc(doc(bob,'conversations/'+friendshipId),{
     roomKeys:{'social-a':'unauthorized-replacement','social-b':'unauthorized-replacement'},
     participantPublicKeys:{'social-a':'alice-key-rotated','social-b':'bob-key'},updatedAt:serverTimestamp()}));
   const encryptedRef=doc(alice,'conversations/'+friendshipId+'/messages/message-2');
   await assertSucceeds(setDoc(encryptedRef,{senderUid:'social-a',senderUsername:'social_alice',
     ciphertext:'encrypted-payload',deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+  await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),{
+    lastMessage:'Secure message',lastMessageId:'message-2',lastSenderUid:'social-a',updatedAt:serverTimestamp()}));
+  // Once encrypted history exists, nobody may replace the room key and make that history unreadable.
+  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),{
+    roomKeys:{'social-a':'late-replacement','social-b':'late-replacement'},
+    participantPublicKeys:{'social-a':'alice-key-rotated','social-b':'bob-key'},updatedAt:serverTimestamp()}));
   await assertSucceeds(getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-2')));
   await assertFails(setDoc(doc(bob,'conversations/'+friendshipId+'/messages/safe-contact-plaintext'),
     {senderUid:'social-b',senderUsername:'social_bob',body:'Unencrypted reply',deleted:false,
@@ -297,16 +306,18 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
       sentAt:serverTimestamp(),clientSentAt:Date.now()}));
 });
 
-test('support conversations allow one user, safe contact, staff member, and admin', async () => {
+test('support conversations keep encrypted access when more than four people participate', async () => {
   const owner=env.authenticatedContext('support-owner',{email:'support_owner@users.olive.invalid'}).firestore();
   const staff=env.authenticatedContext('support-staff',{email:'staff@example.ca',role:'STAFF'}).firestore();
   const contact=env.authenticatedContext('support-contact',{email:'support_contact@safe.olive.invalid'}).firestore();
+  const guest=env.authenticatedContext('support-guest',{email:'support_guest@users.olive.invalid'}).firestore();
   const admin=env.authenticatedContext('support-admin',{email:'admin@example.ca',role:'ADMIN'}).firestore();
   const stranger=env.authenticatedContext('support-stranger',{email:'support_stranger@users.olive.invalid'}).firestore();
   const directory=[
     [owner,'support_owner','support-owner','owner-key'],
     [staff,'support_staff','support-staff','staff-key'],
     [contact,'support_contact','support-contact','contact-key'],
+    [guest,'support_guest','support-guest','guest-key'],
     [admin,'support_admin','support-admin','admin-key'],
   ];
   for (const [client,username,uid,publicKey] of directory) {
@@ -320,8 +331,9 @@ test('support conversations allow one user, safe contact, staff member, and admi
   const conversationId='support-support-owner-ticket-1';
   const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',adminUid:'support-admin',
     supportOrigin:'SUPPORT',supportTag:'NEEDS_ADMIN',
-    friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-admin'],
-    participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact','support-admin':'support_admin'},
+    friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-guest','support-admin'],
+    participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact',
+      'support-guest':'support_guest','support-admin':'support_admin'},
     createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:''};
   await env.withSecurityRulesDisabled(async context => {
     await setDoc(doc(context.firestore(),`conversations/${conversationId}`),conversation);
@@ -329,12 +341,15 @@ test('support conversations allow one user, safe contact, staff member, and admi
   await assertSucceeds(getDoc(doc(owner,`conversations/${conversationId}`)));
   await assertSucceeds(getDoc(doc(staff,`conversations/${conversationId}`)));
   await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}`)));
+  await assertSucceeds(getDoc(doc(guest,`conversations/${conversationId}`)));
   await assertSucceeds(getDoc(doc(admin,`conversations/${conversationId}`)));
   await assertFails(getDoc(doc(stranger,`conversations/${conversationId}`)));
   await assertFails(updateDoc(doc(owner,`conversations/${conversationId}`),
     {participantIds:['support-owner','support-staff'],updatedAt:serverTimestamp()}));
-  const keys={roomKeys:{'support-owner':'owner-wrap','support-staff':'staff-wrap','support-contact':'contact-wrap','support-admin':'admin-wrap'},
-    participantPublicKeys:{'support-owner':'owner-key','support-staff':'staff-key','support-contact':'contact-key','support-admin':'admin-key'},
+  const keys={roomKeys:{'support-owner':'owner-wrap','support-staff':'staff-wrap','support-contact':'contact-wrap',
+    'support-guest':'guest-wrap','support-admin':'admin-wrap'},
+    participantPublicKeys:{'support-owner':'owner-key','support-staff':'staff-key','support-contact':'contact-key',
+      'support-guest':'guest-key','support-admin':'admin-key'},
     updatedAt:serverTimestamp()};
   await assertSucceeds(updateDoc(doc(owner,`conversations/${conversationId}`),keys));
   await assertFails(updateDoc(doc(staff,`conversations/${conversationId}`),{

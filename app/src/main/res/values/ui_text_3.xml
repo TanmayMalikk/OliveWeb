@@ -89,6 +89,7 @@
     <string name="ui_start_voice_call">Start voice call</string>
     <string name="ui_calling">Calling…</string>
     <string name="ui_call_in_progress">Call in progress</string>
+    <string name="ui_join_call">Join call</string>
     <string name="ui_missed_call">Missed call</string>
     <string name="ui_call_declined">Call declined</string>
     <string name="ui_call_ended">Call ended</string>

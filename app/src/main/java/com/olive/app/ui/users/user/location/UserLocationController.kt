@@ -342,7 +342,8 @@ internal class LocationMapController(
     fun startSharingWith(
         configuration: LocationMapConfiguration, recipients: List<Friend>, durationMillis: Long,
         requestPermission: suspend () -> Boolean, permissionError: String, startError: String,
-        onError: (String) -> Unit = {}
+        onError: (String) -> Unit = {},
+        onStarted: (Long) -> Unit = {},
     ) {
         if (configuration.localMode || recipients.isEmpty() || state.working) return
         scope.launch {
@@ -377,6 +378,7 @@ internal class LocationMapController(
                         .first { it.uid == configuration.identity.uid && it.updatedAt >= startedAt }
                 }
                 state = state.copy(working = false, liveActive = true, expiresAt = end)
+                onStarted(end)
                 watchExpiry()
             } catch (failure: Exception) {
                 LiveLocationController.stop(applicationContext)

@@ -233,6 +233,15 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
 
     // Escalates this support ticket by adding an available admin.
     fun requestAdminHelp(conversationId: String) = runtime.staffSupport.requestAdmin(conversationId)
+    // Adds an accepted contact to this encrypted conversation without starting a new chat.
+    fun addConversationParticipant(conversationId: String, participantUid: String) =
+        runtime.staffSupport.addParticipant(conversationId, participantUid)
+    // Removes another member when the signed-in account owns this group chat.
+    fun removeConversationParticipant(conversationId: String, participantUid: String) =
+        runtime.staffSupport.removeParticipant(conversationId, participantUid)
+    // Starts a separate staff ticket with every person already in this personal chat.
+    fun requestStaffForConversation(conversationId: String, onCreated: (String) -> Unit) =
+        runtime.staffSupport.requestStaffForConversation(conversationId, onCreated)
     // Closes the support ticket and archives it for every participant.
     fun closeSupportChat(conversationId: String) = runtime.staffSupport.close(conversationId)
 }

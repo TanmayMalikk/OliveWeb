@@ -406,4 +406,21 @@
     <string name="evidence_tagged">Tagged as evidence</string>
     <string name="evidence_normal_file">Normal account file</string>
     <string name="safety_remove_attachment">移除附件 %1$s</string>
+    <string name="chat_info">聊天信息</string>
+    <string name="chat_members">聊天中的人员</string>
+    <string name="chat_header_member_count">%1$d 位成员</string>
+    <string name="chat_member_count">%1$d 人</string>
+    <string name="chat_shared_items">共享项目</string>
+    <string name="chat_no_shared_items">尚未共享文件或安全项目。</string>
+    <string name="chat_add_people">添加人员</string>
+    <string name="chat_add_person">添加 %1$s</string>
+    <string name="chat_remove_person">将 %1$s 移出此群聊</string>
+    <string name="chat_add_participant_error">无法添加此人。对方必须是已接受的联系人，并已设置安全消息。</string>
+    <string name="chat_request_staff_title">工作人员支持</string>
+    <string name="chat_request_staff_description">创建一个单独的支持聊天，并保留此聊天中的所有人员。</string>
+    <string name="chat_request_staff_button">请求工作人员</string>
+    <string name="chat_organization_member">Olive 支持团队</string>
+    <string name="chat_open_info">打开聊天信息</string>
+    <string name="shared_location_active_until">实时位置共享至 %1$s</string>
+    <string name="shared_location_ended">实时位置共享已结束</string>
 </resources>

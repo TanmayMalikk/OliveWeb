@@ -22,6 +22,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.URI
+import java.net.UnknownHostException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
@@ -71,6 +72,14 @@ data class VoipCall(
     val endedAt: Long = 0L,
     val endReason: String = "",
 )
+
+fun VoipCall.connectedParticipantCount(): Int =
+    participants.count { it.status == VoipParticipantStatus.ACCEPTED }
+
+fun VoipCall.canBeRejoinedBy(userId: String): Boolean =
+    status == VoipCallStatus.ACTIVE &&
+        connectedParticipantCount() >= 2 &&
+        participants.any { it.userId == userId && it.status == VoipParticipantStatus.DECLINED }
 
 internal fun VoipCall.otherPartyName(currentUid: String): String =
     if (callerId == currentUid) name else callerName.ifBlank { name }
@@ -226,6 +235,20 @@ class VoipManager(
         request("POST", "/calls/end", JSONObject().put("callId", callId))
     }
 
+    // Removes this phone from a group call without disconnecting everyone else.
+    suspend fun leaveCall(callId: String) {
+        require(callId.isNotBlank()) { "Call ID must not be blank" }
+        request("POST", "/api/calls/${encodePathSegment(callId)}/leave", JSONObject())
+    }
+
+    // Restores a previous member while at least two people are still in the group call.
+    suspend fun rejoinCall(callId: String): VoipCall {
+        require(callId.isNotBlank()) { "Call ID must not be blank" }
+        return parseCall(
+            request("POST", "/api/calls/${encodePathSegment(callId)}/rejoin", JSONObject())
+        )
+    }
+
     suspend fun registerPushToken(deviceId: String, token: String) {
         require(deviceId.isNotBlank()) { "Device ID must not be blank" }
         require(token.isNotBlank()) { "Push token must not be blank" }
@@ -267,25 +290,43 @@ class VoipManager(
                 requestBuilder.method(method, null)
             }
 
-            // Converts successful responses and turns server failures into useful app errors.
-            httpClient.newCall(requestBuilder.build()).execute().use { response ->
-                val responseBody = response.body.string()
-                if (!response.isSuccessful) {
-                    val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
-                    throw VoipApiException(
-                        statusCode = response.code,
-                        errorCode = error?.optString("code")?.takeIf(String::isNotBlank),
-                        message = error?.optString("message")?.takeIf(String::isNotBlank)
-                            ?: "VoIP API request failed with HTTP ${response.code}"
-                    )
-                }
+            val request = requestBuilder.build()
+            // Unknown-host failures happen before a request reaches the server, so retrying cannot
+            // create a duplicate call. This gives Android time to refresh a recently changed DNS entry.
+            val attempts = 3
+            var lastDnsError: UnknownHostException? = null
 
+            // A phone can briefly keep an old DNS result after the VoIP host is deployed.
+            repeat(attempts) { attempt ->
                 try {
-                    JSONObject(responseBody)
-                } catch (error: Exception) {
-                    throw IOException("VoIP API returned an invalid JSON response", error)
+                    // Converts successful responses and turns server failures into useful app errors.
+                    return@withContext httpClient.newCall(request).execute().use { response ->
+                        val responseBody = response.body.string()
+                        if (!response.isSuccessful) {
+                            val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
+                            throw VoipApiException(
+                                statusCode = response.code,
+                                errorCode = error?.optString("code")?.takeIf(String::isNotBlank),
+                                message = error?.optString("message")?.takeIf(String::isNotBlank)
+                                    ?: "VoIP API request failed with HTTP ${response.code}"
+                            )
+                        }
+
+                        try {
+                            JSONObject(responseBody)
+                        } catch (error: Exception) {
+                            throw IOException("VoIP API returned an invalid JSON response", error)
+                        }
+                    }
+                } catch (error: UnknownHostException) {
+                    lastDnsError = error
+                    if (attempt + 1 < attempts) delay(750L * (attempt + 1))
                 }
             }
+            throw IOException(
+                "The voice service could not be reached. Check the connection and try again.",
+                lastDnsError,
+            )
         }
 
     // Converts one call JSON object into the model used by the app.

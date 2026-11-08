@@ -53,6 +53,8 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         }
         val ref = firestore.collection("conversations").document(conversation.id)
         val locallyAvailableKey = existingRoomKey(conversation.id, currentUid)
+        // An empty chat can safely replace stale setup keys because there is no ciphertext to lose.
+        val encryptedMessagesExist = !ref.collection("messages").limit(1).get().await().isEmpty
         val roomKey = firestore.runTransaction { transaction ->
             val snapshot = transaction.get(ref)
             val savedKeys = snapshot.participantPublicKeys().orEmpty()
@@ -70,10 +72,30 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                 )
                 generated
             } else {
-                val ownWrappedKey = savedWrapped[currentUid]
-                    ?: error("An existing participant must open this chat to share its key.")
-                val existingKey = locallyAvailableKey ?: KeyManager.unwrapKey(ownWrappedKey)
-                if (savedKeys == encodedPublicKeys && savedWrapped.keys.containsAll(conversation.participantIds)) {
+                val existingKey = locallyAvailableKey ?: savedWrapped[currentUid]?.let { wrapped ->
+                    runCatching { KeyManager.unwrapKey(wrapped) }.getOrNull()
+                }
+                if (existingKey == null) {
+                    val hasMessageMetadata = snapshot.getString("lastMessageId").orEmpty().isNotBlank()
+                    check(!encryptedMessagesExist && !hasMessageMetadata) {
+                        "An existing authorized device must share this conversation key."
+                    }
+                    val regenerated = EncryptionUtils.generateSymmetricKey()
+                    val wrapped = participantPublicKeys.mapValues { (_, key) ->
+                        KeyManager.wrapKey(regenerated, key)
+                    }
+                    transaction.update(
+                        ref, mapOf(
+                            "roomKeys" to wrapped,
+                            "participantPublicKeys" to encodedPublicKeys,
+                            "updatedAt" to FieldValue.serverTimestamp(),
+                        )
+                    )
+                    regenerated
+                } else if (
+                    savedKeys == encodedPublicKeys &&
+                    savedWrapped.keys.containsAll(conversation.participantIds)
+                ) {
                     existingKey
                 } else {
                     // Rewrap the same AES key for new participants and changed device keys.
@@ -462,7 +484,11 @@ data class ChatConversation(
         if (viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
             participantUsernames[ownerUid].orEmpty().ifBlank { "User" }
         } else anonymousStaffName
-    } else participantUsernames.entries.firstOrNull { it.key != currentUid }?.value ?: "Conversation"
+    } else {
+        participantIds.mapNotNull { uid ->
+            participantUsernames[uid]?.takeIf { uid != currentUid }
+        }.joinToString(", ").ifBlank { "Conversation" }
+    }
 
     // Personal accounts see why the anonymous Olive Staff conversation was opened.
     fun anonymousStaffDisplayName(

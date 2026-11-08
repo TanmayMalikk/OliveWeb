@@ -53,6 +53,18 @@ class MessagingModelsEdgeCaseTest {
         assertEquals("Conversation", selfOnly.displayName("owner", AccountRole.USER))
     }
 
+    // Inputs: a three-person group in member order. Expected: each viewer sees the other two names together.
+    @Test
+    fun groupChatsShowEveryOtherParticipant() {
+        val group = conversation(
+            type = "GROUP",
+            usernames = linkedMapOf("owner" to "OliveUser", "safe" to "TrustedOne", "friend" to "FriendTwo"),
+        )
+
+        assertEquals("TrustedOne, FriendTwo", group.displayName("owner", AccountRole.USER))
+        assertEquals("OliveUser, FriendTwo", group.displayName("safe", AccountRole.SAFE_CONTACT))
+    }
+
     // Inputs: the values shown below. Expected: ticket labels distinguish consultation support and escalation.
     @Test
     fun ticketLabelsDistinguishConsultationSupportAndEscalation() {

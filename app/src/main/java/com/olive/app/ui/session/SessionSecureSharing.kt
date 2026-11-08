@@ -242,7 +242,12 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                     requestPermission,
                     application.getString(R.string.location_permission_required),
                     application.getString(R.string.location_start_failed),
-                    onError = { message = it })
+                    onError = { message = it },
+                    onStarted = { expiresAt ->
+                        // Posts a normal encrypted timeline item after location sharing has actually started.
+                        conversationActions.sendMessage("SHARED_LOCATION:$expiresAt")
+                    },
+                )
             }
         }
     }

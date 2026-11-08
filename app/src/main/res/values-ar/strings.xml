@@ -406,4 +406,21 @@
     <string name="evidence_tagged">Tagged as evidence</string>
     <string name="evidence_normal_file">Normal account file</string>
     <string name="safety_remove_attachment">إزالة المرفق %1$s</string>
+    <string name="chat_info">معلومات المحادثة</string>
+    <string name="chat_members">الأشخاص في هذه المحادثة</string>
+    <string name="chat_header_member_count">%1$d أعضاء</string>
+    <string name="chat_member_count">%1$d أشخاص</string>
+    <string name="chat_shared_items">العناصر المشتركة</string>
+    <string name="chat_no_shared_items">لم تتم مشاركة ملفات أو عناصر أمان بعد.</string>
+    <string name="chat_add_people">إضافة أشخاص</string>
+    <string name="chat_add_person">إضافة %1$s</string>
+    <string name="chat_remove_person">إزالة %1$s من هذه المجموعة</string>
+    <string name="chat_add_participant_error">تعذرت إضافة هذا الشخص. يجب أن يكون جهة اتصال مقبولة وأن تكون المراسلة الآمنة معدة.</string>
+    <string name="chat_request_staff_title">دعم الموظفين</string>
+    <string name="chat_request_staff_description">أنشئ محادثة دعم منفصلة تضم جميع الأشخاص الموجودين في هذه المحادثة.</string>
+    <string name="chat_request_staff_button">طلب موظف</string>
+    <string name="chat_organization_member">فريق دعم Olive</string>
+    <string name="chat_open_info">فتح معلومات المحادثة</string>
+    <string name="shared_location_active_until">تمت مشاركة الموقع المباشر حتى %1$s</string>
+    <string name="shared_location_ended">انتهت مشاركة الموقع المباشر</string>
 </resources>

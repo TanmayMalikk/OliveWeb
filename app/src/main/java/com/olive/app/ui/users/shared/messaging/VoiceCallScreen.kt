@@ -2,6 +2,7 @@ package com.olive.app.ui.users.shared.messaging
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +23,8 @@ import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.CallEnd
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MicOff
+import androidx.compose.material.icons.outlined.Headphones
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material3.Button
@@ -54,9 +58,9 @@ import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.otherPartyName
 import kotlinx.coroutines.delay
 
-private val CallBackground = Color(0xFF101A17)
-private val CallControlBackground = Color(0xFF2A3733)
-private val CallGreen = Color(0xFF2E7D5B)
+private val CallBackground = Color(0xFF172219)
+private val CallControlBackground = Color(0xFF2B382D)
+private val CallGreen = Color(0xFF789C68)
 private val CallRed = Color(0xFFD4423C)
 
 internal fun formatCallDuration(totalSeconds: Long): String {
@@ -107,7 +111,20 @@ internal fun ActiveCallDialog(
     onMute: (Boolean) -> Unit,
     onSpeaker: (Boolean) -> Unit,
     onFinish: () -> Unit,
+    onQuickExit: () -> Unit,
 ) = FullScreenCallDialog(onBack = onFinish) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        Button(
+            onClick = onQuickExit,
+            colors = ButtonDefaults.buttonColors(containerColor = CallRed),
+            modifier = Modifier.testTag("call_quick_exit"),
+        ) {
+            Icon(Icons.Outlined.Close, null)
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.quick_exit))
+        }
+    }
+    Spacer(Modifier.height(20.dp))
     val active = state as? VoipSessionState.Active
     val call = when (state) {
         is VoipSessionState.Connecting -> state.call
@@ -140,6 +157,10 @@ internal fun ActiveCallDialog(
         status = status,
         isError = state is VoipSessionState.Error,
     )
+    if (active != null) {
+        Spacer(Modifier.height(28.dp))
+        AudioWaveform()
+    }
     Spacer(Modifier.weight(1f))
     if (active != null) {
         Row(
@@ -228,14 +249,16 @@ private fun FullScreenCallDialog(
 @Composable
 private fun CallIdentity(name: String, status: String, isError: Boolean = false) {
     Box(
-        Modifier.size(116.dp).background(CallGreen.copy(alpha = .28f), CircleShape),
+        Modifier.size(132.dp)
+            .background(CallGreen.copy(alpha = .14f), CircleShape)
+            .border(3.dp, CallGreen, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            name.trim().firstOrNull()?.uppercase().orEmpty(),
-            color = Color.White,
-            fontSize = 46.sp,
-            fontWeight = FontWeight.SemiBold,
+        Icon(
+            Icons.Outlined.Headphones,
+            null,
+            tint = Color.White,
+            modifier = Modifier.size(62.dp),
         )
     }
     Spacer(Modifier.height(28.dp))
@@ -253,6 +276,21 @@ private fun CallIdentity(name: String, status: String, isError: Boolean = false)
         style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
     )
+}
+
+@Composable
+private fun AudioWaveform() {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        listOf(18, 34, 25, 46, 30, 39, 20).forEach { height ->
+            Box(
+                Modifier.width(5.dp).height(height.dp)
+                    .background(CallGreen, CircleShape),
+            )
+        }
+    }
 }
 
 @Composable
