@@ -29,7 +29,7 @@ import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.data.media.OfflineMediaCache
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
-import com.olive.app.data.media.PassThroughMediaPreprocessor
+import com.olive.app.data.media.OnDeviceMediaPreprocessor
 import com.olive.app.data.media.PreparedEncryptedMedia
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
@@ -80,7 +80,7 @@ internal class MediaTransferController(
     private val store:MediaTransferStore=MediaTransferStore(context),
     private val offlineCache:OfflineMediaCache=OfflineMediaCache(context),
     private val client:OkHttpClient=OkHttpClient(),
-    private val preprocessor:MediaPreprocessor=PassThroughMediaPreprocessor,
+    private val preprocessor:MediaPreprocessor=OnDeviceMediaPreprocessor(context.applicationContext),
 ):MediaTransferOperations {
     private val applicationContext=context.applicationContext
     private var observedOwnerUid:String?=null
@@ -402,7 +402,7 @@ internal class MediaTransferController(
     }
 
     /** Resolves picker metadata, then hands the stream to the shared preparation pipeline. */
-    private fun prepareUri(
+    private suspend fun prepareUri(
         uri:Uri, owner:AccountIdentity, ocrReview:OcrReview, tags:Set<String>
     ):MediaUploadJob {
         val resolver=applicationContext.contentResolver
@@ -423,7 +423,7 @@ internal class MediaTransferController(
      * Security-critical preparation boundary. Plaintext is consumed here, optionally compressed,
      * and immediately encrypted into the app-private outbox before a durable/network job exists.
      */
-    private fun prepare(
+    private suspend fun prepare(
         input:InputStream,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,ocrReview:OcrReview,
         ocr:DocumentOcrMetadata?=null,
         tags:Set<String> = emptySet(),
@@ -435,15 +435,17 @@ internal class MediaTransferController(
         // Turn an unexpected prepare failure into a readable message.
         try {
             var processedMimeType=mimeType
+            var processedName=name
             // The preprocessor owns compression only. Its output is immediately consumed by the
             // cipher, and ProcessedMedia.close() guarantees adapter-specific plaintext cleanup.
             input.use { source -> preprocessor.process(source,mimeType,kind).use { processed ->
                 processedMimeType=processed.mimeType
+                processedName=processed.displayName(name)
                 target.outputStream().buffered().use { MediaCipher.encrypt(processed.input,it,key) }
             } }
             require(target.length() in 1..MAX_CIPHERTEXT_BYTES) { "Encrypted media must be smaller than 250 MB" }
             val metadata=JSONObject().apply {
-                put("name", name.trim().take(160).ifBlank { "Document" })
+                put("name", processedName.trim().take(160).ifBlank { "Document" })
                 put("mimeType", processedMimeType.take(120))
                 put("kind", kind.name)
                 put("ocrReview", ocrReview.name)
