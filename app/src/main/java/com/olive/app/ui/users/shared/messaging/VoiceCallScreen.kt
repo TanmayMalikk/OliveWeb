@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -134,13 +133,6 @@ internal fun ActiveCallDialog(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_notification_olive_branch),
-            contentDescription = null,
-            tint = CallGreen,
-            modifier = Modifier.size(34.dp),
-        )
-        Spacer(Modifier.width(10.dp))
         Text(
             stringResource(R.string.olive_branch),
             color = Color.White,
