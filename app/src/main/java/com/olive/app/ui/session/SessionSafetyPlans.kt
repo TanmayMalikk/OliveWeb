@@ -400,8 +400,10 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         // Turn an unexpected refresh consultations failure into a readable message.
         try {
             val cached = withContext(Dispatchers.IO) { store.all(actor) }
-            if (authorized() && actor == runtime.coverAccountId) consultations =
-                cached.map {
+            // Show saved plans only while the consultation screen has no list yet.
+            // Later refreshes keep the current cloud list visible instead of briefly replacing it with a smaller cache.
+            if (consultations.isEmpty() && authorized() && actor == runtime.coverAccountId) {
+                consultations = cached.map {
                     SafetyConsultation(
                         it.ownerUid,
                         it.ownerName,
@@ -410,6 +412,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                         it.staffName,
                     )
                 }
+            }
             if (!hasValidatedInternetConnection(runtime.application)) return
             val result = repository.consultations()
             withContext(Dispatchers.IO) {
