@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <cache-path name="opened_documents" path="opened-documents/" />
+    <files-path name="verified_app_updates" path="updates/" />
 </paths>

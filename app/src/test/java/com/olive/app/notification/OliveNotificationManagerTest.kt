@@ -13,19 +13,6 @@ class OliveNotificationManagerTest {
     fun coverTypesUseMatchingDiscreetDefaults() {
         assertEquals(
             CoverNotificationContent(
-                "olive_food_channel",
-                "Olive Order Update",
-                "Your order is being prepared."
-            ),
-            OliveNotificationManager.contentFor(
-                null,
-                null,
-                CoverType.FOOD,
-                com.olive.app.ui.testResourceText()
-            )
-        )
-        assertEquals(
-            CoverNotificationContent(
                 "olive_news_channel",
                 "Daily Digest",
                 "New headlines are available."
@@ -79,10 +66,6 @@ class OliveNotificationManagerTest {
     @Test
     fun everyCoverUsesItsOwnStatusIcon() {
         assertEquals(
-            R.drawable.ic_notification_olive,
-            OliveNotificationManager.iconFor(CoverType.FOOD)
-        )
-        assertEquals(
             R.drawable.ic_notification_daily_digest,
             OliveNotificationManager.iconFor(CoverType.NEWS)
         )
@@ -95,16 +78,16 @@ class OliveNotificationManagerTest {
             OliveNotificationManager.iconFor(CoverType.GAME)
         )
         assertEquals(
-            R.drawable.ic_notification_olive_branch,
-            OliveNotificationManager.iconFor(CoverType.FOOD, AccountRole.SAFE_CONTACT)
+            R.drawable.ic_notification_olive,
+            OliveNotificationManager.iconFor(CoverType.NEWS, AccountRole.SAFE_CONTACT)
         )
         assertEquals(
             R.drawable.ic_notification_olive_tree,
-            OliveNotificationManager.iconFor(CoverType.FOOD, AccountRole.STAFF)
+            OliveNotificationManager.iconFor(CoverType.NEWS, AccountRole.STAFF)
         )
         assertEquals(
             R.drawable.ic_notification_olive_tree,
-            OliveNotificationManager.iconFor(CoverType.FOOD, AccountRole.ADMIN)
+            OliveNotificationManager.iconFor(CoverType.NEWS, AccountRole.ADMIN)
         )
     }
 }

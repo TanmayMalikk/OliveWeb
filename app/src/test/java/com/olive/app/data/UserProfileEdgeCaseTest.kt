@@ -11,8 +11,8 @@ class UserProfileEdgeCaseTest {
     fun unknownStoredRoleAndCoverUseSafePersonalAccountDefaults() {
         assertEquals(AccountRole.USER, AccountRole.fromStored("SUPER_ADMIN"))
         assertEquals(AccountRole.USER, AccountRole.fromStored(""))
-        assertEquals(CoverType.FOOD, CoverType.fromStored("VIDEO"))
-        assertEquals(CoverType.FOOD, CoverType.fromStored("food"))
+        assertEquals(CoverType.FITNESS, CoverType.fromStored("VIDEO"))
+        assertEquals(CoverType.FITNESS, CoverType.fromStored("REMOVED_COVER"))
     }
 
     // Inputs: the values shown below. Expected: incomplete and overlong addresses are not accepted.
@@ -66,7 +66,7 @@ class UserProfileEdgeCaseTest {
 
         assertEquals("old_user", restored.username)
         assertTrue(restored.contacts.isEmpty())
-        assertEquals(CoverType.FOOD, restored.coverType)
+        assertEquals(CoverType.FITNESS, restored.coverType)
         assertEquals(AccountRole.USER, restored.role)
     }
 }

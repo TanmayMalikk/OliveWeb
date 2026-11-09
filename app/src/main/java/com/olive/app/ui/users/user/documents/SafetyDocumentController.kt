@@ -3,8 +3,6 @@ package com.olive.app.ui.users.user.documents
 
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +15,7 @@ import com.olive.app.data.DocumentOcrMetadata
 import com.olive.app.data.DocumentListSource
 import com.olive.app.data.PrivateEntry
 import com.olive.app.data.UserProfile
+import com.olive.app.data.hasValidatedInternetConnection
 import com.olive.app.R
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
@@ -181,7 +180,7 @@ internal class SafetyDocumentsController(
             state = state.copy(loading = true, error = null)
             runCatching {
                 val source = checkNotNull(repository)
-                val document = if (hasValidatedNetwork(applicationContext)) {
+                val document = if (hasValidatedInternetConnection(applicationContext)) {
                     source.getFor(viewerUid, documentId)
                 } else source.cachedFor(viewerUid, documentId)
                     ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
@@ -339,6 +338,25 @@ internal class SafetyDocumentsController(
         checkNotNull(repository).share(document, ownerUid, recipients)
     }
 
+    // Gives assigned safety-plan staff and admins encrypted access without exposing upload controls.
+    fun grantPlanAccess(
+        documents: List<SafetyDocument>,
+        ownerUid: String,
+        recipients: Map<String, String>,
+    ) = run(refreshAfter = true) {
+        val source = checkNotNull(repository)
+        var granted = false
+        var lastFailure: Throwable? = null
+        documents.forEach { document ->
+            recipients.filterKeys { it !in document.allowedUsers }.forEach { (uid, username) ->
+                runCatching { source.grantAccess(document, ownerUid, uid, username) }
+                    .onSuccess { granted = true }
+                    .onFailure { lastFailure = it }
+            }
+        }
+        if (!granted) lastFailure?.let { throw it }
+    }
+
     // Changes a document failure into a clear message shown on the Safe App screen.
     fun reportError(message: String?) {
         state = state.copy(error = message)
@@ -420,11 +438,4 @@ internal fun mediaFailureResource(failure: Throwable): Int {
         MediaAccessError.DOWNLOAD_FAILED -> R.string.documents_download_failed
         null -> R.string.documents_open_failed
     }
-}
-
-private fun hasValidatedNetwork(context: Context): Boolean {
-    val manager = context.getSystemService(ConnectivityManager::class.java)
-    val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
-    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }

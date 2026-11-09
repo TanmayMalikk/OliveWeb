@@ -6,7 +6,6 @@ import com.olive.app.data.AccountIdentity
 import com.olive.app.data.AccountRole
 import com.olive.app.data.CoverStateStore
 import com.olive.app.data.CoverType
-import com.olive.app.data.FoodCoverState
 import com.olive.app.data.NewsArticle
 import com.olive.app.data.NewsFeedCacheStore
 import com.olive.app.data.NewsScope
@@ -77,17 +76,12 @@ class ResponsivePersistenceTest {
         assertEquals(emptySet<String>(), store.archivedConversationIds("viewer-a"))
     }
 
-    // Checks the all cover state restores from one snapshot step with the test's sample data.
+    // Checks saved news cover state restores from one snapshot step with the test's sample data.
     @Test
-    fun allCoverStateRestoresFromOneSnapshot() {
+    fun newsCoverStateRestoresFromOneSnapshot() {
         val store =
             CoverStateStore(EncryptedVault(context, "responsive-cover-${UUID.randomUUID()}"))
         val uid = "cover-user"
-        val food = FoodCoverState(
-            mapOf("dish-1" to 2),
-            setOf("dish-1"),
-            mapOf("dish-1" to setOf("Olives"))
-        )
         val article = NewsArticle(
             "Cached headline",
             "Summary",
@@ -95,13 +89,11 @@ class ResponsivePersistenceTest {
             "Source",
             "Today"
         )
-        store.saveFood(uid, food)
         store.saveNews(uid, listOf(article))
 
         val restored = store.restore(uid)
 
-        assertEquals(food, restored.first)
-        assertEquals(listOf(article), restored.second)
+        assertEquals(listOf(article), restored)
     }
 
     // Checks the news cache survives astore recreation and separates scopes step with the test's sample data.

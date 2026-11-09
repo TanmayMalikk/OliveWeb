@@ -1,11 +1,10 @@
-// Creates 53 fictional load-test accounts only after the operator confirms the Firebase project.
-const path = require("node:path");
-const fs = require("node:fs");
-const os = require("node:os");
-const {initializeApp} = require("firebase-admin/app");
+// Creates 360 fictional load-test accounts only after the operator confirms the Firebase project.
 const {getAuth} = require("firebase-admin/auth");
+const {getFirestore} = require("firebase-admin/firestore");
+const {getStorage} = require("firebase-admin/storage");
 const {defaultProfile, organizationEmailKey, signInEmail, validPassword} = require("../src/accountPolicy");
 const {accounts, triggerHash, TEST_TRIGGER} = require("./load-test-account-fixtures");
+const {initializeOliveAdminApp} = require("./firebase-admin-app");
 
 const projectId = String(process.env.OLIVE_LOAD_TEST_PROJECT_ID || "").trim();
 const confirmation = String(process.env.OLIVE_LOAD_TEST_CONFIRM_PROJECT || "").trim();
@@ -18,52 +17,25 @@ if (!accounts.every(account => validPassword(password, account.username))) {
 }
 
 const bucketName = String(process.env.OLIVE_LOAD_TEST_STORAGE_BUCKET || `${projectId}.firebasestorage.app`).trim();
-const appRoot = path.resolve(__dirname, "../..");
-const cliConfigPaths = [
-  path.join(os.homedir(), ".config", "configstore", "firebase-tools.json"),
-  process.env.APPDATA && path.join(process.env.APPDATA, "configstore", "firebase-tools.json"),
-].filter(Boolean);
-
-// Reuses the developer's Firebase CLI session without adding a service-account key to the repository.
-function cliToken() {
-  const configPath = cliConfigPaths.find(candidate => fs.existsSync(candidate));
-  const tokens = configPath && JSON.parse(fs.readFileSync(configPath, "utf8")).tokens;
-  if (!tokens?.access_token || Number(tokens.expires_at || 0) <= Date.now() + 60_000) {
-    throw new Error(`Firebase CLI login is missing or expired for ${appRoot}. Run: npx firebase-tools projects:list`);
-  }
-  return tokens;
-}
-
-const credential = {
-  getAccessToken: async () => {
-    const tokens = cliToken();
-    return {access_token: tokens.access_token,
-      expires_in: Math.max(60, Math.floor((Number(tokens.expires_at) - Date.now()) / 1000))};
-  },
-};
-const app = initializeApp({credential, projectId, storageBucket: bucketName}, "load-test-provisioning");
+const app = initializeOliveAdminApp({
+  projectId,
+  storageBucket: bucketName,
+}, "load-test-provisioning");
 const auth = getAuth(app);
-
-async function token() { return cliToken().access_token; }
+const firestore = getFirestore(app);
+const bucket = getStorage(app).bucket();
 
 // Uploads the same profile JSON format used by the Android and web applications.
 async function writeProfile(uid, profile) {
-  const objectName = encodeURIComponent(`accounts/${uid}/profile.json`);
-  const response = await fetch(
-      `https://storage.googleapis.com/upload/storage/v1/b/${bucketName}/o?uploadType=media&name=${objectName}`,
-      {method: "POST", headers: {Authorization: `Bearer ${await token()}`, "Content-Type": "application/json"},
-        body: JSON.stringify(profile, null, 2)},
-  );
-  if (!response.ok) throw new Error(`Profile upload failed: ${response.status} ${await response.text()}`);
+  await bucket.file(`accounts/${uid}/profile.json`).save(JSON.stringify(profile, null, 2), {
+    contentType: "application/json",
+    resumable: false,
+  });
 }
 
 // Creates or replaces one trusted Firestore document used by account lookup and staff assignment.
-async function writeDocument(collection, documentId, fields) {
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/${collection}/${documentId}`;
-  const response = await fetch(url, {method: "PATCH",
-    headers: {Authorization: `Bearer ${await token()}`, "Content-Type": "application/json"},
-    body: JSON.stringify({fields})});
-  if (!response.ok) throw new Error(`${collection} update failed: ${response.status} ${await response.text()}`);
+async function writeDocument(collection, documentId, value) {
+  await firestore.collection(collection).doc(documentId).set(value);
 }
 
 // Creates one account idempotently so rerunning the script repairs incomplete test data.
@@ -86,26 +58,32 @@ async function provision(account) {
   if (account.role === "USER") profile.triggerHash = triggerHash;
   await writeProfile(user.uid, profile);
   await writeDocument("accountDirectory", account.username, {
-    uid: {stringValue: user.uid}, username: {stringValue: account.username}, role: {stringValue: account.role},
-    protected: {booleanValue: false},
-    ...(account.role === "STAFF" ? {loginAlias: {stringValue: authEmail}} : {}),
-    createdAt: {timestampValue: new Date().toISOString()},
+    uid: user.uid, username: account.username, role: account.role,
+    protected: false,
+    fullName: profile.fullName,
+    contactEmail: profile.email,
+    phone: profile.phone,
+    profileComplete: true,
+    ...(account.role === "STAFF" ? {loginAlias: authEmail} : {}),
+    createdAt: new Date(),
   });
   if (account.role === "STAFF") {
     await writeDocument("safetyStaff", user.uid, {
-      available: {booleanValue: true}, activeCount: {integerValue: "0"},
+      available: true, activeCount: 0,
     });
     await writeDocument("organizationLoginAliases", organizationEmailKey(account.email), {
-      uid: {stringValue: user.uid}, username: {stringValue: account.username}, role: {stringValue: account.role},
-      authEmail: {stringValue: authEmail}, updatedAt: {timestampValue: new Date().toISOString()},
+      uid: user.uid, username: account.username, role: account.role,
+      authEmail, updatedAt: new Date(),
     });
   }
   console.log(`Ready: ${account.username} (${account.role}) — ${account.fullName}, ${account.region}`);
 }
 
-// Runs sequentially to avoid flooding Auth, Firestore, and Storage administration APIs.
+// Uses small groups so this larger fixture is practical without flooding Firebase administration APIs.
 (async () => {
-  for (const account of accounts) await provision(account);
+  for (let index = 0; index < accounts.length; index += 5) {
+    await Promise.all(accounts.slice(index, index + 5).map(provision));
+  }
   console.log(`Created or repaired ${accounts.length} fictional accounts in ${projectId}.`);
   console.log(`All accounts use OLIVE_LOAD_TEST_PASSWORD. User trigger phrase: ${TEST_TRIGGER}`);
 })().catch(error => {

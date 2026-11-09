@@ -6,11 +6,8 @@
   .landing-hero {
     gap: 2rem;
   }
-  .hero-food {
-    top: 12%;
-  }
   .hero-news {
-    top: 35%;
+    top: 24%;
   }
   .art-caption {
     font-size: 1.2rem;
@@ -131,9 +128,6 @@
   .preview-masthead {
     font-size: 1.2rem;
   }
-  .preview-food > span {
-    font-size: 1rem;
-  }
   .preview-news > strong {
     font-size: 1rem;
   }
@@ -148,8 +142,5 @@
   }
   .hero-art .cover-preview {
     padding: 1rem;
-  }
-  .hero-art .preview-food > span {
-    font-size: 1.3rem;
   }
 }

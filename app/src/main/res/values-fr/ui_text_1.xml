@@ -128,15 +128,6 @@
     <string name="ui_paywall">Mur payant</string>
     <string name="ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag">Cet article n\'a pas pu être chargé. Vérifiez votre connexion et réessayez.</string>
     <string name="ui_this_changes_the_local_news_search_on_this_device">Cela modifie la recherche d\'actualités locales sur cet appareil.</string>
-    <string name="ui_unsave_value">Annuler l\'enregistrement de %1$s</string>
-    <string name="ui_save_value">Enregistrer %1$s</string>
-    <string name="ui_value_value">%1$s  ·  %2$s</string>
-    <string name="ui_value_value_min">★ %1$s · %2$s min</string>
-    <string name="ui_value_value_min_fe5b84">★ %1$s · %2$s min</string>
-    <string name="ui_add_another_value_in_cart">Ajouter un autre · %1$s dans le panier</string>
-    <string name="ui_remove_one_value">Supprimez un %1$s</string>
-    <string name="ui_add_one_value">Ajoutez un %1$s</string>
-    <string name="ui_value_dishes">%1$s plats</string>
     <string name="ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required">Un nom complet, une date de naissance valide et un véritable e-mail sont requis.</string>
     <string name="ui_unable_to_finish_the_organization_profile_check_the_email_and_try">Impossible de terminer le profil de l\'organisation. Vérifiez l\'e-mail et réessayez.</string>
     <string name="ui_unable_to_update_your_olive_tree_profile">Impossible de mettre à jour votre profil Olive Tree.</string>
@@ -174,7 +165,4 @@
 
 
 
-    <string name="ui_garden_harvest_bowl">Bol de récolte de jardin</string>
-    <string name="ui_quinoa_roasted_vegetables_and_lemon_tahini">Quinoa, légumes rôtis et tahini citronné.</string>
-    <string name="ui_olive_kitchen">Olive Kitchen</string>
 </resources>

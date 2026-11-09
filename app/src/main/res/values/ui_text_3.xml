@@ -62,8 +62,6 @@
 
 
 
-    <string name="ui_olive_order_update">Olive Order Update</string>
-    <string name="ui_your_order_is_being_prepared">Your order is being prepared.</string>
     <string name="ui_new_headlines_are_available">New headlines are available.</string>
     <string name="ui_a_new_update_is_available">A new update is available.</string>
     <string name="ui_an_account_update_is_available">An account update is available.</string>
@@ -75,7 +73,6 @@
 
     <string name="ui_open_the_app_to_see_what_s_new">Open the app to see what\'s new.</string>
     <string name="ui_new_activity_is_waiting">New activity is waiting.</string>
-    <string name="ui_olive_order_updates">Olive Order Updates</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">Order status and delivery notifications for Olive</string>
     <string name="ui_daily_digest_briefings">Daily Digest Briefings</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">Daily headlines and news digest notifications</string>
@@ -89,9 +86,15 @@
     <string name="ui_speaker_off">Speaker off</string>
     <string name="ui_incoming_call">Incoming call</string>
     <string name="ui_voice_call">Voice call</string>
+    <string name="ui_minimize_call">Minimize call</string>
+    <string name="ui_return_to_call">Return to call</string>
+    <string name="ui_call_running_in_background">Call continues in the background</string>
     <string name="ui_start_voice_call">Start voice call</string>
     <string name="ui_calling">Calling…</string>
     <string name="ui_call_in_progress">Call in progress</string>
+    <string name="ui_group_voice_call">Group voice call</string>
+    <string name="ui_group_call_status">%1$d connected • %2$s</string>
+    <string name="ui_join_call">Join call</string>
     <string name="ui_missed_call">Missed call</string>
     <string name="ui_call_declined">Call declined</string>
     <string name="ui_call_ended">Call ended</string>

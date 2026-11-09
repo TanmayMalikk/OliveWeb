@@ -82,6 +82,6 @@ The Bash runner also accepts `-WithDeviceTests`, `-SkipFirebaseRules`, and `-Dev
 
 To run one test, open its Kotlin test file and click the green triangle beside the class or test method. To run all JVM tests, open the **Gradle** panel and run `app > Tasks > verification > testDebugUnitTest`.
 
-The device tests are separated by feature under `app/src/androidTest/java/com/olive/app`: onboarding, cover/account, privacy/security, settings, checkout, and standalone cover behavior. `OliveUiTestBase.kt` contains only their shared setup and common UI actions.
+The device tests are separated by feature under `app/src/androidTest/java/com/olive/app`: onboarding, cover/account, privacy/security, settings, and standalone cover behavior. `OliveUiTestBase.kt` contains only their shared setup and common UI actions.
 
 For repeatable automatic checks, add `test-all.bat` as an Android Studio external tool or Run Configuration. Set the program to the project's `test-all.bat` file and the working directory to the project root. Running that configuration performs the same complete check every time.

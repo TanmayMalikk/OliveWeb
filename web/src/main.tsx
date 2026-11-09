@@ -20,7 +20,6 @@ import "./styles.css";
 const Download = lazy(() => import("./public/AppDownloadInstructions"));
 const EntryLink = lazy(() => import("./users/shared/auth/PrivateEntryLink"));
 const SafeApp = lazy(() => import("./users/shared/safe_app/SafeAppLayout"));
-const Food = lazy(() => import("./public/covers/FoodDeliveryCover"));
 const News = lazy(() => import("./public/covers/DailyDigestCover"));
 const Fitness = lazy(() => import("./public/covers/FitnessCover"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
@@ -147,9 +146,7 @@ function Cover() {
   const [accountOpen, setAccountOpen] = useState(false);
   const lastOliveTap = useRef(0);
   const coverLabel =
-    s.cover === "FOOD"
-      ? "Olive"
-      : s.cover === "NEWS"
+    s.cover === "NEWS"
         ? "Daily Digest"
         : s.cover === "FITNESS"
           ? "Fitness"
@@ -198,9 +195,7 @@ function Cover() {
         role="tabpanel"
         hidden={accountOpen}
       >
-        {s.cover === "FOOD" ? (
-          <Food />
-        ) : s.cover === "NEWS" ? (
+        {s.cover === "NEWS" ? (
           <News />
         ) : s.cover === "FITNESS" ? (
           <Fitness />
@@ -313,7 +308,7 @@ class ErrorBoundary extends Component<
         <p>
           This page could not open. Your stored account has not been deleted.
         </p>
-        <a href="/">Return to Little Grove</a>
+        <a href="/">Return to Fitness Tracker</a>
       </main>
     ) : (
       this.props.children

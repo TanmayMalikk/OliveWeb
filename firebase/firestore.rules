@@ -448,15 +448,20 @@ service cloud.firestore {
     }
 
     function validSupportAdmin(data) {
-      return (!data.keys().hasAny(['adminUid']) && data.participantIds.size() <= 3)
+      return !data.keys().hasAny(['adminUid'])
         || (data.keys().hasAny(['adminUid']) && data.adminUid is string
-          && ((data.adminUid == '' && data.participantIds.size() <= 3)
+          && ((data.adminUid == '')
             || (data.adminUid != '' && data.adminUid in data.participantIds)));
     }
 
     function validConversation(data, conversationId) {
-      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','closedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys'])
+      return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','ticketNumber','ticketStatus','closedAt','completedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys','requestSource','sourceConversationId','supportConversationId'])
         && data.friendshipId == conversationId
+        && (!data.keys().hasAny(['requestSource']) || data.requestSource in ['GROUP_CHAT'])
+        && (!data.keys().hasAny(['sourceConversationId']) || data.sourceConversationId is string)
+        && (!data.keys().hasAny(['supportConversationId']) || data.supportConversationId is string)
+        && (!data.keys().hasAny(['ticketNumber']) || (data.ticketNumber is int && data.ticketNumber >= 0))
+        && (!data.keys().hasAny(['ticketStatus']) || data.ticketStatus in ['COMPLETED'])
         && data.lastMessage is string && data.lastMessage.size() <= 160
         && data.lastMessageId is string && data.lastMessageId.size() <= 128
         && (!data.keys().hasAny(['lastSenderUid'])
@@ -467,27 +472,30 @@ service cloud.firestore {
               && data.participantUsernames == friendshipForConversation(data).participantUsernames)
           || (data.type == 'SUPPORT' && data.ownerUid is string && data.staffUid is string
               && (!data.keys().hasAny(['closedAt']) || data.closedAt is timestamp)
+              && (!data.keys().hasAny(['completedAt']) || data.completedAt is timestamp)
               && data.supportOrigin in ['PLAN_CONSULT', 'SUPPORT']
               && data.supportTag in ['PLAN_CONSULT', 'SUPPORT', 'NEEDS_ADMIN']
               && conversationId.matches('^' + (data.supportOrigin == 'PLAN_CONSULT' ? 'plan-consult-' : 'support-')
                 + data.ownerUid + '(-[A-Za-z0-9_-]{1,64})?$')
               && data.participantIds is list && data.participantIds.size() >= 2
-              && data.participantIds.size() <= 4 && data.ownerUid in data.participantIds
+              && data.ownerUid in data.participantIds
               && data.staffUid in data.participantIds
-              && validSupportAdmin(data)));
+              && validSupportAdmin(data))
+          || (data.type == 'GROUP'
+              && (!data.keys().hasAny(['ownerUid'])
+                || (data.ownerUid is string && data.ownerUid in data.participantIds))
+              && data.participantIds is list && data.participantIds.size() >= 2
+              && data.participantUsernames is map
+              && data.participantUsernames.keys().hasAll(data.participantIds)
+              && data.participantUsernames.keys().hasOnly(data.participantIds)));
     }
 
     function validAdditionalConversationKeys(data) {
-      return data.participantIds.size() == 2
-        || (data.participantIds.size() >= 3
-          && data.roomKeys[data.participantIds[2]] is string
-          && data.roomKeys[data.participantIds[2]].size() <= 1000
-          && data.participantPublicKeys[data.participantIds[2]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[2]])).data.publicKey
-          && (data.participantIds.size() == 3
-            || (data.participantIds.size() == 4
-              && data.roomKeys[data.participantIds[3]] is string
-              && data.roomKeys[data.participantIds[3]].size() <= 1000
-              && data.participantPublicKeys[data.participantIds[3]] == get(/databases/$(database)/documents/messageDirectory/$(data.participantUsernames[data.participantIds[3]])).data.publicKey)));
+      return data.participantIds.size() >= 2
+        && data.roomKeys.keys().hasAll(data.participantIds)
+        && data.roomKeys.keys().hasOnly(data.participantIds)
+        && data.participantPublicKeys.keys().hasAll(data.participantIds)
+        && data.participantPublicKeys.keys().hasOnly(data.participantIds);
     }
 
     function validConversationKeys(data) {
@@ -523,6 +531,11 @@ service cloud.firestore {
             && validConversationKeys(request.resource.data))
           || (resource.data.keys().hasAll(['roomKeys','participantPublicKeys'])
             && resource.data.participantPublicKeys != request.resource.data.participantPublicKeys
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roomKeys','participantPublicKeys','updatedAt'])
+            && validConversationKeys(request.resource.data))
+          || (resource.data.keys().hasAll(['roomKeys','participantPublicKeys'])
+            && (!resource.data.keys().hasAny(['lastMessageId']) || resource.data.lastMessageId == '')
+            && (!request.resource.data.keys().hasAny(['lastMessageId']) || request.resource.data.lastMessageId == '')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['roomKeys','participantPublicKeys','updatedAt'])
             && validConversationKeys(request.resource.data))
         );

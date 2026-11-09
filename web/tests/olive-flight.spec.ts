@@ -15,7 +15,7 @@ test("all games stay within the page width and keep controls reachable", async (
     [2560, 1080],
   ]) {
     await page.setViewportSize({ width, height });
-    await page.goto("/");
+    await page.goto("/game");
     for (const name of ["Nature Pairs", "Olive Flight", "Olive Crossing"]) {
       await page.getByRole("button", { name, exact: true }).click();
       const layout = await page.evaluate(() => {
@@ -121,7 +121,7 @@ test("all games stay within the page width and keep controls reachable", async (
 test("Olive Flight supports keyboard flight, pause, collision, restart and returning to Nature Pairs", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/game");
   await expect(page.locator('a[href="/account"], a[href="/get"]')).toHaveCount(
     0,
   );
@@ -168,7 +168,7 @@ test("Olive Flight fits phone and desktop widths and accepts touch input", async
     hasTouch: true,
   });
   const page = await context.newPage();
-  await page.goto("http://127.0.0.1:5173/");
+  await page.goto("http://127.0.0.1:5173/game");
   await page.getByRole("button", { name: "Olive Flight", exact: true }).tap();
   await page.getByRole("button", { name: "Start Olive Flight" }).tap();
   await page.getByRole("button", { name: "Pause", exact: true }).tap();

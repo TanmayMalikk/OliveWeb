@@ -7,8 +7,9 @@ service firebase.storage {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // GitHub Actions replaces this debug APK; website visitors can only download it.
-    match /public/android/olive-branch.apk {
+    // The release publisher writes versioned APKs and latest.json with Admin SDK credentials.
+    // Website visitors can read these public release files but can never replace them.
+    match /public/android/{releaseFile=**} {
       allow read: if true;
       allow write: if false;
     }

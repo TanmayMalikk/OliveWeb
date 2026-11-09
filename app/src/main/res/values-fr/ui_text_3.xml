@@ -62,8 +62,6 @@
 
 
 
-    <string name="ui_olive_order_update">Mise à jour de la commande d\'olives</string>
-    <string name="ui_your_order_is_being_prepared">Votre commande est en cours de préparation.</string>
     <string name="ui_new_headlines_are_available">De nouveaux titres sont disponibles.</string>
     <string name="ui_a_new_update_is_available">Une nouvelle mise à jour est disponible.</string>
     <string name="ui_an_account_update_is_available">Une mise à jour du compte est disponible.</string>
@@ -75,7 +73,6 @@
 
     <string name="ui_open_the_app_to_see_what_s_new">Ouvrez l\'application pour voir les nouveautés.</string>
     <string name="ui_new_activity_is_waiting">Une nouvelle activité vous attend.</string>
-    <string name="ui_olive_order_updates">Mises à jour de la commande d\'olives</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">État de la commande et notifications de livraison pour Olive</string>
     <string name="ui_daily_digest_briefings">Briefings quotidiens</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">Titres quotidiens et notifications de résumés d\'actualités</string>
@@ -89,9 +86,13 @@
     <string name="ui_speaker_off">Désactiver le haut-parleur</string>
     <string name="ui_incoming_call">Appel entrant</string>
     <string name="ui_voice_call">Appel vocal</string>
+    <string name="ui_minimize_call">Réduire l’appel</string>
+    <string name="ui_return_to_call">Revenir à l’appel</string>
+    <string name="ui_call_running_in_background">L’appel continue en arrière-plan</string>
     <string name="ui_start_voice_call">Démarrer un appel vocal</string>
     <string name="ui_calling">Appel en cours…</string>
     <string name="ui_call_in_progress">Appel en cours</string>
+    <string name="ui_join_call">Rejoindre l’appel</string>
     <string name="ui_missed_call">Appel manqué</string>
     <string name="ui_call_declined">Appel refusé</string>
     <string name="ui_call_ended">Appel terminé</string>

@@ -19,9 +19,9 @@ class OliveActivityPrivacyTest {
     // Inputs: the values shown below. Expected: task identity only updates when cover or role changes.
     @Test
     fun taskIdentityOnlyUpdatesWhenCoverOrRoleChanges() {
-        val applied = CoverType.FOOD to AccountRole.USER
-        assertFalse(shouldApplyTaskIdentity(applied, CoverType.FOOD, AccountRole.USER))
-        assertTrue(shouldApplyTaskIdentity(applied, CoverType.NEWS, AccountRole.USER))
-        assertTrue(shouldApplyTaskIdentity(applied, CoverType.FOOD, AccountRole.ADMIN))
+        val applied = CoverType.NEWS to AccountRole.USER
+        assertFalse(shouldApplyTaskIdentity(applied, CoverType.NEWS, AccountRole.USER))
+        assertTrue(shouldApplyTaskIdentity(applied, CoverType.FITNESS, AccountRole.USER))
+        assertTrue(shouldApplyTaskIdentity(applied, CoverType.NEWS, AccountRole.ADMIN))
     }
 }

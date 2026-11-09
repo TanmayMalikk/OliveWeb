@@ -232,12 +232,18 @@ internal fun SafetyDocumentUploadFlow(
     visible: Boolean,
     onDismiss: () -> Unit,
     tags: Set<String> = emptySet(),
+    onSelectExisting: ((SafetyDocument) -> Unit)? = null,
+    onUploadStarted: (() -> Unit)? = null,
 ) {
     val controller = session.documents
     val unableUpload = stringResource(R.string.documents_upload_failed)
     var pickerTags by remember { mutableStateOf(tags) }
+    var showOliveStorage by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(visible, tags) {
-        if (visible) pickerTags = tags
+        if (visible) {
+            pickerTags = tags
+            showOliveStorage = false
+        }
     }
     fun finishSelection(uri: android.net.Uri?) {
         session.endExternalFilePicker()
@@ -258,6 +264,7 @@ internal fun SafetyDocumentUploadFlow(
         ::finishSelection,
     )
     fun launchProtectedPicker(action: () -> Unit) {
+        onUploadStarted?.invoke()
         onDismiss()
         session.beginExternalFilePicker()
         runCatching(action).onFailure {
@@ -271,17 +278,60 @@ internal fun SafetyDocumentUploadFlow(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                stringResource(R.string.documents_choose_source),
+                stringResource(
+                    if (showOliveStorage) R.string.olive_storage
+                    else R.string.documents_choose_source
+                ),
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.semantics { heading() })
             Text(
-                stringResource(R.string.documents_choose_source_help),
+                stringResource(
+                    if (showOliveStorage) R.string.olive_storage_help
+                    else R.string.documents_choose_source_help
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Muted
             )
+            if (showOliveStorage) {
+                val ownerUid = session.coverAccountId
+                val available = controller.state.files.filter { it.ownerUid == ownerUid }
+                if (available.isEmpty()) {
+                    Text(
+                        stringResource(R.string.attachments_empty_help),
+                        color = Muted,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                } else {
+                    LazyColumn(
+                        Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(available, key = SafetyDocument::id) { document ->
+                            OutlinedButton(
+                                onClick = {
+                                    onSelectExisting?.invoke(document)
+                                    onDismiss()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                                    .testTag("olive_storage_${document.id}"),
+                            ) {
+                                Icon(Icons.Outlined.Attachment, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(document.name, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = { showOliveStorage = false },
+                    modifier = Modifier.align(Alignment.End),
+                ) { Text(stringResource(R.string.back)) }
+                return@Column
+            }
             Button(
                 onClick = {
-                    session.pendingCameraUploadTags = tags
+                    onUploadStarted?.invoke()
+                    session.pendingCameraUploadTags = pickerTags
                     onDismiss()
                     session.navigation.openSafePage(SafePage.Camera)
                 },
@@ -323,6 +373,14 @@ internal fun SafetyDocumentUploadFlow(
                 Text(
                     stringResource(R.string.documents_choose_document)
                 )
+            }
+            if (onSelectExisting != null) OutlinedButton(
+                onClick = { showOliveStorage = true },
+                modifier = Modifier.fillMaxWidth().testTag("documents_choose_olive_storage"),
+            ) {
+                Icon(Icons.Outlined.FolderSpecial, null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.olive_storage))
             }
             TextButton(
                 onClick = onDismiss,
@@ -421,212 +479,4 @@ private fun PendingUploadCard(upload: MediaUploadPresentation, onRetry: () -> Un
             }
         }
     }
-}
-
-// user safety documents screen shows this safety document card view so the user can view its details and use its actions.
-@Composable
-private fun SafetyDocumentCard(
-    file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
-    offline: OfflineMediaAvailability, onShare: () -> Unit, onDelete: () -> Unit,
-    onMakeOffline: () -> Unit, onRemoveOffline: () -> Unit,
-    evidenceUpdating: Boolean,
-    onEvidenceChange: (Boolean) -> Unit,
-) {
-    val own = file.ownerUid == currentUid
-    val owner = friends.firstOrNull { it.uid == file.ownerUid }?.username
-    OutlinedCard(Modifier.fillMaxWidth().testTag("document_${file.id}")) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    when {
-                        file.mimeType.startsWith("image/") -> Icons.Outlined.Image
-                        file.mimeType.startsWith("video/") -> Icons.Outlined.Videocam
-                        else -> Icons.Outlined.Description
-                    }, null,
-                    Modifier.size(30.dp), tint = OliveGreen
-                )
-                Column(Modifier.weight(1f)) {
-                    Text(file.name, style = MaterialTheme.typography.titleMedium, maxLines = 2)
-                    Text(
-                        if (own) stringResource(R.string.documents_yours) else stringResource(
-                            R.string.documents_shared_by,
-                            owner ?: stringResource(R.string.safe_contact_shared_user)
-                        ),
-                        style = MaterialTheme.typography.bodySmall, color = Muted
-                    )
-                    file.ocrConfidence?.let { confidence ->
-                        Text(
-                            stringResource(
-                                R.string.camera_ocr_confidence,
-                                (confidence * 100).toInt()
-                            ),
-                            style = MaterialTheme.typography.bodySmall, color = Muted
-                        )
-                    }
-                }
-            }
-            file.ocrText?.takeIf { it.isNotBlank() }?.let { text ->
-                Text(
-                    text, style = MaterialTheme.typography.bodySmall, maxLines = 3,
-                    modifier = Modifier.testTag("document_ocr_${file.id}")
-                )
-            }
-            // Only the owner may change evidence status; shared viewers do not see this action.
-            if (own) Row(
-                Modifier.fillMaxWidth().testTag("document_evidence_${file.id}")
-                    .toggleable(
-                        value = file.evidence,
-                        enabled = !evidenceUpdating,
-                        role = Role.Checkbox,
-                        onValueChange = onEvidenceChange,
-                    ),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Checkbox(
-                    checked = file.evidence,
-                    onCheckedChange = null,
-                    enabled = !evidenceUpdating,
-                )
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.evidence), style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        stringResource(if (file.evidence) R.string.evidence_tagged else R.string.evidence_normal_file),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted,
-                    )
-                }
-                if (evidenceUpdating) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onOpen,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Outlined.Visibility, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        stringResource(R.string.open)
-                    )
-                }
-                // Owners can share the document; recipients only get the open action.
-                if (own) OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {
-                    Icon(
-                        Icons.Outlined.Share,
-                        null
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.share))
-                }
-                if (own) IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        stringResource(R.string.remove)
-                    )
-                }
-            }
-            if (file.objectKey.isNotBlank()) {
-                val cached = offline in setOf(
-                    OfflineMediaAvailability.AVAILABLE,
-                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
-                )
-                OutlinedButton(
-                    onClick = if (cached) onRemoveOffline else onMakeOffline,
-                    enabled = offline != OfflineMediaAvailability.SAVING,
-                    modifier = Modifier.fillMaxWidth().testTag("document_offline_${file.id}"),
-                ) {
-                    Icon(if (cached) Icons.Outlined.Delete else Icons.Outlined.Download, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(when {
-                        offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
-                        cached -> R.string.documents_remove_offline_copy
-                        else -> R.string.documents_make_available_offline
-                    }))
-                }
-                when (offline) {
-                    OfflineMediaAvailability.REVALIDATION_REQUIRED,
-                    OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED -> Text(
-                        stringResource(R.string.documents_offline_revalidation_required),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                    OfflineMediaAvailability.AVAILABLE -> Text(
-                        stringResource(R.string.documents_available_offline),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = OliveGreen,
-                    )
-                    OfflineMediaAvailability.RECENT_AVAILABLE -> Text(
-                        stringResource(R.string.documents_recently_cached),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted,
-                    )
-                    else -> Unit
-                }
-            }
-        }
-    }
-}
-// Lets the user choose which trusted contacts may open a document.
-@Composable
-private fun DocumentSharingDialog(
-    file: SafetyDocument,
-    currentUid: String,
-    friends: List<Friend>,
-    contacts: List<SafeContact>,
-    onDismiss: () -> Unit,
-    onSave: (Map<String, String>) -> Unit
-) {
-    var selected by remember(file.id) {
-        mutableStateOf(file.allowedUsers.filterNot { it == currentUid }.toSet())
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.documents_share_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    stringResource(R.string.documents_share_help),
-                    style = MaterialTheme.typography.bodySmall
-                )
-                if (friends.isEmpty()) Text(
-                    stringResource(R.string.location_no_friends),
-                    color = Muted
-                )
-                friends.forEach { friend ->
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        val trusted = contacts.firstOrNull { it.linkedUid == friend.uid }
-                        Checkbox(
-                            friend.uid in selected,
-                            { checked ->
-                                selected =
-                                    if (checked) selected + friend.uid else selected - friend.uid
-                            },
-                            enabled = friend.uid in selected || selected.size < 10
-                        )
-                        Column {
-                            Text(trusted?.name ?: friend.username)
-                            if (trusted != null) Text(
-                                "@${friend.username}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Muted
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val namedRecipients = friends.filter { it.uid in selected }.associate { it.uid to it.username }
-                val existingHiddenRecipients = selected
-                    .filter { it in file.allowedUsers && it !in namedRecipients }
-                    .associateWith { "" }
-                onSave(existingHiddenRecipients + namedRecipients)
-            }) { Text(stringResource(R.string.save)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } })
 }

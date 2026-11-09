@@ -2,7 +2,6 @@
 package com.olive.app.ui.session
 
 import com.olive.app.ui.users.shared.navigation.*
-
 import androidx.compose.runtime.*
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.functions.FirebaseFunctionsException
@@ -12,6 +11,17 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.seconds
+import com.olive.app.data.AccountRole
+import com.olive.app.security.DeviceLockChallenge
+import com.olive.app.security.DeviceLockKey
+import com.olive.app.security.SafeEntryMethod
+import com.olive.app.security.InputPolicy
+import com.olive.app.ui.users.shared.navigation.SessionScreen
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import javax.crypto.Cipher
+
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
 internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
@@ -178,7 +188,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                         store.update(actor, actor) { it.copy(shareAction = action) }
                     }
                 }
-                if (!hasSafetyConnection(runtime.application)) {
+                if (!hasValidatedInternetConnection(runtime.application)) {
                     SafetyPlanSyncWorker.enqueue(runtime.application, actor, actor)
                     return@launch
                 }
@@ -283,6 +293,15 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
+    // Loads the staff/admin encryption identities that can read attachments on the user's own plan.
+    suspend fun mediaRecipients(): Map<String, String> {
+        val actor = runtime.coverAccountId ?: return emptyMap()
+        if (!authorized() || runtime.state.accountRole != AccountRole.USER || activeOwner != actor || runtime.localMode) {
+            return emptyMap()
+        }
+        return repository.mediaRecipients()
+    }
+
     // Writes one plan change in order, then asks the durable worker to sync it when online.
     private fun persist(change: (SafetyPlan) -> SafetyPlan) {
         if (!authorized()) return
@@ -340,7 +359,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         // Turn an unexpected refresh failure into a readable message.
         try {
             // Local demo plans are saved immediately because there is no cloud connection.
-            if (!runtime.localMode && hasSafetyConnection(runtime.application)) {
+            if (!runtime.localMode && hasValidatedInternetConnection(runtime.application)) {
                 withTimeout(35.seconds) {
                     withContext(Dispatchers.IO) {
                         syncSafetyPlan(
@@ -381,9 +400,20 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         // Turn an unexpected refresh consultations failure into a readable message.
         try {
             val cached = withContext(Dispatchers.IO) { store.all(actor) }
-            if (authorized() && actor == runtime.coverAccountId) consultations =
-                cached.map { SafetyConsultation(it.ownerUid, it.ownerName) }
-            if (!hasSafetyConnection(runtime.application)) return
+            // Show saved plans only while the consultation screen has no list yet.
+            // Later refreshes keep the current cloud list visible instead of briefly replacing it with a smaller cache.
+            if (consultations.isEmpty() && authorized() && actor == runtime.coverAccountId) {
+                consultations = cached.map {
+                    SafetyConsultation(
+                        it.ownerUid,
+                        it.ownerName,
+                        it.consultationConversationId,
+                        it.staffUid,
+                        it.staffName,
+                    )
+                }
+            }
+            if (!hasValidatedInternetConnection(runtime.application)) return
             val result = repository.consultations()
             withContext(Dispatchers.IO) {
                 cached.filter { old -> result.second.none { it.ownerUid == old.ownerUid } }
@@ -419,4 +449,111 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             }
         }
     }
+}
+
+// Signed-in users: checks device-lock and PIN entry.
+
+internal class DeviceLockRequest internal constructor(
+    val challenge: DeviceLockChallenge,
+    val settingsChange: Boolean = false
+) {
+    internal val result = CompletableDeferred<Cipher?>()
+    // Session device access: Finishes the active task.
+    fun complete(cipher: Cipher?) {
+        result.complete(cipher)
+    }
+}
+
+// A prompt result is useful only to its original account, screen and cancellation epoch.
+internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
+    private val keys = DeviceLockKey(if (runtime.localMode) "demo" else "firebase")
+
+    // Authenticates the account for session device access.
+    fun authenticate(enroll: Boolean, trigger: String? = null): Unit = with(runtime) {
+        with(state) {
+            if (busy || privacyBlackout) return
+            if (accountRole != AccountRole.USER) return
+            val identity = pendingIdentity
+            val value = pendingProfile
+            val device = enrollment
+            val expectedScreen =
+                if (enroll) SessionScreen.DevicePin else if (trigger != null) SessionScreen.Safe else SessionScreen.Pin
+            if (screen != expectedScreen) return
+            if (enroll && (identity == null || value == null || device != null || value.role != AccountRole.USER)) return
+            if (!enroll && device?.entryMethod != SafeEntryMethod.DEVICE_LOCK) return
+            if (!enroll && device?.role != AccountRole.USER) return
+            if (!enroll && trigger == null && activeTriggerId == null) return
+            if (trigger != null && !InputPolicy.validTrigger(trigger)) {
+                message = application.getString(R.string.entry_invalid_trigger)
+                return
+            }
+            val uid = if (enroll) identity!!.uid else device!!.uid
+            // Counts changes to value.
+            val version = pinChallengeVersion
+            operations.runOperation(
+                application.getString(R.string.entry_auth_failed),
+                timeoutMillis = 120_000
+            ) { token ->
+                val challenge = withContext(Dispatchers.IO) {
+                    keys.prepare(uid, if (enroll) null else store.deviceLockGrant(uid))
+                }
+                if (!current(token, expectedScreen, uid, enroll)) {
+                    challenge.close()
+                    return@runOperation
+                }
+                val request = DeviceLockRequest(challenge, settingsChange = trigger != null)
+                deviceLockRequest = request
+                // Use the fallback when authenticate is unavailable.
+                try {
+                    val cipher = request.result.await()
+                    if (!current(token, expectedScreen, uid, enroll)) return@runOperation
+                    if (cipher == null) {
+                        message =
+                            application.getString(R.string.entry_auth_cancelled)
+                        return@runOperation
+                    }
+                    // The callback alone grants no access: Android Keystore must complete the protected operation.
+                    val grant = withContext(Dispatchers.IO) { challenge.finish(cipher) }
+                    if (!current(token, expectedScreen, uid, enroll)) return@runOperation
+                    // Save device-lock enrolment only when this prompt came from setup.
+                    if (enroll) {
+                        val saved = withContext(Dispatchers.IO) {
+                            store.enrollDeviceLock(identity!!, value!!, checkNotNull(grant))
+                                .also { challenge.markEnrolled() }
+                        }
+                        if (current(token, expectedScreen, uid, true)) accountSession.finishEnrollment(
+                            saved,
+                            value!!,
+                            token
+                        )
+                    } else if (trigger != null) {
+                        settings.saveVerifiedTrigger(device!!, trigger, token)
+                    } else {
+                        withContext(Dispatchers.IO) {
+                            triggerJob?.join()
+                            activeTriggerId?.let { store.recordTriggerAttempt(uid, it, true) }
+                        }
+                        if (current(
+                                token,
+                                expectedScreen,
+                                uid,
+                                false
+                            ) && version == pinChallengeVersion
+                        )
+                            access.unlockVerifiedDevice(device!!, token, expectedScreen, version)
+                    }
+                } finally {
+                    if (deviceLockRequest === request) deviceLockRequest = null
+                    challenge.close()
+                }
+            }
+        }
+    }
+
+    // Reads the current private-entry settings before changing them.
+    private fun current(token: Long, expected: SessionScreen, uid: String, enroll: Boolean) =
+        with(runtime) {
+            epoch == token && state.screen == expected && !state.privacyBlackout && state.accountRole == AccountRole.USER &&
+                    (if (enroll) pendingIdentity?.uid == uid else enrollment?.uid == uid)
+        }
 }

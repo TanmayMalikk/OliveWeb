@@ -1,6 +1,6 @@
 // All app roles: defines web app account, cover, contact, and message data.
 import { coverSite } from "../sites/SiteRouting";
-export type Cover = "FOOD" | "NEWS" | "FITNESS" | "GAME";
+export type Cover = "NEWS" | "FITNESS" | "GAME";
 export type Role = "USER" | "SAFE_CONTACT" | "STAFF" | "ADMIN";
 export type Page =
   | "Home"
@@ -68,8 +68,7 @@ export interface Entry {
   deletedAt?: number;
   purgedAt?: number;
 }
-export type Category =
-  "settings" | "triggers" | "checkouts" | "private_entries";
+export type Category = "settings" | "triggers" | "private_entries";
 export interface Event {
   id: string;
   timestamp: number;
@@ -79,14 +78,11 @@ export interface Event {
   pinAttempts?: number;
   lastResult?: string;
   changes?: { field: string; before: string; after: string }[];
-  foods?: { food: string; quantity: number }[];
-  totalCents?: number;
   error?: string;
 }
 export interface History {
   settings: Event[];
   triggers: Event[];
-  checkouts: Event[];
   private_entries: Entry[];
 }
 export interface Identity {
@@ -130,13 +126,6 @@ export const covers: {
   caption: string;
 }[] = [
   {
-    id: "FOOD",
-    slug: "olive",
-    name: "Olive",
-    description: "Good food. Good mood.",
-    caption: "A fresh take on your everyday menu.",
-  },
-  {
     id: "NEWS",
     slug: "daily-digest",
     name: "Daily Digest",
@@ -160,12 +149,11 @@ export const covers: {
 ];
 // Cover apps: converts removed or damaged saved cover values to a supported cover.
 export function normalizeCover(value: unknown): Cover {
-  if (value === "CALCULATOR") return "FITNESS";
-  return covers.some((cover) => cover.id === value) ? (value as Cover) : "GAME";
+  return covers.some((cover) => cover.id === value) ? (value as Cover) : "FITNESS";
 }
 // Creates the title, description, and icon details for one cover app.
 export const coverInfo = (id: Cover) =>
-  covers.find((cover) => cover.id === normalizeCover(id)) ?? covers[3];
+  covers.find((cover) => cover.id === normalizeCover(id)) ?? covers[0];
 // Returns the public web address for the selected cover app.
 export const coverPath = (id: Cover) => coverSite(normalizeCover(id)).path;
 // Account sign-in: Normalizes a username for reliable matching. It removes outside spaces and converts every letter to lowercase.
@@ -193,7 +181,6 @@ export function signInEmail(username: string, role: Role) {
 export const emptyHistory = (): History => ({
   settings: [],
   triggers: [],
-  checkouts: [],
   private_entries: [],
 });
 export const emptyProfile = (
@@ -219,7 +206,7 @@ export const emptyProfile = (
     postalCode: "",
     country: "Canada",
   },
-  coverType: "GAME",
+  coverType: "FITNESS",
   email: "",
   phone: "",
 });

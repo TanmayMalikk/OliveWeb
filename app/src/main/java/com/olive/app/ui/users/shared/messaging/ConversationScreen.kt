@@ -18,6 +18,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
@@ -25,9 +26,11 @@ import com.olive.app.R
 import androidx.compose.foundation.layout.*
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,6 +40,10 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material.icons.outlined.NorthEast
@@ -47,6 +54,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
@@ -69,6 +78,7 @@ import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipCallStatus
+import com.olive.app.data.messaging.canBeJoinedBy
 import androidx.core.content.ContextCompat
 import java.io.File
 
@@ -87,6 +97,11 @@ private sealed interface ConversationTimelineItem {
     }
 }
 
+private val ChatPageBackground = Color(0xFFF8F7F1)
+private val ChatIncomingBubble = Color(0xFFF0F2E8)
+private val ChatSentBubble = Color(0xFF49683B)
+private val ChatBorder = Color(0xFFD8DDCE)
+
 @OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
 @Composable
@@ -98,15 +113,19 @@ internal fun ChatPane(
     val active = session.messages.activeConversation ?: return
     val callState by session.calls.state.collectAsState()
     val callAllowed = canCallFromConversation(session.accountRole, active, currentUid)
+    val canAttachMedia = session.accountRole !in setOf(
+        com.olive.app.data.AccountRole.STAFF,
+        com.olive.app.data.AccountRole.ADMIN,
+    )
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
+    var showChatInfo by rememberSaveable(active.id) { mutableStateOf(false) }
     var openedMedia by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
     val listState = rememberLazyListState()
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible = imeBottom > 0
     val context = LocalContext.current
-    val callHistory = session.calls.historyFor(active.id)
-        .filter { it.status != VoipCallStatus.ACTIVE }
+    val callHistory = session.calls.historyFor(active.id, session.accountRole)
     val timeline = remember(session.messages.chatMessages, callHistory) {
         (session.messages.chatMessages.map(ConversationTimelineItem::Message) +
             callHistory.map(ConversationTimelineItem::Call))
@@ -149,10 +168,12 @@ internal fun ChatPane(
         }
         return
     }
-    Box(modifier) {
-        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 12.dp)) {
+    Box(modifier.background(ChatPageBackground)) {
+        Column(Modifier.fillMaxSize()) {
             Row(
-                Modifier.fillMaxWidth().heightIn(min = 76.dp).padding(vertical = 8.dp),
+                Modifier.fillMaxWidth().heightIn(min = 78.dp)
+                    .background(Color.White)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -162,12 +183,30 @@ internal fun ChatPane(
                 ) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.all_conversations))
                 }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(
-                        stringResource(if (active.type == "SUPPORT") R.string.support_conversation else R.string.direct_message),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Muted
+                Box(
+                    Modifier.size(44.dp).background(OliveGreen, RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        when {
+                            active.type == "SUPPORT" -> Icons.Outlined.SupportAgent
+                            active.type == "GROUP" || active.participantIds.size > 2 -> Icons.Outlined.Group
+                            else -> Icons.Outlined.PersonOutline
+                        },
+                        null,
+                        tint = Color.White,
                     )
+                    Box(
+                        Modifier.size(10.dp).background(Color(0xFF38B56C), CircleShape)
+                            .align(Alignment.BottomEnd),
+                    )
+                }
+                Column(
+                    Modifier.weight(1f).clickable { showChatInfo = true }
+                        .testTag("open_chat_info")
+                        .semantics { contentDescription = uiText(R.string.chat_open_info) },
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
                     Text(
                         active.displayName(
                             currentUid,
@@ -179,8 +218,17 @@ internal fun ChatPane(
                                 uiText(R.string.support_ticket_escalation),
                             ),
                         ),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.semantics { heading() })
+                    Text(
+                        if (active.type == "SUPPORT") {
+                            stringResource(R.string.support_conversation)
+                        } else {
+                            stringResource(R.string.chat_header_member_count, active.participantIds.size)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Muted,
+                    )
                     if (active.type == "SUPPORT" && session.accountRole in setOf(
                             com.olive.app.data.AccountRole.STAFF,
                             com.olive.app.data.AccountRole.ADMIN,
@@ -207,9 +255,9 @@ internal fun ChatPane(
                 ) {
                     Icon(Icons.Outlined.Call, stringResource(R.string.ui_start_voice_call))
                 }
-                if (exit != null) Button(
+                if (exit != null) FilledTonalButton(
                     onClick = exit,
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     modifier = Modifier.heightIn(min = 44.dp).testTag("quick_exit")
                 ) { Text(uiText(R.string.ui_exit)) }
             }
@@ -223,7 +271,10 @@ internal fun ChatPane(
                         .testTag("request_admin_help"),
                 ) { Text(stringResource(R.string.request_admin_help)) }
             }
-            if (session.accountRole == com.olive.app.data.AccountRole.STAFF &&
+            if (session.accountRole in setOf(
+                    com.olive.app.data.AccountRole.STAFF,
+                    com.olive.app.data.AccountRole.ADMIN,
+                ) &&
                 active.type == "SUPPORT" && active.closedAt == 0L) {
                 OutlinedButton(
                     onClick = { session.messages.closeSupportChat(active.id) },
@@ -234,12 +285,12 @@ internal fun ChatPane(
             session.staffSupport.error?.let { message ->
                 Text(stringResource(message), color = MaterialTheme.colorScheme.error)
             }
-            Column(Modifier.weight(1f).fillMaxWidth().imePadding().padding(bottom = 10.dp)) {
+            Column(Modifier.weight(1f).fillMaxWidth().imePadding()) {
                 LazyColumn(
                     Modifier.weight(1f).fillMaxWidth(),
                     state = listState,
-                    contentPadding = PaddingValues(vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (timeline.isEmpty()) item {
                         Text(
@@ -250,7 +301,21 @@ internal fun ChatPane(
                     }
                     items(timeline, key = ConversationTimelineItem::key) { timelineItem ->
                         if (timelineItem is ConversationTimelineItem.Call) {
-                            CallHistoryRow(timelineItem.value)
+                            val call = timelineItem.value
+                            CallHistoryRow(
+                                call = call,
+                                canJoin = callState == VoipSessionState.Idle &&
+                                    call.canBeJoinedBy(currentUid),
+                                onJoin = {
+                                    withMicrophonePermission {
+                                        session.calls.joinActive(
+                                            call,
+                                            currentUid,
+                                            session.accountRole,
+                                        )
+                                    }
+                                },
+                            )
                             return@items
                         }
                         val chat = (timelineItem as ConversationTimelineItem.Message).value
@@ -261,10 +326,18 @@ internal fun ChatPane(
                             horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start
                         ) {
                             Surface(
-                                color = if (mine) OliveGreen else Color(0xFFE7EDE2),
+                                color = if (mine) ChatSentBubble else ChatIncomingBubble,
                                 contentColor = if (mine) Color.White else Color.Unspecified,
-                                shape = MaterialTheme.shapes.large,
-                                modifier = Modifier.widthIn(max = 340.dp).then(
+                                shape = RoundedCornerShape(
+                                    topStart = 18.dp,
+                                    topEnd = 18.dp,
+                                    bottomStart = if (mine) 18.dp else 5.dp,
+                                    bottomEnd = if (mine) 5.dp else 18.dp,
+                                ),
+                                tonalElevation = 1.dp,
+                                shadowElevation = 1.dp,
+                                border = if (mine) null else BorderStroke(1.dp, ChatBorder),
+                                modifier = Modifier.fillMaxWidth(.84f).widthIn(max = 360.dp).then(
                                     if (mine && !chat.unsent) Modifier.combinedClickable(
                                         onClickLabel = uiText(R.string.a11y_message_actions),
                                         onClick = { menuOpen = true },
@@ -275,10 +348,10 @@ internal fun ChatPane(
                             ) {
                                 Row(
                                     Modifier.padding(
-                                        start = 14.dp,
-                                        end = 4.dp,
-                                        top = 8.dp,
-                                        bottom = 8.dp
+                                        start = 15.dp,
+                                        end = 6.dp,
+                                        top = 11.dp,
+                                        bottom = 10.dp
                                     ), verticalAlignment = Alignment.Top
                                 ) {
                                     Column(Modifier.weight(1f)) {
@@ -357,19 +430,27 @@ internal fun ChatPane(
                     }
                 }
                 Status(session)
+                Surface(
+                    color = Color.White,
+                    shadowElevation = 8.dp,
+                    border = BorderStroke(1.dp, ChatBorder),
+                ) {
                 Row(
-                    Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    IconButton(
-                        onClick = { showAttachmentPicker = true }, enabled = !session.messages.busy,
-                        modifier = Modifier.testTag("attach_private_entry")
-                    ) {
-                        Icon(
-                            Icons.Outlined.AttachFile,
-                            stringResource(R.string.attach_secure_entry)
-                        )
+                    if (canAttachMedia) {
+                        IconButton(
+                            onClick = { showAttachmentPicker = true },
+                            enabled = !session.messages.busy,
+                            modifier = Modifier.testTag("attach_private_entry")
+                        ) {
+                            Icon(
+                                Icons.Outlined.AttachFile,
+                                stringResource(R.string.attach_secure_entry)
+                            )
+                        }
                     }
                     OutlinedTextField(
                         draft,
@@ -377,13 +458,15 @@ internal fun ChatPane(
                         label = { Text(stringResource(R.string.message)) },
                         modifier = Modifier.weight(1f).testTag("message_body")
                             .keepVisibleWhileTyping(),
-                        maxLines = 4
+                        maxLines = 4,
+                        shape = RoundedCornerShape(24.dp),
                     )
-                    Button(
+                    FilledIconButton(
                         onClick = { session.messages.sendMessage(draft) { draft = "" } },
                         enabled = draft.isNotBlank() && !session.messages.busy,
-                        modifier = Modifier.testTag("send_message")
-                    ) { Text(stringResource(R.string.send)) }
+                        modifier = Modifier.size(50.dp).testTag("send_message")
+                    ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
+                }
                 }
             }
         }
@@ -453,8 +536,18 @@ internal fun ChatPane(
                 }
             }
         }
-        if (showAttachmentPicker) AttachmentPicker(session) { showAttachmentPicker = false }
-        session.calls.message?.takeIf { callState == VoipSessionState.Idle }?.let { message ->
+        if (showAttachmentPicker && canAttachMedia) {
+            AttachmentPicker(session) { showAttachmentPicker = false }
+        }
+        if (showChatInfo) ChatInfoDialog(
+            session = session,
+            currentUid = currentUid,
+            onClose = { showChatInfo = false },
+            onOpenMedia = { document, file -> openedMedia = document to file },
+        )
+        session.calls.message?.takeIf {
+            callAllowed && callState == VoipSessionState.Idle
+        }?.let { message ->
             AlertDialog(
                 onDismissRequest = session.calls::clearMessage,
                 title = { Text(stringResource(R.string.ui_voice_call)) },
@@ -468,7 +561,11 @@ internal fun ChatPane(
 }
 
 @Composable
-internal fun CallHistoryRow(call: VoipCall) {
+internal fun CallHistoryRow(
+    call: VoipCall,
+    canJoin: Boolean = false,
+    onJoin: () -> Unit = {},
+) {
     val label = stringResource(
         when (call.status) {
             VoipCallStatus.MISSED -> R.string.ui_missed_call
@@ -477,11 +574,16 @@ internal fun CallHistoryRow(call: VoipCall) {
             VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
         }
     )
+    val activeColor = MaterialTheme.colorScheme.primaryContainer
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = if (call.status == VoipCallStatus.ACTIVE) activeColor
+        else MaterialTheme.colorScheme.surfaceVariant,
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
-            .testTag("call_history_${call.callId}"),
+            .testTag("call_history_${call.callId}")
+            .then(if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                Modifier.clickable(onClick = onJoin)
+            } else Modifier),
     ) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -500,180 +602,14 @@ internal fun CallHistoryRow(call: VoipCall) {
                     color = Muted,
                 )
             }
-        }
-    }
-}
-
-// Shows text or the correct viewer button for one chat message.
-@Composable
-private fun ChatMessageBody(
-    chat: com.olive.app.data.ChatMessage, session: SessionViewModel, mine: Boolean,
-    onOpenMedia: (SafetyDocument, File) -> Unit
-) {
-    val parts = chat.body.split(":", limit = 3)
-    if (!chat.unsent && parts.firstOrNull() == "SHARED_MEDIA" && parts.size >= 2) {
-        SharedMediaMessage(parts[1], parts.getOrNull(2).orEmpty(), session, mine, onOpenMedia)
-        return
-    }
-    // An unsent location card can still be removed before it reaches the chat.
-    if (!chat.unsent && parts.firstOrNull() == "SHARED_LOCATION") {
-        Surface(
-            onClick = { session.navigation.openSafePage(SafePage.Location) }, shape = MaterialTheme.shapes.medium,
-            color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                .testTag("shared_live_location")
-        ) {
-            Row(
-                Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Outlined.LocationOn, stringResource(R.string.shared_live_location))
-                Column {
-                    Text(
-                        stringResource(R.string.shared_live_location),
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                    Text(
-                        stringResource(R.string.open_location_map),
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                    )
+            if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                FilledTonalButton(
+                    onClick = onJoin,
+                    modifier = Modifier.testTag("join_call_${call.callId}"),
+                ) {
+                    Text(stringResource(R.string.ui_join_call))
                 }
             }
         }
-        return
-    }
-    // An unsent safety-plan card can still be removed before it reaches the chat.
-    if (!chat.unsent && parts.firstOrNull() == "SHARED_SAFETY_PLAN") {
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        ) {
-            Row(
-                Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(Icons.Outlined.HealthAndSafety, stringResource(R.string.shared_safety_plan))
-                Text(stringResource(R.string.shared_safety_plan), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-            }
-        }
-        return
-    }
-    val shared = parts.firstOrNull() in setOf("SHARED_NOTE", "SHARED_INCIDENT") && parts.size >= 2
-    if (chat.unsent || !shared) {
-        Text(
-            when {
-                chat.unsent -> stringResource(R.string.message_unsent)
-                chat.body.isBlank() -> stringResource(R.string.encrypted_message_unavailable)
-                else -> chat.body
-            }, fontStyle = if (chat.unsent) androidx.compose.ui.text.font.FontStyle.Italic else null
-        )
-        return
-    }
-    val incident = parts[0] == "SHARED_INCIDENT"
-    val title = parts.getOrNull(2).orEmpty().ifBlank { stringResource(R.string.encrypted_document) }
-    Surface(
-        onClick = { session.messages.openSharedPrivateEntry(parts[1]) }, shape = MaterialTheme.shapes.medium,
-        color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-    ) {
-        Row(
-            Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                if (incident) Icons.Outlined.Warning else Icons.Outlined.Lock,
-                stringResource(if (incident) R.string.shared_incident_report else R.string.shared_private_note)
-            )
-            Column {
-                Text(
-                    stringResource(if (incident) R.string.shared_incident_report else R.string.shared_private_note),
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    title, style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-// shared safe app conversation screen shows this shared media message view so the user can view its details and use its actions.
-@Composable
-private fun SharedMediaMessage(
-    id: String, name: String, session: SessionViewModel, mine: Boolean,
-    onOpen: (SafetyDocument, File) -> Unit
-) {
-    var opening by remember(id) { mutableStateOf(false) }
-    val document = session.documents.state.files.firstOrNull { it.id == id }
-    val offline = session.media?.offlineCopies?.get(id) ?: OfflineMediaAvailability.NOT_CACHED
-    val error = session.documents.state.attachmentErrors[id]
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-    Surface(
-        onClick = {
-            val uid = session.coverAccountId ?: return@Surface
-            if (opening) return@Surface
-            opening = true
-            session.documents.openShared(
-                uid,
-                id,
-                { document, local -> onOpen(document, local) },
-                { opening = false })
-        }, enabled = !opening, shape = MaterialTheme.shapes.medium,
-        color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
-    ) {
-        Row(
-            Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (opening) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
-            else Icon(Icons.Outlined.AttachFile, stringResource(R.string.shared_secure_file))
-            Column {
-                Text(
-                    stringResource(R.string.shared_secure_file),
-                    style = MaterialTheme.typography.labelSmall
-                )
-                Text(
-                    name.ifBlank { stringResource(R.string.encrypted_document) },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                    maxLines = 2
-                )
-            }
-        }
-    }
-    if (document?.objectKey?.isNotBlank() == true) {
-        val cached = offline in setOf(
-            OfflineMediaAvailability.AVAILABLE,
-            OfflineMediaAvailability.REVALIDATION_REQUIRED,
-        )
-        TextButton(
-            onClick = {
-                if (cached) session.documents.removeOfflineCopy(document)
-                else session.documents.makeAvailableOffline(document)
-            },
-            enabled = offline != OfflineMediaAvailability.SAVING,
-            modifier = Modifier.testTag("shared_media_offline_$id"),
-        ) {
-            Text(stringResource(when {
-                offline == OfflineMediaAvailability.SAVING -> R.string.documents_saving_offline
-                cached -> R.string.documents_remove_offline_copy
-                else -> R.string.documents_make_available_offline
-            }))
-        }
-        if (offline == OfflineMediaAvailability.RECENT_AVAILABLE) Text(
-            stringResource(R.string.documents_recently_cached),
-            style = MaterialTheme.typography.bodySmall,
-        )
-    }
-    error?.let {
-        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
-                .testTag("shared_media_error_$id"))
-    }
     }
 }

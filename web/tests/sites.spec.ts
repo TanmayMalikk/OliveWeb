@@ -26,7 +26,6 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   for (const [slug, title, landmark] of [
-    ["olive", "Olive", 'button:has-text("Saved")'],
     ["daily-digest", "Daily Digest", ".news-page"],
     ["fitness", "Fitness Tracker", ".fitness-page"],
     ["game", "Game", ".grove-games"],
@@ -51,9 +50,7 @@ test("short cover URLs and legacy bookmarks open the same cover with the right i
     expect(legacy).toEqual(manifest);
   }
   await page.goto("/");
-  await expect(
-    page.getByRole("button", { name: "Nature Pairs", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fitness Tracker" })).toBeVisible();
   await expect(page.locator('a[href$="/account"],a[href$="/get"]')).toHaveCount(
     0,
   );

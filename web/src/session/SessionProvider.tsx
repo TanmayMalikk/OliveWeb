@@ -20,7 +20,6 @@ import {
   verifyEntryLink,
   validEntryToken,
 } from "../services/PrivateEntryLinks";
-import { readCover, writeCover } from "../services/CoverStateStore";
 import {
   canonicalPath,
   coverForRoute,
@@ -104,7 +103,7 @@ export function SessionProvider({
   const routeCover = coverForRoute(path, location.origin)?.id as
     Cover | undefined;
   const cover = normalizeCover(
-    routeCover ?? enrollment?.cover ?? profile?.coverType ?? "GAME",
+    routeCover ?? enrollment?.cover ?? profile?.coverType ?? "FITNESS",
   );
   // Reloads account files when another phone or browser changes this account.
   useEffect(() => {
@@ -486,16 +485,10 @@ export function SessionProvider({
     };
     await accounts.saveRecord("triggers", event);
     if (token !== epoch.current) return;
-    const pending = await readCover<Event[]>(`${enrollment.uid}:checkouts`, []);
-    for (const checkout of pending)
-      await accounts.saveRecord("checkouts", checkout);
-    await writeCover(`${enrollment.uid}:checkouts`, []);
-    if (token !== epoch.current) return;
     setProfile(loaded.profile);
     setHistory({
       ...loaded.history,
       triggers: [event, ...loaded.history.triggers],
-      checkouts: [...pending, ...loaded.history.checkouts],
     });
     setPhase("safe");
     setPage("Home");

@@ -140,3 +140,4 @@ private fun ActivityProgressRings(progress: Float) {
         }
     }
 }
+

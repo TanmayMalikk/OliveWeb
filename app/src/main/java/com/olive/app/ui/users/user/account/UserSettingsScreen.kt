@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.FitnessCenter
-import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material3.Button
@@ -38,7 +37,7 @@ import com.olive.app.R
 import com.olive.app.data.AccountRole
 import com.olive.app.data.CoverType
 import com.olive.app.data.UserProfile
-import com.olive.app.ui.covers.food.AddressFields
+import com.olive.app.ui.shared.AddressFields
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
@@ -321,7 +320,6 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
     CoverType.entries.forEach { type ->
         val isSelected = selected == type
         val label = when (type) {
-            CoverType.FOOD -> uiText(R.string.food_delivery_app_olive)
             CoverType.GAME -> uiText(R.string.game_cover_app_olive_tap)
             CoverType.NEWS -> uiText(R.string.news_app_daily_digest)
             CoverType.FITNESS -> uiText(R.string.fitness_cover_choice)
@@ -348,7 +346,6 @@ internal fun CoverPicker(selected: CoverType, enabled: Boolean, onSelect: (Cover
             Icon(
                 // Saves the chosen cover, or asks for a backup PIN when the cover needs one.
                 when (type) {
-                    CoverType.FOOD -> Icons.Outlined.LocalDining
                     CoverType.NEWS -> Icons.Outlined.Newspaper
                     CoverType.FITNESS -> Icons.Outlined.FitnessCenter
                     CoverType.GAME -> Icons.Outlined.SportsEsports

@@ -128,15 +128,6 @@
     <string name="ui_paywall">Paywall</string>
     <string name="ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag">This article could not be loaded. Check your connection and try again.</string>
     <string name="ui_this_changes_the_local_news_search_on_this_device">This changes the local news search on this device.</string>
-    <string name="ui_unsave_value">Unsave %1$s</string>
-    <string name="ui_save_value">Save %1$s</string>
-    <string name="ui_value_value">%1$s  ·  %2$s</string>
-    <string name="ui_value_value_min">★ %1$s     ·     %2$s min</string>
-    <string name="ui_value_value_min_fe5b84">★ %1$s  ·  %2$s min</string>
-    <string name="ui_add_another_value_in_cart">Add another · %1$s in cart</string>
-    <string name="ui_remove_one_value">Remove one %1$s</string>
-    <string name="ui_add_one_value">Add one %1$s</string>
-    <string name="ui_value_dishes">%1$s dishes</string>
     <string name="ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required">Full name, a valid date of birth, and a real email are required.</string>
     <string name="ui_unable_to_finish_the_organization_profile_check_the_email_and_try">Unable to finish the organization profile. Check the email and try again.</string>
     <string name="ui_unable_to_update_your_olive_tree_profile">Unable to update your Olive Tree profile.</string>
@@ -173,7 +164,4 @@
 
 
 
-    <string name="ui_garden_harvest_bowl">Garden harvest bowl</string>
-    <string name="ui_quinoa_roasted_vegetables_and_lemon_tahini">Quinoa, roasted vegetables and lemon tahini.</string>
-    <string name="ui_olive_kitchen">Olive Kitchen</string>
 </resources>
