@@ -14,7 +14,8 @@
     "simulate-load-test-locations": "node scripts/simulate-load-test-locations.js",
     "delete-load-test-accounts": "node scripts/delete-load-test-accounts.js",
     "backfill-account-directory-summaries": "node scripts/backfill-account-directory-summaries.js",
-    "purge-plaintext-ocr": "node scripts/purgePlaintextOcr.js"
+    "purge-plaintext-ocr": "node scripts/purgePlaintextOcr.js",
+    "publish-android-release": "node scripts/publish-android-release.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1158.0",

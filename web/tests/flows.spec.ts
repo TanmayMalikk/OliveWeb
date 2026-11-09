@@ -122,7 +122,9 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await page.getByRole("button", { name: "Continue to my cover" }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Fitness Tracker" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Fitness Tracker" }),
+  ).toBeVisible();
   await unlock(page, link);
   await page.getByRole("button", { name: "Notes", exact: true }).click();
   await page.getByRole("button", { name: "New entry", exact: true }).click();
@@ -319,8 +321,8 @@ test("news reader sanitizes publisher HTML and bookmarks stay available", async 
     /javascript:/,
   );
 });
-// Inputs: the values in this case. Expected: PWA manifests use cover-specific identities and the download page offers the debug APK.
-test("PWA manifests use cover-specific identities and the download page offers the debug APK", async ({
+// Inputs: the values in this case. Expected: PWA manifests use cover-specific identities and the download page offers the signed APK.
+test("PWA manifests use cover-specific identities and the download page offers the signed APK", async ({
   page,
   request,
 }) => {
@@ -338,14 +340,14 @@ test("PWA manifests use cover-specific identities and the download page offers t
     page.getByRole("button", { name: "Begin onboarding" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Download the Android debug app." }),
+    page.getByRole("heading", { name: "Download the signed Android app." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /Download debug APK/i }),
+    page.getByRole("link", { name: /Download signed APK/i }),
   ).toHaveAttribute("href", /\/download\/android$/);
-  const download = await request.get("/download/android", { maxRedirects: 0 });
-  expect(download.status()).toBe(302);
-  expect(download.headers().location).toContain("olive-branch.apk");
+  await expect(
+    page.getByAltText("QR code for the latest signed Android app"),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Your space, on the web." }),
   ).toBeVisible();

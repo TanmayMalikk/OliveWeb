@@ -28,6 +28,13 @@ require(
     voipApiBaseUrl.isBlank() ||
         voipApiBaseUrl.matches(Regex("https://[A-Za-z0-9.-]+(:[0-9]{1,5})?|http://10\\.0\\.2\\.2(:[0-9]{1,5})?"))
 ) { "VOIP_API_BASE_URL must use HTTPS (or Android emulator loopback)" }
+val updateManifestUrl = localProperties.getProperty(
+    "UPDATE_MANIFEST_URL",
+    "https://yourolivebranch.ca/api/android/releases/latest"
+).trim()
+require(updateManifestUrl.matches(Regex("https://[A-Za-z0-9.-]+(/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?"))) {
+    "UPDATE_MANIFEST_URL must be a valid HTTPS URL"
+}
 val releaseProperties = Properties().apply {
     val source = rootProject.file("keystore.properties")
     if (source.exists()) source.inputStream().use { load(it) }
@@ -68,13 +75,15 @@ android {
         applicationId = "com.olive.app"
         minSdk = 28
         targetSdk = 37
-        versionCode = automatedVersionCode ?: 2
-        versionName = automatedVersionName ?: "0.2.0"
+        // v1.0.0.0 maps to 100000000: major, two-digit minor, two-digit revision, four-digit build.
+        versionCode = automatedVersionCode ?: 100000000
+        versionName = automatedVersionName ?: "v1.0.0.0"
         buildConfigField("boolean", "FIREBASE_CONFIGURED", firebaseConfigured.toString())
         buildConfigField("String", "GEOAPIFY_API_KEY", "\"$geoapifyApiKey\"")
         buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
         buildConfigField("String", "REALTIME_DATABASE_URL", "\"$realtimeDatabaseUrl\"")
         buildConfigField("String", "VOIP_API_BASE_URL", "\"$voipApiBaseUrl\"")
+        buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
