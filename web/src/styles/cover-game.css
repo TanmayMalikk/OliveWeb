@@ -175,15 +175,6 @@
   min-height: 90svh;
 }
 @media (max-width: 60rem) {
-  .food-top {
-    gap: 1rem;
-  }
-  .food-hero {
-    gap: 1.5rem;
-  }
-  .food-hero h1 {
-    font-size: 3.5rem;
-  }
   .grove-main {
     gap: 3rem;
   }
@@ -194,61 +185,6 @@
 @media (max-width: 48rem) {
   .cover-container {
     width: calc(100% - 2rem);
-  }
-  .food-top {
-    padding-block: 1.4rem;
-    flex-wrap: wrap;
-  }
-  .food-wordmark {
-    font-size: 3rem;
-  }
-  .delivery-location {
-    order: 3;
-    width: 100%;
-  }
-  .food-top > .button {
-    font-size: 0.72rem;
-    padding: 0.7rem 1rem;
-  }
-  .food-hero {
-    grid-template-columns: 1fr;
-    padding: 2rem 1.5rem;
-    margin-top: 1.5rem;
-  }
-  .food-hero-image {
-    width: 70%;
-    margin: 0 auto 1rem;
-  }
-  .food-hero h1 {
-    font-size: 3.5rem;
-  }
-  .food-hero p {
-    font-size: 0.85rem;
-  }
-  .food-stamp {
-    width: 5.3rem;
-    height: 5.3rem;
-    font-size: 0.44rem;
-  }
-  .menu-heading {
-    display: block;
-  }
-  .menu-heading > .search-field {
-    margin-top: 1.5rem;
-    width: 100%;
-    max-width: none;
-  }
-  .menu-grid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-    gap: 2rem 1rem;
-  }
-  .cart-layout {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
-  .order-summary {
-    position: static;
-    margin-top: 0;
   }
   .news-edition {
     font-size: 0.48rem;

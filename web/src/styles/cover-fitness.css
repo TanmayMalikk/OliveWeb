@@ -28,7 +28,7 @@
 .fitness-brand-mark { width: 2.65rem; height: 2.65rem; display: grid; place-items: center; border-radius: 0.85rem; color: white; background: var(--fitness-olive); font: 600 1.35rem var(--serif); }
 .fitness-brand div, .fitness-sidebar-sync div { min-width: 0; display: grid; gap: 0.15rem; }
 .fitness-brand strong { font-size: 1.05rem; }
-.fitness-brand small, .fitness-sidebar-sync small { color: #71806c; font-size: 0.73rem; }
+.fitness-brand small, .fitness-sidebar-sync small { color: #53604f; font-size: 0.73rem; }
 .fitness-navigation { display: grid; gap: 0.35rem; }
 .fitness-navigation button {
   min-height: 3.25rem;
@@ -72,13 +72,13 @@
 .fitness-feedback { margin-top: 1.25rem; padding: 0.8rem 1rem; border-radius: 0.8rem; color: var(--fitness-olive); background: #e8efdf; }
 .fitness-welcome { margin-bottom: 1.4rem; display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
 .fitness-welcome h2 { max-width: 42rem; margin: 0.35rem 0; font: 600 clamp(1.9rem, 3vw, 3.25rem) / 1.05 var(--serif); }
-.fitness-welcome p { margin: 0; color: #6d7768; }
+.fitness-welcome p { margin: 0; color: #596455; }
 .fitness-welcome > svg { width: 3rem; height: 3rem; color: #9aaa89; }
 .fitness-dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.85fr); gap: 1rem; }
 .fitness-card { min-width: 0; padding: clamp(1.15rem, 2vw, 1.65rem); border: 1px solid #dfe5d7; border-radius: 1.25rem; background: var(--fitness-card); box-shadow: 0 0.65rem 1.8rem rgb(48 66 38 / 0.055); }
 .fitness-card-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .fitness-card-title > div { display: grid; gap: 0.2rem; }
-.fitness-card-title span { color: #6f796b; font-size: 0.82rem; }
+.fitness-card-title span { color: #596455; font-size: 0.82rem; }
 .fitness-card-title strong { font-size: 1.2rem; }
 .fitness-card-title > svg { width: 1.35rem; color: var(--fitness-mid); }
 .fitness-card-title button { border: 0; color: var(--fitness-olive); background: transparent; font-weight: 700; }
@@ -97,7 +97,7 @@
 .fitness-stat-icon { width: 2.5rem; height: 2.5rem; flex: 0 0 auto; display: grid; place-items: center; border-radius: 0.8rem; color: var(--fitness-olive); background: var(--fitness-pale); }
 .fitness-stat-icon svg { width: 1.2rem; }
 .fitness-stat-card div { min-width: 0; display: grid; gap: 0.12rem; }
-.fitness-stat-card span, .fitness-stat-card small { color: #737d6f; font-size: 0.7rem; }
+.fitness-stat-card span, .fitness-stat-card small { color: #596455; font-size: 0.7rem; }
 .fitness-stat-card strong { font-size: clamp(1.05rem, 1.8vw, 1.4rem); }
 .fitness-wide-card { grid-column: 1; }
 .fitness-week-card { display: grid; align-content: center; text-align: center; background: var(--fitness-deep); color: white; }
@@ -142,7 +142,7 @@
 .fitness-empty.compact { min-height: 12rem; }
 .fitness-empty svg { width: 2.7rem; height: 2.7rem; color: var(--fitness-mid); }
 .fitness-empty h2, .fitness-empty h3, .fitness-empty p { margin: 0; }
-.fitness-empty p { max-width: 28rem; color: #758071; }
+.fitness-empty p { max-width: 28rem; color: #596455; }
 .fitness-nutrition-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .fitness-nutrition-summary { grid-column: 1 / -1; }
 .fitness-macro-list.large { margin-top: 2rem; }

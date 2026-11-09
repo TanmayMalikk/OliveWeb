@@ -1,6 +1,7 @@
-# Load testing on macOS or Linux
+# Load testing 360 accounts on macOS or Linux
 
-This guide runs the fictional account and Alberta location tests from a Bash or Zsh terminal. Do not use a real account password.
+This guide runs the fictional Alberta and British Columbia account, support, friendship, and
+location tests from a Bash or Zsh terminal. Do not use a real account password.
 
 ## 1. Open the cloned project
 
@@ -20,14 +21,14 @@ java --version
 
 The Functions project expects Node.js 22. The Android project also needs the Java version configured for the project in Android Studio.
 
-## 3. Sign in to Firebase
+## 3. Configure Firebase Admin credentials
 
 ```bash
-npx firebase-tools login --reauth
-npx firebase-tools projects:list
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/private_credentials/olive-firebase-admin.json.json"
 ```
 
-Make sure `olive-21239` appears in the project list.
+The scripts use Firebase Admin's Application Default Credentials. Keep the service-account file in
+the ignored `private_credentials` directory and never commit it.
 
 ## 4. Set the test configuration
 
@@ -56,24 +57,36 @@ npm install
 npm run provision-load-test-accounts
 ```
 
-This creates 40 users, 8 staff accounts, and 5 safe-contact accounts. All profiles and locations are fictional.
+This creates 250 users, 100 safe-contact accounts, and 10 staff accounts. Every profile has a
+unique fictional name and a repeatable off-centre point inside an Alberta or British Columbia city.
 
-## 7. Add the Alberta map locations
+## 7. Add the Alberta and British Columbia map locations
 
 ```bash
 export OLIVE_LOAD_TEST_LOCATIONS_ACTIVE="true"
 npm run seed-load-test-locations
 ```
 
-This produces 20 active locations and 20 last-known locations.
+This produces 125 active locations and 125 last-known locations.
 
-## 8. Simulate 10 moving users
+## 7a. Add support tickets, safety plans, and friendships
+
+```bash
+npm run seed-load-test-support
+```
+
+This assigns every user a regular support ticket and a safety-plan consultation using the
+least-busy load staff. Exactly 55% of each is completed. Every safe contact receives five accepted
+load users as friends.
+
+## 8. Simulate 50 moving users
 
 ```bash
 npm run simulate-load-test-locations
 ```
 
-Keep this terminal open. Ten users move around preset Alberta loops at 60 km/h, ten remain active and stationary, and twenty remain last-known.
+Keep this terminal open. Fifty users move around their seeded city loops at 60 km/h, 75 remain
+active and stationary, and 125 remain last-known.
 
 Press `Control+C` to stop the simulation. The moving users' final positions become last-known locations.
 
@@ -125,6 +138,10 @@ Only run this after testing is complete:
 
 ```bash
 cd ~/path/to/F26_D1/functions
+export OLIVE_LOAD_TEST_DELETE_CONFIRM="DELETE-360-olive-21239"
+export OLIVE_LOAD_TEST_FIREBASE_API_KEY="YOUR_FIREBASE_WEB_API_KEY"
+export OLIVE_LOAD_TEST_ADMIN_EMAIL="YOUR_PROTECTED_ADMIN_EMAIL"
+export OLIVE_LOAD_TEST_ADMIN_PASSWORD="YOUR_ADMIN_PASSWORD"
 npm run delete-load-test-accounts
 ```
 

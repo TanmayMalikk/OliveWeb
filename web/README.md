@@ -61,11 +61,11 @@ deployment only after the production branch and environment variables are confir
 The four user covers are states of the first SPA, rather than pages or subdomains.
 The chosen cover is saved in the browser enrollment/profile. Two people can open
 the same `https://yourolivebranch.ca/` address and see different covers. The Game
-cover exposes no login or download links. Five quick taps on its Little Grove
-brand starts private entry. Food, News, and Fitness retain their configured
+cover exposes no login or download links. Five quick taps on its Fitness Tracker
+brand starts private entry. News and Fitness retain their configured
 trigger input. Quick Exit returns to the saved cover at `/`.
 
-Local routes such as `/olive`, `/daily-digest`, `/fitness`, `/game`, and
+Local routes such as `/daily-digest`, `/fitness`, `/game`, and
 `/account/sign-in` are accepted as migration/development inputs, then immediately
 removed from the address bar. Personal entry links arrive as
 `https://yourolivebranch.ca/entry#<random-token>`; both the path and fragment are
@@ -97,7 +97,7 @@ The web adapter preserves mobile contracts:
   different login email when creating the account. That login email is locked
   after creation; later profile email changes are contact details only.
 - Profiles: Storage `accounts/{uid}/profile.json`, with the same profile fields.
-- History: Storage `accounts/{uid}/history/{settings,triggers,checkouts,private_entries}/{id}.json`.
+- History: Storage `accounts/{uid}/history/{settings,triggers,private_entries}/{id}.json`.
 - Messages/friends: existing Firestore directory, request, friendship, friend-list,
   conversation, and message collections. Firestore disk persistence is disabled.
   The web client never replaces a different device's public encryption key; until
@@ -168,7 +168,7 @@ page. This intentionally does not provide a fully offline application shell.
   recording detection, recent-app preview protection, or a system-wide silent
   exit. Quick Exit cannot erase browser history or prevent screenshots.
 - Notes, incident records, edit history, pinning, trusted contacts, profile updates,
-  password/PIN changes, and settings/trigger/checkout history have web workflows.
+  password/PIN changes, and settings/trigger history have web workflows.
   Trash currently expires after **10 seconds**, matching the mobile test setting.
 - Messaging requires Firebase; local accounts cannot communicate with other users.
   Speech/video calling is not implemented in either version by this work.
@@ -178,8 +178,6 @@ page. This intentionally does not provide a fully offline application shell.
   article HTML and links to the original when Google News resolution, paywalls,
   or publisher restrictions prevent reading. It does not promise that every
   article will open in-page or bypass a subscription.
-- Food checkout is a demonstration, matching the mobile cover: no order is placed
-  and no payment is charged. Card fields are transient and never stored or sent.
 - The Fitness cover logs calories/macros in a browser and displays the Android app's
   owner-only 14-day steps, distance, calories, and Wear OS heart-rate summary. A
   browser does not claim to count background steps.

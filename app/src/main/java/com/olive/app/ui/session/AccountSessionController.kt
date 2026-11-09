@@ -1,5 +1,6 @@
 // All account roles: restores sessions, completes account setup, and signs out.
 package com.olive.app.ui.session
+
 import android.util.Log
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
@@ -17,6 +18,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.milliseconds
+import android.os.SystemClock
+import android.os.Build
+import android.view.accessibility.AccessibilityManager
+import kotlinx.coroutines.delay
+
 
 // Restores enrollment, signs accounts in/out and runs onboarding; stale account-choice callbacks cannot restart setup.
 internal class AccountSessionController(private val runtime: SessionRuntime) {
@@ -97,7 +103,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         val state = runtime.state
         if (state.busy || runtime.enrollment != null || state.screen != SessionScreen.Cover) return
         state.accountRole = AccountRole.USER
-        state.coverType = CoverType.FOOD
+        state.coverType = CoverType.FITNESS
         state.creatingAccount = false
         state.message = null
         runtime.navigation.openScreen(SessionScreen.Welcome)
@@ -134,6 +140,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         if (epoch == token) {
                             enrollment = saved
                             archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+                            restoredClosedConversationIds = withContext(Dispatchers.IO) {
+                                store.restoredClosedConversationIds(saved.uid)
+                            }
                             privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
                             profile = value
                             coverUsername =
@@ -203,6 +212,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
             coverType = value.coverType
             accountRole = value.role
             archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+            restoredClosedConversationIds = withContext(Dispatchers.IO) {
+                store.restoredClosedConversationIds(saved.uid)
+            }
             privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
             covers.restoreCoverData(saved.uid)
             navigation.quickExit()
@@ -314,16 +326,12 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         coverDob = ""
                         coverFullName = ""
                         coverUsername = ""
-                        coverType =
-                            CoverType.FOOD
+                        coverType = CoverType.FITNESS
                         accountRole = AccountRole.USER
                         profile = null
-                        foodCart = emptyMap()
-                        foodFavorites = emptySet()
-                        foodCustomizations =
-                            emptyMap()
                         savedNews = emptyList()
                         archivedConversationIds = emptySet()
+                        restoredClosedConversationIds = emptySet()
                         privateContactNotes = emptyMap()
                         coverDataVersion++
                         screen = SessionScreen.Cover
@@ -362,10 +370,12 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 coverType = saved.coverType
                 accountRole = saved.role
                 covers.restoreCoverData(device.uid)
-                checkoutHistory = withContext(Dispatchers.IO) { store.checkoutHistory(device.uid) }
                 if (!localMode) history.loadCloudHistory(device.uid, saved.username)
                 if (saved.role != AccountRole.USER) profile = saved
                 archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(device.uid) }
+                restoredClosedConversationIds = withContext(Dispatchers.IO) {
+                    store.restoredClosedConversationIds(device.uid)
+                }
                 privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(device.uid) }
                 if (saved.role == AccountRole.SAFE_CONTACT) withContext(Dispatchers.IO) {
                     store.removePin(
@@ -422,6 +432,117 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                     AccountRole.SAFE_CONTACT -> SessionScreen.Safe
                     AccountRole.STAFF, AccountRole.ADMIN -> SessionScreen.Portal
                 }
+            }
+        }
+    }
+}
+
+// Signed-in users: clears private state when the safe app closes.
+
+// Keeps private-note actions separate from the rest of the signed-in session.
+internal class SessionPrivacy(private val runtime: SessionRuntime) {
+    // Opens or closes the private note editor for the selected person.
+    fun noteInteraction() {
+        with(runtime) {
+            with(state) {
+                if (screen != SessionScreen.Safe || accountRole != AccountRole.USER) return
+                lastTouchAt = SystemClock.elapsedRealtime()
+                idleCountdownSeconds = null
+            }
+        }
+    }
+
+    // Records a screenshot or screen-recording alert in private activity history.
+    fun captureDetected(kind: String) {
+        with(runtime) {
+            with(state) {
+                if (privacyBlackout) return
+                val uid = enrollment?.uid
+                if (accountRole == AccountRole.USER) navigation.quickExit()
+                privacyBlackout = true
+                if (kind == "Screenshot") scope.launch {
+                    delay(1_500.milliseconds)
+                    privacyBlackout = false
+                }
+                if (uid == null) return
+                scope.launch(Dispatchers.IO) {
+                    runCatching {
+                        store.recordSettings(
+                            uid,
+                            SettingsEvent(area = "Privacy", action = "$kind detected")
+                        )
+                        history.queueHistorySync()
+                    }
+                }
+            }
+        }
+    }
+
+    // Records when Android says screen recording has stopped.
+    fun recordingStopped() {
+        with(runtime) {
+            with(state) {
+                privacyBlackout = false
+            }
+        }
+    }
+
+    // This warning applies only while the User safe area is open; background locking remains immediate.
+    fun startIdleTimer() {
+        with(runtime) {
+            with(state) {
+                idleJob?.cancel()
+                if (accountRole != AccountRole.USER) {
+                    idleCountdownSeconds = null
+                    return
+                }
+                noteInteraction()
+                idleJob = scope.launch {
+                    // Keep the idle timer running only while the private Safe App is open.
+                    while (screen == SessionScreen.Safe) {
+                        delay(250.milliseconds)
+                        val accessibility =
+                            application.getSystemService(AccessibilityManager::class.java)
+                        val warningDuration =
+                            if (Build.VERSION.SDK_INT >= 29) accessibility?.getRecommendedTimeoutMillis(
+                                15_000,
+                                AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS
+                            )?.toLong() ?: 15_000L else 15_000L
+                        val countdown = IdlePolicy.countdown(
+                            SystemClock.elapsedRealtime() - lastTouchAt,
+                            warningDuration
+                        )
+                        if (countdown == 0) {
+                            navigation.quickExit()
+                            break
+                        }
+                        idleCountdownSeconds = countdown
+                    }
+                }
+            }
+        }
+    }
+
+    // A full-screen call is active interaction. Preserve the underlying Safe page and restart
+    // its full inactivity window only after the call overlay has gone away.
+    fun pauseIdleTimerForCall() {
+        with(runtime) {
+            with(state) {
+                if (screen != SessionScreen.Safe || accountRole != AccountRole.USER) return
+                idlePausedForCall = true
+                idleJob?.cancel()
+                idleJob = null
+                idleCountdownSeconds = null
+            }
+        }
+    }
+
+    fun resumeIdleTimerAfterCall() {
+        with(runtime) {
+            if (!idlePausedForCall) return
+            idlePausedForCall = false
+            if (state.screen == SessionScreen.Safe && state.accountRole == AccountRole.USER) {
+                startIdleTimer()
             }
         }
     }

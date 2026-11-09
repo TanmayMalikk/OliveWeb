@@ -12,13 +12,54 @@ test("deployment keeps the existing callable endpoint names", () => {
   const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount", "createPublicAccount",
     "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
-    "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
+    "safetyPlanShareContacts", "safetyPlanMediaRecipients", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
     "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
-    "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch"];
+    "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant", "conversationRemoveParticipant",
+    "conversationRequestStaff", "staffSupportClose",
+    "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+// Inputs: a three-person group, its owner, and one other member. Expected: only the owner can
+// remove that member, while two-person groups and unrelated accounts are rejected.
+test("group member removal keeps an owner and at least two people", () => {
+  const group = {type:"GROUP", ownerUid:"owner", participantIds:["owner", "friend", "safe"]};
+  assert.deepEqual(supportGroups.validateGroupRemoval(group, "owner", "safe"), ["owner", "friend"]);
+  assert.throws(() => supportGroups.validateGroupRemoval(group, "friend", "safe"));
+  assert.throws(() => supportGroups.validateGroupRemoval(group, "owner", "missing"));
+  assert.throws(() => supportGroups.validateGroupRemoval(
+    {...group, participantIds:["owner", "friend"]}, "owner", "friend",
+  ));
+});
+
+// Inputs: current and older support tickets with staff/admin participants. Expected: an
+// organization account in the chat may close it even when an old assignment field is stale.
+test("support ticket closing follows trusted role and chat membership", () => {
+  const conversation = {
+    type: "SUPPORT",
+    participantIds: ["user", "staff", "admin"],
+    staffUid: "old-staff-field",
+    adminUid: "",
+  };
+  assert.equal(
+    supportGroups.canCloseSupportConversation(conversation, {uid: "staff", role: "STAFF"}),
+    true,
+  );
+  assert.equal(
+    supportGroups.canCloseSupportConversation(conversation, {uid: "admin", role: "ADMIN"}),
+    true,
+  );
+  assert.equal(
+    supportGroups.canCloseSupportConversation(conversation, {uid: "user", role: "USER"}),
+    false,
+  );
+  assert.equal(
+    supportGroups.canCloseSupportConversation(conversation, {uid: "other-admin", role: "ADMIN"}),
+    false,
+  );
 });
 
 // Inputs: one device key for the caller and one forged key for another UID. Expected: only caller-owned device IDs pass.

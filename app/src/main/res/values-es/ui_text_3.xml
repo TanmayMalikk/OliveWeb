@@ -62,8 +62,6 @@
 
 
 
-    <string name="ui_olive_order_update">Actualización del pedido de aceitunas</string>
-    <string name="ui_your_order_is_being_prepared">Tu pedido se está preparando.</string>
     <string name="ui_new_headlines_are_available">Hay nuevos titulares disponibles.</string>
     <string name="ui_a_new_update_is_available">Hay una nueva actualización disponible.</string>
     <string name="ui_an_account_update_is_available">Hay una actualización de cuenta disponible.</string>
@@ -75,7 +73,6 @@
 
     <string name="ui_open_the_app_to_see_what_s_new">Abra la aplicación para ver las novedades.</string>
     <string name="ui_new_activity_is_waiting">Nueva actividad está esperando.</string>
-    <string name="ui_olive_order_updates">Actualizaciones de pedidos de aceitunas</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">Estado del pedido y notificaciones de entrega de Olive</string>
     <string name="ui_daily_digest_briefings">Resúmenes informativos diarios</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">Titulares diarios y notificaciones de resúmenes de noticias.</string>
@@ -89,9 +86,13 @@
     <string name="ui_speaker_off">Desactivar altavoz</string>
     <string name="ui_incoming_call">Llamada entrante</string>
     <string name="ui_voice_call">Llamada de voz</string>
+    <string name="ui_minimize_call">Minimizar llamada</string>
+    <string name="ui_return_to_call">Volver a la llamada</string>
+    <string name="ui_call_running_in_background">La llamada continúa en segundo plano</string>
     <string name="ui_start_voice_call">Iniciar llamada de voz</string>
     <string name="ui_calling">Llamando…</string>
     <string name="ui_call_in_progress">Llamada en curso</string>
+    <string name="ui_join_call">Unirse a la llamada</string>
     <string name="ui_missed_call">Llamada perdida</string>
     <string name="ui_call_declined">Llamada rechazada</string>
     <string name="ui_call_ended">Llamada finalizada</string>

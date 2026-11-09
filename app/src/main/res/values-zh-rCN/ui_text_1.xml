@@ -128,15 +128,6 @@
     <string name="ui_paywall">付费专区</string>
     <string name="ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag">这篇文章无法加载。检查您的连接并重试。</string>
     <string name="ui_this_changes_the_local_news_search_on_this_device">这会更改该设备上的本地新闻搜索。</string>
-    <string name="ui_unsave_value">取消保存 %1$s</string>
-    <string name="ui_save_value">保存 %1$s</string>
-    <string name="ui_value_value">%1$s  ·  %2$s</string>
-    <string name="ui_value_value_min">★ %1$s · %2$s 分钟</string>
-    <string name="ui_value_value_min_fe5b84">★ %1$s · %2$s 分钟</string>
-    <string name="ui_add_another_value_in_cart">在购物车中添加另一个 · %1$s</string>
-    <string name="ui_remove_one_value">删除一个 %1$s</string>
-    <string name="ui_add_one_value">添加一个 %1$s</string>
-    <string name="ui_value_dishes">%1$s 菜肴</string>
     <string name="ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required">需要全名、有效的出生日期和真实的电子邮件。</string>
     <string name="ui_unable_to_finish_the_organization_profile_check_the_email_and_try">无法完成组织简介。检查电子邮件并重试。</string>
     <string name="ui_unable_to_update_your_olive_tree_profile">无法更新您的 Olive Tree 个人资料。</string>
@@ -172,7 +163,4 @@
 
 
 
-    <string name="ui_garden_harvest_bowl">花园收获碗</string>
-    <string name="ui_quinoa_roasted_vegetables_and_lemon_tahini">藜麦、烤蔬菜和柠檬芝麻酱。</string>
-    <string name="ui_olive_kitchen">Olive Kitchen</string>
 </resources>

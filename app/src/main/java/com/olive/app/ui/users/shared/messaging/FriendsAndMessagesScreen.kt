@@ -2,17 +2,12 @@
 package com.olive.app.ui.users.shared.messaging
 
 import com.olive.app.ui.shared.*
-
-
 import com.olive.app.ui.users.shared.navigation.*
-
-
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.ui.res.stringResource
 import com.olive.app.R
-
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.combinedClickable
@@ -23,8 +18,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,11 +30,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.*
+import androidx.compose.foundation.verticalScroll
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
+
+// Completed tickets stay archived unless this account manually restores them to the regular list.
+internal fun isConversationArchived(
+    conversation: ChatConversation,
+    archivedIds: Set<String>,
+    restoredClosedIds: Set<String>,
+): Boolean = conversation.id in archivedIds ||
+    (conversation.closedAt > 0L && conversation.id !in restoredClosedIds)
+
+// Staff sort every assigned ticket type, while admins work only with escalated tickets.
+internal fun visibleSupportTags(role: AccountRole): List<String> = when (role) {
+    AccountRole.ADMIN -> listOf(SUPPORT_TAG_NEEDS_ADMIN)
+    AccountRole.STAFF -> listOf(
+        SUPPORT_TAG_PLAN_CONSULT,
+        SUPPORT_TAG_SUPPORT,
+        SUPPORT_TAG_NEEDS_ADMIN,
+    )
+    else -> emptyList()
+}
 
 // Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices.
 // UI sizing: messaging switches to two panes at 720dp; the sidebar is 340dp wide and leaves 96dp for bottom controls.
 @Composable
-internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = null) {
+internal fun MessagesScreen(
+    session: SessionViewModel,
+    exit: (() -> Unit)? = null,
+    initialSupportFilter: String? = null,
+) {
     val active = session.messages.activeConversation
     val currentUid = session.coverAccountId.orEmpty()
     // Keep the chosen list visible while a phone opens a chat and returns from it.
@@ -53,6 +74,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
             MessagingSidebar(
                 session, currentUid, portalExit(session, exit), showingArchived,
+                initialSupportFilter = initialSupportFilter,
                 onShowingArchivedChange = { showingArchived = it },
                 modifier = Modifier.width(340.dp).fillMaxHeight(),
             )
@@ -68,6 +90,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
             } else ChatPane(session, currentUid, false, chatExit, Modifier.weight(1f).fillMaxHeight())
         } else if (active == null) MessagingSidebar(
             session, currentUid, portalExit(session, exit), showingArchived,
+            initialSupportFilter = initialSupportFilter,
             onShowingArchivedChange = { showingArchived = it },
             modifier = Modifier.fillMaxSize(),
         )
@@ -90,20 +113,45 @@ private fun MessagingSidebar(
     exit: (() -> Unit)?,
     showingArchived: Boolean,
     onShowingArchivedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialSupportFilter: String? = null,
 ) {
     val uiText = rememberResourceText()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
-    var supportFilter by rememberSaveable { mutableStateOf(SUPPORT_TAG_SUPPORT) }
+    val allowedSupportTags = visibleSupportTags(session.accountRole)
+    val defaultSupportFilter = when {
+        initialSupportFilter in allowedSupportTags -> initialSupportFilter!!
+        allowedSupportTags.isNotEmpty() -> allowedSupportTags.first()
+        else -> SUPPORT_TAG_SUPPORT
+    }
+    var supportFilter by rememberSaveable(initialSupportFilter) {
+        mutableStateOf(defaultSupportFilter)
+    }
+    // A role change cannot leave an admin viewing a staff-only ticket category.
+    LaunchedEffect(session.accountRole, allowedSupportTags) {
+        if (allowedSupportTags.isNotEmpty() && supportFilter !in allowedSupportTags) {
+            supportFilter = allowedSupportTags.first()
+        }
+    }
     val roleConversations = if (organizationAccount) session.messages.conversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
     } else session.messages.conversations
     val shownConversations = roleConversations.filter {
-        (it.closedAt > 0L || it.id in session.messages.archivedConversationIds) == showingArchived
+        isConversationArchived(
+            it,
+            session.messages.archivedConversationIds,
+            session.messages.restoredClosedConversationIds,
+        ) == showingArchived
     }
     val supportConversations = shownConversations.filter { it.type == "SUPPORT" }
     val directConversations = shownConversations.filter { it.type != "SUPPORT" }
-    val archivedCount = roleConversations.count { it.closedAt > 0L || it.id in session.messages.archivedConversationIds }
+    val archivedCount = roleConversations.count {
+        isConversationArchived(
+            it,
+            session.messages.archivedConversationIds,
+            session.messages.restoredClosedConversationIds,
+        )
+    }
     var conversationActions by remember { mutableStateOf<ChatConversation?>(null) }
     var noteTargets by remember { mutableStateOf<List<DirectoryUser>?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -173,30 +221,23 @@ private fun MessagingSidebar(
                 }
             }
         }
-        // Hides friend controls for staff and admin accounts because support chats are assigned.
-        if (organizationAccount) item {
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    stringResource(R.string.staff_conversations_assigned_help),
-                    modifier = Modifier.padding(14.dp),
-                    color = OliveGreen,
-                )
-            }
-        }
         if (organizationAccount) item {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                listOf(
-                    SUPPORT_TAG_PLAN_CONSULT to stringResource(R.string.support_filter_plan_consults),
-                    SUPPORT_TAG_SUPPORT to stringResource(R.string.support_filter_support),
-                    SUPPORT_TAG_NEEDS_ADMIN to stringResource(R.string.support_filter_needs_admin),
-                ).forEach { (tag, label) ->
+                allowedSupportTags.forEach { tag ->
+                    val label = stringResource(
+                        when (tag) {
+                            SUPPORT_TAG_PLAN_CONSULT -> R.string.support_filter_plan_consults
+                            SUPPORT_TAG_NEEDS_ADMIN -> if (session.accountRole == AccountRole.ADMIN) {
+                                R.string.support_ticket_escalation
+                            } else {
+                                R.string.support_filter_needs_admin
+                            }
+                            else -> R.string.support_filter_support
+                        }
+                    )
                     val unreadCount = session.messages.unreadCountForSupportTag(tag)
                     FilterChip(
                         selected = supportFilter == tag,
@@ -258,11 +299,9 @@ private fun MessagingSidebar(
             Text(stringResource(R.string.support_conversations), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() })
         }
-        // Explain how support starts when this account has no support tickets yet.
-        if (supportConversations.isEmpty()) item {
+        if (supportConversations.isEmpty() && showingArchived) item {
             Text(stringResource(when {
                 showingArchived -> R.string.no_archived_chats
-                organizationAccount -> R.string.no_assigned_support_conversations
                 else -> R.string.support_no_conversations
             }), color = Muted)
         }
@@ -310,16 +349,33 @@ private fun MessagingSidebar(
     conversationActions?.let { conversation ->
         ConversationActionsDialog(
             conversation = conversation,
-            archived = conversation.closedAt > 0L || conversation.id in session.messages.archivedConversationIds,
+            archived = isConversationArchived(
+                conversation,
+                session.messages.archivedConversationIds,
+                session.messages.restoredClosedConversationIds,
+            ),
             closed = conversation.closedAt > 0L,
             currentUid = currentUid,
             role = session.accountRole,
             friendUids = session.messages.friends.mapTo(mutableSetOf()) { it.uid },
             onArchive = {
-                session.messages.setConversationArchived(
-                    conversation,
-                    conversation.closedAt == 0L && conversation.id !in session.messages.archivedConversationIds,
-                )
+                if (
+                    session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+                    conversation.type == "SUPPORT" &&
+                    conversation.closedAt == 0L
+                ) {
+                    // Staff closing a ticket archives the same chat for every participant.
+                    session.messages.closeSupportChat(conversation.id)
+                } else {
+                    session.messages.setConversationArchived(
+                        conversation,
+                        !isConversationArchived(
+                            conversation,
+                            session.messages.archivedConversationIds,
+                            session.messages.restoredClosedConversationIds,
+                        ),
+                    )
+                }
                 conversationActions = null
             },
             onNotes = {
@@ -354,8 +410,11 @@ private fun ConversationRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Icon(
-                if (conversation.type == "SUPPORT") Icons.Outlined.SupportAgent
-                else Icons.Outlined.PersonOutline,
+                when {
+                    conversation.type == "SUPPORT" -> Icons.Outlined.SupportAgent
+                    conversation.type == "GROUP" || conversation.participantIds.size > 2 -> Icons.Outlined.Group
+                    else -> Icons.Outlined.PersonOutline
+                },
                 contentDescription = null,
                 modifier = Modifier.size(22.dp),
             )
@@ -402,3 +461,137 @@ private fun supportTagLabel(tag: String) = stringResource(
         else -> R.string.support_filter_support
     }
 )
+
+// All safe-app roles: shows private notes linked to friends or assigned users.
+
+// Lists the friends or supported users who may have a private contact note.
+internal fun ChatConversation.privateNoteTargets(
+    currentUid: String,
+    role: AccountRole,
+    friendUids: Set<String>,
+): List<DirectoryUser> {
+    val ids = if (type == "SUPPORT" && role in setOf(
+            AccountRole.SAFE_CONTACT,
+            AccountRole.STAFF,
+            AccountRole.ADMIN,
+        ) && ownerUid.isNotBlank()
+    ) listOf(ownerUid) else participantIds.filter { it != currentUid }
+    val allowedIds = if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) ids
+    else ids.filter(friendUids::contains)
+    return allowedIds.distinct().map { uid ->
+        DirectoryUser(uid, participantUsernames[uid].orEmpty().ifBlank { uid })
+    }
+}
+// Shows archive and private-note actions for the selected conversation.
+@Composable
+internal fun ConversationActionsDialog(
+    conversation: ChatConversation,
+    archived: Boolean,
+    closed: Boolean = false,
+    currentUid: String,
+    role: AccountRole,
+    friendUids: Set<String>,
+    onArchive: () -> Unit,
+    onNotes: (List<DirectoryUser>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val targets = conversation.privateNoteTargets(currentUid, role, friendUids)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                conversation.displayName(
+                    currentUid,
+                    role,
+                    conversation.anonymousStaffDisplayName(
+                        stringResource(R.string.support_chat_name),
+                        stringResource(R.string.support_ticket_consultation),
+                        stringResource(R.string.support_ticket_support),
+                        stringResource(R.string.support_ticket_escalation),
+                    ),
+                )
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (closed) Text(stringResource(R.string.support_chat_closed))
+                Button(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(if (archived) R.string.unarchive_chat else R.string.archive_chat))
+                }
+                if (targets.isNotEmpty()) OutlinedButton(
+                    onClick = { onNotes(targets) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.private_note)) }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        },
+    )
+}
+
+// shared safe app private contact notes shows this private contact note dialog view so the user can view its details and use its actions.
+@Composable
+internal fun PrivateContactNoteDialog(
+    session: SessionViewModel,
+    targets: List<DirectoryUser>,
+    onDismiss: () -> Unit,
+) {
+    var selected by remember(targets) { mutableStateOf(targets.singleOrNull()) }
+    var addition by remember(selected?.uid) { mutableStateOf("") }
+    val target = selected
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.private_contact_note)) },
+        text = {
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(stringResource(R.string.private_contact_note_explanation), color = Muted)
+                // Close the note dialog after its contact disappears from the current list.
+                if (target == null) {
+                    Text(stringResource(R.string.choose_person), style = MaterialTheme.typography.titleMedium)
+                    targets.forEach { person ->
+                        OutlinedButton(
+                            onClick = { selected = person },
+                            modifier = Modifier.fillMaxWidth().testTag("private_note_person_${person.uid}"),
+                        ) { Text(person.username) }
+                    }
+                } else {
+                    Text(target.username, style = MaterialTheme.typography.titleMedium)
+                    session.messages.privateContactNotes[target.uid]?.body?.let { existing ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Text(existing, Modifier.fillMaxWidth().padding(12.dp))
+                        }
+                    }
+                    OutlinedTextField(
+                        value = addition,
+                        onValueChange = { addition = it.take(2_000) },
+                        label = { Text(stringResource(R.string.add_to_private_note)) },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth().testTag("private_contact_note_text"),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (target != null) Button(
+                onClick = { session.messages.appendPrivateContactNote(target, addition, onDismiss) },
+                enabled = addition.isNotBlank() && !session.messages.busy,
+                modifier = Modifier.testTag("save_private_contact_note"),
+            ) { Text(stringResource(R.string.append_note)) }
+        },
+        dismissButton = {
+            TextButton(onClick = if (target != null && targets.size > 1) {
+                { selected = null }
+            } else onDismiss) {
+                Text(stringResource(if (target != null && targets.size > 1) R.string.back else R.string.cancel))
+            }
+        },
+    )
+}

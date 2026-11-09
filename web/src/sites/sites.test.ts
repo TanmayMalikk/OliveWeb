@@ -14,15 +14,16 @@ it("recognizes legacy cover paths while keeping their canonical cover identity",
     expect(coverForRoute(site.path)?.id).toBe(site.id);
     expect(coverForRoute(`/cover/${site.slug}/`)?.id).toBe(site.id);
   }
-  expect(canonicalPath("/cover/olive/?q=a#b")).toBe("/olive?q=a#b");
+  const first = config.covers[0];
+  expect(canonicalPath(`/cover/${first.slug}/?q=a#b`)).toBe(`${first.path}?q=a#b`);
   expect(coverForRoute("/")).toBeUndefined();
   expect(coverForRoute("/safe")).toBeUndefined();
 });
 
 // Inputs: the values in this case. Expected: keeps local preview routes usable.
 it("keeps every page on the same origin", () => {
-  expect(siteDestination("/olive", "http://localhost:5173")).toBe(
-    "http://localhost:5173/olive",
+  expect(siteDestination("/daily-digest", "http://localhost:5173")).toBe(
+    "http://localhost:5173/daily-digest",
   );
   expect(siteDestination("/download", "http://127.0.0.1:5173")).toBe(
     "http://127.0.0.1:5173/get",
@@ -48,5 +49,5 @@ it("selects site mode from the page path", () => {
   expect(siteMode("/get")).toBe("download");
   expect(siteMode("/download")).toBe("download");
   expect(siteMode("/admin")).toBe("admin");
-  expect(siteMode("/olive")).toBe("user");
+  expect(siteMode("/daily-digest")).toBe("user");
 });

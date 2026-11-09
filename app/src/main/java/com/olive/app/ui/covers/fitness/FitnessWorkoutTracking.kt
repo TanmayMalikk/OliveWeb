@@ -28,6 +28,12 @@ import kotlin.math.asin
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+import com.google.firebase.auth.FirebaseAuth
+import com.google.android.gms.wearable.DataEvent
+import com.google.android.gms.wearable.DataEventBuffer
+import com.google.android.gms.wearable.DataMapItem
+import com.google.android.gms.wearable.WearableListenerService
+
 
 internal enum class OutdoorWorkoutType(val storedName: String) {
     WALK("walk"),
@@ -502,5 +508,35 @@ internal class FitnessWorkoutService : Service() {
         private const val SERVICE_PREFERENCES = "fitness_workout_service"
         private const val NOTIFICATION_CHANNEL = "fitness_outdoor_workout"
         private const val NOTIFICATION_ID = 4_120
+    }
+}
+
+// Fitness cover users: receives the paired Watch6 daily step total for the active account.
+
+internal class FitnessWatchListenerService : WearableListenerService() {
+    // Saves fitness data received from the connected Wear OS watch.
+    override fun onDataChanged(events: DataEventBuffer) {
+        events.forEach { event ->
+            if (event.type != DataEvent.TYPE_CHANGED ||
+                event.dataItem.uri.path != FitnessWatchSync.WATCH_ACTIVITY_PATH
+            ) return@forEach
+
+            val accountId = getSharedPreferences(
+                FitnessWatchSync.SYNC_PREFERENCES,
+                MODE_PRIVATE,
+            ).getString(FitnessWatchSync.ACTIVE_ACCOUNT_ID, null) ?: return@forEach
+            val watchData = DataMapItem.fromDataItem(event.dataItem).dataMap
+            val watchAccountId = watchData.getString("accountId").orEmpty()
+            val signedInAccountId = runCatching {
+                FirebaseAuth.getInstance().currentUser?.uid
+            }.getOrNull()
+            // Ignore delayed readings from a watch session owned by another account.
+            if (watchAccountId != accountId || signedInAccountId != accountId) return@forEach
+            FitnessStore(applicationContext, accountId).recordWatchActivity(
+                watchSteps = watchData.getInt("watchSteps"),
+                heartRate = watchData.getInt("heartRate"),
+                watchUpdatedAt = watchData.getLong("updatedAt"),
+            )
+        }
     }
 }

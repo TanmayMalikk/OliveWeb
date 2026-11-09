@@ -1,5 +1,6 @@
 // All app roles: starts the Android UI and handles private-screen behavior.
 package com.olive.app
+
 import com.olive.app.ui.shared.observeAccessibilityInteractions
 import android.app.ActivityManager
 import android.os.Bundle
@@ -35,6 +36,12 @@ import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SafePage
 import java.util.function.Consumer
+import android.app.Application
+import com.google.firebase.auth.FirebaseAuth
+import com.olive.app.ui.covers.fitness.FitnessWatchSync
+import android.app.Activity
+import com.olive.app.data.update.AppUpdateScheduler
+
 
 // Prevents Android from showing private content in the recent-apps preview.
 internal fun shouldBlankRecentPreview(protectionEnabled: Boolean, sensitive: Boolean) =
@@ -336,7 +343,7 @@ class OliveActivity : FragmentActivity() {
             role == AccountRole.SAFE_CONTACT -> R.mipmap.ic_launcher_branch
             type == CoverType.NEWS -> R.mipmap.ic_launcher_news
             type == CoverType.FITNESS -> R.mipmap.ic_launcher_fitness
-            else -> R.mipmap.ic_launcher_food
+            else -> R.mipmap.ic_launcher_game
         }
         val appTitle = when (role) {
             AccountRole.SAFE_CONTACT -> getString(R.string.olive_branch)
@@ -344,7 +351,6 @@ class OliveActivity : FragmentActivity() {
             AccountRole.USER -> getString(
                 // Chooses the recent-app title and icon that match the active cover.
                 when (type) {
-                    CoverType.FOOD -> R.string.ui_olive_8f62f4
                     CoverType.NEWS -> R.string.ui_daily_digest
                     CoverType.FITNESS -> R.string.fitness_tracker
                     CoverType.GAME -> R.string.ui_game
@@ -358,5 +364,36 @@ class OliveActivity : FragmentActivity() {
                 .setLabel(appTitle).setIcon(iconId).build()
         )
         appliedTaskIdentity = identity
+    }
+}
+
+// All app roles: sets up app-wide services before any screen opens.
+
+class OliveApplication : Application() {
+    // Creates app-wide notification channels and background services at startup.
+    override fun onCreate() {
+        super.onCreate()
+        // Release updates are checked in the background. Android always keeps the final install
+        // confirmation under the device owner's control.
+        AppUpdateScheduler.schedule(this)
+        if (BuildConfig.FIREBASE_CONFIGURED) {
+            AppCheckProviderInstaller.install()
+            FirebaseAuth.getInstance().addAuthStateListener { auth ->
+                // The watch follows the account currently authenticated on this phone.
+                FitnessWatchSync.bindAccount(this@OliveApplication, auth.currentUser?.uid)
+            }
+        }
+    }
+}
+
+// All app roles: starts the cover app when the Android launcher opens.
+
+// Android Studio launches through here so changing cover icons never breaks the Run button.
+class OliveLauncher : Activity() {
+    // Sends launcher taps into OliveActivity and closes this small forwarding activity.
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        startActivity(Intent(this, OliveActivity::class.java))
+        finish()
     }
 }

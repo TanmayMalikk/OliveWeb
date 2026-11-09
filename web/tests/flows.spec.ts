@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const password = "Test-password1!";
-async function onboard(page: Page, cover = "Olive") {
+async function onboard(page: Page, cover = "Fitness Tracker") {
   await page.goto("/account/create");
   await page.getByLabel("Username", { exact: true }).fill("website_tester");
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -100,23 +100,19 @@ test("account creation enforces current credential rules before onboarding", asy
     page.getByRole("heading", { name: "Choose your familiar." }),
   ).toBeVisible();
 });
-// Inputs: the values in this case. Expected: plain domain and guessed private paths show the game, never a private workspace.
-test("plain domain and guessed private paths show the game, never a private workspace", async ({
+// Inputs: the values in this case. Expected: plain domain and guessed private paths show Fitness, never a private workspace.
+test("plain domain and guessed private paths show Fitness, never a private workspace", async ({
   page,
 }) => {
   for (const path of ["/", "/safe", "/entry"]) {
     await page.goto(path);
     await expect(
-      page.getByRole("heading", {
-        name: "A little less rush. A little more play.",
-      }),
+      page.getByRole("heading", { name: "Fitness Tracker" }),
     ).toBeVisible();
     await expect(
       page.getByText("Your personal entry", { exact: true }),
     ).toHaveCount(0);
   }
-  await page.getByRole("button", { name: "Turn card 1", exact: true }).click();
-  await expect(page.getByRole("button", { name: /Card 1: / })).toBeVisible();
 });
 // Inputs: the values in this case. Expected: account onboarding, unique-link gate, encrypted notes, contact CRUD, settings, exit and re-entry.
 test("account onboarding, unique-link gate, encrypted notes, contact CRUD, settings, exit and re-entry", async ({
@@ -127,9 +123,7 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/");
   await expect(
-    page.getByRole("heading", {
-      name: "Good food. Better together.",
-    }),
+    page.getByRole("heading", { name: "Fitness Tracker" }),
   ).toBeVisible();
   await unlock(page, link);
   await page.getByRole("button", { name: "Notes", exact: true }).click();
@@ -256,40 +250,6 @@ test("personal links can be rotated and wrong PINs do not reveal private data", 
   await expect(page.getByRole("alert")).toContainText("current personal link");
   await unlock(page, replacement);
 });
-// Inputs: the values in this case. Expected: food menu customizations, favourites, cart quantities and payment data stay inside their intended flows.
-test("food menu customizations, favourites, cart quantities and payment data stay inside their intended flows", async ({
-  page,
-}) => {
-  await page.goto("/cover/olive");
-  await page
-    .getByRole("button", { name: "Save Garden harvest bowl", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Saved", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Garden harvest bowl", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Garden harvest bowl", exact: true })
-    .click();
-  await page.getByRole("checkbox", { name: "Quinoa", exact: true }).uncheck();
-  await page.getByRole("button", { name: /Add to bag ·/ }).click();
-  await page.getByRole("button", { name: "Cart (1)", exact: true }).click();
-  await expect(page.getByText("$14.95", { exact: true }).first()).toBeVisible();
-  await page
-    .getByRole("button", { name: "Add one Garden harvest bowl" })
-    .click();
-  await expect(page.getByText("$29.90", { exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "Continue to checkout" }).click();
-  await expect(
-    page.getByRole("checkbox", { name: "Use shipping address for billing" }),
-  ).toBeChecked();
-  await page
-    .getByRole("checkbox", { name: "Use shipping address for billing" })
-    .uncheck();
-  await expect(
-    page.getByLabel("Billing address", { exact: true }),
-  ).toBeVisible();
-});
 // Inputs: the values in this case. Expected: Quick Exit cancels an in-flight PIN operation and idle dialog autofocus does not extend the timeout.
 test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus does not extend the timeout", async ({
   page,
@@ -361,17 +321,17 @@ test("news reader sanitizes publisher HTML and bookmarks stay available", async 
     /javascript:/,
   );
 });
-// Inputs: the values in this case. Expected: PWA manifests use cover-specific identities and the download page offers the debug APK.
-test("PWA manifests use cover-specific identities and the download page offers the debug APK", async ({
+// Inputs: the values in this case. Expected: PWA manifests use cover-specific identities and the download page offers the signed APK.
+test("PWA manifests use cover-specific identities and the download page offers the signed APK", async ({
   page,
   request,
 }) => {
   const manifest = await (
-    await request.get("/cover/olive/manifest.webmanifest")
+    await request.get("/cover/daily-digest/manifest.webmanifest")
   ).json();
-  expect(manifest.name).toBe("Olive");
+  expect(manifest.name).toBe("Daily Digest");
   expect(manifest.start_url).toBe("/");
-  expect(manifest.icons[0].src).toContain("olive-192");
+  expect(manifest.icons[0].src).toContain("daily-digest-192");
   await page.goto("/get");
   await expect(
     page.getByRole("heading", { name: "A place on your Home Screen." }),
@@ -380,14 +340,14 @@ test("PWA manifests use cover-specific identities and the download page offers t
     page.getByRole("button", { name: "Begin onboarding" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Download the Android debug app." }),
+    page.getByRole("heading", { name: "Download the signed Android app." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /Download debug APK/i }),
+    page.getByRole("link", { name: /Download signed APK/i }),
   ).toHaveAttribute("href", /\/download\/android$/);
-  const download = await request.get("/download/android", { maxRedirects: 0 });
-  expect(download.status()).toBe(302);
-  expect(download.headers().location).toContain("olive-branch.apk");
+  await expect(
+    page.getByAltText("QR code for the latest signed Android app"),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Your space, on the web." }),
   ).toBeVisible();
@@ -411,7 +371,6 @@ for (const size of [
       "/",
       "/account",
       "/get",
-      "/cover/olive",
       "/cover/daily-digest",
       "/cover/fitness",
     ]) {
@@ -424,13 +383,13 @@ for (const size of [
       expect(overflow, `${path} overflows ${size.width}px`).toBe(false);
       if (path === "/" || path === "/account")
         await page.screenshot({
-          path: `test-results/${size.width}-${path === "/" ? "game" : "account"}.png`,
+          path: `test-results/${size.width}-${path === "/" ? "fitness" : "account"}.png`,
           fullPage: true,
         });
     }
   });
-// Inputs: the values in this case. Expected: public game and account screens meet core accessibility checks.
-test("public game and account screens meet core accessibility checks", async ({
+// Inputs: the values in this case. Expected: public Fitness and account screens meet core accessibility checks.
+test("public Fitness and account screens meet core accessibility checks", async ({
   page,
 }) => {
   for (const path of ["/", "/account/create", "/get"]) {

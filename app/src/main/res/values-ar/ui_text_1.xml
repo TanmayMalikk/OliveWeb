@@ -128,15 +128,6 @@
     <string name="ui_paywall">نظام حظر الاشتراك غير المدفوع</string>
     <string name="ui_this_article_could_not_be_loaded_check_your_connection_and_try_ag">لا يمكن تحميل هذه المقالة. تحقق من اتصالك وحاول مرة أخرى.</string>
     <string name="ui_this_changes_the_local_news_search_on_this_device">يؤدي هذا إلى تغيير البحث عن الأخبار المحلية على هذا الجهاز.</string>
-    <string name="ui_unsave_value">إلغاء حفظ %1$s</string>
-    <string name="ui_save_value">حفظ %1$s</string>
-    <string name="ui_value_value">%1$s  ·  %2$s</string>
-    <string name="ui_value_value_min">★ %1$s · %2$s دقيقة</string>
-    <string name="ui_value_value_min_fe5b84">★ %1$s · %2$s دقيقة</string>
-    <string name="ui_add_another_value_in_cart">أضف آخر · %1$s في سلة التسوق</string>
-    <string name="ui_remove_one_value">قم بإزالة %1$s واحد</string>
-    <string name="ui_add_one_value">أضف واحدًا %1$s</string>
-    <string name="ui_value_dishes">%1$s أطباق</string>
     <string name="ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required">مطلوب الاسم الكامل وتاريخ ميلاد صالح والبريد الإلكتروني الحقيقي.</string>
     <string name="ui_unable_to_finish_the_organization_profile_check_the_email_and_try">غير قادر على إنهاء ملف تعريف المؤسسة. تحقق من البريد الإلكتروني وحاول مرة أخرى.</string>
     <string name="ui_unable_to_update_your_olive_tree_profile">غير قادر على تحديث ملف تعريف Olive Tree الخاص بك.</string>
@@ -177,7 +168,4 @@
 
 
 
-    <string name="ui_garden_harvest_bowl">وعاء حصاد الحديقة</string>
-    <string name="ui_quinoa_roasted_vegetables_and_lemon_tahini">كينوا، خضروات مشوية وطحينة بالليمون.</string>
-    <string name="ui_olive_kitchen">Olive Kitchen</string>
 </resources>

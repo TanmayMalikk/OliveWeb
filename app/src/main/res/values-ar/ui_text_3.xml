@@ -62,8 +62,6 @@
 
 
 
-    <string name="ui_olive_order_update">تحديث طلب الزيتون</string>
-    <string name="ui_your_order_is_being_prepared">طلبك قيد الإعداد.</string>
     <string name="ui_new_headlines_are_available">عناوين جديدة متاحة.</string>
     <string name="ui_a_new_update_is_available">تحديث جديد متاح.</string>
     <string name="ui_an_account_update_is_available">تحديث الحساب متاح.</string>
@@ -75,7 +73,6 @@
 
     <string name="ui_open_the_app_to_see_what_s_new">افتح التطبيق لمعرفة الجديد.</string>
     <string name="ui_new_activity_is_waiting">نشاط جديد في انتظارك.</string>
-    <string name="ui_olive_order_updates">تحديثات طلب الزيتون</string>
     <string name="ui_order_status_and_delivery_notifications_for_olive">حالة الطلب وإخطارات التسليم للزيتون</string>
     <string name="ui_daily_digest_briefings">ملخصات الملخص اليومي</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">العناوين اليومية وإخطارات ملخص الأخبار</string>
@@ -89,9 +86,13 @@
     <string name="ui_speaker_off">إيقاف مكبر الصوت</string>
     <string name="ui_incoming_call">مكالمة واردة</string>
     <string name="ui_voice_call">مكالمة صوتية</string>
+    <string name="ui_minimize_call">تصغير المكالمة</string>
+    <string name="ui_return_to_call">العودة إلى المكالمة</string>
+    <string name="ui_call_running_in_background">تستمر المكالمة في الخلفية</string>
     <string name="ui_start_voice_call">بدء مكالمة صوتية</string>
     <string name="ui_calling">جارٍ الاتصال…</string>
     <string name="ui_call_in_progress">المكالمة جارية</string>
+    <string name="ui_join_call">الانضمام إلى المكالمة</string>
     <string name="ui_missed_call">مكالمة فائتة</string>
     <string name="ui_call_declined">تم رفض المكالمة</string>
     <string name="ui_call_ended">انتهت المكالمة</string>

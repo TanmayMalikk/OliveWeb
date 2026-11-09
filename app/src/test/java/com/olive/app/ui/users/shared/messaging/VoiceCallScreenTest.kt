@@ -6,9 +6,11 @@ import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipParticipant
 import com.olive.app.data.messaging.VoipParticipantStatus
 import com.olive.app.data.messaging.VoipInvitation
+import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.otherPartyName
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.shouldShowCallOverlay
+import com.olive.app.ui.users.shared.navigation.shouldShowActiveCall
 import com.olive.app.ui.users.shared.navigation.resolveIncomingCaller
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -45,6 +47,36 @@ class VoiceCallScreenTest {
         assertEquals(true, shouldShowCallOverlay(SessionScreen.Safe, AccountRole.SAFE_CONTACT))
         assertEquals(false, shouldShowCallOverlay(SessionScreen.Cover, AccountRole.SAFE_CONTACT))
         assertEquals(false, shouldShowCallOverlay(SessionScreen.Welcome, AccountRole.USER))
+    }
+
+    // A failed request with no connected call stays in its eligible chat instead of covering support screens.
+    @Test
+    fun callOverlayNeedsAnActualCallWhenStateIsError() {
+        assertEquals(false, shouldShowActiveCall(VoipSessionState.Error(null, "Unauthorized")))
+        assertEquals(
+            true,
+            shouldShowActiveCall(
+                VoipSessionState.Error(
+                    VoipCall("call-1", "Private call", "user-1", emptyList()),
+                    "Room disconnected",
+                )
+            ),
+        )
+    }
+
+    // A completed ticket is archived by default, but a manual restore changes only its list placement.
+    @Test
+    fun completedTicketCanBeManuallyShownWithoutReopeningIt() {
+        val completed = ChatConversation(
+            id = "support-1",
+            friendshipId = "",
+            participantIds = listOf("user-1", "staff-1"),
+            participantUsernames = emptyMap(),
+            type = "SUPPORT",
+            closedAt = 100L,
+        )
+        assertEquals(true, isConversationArchived(completed, emptySet(), emptySet()))
+        assertEquals(false, isConversationArchived(completed, emptySet(), setOf("support-1")))
     }
 
     @Test

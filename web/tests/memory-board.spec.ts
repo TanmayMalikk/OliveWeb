@@ -11,7 +11,7 @@ test("all board sizes stay usable without horizontal scrolling", async ({
     [1920, 1080],
   ]) {
     await page.setViewportSize({ width, height });
-    await page.goto("/");
+    await page.goto("/game");
     for (let size = 5; size <= 8; size++) {
       await page
         .getByLabel("Board size", { exact: true })
@@ -65,7 +65,7 @@ test("changing size cancels pending flips, and odd boards can be completed", asy
   page,
 }) => {
   await page.clock.install();
-  await page.goto("/");
+  await page.goto("/game");
   await page.getByLabel("Board size", { exact: true }).selectOption("8");
   await page.getByRole("button", { name: "Turn card 1", exact: true }).click();
   await page.getByRole("button", { name: "Turn card 2", exact: true }).click();

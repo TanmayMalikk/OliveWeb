@@ -22,25 +22,26 @@ class MessagingModelsEdgeCaseTest {
         adminUid = "admin",
         supportOrigin = origin,
         supportTag = tag,
+        ticketSequence = 0L,
     )
 
-    // Inputs: the values shown below. Expected: users see anonymous support name while staff and admins see the user.
+    // Personal accounts see Olive Staff, while organization accounts see only the anonymous ticket number.
     @Test
-    fun usersSeeAnonymousSupportNameWhileStaffAndAdminsSeeTheUser() {
+    fun supportNamesHideBothStaffAndUserAccountNames() {
         val chat = conversation()
 
         assertEquals("Olive Staff", chat.displayName("owner", AccountRole.USER, "Olive Staff"))
         assertEquals("Olive Staff", chat.displayName("safe", AccountRole.SAFE_CONTACT, "Olive Staff"))
-        assertEquals("visible_user", chat.displayName("staff", AccountRole.STAFF, "Olive Staff"))
-        assertEquals("visible_user", chat.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Ticket #0", chat.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("Ticket #0", chat.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
     }
 
-    // Inputs: the values shown below. Expected: missing owner name uses safe fallback for organization accounts.
+    // A missing username does not change the anonymous ticket label shown to organization accounts.
     @Test
-    fun missingOwnerNameUsesSafeFallbackForOrganizationAccounts() {
+    fun missingOwnerNameStillUsesAnonymousTicketNumber() {
         val chat = conversation(usernames = mapOf("staff" to "real_staff"))
 
-        assertEquals("User", chat.displayName("staff", AccountRole.STAFF))
+        assertEquals("Ticket #0", chat.displayName("staff", AccountRole.STAFF))
     }
 
     // Inputs: the values shown below. Expected: direct chats show the other participant or conversation fallback.
@@ -51,6 +52,18 @@ class MessagingModelsEdgeCaseTest {
 
         val selfOnly = direct.copy(participantUsernames = mapOf("owner" to "visible_user"))
         assertEquals("Conversation", selfOnly.displayName("owner", AccountRole.USER))
+    }
+
+    // Inputs: a three-person group in member order. Expected: each viewer sees the other two names together.
+    @Test
+    fun groupChatsShowEveryOtherParticipant() {
+        val group = conversation(
+            type = "GROUP",
+            usernames = linkedMapOf("owner" to "OliveUser", "safe" to "TrustedOne", "friend" to "FriendTwo"),
+        )
+
+        assertEquals("TrustedOne, FriendTwo", group.displayName("owner", AccountRole.USER))
+        assertEquals("OliveUser, FriendTwo", group.displayName("safe", AccountRole.SAFE_CONTACT))
     }
 
     // Inputs: the values shown below. Expected: ticket labels distinguish consultation support and escalation.

@@ -48,7 +48,10 @@ class VoipSessionControllerTest {
         controller.leaveCall()
         assertEquals(1, audio.disconnectCount)
         assertEquals(VoipSessionState.Idle, controller.state.value)
-        assertEquals(listOf("/api/calls", "/calls/token"), requests.map { it.url.encodedPath })
+        assertEquals(
+            listOf("/api/calls", "/calls/token", "/api/calls/call-1/leave"),
+            requests.map { it.url.encodedPath },
+        )
     }
 
     // Checks the accept join and end ends call on api step with the test's sample data.
@@ -71,6 +74,22 @@ class VoipSessionControllerTest {
         )
         assertEquals(1, audio.disconnectCount)
         assertEquals(VoipSessionState.Idle, controller.state.value)
+    }
+
+    // A person who left can use the active call event to obtain a fresh room token.
+    @Test
+    fun rejoinActiveGroupCallRequestsMembershipBeforeConnecting() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val audio = FakeLiveKitAudioSession()
+        val controller = VoipSessionController(apiManager(requests), audio)
+
+        controller.rejoinCall("call-1")
+
+        assertEquals(
+            listOf("/api/calls/call-1/rejoin", "/calls/token"),
+            requests.map { it.url.encodedPath },
+        )
+        assertEquals(listOf(connection), audio.connections)
     }
 
     @Test
@@ -151,7 +170,10 @@ class VoipSessionControllerTest {
             }
         }
 
-        assertEquals(listOf("/api/calls", "/calls/token"), requests.map { it.url.encodedPath })
+        assertEquals(
+            listOf("/api/calls", "/calls/token"),
+            requests.map { it.url.encodedPath },
+        )
     }
 
     // Checks the microphone failure is visible and session can still be left step with the test's sample data.

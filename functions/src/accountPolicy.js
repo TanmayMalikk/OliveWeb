@@ -176,7 +176,7 @@ function defaultProfile(username, role, input, email) {
       postalCode: text(address.postalCode, 160),
       country: text(address.country, 160) || "Canada",
     },
-    coverType: "FOOD",
+    coverType: "FITNESS",
     role,
     email:
       role === "STAFF" || role === "ADMIN"

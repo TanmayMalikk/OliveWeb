@@ -28,12 +28,11 @@ describe("recent web domain boundaries", () => {
     for (const cover of covers) expect(coverInfo(cover.id)).toEqual(cover);
   });
 
-  // Input: the removed calculator cover and an invalid saved value. Expected: old accounts migrate safely without crashing the public page.
-  it("migrates removed and invalid saved cover values", () => {
-    expect(normalizeCover("CALCULATOR")).toBe("FITNESS");
+  // Input: an invalid saved value. Expected: old accounts fall back safely without crashing the public page.
+  it("normalizes invalid saved cover values", () => {
     expect(normalizeCover("FITNESS")).toBe("FITNESS");
-    expect(normalizeCover("unknown-cover")).toBe("GAME");
-    expect(normalizeCover(null)).toBe("GAME");
+    expect(normalizeCover("unknown-cover")).toBe("FITNESS");
+    expect(normalizeCover(null)).toBe("FITNESS");
   });
 
   // Input: exact username boundaries and non-letter lookalikes. Expected: web validation matches Android and Cloud rules.

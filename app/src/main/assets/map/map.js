@@ -154,12 +154,22 @@ map.on('zoomend',function(){
 window.oliveRecenter=function(){
   if(points.length) map.setView([points[0].latitude,points[0].longitude],14);
 };
-window.oliveSetFollow=function(enabled,uid){
+window.oliveSetFollow=function(enabled,uid,focusClose){
   followEnabled=!!enabled;
   followUid=uid||null;
   if(followEnabled){
     const target=points.find(point=>(point.uid||point.name)===followUid);
-    if(target) map.panTo([target.latitude,target.longitude],{animate:true,duration:.5});
+    if(target){
+      if(detailsOnlyForSelectedPoint&&selectedPointUid!==followUid){
+        selectedPointUid=followUid;
+        window.oliveSetPoints(points,false,true);
+      }
+      // Search selection starts three zoom-out steps below the closest map view.
+      if(focusClose){
+        const closeFollowZoom=Math.max(map.getMinZoom(),map.getMaxZoom()-3);
+        map.setView([target.latitude,target.longitude],closeFollowZoom,{animate:true,duration:.5});
+      }else map.panTo([target.latitude,target.longitude],{animate:true,duration:.5});
+    }
   }
 };
 // Incident reports: lets the user tap the map or drag one pushpin to save exact coordinates.
