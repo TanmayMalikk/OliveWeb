@@ -37,8 +37,19 @@ class SessionCallsTest {
     // Staff and Admin accounts cannot reveal or bypass the call button policy.
     @Test
     fun organizationAccountsCannotStartDirectCalls() {
+        assertFalse(canUseVoip(AccountRole.STAFF))
+        assertFalse(canUseVoip(AccountRole.ADMIN))
         assertFalse(canCallFromConversation(AccountRole.STAFF, directConversation(), "user-1"))
         assertFalse(canCallFromConversation(AccountRole.ADMIN, directConversation(), "user-1"))
+    }
+
+    // Only personal User and Safe Contact accounts register for incoming calls.
+    @Test
+    fun onlyPersonalAccountsUseVoip() {
+        assertTrue(canUseVoip(AccountRole.USER))
+        assertTrue(canUseVoip(AccountRole.SAFE_CONTACT))
+        assertFalse(canUseVoip(AccountRole.STAFF))
+        assertFalse(canUseVoip(AccountRole.ADMIN))
     }
 
     // Support tickets may contain organization accounts, so they never allow calls.
@@ -54,6 +65,19 @@ class SessionCallsTest {
     fun closedOrUnrelatedConversationCannotStartCall() {
         assertFalse(canCallFromConversation(AccountRole.USER, directConversation().copy(closedAt = 1L), "user-1"))
         assertFalse(canCallFromConversation(AccountRole.USER, directConversation(), "outsider"))
+    }
+
+    // Missing optional VoIP configuration hides calling while the rest of messaging stays available.
+    @Test
+    fun missingVoipConfigurationDisablesOnlyCalling() {
+        assertFalse(
+            canCallFromConversation(
+                AccountRole.USER,
+                directConversation(),
+                "user-1",
+                featureAvailable = false,
+            )
+        )
     }
 
     // A guest leaving a group only disconnects that guest; the caller still owns the room.

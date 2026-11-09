@@ -26,6 +26,7 @@ class VoiceCallScreenUiTest {
         var speaker = false
         var finished = false
         var quickExited = false
+        var minimized = false
         compose.activity.setContent {
             OliveTheme {
                 ActiveCallDialog(
@@ -34,6 +35,7 @@ class VoiceCallScreenUiTest {
                     onMute = { muted = it },
                     onSpeaker = { speaker = it },
                     onFinish = { finished = true },
+                    onMinimize = { minimized = true },
                     onQuickExit = { quickExited = true },
                 )
             }
@@ -41,15 +43,33 @@ class VoiceCallScreenUiTest {
 
         compose.onNodeWithTag("mute_voice_call").assertIsDisplayed().performClick()
         compose.onNodeWithTag("speaker_voice_call").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("minimize_voice_call").assertIsDisplayed().performClick()
         compose.onNodeWithTag("call_quick_exit").assertIsDisplayed().performClick()
         compose.onNodeWithTag("finish_voice_call").assertIsDisplayed().performClick()
 
         compose.runOnIdle {
             assertTrue(muted)
             assertTrue(speaker)
+            assertTrue(minimized)
             assertTrue(quickExited)
             assertTrue(finished)
         }
+    }
+
+    @Test
+    fun minimizedCallBubbleReturnsToTheCallScreenWhenTapped() {
+        var opened = false
+        compose.activity.setContent {
+            OliveTheme {
+                DraggableCallBubble(
+                    state = VoipSessionState.Active(call, microphoneMuted = false),
+                    onOpen = { opened = true },
+                )
+            }
+        }
+
+        compose.onNodeWithTag("minimized_voice_call").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertTrue(opened) }
     }
 
     @Test
@@ -63,6 +83,7 @@ class VoiceCallScreenUiTest {
                     onMute = {},
                     onSpeaker = {},
                     onFinish = { finished = true },
+                    onMinimize = {},
                     onQuickExit = {},
                 )
             }
@@ -86,6 +107,7 @@ class VoiceCallScreenUiTest {
                     onMute = {},
                     onSpeaker = {},
                     onFinish = {},
+                    onMinimize = {},
                     onQuickExit = {},
                 )
             }

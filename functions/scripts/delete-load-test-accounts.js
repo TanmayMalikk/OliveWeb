@@ -1,5 +1,6 @@
 // Deletes the 53 known load-test accounts through Olive's normal full account-cleanup function.
 const {getAuth} = require("firebase-admin/auth");
+const {getDatabase} = require("firebase-admin/database");
 const {signInEmail} = require("../src/accountPolicy");
 const {accounts} = require("./load-test-account-fixtures");
 const {initializeOliveAdminApp} = require("./firebase-admin-app");
@@ -16,8 +17,10 @@ if (!apiKey || !adminEmail || !adminPassword) {
   throw new Error("Set the Firebase API key and a protected admin email/password for the cleanup call.");
 }
 
-const app = initializeOliveAdminApp({projectId}, "load-test-cleanup");
+const databaseURL = String(process.env.OLIVE_LOAD_TEST_DATABASE_URL || "").trim();
+const app = initializeOliveAdminApp({projectId, databaseURL}, "load-test-cleanup");
 const auth = getAuth(app);
+const database = getDatabase(app);
 
 // Signs in as an administrator so the deployed cleanup function applies every normal deletion rule.
 async function adminIdToken() {
@@ -50,6 +53,12 @@ async function deleteAccount(idToken, account) {
   );
   const body = await response.json();
   if (!response.ok || body.error) throw new Error(`Delete ${account.username} failed: ${JSON.stringify(body)}`);
+  await Promise.all([
+    database.ref(`adminLiveLocations/${user.uid}`).remove(),
+    database.ref(`liveLocations/${user.uid}`).remove(),
+    database.ref(`liveLocationTrails/${user.uid}`).remove(),
+    database.ref(`users/${user.uid}`).remove(),
+  ]);
   console.log(`Deleted: ${account.username}`);
 }
 

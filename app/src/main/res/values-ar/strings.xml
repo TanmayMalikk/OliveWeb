@@ -315,19 +315,19 @@
     <string name="organization_live_map">خريطة الموقع المباشر</string>
     <string name="organization_live_map_description">هذا العرض المحمي جاهز لإظهار المستخدمين المعيّنين كنقاط حمراء وامضة.</string>
     <string name="organization_location_feed_not_enabled">مشاركة الموقع المباشر للمؤسسة غير مفعّلة بعد. لا يتم جمع مواقع المستخدمين لهذا العرض.</string>
-    <string name="organization_live_map_admin_description">يعرض أحدث موقع مباشر أو آخر موقع معروف تم الإبلاغ عنه لكل حساب مستخدم.</string>
+    <string name="organization_live_map_admin_description">اعرض مواقع جميع المستخدمين.</string>
     <string name="organization_location_feed_empty">لم يتم الإبلاغ عن أي موقع مستخدم حتى الآن.</string>
     <string name="support_conversations">محادثات الدعم</string>
     <string name="assigned_users_count">المستخدمون المعيّنون: %1$d</string>
     <string name="safety_plan_shared_in_chat">تمت مشاركة خطة الأمان في محادثة الدعم.</string>
     <string name="share_safety_plan_support_chat">شاركها مع موظف الدعم المعيّن وجهة الاتصال الآمنة.</string>
     <string name="shared_safety_plan">خطة أمان مشتركة</string>
-    <string name="safety_admin_intro">راجع وعدّل أي خطة أمان. تبقى جهات الاتصال الآمنة للقراءة فقط.</string>
-    <string name="staff_conversations_assigned_help">تظهر محادثات الدعم تلقائياً عندما يطلب المستخدم مساعدة الموظفين. حسابات الموظفين لا تضيف أصدقاء.</string>
+    <string name="safety_admin_intro">اعرض خطط أمان المستخدمين.</string>
+    <string name="staff_conversations_assigned_help">اعرض محادثات الدعم المعيّنة.</string>
     <string name="no_assigned_support_conversations">لا يوجد حالياً مستخدمون معيّنون لك لدعمهم عبر المحادثة.</string>
-    <string name="staff_safety_plans_description">راجع وحدّث خطط الأمان للمستخدمين المعيّنين لك.</string>
-    <string name="admin_safety_plans_description">راجع وعدّل خطط الأمان في المؤسسة.</string>
-    <string name="admin_accounts_description">أنشئ الحسابات وراجع عدد المستخدمين المعيّنين لكل موظف.</string>
+    <string name="staff_safety_plans_description">اعرض خطط الأمان المعيّنة.</string>
+    <string name="admin_safety_plans_description">اعرض خطط أمان المستخدمين.</string>
+    <string name="admin_accounts_description">اعرض الحسابات وأدرها.</string>
 
     <string name="steps_today">خطوات اليوم</string>
     <string name="calories">السعرات</string>
@@ -431,7 +431,7 @@
     <string name="note_attachments_help">أضف ملفًا جديدًا أو اختر ملفًا حفظته مسبقًا في تخزين OLIVE.</string>
     <string name="ui_group_voice_call">مكالمة صوتية جماعية</string>
     <string name="ui_group_call_status">%1$d متصلون • %2$s</string>
-    <string name="organization_live_map_staff_description">يعرض أحدث موقع مباشر أو آخر موقع معروف لكل حساب مستخدم.</string>
+    <string name="organization_live_map_staff_description">اعرض مواقع جميع المستخدمين.</string>
     <string name="safety_mark_consultation_complete">وضع علامة مكتمل على الاستشارة</string>
     <string name="safety_complete_consultation_title">هل تريد إكمال هذه الاستشارة؟</string>
     <string name="safety_complete_consultation_description">يؤدي هذا إلى أرشفة محادثة الاستشارة للجميع وإزالة خطة الأمان هذه من صندوق الوارد الخاص بالموظف.</string>
@@ -439,9 +439,9 @@
     <string name="safety_open_anonymous_plan">فتح خطة الأمان المشتركة</string>
     <string name="admin_no_accounts_in_category">لا توجد حسابات في هذه الفئة.</string>
     <string name="admin_staff_management">إدارة الموظفين</string>
-    <string name="admin_staff_management_description">راجع خطط السلامة ومحادثات الدعم المعينة لكل موظف.</string>
+    <string name="admin_staff_management_description">اعرض أعباء عمل الموظفين.</string>
     <string name="admin_escalation_chats">محادثات التصعيد</string>
-    <string name="admin_escalation_chats_description">انضم إلى الطلبات التي طلب فيها الموظف مساعدة مسؤول.</string>
+    <string name="admin_escalation_chats_description">اعرض محادثات الدعم المصعّدة.</string>
     <string name="admin_open_tickets">الطلبات المفتوحة</string>
     <string name="admin_closed_tickets">الطلبات المغلقة</string>
     <string name="admin_no_staff_accounts">لم يتم العثور على حسابات موظفين.</string>
@@ -455,4 +455,6 @@
     <string name="safety_waiting_for_staff">بانتظار موظف</string>
     <string name="safety_no_plans_in_category">لا توجد خطط سلامة في هذه الفئة.</string>
     <string name="safety_assigned_staff_value">معينة إلى %1$s</string>
+    <string name="location_search_user">البحث عن مستخدم</string>
+    <string name="location_search_no_users">لم يتم العثور على مستخدمين مطابقين.</string>
 </resources>

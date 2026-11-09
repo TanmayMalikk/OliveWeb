@@ -45,8 +45,10 @@ internal fun SafetyChecklistSection(
     contactsEditable: Boolean = false,
     onContactsChange: ((List<SafeContact>) -> Unit)? = null,
     editable: Boolean = true,
+    attachmentsEditable: Boolean = editable,
     onUploadDocument: ((String) -> Unit)? = null,
     documents: List<SafetyDocument> = emptyList(),
+    onOpenDocument: ((SafetyDocument) -> Unit)? = null,
 ) {
     val field = plan.fields[fieldKey] ?: return
     val items = remember(field.value) { readSafetyChecklist(field.value) }
@@ -90,7 +92,7 @@ internal fun SafetyChecklistSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = Muted
             )
-            Text(
+            if (attachmentsEditable) Text(
                 stringResource(R.string.safety_document_upload_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = Muted
@@ -110,6 +112,8 @@ internal fun SafetyChecklistSection(
                     onText = { value -> update(items.map { if (it.id == item.id) it.copy(text = value) else it }) },
                     onRemove = { update(items.filterNot { it.id == item.id }) },
                     attachments = safetyChecklistAttachments(fieldKey, item, documents),
+                    attachmentsEditable = attachmentsEditable,
+                    onOpenAttachment = onOpenDocument,
                     onRemoveAttachment = { document ->
                         update(items.map {
                             if (it.id == item.id) it.copy(
@@ -173,6 +177,8 @@ private fun ChecklistRow(
     item: SafetyChecklistItem, heading: String, sectionKey: String, index: Int, editable: Boolean,
     onChecked: (Boolean) -> Unit, onText: (String) -> Unit, onRemove: () -> Unit,
     attachments: List<SafetyDocument>, onRemoveAttachment: (SafetyDocument) -> Unit,
+    attachmentsEditable: Boolean,
+    onOpenAttachment: ((SafetyDocument) -> Unit)?,
     onUploadDocument: (() -> Unit)?,
 ) {
     val empty = stringResource(R.string.safety_empty_item)
@@ -206,7 +212,7 @@ private fun ChecklistRow(
                     }
                 })
             // Editable document rows can open the attachment picker.
-            if (sectionKey.substringAfter('_') == "documents" && editable && onUploadDocument != null) {
+            if (sectionKey.substringAfter('_') == "documents" && attachmentsEditable && onUploadDocument != null) {
                 val uploadDescription = stringResource(R.string.safety_upload_for, name)
                 OutlinedButton(
                     onClick = onUploadDocument,
@@ -221,14 +227,25 @@ private fun ChecklistRow(
             }
             attachments.forEach { document ->
                 Row(
-                    Modifier.fillMaxWidth().testTag("safety_attachment_${item.id}_${document.id}"),
+                    Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Outlined.Attachment, null, Modifier.size(18.dp), tint = OliveGreen)
-                    Spacer(Modifier.width(8.dp))
-                    Text(document.name, style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f), maxLines = 2)
-                    if (editable) IconButton(
+                    TextButton(
+                        onClick = { onOpenAttachment?.invoke(document) },
+                        enabled = onOpenAttachment != null,
+                        modifier = Modifier.weight(1f)
+                            .testTag("safety_attachment_${item.id}_${document.id}"),
+                    ) {
+                        Icon(Icons.Outlined.Attachment, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            document.name,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2,
+                        )
+                    }
+                    if (attachmentsEditable) IconButton(
                         onClick = { onRemoveAttachment(document) },
                         modifier = Modifier.testTag("safety_remove_attachment_${document.id}"),
                     ) {

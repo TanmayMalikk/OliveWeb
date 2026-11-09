@@ -1,6 +1,8 @@
 // Users and support staff: saves safety-plan edits and shares approved plans.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {db} = require("./firebaseAdminClient");
+const {listEveryUser, readProfile} = require("./accountStorage");
+const {text} = require("./accountPolicy");
 const {mergeFields} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference, canEdit, canRead} = require("./safetyPlanAccess");
 exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
@@ -51,6 +53,26 @@ exports.safetyPlanShareContacts = onCall({invoker: "public"}, async (request) =>
     transaction.set(reference, updated);
     return {plan: updated};
   });
+});
+
+// Gives a plan owner the public organization identities needed to wrap attachment keys on-device.
+exports.safetyPlanMediaRecipients = onCall({invoker: "public"}, async (request) => {
+  const caller = await safetyCaller(request);
+  if (caller.role !== "USER") throw new HttpsError("permission-denied", "Owner only.");
+  const plan = (await planReference(caller.uid).get()).data();
+  if (!plan) throw new HttpsError("failed-precondition", "Open the plan before sharing files.");
+  const recipients = new Map();
+  if (typeof plan.staffUid === "string" && plan.staffUid) recipients.set(plan.staffUid, "");
+  if (typeof plan.adminUid === "string" && plan.adminUid) recipients.set(plan.adminUid, "");
+  for (const user of await listEveryUser()) {
+    if (!user.disabled && user.customClaims?.role === "ADMIN") recipients.set(user.uid, "");
+  }
+  const rows = await Promise.all([...recipients.keys()].map(async (uid) => {
+    const profile = await readProfile(uid);
+    const username = text(profile?.username, 24).toLowerCase();
+    return /^[a-z0-9_]{4,24}$/.test(username) ? {uid, username} : null;
+  }));
+  return {recipients: rows.filter(Boolean)};
 });
 exports.safetyPlansSharedWithMe = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);

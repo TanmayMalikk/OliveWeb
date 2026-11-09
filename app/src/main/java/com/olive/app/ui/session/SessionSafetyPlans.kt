@@ -293,6 +293,15 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
+    // Loads the staff/admin encryption identities that can read attachments on the user's own plan.
+    suspend fun mediaRecipients(): Map<String, String> {
+        val actor = runtime.coverAccountId ?: return emptyMap()
+        if (!authorized() || runtime.state.accountRole != AccountRole.USER || activeOwner != actor || runtime.localMode) {
+            return emptyMap()
+        }
+        return repository.mediaRecipients()
+    }
+
     // Writes one plan change in order, then asks the durable worker to sync it when online.
     private fun persist(change: (SafetyPlan) -> SafetyPlan) {
         if (!authorized()) return

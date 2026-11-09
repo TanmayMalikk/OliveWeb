@@ -86,6 +86,9 @@
     <string name="ui_speaker_off">Desactivar altavoz</string>
     <string name="ui_incoming_call">Llamada entrante</string>
     <string name="ui_voice_call">Llamada de voz</string>
+    <string name="ui_minimize_call">Minimizar llamada</string>
+    <string name="ui_return_to_call">Volver a la llamada</string>
+    <string name="ui_call_running_in_background">La llamada continúa en segundo plano</string>
     <string name="ui_start_voice_call">Iniciar llamada de voz</string>
     <string name="ui_calling">Llamando…</string>
     <string name="ui_call_in_progress">Llamada en curso</string>

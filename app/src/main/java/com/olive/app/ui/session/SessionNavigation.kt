@@ -396,7 +396,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         saving++
         error = null
         runtime.scope.launch {
-            // Use the fallback when close is unavailable.
+            // Closing a ticket is safe to retry because the server treats an already-closed ticket as success.
             try {
                 withContext(Dispatchers.IO) { repository.close(conversationId) }
                 if (runtime.coverAccountId == actor) onClosed()
@@ -405,8 +405,18 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) { // Leave the chat active when the server cannot archive it for every participant.
-                if (runtime.coverAccountId == actor) error = R.string.support_close_error
+            } catch (_: Exception) { // Retry once in case the server closed the ticket but its first reply was lost.
+                try {
+                    withContext(Dispatchers.IO) { repository.close(conversationId) }
+                    if (runtime.coverAccountId == actor) onClosed()
+                    if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
+                        runtime.conversationActions.closeConversation()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) { // Show an error only after both close attempts fail.
+                    if (runtime.coverAccountId == actor) error = R.string.support_close_error
+                }
             } finally {
                 if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
             }

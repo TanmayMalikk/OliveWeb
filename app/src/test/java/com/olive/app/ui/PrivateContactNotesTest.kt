@@ -10,6 +10,20 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PrivateContactNotesTest {
+    // Admins only see escalations, while staff keep every support-ticket category.
+    @Test
+    fun organizationChatFiltersMatchTheAccountRole() {
+        assertEquals(
+            listOf(SUPPORT_TAG_NEEDS_ADMIN),
+            visibleSupportTags(AccountRole.ADMIN),
+        )
+        assertEquals(
+            listOf(SUPPORT_TAG_PLAN_CONSULT, SUPPORT_TAG_SUPPORT, SUPPORT_TAG_NEEDS_ADMIN),
+            visibleSupportTags(AccountRole.STAFF),
+        )
+        assertEquals(emptyList<String>(), visibleSupportTags(AccountRole.USER))
+    }
+
     // Support chats hide organization names from personal accounts and user names from organization accounts.
     @Test
     fun supportChatsShowTheUserToStaffAndHideOrganizationNamesFromPersonalAccounts() {

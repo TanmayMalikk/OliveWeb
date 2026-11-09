@@ -115,6 +115,14 @@ async function closeSupportConversation(conversationId) {
   }
 }
 
+/** Confirms that organization support belongs to the ticket before allowing a global close. */
+function canCloseSupportConversation(conversation, caller) {
+  return conversation?.type === "SUPPORT" &&
+    ["STAFF", "ADMIN"].includes(caller?.role) &&
+    Array.isArray(conversation.participantIds) &&
+    conversation.participantIds.includes(caller.uid);
+}
+
 // Lets a user add one approved safe contact to an active plan consultation.
 exports.safetySupportContact = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
@@ -355,13 +363,11 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
     if (!snapshot.exists || snapshot.get("type") !== "SUPPORT") {
       throw new HttpsError("permission-denied", "Support conversation not found.");
     }
-    const assignedToCaller = caller.role === "STAFF" ? snapshot.get("staffUid") === caller.uid :
-      snapshot.get("adminUid") === caller.uid;
-    if (!assignedToCaller) {
-      throw new HttpsError("permission-denied", "Only assigned organization support can close this chat.");
+    const conversation = snapshot.data();
+    if (!canCloseSupportConversation(conversation, caller)) {
+      throw new HttpsError("permission-denied", "Only organization support in this chat can close it.");
     }
     if (snapshot.get("closedAt")) return;
-    const conversation = snapshot.data();
     const sourceReference = conversation.supportOrigin === PLAN_CONSULT ?
       planReference(conversation.ownerUid) :
       conversation.requestSource === "GROUP_CHAT" && conversation.sourceConversationId ?
@@ -412,3 +418,4 @@ module.exports.PLAN_CONSULT = PLAN_CONSULT;
 module.exports.SUPPORT = SUPPORT;
 module.exports.eligibleStaffCandidates = eligibleStaffCandidates;
 module.exports.validateGroupRemoval = validateGroupRemoval;
+module.exports.canCloseSupportConversation = canCloseSupportConversation;

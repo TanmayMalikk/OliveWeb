@@ -338,6 +338,25 @@ internal class SafetyDocumentsController(
         checkNotNull(repository).share(document, ownerUid, recipients)
     }
 
+    // Gives assigned safety-plan staff and admins encrypted access without exposing upload controls.
+    fun grantPlanAccess(
+        documents: List<SafetyDocument>,
+        ownerUid: String,
+        recipients: Map<String, String>,
+    ) = run(refreshAfter = true) {
+        val source = checkNotNull(repository)
+        var granted = false
+        var lastFailure: Throwable? = null
+        documents.forEach { document ->
+            recipients.filterKeys { it !in document.allowedUsers }.forEach { (uid, username) ->
+                runCatching { source.grantAccess(document, ownerUid, uid, username) }
+                    .onSuccess { granted = true }
+                    .onFailure { lastFailure = it }
+            }
+        }
+        if (!granted) lastFailure?.let { throw it }
+    }
+
     // Changes a document failure into a clear message shown on the Safe App screen.
     fun reportError(message: String?) {
         state = state.copy(error = message)

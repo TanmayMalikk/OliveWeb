@@ -86,6 +86,9 @@
     <string name="ui_speaker_off">Speaker off</string>
     <string name="ui_incoming_call">Incoming call</string>
     <string name="ui_voice_call">Voice call</string>
+    <string name="ui_minimize_call">Minimize call</string>
+    <string name="ui_return_to_call">Return to call</string>
+    <string name="ui_call_running_in_background">Call continues in the background</string>
     <string name="ui_start_voice_call">Start voice call</string>
     <string name="ui_calling">Calling…</string>
     <string name="ui_call_in_progress">Call in progress</string>
