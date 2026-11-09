@@ -1,4 +1,4 @@
-// Public visitors: download the Android debug app or install the iOS web app.
+// Public visitors: download the signed Android release or install the iOS web app.
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -58,14 +58,24 @@ export default function DownloadPage() {
               <Download size={30} />
             </div>
             <span className="eyebrow">FOR ANDROID</span>
-            <h2>Download the Android debug app.</h2>
+            <h2>Download the signed Android app.</h2>
             <p>
-              Download the current debug APK on your Android device, then open
-              the file to install it. Android may ask you to allow installation
-              from your browser.
+              Scan the QR code or download the current release on your Android
+              device, then open the file to install it. Android may ask you to
+              allow installation from your browser.
             </p>
+            <a
+              className="download-qr"
+              href={ANDROID_DOWNLOAD_URL}
+              aria-label="Download the signed Android app"
+            >
+              <img
+                src="/android-download-qr.svg"
+                alt="QR code for the latest signed Android app"
+              />
+            </a>
             <a className="button" href={ANDROID_DOWNLOAD_URL}>
-              <Download size={17} /> Download debug APK
+              <Download size={17} /> Download signed APK
             </a>
             <p className="help-note">
               Android may show a warning because this APK is installed outside

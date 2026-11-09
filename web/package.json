@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "node server/developmentServer.mjs",
     "security:check": "node scripts/check-public-secrets.mjs",
-    "build": "npm run security:check && tsc -b && vite build",
+    "build": "npm run security:check && npm run qr:generate && tsc -b && vite build",
+    "qr:generate": "node scripts/generate-download-qr.mjs",
     "postinstall": "npm run build",
     "start": "node server/productionServer.mjs",
     "test": "vitest run",
@@ -25,6 +26,7 @@
     "leaflet": "^1.9.4",
     "linkedom": "^0.18.14",
     "lucide-react": "^1.62.0",
+    "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "undici": "^8.12.3"

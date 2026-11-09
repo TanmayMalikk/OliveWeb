@@ -40,6 +40,7 @@ import android.app.Application
 import com.google.firebase.auth.FirebaseAuth
 import com.olive.app.ui.covers.fitness.FitnessWatchSync
 import android.app.Activity
+import com.olive.app.data.update.AppUpdateScheduler
 
 
 // Prevents Android from showing private content in the recent-apps preview.
@@ -372,6 +373,9 @@ class OliveApplication : Application() {
     // Creates app-wide notification channels and background services at startup.
     override fun onCreate() {
         super.onCreate()
+        // Release updates are checked in the background. Android always keeps the final install
+        // confirmation under the device owner's control.
+        AppUpdateScheduler.schedule(this)
         if (BuildConfig.FIREBASE_CONFIGURED) {
             AppCheckProviderInstaller.install()
             FirebaseAuth.getInstance().addAuthStateListener { auth ->
