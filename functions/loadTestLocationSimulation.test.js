@@ -8,7 +8,7 @@ const {
   METRES_PER_SECOND_AT_60_KMPH,
 } = require("./scripts/load-test-location-simulation");
 
-test("a generated Alberta movement route is a closed loop around its seeded point", () => {
+test("a generated city movement route is a closed loop around its seeded point", () => {
   const route = routeLoop(53.5461, -113.4938);
   assert.equal(route.length, 17);
   assert.deepEqual(route[0], route.at(-1));

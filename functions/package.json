@@ -13,6 +13,7 @@
     "seed-load-test-locations": "node scripts/seed-load-test-locations.js",
     "simulate-load-test-locations": "node scripts/simulate-load-test-locations.js",
     "delete-load-test-accounts": "node scripts/delete-load-test-accounts.js",
+    "backfill-account-directory-summaries": "node scripts/backfill-account-directory-summaries.js",
     "purge-plaintext-ocr": "node scripts/purgePlaintextOcr.js"
   },
   "dependencies": {

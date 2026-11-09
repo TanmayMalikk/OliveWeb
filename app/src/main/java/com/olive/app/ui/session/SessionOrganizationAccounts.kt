@@ -111,16 +111,47 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
         }
     }
 
-    // Session organization accounts: Refreshes admin accounts. It runs the work through shared error handling and uses a readable message if it fails.
-    fun refreshAdminAccounts() {
+    // Refreshes only the small dashboard totals after an administrator signs in.
+    fun refreshAdminSummary() {
         with(runtime) {
             with(state) {
                 val repository = adminRepository ?: return
                 if (accountRole != AccountRole.ADMIN || busy) return
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
-                    val (counts, rows) = repository.accounts()
+                    val counts = repository.summary()
+                    if (epoch == token && screen == SessionScreen.Portal) adminCounts = counts
+                }
+            }
+        }
+    }
+
+    // Loads the complete directory only when the administrator opens Accounts.
+    fun refreshAdminAccounts() {
+        with(runtime) {
+            with(state) {
+                val repository = adminRepository ?: return
+                if (accountRole != AccountRole.ADMIN || busy) return
+                adminAccounts = emptyList()
+                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
+                    val rows = repository.accounts()
                     if (epoch == token && screen == SessionScreen.Portal) {
-                        adminCounts = counts
+                        adminAccounts = rows
+                    }
+                }
+            }
+        }
+    }
+
+    // Loads staff rows and their workload totals only when Staff management is open.
+    fun refreshAdminStaff() {
+        with(runtime) {
+            with(state) {
+                val repository = adminRepository ?: return
+                if (accountRole != AccountRole.ADMIN || busy) return
+                adminAccounts = emptyList()
+                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
+                    val rows = repository.staffAccounts()
+                    if (epoch == token && screen == SessionScreen.Portal) {
                         adminAccounts = rows
                     }
                 }
@@ -134,7 +165,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
             with(state) {
                 scope.launch {
                     while (busy) delay(50.milliseconds)
-                    if (screen == SessionScreen.Portal && accountRole == AccountRole.ADMIN) refreshAdminAccounts()
+                    if (screen == SessionScreen.Portal && accountRole == AccountRole.ADMIN) refreshAdminSummary()
                 }
             }
         }
@@ -163,7 +194,8 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_create_the_account_the_username_or_email_may_already_be)) { token ->
                     repository.create(value)
-                    val (counts, rows) = repository.accounts()
+                    val rows = repository.accounts()
+                    val counts = repository.summary()
                     // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         adminCounts = counts
@@ -187,7 +219,8 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 if (accountRole != AccountRole.ADMIN || busy || value.protected) return
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_delete_this_account)) { token ->
                     repository.delete(value.uid)
-                    val (counts, rows) = repository.accounts()
+                    val rows = repository.accounts()
+                    val counts = repository.summary()
                     // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         adminCounts = counts

@@ -1,4 +1,4 @@
-// Creates 53 fictional load-test accounts only after the operator confirms the Firebase project.
+// Creates 360 fictional load-test accounts only after the operator confirms the Firebase project.
 const {getAuth} = require("firebase-admin/auth");
 const {getFirestore} = require("firebase-admin/firestore");
 const {getStorage} = require("firebase-admin/storage");
@@ -60,6 +60,10 @@ async function provision(account) {
   await writeDocument("accountDirectory", account.username, {
     uid: user.uid, username: account.username, role: account.role,
     protected: false,
+    fullName: profile.fullName,
+    contactEmail: profile.email,
+    phone: profile.phone,
+    profileComplete: true,
     ...(account.role === "STAFF" ? {loginAlias: authEmail} : {}),
     createdAt: new Date(),
   });
@@ -75,9 +79,11 @@ async function provision(account) {
   console.log(`Ready: ${account.username} (${account.role}) — ${account.fullName}, ${account.region}`);
 }
 
-// Runs sequentially to avoid flooding Auth, Firestore, and Storage administration APIs.
+// Uses small groups so this larger fixture is practical without flooding Firebase administration APIs.
 (async () => {
-  for (const account of accounts) await provision(account);
+  for (let index = 0; index < accounts.length; index += 5) {
+    await Promise.all(accounts.slice(index, index + 5).map(provision));
+  }
   console.log(`Created or repaired ${accounts.length} fictional accounts in ${projectId}.`);
   console.log(`All accounts use OLIVE_LOAD_TEST_PASSWORD. User trigger phrase: ${TEST_TRIGGER}`);
 })().catch(error => {

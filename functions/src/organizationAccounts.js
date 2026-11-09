@@ -1,7 +1,7 @@
 // Admins: creates and updates staff and admin accounts.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {auth, db} = require("./firebaseAdminClient");
-const {text, normalizedExistingUsername, normalizedRole, signInEmail, organizationEmailKey, roleFromUser, isTemporaryEmail, defaultProfile} = require("./accountPolicy");
+const {text, normalizedExistingUsername, normalizedRole, signInEmail, organizationEmailKey, roleFromUser, isTemporaryEmail, defaultProfile, profileComplete} = require("./accountPolicy");
 const {readProfile, writeProfile, saveOrganizationLogin, lockedOrganizationAlias, deleteOrganizationLogin} = require("./accountStorage");
 
 exports.completeOrganizationProfile = onCall(async (request) => {
@@ -22,6 +22,13 @@ exports.completeOrganizationProfile = onCall(async (request) => {
   const alias = await lockedOrganizationAlias(user.uid, profile.username, role);
   await saveOrganizationLogin(user.uid, profile.username, role, email, alias);
   await writeProfile(user.uid, profile);
+  // Keeps the lightweight admin directory current without exposing the protected profile file.
+  await db.collection("accountDirectory").doc(profile.username).set({
+    fullName: profile.fullName,
+    contactEmail: profile.email,
+    phone: profile.phone,
+    profileComplete: profileComplete(role, profile),
+  }, {merge: true});
   if (current?.email?.toLowerCase() !== email.toLowerCase()) await deleteOrganizationLogin(current?.email);
   return {profile};
 });
