@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material3.Button
@@ -39,11 +41,22 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -59,6 +72,7 @@ import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.otherPartyName
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 private val CallBackground = Color(0xFF172219)
 private val CallControlBackground = Color(0xFF2B382D)
@@ -113,8 +127,9 @@ internal fun ActiveCallDialog(
     onMute: (Boolean) -> Unit,
     onSpeaker: (Boolean) -> Unit,
     onFinish: () -> Unit,
+    onMinimize: () -> Unit,
     onQuickExit: () -> Unit,
-) = FullScreenCallDialog(onBack = onFinish) {
+) = FullScreenCallDialog(onBack = onMinimize) {
     Row(
         Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -133,6 +148,18 @@ internal fun ActiveCallDialog(
             fontWeight = FontWeight.SemiBold,
         )
         Spacer(Modifier.weight(1f))
+        Button(
+            onClick = onMinimize,
+            colors = ButtonDefaults.buttonColors(containerColor = CallControlBackground),
+            modifier = Modifier.size(48.dp).testTag("minimize_voice_call"),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        ) {
+            Icon(
+                Icons.Outlined.KeyboardArrowDown,
+                stringResource(R.string.ui_minimize_call),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
         Button(
             onClick = onQuickExit,
             colors = ButtonDefaults.buttonColors(containerColor = CallRed),
@@ -242,6 +269,76 @@ internal fun ActiveCallDialog(
         }
     }
 }
+
+// Shows a small movable call button while the user works elsewhere inside Olive Branch.
+@Composable
+internal fun DraggableCallBubble(
+    state: VoipSessionState,
+    onOpen: () -> Unit,
+) {
+    val label = stringResource(R.string.ui_return_to_call)
+    var parentSize by remember { mutableStateOf(IntSize.Zero) }
+    var bubbleSize by remember { mutableStateOf(IntSize.Zero) }
+    var position by remember { mutableStateOf(Offset.Zero) }
+    var positionReady by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize().onSizeChanged { parentSize = it }) {
+        // Starts the bubble near the right edge, then keeps every drag inside the visible app window.
+        LaunchedEffect(parentSize, bubbleSize) {
+            if (!positionReady && parentSize.width > 0 && bubbleSize.width > 0) {
+                position = Offset(
+                    x = (parentSize.width - bubbleSize.width - 24).coerceAtLeast(0).toFloat(),
+                    y = ((parentSize.height - bubbleSize.height) / 2).coerceAtLeast(0).toFloat(),
+                )
+                positionReady = true
+            } else if (positionReady) {
+                position = position.coerceInside(parentSize, bubbleSize)
+            }
+        }
+
+        Surface(
+            onClick = onOpen,
+            modifier = Modifier
+                .offset { IntOffset(position.x.roundToInt(), position.y.roundToInt()) }
+                .size(72.dp)
+                .onSizeChanged { bubbleSize = it }
+                .pointerInput(parentSize, bubbleSize) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        position = (position + dragAmount).coerceInside(parentSize, bubbleSize)
+                    }
+                }
+                .semantics {
+                    contentDescription = label
+                    role = Role.Button
+                }
+                .testTag("minimized_voice_call"),
+            shape = CircleShape,
+            color = CallBackground,
+            shadowElevation = 10.dp,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Outlined.Call,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp),
+                )
+                if (state is VoipSessionState.Active) Box(
+                    Modifier.align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .size(12.dp)
+                        .background(CallGreen, CircleShape),
+                )
+            }
+        }
+    }
+}
+
+// Prevents a dragged call bubble from covering the system edges or leaving the app window.
+private fun Offset.coerceInside(parent: IntSize, child: IntSize): Offset = Offset(
+    x = x.coerceIn(0f, (parent.width - child.width).coerceAtLeast(0).toFloat()),
+    y = y.coerceIn(0f, (parent.height - child.height).coerceAtLeast(0).toFloat()),
+)
 
 @Composable
 private fun FullScreenCallDialog(

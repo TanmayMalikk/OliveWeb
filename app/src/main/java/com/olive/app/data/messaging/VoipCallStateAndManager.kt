@@ -41,6 +41,7 @@ import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.RemoteMessage
 import com.olive.app.notification.OliveNotificationManager
+import com.olive.app.data.AccountRole
 import java.util.UUID
 
 
@@ -120,6 +121,9 @@ class VoipApiException(
     message: String
 ) : IOException(message)
 
+internal fun isVoipApiConfigured(apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL): Boolean =
+    apiBaseUrl.isNotBlank()
+
 class VoipManager(
     private val apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL,
     private val httpClient: OkHttpClient = OkHttpClient(),
@@ -138,19 +142,22 @@ class VoipManager(
 
     //double check this code when Live, might need to be changed to connect to actual server.
     init {
-        val apiUri = runCatching { URI(baseUrl) }.getOrNull()
-        val isHttps = apiUri?.scheme.equals("https", ignoreCase = true)
-        val isEmulatorLoopback = apiUri?.scheme.equals("http", ignoreCase = true) &&
-            apiUri?.host.equals("10.0.2.2", ignoreCase = true)
-        require(
-            apiUri?.isAbsolute == true &&
-                apiUri.host != null &&
-                apiUri.userInfo == null &&
-                apiUri.query == null &&
-                apiUri.fragment == null &&
-                (isHttps || isEmulatorLoopback)
-        ) {
-            "Configure VOIP_API_BASE_URL with HTTPS (or the Android emulator loopback host)"
+        // A missing optional VoIP URL disables calls without stopping the rest of Olive from opening.
+        if (baseUrl.isNotBlank()) {
+            val apiUri = runCatching { URI(baseUrl) }.getOrNull()
+            val isHttps = apiUri?.scheme.equals("https", ignoreCase = true)
+            val isEmulatorLoopback = apiUri?.scheme.equals("http", ignoreCase = true) &&
+                apiUri?.host.equals("10.0.2.2", ignoreCase = true)
+            require(
+                apiUri?.isAbsolute == true &&
+                    apiUri.host != null &&
+                    apiUri.userInfo == null &&
+                    apiUri.query == null &&
+                    apiUri.fragment == null &&
+                    (isHttps || isEmulatorLoopback)
+            ) {
+                "Configure VOIP_API_BASE_URL with HTTPS (or the Android emulator loopback host)"
+            }
         }
     }
 
@@ -292,6 +299,9 @@ class VoipManager(
     // Runs one authenticated API request and converts its response into JSON.
     private suspend fun request(method: String, path: String, body: JSONObject? = null): JSONObject =
         withContext(Dispatchers.IO) {
+            check(isVoipApiConfigured(baseUrl)) {
+                "Voice calling is unavailable because this build has no VoIP service configured"
+            }
             val cachedToken = bearerTokenProvider()?.takeIf(String::isNotBlank)
 
             // A rejected cached Firebase token is refreshed once before showing an authentication error.
@@ -439,6 +449,7 @@ object VoipPushTokenRegistration {
     private const val PREFERENCES = "voip_push_token"
     private const val TOKEN_KEY = "token"
     private const val DEVICE_ID_KEY = "device_id"
+    private const val ENABLED_KEY = "enabled_for_account"
     private const val WORK_NAME = "voip-push-token-registration"
     private const val INPUT_TOKEN = "token"
     private const val INPUT_DEVICE_ID = "device_id"
@@ -447,14 +458,30 @@ object VoipPushTokenRegistration {
         FirebaseMessaging.getInstance().register().await()
         val token = FirebaseInstallations.getInstance().id.await()
         saveToken(context, token)
-        if (FirebaseAuth.getInstance().currentUser != null) {
+        if (FirebaseAuth.getInstance().currentUser != null && isEnabled(context)) {
             enqueueRegistration(context, token)
+        }
+    }
+
+    // Personal accounts can receive calls. Organization accounts remove any token left by a previous user.
+    suspend fun configureForRole(context: Context, role: AccountRole) {
+        val enabled = role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) &&
+            isVoipApiConfigured()
+        preferences(context).edit().putBoolean(ENABLED_KEY, enabled).apply()
+        if (enabled) {
+            registerCurrentToken(context)
+        } else {
+            WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+            if (FirebaseAuth.getInstance().currentUser != null) unregisterCurrentDevice(context)
         }
     }
 
     suspend fun registerCurrentToken(context: Context) {
         check(FirebaseAuth.getInstance().currentUser != null) {
             "Sign in before registering this device for call invitations"
+        }
+        check(isEnabled(context)) {
+            "Voice calls are not enabled for this account type"
         }
         registerForTokenUpdates(context)
     }
@@ -489,10 +516,13 @@ object VoipPushTokenRegistration {
     internal fun onTokenRefreshed(context: Context, token: String) {
         require(token.isNotBlank()) { "Firebase returned a blank push token" }
         saveToken(context, token)
-        if (FirebaseAuth.getInstance().currentUser != null) {
+        if (FirebaseAuth.getInstance().currentUser != null && isEnabled(context)) {
             enqueueRegistration(context, token)
         }
     }
+
+    internal fun isEnabled(context: Context): Boolean =
+        isVoipApiConfigured() && preferences(context).getBoolean(ENABLED_KEY, false)
 
     private fun saveToken(context: Context, token: String) {
         require(token.isNotBlank()) { "Firebase returned a blank push token" }
@@ -553,6 +583,7 @@ class VoipPushTokenRegistrationWorker(
             Log.i(VoipPushTokenRegistration.TAG, "Push token saved locally; registration waits for sign-in")
             return Result.success()
         }
+        if (!VoipPushTokenRegistration.isEnabled(applicationContext)) return Result.success()
 
         return try {
             VoipManager().registerPushToken(deviceId, token)
@@ -587,6 +618,7 @@ class VoipFirebaseMessagingService : com.google.firebase.messaging.FirebaseMessa
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
         if (data["type"] != "call_invitation") return
+        if (!VoipPushTokenRegistration.isEnabled(this)) return
 
         val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val recipientId = data["recipientId"] ?: return

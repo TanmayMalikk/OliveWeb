@@ -315,19 +315,19 @@
     <string name="organization_live_map">Mapa de ubicación en vivo</string>
     <string name="organization_live_map_description">Esta vista protegida está lista para mostrar a los usuarios asignados como puntos rojos parpadeantes.</string>
     <string name="organization_location_feed_not_enabled">La ubicación en vivo de la organización aún no está habilitada. Esta vista no recopila ubicaciones.</string>
-    <string name="organization_live_map_admin_description">Muestra la ubicación en vivo o la última ubicación conocida de cada cuenta de usuario.</string>
+    <string name="organization_live_map_admin_description">Ver todas las ubicaciones.</string>
     <string name="organization_location_feed_empty">Todavía no se ha informado ninguna ubicación de usuario.</string>
     <string name="support_conversations">Conversaciones de apoyo</string>
     <string name="assigned_users_count">Usuarios asignados: %1$d</string>
     <string name="safety_plan_shared_in_chat">Plan de seguridad compartido en el chat de apoyo.</string>
     <string name="share_safety_plan_support_chat">Compártelo con el personal asignado y el contacto seguro.</string>
     <string name="shared_safety_plan">Plan de seguridad compartido</string>
-    <string name="safety_admin_intro">Revisa y edita cualquier plan de seguridad. Los contactos seguros permanecen en modo de solo lectura.</string>
-    <string name="staff_conversations_assigned_help">Las conversaciones aparecen automáticamente cuando un usuario solicita ayuda. Las cuentas del personal no agregan amigos.</string>
+    <string name="safety_admin_intro">Ver planes de seguridad.</string>
+    <string name="staff_conversations_assigned_help">Ver chats de apoyo asignados.</string>
     <string name="no_assigned_support_conversations">Actualmente no tienes usuarios asignados para apoyo por chat.</string>
-    <string name="staff_safety_plans_description">Revisa y actualiza los planes de los usuarios que tienes asignados.</string>
-    <string name="admin_safety_plans_description">Revisa y edita los planes de seguridad de la organización.</string>
-    <string name="admin_accounts_description">Crea cuentas y revisa cuántos usuarios tiene asignado cada empleado.</string>
+    <string name="staff_safety_plans_description">Ver planes asignados.</string>
+    <string name="admin_safety_plans_description">Ver planes de usuarios.</string>
+    <string name="admin_accounts_description">Ver y administrar cuentas.</string>
 
     <string name="steps_today">Pasos de hoy</string>
     <string name="calories">Calorías</string>
@@ -431,7 +431,7 @@
     <string name="note_attachments_help">Añade un archivo nuevo o elige uno que ya guardaste en el almacenamiento OLIVE.</string>
     <string name="ui_group_voice_call">Llamada de voz grupal</string>
     <string name="ui_group_call_status">%1$d conectados • %2$s</string>
-    <string name="organization_live_map_staff_description">Muestra la ubicación en vivo o la última ubicación conocida de cada cuenta de usuario.</string>
+    <string name="organization_live_map_staff_description">Ver todas las ubicaciones.</string>
     <string name="safety_mark_consultation_complete">Marcar consulta como completada</string>
     <string name="safety_complete_consultation_title">¿Completar esta consulta?</string>
     <string name="safety_complete_consultation_description">Esto archiva el chat de consulta para todos y elimina este plan de seguridad de tu bandeja de personal.</string>
@@ -439,9 +439,9 @@
     <string name="safety_open_anonymous_plan">Abrir el plan de seguridad compartido</string>
     <string name="admin_no_accounts_in_category">No hay cuentas en esta categoría.</string>
     <string name="admin_staff_management">Gestión del personal</string>
-    <string name="admin_staff_management_description">Revisa los planes de seguridad y chats de apoyo asignados a cada miembro.</string>
+    <string name="admin_staff_management_description">Ver cargas de trabajo.</string>
     <string name="admin_escalation_chats">Chats escalados</string>
-    <string name="admin_escalation_chats_description">Únete a solicitudes donde el personal pidió ayuda de un administrador.</string>
+    <string name="admin_escalation_chats_description">Ver chats escalados.</string>
     <string name="admin_open_tickets">Solicitudes abiertas</string>
     <string name="admin_closed_tickets">Solicitudes cerradas</string>
     <string name="admin_no_staff_accounts">No se encontraron cuentas de personal.</string>
@@ -455,4 +455,6 @@
     <string name="safety_waiting_for_staff">Esperando personal</string>
     <string name="safety_no_plans_in_category">No hay planes de seguridad en esta categoría.</string>
     <string name="safety_assigned_staff_value">Asignado a %1$s</string>
+    <string name="location_search_user">Buscar un usuario</string>
+    <string name="location_search_no_users">No se encontraron usuarios que coincidan.</string>
 </resources>

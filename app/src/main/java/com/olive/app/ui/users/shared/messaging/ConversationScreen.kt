@@ -113,6 +113,10 @@ internal fun ChatPane(
     val active = session.messages.activeConversation ?: return
     val callState by session.calls.state.collectAsState()
     val callAllowed = canCallFromConversation(session.accountRole, active, currentUid)
+    val canAttachMedia = session.accountRole !in setOf(
+        com.olive.app.data.AccountRole.STAFF,
+        com.olive.app.data.AccountRole.ADMIN,
+    )
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
     var showChatInfo by rememberSaveable(active.id) { mutableStateOf(false) }
@@ -121,7 +125,7 @@ internal fun ChatPane(
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible = imeBottom > 0
     val context = LocalContext.current
-    val callHistory = session.calls.historyFor(active.id)
+    val callHistory = session.calls.historyFor(active.id, session.accountRole)
     val timeline = remember(session.messages.chatMessages, callHistory) {
         (session.messages.chatMessages.map(ConversationTimelineItem::Message) +
             callHistory.map(ConversationTimelineItem::Call))
@@ -436,14 +440,17 @@ internal fun ChatPane(
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    IconButton(
-                        onClick = { showAttachmentPicker = true }, enabled = !session.messages.busy,
-                        modifier = Modifier.testTag("attach_private_entry")
-                    ) {
-                        Icon(
-                            Icons.Outlined.AttachFile,
-                            stringResource(R.string.attach_secure_entry)
-                        )
+                    if (canAttachMedia) {
+                        IconButton(
+                            onClick = { showAttachmentPicker = true },
+                            enabled = !session.messages.busy,
+                            modifier = Modifier.testTag("attach_private_entry")
+                        ) {
+                            Icon(
+                                Icons.Outlined.AttachFile,
+                                stringResource(R.string.attach_secure_entry)
+                            )
+                        }
                     }
                     OutlinedTextField(
                         draft,
@@ -529,7 +536,9 @@ internal fun ChatPane(
                 }
             }
         }
-        if (showAttachmentPicker) AttachmentPicker(session) { showAttachmentPicker = false }
+        if (showAttachmentPicker && canAttachMedia) {
+            AttachmentPicker(session) { showAttachmentPicker = false }
+        }
         if (showChatInfo) ChatInfoDialog(
             session = session,
             currentUid = currentUid,

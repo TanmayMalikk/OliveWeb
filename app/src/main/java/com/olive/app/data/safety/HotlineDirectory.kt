@@ -505,6 +505,15 @@ internal class SafetyPlanRepository(
             mapOf("uid" to it.uid, "friendshipId" to it.friendshipId, "name" to it.username)
         })).getJSONObject("plan"))
 
+    // Returns only the organization accounts that may open media attached to this user's plan.
+    suspend fun mediaRecipients(): Map<String, String> {
+        val rows = call("safetyPlanMediaRecipients").getJSONArray("recipients")
+        return (0 until rows.length()).associate { index ->
+            val row = rows.getJSONObject(index)
+            row.getString("uid") to row.getString("username")
+        }
+    }
+
     // Saves which trusted contact should receive safety-plan support access.
     suspend fun setSupportContact(uid: String) {
         call("safetySupportContact", mapOf("safeContactUid" to uid))

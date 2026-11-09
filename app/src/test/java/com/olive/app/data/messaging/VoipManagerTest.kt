@@ -335,6 +335,18 @@ class VoipManagerTest {
         assertEquals(emptyList<Request>(), requests)
     }
 
+    // A build without the optional VoIP URL opens normally and rejects only call requests.
+    @Test
+    fun missingVoipConfigurationDoesNotCrashDuringManagerCreation() {
+        val manager = VoipManager(apiBaseUrl = "")
+
+        val error = assertThrows(IllegalStateException::class.java) {
+            runBlocking { manager.listCalls() }
+        }
+
+        assertTrue(error.message.orEmpty().contains("no VoIP service configured"))
+    }
+
     // Checks the polling clears ringing state when invitations disappear step with the test's sample data.
     @Test
     fun pollingClearsRingingStateWhenInvitationsDisappear() = runBlocking {

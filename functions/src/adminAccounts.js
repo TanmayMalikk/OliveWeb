@@ -6,11 +6,16 @@ const {readProfile, writeProfile, saveOrganizationLogin, requireAdmin, listEvery
 
 exports.adminListAccounts = onCall(async (request) => {
   await requireAdmin(request);
-  const [users, supportSnapshot] = await Promise.all([
-    listEveryUser(),
+  const users = await listEveryUser();
+  const profiles = new Map((await Promise.all(users.map(async user => [user.uid, await readProfile(user.uid)]))));
+  const roles = new Map(users.map(user => [user.uid, roleFromUser(user, profiles.get(user.uid))]));
+  const staffUids = new Set([...roles].filter(([, role]) => role === "STAFF").map(([uid]) => uid));
+  const [supportSnapshot, safetyPlanSnapshot] = await Promise.all([
     db.collection("conversations").where("type", "==", "SUPPORT").get(),
+    db.collection("safetyPlans").where("consultationRequested", "==", true).get(),
   ]);
   const workloadByStaff = new Map();
+  const countedPlanConversations = new Set();
   let openTickets = 0;
   let closedTickets = 0;
   supportSnapshot.docs.forEach((document) => {
@@ -18,7 +23,8 @@ exports.adminListAccounts = onCall(async (request) => {
     const closed = Boolean(conversation.closedAt);
     if (closed) closedTickets += 1;
     else openTickets += 1;
-    const staffUid = text(conversation.staffUid, 128);
+    const participantIds = Array.isArray(conversation.participantIds) ? conversation.participantIds : [];
+    const staffUid = text(conversation.staffUid, 128) || participantIds.find(uid => staffUids.has(uid)) || "";
     if (!staffUid) return;
     const workload = workloadByStaff.get(staffUid) || {
       safetyPlans: 0, completedSafetyPlans: 0, supportChats: 0, closedSupportChats: 0,
@@ -27,15 +33,28 @@ exports.adminListAccounts = onCall(async (request) => {
     if (planConsult) {
       workload.safetyPlans += 1;
       if (closed) workload.completedSafetyPlans += 1;
+      countedPlanConversations.add(document.id);
     } else {
       workload.supportChats += 1;
       if (closed) workload.closedSupportChats += 1;
     }
     workloadByStaff.set(staffUid, workload);
   });
+  // Includes a newly assigned consultation even if its conversation write has not finished yet.
+  safetyPlanSnapshot.docs.forEach(document => {
+    const plan = document.data();
+    const staffUid = text(plan.staffUid, 128);
+    const conversationId = text(plan.consultationConversationId, 512);
+    if (!staffUid || (conversationId && countedPlanConversations.has(conversationId))) return;
+    const workload = workloadByStaff.get(staffUid) || {
+      safetyPlans: 0, completedSafetyPlans: 0, supportChats: 0, closedSupportChats: 0,
+    };
+    workload.safetyPlans += 1;
+    workloadByStaff.set(staffUid, workload);
+  });
   const accounts = await Promise.all(users.map(async (user) => {
-    const profile = await readProfile(user.uid);
-    const role = roleFromUser(user, profile);
+    const profile = profiles.get(user.uid);
+    const role = roles.get(user.uid);
     const username = text(profile?.username || user.displayName || user.email?.split("@")[0], 24).toLowerCase();
     const staffSettings = role === "STAFF" ? (await db.collection("safetyStaff").doc(user.uid).get()).data() : null;
     const workload = workloadByStaff.get(user.uid) || {};

@@ -294,7 +294,7 @@ private fun ActiveWorkoutContent(
     }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         OutlinedButton(
-            onClick = if (workout.paused) onResume else onPause,
+                onClick = if (workout.paused) onResume else onPause,
             enabled = enabled,
             modifier = Modifier.weight(1f).height(48.dp),
         ) {

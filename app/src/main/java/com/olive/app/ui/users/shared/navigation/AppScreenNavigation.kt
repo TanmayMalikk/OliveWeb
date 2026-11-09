@@ -49,6 +49,7 @@ import com.olive.app.ui.users.user.dashboard.SafeSupportControls
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.ui.users.shared.messaging.ActiveCallDialog
+import com.olive.app.ui.users.shared.messaging.DraggableCallBubble
 import com.olive.app.ui.users.shared.messaging.IncomingCallDialog
 import androidx.core.content.ContextCompat
 import java.security.MessageDigest
@@ -93,6 +94,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
     val uiText = rememberResourceText()
     val callState by session.calls.state.collectAsState()
     val callAccountId = session.coverAccountId.orEmpty()
+    var callMinimized by remember(callAccountId) { mutableStateOf(false) }
     val incomingCall = session.calls.invitations.firstOrNull()?.let {
         resolveIncomingCaller(it, session.messages.conversations, callAccountId)
     }
@@ -126,6 +128,9 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
     LaunchedEffect(callOverlayVisible) {
         if (callOverlayVisible) session.pauseIdleTimerForCall()
         else session.resumeIdleTimerAfterCall()
+    }
+    LaunchedEffect(callState) {
+        if (!shouldShowActiveCall(callState)) callMinimized = false
     }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
@@ -422,16 +427,21 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                     },
                 )
             }
-            if (shouldShowActiveCall(callState)) ActiveCallDialog(
+            if (shouldShowActiveCall(callState) && !callMinimized) ActiveCallDialog(
                 state = callState,
                 currentUid = callAccountId,
                 onMute = session.calls::setMuted,
                 onSpeaker = session.calls::setSpeakerEnabled,
                 onFinish = { session.calls.finish(callAccountId) },
+                onMinimize = { callMinimized = true },
                 onQuickExit = {
                     session.calls.finish(callAccountId)
                     session.navigation.quickExit()
                 },
+            )
+            if (shouldShowActiveCall(callState) && callMinimized) DraggableCallBubble(
+                state = callState,
+                onOpen = { callMinimized = false },
             )
         }
     }

@@ -12,13 +12,17 @@ import com.olive.app.data.messaging.VoipManager
 import com.olive.app.data.messaging.VoipSessionController
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallForegroundService
 import com.olive.app.data.messaging.VoipCallStatus
 import com.olive.app.data.messaging.VoipParticipantStatus
+import com.olive.app.data.messaging.VoipPushTokenRegistration
 import com.olive.app.data.messaging.canBeJoinedBy
+import com.olive.app.data.messaging.isVoipApiConfigured
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -91,12 +95,16 @@ internal fun canCallFromConversation(
     role: AccountRole,
     conversation: ChatConversation,
     currentUid: String,
-): Boolean = role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) &&
+    featureAvailable: Boolean = isVoipApiConfigured(),
+): Boolean = featureAvailable && role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) &&
     conversation.type in setOf("DIRECT", "GROUP") &&
     conversation.closedAt == 0L &&
     currentUid.isNotBlank() &&
     currentUid in conversation.participantIds &&
     conversation.participantIds.any { it != currentUid }
+
+internal fun canUseVoip(role: AccountRole): Boolean =
+    role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
 
 internal fun shouldLeaveGroupCall(
     call: VoipCall,
@@ -117,6 +125,7 @@ internal class SessionCalls(
     private val controller = VoipSessionController.create(application, manager)
     private var invitationJob: Job? = null
     private var observedUid: String? = null
+    private var configuredRole: AccountRole? = null
     private val suppressedInvitationIds = invitationPreferences
         .getStringSet(DISMISSED_INVITATIONS_KEY, emptySet())
         .orEmpty()
@@ -131,9 +140,28 @@ internal class SessionCalls(
     var message by mutableStateOf<String?>(null)
         private set
 
+    init {
+        // Keeps the microphone session running while the phone is on Home or another app is open.
+        scope.launch {
+            state.collectLatest { callState ->
+                when (callState) {
+                    is VoipSessionState.Connecting,
+                    is VoipSessionState.Active -> VoipCallForegroundService.start(application)
+                    else -> VoipCallForegroundService.stop(application)
+                }
+            }
+        }
+    }
+
     // Starts one invitation listener while this signed-in person has the messaging screen open.
     fun observeInvitations(uid: String, role: AccountRole) {
-        if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) || uid.isBlank()) {
+        if (configuredRole != role && uid.isNotBlank()) {
+            configuredRole = role
+            scope.launch {
+                runCatching { VoipPushTokenRegistration.configureForRole(application, role) }
+            }
+        }
+        if (!canUseVoip(role) || !isVoipApiConfigured() || uid.isBlank()) {
             stopObserving()
             return
         }
@@ -222,7 +250,7 @@ internal class SessionCalls(
 
     // Accepts the selected invitation and joins its LiveKit audio room.
     fun accept(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
-        if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) || currentUid.isBlank()) return
+        if (!canUseVoip(role) || currentUid.isBlank()) return
         suppressInvitation(invitation.callId)
         scope.launch {
             runCallAction {
@@ -239,7 +267,7 @@ internal class SessionCalls(
 
     // Declines the invitation without opening the microphone or joining its room.
     fun decline(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
-        if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) || currentUid.isBlank()) return
+        if (!canUseVoip(role) || currentUid.isBlank()) return
         suppressInvitation(invitation.callId)
         scope.launch {
             runCallAction {
@@ -250,7 +278,7 @@ internal class SessionCalls(
 
     // Joins an active call from the event shown in chat, using the member's current call status.
     fun joinActive(call: VoipCall, currentUid: String, role: AccountRole) {
-        if (role !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) ||
+        if (!canUseVoip(role) ||
             !call.canBeJoinedBy(currentUid)
         ) return
         scope.launch {
@@ -309,6 +337,7 @@ internal class SessionCalls(
     // Stops network polling when the session is cleared or the account no longer supports calls.
     fun close() {
         stopObserving()
+        VoipCallForegroundService.stop(application)
         val current = state.value
         if (current is VoipSessionState.Connecting || current is VoipSessionState.Active ||
             current is VoipSessionState.Error) finish("")
@@ -322,8 +351,9 @@ internal class SessionCalls(
         invitationFirstSeenAt.clear()
     }
 
-    fun historyFor(conversationId: String): List<VoipCall> =
-        callHistory.filter { it.conversationId == conversationId }
+    fun historyFor(conversationId: String, role: AccountRole): List<VoipCall> =
+        if (canUseVoip(role)) callHistory.filter { it.conversationId == conversationId }
+        else emptyList()
 
     private fun cancelNotification(callId: String) {
         androidx.core.app.NotificationManagerCompat.from(application).cancel(callId.hashCode())
@@ -404,7 +434,7 @@ internal fun Heading(
         modifier = Modifier.focusRequester(focusRequester).focusable().semantics { heading() },
         style = MaterialTheme.typography.headlineMedium
     )
-    Text(subtitle, color = Muted)
+    if (subtitle.isNotBlank()) Text(subtitle, color = Muted)
 }
 
 // Warns testers when data is only being saved on the current device.

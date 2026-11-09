@@ -42,6 +42,17 @@ internal fun isConversationArchived(
 ): Boolean = conversation.id in archivedIds ||
     (conversation.closedAt > 0L && conversation.id !in restoredClosedIds)
 
+// Staff sort every assigned ticket type, while admins work only with escalated tickets.
+internal fun visibleSupportTags(role: AccountRole): List<String> = when (role) {
+    AccountRole.ADMIN -> listOf(SUPPORT_TAG_NEEDS_ADMIN)
+    AccountRole.STAFF -> listOf(
+        SUPPORT_TAG_PLAN_CONSULT,
+        SUPPORT_TAG_SUPPORT,
+        SUPPORT_TAG_NEEDS_ADMIN,
+    )
+    else -> emptyList()
+}
+
 // Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices.
 // UI sizing: messaging switches to two panes at 720dp; the sidebar is 340dp wide and leaves 96dp for bottom controls.
 @Composable
@@ -107,8 +118,20 @@ private fun MessagingSidebar(
 ) {
     val uiText = rememberResourceText()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+    val allowedSupportTags = visibleSupportTags(session.accountRole)
+    val defaultSupportFilter = when {
+        initialSupportFilter in allowedSupportTags -> initialSupportFilter!!
+        allowedSupportTags.isNotEmpty() -> allowedSupportTags.first()
+        else -> SUPPORT_TAG_SUPPORT
+    }
     var supportFilter by rememberSaveable(initialSupportFilter) {
-        mutableStateOf(initialSupportFilter ?: SUPPORT_TAG_SUPPORT)
+        mutableStateOf(defaultSupportFilter)
+    }
+    // A role change cannot leave an admin viewing a staff-only ticket category.
+    LaunchedEffect(session.accountRole, allowedSupportTags) {
+        if (allowedSupportTags.isNotEmpty() && supportFilter !in allowedSupportTags) {
+            supportFilter = allowedSupportTags.first()
+        }
     }
     val roleConversations = if (organizationAccount) session.messages.conversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
@@ -198,30 +221,23 @@ private fun MessagingSidebar(
                 }
             }
         }
-        // Hides friend controls for staff and admin accounts because support chats are assigned.
-        if (organizationAccount) item {
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    stringResource(R.string.staff_conversations_assigned_help),
-                    modifier = Modifier.padding(14.dp),
-                    color = OliveGreen,
-                )
-            }
-        }
         if (organizationAccount) item {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                listOf(
-                    SUPPORT_TAG_PLAN_CONSULT to stringResource(R.string.support_filter_plan_consults),
-                    SUPPORT_TAG_SUPPORT to stringResource(R.string.support_filter_support),
-                    SUPPORT_TAG_NEEDS_ADMIN to stringResource(R.string.support_filter_needs_admin),
-                ).forEach { (tag, label) ->
+                allowedSupportTags.forEach { tag ->
+                    val label = stringResource(
+                        when (tag) {
+                            SUPPORT_TAG_PLAN_CONSULT -> R.string.support_filter_plan_consults
+                            SUPPORT_TAG_NEEDS_ADMIN -> if (session.accountRole == AccountRole.ADMIN) {
+                                R.string.support_ticket_escalation
+                            } else {
+                                R.string.support_filter_needs_admin
+                            }
+                            else -> R.string.support_filter_support
+                        }
+                    )
                     val unreadCount = session.messages.unreadCountForSupportTag(tag)
                     FilterChip(
                         selected = supportFilter == tag,
@@ -283,11 +299,9 @@ private fun MessagingSidebar(
             Text(stringResource(R.string.support_conversations), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() })
         }
-        // Explain how support starts when this account has no support tickets yet.
-        if (supportConversations.isEmpty()) item {
+        if (supportConversations.isEmpty() && showingArchived) item {
             Text(stringResource(when {
                 showingArchived -> R.string.no_archived_chats
-                organizationAccount -> R.string.no_assigned_support_conversations
                 else -> R.string.support_no_conversations
             }), color = Muted)
         }

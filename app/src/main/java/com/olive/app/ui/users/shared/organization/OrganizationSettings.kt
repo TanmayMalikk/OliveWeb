@@ -261,7 +261,6 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.semantics { heading() },
         )
-        Text(stringResource(R.string.organization_live_map_description), color = Muted)
         Box(
             Modifier.fillMaxWidth().height(420.dp),
             contentAlignment = Alignment.Center,
@@ -270,6 +269,7 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
                 points = state.points,
                 ownPointUid = null,
                 detailsOnlyForSelectedPoint = true,
+                userSearchEnabled = true,
                 modifier = Modifier.fillMaxSize(),
             )
             if (state.loading) CircularProgressIndicator()
@@ -305,7 +305,7 @@ internal fun OrganizationDashboardCard(
             }) {
                 Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(description, style = MaterialTheme.typography.bodySmall, color = Muted)
             }

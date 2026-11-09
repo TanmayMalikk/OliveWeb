@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING" />
     <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
@@ -39,6 +40,11 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+        <service
+            android:name=".data.messaging.VoipCallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone"
+            android:stopWithTask="false" />
         <service android:name=".location.LiveLocationService" android:exported="false"
             android:foregroundServiceType="location" android:stopWithTask="false" />
         <service android:name=".location.AdminLocationService" android:exported="false"

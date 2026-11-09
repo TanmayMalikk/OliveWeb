@@ -315,19 +315,19 @@
     <string name="organization_live_map">实时位置地图</string>
     <string name="organization_live_map_description">此受保护视图已准备好用闪烁红点显示已分配的用户。</string>
     <string name="organization_location_feed_not_enabled">组织实时位置共享尚未启用。此视图不会收集用户位置。</string>
-    <string name="organization_live_map_admin_description">显示每个用户账户报告的最新实时位置或最后已知位置。</string>
+    <string name="organization_live_map_admin_description">查看所有用户位置。</string>
     <string name="organization_location_feed_empty">尚未收到任何用户位置。</string>
     <string name="support_conversations">支持对话</string>
     <string name="assigned_users_count">已分配用户：%1$d</string>
     <string name="safety_plan_shared_in_chat">安全计划已分享到支持聊天。</string>
     <string name="share_safety_plan_support_chat">与分配的工作人员和安全联系人共享。</string>
     <string name="shared_safety_plan">已共享的安全计划</string>
-    <string name="safety_admin_intro">查看并编辑任何用户的安全计划。安全联系人仍然只能查看。</string>
-    <string name="staff_conversations_assigned_help">用户请求工作人员帮助后，支持对话会自动出现。工作人员账号不能添加好友。</string>
+    <string name="safety_admin_intro">查看用户安全计划。</string>
+    <string name="staff_conversations_assigned_help">查看已分配的支持聊天。</string>
     <string name="no_assigned_support_conversations">目前没有分配给你的聊天支持用户。</string>
-    <string name="staff_safety_plans_description">查看并更新分配给你的用户安全计划。</string>
-    <string name="admin_safety_plans_description">查看并编辑整个组织的安全计划。</string>
-    <string name="admin_accounts_description">创建账号并查看工作人员的用户分配数量。</string>
+    <string name="staff_safety_plans_description">查看已分配的安全计划。</string>
+    <string name="admin_safety_plans_description">查看用户安全计划。</string>
+    <string name="admin_accounts_description">查看和管理账号。</string>
 
     <string name="steps_today">今日步数</string>
     <string name="calories">卡路里</string>
@@ -431,7 +431,7 @@
     <string name="note_attachments_help">添加新文件，或选择已保存在 OLIVE 存储中的文件。</string>
     <string name="ui_group_voice_call">群组语音通话</string>
     <string name="ui_group_call_status">%1$d 人已连接 • %2$s</string>
-    <string name="organization_live_map_staff_description">显示每个用户账户的最新实时位置或最后已知位置。</string>
+    <string name="organization_live_map_staff_description">查看所有用户位置。</string>
     <string name="safety_mark_consultation_complete">将咨询标记为已完成</string>
     <string name="safety_complete_consultation_title">完成此咨询？</string>
     <string name="safety_complete_consultation_description">这会为所有人归档咨询聊天，并从工作人员收件箱中移除此安全计划。</string>
@@ -439,9 +439,9 @@
     <string name="safety_open_anonymous_plan">打开共享安全计划</string>
     <string name="admin_no_accounts_in_category">此类别中没有账户。</string>
     <string name="admin_staff_management">员工管理</string>
-    <string name="admin_staff_management_description">查看每位员工分配的安全计划和支持聊天。</string>
+    <string name="admin_staff_management_description">查看员工工作量。</string>
     <string name="admin_escalation_chats">升级聊天</string>
-    <string name="admin_escalation_chats_description">加入员工请求管理员协助的工单。</string>
+    <string name="admin_escalation_chats_description">查看升级的支持聊天。</string>
     <string name="admin_open_tickets">开放工单</string>
     <string name="admin_closed_tickets">已关闭工单</string>
     <string name="admin_no_staff_accounts">未找到员工账户。</string>
@@ -455,4 +455,6 @@
     <string name="safety_waiting_for_staff">等待员工</string>
     <string name="safety_no_plans_in_category">此类别中没有安全计划。</string>
     <string name="safety_assigned_staff_value">已分配给 %1$s</string>
+    <string name="location_search_user">查找用户</string>
+    <string name="location_search_no_users">未找到匹配的用户。</string>
 </resources>
