@@ -124,6 +124,7 @@ internal data class SafetyChecklistItem(
     val id: String,
     val text: String,
     val checked: Boolean = false,
+    val attachmentIds: List<String> = emptyList(),
     val excludedAttachmentIds: List<String> = emptyList(),
 )
 
@@ -142,7 +143,9 @@ internal fun safetyChecklistAttachments(
     documents: List<SafetyDocument>,
 ): List<SafetyDocument> {
     val tag = safetyChecklistAttachmentTag(fieldKey, item.id)
-    return documents.filter { tag in it.tags && it.id !in item.excludedAttachmentIds }
+    return documents.filter {
+        (tag in it.tags || it.id in item.attachmentIds) && it.id !in item.excludedAttachmentIds
+    }
 }
 
 // Creates one trusted-contact checklist item for a new safety plan.
@@ -180,6 +183,12 @@ internal fun readSafetyChecklist(
                 row.getString("id"),
                 row.getString("text"),
                 row.getBoolean("checked"),
+                row.optJSONArray("attachmentIds")?.let { values ->
+                    require(values.length() <= 80)
+                    (0 until values.length()).map(values::getString)
+                        .onEach { require(it.length <= 128) }
+                        .distinct()
+                }.orEmpty(),
                 row.optJSONArray("excludedAttachmentIds")?.let { values ->
                     require(values.length() <= 80)
                     (0 until values.length()).map(values::getString)
@@ -206,6 +215,10 @@ internal fun writeSafetyChecklist(items: List<SafetyChecklistItem>): String =
                 rows.put(
                     JSONObject().put("id", item.id).put("text", item.text)
                         .put("checked", item.checked)
+                        .put(
+                            "attachmentIds",
+                            JSONArray(item.attachmentIds.distinct().takeLast(80)),
+                        )
                         .put(
                             "excludedAttachmentIds",
                             JSONArray(item.excludedAttachmentIds.distinct().takeLast(80)),

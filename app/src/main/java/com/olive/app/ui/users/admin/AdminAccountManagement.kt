@@ -35,6 +35,9 @@ import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.material.icons.outlined.ManageAccounts
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
 import com.olive.app.data.AdminAccountSummary
@@ -58,6 +61,11 @@ internal fun AdminAccounts(
 ) {
     val uiText = rememberResourceText()
     var noteTarget by remember { mutableStateOf<DirectoryUser?>(null) }
+    val expandedRoles = remember {
+        mutableStateMapOf<AccountRole, Boolean>().apply {
+            AccountRole.entries.forEach { role -> put(role, true) }
+        }
+    }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 18.dp),
@@ -91,20 +99,75 @@ internal fun AdminAccounts(
             uiText(R.string.ui_no_accounts_found),
             color = Muted
         )
-        session.adminAccounts.forEach { account ->
-            AccountRow(
-                account,
-                !session.busy,
-                onNote = if (account.role == AccountRole.USER) {
-                    { noteTarget = DirectoryUser(account.uid, account.username) }
-                } else null,
-                onDelete = { onDelete(account) },
+        AccountRole.entries.forEach { role ->
+            val accounts = session.adminAccounts.filter { it.role == role }
+            AccountRoleSection(
+                role = role,
+                accounts = accounts,
+                expanded = expandedRoles[role] != false,
+                onExpandedChange = { expandedRoles[role] = it },
+                enabled = !session.busy,
+                onNote = { account -> noteTarget = DirectoryUser(account.uid, account.username) },
+                onDelete = onDelete,
             )
         }
         Status(session)
     }
     noteTarget?.let { target ->
         PrivateContactNoteDialog(session, listOf(target), onDismiss = { noteTarget = null })
+    }
+}
+
+// Admin account management groups accounts by role so a large organization list stays easy to scan.
+@Composable
+private fun AccountRoleSection(
+    role: AccountRole,
+    accounts: List<AdminAccountSummary>,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    enabled: Boolean,
+    onNote: (AdminAccountSummary) -> Unit,
+    onDelete: (AdminAccountSummary) -> Unit,
+) {
+    val uiText = rememberResourceText()
+    OutlinedCard(Modifier.fillMaxWidth()) {
+        Column {
+            TextButton(
+                onClick = { onExpandedChange(!expanded) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    "${role.localizedTitle(uiText)} (${accounts.size})",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Icon(
+                    if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    contentDescription = null,
+                )
+            }
+            if (expanded) {
+                HorizontalDivider()
+                if (accounts.isEmpty()) {
+                    Text(
+                        stringResource(R.string.admin_no_accounts_in_category),
+                        modifier = Modifier.padding(16.dp),
+                        color = Muted,
+                    )
+                }
+                accounts.forEach { account ->
+                    Box(Modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
+                        AccountRow(
+                            account = account,
+                            enabled = enabled,
+                            onNote = if (role == AccountRole.USER) ({ onNote(account) }) else null,
+                            onDelete = { onDelete(account) },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
     }
 }
 // Shows user, trusted-contact, staff, and admin totals as accessible cards.
@@ -339,7 +402,7 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
 
 // Admins: shows admin tools and account totals.
 
-private enum class AdminPage { Dashboard, Accounts, Settings, Map, SafetyPlans, Messages }
+private enum class AdminPage { Dashboard, Accounts, StaffManagement, Settings, Map, SafetyPlans, Messages }
 
 // admin dashboard shows this admin portal view so the user can view its details and use its actions.
 @Composable
@@ -355,6 +418,7 @@ internal fun AdminPortal(session: SessionViewModel) {
         AdminPage.Dashboard -> AdminDashboard(
             session,
             onAccounts = { page = AdminPage.Accounts },
+            onStaffManagement = { page = AdminPage.StaffManagement },
             onSettings = { page = AdminPage.Settings },
             onMap = { page = AdminPage.Map },
             onSafetyPlans = { page = AdminPage.SafetyPlans },
@@ -366,13 +430,21 @@ internal fun AdminPortal(session: SessionViewModel) {
             onCreate = { createOpen = true },
             onDelete = { deleteTarget = it },
         )
+        AdminPage.StaffManagement -> StaffManagement(
+            session = session,
+            onBack = { page = AdminPage.Dashboard },
+        )
         AdminPage.Settings -> OrganizationSettings(
             session,
             onBack = { page = AdminPage.Dashboard },
         )
         AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard })
         AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
-        AdminPage.Messages -> MessagesScreen(session, exit = { page = AdminPage.Dashboard })
+        AdminPage.Messages -> MessagesScreen(
+            session,
+            exit = { page = AdminPage.Dashboard },
+            initialSupportFilter = SUPPORT_TAG_NEEDS_ADMIN,
+        )
     }
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
     // Open the protected-account form and close it when the admin dismisses it.
@@ -404,6 +476,7 @@ internal fun AdminPortal(session: SessionViewModel) {
 private fun AdminDashboard(
     session: SessionViewModel,
     onAccounts: () -> Unit,
+    onStaffManagement: () -> Unit,
     onSettings: () -> Unit,
     onMap: () -> Unit,
     onSafetyPlans: () -> Unit,
@@ -435,6 +508,7 @@ private fun AdminDashboard(
             }
         }
         AccountCountGrid(session.adminCounts)
+        TicketCountGrid(session.adminCounts)
         OrganizationDashboardCard(
             Icons.Outlined.HealthAndSafety,
             stringResource(R.string.safety_inbox),
@@ -448,9 +522,15 @@ private fun AdminDashboard(
             onAccounts,
         )
         OrganizationDashboardCard(
+            Icons.Outlined.Badge,
+            stringResource(R.string.admin_staff_management),
+            stringResource(R.string.admin_staff_management_description),
+            onStaffManagement,
+        )
+        OrganizationDashboardCard(
             Icons.Outlined.Forum,
-            stringResource(R.string.support_conversations),
-            stringResource(R.string.staff_conversations_assigned_help),
+            stringResource(R.string.admin_escalation_chats),
+            stringResource(R.string.admin_escalation_chats_description),
             onMessages,
             session.messages.pendingActionCount,
         )
@@ -469,6 +549,111 @@ private fun AdminDashboard(
     }
 }
 
+// Admin dashboard keeps open and closed support totals visible without opening the chat list.
+@Composable
+private fun TicketCountGrid(counts: AccountCounts) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        TicketCountCard(
+            label = stringResource(R.string.admin_open_tickets),
+            count = counts.openTickets,
+            modifier = Modifier.weight(1f),
+        )
+        TicketCountCard(
+            label = stringResource(R.string.admin_closed_tickets),
+            count = counts.closedTickets,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+// One ticket card reads as a single TalkBack item instead of separate count and label items.
+@Composable
+private fun TicketCountCard(label: String, count: Int, modifier: Modifier = Modifier) {
+    ElevatedCard(modifier.clearAndSetSemantics { contentDescription = "$count $label" }) {
+        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+            Text(count.toString(), style = MaterialTheme.typography.headlineSmall, color = OliveGreen)
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = Muted)
+        }
+    }
+}
+
+// Admin staff management shows each staff member's active and completed plan and support work.
+@Composable
+private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
+    val uiText = rememberResourceText()
+    val staff = session.adminAccounts.filter { it.role == AccountRole.STAFF }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.ui_back))
+            }
+            Column {
+                Text(
+                    stringResource(R.string.admin_staff_management),
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(stringResource(R.string.admin_staff_management_description), color = Muted)
+            }
+        }
+        OutlinedButton(
+            onClick = session::refreshAdminAccounts,
+            enabled = !session.busy,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(R.string.refresh)) }
+        if (staff.isEmpty() && !session.busy) {
+            Text(stringResource(R.string.admin_no_staff_accounts), color = Muted)
+        }
+        staff.forEach { account -> StaffWorkloadCard(account) }
+        Status(session)
+    }
+}
+
+// A staff workload card summarizes plans and chats with completed counts kept beside their totals.
+@Composable
+private fun StaffWorkloadCard(account: AdminAccountSummary) {
+    val summary = stringResource(
+        R.string.admin_staff_workload_accessibility,
+        account.username,
+        account.safetyPlans,
+        account.completedSafetyPlans,
+        account.supportChats,
+        account.closedSupportChats,
+    )
+    OutlinedCard(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = summary }) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(account.username, style = MaterialTheme.typography.titleLarge)
+            account.fullName.takeIf { it.isNotBlank() }?.let { Text(it, color = Muted) }
+            HorizontalDivider()
+            WorkloadRow(
+                stringResource(R.string.admin_safety_plan_tasks),
+                account.safetyPlans,
+                account.completedSafetyPlans,
+                stringResource(R.string.admin_completed),
+            )
+            WorkloadRow(
+                stringResource(R.string.admin_support_chat_tasks),
+                account.supportChats,
+                account.closedSupportChats,
+                stringResource(R.string.admin_closed),
+            )
+        }
+    }
+}
+
+// Each workload row keeps its total and finished count together for quick comparison.
+@Composable
+private fun WorkloadRow(label: String, total: Int, finished: Int, finishedLabel: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.titleMedium)
+        Text("$total ($finished $finishedLabel)", color = OliveGreen)
+    }
+}
+
 // Admins: holds the live user locations shown on the organization map.
 
 internal data class AdminLocationMapState(
@@ -477,7 +662,7 @@ internal data class AdminLocationMapState(
     val error: String? = null,
 )
 
-/** Opens one admin-only Firebase listener and closes it when the map is left. */
+/** Opens the protected organization location feed for staff and admin accounts. */
 internal class AdminLocationMapController(
     private val repository: AdminLocationRepository?,
 ) {
@@ -485,9 +670,9 @@ internal class AdminLocationMapController(
         private set
     private var subscription: ChatSubscription? = null
 
-    // Starts the organization feed only for an authenticated administrator.
+    // Starts the organization feed only for an authenticated staff or admin account.
     fun open(role: AccountRole) {
-        if (role != AccountRole.ADMIN || repository == null || subscription != null) return
+        if (role !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || repository == null || subscription != null) return
         state = AdminLocationMapState(loading = true)
         subscription = repository.observe(
             onUpdate = { points ->

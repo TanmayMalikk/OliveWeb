@@ -5,6 +5,7 @@ const {listEveryUser, readProfile} = require("./accountStorage");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");
 const {roleFromUser} = require("./accountPolicy");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
+const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
 const crypto = require("node:crypto");
 
 const PLAN_CONSULT = "PLAN_CONSULT";
@@ -70,6 +71,10 @@ async function saveSupportConversation(plan, safeContactUid = "", reopen = false
   const participantUsernames = await participantNames(participantIds);
   const reference = db.collection("conversations").doc(conversationId);
   const current = await reference.get();
+  // Completed tickets stay immutable. A later request must receive a new ID and ticket number.
+  if (current.exists && current.get("closedAt")) {
+    throw new HttpsError("failed-precondition", "Create a new ticket instead of reopening a completed chat.");
+  }
   const previousParticipants = current.data()?.participantIds || [];
   const participantRemoved = previousParticipants.some(uid => !participantIds.includes(uid));
   const value = {
@@ -79,13 +84,13 @@ async function saveSupportConversation(plan, safeContactUid = "", reopen = false
     updatedAt: FieldValue.serverTimestamp(), lastMessage: current.data()?.lastMessage || "",
     lastMessageId: current.data()?.lastMessageId || "", lastSenderUid: current.data()?.lastSenderUid || "",
   };
+  if (Number.isSafeInteger(plan.ticketNumber) && plan.ticketNumber >= 0) {
+    value.ticketNumber = plan.ticketNumber;
+  }
   if (plan.requestSource) value.requestSource = plan.requestSource;
   if (plan.sourceConversationId) value.sourceConversationId = plan.sourceConversationId;
   if (!current.exists) value.createdAt = FieldValue.serverTimestamp();
-  // Existing active requests may safely retry. A new ticket must use a new conversation id.
-  if (reopen && current.get("closedAt")) {
-    throw new HttpsError("failed-precondition", "Create a new ticket instead of reopening a closed chat.");
-  }
+  // Existing active requests may safely retry. Closed records were rejected above.
   // Adding someone preserves the old room key so prior messages stay readable.
   // Removing someone clears it so they cannot read messages sent afterward.
   if (participantRemoved) {
@@ -101,7 +106,12 @@ async function closeSupportConversation(conversationId) {
   const reference = db.collection("conversations").doc(conversationId);
   const snapshot = await reference.get();
   if (snapshot.exists && !snapshot.get("closedAt")) {
-    await reference.update({closedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()});
+    await reference.update({
+      closedAt: FieldValue.serverTimestamp(),
+      completedAt: FieldValue.serverTimestamp(),
+      ticketStatus: "COMPLETED",
+      updatedAt: FieldValue.serverTimestamp(),
+    });
   }
 }
 
@@ -297,6 +307,7 @@ exports.conversationRequestStaff = onCall({invoker: "public"}, async (request) =
     }
     const staff = chooseStaff(settings);
     if (!staff) throw new HttpsError("failed-precondition", "No staff member is available.");
+    const ticketNumber = await reserveSupportTicketNumber(transaction);
     const participantIds = [...personalParticipantUids, staff.uid];
     transaction.set(staff.reference, {activeCount: (staff.activeCount || 0) + 1}, {merge: true});
     transaction.set(db.collection("conversations").doc(conversationId), {
@@ -316,6 +327,7 @@ exports.conversationRequestStaff = onCall({invoker: "public"}, async (request) =
       lastMessage: "",
       lastMessageId: "",
       lastSenderUid: "",
+      ticketNumber,
     });
     transaction.update(sourceReference, {
       supportConversationId: conversationId,
@@ -326,10 +338,12 @@ exports.conversationRequestStaff = onCall({invoker: "public"}, async (request) =
   return {conversationId, staffUid: selected.uid};
 });
 
-/** Archives a support conversation for every participant when its assigned staff member closes it. */
+/** Archives a support conversation for everyone when its assigned staff member or administrator closes it. */
 exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
-  if (caller.role !== "STAFF") throw new HttpsError("permission-denied", "Assigned staff only.");
+  if (!["STAFF", "ADMIN"].includes(caller.role)) {
+    throw new HttpsError("permission-denied", "Organization support accounts only.");
+  }
   const conversationId = typeof request.data?.conversationId === "string" ? request.data.conversationId : "";
   if (!/^(plan-consult|support)-[A-Za-z0-9_-]{1,300}$/.test(conversationId)) {
     throw new HttpsError("invalid-argument", "Invalid support conversation.");
@@ -338,8 +352,13 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
   // Archives the chat, closes its ticket, and updates the staff workload together.
   await db.runTransaction(async transaction => {
     const snapshot = await transaction.get(reference);
-    if (!snapshot.exists || snapshot.get("type") !== "SUPPORT" || snapshot.get("staffUid") !== caller.uid) {
-      throw new HttpsError("permission-denied", "Only the assigned staff member can close this chat.");
+    if (!snapshot.exists || snapshot.get("type") !== "SUPPORT") {
+      throw new HttpsError("permission-denied", "Support conversation not found.");
+    }
+    const assignedToCaller = caller.role === "STAFF" ? snapshot.get("staffUid") === caller.uid :
+      snapshot.get("adminUid") === caller.uid;
+    if (!assignedToCaller) {
+      throw new HttpsError("permission-denied", "Only assigned organization support can close this chat.");
     }
     if (snapshot.get("closedAt")) return;
     const conversation = snapshot.data();
@@ -348,11 +367,15 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
       conversation.requestSource === "GROUP_CHAT" && conversation.sourceConversationId ?
         db.collection("conversations").doc(conversation.sourceConversationId) :
         db.collection("supportRequests").doc(conversation.sourceConversationId || conversation.ownerUid);
-    const staffReference = db.collection("safetyStaff").doc(caller.uid);
+    if (!conversation.staffUid) throw new HttpsError("failed-precondition", "This ticket has no assigned staff member.");
+    const staffReference = db.collection("safetyStaff").doc(conversation.staffUid);
     const sourceSnapshot = await transaction.get(sourceReference);
     const staffSnapshot = await transaction.get(staffReference);
     transaction.update(reference, {
-      closedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+      closedAt: FieldValue.serverTimestamp(),
+      completedAt: FieldValue.serverTimestamp(),
+      ticketStatus: "COMPLETED",
+      updatedAt: FieldValue.serverTimestamp(),
     });
     // Clears only the ticket that still points to this exact conversation.
     if (sourceSnapshot.exists) {
@@ -364,6 +387,7 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
         if (conversation.supportOrigin === PLAN_CONSULT) {
           transaction.set(sourceReference, {
             consultationRequested: false, staffUid: "", staffName: "", adminUid: "", adminName: "",
+            consultationConversationId: "",
             updatedAt: Date.now(),
           }, {merge: true});
         } else if (conversation.requestSource === "GROUP_CHAT") {

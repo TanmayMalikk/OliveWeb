@@ -339,6 +339,25 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         with(runtime) {
             val uid = enrollment?.uid ?: return
             if (uid !in conversation.participantIds) return
+            if (conversation.closedAt > 0L) {
+                val previous = state.restoredClosedConversationIds
+                state.restoredClosedConversationIds = if (archived) {
+                    previous - conversation.id
+                } else {
+                    previous + conversation.id
+                }
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            store.setClosedConversationRestored(uid, conversation.id, !archived)
+                        }
+                    } catch (_: Exception) { // Put the completed chat back where it was if this phone could not save the choice.
+                        state.restoredClosedConversationIds = previous
+                        state.message = runtime.application.getString(R.string.unable_to_update_archived_chat)
+                    }
+                }
+                return
+            }
             val previous = state.archivedConversationIds
             state.archivedConversationIds = if (archived) {
                 previous + conversation.id

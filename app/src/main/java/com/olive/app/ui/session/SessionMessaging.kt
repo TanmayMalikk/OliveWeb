@@ -501,6 +501,9 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         state.archivedConversationIds = withContext(Dispatchers.IO) {
             runtime.store.archivedConversationIds(enrolled.uid)
         }
+        state.restoredClosedConversationIds = withContext(Dispatchers.IO) {
+            runtime.store.restoredClosedConversationIds(enrolled.uid)
+        }
         state.privateContactNotes = withContext(Dispatchers.IO) {
             runtime.store.privateContactNotes(enrolled.uid)
         }

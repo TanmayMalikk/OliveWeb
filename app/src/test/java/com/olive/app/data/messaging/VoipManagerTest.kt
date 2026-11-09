@@ -86,7 +86,7 @@ class VoipManagerTest {
         val manager = VoipManager(
             apiBaseUrl = "https://voip.test",
             httpClient = client,
-            bearerTokenProvider = { "firebase-id-token" }
+            bearerTokenProvider = { "firebase-id-token" },
         )
 
         val details = manager.getLiveKitConnectionDetails("call-1")
@@ -181,7 +181,8 @@ class VoipManagerTest {
         val manager = VoipManager(
             apiBaseUrl = "https://voip.test",
             httpClient = client,
-            bearerTokenProvider = { "firebase-id-token" }
+            bearerTokenProvider = { "firebase-id-token" },
+            refreshedBearerTokenProvider = { "refreshed-firebase-id-token" },
         )
 
         val error = assertThrows(VoipApiException::class.java) {
@@ -191,6 +192,37 @@ class VoipManagerTest {
         assertEquals(401, error.statusCode)
         assertEquals("unauthorized", error.errorCode)
         assertEquals("Sign in required", error.message)
+    }
+
+    // Uses a fresh Firebase token after the server rejects the cached token, then completes the call request.
+    @Test
+    fun unauthorizedCachedTokenIsRefreshedOnce() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                requests += chain.request()
+                if (requests.size == 1) {
+                    chain.request().jsonResponse(
+                        code = 401,
+                        body = """{"error":{"code":"unauthorized","message":"A valid Firebase bearer token is required"}}""",
+                    )
+                } else {
+                    chain.request().jsonResponse(body = INVITATIONRESPONSE)
+                }
+            }
+            .build()
+        val manager = VoipManager(
+            apiBaseUrl = "https://voip.test",
+            httpClient = client,
+            bearerTokenProvider = { "expired-token" },
+            refreshedBearerTokenProvider = { "fresh-token" },
+        )
+
+        val invitations = manager.getIncomingCalls("user-2")
+
+        assertEquals(1, invitations.size)
+        assertEquals("Bearer expired-token", requests.first().header("Authorization"))
+        assertEquals("Bearer fresh-token", requests.last().header("Authorization"))
     }
 
     // Checks the server error without json uses status fallback step with the test's sample data.

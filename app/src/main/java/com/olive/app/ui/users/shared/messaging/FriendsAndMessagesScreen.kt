@@ -34,11 +34,22 @@ import androidx.compose.foundation.verticalScroll
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 
+// Completed tickets stay archived unless this account manually restores them to the regular list.
+internal fun isConversationArchived(
+    conversation: ChatConversation,
+    archivedIds: Set<String>,
+    restoredClosedIds: Set<String>,
+): Boolean = conversation.id in archivedIds ||
+    (conversation.closedAt > 0L && conversation.id !in restoredClosedIds)
 
 // Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices.
 // UI sizing: messaging switches to two panes at 720dp; the sidebar is 340dp wide and leaves 96dp for bottom controls.
 @Composable
-internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = null) {
+internal fun MessagesScreen(
+    session: SessionViewModel,
+    exit: (() -> Unit)? = null,
+    initialSupportFilter: String? = null,
+) {
     val active = session.messages.activeConversation
     val currentUid = session.coverAccountId.orEmpty()
     // Keep the chosen list visible while a phone opens a chat and returns from it.
@@ -52,6 +63,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
             MessagingSidebar(
                 session, currentUid, portalExit(session, exit), showingArchived,
+                initialSupportFilter = initialSupportFilter,
                 onShowingArchivedChange = { showingArchived = it },
                 modifier = Modifier.width(340.dp).fillMaxHeight(),
             )
@@ -67,6 +79,7 @@ internal fun MessagesScreen(session: SessionViewModel, exit: (() -> Unit)? = nul
             } else ChatPane(session, currentUid, false, chatExit, Modifier.weight(1f).fillMaxHeight())
         } else if (active == null) MessagingSidebar(
             session, currentUid, portalExit(session, exit), showingArchived,
+            initialSupportFilter = initialSupportFilter,
             onShowingArchivedChange = { showingArchived = it },
             modifier = Modifier.fillMaxSize(),
         )
@@ -89,20 +102,33 @@ private fun MessagingSidebar(
     exit: (() -> Unit)?,
     showingArchived: Boolean,
     onShowingArchivedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    initialSupportFilter: String? = null,
 ) {
     val uiText = rememberResourceText()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
-    var supportFilter by rememberSaveable { mutableStateOf(SUPPORT_TAG_SUPPORT) }
+    var supportFilter by rememberSaveable(initialSupportFilter) {
+        mutableStateOf(initialSupportFilter ?: SUPPORT_TAG_SUPPORT)
+    }
     val roleConversations = if (organizationAccount) session.messages.conversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
     } else session.messages.conversations
     val shownConversations = roleConversations.filter {
-        (it.closedAt > 0L || it.id in session.messages.archivedConversationIds) == showingArchived
+        isConversationArchived(
+            it,
+            session.messages.archivedConversationIds,
+            session.messages.restoredClosedConversationIds,
+        ) == showingArchived
     }
     val supportConversations = shownConversations.filter { it.type == "SUPPORT" }
     val directConversations = shownConversations.filter { it.type != "SUPPORT" }
-    val archivedCount = roleConversations.count { it.closedAt > 0L || it.id in session.messages.archivedConversationIds }
+    val archivedCount = roleConversations.count {
+        isConversationArchived(
+            it,
+            session.messages.archivedConversationIds,
+            session.messages.restoredClosedConversationIds,
+        )
+    }
     var conversationActions by remember { mutableStateOf<ChatConversation?>(null) }
     var noteTargets by remember { mutableStateOf<List<DirectoryUser>?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -309,16 +335,33 @@ private fun MessagingSidebar(
     conversationActions?.let { conversation ->
         ConversationActionsDialog(
             conversation = conversation,
-            archived = conversation.closedAt > 0L || conversation.id in session.messages.archivedConversationIds,
+            archived = isConversationArchived(
+                conversation,
+                session.messages.archivedConversationIds,
+                session.messages.restoredClosedConversationIds,
+            ),
             closed = conversation.closedAt > 0L,
             currentUid = currentUid,
             role = session.accountRole,
             friendUids = session.messages.friends.mapTo(mutableSetOf()) { it.uid },
             onArchive = {
-                session.messages.setConversationArchived(
-                    conversation,
-                    conversation.closedAt == 0L && conversation.id !in session.messages.archivedConversationIds,
-                )
+                if (
+                    session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+                    conversation.type == "SUPPORT" &&
+                    conversation.closedAt == 0L
+                ) {
+                    // Staff closing a ticket archives the same chat for every participant.
+                    session.messages.closeSupportChat(conversation.id)
+                } else {
+                    session.messages.setConversationArchived(
+                        conversation,
+                        !isConversationArchived(
+                            conversation,
+                            session.messages.archivedConversationIds,
+                            session.messages.restoredClosedConversationIds,
+                        ),
+                    )
+                }
                 conversationActions = null
             },
             onNotes = {
@@ -458,7 +501,7 @@ internal fun ConversationActionsDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (closed) Text(stringResource(R.string.support_chat_closed))
-                else Button(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {
+                Button(onClick = onArchive, modifier = Modifier.fillMaxWidth()) {
                     Text(stringResource(if (archived) R.string.unarchive_chat else R.string.archive_chat))
                 }
                 if (targets.isNotEmpty()) OutlinedButton(

@@ -251,8 +251,12 @@ internal fun ChatInfoDialog(
                     items(conversation.participantIds, key = { "member-$it" }) { uid ->
                         val organizationMember = conversation.type == "SUPPORT" && personalViewer &&
                             uid in setOf(conversation.staffUid, conversation.adminUid).filter(String::isNotBlank)
+                        val anonymousPersonalMember = conversation.type == "SUPPORT" &&
+                            session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+                            uid !in setOf(conversation.staffUid, conversation.adminUid).filter(String::isNotBlank)
                         val name = when {
                             organizationMember -> stringResource(R.string.chat_organization_member)
+                            anonymousPersonalMember -> "Ticket ${conversation.participantTicketNumber(uid)}"
                             else -> conversation.participantUsernames[uid].orEmpty().ifBlank { stringResource(R.string.account) }
                         }
                         Card(

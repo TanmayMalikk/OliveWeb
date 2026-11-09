@@ -121,12 +121,14 @@ class VoipApiException(
 ) : IOException(message)
 
 class VoipManager(
-    // API authentication is also not built yet, needs server side hosting to finalize implementation.
     private val apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL,
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val bearerTokenProvider: suspend () -> String? = {
         FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
-    }
+    },
+    private val refreshedBearerTokenProvider: suspend () -> String? = {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.await()?.token
+    },
 ) {
     private val baseUrl = apiBaseUrl.trimEnd('/')
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -290,18 +292,37 @@ class VoipManager(
     // Runs one authenticated API request and converts its response into JSON.
     private suspend fun request(method: String, path: String, body: JSONObject? = null): JSONObject =
         withContext(Dispatchers.IO) {
-            // Adds authentication and an optional JSON body to the outgoing request.
-            val requestBuilder = Request.Builder().url("$baseUrl$path")
-            bearerTokenProvider()?.takeIf(String::isNotBlank)?.let {
-                requestBuilder.header("Authorization", "Bearer $it")
-            }
-            if (body != null) {
-                requestBuilder.method(method, body.toString().toRequestBody(jsonMediaType))
-            } else {
-                requestBuilder.method(method, null)
-            }
+            val cachedToken = bearerTokenProvider()?.takeIf(String::isNotBlank)
 
-            val request = requestBuilder.build()
+            // A rejected cached Firebase token is refreshed once before showing an authentication error.
+            try {
+                executeWithDnsRetries(authenticatedRequest(method, path, body, cachedToken))
+            } catch (error: VoipApiException) {
+                if (error.statusCode != 401) throw error
+                val freshToken = refreshedBearerTokenProvider()?.takeIf(String::isNotBlank) ?: throw error
+                executeWithDnsRetries(authenticatedRequest(method, path, body, freshToken))
+            }
+        }
+
+    // Builds one request with the Firebase identity currently available for this signed-in account.
+    private fun authenticatedRequest(
+        method: String,
+        path: String,
+        body: JSONObject?,
+        bearerToken: String?,
+    ): Request {
+        val requestBuilder = Request.Builder().url("$baseUrl$path")
+        bearerToken?.let { requestBuilder.header("Authorization", "Bearer $it") }
+        if (body != null) {
+            requestBuilder.method(method, body.toString().toRequestBody(jsonMediaType))
+        } else {
+            requestBuilder.method(method, null)
+        }
+        return requestBuilder.build()
+    }
+
+    // Retries only DNS lookup failures, then parses the server response or reports its exact error.
+    private suspend fun executeWithDnsRetries(request: Request): JSONObject {
             // Unknown-host failures happen before a request reaches the server, so retrying cannot
             // create a duplicate call. This gives Android time to refresh a recently changed DNS entry.
             val attempts = 3
@@ -311,7 +332,7 @@ class VoipManager(
             repeat(attempts) { attempt ->
                 try {
                     // Converts successful responses and turns server failures into useful app errors.
-                    return@withContext httpClient.newCall(request).execute().use { response ->
+                    return httpClient.newCall(request).execute().use { response ->
                         val responseBody = response.body.string()
                         if (!response.isSuccessful) {
                             val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
@@ -338,7 +359,7 @@ class VoipManager(
                 "The voice service could not be reached. Check the connection and try again.",
                 lastDnsError,
             )
-        }
+    }
 
     // Converts one call JSON object into the model used by the app.
     private fun parseCall(json: JSONObject): VoipCall =

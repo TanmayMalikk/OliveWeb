@@ -74,6 +74,30 @@ class SafetyChecklistTest {
         )
     }
 
+    @Test
+    fun savedOliveStorageAttachmentSurvivesSavingWithoutAnUploadTag() {
+        val item = SafetyChecklistItem(
+            id = "item-id",
+            text = "Passport",
+            attachmentIds = listOf("saved-document"),
+        )
+        val restored = readSafetyChecklist(writeSafetyChecklist(listOf(item))).single()
+        val savedDocument = SafetyDocument(
+            id = "saved-document",
+            ownerUid = "owner",
+            storagePath = "",
+            name = "Existing passport.pdf",
+            mimeType = "application/pdf",
+            allowedUsers = listOf("owner"),
+        )
+
+        assertEquals(listOf("saved-document"), restored.attachmentIds)
+        assertEquals(
+            listOf(savedDocument),
+            safetyChecklistAttachments("primary_documents", restored, listOf(savedDocument)),
+        )
+    }
+
     // Inputs: the values shown below. Expected: removed items stay removed including an entirely empty checklist.
     @Test
     fun removedItemsStayRemovedIncludingAnEntirelyEmptyChecklist() {

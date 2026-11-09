@@ -6,6 +6,7 @@ const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller} = require("./safetyPlanAccess");
 const {saveSupportConversation, closeSupportConversation, supportConversationId, SUPPORT} =
   require("./supportGroups");
+const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
 
 // Finds staff accounts that are active and ready to receive support tickets.
 async function candidates() {
@@ -65,6 +66,7 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
       settings.set(uid, (await transaction.get(staffReference)).data() || {});
     }
     const selected = chooseStaff(staffCandidates.map(staff => ({...staff, ...settings.get(staff.uid)})));
+    const ticketNumber = await reserveSupportTicketNumber(transaction);
     if (selected) transaction.set(references.get(selected.uid), {
       activeCount: (selected.activeCount || 0) + 1,
     }, {merge: true});
@@ -73,7 +75,7 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
       staffUid: selected?.uid || "", staffName: selected?.name || "",
       adminUid: "", adminName: "", supportOrigin: SUPPORT,
       requestSource: "SUPPORT_BUTTON", sourceConversationId: newConversationId,
-      conversationId: newConversationId, updatedAt: Date.now(),
+      conversationId: newConversationId, ticketNumber, updatedAt: Date.now(),
     };
     transaction.set(reference, created);
     return created;

@@ -11,6 +11,7 @@ class AdminAccountMappingTest {
         val (counts, accounts) = parseAdminAccounts(
             mapOf(
                 "counts" to mapOf("USER" to 5, "SAFE_CONTACT" to 4L, "STAFF" to 3.0, "ADMIN" to 2),
+                "tickets" to mapOf("open" to 12, "closed" to 4),
                 "accounts" to listOf(
                     mapOf(
                         "uid" to "staff-1",
@@ -22,13 +23,21 @@ class AdminAccountMappingTest {
                         "profileComplete" to true,
                         "protected" to true,
                         "assignedUsers" to 7L,
+                        "safetyPlans" to 10,
+                        "completedSafetyPlans" to 2,
+                        "supportChats" to 12,
+                        "closedSupportChats" to 4,
                     )
                 ),
             )
         )
-        assertEquals(AccountCounts(5, 4, 3, 2), counts)
+        assertEquals(AccountCounts(5, 4, 3, 2, 12, 4), counts)
         assertEquals(AccountRole.STAFF, accounts.single().role)
         assertEquals(7, accounts.single().assignedUsers)
+        assertEquals(10, accounts.single().safetyPlans)
+        assertEquals(2, accounts.single().completedSafetyPlans)
+        assertEquals(12, accounts.single().supportChats)
+        assertEquals(4, accounts.single().closedSupportChats)
         assertTrue(accounts.single().profileComplete)
         assertTrue(accounts.single().protected)
     }
@@ -74,15 +83,26 @@ class AdminAccountMappingTest {
         assertFalse(account.protected)
     }
 
-    // Input: negative and non-numeric assignment counts. Expected: the UI never displays a negative workload.
+    // Input: negative and non-numeric workload counts. Expected: the UI never displays a negative workload.
     @Test
     fun invalidAssignmentCountsBecomeZero() {
         val rows = listOf(
-            mapOf("uid" to "negative", "assignedUsers" to -10),
+            mapOf(
+                "uid" to "negative",
+                "assignedUsers" to -10,
+                "safetyPlans" to -2,
+                "completedSafetyPlans" to -3,
+                "supportChats" to -4,
+                "closedSupportChats" to -5,
+            ),
             mapOf("uid" to "text", "assignedUsers" to "many"),
         )
         val (_, accounts) = parseAdminAccounts(mapOf("accounts" to rows))
         assertEquals(listOf(0, 0), accounts.map { it.assignedUsers })
+        assertEquals(listOf(0, 0), accounts.map { it.safetyPlans })
+        assertEquals(listOf(0, 0), accounts.map { it.completedSafetyPlans })
+        assertEquals(listOf(0, 0), accounts.map { it.supportChats })
+        assertEquals(listOf(0, 0), accounts.map { it.closedSupportChats })
     }
 
     // Input: a complete staff draft. Expected: every admin form field reaches the named server field.

@@ -473,8 +473,17 @@ data class ChatConversation(
     val adminUid: String = "",
     val supportOrigin: String = "",
     val supportTag: String = "",
+    val ticketSequence: Long = -1L,
     val closedAt: Long = 0L,
 ) {
+    // Gives support staff an anonymous, stable label without exposing the user's account name.
+    fun ticketNumber(): String =
+        if (ticketSequence >= 0L) "#$ticketSequence" else supportTicketNumber(id)
+
+    // Gives each personal participant a stable anonymous label inside organization support views.
+    fun participantTicketNumber(uid: String): String =
+        if (uid == ownerUid) ticketNumber() else supportTicketNumber("$id-$uid")
+
     // Chooses the private display name shown for this conversation.
     fun displayName(
         currentUid: String,
@@ -482,7 +491,7 @@ data class ChatConversation(
         anonymousStaffName: String = "Your Olive Branch",
     ) = if (type == "SUPPORT") {
         if (viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-            participantUsernames[ownerUid].orEmpty().ifBlank { "User" }
+            "Ticket ${ticketNumber()}"
         } else anonymousStaffName
     } else {
         participantIds.mapNotNull { uid ->
@@ -511,12 +520,23 @@ data class ChatConversation(
         senderUsername: String,
         viewerRole: AccountRole,
         anonymousStaffName: String,
-    ) = if (
+    ) = when {
         type == "SUPPORT" &&
-        viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
-        senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() }
-    ) anonymousStaffName else senderUsername
+            viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+            senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() } -> anonymousStaffName
+        type == "SUPPORT" &&
+            viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+            senderUid !in setOf(staffUid, adminUid).filter { it.isNotBlank() } ->
+            "Ticket ${participantTicketNumber(senderUid)}"
+        else -> senderUsername
+    }
 
+}
+
+// Builds the same short ticket label on every device from the unique support conversation ID.
+internal fun supportTicketNumber(conversationId: String): String {
+    val number = conversationId.hashCode().toUInt() % 1_000_000u
+    return "#${number.toString().padStart(6, '0')}"
 }
 
 internal const val SUPPORT_TAG_PLAN_CONSULT = "PLAN_CONSULT"

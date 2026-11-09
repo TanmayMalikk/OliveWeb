@@ -231,6 +231,7 @@ internal fun ChatConversation.toCacheJson() = JSONObject().apply {
     put("adminUid", adminUid)
     put("supportOrigin", supportOrigin)
     put("supportTag", supportTag)
+    put("ticketSequence", ticketSequence)
     put("closedAt", closedAt)
 }
 
@@ -256,6 +257,7 @@ internal fun conversationFromCacheJson(value: JSONObject): ChatConversation {
         adminUid = value.optString("adminUid"),
         supportOrigin = value.optString("supportOrigin"),
         supportTag = value.optString("supportTag"),
+        ticketSequence = value.optLong("ticketSequence", -1L),
         closedAt = value.optLong("closedAt"),
     )
 }

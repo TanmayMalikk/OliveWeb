@@ -10,7 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PrivateContactNotesTest {
-    // Inputs: the values shown below. Expected: support chats show the user to staff and hide organization names from personal accounts.
+    // Support chats hide organization names from personal accounts and user names from organization accounts.
     @Test
     fun supportChatsShowTheUserToStaffAndHideOrganizationNamesFromPersonalAccounts() {
         val conversation = ChatConversation(
@@ -34,8 +34,8 @@ class PrivateContactNotesTest {
         )
         assertEquals("Olive Staff • Support", conversation.displayName("user", AccountRole.USER, anonymousName))
         assertEquals("Olive Staff • Support", conversation.displayName("contact", AccountRole.SAFE_CONTACT, anonymousName))
-        assertEquals("olive_user", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
-        assertEquals("olive_user", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Ticket ${conversation.ticketNumber()}", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("Ticket ${conversation.ticketNumber()}", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
         assertEquals(
             "Olive Staff • Consultation",
             conversation.copy(supportOrigin = SUPPORT_TAG_PLAN_CONSULT, supportTag = SUPPORT_TAG_PLAN_CONSULT)

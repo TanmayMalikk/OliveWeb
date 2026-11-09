@@ -236,7 +236,8 @@ internal data class SafetyPlan(
     val shareAction: String = "",
     val safeContactUids: List<String> = emptyList(),
     val safeContactNames: Map<String, String> = emptyMap(),
-    val supportSafeContactUid: String = ""
+    val supportSafeContactUid: String = "",
+    val consultationConversationId: String = "",
 ) {
     val hasEdits get() = fields.values.any { it.mutationId != null }
     val hasConflicts get() = fields.values.any { it.conflictRevision != null }
@@ -259,6 +260,7 @@ internal data class SafetyPlan(
         .put("safeContactUids", org.json.JSONArray(safeContactUids))
         .put("safeContactNames", JSONObject(safeContactNames))
         .put("supportSafeContactUid", supportSafeContactUid)
+        .put("consultationConversationId", consultationConversationId)
 
     companion object {
         // Rebuilds a safety plan from its encrypted JSON fields.
@@ -281,7 +283,8 @@ internal data class SafetyPlan(
                 json.optJSONObject("safeContactNames")
                     ?.let { names -> names.keys().asSequence().associateWith(names::getString) }
                     .orEmpty(),
-                json.optString("supportSafeContactUid")
+                json.optString("supportSafeContactUid"),
+                json.optString("consultationConversationId"),
             )
         }
     }
@@ -318,6 +321,7 @@ internal fun mergeSafetyPlan(
         adminUid = remote.adminUid,
         adminName = remote.adminName,
         consultationRequested = remote.consultationRequested,
+        consultationConversationId = remote.consultationConversationId,
         safeContactUids = remote.safeContactUids,
         safeContactNames = remote.safeContactNames,
         supportSafeContactUid = remote.supportSafeContactUid
@@ -351,7 +355,14 @@ internal fun safetyFieldsWithDefaults(
     }
 }
 
-internal data class SafetyConsultation(val ownerUid: String, val ownerName: String)
+internal data class SafetyConsultation(
+    val ownerUid: String,
+    val ownerName: String,
+    val conversationId: String = "",
+    val staffUid: String = "",
+    val staffName: String = "",
+    val ticketNumber: Long = -1L,
+)
 internal data class SharedSafetyPlan(
     val ownerUid: String,
     val ownerName: String,

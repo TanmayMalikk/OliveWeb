@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Attachment
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.PushPin
@@ -70,7 +71,6 @@ import com.olive.app.data.PrivateEntry
 import com.olive.app.data.PrivateEntryKind
 import com.olive.app.data.AddressSuggestion
 import com.olive.app.data.GeoapifyClient
-import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DeviceLocation
 import com.olive.app.data.MapLocationPoint
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
@@ -84,6 +84,7 @@ import com.olive.app.ui.shared.rememberResourceText
 import com.olive.app.ui.users.shared.navigation.Field
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.Status
+import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -108,6 +109,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var incidentLongitude by remember { mutableStateOf<Double?>(null) }
     var incidentMapOpen by remember { mutableStateOf(false) }
     var selectedAttachments by remember { mutableStateOf(emptySet<String>()) }
+    var attachmentMenuOpen by rememberSaveable { mutableStateOf(false) }
     var locationSuggestions by remember { mutableStateOf(emptyList<AddressSuggestion>()) }
     var attachAfterUpload by remember { mutableStateOf(false) }
     var filesBeforeUpload by remember { mutableStateOf(emptySet<String>()) }
@@ -144,15 +146,6 @@ internal fun PrivateNotes(session: SessionViewModel) {
         editorOpen = true
     }
     val uid = session.coverAccountId
-    val unableUpload = stringResource(R.string.documents_upload_failed)
-    val attachmentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        session.endExternalFilePicker()
-        if (uri != null && uid != null) {
-            filesBeforeUpload = session.documents.state.files.mapTo(mutableSetOf()) { it.id }
-            attachAfterUpload = true
-            session.documents.upload(uri, AccountIdentity(uid, session.coverUsername), unableUpload)
-        }
-    }
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { permissions ->
@@ -374,39 +367,65 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 OutlinedTextField(
                     value = body,
                     onValueChange = { body = it.take(10_000) },
-                    label = { Text(stringResource(R.string.private_details)) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 300.dp)
+                    label = {
+                        Text(
+                            stringResource(
+                                if (kind == PrivateEntryKind.Incident) R.string.incident_body
+                                else R.string.note_content
+                            )
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 220.dp)
                         .testTag("private_entry_body").keepVisibleWhileTyping(),
                     enabled = !session.busy
                 )
             }
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(stringResource(R.string.attachments), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.incident_attachments_help), color = Muted)
-                    TextButton(
-                        onClick = {
-                            session.beginExternalFilePicker()
-                            attachmentPicker.launch(arrayOf("image/*", "video/*", "application/pdf", "text/*"))
-                        },
-                        enabled = uid != null && !session.busy,
-                    ) { Text(stringResource(R.string.upload_new_attachment)) }
-                    session.documents.state.files.forEach { document ->
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(stringResource(R.string.attachments), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(
+                                if (kind == PrivateEntryKind.Incident) R.string.incident_attachments_help
+                                else R.string.note_attachments_help
+                            ),
+                            color = Muted,
+                        )
+                        Button(
+                            onClick = { attachmentMenuOpen = true },
+                            enabled = uid != null && !session.busy,
+                            modifier = Modifier.fillMaxWidth().testTag("private_add_attachment"),
+                        ) {
+                            Icon(Icons.Outlined.Attachment, null)
+                            Text(
+                                stringResource(R.string.add_attachment),
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                        session.documents.state.files.filter { it.id in selectedAttachments }.forEach { document ->
                         Row(
                             Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Checkbox(
-                                checked = document.id in selectedAttachments,
-                                onCheckedChange = { checked ->
-                                    selectedAttachments = if (checked) selectedAttachments + document.id else selectedAttachments - document.id
-                                },
+                                checked = true,
+                                onCheckedChange = { selectedAttachments = selectedAttachments - document.id },
                             )
                             Text(document.name, modifier = Modifier.weight(1f))
                             if (document.evidence) Text(stringResource(R.string.evidence), color = OliveGreen)
                         }
                     }
-                    if (session.documents.state.files.isEmpty()) Text(stringResource(R.string.attachments_empty_help), color = Muted)
+                        if (selectedAttachments.isEmpty()) Text(
+                            stringResource(R.string.attachments_empty_help),
+                            color = Muted,
+                        )
+                    }
                 }
             }
             item {
@@ -441,6 +460,18 @@ internal fun PrivateNotes(session: SessionViewModel) {
             }
             item { Status(session) }
         }
+        SafetyDocumentUploadFlow(
+            session = session,
+            visible = attachmentMenuOpen,
+            onDismiss = { attachmentMenuOpen = false },
+            onSelectExisting = { document ->
+                selectedAttachments = selectedAttachments + document.id
+            },
+            onUploadStarted = {
+                filesBeforeUpload = session.documents.state.files.mapTo(mutableSetOf()) { it.id }
+                attachAfterUpload = true
+            },
+        )
         return
     }
     val trashed =
