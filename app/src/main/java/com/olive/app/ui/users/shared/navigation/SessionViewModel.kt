@@ -263,6 +263,8 @@ internal interface SessionAccountManagementActions {
 
     // Reloads the account list shown in the admin portal.
     fun refreshAdminAccounts() = runtime.organization.refreshAdminAccounts()
+    // Reloads staff workload rows without downloading the full account directory.
+    fun refreshAdminStaff() = runtime.organization.refreshAdminStaff()
     // Creates a staff or admin account from the admin form.
     fun createManagedAccount(value: AdminAccountDraft) = runtime.organization.createManagedAccount(value)
     // Deletes a staff or admin account selected in the admin portal.

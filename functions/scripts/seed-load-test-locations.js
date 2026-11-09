@@ -1,4 +1,4 @@
-// Places the 40 fictional user accounts at Alberta community-centre coordinates for admin-map testing.
+// Places all fictional users at randomized Alberta and British Columbia coordinates for map testing.
 const {getAuth} = require("firebase-admin/auth");
 const {getDatabase} = require("firebase-admin/database");
 const {signInEmail} = require("../src/accountPolicy");

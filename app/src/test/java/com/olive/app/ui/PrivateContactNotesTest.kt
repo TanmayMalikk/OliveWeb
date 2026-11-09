@@ -48,8 +48,12 @@ class PrivateContactNotesTest {
         )
         assertEquals("Olive Staff • Support", conversation.displayName("user", AccountRole.USER, anonymousName))
         assertEquals("Olive Staff • Support", conversation.displayName("contact", AccountRole.SAFE_CONTACT, anonymousName))
-        assertEquals("Ticket ${conversation.ticketNumber()}", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
-        assertEquals("Ticket ${conversation.ticketNumber()}", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Support ticket", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("Support ticket", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals(
+            "Ticket #42",
+            conversation.copy(ticketSequence = 42).displayName("staff", AccountRole.STAFF, "Olive Staff"),
+        )
         assertEquals(
             "Olive Staff • Consultation",
             conversation.copy(supportOrigin = SUPPORT_TAG_PLAN_CONSULT, supportTag = SUPPORT_TAG_PLAN_CONSULT)

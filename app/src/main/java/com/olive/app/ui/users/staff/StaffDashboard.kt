@@ -36,7 +36,6 @@ import com.olive.app.ui.users.shared.safetyplan.SafetyPlanScreen
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import com.olive.app.data.SafetyConsultation
-import com.olive.app.data.supportTicketNumber
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 
@@ -150,9 +149,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     BackHandler { if (selected != null) selected = null else onBack() }
     val plan = selected
     if (plan != null) {
-        val number = if (plan.ticketNumber >= 0L) "#${plan.ticketNumber}" else
-            supportTicketNumber(plan.conversationId.ifBlank { plan.ownerUid })
-        val ticketLabel = "Ticket $number"
+        val ticketLabel = if (plan.ticketNumber >= 0L) "Ticket #${plan.ticketNumber}" else "Support ticket"
         SafetyPlanScreen(
             session = session,
             ownerUid = plan.ownerUid,
@@ -280,9 +277,11 @@ private fun ConsultationGroup(
                     )
                 }
                 consultations.forEach { consultation ->
-                    val number = if (consultation.ticketNumber >= 0L) "#${consultation.ticketNumber}" else
-                        supportTicketNumber(consultation.conversationId.ifBlank { consultation.ownerUid })
-                    val ticketLabel = "Ticket $number"
+                    val ticketLabel = if (consultation.ticketNumber >= 0L) {
+                        "Ticket #${consultation.ticketNumber}"
+                    } else {
+                        "Support ticket"
+                    }
                     ElevatedCard(
                         onClick = { onSelected(consultation) },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 5.dp)

@@ -14,6 +14,8 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -60,58 +62,77 @@ internal fun AdminAccounts(
     onDelete: (AdminAccountSummary) -> Unit
 ) {
     val uiText = rememberResourceText()
+    LaunchedEffect(Unit) { session.refreshAdminAccounts() }
     var noteTarget by remember { mutableStateOf<DirectoryUser?>(null) }
     val expandedRoles = remember {
         mutableStateMapOf<AccountRole, Boolean>().apply {
             AccountRole.entries.forEach { role -> put(role, true) }
         }
     }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
+    LazyColumn(
+        Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.ArrowBack,
-                    uiText(R.string.ui_back)
-                )
+        item("account_header") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        uiText(R.string.ui_back)
+                    )
+                }
+                Text(
+                    stringResource(R.string.accounts),
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.semantics { heading() })
             }
-            Text(
-                stringResource(R.string.accounts),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.semantics { heading() })
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = onCreate,
-                enabled = !session.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text(stringResource(R.string.create_account)) }
-            OutlinedButton(
-                onClick = session::refreshAdminAccounts,
-                enabled = !session.busy,
-                modifier = Modifier.weight(1f)
-            ) { Text(stringResource(R.string.refresh)) }
+        item("account_actions") {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onCreate,
+                    enabled = !session.busy,
+                    modifier = Modifier.weight(1f)
+                ) { Text(stringResource(R.string.create_account)) }
+                OutlinedButton(
+                    onClick = session::refreshAdminAccounts,
+                    enabled = !session.busy,
+                    modifier = Modifier.weight(1f)
+                ) { Text(stringResource(R.string.refresh)) }
+            }
         }
-        if (session.adminAccounts.isEmpty() && !session.busy) Text(
-            uiText(R.string.ui_no_accounts_found),
-            color = Muted
-        )
+        if (session.adminAccounts.isEmpty() && !session.busy) item("no_accounts") {
+            Text(uiText(R.string.ui_no_accounts_found), color = Muted)
+        }
         AccountRole.entries.forEach { role ->
             val accounts = session.adminAccounts.filter { it.role == role }
-            AccountRoleSection(
-                role = role,
-                accounts = accounts,
-                expanded = expandedRoles[role] != false,
-                onExpandedChange = { expandedRoles[role] = it },
-                enabled = !session.busy,
-                onNote = { account -> noteTarget = DirectoryUser(account.uid, account.username) },
-                onDelete = onDelete,
-            )
+            item("role_${role.name}") {
+                AccountRoleHeader(
+                    role = role,
+                    accountCount = accounts.size,
+                    expanded = expandedRoles[role] != false,
+                    onExpandedChange = { expandedRoles[role] = it },
+                )
+            }
+            if (expandedRoles[role] != false && accounts.isEmpty()) item("empty_${role.name}") {
+                Text(
+                    stringResource(R.string.admin_no_accounts_in_category),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    color = Muted,
+                )
+            }
+            if (expandedRoles[role] != false) items(accounts, key = { it.uid }) { account ->
+                AccountRow(
+                    account = account,
+                    enabled = !session.busy,
+                    onNote = if (role == AccountRole.USER) ({
+                        noteTarget = DirectoryUser(account.uid, account.username)
+                    }) else null,
+                    onDelete = { onDelete(account) },
+                )
+            }
         }
-        Status(session)
+        item("account_status") { Status(session) }
     }
     noteTarget?.let { target ->
         PrivateContactNoteDialog(session, listOf(target), onDismiss = { noteTarget = null })
@@ -120,53 +141,27 @@ internal fun AdminAccounts(
 
 // Admin account management groups accounts by role so a large organization list stays easy to scan.
 @Composable
-private fun AccountRoleSection(
+private fun AccountRoleHeader(
     role: AccountRole,
-    accounts: List<AdminAccountSummary>,
+    accountCount: Int,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    enabled: Boolean,
-    onNote: (AdminAccountSummary) -> Unit,
-    onDelete: (AdminAccountSummary) -> Unit,
 ) {
     val uiText = rememberResourceText()
     OutlinedCard(Modifier.fillMaxWidth()) {
-        Column {
-            TextButton(
-                onClick = { onExpandedChange(!expanded) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    "${role.localizedTitle(uiText)} (${accounts.size})",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Icon(
-                    if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                    contentDescription = null,
-                )
-            }
-            if (expanded) {
-                HorizontalDivider()
-                if (accounts.isEmpty()) {
-                    Text(
-                        stringResource(R.string.admin_no_accounts_in_category),
-                        modifier = Modifier.padding(16.dp),
-                        color = Muted,
-                    )
-                }
-                accounts.forEach { account ->
-                    Box(Modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
-                        AccountRow(
-                            account = account,
-                            enabled = enabled,
-                            onNote = if (role == AccountRole.USER) ({ onNote(account) }) else null,
-                            onDelete = { onDelete(account) },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-            }
+        TextButton(
+            onClick = { onExpandedChange(!expanded) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                "${role.localizedTitle(uiText)} ($accountCount)",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Icon(
+                if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                contentDescription = null,
+            )
         }
     }
 }
@@ -581,6 +576,7 @@ private fun TicketCountCard(label: String, count: Int, modifier: Modifier = Modi
 @Composable
 private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
     val uiText = rememberResourceText()
+    LaunchedEffect(Unit) { session.refreshAdminStaff() }
     val staff = session.adminAccounts.filter { it.role == AccountRole.STAFF }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -601,7 +597,7 @@ private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
             }
         }
         OutlinedButton(
-            onClick = session::refreshAdminAccounts,
+            onClick = session::refreshAdminStaff,
             enabled = !session.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.refresh)) }

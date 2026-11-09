@@ -238,9 +238,28 @@ data class AdminAccountDraft(
 class AdminRepository {
     private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
 
-    // Loads account counts and the staff/admin management list.
-    suspend fun accounts(): Pair<AccountCounts, List<AdminAccountSummary>> {
-        return parseAdminAccounts(functions.getHttpsCallable("adminListAccounts").call().await().data)
+    // Loads only dashboard totals so sign-in does not download every organization account.
+    suspend fun summary(): AccountCounts {
+        return parseAdminAccounts(
+            functions.getHttpsCallable("adminListAccounts")
+                .call(mapOf("view" to "SUMMARY")).await().data
+        ).first
+    }
+
+    // Loads account rows only after the administrator opens the account directory.
+    suspend fun accounts(): List<AdminAccountSummary> {
+        return parseAdminAccounts(
+            functions.getHttpsCallable("adminListAccounts")
+                .call(mapOf("view" to "ACCOUNTS")).await().data
+        ).second
+    }
+
+    // Loads staff rows and calculated workloads only on the Staff management screen.
+    suspend fun staffAccounts(): List<AdminAccountSummary> {
+        return parseAdminAccounts(
+            functions.getHttpsCallable("adminListAccounts")
+                .call(mapOf("view" to "STAFF")).await().data
+        ).second
     }
 
     // Calls the protected backend to create a staff or admin account.

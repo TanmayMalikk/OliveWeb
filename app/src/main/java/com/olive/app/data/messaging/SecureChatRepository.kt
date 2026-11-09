@@ -480,6 +480,10 @@ data class ChatConversation(
     fun ticketNumber(): String =
         if (ticketSequence >= 0L) "#$ticketSequence" else supportTicketNumber(id)
 
+    // Keeps the header neutral until Firestore returns the real ticket number.
+    fun ticketDisplayName(): String =
+        if (ticketSequence >= 0L) "Ticket #$ticketSequence" else "Support ticket"
+
     // Gives each personal participant a stable anonymous label inside organization support views.
     fun participantTicketNumber(uid: String): String =
         if (uid == ownerUid) ticketNumber() else supportTicketNumber("$id-$uid")
@@ -491,7 +495,7 @@ data class ChatConversation(
         anonymousStaffName: String = "Your Olive Branch",
     ) = if (type == "SUPPORT") {
         if (viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-            "Ticket ${ticketNumber()}"
+            ticketDisplayName()
         } else anonymousStaffName
     } else {
         participantIds.mapNotNull { uid ->

@@ -1,4 +1,4 @@
-// Deletes the 53 known load-test accounts through Olive's normal full account-cleanup function.
+// Deletes the 360 known load-test accounts through Olive's normal full account-cleanup function.
 const {getAuth} = require("firebase-admin/auth");
 const {getDatabase} = require("firebase-admin/database");
 const {signInEmail} = require("../src/accountPolicy");
@@ -10,8 +10,8 @@ const confirmation = String(process.env.OLIVE_LOAD_TEST_DELETE_CONFIRM || "").tr
 const apiKey = String(process.env.OLIVE_LOAD_TEST_FIREBASE_API_KEY || "").trim();
 const adminEmail = String(process.env.OLIVE_LOAD_TEST_ADMIN_EMAIL || "").trim();
 const adminPassword = String(process.env.OLIVE_LOAD_TEST_ADMIN_PASSWORD || "");
-if (!projectId || confirmation !== `DELETE-53-${projectId}`) {
-  throw new Error(`Set OLIVE_LOAD_TEST_DELETE_CONFIRM to DELETE-53-${projectId || "PROJECT_ID"}.`);
+if (!projectId || confirmation !== `DELETE-360-${projectId}`) {
+  throw new Error(`Set OLIVE_LOAD_TEST_DELETE_CONFIRM to DELETE-360-${projectId || "PROJECT_ID"}.`);
 }
 if (!apiKey || !adminEmail || !adminPassword) {
   throw new Error("Set the Firebase API key and a protected admin email/password for the cleanup call.");
