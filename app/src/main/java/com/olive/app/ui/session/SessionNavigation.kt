@@ -387,8 +387,11 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
     }
 
     // Staff support controller: Closes the active feature.
-    fun close(conversationId: String) {
-        if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || conversationId.isBlank() || saving > 0) return
+    fun close(conversationId: String, onClosed: () -> Unit = {}) {
+        if (runtime.localMode ||
+            runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) ||
+            conversationId.isBlank() || saving > 0
+        ) return
         val actor = runtime.coverAccountId ?: return
         saving++
         error = null
@@ -396,6 +399,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
             // Use the fallback when close is unavailable.
             try {
                 withContext(Dispatchers.IO) { repository.close(conversationId) }
+                if (runtime.coverAccountId == actor) onClosed()
                 if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
                     runtime.conversationActions.closeConversation()
                 }

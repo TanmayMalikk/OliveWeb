@@ -198,7 +198,9 @@ data class AccountCounts(
     val users: Int = 0,
     val safeContacts: Int = 0,
     val staff: Int = 0,
-    val admins: Int = 0
+    val admins: Int = 0,
+    val openTickets: Int = 0,
+    val closedTickets: Int = 0,
 )
 
 data class AdminAccountSummary(
@@ -211,6 +213,10 @@ data class AdminAccountSummary(
     val profileComplete: Boolean,
     val protected: Boolean,
     val assignedUsers: Int = 0,
+    val safetyPlans: Int = 0,
+    val completedSafetyPlans: Int = 0,
+    val supportChats: Int = 0,
+    val closedSupportChats: Int = 0,
 )
 
 data class AdminAccountDraft(
@@ -268,12 +274,15 @@ class AdminRepository {
 internal fun parseAdminAccounts(raw: Any?): Pair<AccountCounts, List<AdminAccountSummary>> {
     val root = raw.asMap()
     val counts = root["counts"].asMap()
+    val tickets = root["tickets"].asMap()
     val rows = root["accounts"] as? List<*> ?: emptyList<Any>()
     return AccountCounts(
         counts.int("USER"),
         counts.int("SAFE_CONTACT"),
         counts.int("STAFF"),
-        counts.int("ADMIN")
+        counts.int("ADMIN"),
+        tickets.int("open"),
+        tickets.int("closed"),
     ) to rows.mapNotNull { row ->
         row.asMap().takeIf { it.isNotEmpty() }?.let { value ->
             AdminAccountSummary(
@@ -286,6 +295,10 @@ internal fun parseAdminAccounts(raw: Any?): Pair<AccountCounts, List<AdminAccoun
                 value["profileComplete"] == true,
                 value["protected"] == true,
                 (value["assignedUsers"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
+                (value["safetyPlans"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
+                (value["completedSafetyPlans"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
+                (value["supportChats"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
+                (value["closedSupportChats"] as? Number)?.toInt()?.coerceAtLeast(0) ?: 0,
             )
         }
     }

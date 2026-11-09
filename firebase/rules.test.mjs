@@ -411,7 +411,7 @@ test('organization locations are written by users and readable only by admins', 
     updatedAt:Date.now(),active:true};
   await assertSucceeds(set(ref(user,path),point));
   await assertSucceeds(get(ref(admin,'adminLiveLocations')));
-  await assertFails(get(ref(staff,'adminLiveLocations')));
+  await assertSucceeds(get(ref(staff,'adminLiveLocations')));
   await assertFails(get(ref(safeContact,'adminLiveLocations')));
   await assertFails(set(ref(admin,path),point));
   await assertFails(set(ref(user,path),{...point,latitude:91}));

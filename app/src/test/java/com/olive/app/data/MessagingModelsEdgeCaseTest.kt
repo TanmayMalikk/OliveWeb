@@ -22,25 +22,26 @@ class MessagingModelsEdgeCaseTest {
         adminUid = "admin",
         supportOrigin = origin,
         supportTag = tag,
+        ticketSequence = 0L,
     )
 
-    // Inputs: the values shown below. Expected: users see anonymous support name while staff and admins see the user.
+    // Personal accounts see Olive Staff, while organization accounts see only the anonymous ticket number.
     @Test
-    fun usersSeeAnonymousSupportNameWhileStaffAndAdminsSeeTheUser() {
+    fun supportNamesHideBothStaffAndUserAccountNames() {
         val chat = conversation()
 
         assertEquals("Olive Staff", chat.displayName("owner", AccountRole.USER, "Olive Staff"))
         assertEquals("Olive Staff", chat.displayName("safe", AccountRole.SAFE_CONTACT, "Olive Staff"))
-        assertEquals("visible_user", chat.displayName("staff", AccountRole.STAFF, "Olive Staff"))
-        assertEquals("visible_user", chat.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Ticket #0", chat.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("Ticket #0", chat.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
     }
 
-    // Inputs: the values shown below. Expected: missing owner name uses safe fallback for organization accounts.
+    // A missing username does not change the anonymous ticket label shown to organization accounts.
     @Test
-    fun missingOwnerNameUsesSafeFallbackForOrganizationAccounts() {
+    fun missingOwnerNameStillUsesAnonymousTicketNumber() {
         val chat = conversation(usernames = mapOf("staff" to "real_staff"))
 
-        assertEquals("User", chat.displayName("staff", AccountRole.STAFF))
+        assertEquals("Ticket #0", chat.displayName("staff", AccountRole.STAFF))
     }
 
     // Inputs: the values shown below. Expected: direct chats show the other participant or conversation fallback.

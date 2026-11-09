@@ -350,6 +350,8 @@ internal class SessionCalls(
             throw error
         } catch (error: Exception) {
             message = error.message ?: "The voice call could not be completed"
+            // A failed API or room request returns to chat so its error cannot cover unrelated support screens.
+            if (state.value is VoipSessionState.Error) controller.dismiss()
         }
     }
 

@@ -67,6 +67,15 @@ internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 internal fun shouldShowCallOverlay(screen: SessionScreen, role: AccountRole): Boolean =
     screen == SessionScreen.Safe && role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
 
+// A failed call with no room attached is shown inside its eligible chat instead of covering every safe-app page.
+internal fun shouldShowActiveCall(state: VoipSessionState): Boolean = when (state) {
+    is VoipSessionState.Connecting,
+    is VoipSessionState.Active,
+    is VoipSessionState.Leaving -> true
+    is VoipSessionState.Error -> state.call != null
+    VoipSessionState.Idle -> false
+}
+
 internal fun resolveIncomingCaller(
     invitation: VoipInvitation,
     conversations: List<ChatConversation>,
@@ -88,7 +97,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
         resolveIncomingCaller(it, session.messages.conversations, callAccountId)
     }
     val callOverlayVisible = shouldShowCallOverlay(session.screen, session.accountRole) &&
-        (incomingCall != null || callState != VoipSessionState.Idle)
+        (incomingCall != null || shouldShowActiveCall(callState))
     val context = LocalContext.current
     var pendingCallPermissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val microphonePermission = rememberLauncherForActivityResult(
@@ -413,7 +422,7 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                     },
                 )
             }
-            if (callState != VoipSessionState.Idle) ActiveCallDialog(
+            if (shouldShowActiveCall(callState)) ActiveCallDialog(
                 state = callState,
                 currentUid = callAccountId,
                 onMute = session.calls::setMuted,

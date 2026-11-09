@@ -157,6 +157,7 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     val outgoingFriendRequests get() = runtime.state.outgoingFriendRequests
     val conversations get() = runtime.state.conversations
     val archivedConversationIds get() = runtime.state.archivedConversationIds
+    val restoredClosedConversationIds get() = runtime.state.restoredClosedConversationIds
     val privateContactNotes get() = runtime.state.privateContactNotes
     val activeConversation get() = runtime.state.activeConversation
     val chatQuickExitHintVisible get() = runtime.state.chatQuickExitHintVisible
@@ -243,7 +244,8 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun requestStaffForConversation(conversationId: String, onCreated: (String) -> Unit) =
         runtime.staffSupport.requestStaffForConversation(conversationId, onCreated)
     // Closes the support ticket and archives it for every participant.
-    fun closeSupportChat(conversationId: String) = runtime.staffSupport.close(conversationId)
+    fun closeSupportChat(conversationId: String, onClosed: () -> Unit = {}) =
+        runtime.staffSupport.close(conversationId, onClosed)
 }
 
 // Signed-in accounts and admins: connects profile, cover settings, and account management screens.

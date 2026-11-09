@@ -531,7 +531,11 @@ internal class SafetyPlanRepository(
             val row = plans.getJSONObject(index)
             SafetyConsultation(
                 row.getString("ownerUid"),
-                row.optString("ownerName")
+                row.optString("ownerName"),
+                row.optString("conversationId"),
+                row.optString("staffUid"),
+                row.optString("staffName"),
+                row.optLong("ticketNumber", -1L),
             )
         }
     }

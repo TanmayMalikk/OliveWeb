@@ -267,7 +267,10 @@ internal fun ChatPane(
                         .testTag("request_admin_help"),
                 ) { Text(stringResource(R.string.request_admin_help)) }
             }
-            if (session.accountRole == com.olive.app.data.AccountRole.STAFF &&
+            if (session.accountRole in setOf(
+                    com.olive.app.data.AccountRole.STAFF,
+                    com.olive.app.data.AccountRole.ADMIN,
+                ) &&
                 active.type == "SUPPORT" && active.closedAt == 0L) {
                 OutlinedButton(
                     onClick = { session.messages.closeSupportChat(active.id) },
@@ -533,7 +536,9 @@ internal fun ChatPane(
             onClose = { showChatInfo = false },
             onOpenMedia = { document, file -> openedMedia = document to file },
         )
-        session.calls.message?.takeIf { callState == VoipSessionState.Idle }?.let { message ->
+        session.calls.message?.takeIf {
+            callAllowed && callState == VoipSessionState.Idle
+        }?.let { message ->
             AlertDialog(
                 onDismissRequest = session.calls::clearMessage,
                 title = { Text(stringResource(R.string.ui_voice_call)) },

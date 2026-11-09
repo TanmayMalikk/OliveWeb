@@ -240,9 +240,9 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
     }
 }
 
-// Admins: shows every available user location on the protected organization map.
+// Staff and admins: shows every available user location on the protected organization map.
 
-/** Opens the admin feed and draws each user as a red live or last-known marker. */
+/** Opens the organization feed and draws each user as a red live or last-known marker. */
 @Composable
 internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)

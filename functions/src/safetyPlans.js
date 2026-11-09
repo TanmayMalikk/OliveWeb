@@ -67,7 +67,15 @@ exports.safetyPlanConsultations = onCall({invoker: "public"}, async (request) =>
   const settings = caller.role === "STAFF" ? await db.collection("safetyStaff").doc(caller.uid).get() : null;
   return {available: caller.role === "STAFF" ? settings.data()?.available !== false : true,
     plans: snapshot.docs.filter((document) => document.data().consultationRequested === true)
-        .map((document) => ({ownerUid: document.id, ownerName: document.data().ownerName || "", updatedAt: document.data().updatedAt}))};
+        .map((document) => ({
+          ownerUid: document.id,
+          ownerName: document.data().ownerName || "",
+          conversationId: document.data().consultationConversationId || "",
+          ticketNumber: Number.isSafeInteger(document.data().ticketNumber) ? document.data().ticketNumber : -1,
+          staffUid: document.data().staffUid || "",
+          staffName: document.data().staffName || "",
+          updatedAt: document.data().updatedAt,
+        }))};
 });
 exports.safetyPlanAvailability = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);

@@ -6,23 +6,54 @@ const {readProfile, writeProfile, saveOrganizationLogin, requireAdmin, listEvery
 
 exports.adminListAccounts = onCall(async (request) => {
   await requireAdmin(request);
-  const users = await listEveryUser();
+  const [users, supportSnapshot] = await Promise.all([
+    listEveryUser(),
+    db.collection("conversations").where("type", "==", "SUPPORT").get(),
+  ]);
+  const workloadByStaff = new Map();
+  let openTickets = 0;
+  let closedTickets = 0;
+  supportSnapshot.docs.forEach((document) => {
+    const conversation = document.data();
+    const closed = Boolean(conversation.closedAt);
+    if (closed) closedTickets += 1;
+    else openTickets += 1;
+    const staffUid = text(conversation.staffUid, 128);
+    if (!staffUid) return;
+    const workload = workloadByStaff.get(staffUid) || {
+      safetyPlans: 0, completedSafetyPlans: 0, supportChats: 0, closedSupportChats: 0,
+    };
+    const planConsult = conversation.supportOrigin === "PLAN_CONSULT" || conversation.supportTag === "PLAN_CONSULT";
+    if (planConsult) {
+      workload.safetyPlans += 1;
+      if (closed) workload.completedSafetyPlans += 1;
+    } else {
+      workload.supportChats += 1;
+      if (closed) workload.closedSupportChats += 1;
+    }
+    workloadByStaff.set(staffUid, workload);
+  });
   const accounts = await Promise.all(users.map(async (user) => {
     const profile = await readProfile(user.uid);
     const role = roleFromUser(user, profile);
     const username = text(profile?.username || user.displayName || user.email?.split("@")[0], 24).toLowerCase();
     const staffSettings = role === "STAFF" ? (await db.collection("safetyStaff").doc(user.uid).get()).data() : null;
+    const workload = workloadByStaff.get(user.uid) || {};
     return {
       uid: user.uid, username, role, fullName: text(profile?.fullName, 120), email: user.email || "",
       phone: text(profile?.phone || user.phoneNumber, 40), profileComplete: profileComplete(role, profile),
       protected: user.uid === request.auth.uid || protectedAccount(user, username),
       assignedUsers: role === "STAFF" ? (staffSettings?.activeCount || 0) : 0,
+      safetyPlans: role === "STAFF" ? (workload.safetyPlans || 0) : 0,
+      completedSafetyPlans: role === "STAFF" ? (workload.completedSafetyPlans || 0) : 0,
+      supportChats: role === "STAFF" ? (workload.supportChats || 0) : 0,
+      closedSupportChats: role === "STAFF" ? (workload.closedSupportChats || 0) : 0,
     };
   }));
   const counts = {USER: 0, SAFE_CONTACT: 0, STAFF: 0, ADMIN: 0};
   accounts.forEach((item) => { counts[item.role] += 1; });
   accounts.sort((a, b) => a.role.localeCompare(b.role) || a.username.localeCompare(b.username));
-  return {counts, accounts};
+  return {counts, tickets: {open: openTickets, closed: closedTickets}, accounts};
 });
 
 exports.adminCreateAccount = onCall(async (request) => {

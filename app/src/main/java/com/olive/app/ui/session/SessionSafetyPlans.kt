@@ -392,7 +392,15 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         try {
             val cached = withContext(Dispatchers.IO) { store.all(actor) }
             if (authorized() && actor == runtime.coverAccountId) consultations =
-                cached.map { SafetyConsultation(it.ownerUid, it.ownerName) }
+                cached.map {
+                    SafetyConsultation(
+                        it.ownerUid,
+                        it.ownerName,
+                        it.consultationConversationId,
+                        it.staffUid,
+                        it.staffName,
+                    )
+                }
             if (!hasValidatedInternetConnection(runtime.application)) return
             val result = repository.consultations()
             withContext(Dispatchers.IO) {

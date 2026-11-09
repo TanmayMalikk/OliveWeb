@@ -38,18 +38,27 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private data class SafetyAttachmentTarget(
+    val fieldKey: String,
+    val itemId: String,
+    val uploadTag: String,
+)
+
 // shared safe app safety plan screen shows this safety plan screen so the user can view its details and use its actions.
 @Composable
 internal fun SafetyPlanScreen(
     session: SessionViewModel, ownerUid: String = session.coverAccountId.orEmpty(),
-    ownerName: String = session.coverUsername, onBack: () -> Unit = session.navigation::back
+    ownerName: String = session.coverUsername,
+    displayOwnerName: String = ownerName,
+    onCompleteConsultation: (() -> Unit)? = null,
+    onBack: () -> Unit = session.navigation::back,
 ) {
     val controller = session.safetyPlans
     val documentController = session.documents
     val context = LocalContext.current
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
-    var pendingDocumentAttachmentTag by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingDocumentAttachment by remember { mutableStateOf<SafetyAttachmentTarget?>(null) }
     // Hides the keyboard before leaving or switching safety-plan sections.
     fun leaveEditor() {
         focus.clearFocus(force = true)
@@ -124,7 +133,7 @@ internal fun SafetyPlanScreen(
                     }
                 }
                 if (organizationEditor || safeContact) Text(
-                    ownerName,
+                    displayOwnerName,
                     style = MaterialTheme.typography.labelLarge
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -146,6 +155,15 @@ internal fun SafetyPlanScreen(
                         label = { Text(stringResource(R.string.safety_backup)) },
                         modifier = Modifier.weight(1f).testTag("safety_backup")
                     )
+                }
+                if (session.accountRole == AccountRole.STAFF && onCompleteConsultation != null) {
+                    OutlinedButton(
+                        onClick = onCompleteConsultation,
+                        enabled = controller.saving == 0 && session.staffSupport.saving == 0,
+                        modifier = Modifier.fillMaxWidth().testTag("complete_safety_consultation"),
+                    ) {
+                        Text(stringResource(R.string.safety_mark_consultation_complete))
+                    }
                 }
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -239,9 +257,11 @@ internal fun SafetyPlanScreen(
                                         documentController.state.files else emptyList(),
                                     onUploadDocument = if (!organizationEditor && !safeContact && section == "documents") {
                                         { itemId ->
-                                            pendingDocumentAttachmentTag = safetyChecklistAttachmentTag(
-                                                "${prefix}_documents",
-                                                itemId,
+                                            val fieldKey = "${prefix}_documents"
+                                            pendingDocumentAttachment = SafetyAttachmentTarget(
+                                                fieldKey = fieldKey,
+                                                itemId = itemId,
+                                                uploadTag = safetyChecklistAttachmentTag(fieldKey, itemId),
                                             )
                                         }
                                     } else null,
@@ -323,9 +343,20 @@ internal fun SafetyPlanScreen(
     }
     SafetyDocumentUploadFlow(
         session = session,
-        visible = pendingDocumentAttachmentTag != null,
-        onDismiss = { pendingDocumentAttachmentTag = null },
-        tags = setOfNotNull("Safety Plan", pendingDocumentAttachmentTag),
+        visible = pendingDocumentAttachment != null,
+        onDismiss = { pendingDocumentAttachment = null },
+        tags = setOfNotNull("Safety Plan", pendingDocumentAttachment?.uploadTag),
+        onSelectExisting = { document ->
+            val target = pendingDocumentAttachment ?: return@SafetyDocumentUploadFlow
+            val field = controller.plan?.fields?.get(target.fieldKey) ?: return@SafetyDocumentUploadFlow
+            val changed = readSafetyChecklist(field.value).map { item ->
+                if (item.id == target.itemId) item.copy(
+                    attachmentIds = (item.attachmentIds + document.id).distinct().takeLast(80),
+                    excludedAttachmentIds = item.excludedAttachmentIds - document.id,
+                ) else item
+            }
+            controller.edit(target.fieldKey, writeSafetyChecklist(changed))
+        },
     )
 }
 

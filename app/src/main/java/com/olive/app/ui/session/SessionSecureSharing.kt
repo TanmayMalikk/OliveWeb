@@ -498,6 +498,7 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var outgoingFriendRequests by mutableStateOf(emptyList<FriendRequest>())
     var conversations by mutableStateOf(emptyList<ChatConversation>())
     var archivedConversationIds by mutableStateOf(emptySet<String>())
+    var restoredClosedConversationIds by mutableStateOf(emptySet<String>())
     var privateContactNotes by mutableStateOf(emptyMap<String, PrivateContactNote>())
     // Counts changes to read message.
     var readMessageVersion by mutableIntStateOf(0)

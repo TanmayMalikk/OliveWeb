@@ -113,6 +113,7 @@ internal fun SafetyChecklistSection(
                     onRemoveAttachment = { document ->
                         update(items.map {
                             if (it.id == item.id) it.copy(
+                                attachmentIds = it.attachmentIds - document.id,
                                 excludedAttachmentIds =
                                     (it.excludedAttachmentIds + document.id).distinct().takeLast(80),
                             ) else it
