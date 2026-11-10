@@ -101,4 +101,5 @@
     <string name="documents_download_failed">تعذر تنزيل الملف المشفر. حاول مرة أخرى.</string>
     <string name="documents_device_verification_failed">تعذر التحقق من تثبيت التطبيق. أعد فتح التطبيق وحاول مرة أخرى.</string>
     <string name="documents_open_failed">تعذر فتح الملف المشفر.</string>
+    <string name="documents_opening_securely">جارٍ الفتح بأمان…</string>
 </resources>

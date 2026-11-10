@@ -101,4 +101,5 @@
     <string name="documents_download_failed">Le fichier chiffré n’a pas pu être téléchargé. Réessayez.</string>
     <string name="documents_device_verification_failed">Cette installation n’a pas pu être vérifiée. Rouvrez l’application et réessayez.</string>
     <string name="documents_open_failed">Le fichier chiffré n’a pas pu être ouvert.</string>
+    <string name="documents_opening_securely">Ouverture sécurisée…</string>
 </resources>

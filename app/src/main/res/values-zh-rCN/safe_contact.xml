@@ -101,4 +101,5 @@
     <string name="documents_download_failed">无法下载加密文件。请重试。</string>
     <string name="documents_device_verification_failed">无法验证此应用安装。请重新打开应用后重试。</string>
     <string name="documents_open_failed">无法打开加密文件。</string>
+    <string name="documents_opening_securely">正在安全打开…</string>
 </resources>

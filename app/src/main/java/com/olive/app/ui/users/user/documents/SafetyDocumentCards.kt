@@ -46,6 +46,7 @@ internal fun SafetyDocumentCard(
     file: SafetyDocument, currentUid: String, friends: List<Friend>, onOpen: () -> Unit,
     offline: OfflineMediaAvailability, onShare: () -> Unit, onDelete: () -> Unit,
     onMakeOffline: () -> Unit, onRemoveOffline: () -> Unit,
+    opening: Boolean,
     evidenceUpdating: Boolean,
     onEvidenceChange: (Boolean) -> Unit,
 ) {
@@ -121,13 +122,15 @@ internal fun SafetyDocumentCard(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onOpen,
-                    modifier = Modifier.weight(1f)
+                    enabled = !opening,
+                    modifier = Modifier.weight(1f).testTag("document_open_${file.id}"),
                 ) {
-                    Icon(Icons.Outlined.Visibility, null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        stringResource(R.string.open)
-                    )
+                    if (opening) SecureFileOpeningIndicator()
+                    else {
+                        Icon(Icons.Outlined.Visibility, null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.open))
+                    }
                 }
                 // Owners can share the document; recipients only get the open action.
                 if (own) OutlinedButton(onClick = onShare, modifier = Modifier.weight(1f)) {

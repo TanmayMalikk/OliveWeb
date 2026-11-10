@@ -46,6 +46,9 @@ internal class SafetyDocumentsController(
     private val scope: CoroutineScope,
     private val repository: SafetyDocumentDataSource?,
     private val media: MediaTransferOperations?,
+    private val failureMessageResolver: (Throwable) -> String = {
+        context.getString(mediaFailureResource(it))
+    },
 ) {
     private val applicationContext = context.applicationContext
     private var generation = 0
@@ -148,20 +151,25 @@ internal class SafetyDocumentsController(
     // Downloads and decrypts an allowed document, then opens its in-app viewer.
     fun download(document: SafetyDocument, onReady: (File) -> Unit) {
         val viewerUid = state.ownerUid ?: return
+        if (!beginOpening(document.id)) return
         val token = generation
         scope.launch {
-            state = state.copy(loading = true, error = null)
-            runCatching { openDocument(document, viewerUid) }
-                .onSuccess { file ->
-                    if (token == generation && state.ownerUid == viewerUid) onReady(file)
-                }
-                .onFailure { failure ->
-                    if (token == generation) {
-                        state = state.copy(error = localizedFailure(failure),
-                            attachmentErrors = state.attachmentErrors + (document.id to localizedFailure(failure)))
+            try {
+                runCatching { openDocument(document, viewerUid) }
+                    .onSuccess { file ->
+                        if (token == generation && state.ownerUid == viewerUid) onReady(file)
                     }
-                }
-            if (token == generation) state = state.copy(loading = false)
+                    .onFailure { failure ->
+                        if (token == generation) {
+                            val message = localizedFailure(failure)
+                            state = state.copy(error = message,
+                                attachmentErrors = state.attachmentErrors +
+                                    (document.id to message))
+                        }
+                    }
+            } finally {
+                finishOpening(document.id, token)
+            }
         }
     }
 
@@ -170,34 +178,30 @@ internal class SafetyDocumentsController(
         viewerUid: String,
         documentId: String,
         onReady: (SafetyDocument, File) -> Unit,
-        onFinished: () -> Unit
     ) {
         if (state.ownerUid != viewerUid) {
             generation++
             state = SafetyDocumentsState(ownerUid = viewerUid)
         }
+        if (!beginOpening(documentId)) return
         val token = generation
         scope.launch {
-            state = state.copy(loading = true, error = null)
-            runCatching {
-                val source = checkNotNull(repository)
-                val document = if (hasValidatedInternetConnection(applicationContext)) {
-                    source.getFor(viewerUid, documentId)
-                } else source.cachedFor(viewerUid, documentId)
-                    ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
-                val file = openDocument(document, viewerUid)
-                if (token == generation && state.ownerUid == viewerUid) {
-                    state = state.copy(attachmentErrors = state.attachmentErrors - documentId)
-                    onReady(document, file)
-                }
-            }.onFailure { if (token == generation) {
-                val message = localizedFailure(it)
-                state = state.copy(error = message,
-                    attachmentErrors = state.attachmentErrors + (documentId to message))
-            } }
-            if (token == generation) {
-                state = state.copy(loading = false)
-                onFinished()
+            try {
+                runCatching {
+                    val source = checkNotNull(repository)
+                    val document = if (hasValidatedInternetConnection(applicationContext)) {
+                        source.getFor(viewerUid, documentId)
+                    } else source.cachedFor(viewerUid, documentId)
+                        ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
+                    val file = openDocument(document, viewerUid)
+                    if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
+                }.onFailure { if (token == generation) {
+                    val message = localizedFailure(it)
+                    state = state.copy(error = message,
+                        attachmentErrors = state.attachmentErrors + (documentId to message))
+                } }
+            } finally {
+                finishOpening(documentId, token)
             }
         }
     }
@@ -398,8 +402,24 @@ internal class SafetyDocumentsController(
             checkNotNull(repository).download(applicationContext, document)
         }
 
+    private fun beginOpening(documentId: String): Boolean {
+        if (documentId in state.openingDocumentIds) return false
+        state = state.copy(
+            error = null,
+            attachmentErrors = state.attachmentErrors - documentId,
+            openingDocumentIds = state.openingDocumentIds + documentId,
+        )
+        return true
+    }
+
+    private fun finishOpening(documentId: String, token: Int) {
+        if (token == generation) {
+            state = state.copy(openingDocumentIds = state.openingDocumentIds - documentId)
+        }
+    }
+
     private fun localizedFailure(failure: Throwable): String {
-        return applicationContext.getString(mediaFailureResource(failure))
+        return failureMessageResolver(failure)
     }
 }
 
