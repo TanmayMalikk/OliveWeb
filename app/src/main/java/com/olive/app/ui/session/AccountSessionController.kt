@@ -12,6 +12,9 @@ import com.olive.app.location.LiveLocationController
 import com.olive.app.location.AdminLocationService
 import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.data.messaging.VoipPushTokenRegistration
+import com.olive.app.data.sync.PriorityReconciliationWorker
+import com.olive.app.data.sync.SyncCheckpointStore
+import com.olive.app.data.SafetyAccessIndexStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -249,6 +252,8 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 val uid = enrollment!!.uid
                 accountSyncSubscription?.close()
                 accountSyncSubscription = null
+                prioritySync.stop()
+                PriorityReconciliationWorker.cancel(application, uid)
                 LocalNotificationEventHandler.cancel(application)
                 if (LiveLocationController.active(application)) LiveLocationController.stop(
                     application
@@ -275,6 +280,8 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             chatCache.purge(uid)
                             documentIndex.purge(uid)
                             offlineMediaCache.purge(uid)
+                            SafetyAccessIndexStore(application).purge(uid)
+                            SyncCheckpointStore(application).purge(uid)
                         }
                         // Cloud accounts also remove their Firebase sign-in record.
                         if (!localMode) runCatching {
@@ -381,6 +388,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
         accountSyncSubscription?.close()
         accountSyncSubscription = null
         if (localMode) return@with
+        prioritySync.start(identity.uid)
         accountSyncSubscription = AccountSyncRepository().observe(
             identity.uid,
             onChange = {

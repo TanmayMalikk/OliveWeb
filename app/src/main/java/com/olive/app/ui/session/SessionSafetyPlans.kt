@@ -20,12 +20,15 @@ import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.olive.app.data.sync.SyncCompletionEvents
+import kotlinx.coroutines.flow.collect
 import javax.crypto.Cipher
 
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
 internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     private val store = SafetyPlanStore(runtime.application, runtime.localMode)
+    private val accessIndex = SafetyAccessIndexStore(runtime.application)
     private val repository by lazy { SafetyPlanRepository() }
     private val writes = Mutex()
     private val sync = Mutex()
@@ -45,6 +48,22 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         private set
     var available by mutableStateOf(true)
         private set
+
+    init {
+        runtime.scope.launch {
+            SyncCompletionEvents.events.collect { uid ->
+                if (uid == runtime.coverAccountId) loadCachedAccessLists(uid)
+            }
+        }
+    }
+
+    private suspend fun loadCachedAccessLists(actor: String) {
+        val cached = withContext(Dispatchers.IO) { accessIndex.read(actor) }
+        if (!authorized() || actor != runtime.coverAccountId) return
+        available = cached.available
+        consultations = cached.consultations
+        sharedPlans = cached.sharedPlans
+    }
 
     // Allows plan work only while the signed-in role is on a screen that may use safety plans.
     private fun authorized() = runtime.enrollment != null &&
@@ -279,10 +298,12 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         runtime.scope.launch {
             // Turn an unexpected refresh shared plans failure into a readable message.
             try {
+                if (actor != null) loadCachedAccessLists(actor)
                 val result = repository.sharedWithMe()
                 if (actor != null && runtime.coverAccountId == actor && authorized() && generation == token) {
                     sharedPlans = result
                     error = null
+                    withContext(Dispatchers.IO) { accessIndex.replaceShared(actor, result) }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -390,14 +411,14 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val actor = runtime.coverAccountId ?: return
         // Turn an unexpected refresh consultations failure into a readable message.
         try {
-            val cached = withContext(Dispatchers.IO) { store.all(actor) }
-            if (authorized() && actor == runtime.coverAccountId) consultations =
-                cached.map { SafetyConsultation(it.ownerUid, it.ownerName) }
+            loadCachedAccessLists(actor)
             if (!hasValidatedInternetConnection(runtime.application)) return
             val result = repository.consultations()
             withContext(Dispatchers.IO) {
+                val cached = store.all(actor)
                 cached.filter { old -> result.second.none { it.ownerUid == old.ownerUid } }
                     .forEach { store.remove(actor, it.ownerUid) }
+                accessIndex.replaceConsultations(actor, result.first, result.second)
             }
             if (authorized() && actor == runtime.coverAccountId) {
                 available = result.first
