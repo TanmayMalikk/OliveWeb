@@ -282,4 +282,9 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
     fun remove(actorUid: String, ownerUid: String) {
         vault.update { it.optJSONObject(actorUid)?.remove(ownerUid) }
     }
+
+    // Removes every cached plan belonging to one signed-in actor.
+    fun purge(actorUid: String) {
+        vault.update { it.remove(actorUid) }
+    }
 }
