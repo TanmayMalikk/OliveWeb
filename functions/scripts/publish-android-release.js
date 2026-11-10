@@ -28,7 +28,8 @@ if (!Number.isSafeInteger(minimumSupportedVersionCode) || minimumSupportedVersio
 const bytes = readFileSync(apkPath);
 const sizeBytes = statSync(apkPath).size;
 const sha256 = createHash("sha256").update(bytes).digest("hex");
-const objectName = `public/android/releases/${versionCode}/olive-branch-${versionName}.apk`;
+const apkFileName = `OliveBranch${versionName}.apk`;
+const objectName = `public/android/releases/${versionCode}/${apkFileName}`;
 const encodedObject = encodeURIComponent(objectName);
 const apkUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedObject}?alt=media`;
 const notes = (process.env.OLIVE_RELEASE_NOTES || "")
@@ -58,7 +59,7 @@ async function publish() {
     metadata: {
       contentType: "application/vnd.android.package-archive",
       // Mobile browsers otherwise name the download after the encoded Storage path.
-      contentDisposition: `attachment; filename="olive-branch-${versionName}.apk"`,
+      contentDisposition: `attachment; filename="${apkFileName}"`,
       cacheControl: "public,max-age=31536000,immutable",
       metadata: { versionCode: String(versionCode), versionName, sha256 },
     },

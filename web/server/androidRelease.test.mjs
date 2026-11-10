@@ -8,7 +8,7 @@ const valid = {
   versionName: "1.0.0",
   minimumSupportedVersionCode: 1,
   apkUrl:
-    "https://firebasestorage.googleapis.com/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2Freleases%2F10001%2Folive-branch-1.0.0.apk?alt=media",
+    "https://firebasestorage.googleapis.com/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2Freleases%2F10001%2FOliveBranchv1.0.0.0.apk?alt=media",
   sha256: "a".repeat(64),
   sizeBytes: 123456,
   publishedAt: "2026-11-09T00:00:00Z",
