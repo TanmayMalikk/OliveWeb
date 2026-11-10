@@ -45,6 +45,16 @@ class VideoCompressionPolicyTest {
     }
 
     @Test
+    fun highFrameRateInputUsesThirtyFpsEncoderBudget() {
+        val thirtyFps=VideoCompressionPolicy.targetBitrate(1_920,1_080,30f)
+
+        listOf(60f,120f,240f).forEach { sourceFrameRate ->
+            assertEquals(thirtyFps,
+                VideoCompressionPolicy.targetBitrate(1_920,1_080,sourceFrameRate))
+        }
+    }
+
+    @Test
     fun isoAndEbmlSignaturesRejectSpoofedContainers() {
         val iso=temporary(ByteArray(24).apply { "ftyp".encodeToByteArray().copyInto(this,4) })
         val ebml=temporary(byteArrayOf(0x1a,0x45,0xdf.toByte(),0xa3.toByte())+ByteArray(20))
