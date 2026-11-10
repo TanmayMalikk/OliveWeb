@@ -1,0 +1,258 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-unit:
+    name: Android unit tests and coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Run Android unit tests and create coverage report
+        run: ./gradlew :app:createDebugUnitTestCoverageReport --stacktrace
+
+      - name: Enforce Android line coverage threshold
+        run: python3 scripts/check_coverage.py jacoco app/build/reports/coverage/test/debug/report.xml 10 --name Android
+
+      - name: Upload Android coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-coverage
+          path: app/build/reports/coverage/test/debug/
+          if-no-files-found: warn
+          retention-days: 14
+
+  web-unit:
+    name: Web unit tests and coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci --ignore-scripts
+
+      - name: Prepare JUnit report directory
+        run: mkdir -p ../build/reports
+
+      - name: Run web unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Enforce web line coverage threshold
+        run: python3 ../scripts/check_coverage.py lcov coverage/lcov.info 10 --name Web
+
+      - name: Upload web coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: web/coverage/
+          if-no-files-found: warn
+          retention-days: 14
+
+  functions-unit:
+    name: Cloud Functions unit tests and coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - run: npm ci
+
+      - name: Prepare JUnit report directory
+        run: mkdir -p ../build/reports
+
+      - name: Run Cloud Functions tests with coverage
+        run: npm run test:coverage
+
+      - name: Enforce Functions line coverage threshold
+        run: python3 ../scripts/check_coverage.py lcov coverage/lcov.info 30 --name "Cloud Functions"
+
+      - name: Upload Functions coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functions-coverage
+          path: functions/coverage/
+          if-no-files-found: warn
+          retention-days: 14
+
+  android-build-and-lint:
+    name: Android build, UI-test APK, lint, and architecture
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build APKs, run lint, and check architecture
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :checkArchitecture --stacktrace
+
+  web-browser:
+    name: Web production build, browser, and accessibility tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci --ignore-scripts
+
+      - name: Prepare JUnit report directory
+        run: mkdir -p ../build/reports
+
+      - name: Build production web app
+        run: npm run build
+
+      - name: Install Chrome for Playwright
+        run: npx playwright install --with-deps chrome
+
+      - name: Run browser flows and accessibility checks
+        run: npm run test:e2e
+
+  functions-audit:
+    name: Cloud Functions production dependency audit
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev
+
+  firebase-rules:
+    name: Firebase rules emulator tests
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firebase
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: firebase/package-lock.json
+
+      - name: Install Firebase test dependencies
+        run: npm ci
+
+      - name: Install Cloud Functions dependencies used by safety-plan tests
+        run: npm ci --prefix ../functions
+
+      - name: Prepare JUnit report directory
+        run: mkdir -p ../build/reports
+
+      - name: Run Firestore and Storage rules tests
+        run: npm test
+
+  report-ci-failure:
+    name: Report default-branch CI failures
+    if: >-
+      failure() &&
+      github.event_name == 'push' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs:
+      - android-unit
+      - web-unit
+      - functions-unit
+      - android-build-and-lint
+      - web-browser
+      - functions-audit
+      - firebase-rules
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update the CI failure issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          title="CI failure on default branch"
+          body="CI failed on the default branch for commit \`${COMMIT_SHA}\`.
+
+          Workflow run: ${RUN_URL}
+
+          The workflow will update this open issue on subsequent failures rather than opening a duplicate."
+          existing_issue="$(gh issue list --state open --search "in:title ${title}" --json number,title --jq '.[] | select(.title == "CI failure on default branch") | .number' | head -n 1)"
+
+          if [[ -n "$existing_issue" ]]; then
+            gh issue comment "$existing_issue" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
