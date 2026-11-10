@@ -1,13 +1,7 @@
-// All account roles: checks usernames, passwords, account roles, network state, and cover state persistence.
+// All account roles: checks usernames, passwords, account roles, and account setup requirements.
 package com.olive.app.data
 
-import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import com.olive.app.security.EncryptedVault
 import com.olive.app.security.InputPolicy
-import com.olive.app.security.child
-import org.json.JSONArray
 
 enum class AccountSetupStep { PersonalProfile, PrivateTrigger, DevicePin, OrganizationProfile, Ready }
 
@@ -61,52 +55,3 @@ object AccountPolicy {
     }
 }
 
-// Shared connectivity check for features that require a verified internet path.
-internal fun hasValidatedInternetConnection(context: Context): Boolean {
-    val manager = context.getSystemService(ConnectivityManager::class.java)
-    val capabilities = manager.getNetworkCapabilities(manager.activeNetwork) ?: return false
-    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-}
-
-// Persists account-isolated state for the cover applications.
-class CoverStateStore(private val vault: EncryptedVault) {
-    // Restores the saved news feed for the given account.
-    fun restore(uid: String): List<NewsArticle> = news(uid)
-
-    // Reads cached news articles from the encrypted local vault.
-    fun news(uid: String): List<NewsArticle> {
-        val item = vault.read().optJSONObject("accounts")?.optJSONObject(uid) ?: return emptyList()
-        val rows = item.optJSONArray("news") ?: JSONArray()
-        return (0 until rows.length()).mapNotNull { index ->
-            runCatching { NewsArticle.fromJson(rows.getJSONObject(index)) }.getOrNull()
-        }
-    }
-
-    // Saves cached news articles into the encrypted local vault.
-    fun saveNews(uid: String, articles: List<NewsArticle>) {
-        vault.update { root ->
-            root.child("accounts").child(uid).put(
-                "news",
-                JSONArray().also { rows -> articles.forEach { rows.put(it.toJson()) } },
-            )
-        }
-    }
-}
-
-// Represents one message in an encrypted conversation.
-data class ChatMessage(
-    val id: String,
-    val senderUid: String,
-    val senderUsername: String,
-    val body: String,
-    val sentAt: Long,
-    val unsent: Boolean = false,
-    val deliveryStatus: MessageDeliveryStatus = MessageDeliveryStatus.SENT,
-    val deliveryFailureCode: String? = null,
-)
-
-// Gives each screen one handle for stopping a live chat listener safely.
-fun interface ChatSubscription {
-    fun close()
-}
