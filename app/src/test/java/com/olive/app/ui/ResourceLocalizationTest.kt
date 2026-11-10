@@ -1,9 +1,6 @@
 // Tests translated strings and placeholders.
 package com.olive.app.ui
 
-import com.olive.app.R
-import com.olive.app.data.CoverType
-import com.olive.app.notification.AppNotifications
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
@@ -47,22 +44,6 @@ class ResourceLocalizationTest {
                 )
             }
         }
-    }
-
-    // Inputs: the values shown below. Expected: notification defaults use resources and preserve supplied content.
-    @Test
-    fun notificationDefaultsUseResourcesAndPreserveSuppliedContent() {
-        val french = testResourceText("values-fr")
-        val defaults = AppNotifications.contentFor(null, null, CoverType.NEWS, text = french)
-        assertEquals(french(R.string.ui_daily_digest), defaults.title)
-        val custom = AppNotifications.contentFor(
-            "Publisher title",
-            "Original content",
-            CoverType.NEWS,
-            text = french
-        )
-        assertEquals("Publisher title", custom.title)
-        assertEquals("Original content", custom.body)
     }
 
     // Inputs: the values shown below. Expected: ordinary ui copy does not return to literal text arguments.

@@ -1,8 +1,6 @@
 // Users and safe contacts: keeps active voice calls running and registers device push tokens for incoming call alerts.
 package com.olive.app.data.messaging
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
@@ -30,13 +28,7 @@ import kotlinx.coroutines.tasks.await
 class VoipCallForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            getString(R.string.ui_voice_call),
-            NotificationManager.IMPORTANCE_LOW,
-        )
-        channel.description = getString(R.string.ui_call_running_in_background)
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        OliveNotificationManager.createNotificationChannels(this)
     }
 
     // Android requires the foreground notification immediately after the call service starts.
@@ -57,13 +49,12 @@ class VoipCallForegroundService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, OliveNotificationManager.CHANNEL_ACTIVE_CALLS)
             .setSmallIcon(R.drawable.ic_notification_olive_branch)
             .setContentTitle(getString(R.string.ui_voice_call))
             .setContentText(getString(R.string.ui_call_running_in_background))
             .setContentIntent(pendingIntent)
             .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
                 getString(R.string.ui_end_call),
@@ -96,7 +87,6 @@ class VoipCallForegroundService : Service() {
         internal const val ACTION_QUICK_EXIT = "com.olive.app.voip.QUICK_EXIT"
         internal const val CALL_ACTION_SCHEME = "olive-call-action"
         private const val EXTRA_CALL_ID = "call_id"
-        private const val CHANNEL_ID = "olive_voice_call"
         private const val NOTIFICATION_ID = 8_107
 
         // Starts the notification while the call room is connecting or connected.

@@ -114,4 +114,8 @@
     <string name="password_excludes_username">密码不能包含用户名。</string>
 <string name="ocr_no_text">未从文档中识别出文字。</string>
     <string name="ocr_error_detail">OCR 错误：%1$s</string>
+    <string name="notification_active_voice_calls">进行中的语音通话</string>
+    <string name="notification_safe_app_updates">安全应用动态</string>
+    <string name="notification_safe_app_activity">打开 Olive Branch 查看更新。</string>
+    <string name="notification_new_app_update">应用有新版本</string>
 </resources>
