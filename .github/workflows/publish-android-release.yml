@@ -115,7 +115,27 @@ jobs:
           EOF
 
       - name: Run release checks and build signed APK
-        run: ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease --stacktrace
+        shell: bash
+        run: |
+          set -o pipefail
+          max_attempts=3
+
+          for attempt in $(seq 1 "$max_attempts"); do
+            echo "Gradle release attempt $attempt of $max_attempts"
+
+            if ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease --stacktrace; then
+              exit 0
+            fi
+
+            if (( attempt == max_attempts )); then
+              echo "Gradle release checks failed after $max_attempts attempts." >&2
+              exit 1
+            fi
+
+            wait_seconds=$((attempt * 30))
+            echo "The dependency server or build failed. Retrying in $wait_seconds seconds..."
+            sleep "$wait_seconds"
+          done
 
       - name: Verify APK signature
         shell: bash
