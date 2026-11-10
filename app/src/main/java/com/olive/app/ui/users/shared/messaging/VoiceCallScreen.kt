@@ -53,7 +53,10 @@ internal fun IncomingCallDialog(
     invitation: VoipInvitation,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
+    onQuickExit: () -> Unit,
 ) = FullScreenCallDialog(onBack = onDecline) {
+    QuickExitCallButton(onQuickExit, Modifier.align(Alignment.End))
+    Spacer(Modifier.height(20.dp))
     CallIdentity(
         name = invitation.name.ifBlank { stringResource(R.string.ui_voice_call) },
         status = stringResource(R.string.ui_incoming_call),
@@ -114,15 +117,7 @@ internal fun ActiveCallDialog(
             )
         }
         Spacer(Modifier.width(10.dp))
-        Button(
-            onClick = onQuickExit,
-            colors = ButtonDefaults.buttonColors(containerColor = CallRed),
-            modifier = Modifier.testTag("call_quick_exit"),
-        ) {
-            Icon(Icons.Outlined.Close, null)
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.quick_exit))
-        }
+        QuickExitCallButton(onQuickExit)
     }
     Spacer(Modifier.height(20.dp))
     val active = state as? VoipSessionState.Active
@@ -293,6 +288,19 @@ private fun Offset.coerceInside(parent: IntSize, child: IntSize): Offset = Offse
     x = x.coerceIn(0f, (parent.width - child.width).coerceAtLeast(0).toFloat()),
     y = y.coerceIn(0f, (parent.height - child.height).coerceAtLeast(0).toFloat()),
 )
+
+@Composable
+private fun QuickExitCallButton(onQuickExit: () -> Unit, modifier: Modifier = Modifier) {
+    Button(
+        onClick = onQuickExit,
+        colors = ButtonDefaults.buttonColors(containerColor = CallRed),
+        modifier = modifier.testTag("call_quick_exit"),
+    ) {
+        Icon(Icons.Outlined.Close, null)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.quick_exit))
+    }
+}
 
 @Composable
 private fun FullScreenCallDialog(

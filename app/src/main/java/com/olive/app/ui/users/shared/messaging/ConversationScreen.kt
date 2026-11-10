@@ -97,16 +97,22 @@ internal fun ChatPane(
     val microphonePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        session.endCallPermissionRequest()
         val action = permissionAction
         permissionAction = null
-        if (granted) action?.invoke()
-        else session.calls.report(uiText(R.string.ui_microphone_permission_required))
+        if (session.screen == SessionScreen.Safe &&
+            session.messages.activeConversation?.id == active.id
+        ) {
+            if (granted) action?.invoke()
+            else session.calls.report(uiText(R.string.ui_microphone_permission_required))
+        }
     }
     val withMicrophonePermission: (() -> Unit) -> Unit = { action ->
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) action() else {
             permissionAction = action
+            session.beginCallPermissionRequest()
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -220,7 +226,8 @@ internal fun ChatPane(
                 if (exit != null) FilledTonalButton(
                     onClick = exit,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier.heightIn(min = 44.dp).testTag("quick_exit")
+                    modifier = Modifier.heightIn(min = 44.dp)
+                        .testTag(if (canAttachMedia) "quick_exit" else "chat_exit_to_portal")
                 ) { Text(uiText(R.string.ui_exit)) }
             }
             HorizontalDivider()

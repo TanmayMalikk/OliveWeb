@@ -116,6 +116,12 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 
+    fun quickExit(expectedCallId: String? = null) {
+        calls.finish(coverAccountId.orEmpty(), expectedCallId)
+        pendingCameraUploadTags = emptySet()
+        navigation.quickExit()
+    }
+
     // Closing this session also clears document and map data held by their screen controllers.
     fun signOut() {
         pendingCameraUploadTags = emptySet()
