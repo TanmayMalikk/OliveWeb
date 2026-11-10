@@ -71,7 +71,7 @@ export default function DownloadPage() {
               aria-label="Open the Android download page"
             >
               <img
-                src="/android-download-qr.svg"
+                src="/android-download-qr.svg?v=get-page-v1"
                 alt="QR code for the latest signed Android app"
               />
             </a>
