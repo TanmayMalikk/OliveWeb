@@ -19,6 +19,7 @@ import com.olive.app.ui.users.user.documents.MediaTransferOperations
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.documents.mediaFailureResource
 import java.io.File
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -34,6 +35,48 @@ import org.robolectric.RobolectricTestRunner
 class DocumentControllerMediaRoutingTest {
     private val context: Context = RuntimeEnvironment.getApplication()
     private val scope = CoroutineScope(Dispatchers.Unconfined)
+
+    @Test
+    fun `shared opening state tracks each file and clears after completion`() {
+        val document = document(objectKey = "users/owner/media/r2-document")
+        val release = CompletableDeferred<Unit>()
+        val media = FakeMediaTransfers(File(context.cacheDir, "r2"), release = release)
+        val controller = SafetyDocumentsController(
+            context,
+            scope,
+            FakeDocumentRepository(document, File(context.cacheDir, "legacy")),
+            media,
+        )
+        controller.prepare(VIEWER_UID)
+
+        controller.openShared(VIEWER_UID, document.id, { _, _ -> }) {}
+        controller.openShared(VIEWER_UID, "second-document", { _, _ -> }) {}
+
+        assertEquals(setOf(document.id, "second-document"), controller.state.openingDocumentIds)
+        release.complete(Unit)
+        assertTrue(controller.state.openingDocumentIds.isEmpty())
+    }
+
+    @Test
+    fun `repeated taps do not start duplicate opens for the same file`() {
+        val document = document(objectKey = "users/owner/media/r2-document")
+        val release = CompletableDeferred<Unit>()
+        val media = FakeMediaTransfers(File(context.cacheDir, "r2"), release = release)
+        val controller = SafetyDocumentsController(
+            context,
+            scope,
+            FakeDocumentRepository(document, File(context.cacheDir, "legacy")),
+            media,
+        )
+        controller.prepare(VIEWER_UID)
+
+        repeat(25) { controller.openShared(VIEWER_UID, document.id, { _, _ -> }) {} }
+
+        assertEquals(1, media.downloadCount)
+        assertEquals(setOf(document.id), controller.state.openingDocumentIds)
+        release.complete(Unit)
+        assertTrue(controller.state.openingDocumentIds.isEmpty())
+    }
 
     // Inputs: the values shown below. Expected: shared R2 document uses authenticated media download.
     @Test
@@ -173,9 +216,12 @@ class DocumentControllerMediaRoutingTest {
     private class FakeMediaTransfers(
         private val file: File,
         private val failure: Exception? = null,
+        private val release: CompletableDeferred<Unit>? = null,
     ) : MediaTransferOperations {
         var downloadedDocumentId: String? = null
         var viewerUid: String? = null
+        var downloadCount = 0
+            private set
 
         // Checks the observe uploads step with the test's sample data.
         override fun observeUploads(ownerUid: String) = Unit
@@ -205,8 +251,10 @@ class DocumentControllerMediaRoutingTest {
         ) = Unit
         // Checks the download file step with the test's sample data.
         override suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File {
+            downloadCount++
             downloadedDocumentId = document.id
             this.viewerUid = viewerUid
+            release?.await()
             failure?.let { throw it }
             return file
         }

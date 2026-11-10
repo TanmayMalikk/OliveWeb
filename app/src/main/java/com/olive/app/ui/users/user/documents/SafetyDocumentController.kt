@@ -37,6 +37,7 @@ internal data class SafetyDocumentsState(
     val lastSyncedAt: Long? = null,
     val attachmentErrors: Map<String, String> = emptyMap(),
     val evidenceUpdates: Set<String> = emptySet(),
+    val openingDocumentIds: Set<String> = emptySet(),
 )
 
 /** Owns document-storage workflows so the Compose screen only renders state and dispatches actions. */
