@@ -7,6 +7,7 @@
   },
   "scripts": {
     "test": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/functions-tests.xml",
+    "test:coverage": "c8 --reporter=lcov --reporter=text --reporter=html --include='src/**/*.js' --include='index.js' node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/functions-tests.xml",
     "provision-demo-accounts": "node scripts/provision-demo-accounts.js",
     "provision-load-test-accounts": "node scripts/provision-load-test-accounts.js",
     "seed-load-test-support": "node scripts/seed-load-test-support.js",
@@ -27,5 +28,8 @@
     "uuid": "^11.1.1",
     "glob": "^14.0.3",
     "minimatch": "^11.0.3"
+  },
+  "devDependencies": {
+    "c8": "^12.0.0"
   }
 }

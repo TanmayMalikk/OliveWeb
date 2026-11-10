@@ -64,6 +64,9 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            enableUnitTestCoverage = true
+        }
         getByName("release") {
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("oliveRelease")
         }
