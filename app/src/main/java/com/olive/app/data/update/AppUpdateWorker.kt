@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.work.*
+import com.google.firebase.messaging.FirebaseMessaging
 import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.notification.OliveNotificationManager
@@ -71,21 +72,36 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
     }
 }
 
-// Schedules periodic background update checks over unmetered Wi-Fi.
+// Schedules periodic background update checks over unmetered Wi-Fi and handles FCM release broadcasts.
 internal object AppUpdateScheduler {
+    const val TOPIC_APP_UPDATES = "app_updates"
+
     // Checks once after startup and then once per day on an unmetered connection because the APK is large.
     fun schedule(context: Context) {
         val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
         val manager = WorkManager.getInstance(context)
         manager.enqueueUniqueWork(
             "olive-update-startup",
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             OneTimeWorkRequestBuilder<AppUpdateWorker>().setConstraints(constraints).build(),
         )
         manager.enqueueUniquePeriodicWork(
             "olive-update-daily",
             ExistingPeriodicWorkPolicy.KEEP,
             PeriodicWorkRequestBuilder<AppUpdateWorker>(24, TimeUnit.HOURS).setConstraints(constraints).build(),
+        )
+        if (BuildConfig.FIREBASE_CONFIGURED) {
+            runCatching { FirebaseMessaging.getInstance().subscribeToTopic(TOPIC_APP_UPDATES) }
+        }
+    }
+
+    // Immediately enqueues an update check and download when an FCM release alert is received.
+    fun triggerNow(context: Context) {
+        val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "olive-update-fcm",
+            ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<AppUpdateWorker>().setConstraints(constraints).build(),
         )
     }
 }
