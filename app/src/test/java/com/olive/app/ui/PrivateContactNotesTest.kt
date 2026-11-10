@@ -10,7 +10,21 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class PrivateContactNotesTest {
-    // Inputs: the values shown below. Expected: support chats show the user to staff and hide organization names from personal accounts.
+    // Admins only see escalations, while staff keep every support-ticket category.
+    @Test
+    fun organizationChatFiltersMatchTheAccountRole() {
+        assertEquals(
+            listOf(SUPPORT_TAG_NEEDS_ADMIN),
+            visibleSupportTags(AccountRole.ADMIN),
+        )
+        assertEquals(
+            listOf(SUPPORT_TAG_PLAN_CONSULT, SUPPORT_TAG_SUPPORT, SUPPORT_TAG_NEEDS_ADMIN),
+            visibleSupportTags(AccountRole.STAFF),
+        )
+        assertEquals(emptyList<String>(), visibleSupportTags(AccountRole.USER))
+    }
+
+    // Support chats hide organization names from personal accounts and user names from organization accounts.
     @Test
     fun supportChatsShowTheUserToStaffAndHideOrganizationNamesFromPersonalAccounts() {
         val conversation = ChatConversation(
@@ -34,8 +48,12 @@ class PrivateContactNotesTest {
         )
         assertEquals("Olive Staff • Support", conversation.displayName("user", AccountRole.USER, anonymousName))
         assertEquals("Olive Staff • Support", conversation.displayName("contact", AccountRole.SAFE_CONTACT, anonymousName))
-        assertEquals("olive_user", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
-        assertEquals("olive_user", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Support ticket", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("Support ticket", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals(
+            "Ticket #42",
+            conversation.copy(ticketSequence = 42).displayName("staff", AccountRole.STAFF, "Olive Staff"),
+        )
         assertEquals(
             "Olive Staff • Consultation",
             conversation.copy(supportOrigin = SUPPORT_TAG_PLAN_CONSULT, supportTag = SUPPORT_TAG_PLAN_CONSULT)

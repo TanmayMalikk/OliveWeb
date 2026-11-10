@@ -22,25 +22,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 import java.net.URI
+import java.net.UnknownHostException
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
-import android.content.Context
-import android.util.Log
-import androidx.work.CoroutineWorker
-import androidx.work.Constraints
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.WorkerParameters
-import com.google.firebase.installations.FirebaseInstallations
-import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.messaging.RemoteMessage
-import com.olive.app.notification.OliveNotificationManager
-import java.util.UUID
 
 
 enum class VoipParticipantStatus {
@@ -71,6 +57,25 @@ data class VoipCall(
     val endReason: String = "",
 )
 
+fun VoipCall.connectedParticipantCount(): Int =
+    participants.count { it.status == VoipParticipantStatus.ACCEPTED }
+
+fun VoipCall.canBeRejoinedBy(userId: String): Boolean =
+    status == VoipCallStatus.ACTIVE &&
+        connectedParticipantCount() >= 2 &&
+        participants.any { it.userId == userId && it.status == VoipParticipantStatus.DECLINED }
+
+// Lets an invited chat member enter an active call from its chat log.
+// Pending members accept the invitation, while disconnected members rejoin an established room.
+fun VoipCall.canBeJoinedBy(userId: String): Boolean {
+    if (status != VoipCallStatus.ACTIVE) return false
+    return when (participants.firstOrNull { it.userId == userId }?.status) {
+        VoipParticipantStatus.PENDING, VoipParticipantStatus.ACCEPTED -> true
+        VoipParticipantStatus.DECLINED -> connectedParticipantCount() >= 2
+        null -> false
+    }
+}
+
 internal fun VoipCall.otherPartyName(currentUid: String): String =
     if (callerId == currentUid) name else callerName.ifBlank { name }
 
@@ -99,13 +104,18 @@ class VoipApiException(
     message: String
 ) : IOException(message)
 
+internal fun isVoipApiConfigured(apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL): Boolean =
+    apiBaseUrl.isNotBlank()
+
 class VoipManager(
-    // API authentication is also not built yet, needs server side hosting to finalize implementation.
     private val apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL,
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val bearerTokenProvider: suspend () -> String? = {
         FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
-    }
+    },
+    private val refreshedBearerTokenProvider: suspend () -> String? = {
+        FirebaseAuth.getInstance().currentUser?.getIdToken(true)?.await()?.token
+    },
 ) {
     private val baseUrl = apiBaseUrl.trimEnd('/')
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -115,19 +125,22 @@ class VoipManager(
 
     //double check this code when Live, might need to be changed to connect to actual server.
     init {
-        val apiUri = runCatching { URI(baseUrl) }.getOrNull()
-        val isHttps = apiUri?.scheme.equals("https", ignoreCase = true)
-        val isEmulatorLoopback = apiUri?.scheme.equals("http", ignoreCase = true) &&
-            apiUri?.host.equals("10.0.2.2", ignoreCase = true)
-        require(
-            apiUri?.isAbsolute == true &&
-                apiUri.host != null &&
-                apiUri.userInfo == null &&
-                apiUri.query == null &&
-                apiUri.fragment == null &&
-                (isHttps || isEmulatorLoopback)
-        ) {
-            "Configure VOIP_API_BASE_URL with HTTPS (or the Android emulator loopback host)"
+        // A missing optional VoIP URL disables calls without stopping the rest of Olive from opening.
+        if (baseUrl.isNotBlank()) {
+            val apiUri = runCatching { URI(baseUrl) }.getOrNull()
+            val isHttps = apiUri?.scheme.equals("https", ignoreCase = true)
+            val isEmulatorLoopback = apiUri?.scheme.equals("http", ignoreCase = true) &&
+                apiUri?.host.equals("10.0.2.2", ignoreCase = true)
+            require(
+                apiUri?.isAbsolute == true &&
+                    apiUri.host != null &&
+                    apiUri.userInfo == null &&
+                    apiUri.query == null &&
+                    apiUri.fragment == null &&
+                    (isHttps || isEmulatorLoopback)
+            ) {
+                "Configure VOIP_API_BASE_URL with HTTPS (or the Android emulator loopback host)"
+            }
         }
     }
 
@@ -225,6 +238,20 @@ class VoipManager(
         request("POST", "/calls/end", JSONObject().put("callId", callId))
     }
 
+    // Removes this phone from a group call without disconnecting everyone else.
+    suspend fun leaveCall(callId: String) {
+        require(callId.isNotBlank()) { "Call ID must not be blank" }
+        request("POST", "/api/calls/${encodePathSegment(callId)}/leave", JSONObject())
+    }
+
+    // Restores a previous member while at least two people are still in the group call.
+    suspend fun rejoinCall(callId: String): VoipCall {
+        require(callId.isNotBlank()) { "Call ID must not be blank" }
+        return parseCall(
+            request("POST", "/api/calls/${encodePathSegment(callId)}/rejoin", JSONObject())
+        )
+    }
+
     suspend fun registerPushToken(deviceId: String, token: String) {
         require(deviceId.isNotBlank()) { "Device ID must not be blank" }
         require(token.isNotBlank()) { "Push token must not be blank" }
@@ -255,37 +282,77 @@ class VoipManager(
     // Runs one authenticated API request and converts its response into JSON.
     private suspend fun request(method: String, path: String, body: JSONObject? = null): JSONObject =
         withContext(Dispatchers.IO) {
-            // Adds authentication and an optional JSON body to the outgoing request.
-            val requestBuilder = Request.Builder().url("$baseUrl$path")
-            bearerTokenProvider()?.takeIf(String::isNotBlank)?.let {
-                requestBuilder.header("Authorization", "Bearer $it")
+            check(isVoipApiConfigured(baseUrl)) {
+                "Voice calling is unavailable because this build has no VoIP service configured"
             }
-            if (body != null) {
-                requestBuilder.method(method, body.toString().toRequestBody(jsonMediaType))
-            } else {
-                requestBuilder.method(method, null)
-            }
+            val cachedToken = bearerTokenProvider()?.takeIf(String::isNotBlank)
 
-            // Converts successful responses and turns server failures into useful app errors.
-            httpClient.newCall(requestBuilder.build()).execute().use { response ->
-                val responseBody = response.body.string()
-                if (!response.isSuccessful) {
-                    val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
-                    throw VoipApiException(
-                        statusCode = response.code,
-                        errorCode = error?.optString("code")?.takeIf(String::isNotBlank),
-                        message = error?.optString("message")?.takeIf(String::isNotBlank)
-                            ?: "VoIP API request failed with HTTP ${response.code}"
-                    )
-                }
-
-                try {
-                    JSONObject(responseBody)
-                } catch (error: Exception) {
-                    throw IOException("VoIP API returned an invalid JSON response", error)
-                }
+            // A rejected cached Firebase token is refreshed once before showing an authentication error.
+            try {
+                executeWithDnsRetries(authenticatedRequest(method, path, body, cachedToken))
+            } catch (error: VoipApiException) {
+                if (error.statusCode != 401) throw error
+                val freshToken = refreshedBearerTokenProvider()?.takeIf(String::isNotBlank) ?: throw error
+                executeWithDnsRetries(authenticatedRequest(method, path, body, freshToken))
             }
         }
+
+    // Builds one request with the Firebase identity currently available for this signed-in account.
+    private fun authenticatedRequest(
+        method: String,
+        path: String,
+        body: JSONObject?,
+        bearerToken: String?,
+    ): Request {
+        val requestBuilder = Request.Builder().url("$baseUrl$path")
+        bearerToken?.let { requestBuilder.header("Authorization", "Bearer $it") }
+        if (body != null) {
+            requestBuilder.method(method, body.toString().toRequestBody(jsonMediaType))
+        } else {
+            requestBuilder.method(method, null)
+        }
+        return requestBuilder.build()
+    }
+
+    // Retries only DNS lookup failures, then parses the server response or reports its exact error.
+    private suspend fun executeWithDnsRetries(request: Request): JSONObject {
+            // Unknown-host failures happen before a request reaches the server, so retrying cannot
+            // create a duplicate call. This gives Android time to refresh a recently changed DNS entry.
+            val attempts = 3
+            var lastDnsError: UnknownHostException? = null
+
+            // A phone can briefly keep an old DNS result after the VoIP host is deployed.
+            repeat(attempts) { attempt ->
+                try {
+                    // Converts successful responses and turns server failures into useful app errors.
+                    return httpClient.newCall(request).execute().use { response ->
+                        val responseBody = response.body.string()
+                        if (!response.isSuccessful) {
+                            val error = runCatching { JSONObject(responseBody).optJSONObject("error") }.getOrNull()
+                            throw VoipApiException(
+                                statusCode = response.code,
+                                errorCode = error?.optString("code")?.takeIf(String::isNotBlank),
+                                message = error?.optString("message")?.takeIf(String::isNotBlank)
+                                    ?: "VoIP API request failed with HTTP ${response.code}"
+                            )
+                        }
+
+                        try {
+                            JSONObject(responseBody)
+                        } catch (error: Exception) {
+                            throw IOException("VoIP API returned an invalid JSON response", error)
+                        }
+                    }
+                } catch (error: UnknownHostException) {
+                    lastDnsError = error
+                    if (attempt + 1 < attempts) delay(750L * (attempt + 1))
+                }
+            }
+            throw IOException(
+                "The voice service could not be reached. Check the connection and try again.",
+                lastDnsError,
+            )
+    }
 
     // Converts one call JSON object into the model used by the app.
     private fun parseCall(json: JSONObject): VoipCall =
@@ -357,145 +424,5 @@ class VoipManager(
 
     companion object {
         const val DEFAULT_POLLING_INTERVAL_MILLIS = 5_000L
-    }
-}
-
-
-object VoipPushTokenRegistration {
-    private const val PREFERENCES = "voip_push_token"
-    private const val TOKEN_KEY = "token"
-    private const val DEVICE_ID_KEY = "device_id"
-    private const val WORK_NAME = "voip-push-token-registration"
-    private const val INPUT_TOKEN = "token"
-    private const val INPUT_DEVICE_ID = "device_id"
-
-    suspend fun registerForTokenUpdates(context: Context) {
-        FirebaseMessaging.getInstance().register().await()
-        val token = FirebaseInstallations.getInstance().id.await()
-        saveToken(context, token)
-        if (FirebaseAuth.getInstance().currentUser != null) {
-            enqueueRegistration(context, token)
-        }
-    }
-
-    suspend fun registerCurrentToken(context: Context) {
-        check(FirebaseAuth.getInstance().currentUser != null) {
-            "Sign in before registering this device for call invitations"
-        }
-        registerForTokenUpdates(context)
-    }
-
-    suspend fun unregisterCurrentDevice(context: Context) {
-        check(FirebaseAuth.getInstance().currentUser != null) {
-            "Sign in before unregistering this device's call-invitation token"
-        }
-        val deviceId = deviceId(context)
-        VoipManager().unregisterPushToken(deviceId)
-        Log.i(TAG, "Unregistered this device's call-invitation token")
-    }
-
-    suspend fun rotateCurrentToken(context: Context) {
-        check(FirebaseAuth.getInstance().currentUser != null) {
-            "Sign in before rotating this device's call-invitation token"
-        }
-        val messaging = FirebaseMessaging.getInstance()
-        val installations = FirebaseInstallations.getInstance()
-        val installationId = deviceId(context)
-        VoipManager().unregisterPushToken(installationId)
-        messaging.unregister().await()
-        installations.delete().await()
-        preferences(context).edit().remove(TOKEN_KEY).apply()
-        messaging.register().await()
-        val token = installations.id.await()
-        saveToken(context, token)
-        VoipManager().registerPushToken(installationId, token)
-        Log.i(TAG, "Rotated and registered this device's call-invitation token")
-    }
-
-    internal fun onTokenRefreshed(context: Context, token: String) {
-        require(token.isNotBlank()) { "Firebase returned a blank push token" }
-        saveToken(context, token)
-        if (FirebaseAuth.getInstance().currentUser != null) {
-            enqueueRegistration(context, token)
-        }
-    }
-
-    private fun saveToken(context: Context, token: String) {
-        require(token.isNotBlank()) { "Firebase returned a blank push token" }
-        preferences(context).edit()
-            .putString(TOKEN_KEY, token)
-            .apply()
-    }
-
-    private fun storedToken(context: Context): String? =
-        preferences(context).getString(TOKEN_KEY, null)
-
-    @Synchronized
-    private fun deviceId(context: Context): String {
-        val preferences = preferences(context)
-        return preferences.getString(DEVICE_ID_KEY, null) ?: UUID.randomUUID().toString().also {
-            preferences.edit().putString(DEVICE_ID_KEY, it).apply()
-        }
-    }
-
-    private fun preferences(context: Context) =
-        context.applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-
-    private fun enqueueRegistration(context: Context, token: String) {
-        val input = Data.Builder()
-            .putString(INPUT_TOKEN, token)
-            .putString(INPUT_DEVICE_ID, deviceId(context))
-            .build()
-        val request = OneTimeWorkRequestBuilder<VoipPushTokenRegistrationWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
-            .setInputData(input)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
-            request
-        )
-    }
-
-    internal const val TAG = "VoipPushToken"
-    internal const val INPUT_TOKEN_KEY = INPUT_TOKEN
-    internal const val INPUT_DEVICE_ID_KEY = INPUT_DEVICE_ID
-}
-
-class VoipPushTokenRegistrationWorker(
-    context: Context,
-    parameters: WorkerParameters
-) : CoroutineWorker(context, parameters) {
-    override suspend fun doWork(): Result {
-        val token = inputData.getString(VoipPushTokenRegistration.INPUT_TOKEN_KEY)
-            ?: return Result.failure()
-        val deviceId = inputData.getString(VoipPushTokenRegistration.INPUT_DEVICE_ID_KEY)
-            ?: return Result.failure()
-        if (FirebaseAuth.getInstance().currentUser == null) {
-            Log.i(VoipPushTokenRegistration.TAG, "Push token saved locally; registration waits for sign-in")
-            return Result.success()
-        }
-
-        return try {
-            VoipManager().registerPushToken(deviceId, token)
-            Result.success()
-        } catch (error: VoipApiException) {
-            Log.e(VoipPushTokenRegistration.TAG, "Push-token registration failed with HTTP ${error.statusCode}", error)
-            if (error.statusCode == 408 || error.statusCode == 429 || error.statusCode >= 500) {
-                Result.retry()
-            } else {
-                Result.failure()
-            }
-        } catch (error: IOException) {
-            Log.e(VoipPushTokenRegistration.TAG, "Could not reach the VoIP API to register the push token", error)
-            Result.retry()
-        } catch (error: IllegalArgumentException) {
-            Log.e(VoipPushTokenRegistration.TAG, "VoIP API configuration is invalid; token remains stored locally", error)
-            Result.failure()
-        }
     }
 }

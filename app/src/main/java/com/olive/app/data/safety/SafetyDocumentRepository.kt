@@ -2,12 +2,7 @@
 package com.olive.app.data
 
 import android.content.Context
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreException
-import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.MetadataChanges
-import com.google.firebase.firestore.Source
+import com.google.firebase.firestore.*
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
 import com.olive.app.data.media.MediaAccessError
@@ -15,31 +10,19 @@ import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
-import kotlinx.coroutines.tasks.await
-import org.json.JSONObject
 import java.io.File
 import java.security.spec.MGF1ParameterSpec
-
+import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
 
 data class SafetyDocument(
-    val id: String,
-    val ownerUid: String,
-    val storagePath: String,
-    val name: String,
-    val mimeType: String,
-    val allowedUsers: List<String>,
-    val createdAt: Long = 0,
-    val ocrText: String? = null,
-    val ocrConfidence: Float? = null,
-    val ocrSuccessful: Boolean? = null,
-    val objectKey: String = "",
-    val encryptedMetadata: String = "",
-    val wrappedKeys: Map<String, String> = emptyMap(),
-    val ciphertextSize: Long = 0,
-    val ciphertextSha256: String = "",
-    val encryptionVersion: Int = 0,
-    val deviceWrappedKeys: Map<String, String> = emptyMap(),
-    val evidence: Boolean = false,
+    val id: String, val ownerUid: String, val storagePath: String, val name: String,
+    val mimeType: String, val allowedUsers: List<String>, val createdAt: Long = 0,
+    val ocrText: String? = null, val ocrConfidence: Float? = null, val ocrSuccessful: Boolean? = null,
+    val objectKey: String = "", val encryptedMetadata: String = "",
+    val wrappedKeys: Map<String, String> = emptyMap(), val ciphertextSize: Long = 0,
+    val ciphertextSha256: String = "", val encryptionVersion: Int = 0,
+    val deviceWrappedKeys: Map<String, String> = emptyMap(), val evidence: Boolean = false,
     val tags: List<String> = emptyList(),
 )
 

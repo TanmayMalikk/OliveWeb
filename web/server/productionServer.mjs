@@ -11,6 +11,8 @@ app.use(
     setHeaders(res, path) {
       if (/[/\\]assets[/\\]/i.test(path)) {
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      } else if (path.endsWith("android-download-qr.svg")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       }
     },
   }),

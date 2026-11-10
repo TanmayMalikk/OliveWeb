@@ -166,6 +166,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         if (epoch == token) {
                             enrollment = saved
                             archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+                            restoredClosedConversationIds = withContext(Dispatchers.IO) {
+                                store.restoredClosedConversationIds(saved.uid)
+                            }
                             privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
                             profile = value
                             coverUsername =
@@ -235,6 +238,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
             coverType = value.coverType
             accountRole = value.role
             archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+            restoredClosedConversationIds = withContext(Dispatchers.IO) {
+                store.restoredClosedConversationIds(saved.uid)
+            }
             privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
             covers.restoreCoverData(saved.uid)
             navigation.quickExit()
@@ -355,6 +361,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         profile = null
                         savedNews = emptyList()
                         archivedConversationIds = emptySet()
+                        restoredClosedConversationIds = emptySet()
                         privateContactNotes = emptyMap()
                         coverDataVersion++
                         screen = SessionScreen.Cover
@@ -396,6 +403,9 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                 if (!localMode) history.loadCloudHistory(device.uid, saved.username)
                 if (saved.role != AccountRole.USER) profile = saved
                 archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(device.uid) }
+                restoredClosedConversationIds = withContext(Dispatchers.IO) {
+                    store.restoredClosedConversationIds(device.uid)
+                }
                 privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(device.uid) }
                 if (saved.role == AccountRole.SAFE_CONTACT) withContext(Dispatchers.IO) {
                     store.removePin(

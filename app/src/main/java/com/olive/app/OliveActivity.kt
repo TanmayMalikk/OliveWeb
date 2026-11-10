@@ -17,7 +17,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import com.olive.app.location.LiveLocationController
 import com.olive.app.location.LiveLocationService
@@ -25,6 +28,7 @@ import com.olive.app.location.AdminLocationService
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.fragment.app.FragmentActivity
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
@@ -37,15 +41,12 @@ import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SafePage
 import java.util.function.Consumer
 import android.app.Application
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
-import com.olive.app.data.messaging.VoipPushTokenRegistration
 import com.olive.app.ui.covers.fitness.FitnessWatchSync
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import android.app.Activity
+import com.olive.app.data.update.AppUpdateScheduler
+import com.olive.app.data.messaging.VoipCallForegroundService
+import kotlinx.coroutines.launch
 
 
 // Prevents Android from showing private content in the recent-apps preview.
@@ -72,6 +73,25 @@ class OliveActivity : FragmentActivity() {
         resources.getBoolean(R.bool.screen_capture_protection_enabled)
     }
     private val session: SessionViewModel by viewModels()
+    private val callActionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val callId = intent.data?.lastPathSegment ?: return
+            if (!session.calls.canHandleNotification(callId)) return
+            when (intent.action) {
+                VoipCallForegroundService.ACTION_END_CALL ->
+                    session.calls.finish(session.coverAccountId.orEmpty(), callId)
+                VoipCallForegroundService.ACTION_QUICK_EXIT -> {
+                    val hangup = session.quickExit(callId)
+                    lifecycleScope.launch {
+                        // Removing the task clears the ViewModel, which owns the hangup job.
+                        hangup.join()
+                        finishAndRemoveTask()
+                    }
+                }
+            }
+        }
+    }
+    private var closingForQuickExit = false
     private var screenshotCallback: ScreenCaptureCallback? = null
     private var recordingCallback: Consumer<Int>? = null
     private var recentPrivacyCover: View? = null
@@ -90,6 +110,16 @@ class OliveActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         OliveNotificationManager.createNotificationChannels(this)
+        ContextCompat.registerReceiver(
+            this,
+            callActionReceiver,
+            IntentFilter().apply {
+                addAction(VoipCallForegroundService.ACTION_END_CALL)
+                addAction(VoipCallForegroundService.ACTION_QUICK_EXIT)
+                addDataScheme(VoipCallForegroundService.CALL_ACTION_SCHEME)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         receiveIncomingCallIntent(intent)
         CoverLauncher.ensureStudioLauncher(this)
         applyScreenCaptureProtection()
@@ -139,9 +169,16 @@ class OliveActivity : FragmentActivity() {
                 }
             }
             CompositionLocalProvider(com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest provides permissions::requestLocation) {
-                OliveTheme { OliveRoot(session, locationPermissionVersion) }
+                OliveTheme {
+                    OliveRoot(session, locationPermissionVersion, closeApp = ::closeAfterQuickExit)
+                }
             }
         }
+    }
+
+    override fun onDestroy() {
+        unregisterReceiver(callActionReceiver)
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -188,6 +225,7 @@ class OliveActivity : FragmentActivity() {
     // Coming back just refreshes screen protection; it never auto-reopens private pages.
     override fun onResume() {
         super.onResume()
+        closingForQuickExit = false
         session.reconcilePriorityData()
         session.account.refreshDeviceSecurity()
         deviceLock.resume()
@@ -275,11 +313,22 @@ class OliveActivity : FragmentActivity() {
         runCatching { CoverLauncher.apply(this, session.coverType, session.accountRole) }
     }
 
-    // Apply the resource flag to FLAG_SECURE and recent-app screenshots; lifecycle methods register capture callbacks separately.
+    private fun closeAfterQuickExit() {
+        // The task can be snapshotted before Compose redraws the cover or dashboard.
+        closingForQuickExit = true
+        applyScreenCaptureProtection()
+        if (!moveTaskToBack(true)) {
+            closingForQuickExit = false
+            applyScreenCaptureProtection()
+        }
+    }
+
+    // Lifecycle methods register the capture callbacks separately.
     private fun applyScreenCaptureProtection() {
-        if (screenCaptureProtectionEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val protect = screenCaptureProtectionEnabled || closingForQuickExit
+        if (protect) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!screenCaptureProtectionEnabled)
+        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!protect)
     }
 
     // When capture protection is enabled, cover sensitive content and remove its native accessibility descendants together.
@@ -376,36 +425,17 @@ class OliveActivity : FragmentActivity() {
 // All app roles: sets up app-wide services before any screen opens.
 
 class OliveApplication : Application() {
-    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     // Creates app-wide notification channels and background services at startup.
     override fun onCreate() {
         super.onCreate()
+        // Release updates are checked in the background. Android always keeps the final install
+        // confirmation under the device owner's control.
+        AppUpdateScheduler.schedule(this)
         if (BuildConfig.FIREBASE_CONFIGURED) {
             AppCheckProviderInstaller.install()
-            backgroundScope.launch {
-                try {
-                    VoipPushTokenRegistration.registerForTokenUpdates(this@OliveApplication)
-                } catch (error: Exception) {
-                    Log.e("VoipPushToken", "Could not initialize Firebase push messaging", error)
-                }
-            }
             FirebaseAuth.getInstance().addAuthStateListener { auth ->
                 // The watch follows the account currently authenticated on this phone.
                 FitnessWatchSync.bindAccount(this@OliveApplication, auth.currentUser?.uid)
-                if (auth.currentUser != null) {
-                    backgroundScope.launch {
-                        try {
-                            VoipPushTokenRegistration.registerCurrentToken(this@OliveApplication)
-                        } catch (error: Exception) {
-                            Log.e(
-                                "VoipPushToken",
-                                "Could not register this device for call invitations",
-                                error
-                            )
-                        }
-                    }
-                }
             }
         }
     }

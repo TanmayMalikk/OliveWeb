@@ -323,7 +323,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 val device = enrollment ?: return
                 if (localMode) return
                 if (accounts.authenticatedUid() == device.uid)
-                    LocalNotificationEventHandler.start(application, coverType, accountRole)
+                    LocalNotificationEventHandler.start(application)
             }
         }
     }
@@ -500,6 +500,9 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
         val state = runtime.state
         state.archivedConversationIds = withContext(Dispatchers.IO) {
             runtime.store.archivedConversationIds(enrolled.uid)
+        }
+        state.restoredClosedConversationIds = withContext(Dispatchers.IO) {
+            runtime.store.restoredClosedConversationIds(enrolled.uid)
         }
         state.privateContactNotes = withContext(Dispatchers.IO) {
             runtime.store.privateContactNotes(enrolled.uid)

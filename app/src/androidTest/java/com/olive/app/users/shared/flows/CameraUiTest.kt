@@ -30,7 +30,7 @@ class CameraUiTest : OliveUiTestBase() {
             )
         }
         waitFor("camera_screen")
-        compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").assertIsDisplayed()
         waitFor("camera_ready")
         compose.onNodeWithTag("camera_flip").assertIsDisplayed().performClick()
         waitFor("camera_ready")

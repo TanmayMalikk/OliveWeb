@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="ui_olive_8f62f4">Olive</string>
     <string name="ui_the_user_sets_their_own_trigger_word_and_device_pin_on_first_sign">El usuario establece su propia palabra de activación y PIN del dispositivo en el primer inicio de sesión.</string>
     <string name="ui_value_seconds_remaining">%1$s segundos restantes</string>
     <string name="ui_value_days_remaining">%1$s días restantes</string>

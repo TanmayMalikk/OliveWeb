@@ -5,6 +5,7 @@ const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller, planReference} = require("./safetyPlanAccess");
 const {closeSupportConversation, saveSupportConversation, supportConversationId, PLAN_CONSULT} = require("./supportGroups");
+const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
 exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   const action = request.data?.action;
@@ -34,6 +35,11 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
     for (const [uid, ref] of references) settings.set(uid, (await transaction.get(ref)).data() || {});
     const current = plan.staffUid ? {uid: plan.staffUid, name: plan.staffName || "Staff member"} : null;
     const selected = assignmentNeeded ? current || chooseStaff(candidates.map((staff) => ({...staff, ...settings.get(staff.uid)}))) : null;
+    // An active request keeps its number. Every later consultation gets the next number.
+    const ticketNumber = consultationRequested ?
+      (wasRequested && Number.isSafeInteger(plan.ticketNumber) && plan.ticketNumber >= 0 ?
+        plan.ticketNumber : await reserveSupportTicketNumber(transaction)) :
+      (Number.isSafeInteger(plan.ticketNumber) ? plan.ticketNumber : -1);
     if (plan.staffUid && plan.staffUid !== selected?.uid) {
       transaction.set(references.get(plan.staffUid), {activeCount: Math.max(0, (settings.get(plan.staffUid)?.activeCount || 0) - 1)}, {merge: true});
     }
@@ -44,7 +50,7 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
     const updated = {...plan, staffUid: selected?.uid || "", staffName: selected?.name || "",
       adminUid: assignmentNeeded ? plan.adminUid || "" : "",
       adminName: assignmentNeeded ? plan.adminName || "" : "",
-      consultationRequested, consultationConversationId, updatedAt: Date.now()};
+      consultationRequested, consultationConversationId, ticketNumber, updatedAt: Date.now()};
     transaction.set(reference, updated);
     return {plan: updated, closedConversationId: action === "stop" ? consultationConversationId : ""};
   });

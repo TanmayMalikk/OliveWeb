@@ -1,0 +1,161 @@
+name: Publish signed Android release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_line:
+        description: Major, minor, and revision, such as v1.0.0; build is automatic
+        required: true
+        default: "v1.0.0"
+        type: string
+      release_notes:
+        description: Short release notes, one item per line
+        required: false
+        type: string
+      mandatory:
+        description: Mark this update as required
+        required: true
+        default: false
+        type: boolean
+      minimum_version_code:
+        description: Oldest version that may keep running
+        required: true
+        default: "1"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      OLIVE_RELEASE_PROJECT_ID: olive-21239
+      OLIVE_RELEASE_CONFIRM_PROJECT: olive-21239
+      OLIVE_RELEASE_BUCKET: olive-21239.firebasestorage.app
+      OLIVE_RELEASE_MANDATORY: ${{ inputs.mandatory }}
+      OLIVE_MINIMUM_VERSION_CODE: ${{ inputs.minimum_version_code }}
+      OLIVE_RELEASE_NOTES: ${{ inputs.release_notes }}
+      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/private_credentials/firebase-release.json
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Assign four-part Android release version
+        shell: bash
+        env:
+          RELEASE_LINE: ${{ inputs.release_line }}
+        run: |
+          if [[ ! "$RELEASE_LINE" =~ ^v([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{1,2})$ ]]; then
+            echo "Release line must look like v1.0.0." >&2
+            exit 1
+          fi
+          MAJOR="${BASH_REMATCH[1]}"
+          MINOR="${BASH_REMATCH[2]}"
+          REVISION="${BASH_REMATCH[3]}"
+          BUILD=$((GITHUB_RUN_NUMBER - 1))
+          if (( MAJOR > 20 || MINOR > 99 || REVISION > 99 || BUILD > 9999 )); then
+            echo "Release version is outside the supported Android version-code range." >&2
+            exit 1
+          fi
+          VERSION_CODE=$((10#$MAJOR * 100000000 + 10#$MINOR * 1000000 + 10#$REVISION * 10000 + BUILD))
+          if (( VERSION_CODE > 2100000000 )); then
+            echo "Android version code exceeds 2100000000." >&2
+            exit 1
+          fi
+          echo "OLIVE_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
+          echo "OLIVE_VERSION_NAME=$RELEASE_LINE.$BUILD" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - name: Restore private release credentials
+        shell: bash
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.OLIVE_RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.OLIVE_RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.OLIVE_RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.OLIVE_RELEASE_KEY_PASSWORD }}
+          FIREBASE_RELEASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_RELEASE_SERVICE_ACCOUNT }}
+          GEOAPIFY_API_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
+          MAPBOX_ACCESS_TOKEN: ${{ secrets.MAPBOX_ACCESS_TOKEN }}
+          REALTIME_DATABASE_URL: ${{ secrets.REALTIME_DATABASE_URL }}
+          VOIP_API_BASE_URL: ${{ secrets.VOIP_API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p private_credentials release
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > release/olive-release.jks
+          printf '%s' "$FIREBASE_RELEASE_SERVICE_ACCOUNT" > private_credentials/firebase-release.json
+          cat > keystore.properties <<EOF
+          storeFile=release/olive-release.jks
+          storePassword=$RELEASE_STORE_PASSWORD
+          keyAlias=$RELEASE_KEY_ALIAS
+          keyPassword=$RELEASE_KEY_PASSWORD
+          EOF
+          cat > local.properties <<EOF
+          GEOAPIFY_API_KEY=$GEOAPIFY_API_KEY
+          MAPBOX_ACCESS_TOKEN=$MAPBOX_ACCESS_TOKEN
+          REALTIME_DATABASE_URL=$REALTIME_DATABASE_URL
+          VOIP_API_BASE_URL=$VOIP_API_BASE_URL
+          UPDATE_MANIFEST_URL=https://yourolivebranch.ca/api/android/releases/latest
+          EOF
+
+      - name: Run release checks and build signed APK
+        shell: bash
+        run: |
+          set -o pipefail
+          max_attempts=3
+
+          for attempt in $(seq 1 "$max_attempts"); do
+            echo "Gradle release attempt $attempt of $max_attempts"
+
+            if ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease --stacktrace; then
+              exit 0
+            fi
+
+            if (( attempt == max_attempts )); then
+              echo "Gradle release checks failed after $max_attempts attempts." >&2
+              exit 1
+            fi
+
+            wait_seconds=$((attempt * 30))
+            echo "The dependency server or build failed. Retrying in $wait_seconds seconds..."
+            sleep "$wait_seconds"
+          done
+
+      - name: Verify APK signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+
+      - name: Install publisher dependencies
+        run: npm ci --prefix functions
+
+      - name: Publish immutable APK and latest manifest
+        env:
+          OLIVE_RELEASE_APK: ${{ github.workspace }}/app/build/outputs/apk/release/app-release.apk
+        run: npm --prefix functions run publish-android-release
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: olive-branch-${{ env.OLIVE_VERSION_NAME }}-${{ env.OLIVE_VERSION_CODE }}
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
