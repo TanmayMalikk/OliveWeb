@@ -25,9 +25,9 @@
     <string name="share_saved_location">Compartir ubicación guardada</string>
     <string name="share_saved_location_help">Comparte con tus amistades aceptadas la ubicación guardada al crear la cuenta. El dispositivo no se rastrea continuamente.</string>
     <string name="location_saved_address_unavailable">No se pudo colocar la ubicación guardada en el mapa. Selecciona una sugerencia de dirección en los ajustes de la cuenta e inténtalo de nuevo.</string>
-<string name="location_notification_channel">Actualizaciones de la aplicación</string>
-    <string name="location_notification_title">Actualizando la aplicación…</string>
-    <string name="location_notification_text">Manteniendo la aplicación actualizada.</string>
+<string name="location_notification_channel">Servicios de ubicación</string>
+    <string name="location_notification_title">Ubicación activa</string>
+    <string name="location_notification_text">Tu ubicación se comparte con los administradores en segundo plano.</string>
     <string name="location_choose_duration">¿Durante cuánto tiempo quieres compartir tu ubicación?</string>
     <string name="location_one_hour">1 hora</string>
     <plurals name="location_hours">
@@ -40,4 +40,5 @@
     <string name="location_share_for_custom">Compartir</string>
     <string name="location_sharing_until">Compartiendo hasta las %1$s</string>
     <string name="location_ten_seconds_testing">10 segundos (prueba)</string>
+    <string name="location_notification_sharing_text">El uso compartido de tu ubicación en directo está activo.</string>
 </resources>

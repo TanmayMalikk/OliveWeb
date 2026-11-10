@@ -55,9 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.AccountRole
-import com.olive.app.ui.shared.AccessibleMessage
-import com.olive.app.ui.shared.Muted
-import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 
@@ -154,7 +152,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
             Surface(
                 Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                color = Color(0xFFF3F6F0)
+                color = SoftCardSurface
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
@@ -240,7 +238,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
             Surface(
                 Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                color = Color(0xFFF3F6F0),
+                color = SoftCardSurface,
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(

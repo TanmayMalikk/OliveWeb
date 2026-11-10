@@ -56,7 +56,6 @@
         <item quantity="many">مخطط %1$s لمدة %2$d يوماً.</item>
         <item quantity="other">مخطط %1$s لمدة %2$d يوم.</item>
     </plurals>
-    <string name="fitness_chart_latest">أحدث قيمة لـ %1$s هي %2$s %3$s.</string>
     <string name="fitness_chart_average">متوسط %1$s هو %2$s %3$s.</string>
     <string name="fitness_calories_burned">المحروقة</string>
     <string name="fitness_calories_eaten">المتناولة</string>

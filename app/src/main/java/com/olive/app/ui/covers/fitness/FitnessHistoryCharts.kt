@@ -42,7 +42,13 @@ import com.olive.app.ui.shared.Ink
 import com.olive.app.ui.shared.LightSage
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.BurnedOrange
+import com.olive.app.ui.shared.CarbohydrateGold
+import com.olive.app.ui.shared.DistanceGreen
+import com.olive.app.ui.shared.EatenBrown
+import com.olive.app.ui.shared.FatPlum
 import com.olive.app.ui.shared.Paper
+import com.olive.app.ui.shared.ProteinGreen
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.ceil
@@ -50,13 +56,6 @@ import kotlin.math.floor
 import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.roundToInt
-
-private val DistanceGreen = Color(0xFF78935C)
-private val BurnedOrange = Color(0xFFB56D44)
-private val EatenBrown = Color(0xFF765B3D)
-private val ProteinGreen = Color(0xFF45613C)
-private val CarbohydrateGold = Color(0xFFC1963E)
-private val FatPlum = Color(0xFF875E78)
 
 private data class HistorySeries(
     val name: String,

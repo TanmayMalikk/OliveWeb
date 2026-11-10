@@ -5,82 +5,49 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import com.olive.app.ui.shared.*
-
-
-import com.olive.app.ui.users.shared.navigation.*
-
-import com.olive.app.ui.users.shared.camera.AttachmentPicker
-import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
-
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.paneTitle
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import com.olive.app.ui.shared.LocalizedIcon as Icon
-import androidx.compose.ui.res.stringResource
-import com.olive.app.R
-
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.clickable
-
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material.icons.automirrored.outlined.Send
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material.icons.outlined.NorthEast
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.HealthAndSafety
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.milliseconds
+import androidx.core.content.ContextCompat
+import com.olive.app.R
+import com.olive.app.data.*
+import com.olive.app.data.media.OfflineMediaAvailability
+import com.olive.app.data.messaging.*
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.users.shared.camera.AttachmentPicker
+import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.MessageDeliveryStatus
-import com.olive.app.data.media.OfflineMediaAvailability
-import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
-import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
-import com.olive.app.data.messaging.VoipSessionState
-import com.olive.app.data.messaging.VoipCall
-import com.olive.app.data.messaging.VoipCallStatus
-import com.olive.app.data.messaging.canBeJoinedBy
-import androidx.core.content.ContextCompat
-import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.delay
 
 private sealed interface ConversationTimelineItem {
     val key: String
@@ -96,11 +63,6 @@ private sealed interface ConversationTimelineItem {
         override val timestamp = value.endedAt.takeIf { it > 0 } ?: value.createdAt
     }
 }
-
-private val ChatPageBackground = Color(0xFFF8F7F1)
-private val ChatIncomingBubble = Color(0xFFF0F2E8)
-private val ChatSentBubble = Color(0xFF49683B)
-private val ChatBorder = Color(0xFFD8DDCE)
 
 @OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
@@ -135,16 +97,22 @@ internal fun ChatPane(
     val microphonePermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
+        session.endCallPermissionRequest()
         val action = permissionAction
         permissionAction = null
-        if (granted) action?.invoke()
-        else session.calls.report(uiText(R.string.ui_microphone_permission_required))
+        if (session.screen == SessionScreen.Safe &&
+            session.messages.activeConversation?.id == active.id
+        ) {
+            if (granted) action?.invoke()
+            else session.calls.report(uiText(R.string.ui_microphone_permission_required))
+        }
     }
     val withMicrophonePermission: (() -> Unit) -> Unit = { action ->
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) action() else {
             permissionAction = action
+            session.beginCallPermissionRequest()
             microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -197,7 +165,7 @@ internal fun ChatPane(
                         tint = Color.White,
                     )
                     Box(
-                        Modifier.size(10.dp).background(Color(0xFF38B56C), CircleShape)
+                        Modifier.size(10.dp).background(OnlineIndicatorGreen, CircleShape)
                             .align(Alignment.BottomEnd),
                     )
                 }
@@ -258,7 +226,8 @@ internal fun ChatPane(
                 if (exit != null) FilledTonalButton(
                     onClick = exit,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier.heightIn(min = 44.dp).testTag("quick_exit")
+                    modifier = Modifier.heightIn(min = 44.dp)
+                        .testTag(if (canAttachMedia) "quick_exit" else "chat_exit_to_portal")
                 ) { Text(uiText(R.string.ui_exit)) }
             }
             HorizontalDivider()
@@ -556,60 +525,6 @@ internal fun ChatPane(
                     TextButton(onClick = session.calls::clearMessage) { Text(stringResource(R.string.ui_okay)) }
                 },
             )
-        }
-    }
-}
-
-@Composable
-internal fun CallHistoryRow(
-    call: VoipCall,
-    canJoin: Boolean = false,
-    onJoin: () -> Unit = {},
-) {
-    val label = stringResource(
-        when (call.status) {
-            VoipCallStatus.MISSED -> R.string.ui_missed_call
-            VoipCallStatus.DECLINED -> R.string.ui_call_declined
-            VoipCallStatus.ENDED -> R.string.ui_call_ended
-            VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
-        }
-    )
-    val activeColor = MaterialTheme.colorScheme.primaryContainer
-    Surface(
-        color = if (call.status == VoipCallStatus.ACTIVE) activeColor
-        else MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
-            .testTag("call_history_${call.callId}")
-            .then(if (call.status == VoipCallStatus.ACTIVE && canJoin) {
-                Modifier.clickable(onClick = onJoin)
-            } else Modifier),
-    ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Outlined.Call, null, tint = OliveGreen)
-            Column(Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.titleSmall)
-                val timestamp = call.endedAt.takeIf { it > 0 } ?: call.createdAt
-                if (timestamp > 0) Text(
-                    DateTimeFormatter.ofPattern("MMM d, HH:mm")
-                        .withZone(ZoneId.systemDefault())
-                        .format(Instant.ofEpochMilli(timestamp)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Muted,
-                )
-            }
-            if (call.status == VoipCallStatus.ACTIVE && canJoin) {
-                FilledTonalButton(
-                    onClick = onJoin,
-                    modifier = Modifier.testTag("join_call_${call.callId}"),
-                ) {
-                    Text(stringResource(R.string.ui_join_call))
-                }
-            }
         }
     }
 }

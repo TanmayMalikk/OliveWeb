@@ -65,15 +65,11 @@
     <string name="ui_new_headlines_are_available">New headlines are available.</string>
     <string name="ui_a_new_update_is_available">A new update is available.</string>
     <string name="ui_an_account_update_is_available">An account update is available.</string>
-    <string name="ui_fresh_menu_updates_are_available">Fresh menu updates are available.</string>
-    <string name="ui_see_what_s_new_from_olive">See what\'s new from Olive.</string>
-    <string name="ui_new_kitchen_picks_are_ready_to_browse">New kitchen picks are ready to browse.</string>
     <string name="ui_your_latest_digest_is_ready">Your latest digest is ready.</string>
     <string name="ui_there_are_new_stories_to_browse">There are new stories to browse.</string>
 
     <string name="ui_open_the_app_to_see_what_s_new">Open the app to see what\'s new.</string>
     <string name="ui_new_activity_is_waiting">New activity is waiting.</string>
-    <string name="ui_order_status_and_delivery_notifications_for_olive">Order status and delivery notifications for Olive</string>
     <string name="ui_daily_digest_briefings">Daily Digest Briefings</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">Daily headlines and news digest notifications</string>
 
@@ -81,7 +77,7 @@
     <string name="ui_general_app_activity_notifications">General app activity notifications</string>
     <string name="ui_olive_branch_updates">Olive Branch Updates</string>
     <string name="ui_olive_tree_updates">Olive Tree Updates</string>
-    <string name="ui_call_invitation_notifications">Call invitations</string>
+    <string name="ui_call_invitation_notifications">Call Invites</string>
     <string name="ui_speaker">Speaker</string>
     <string name="ui_speaker_off">Speaker off</string>
     <string name="ui_incoming_call">Incoming call</string>
@@ -120,4 +116,8 @@
     <string name="password_excludes_username">Password must not contain your username.</string>
 <string name="ocr_no_text">No text recognized from document.</string>
     <string name="ocr_error_detail">OCR error: %1$s</string>
+    <string name="notification_active_voice_calls">Active Voice Calls</string>
+    <string name="notification_safe_app_updates">Safe App Updates</string>
+    <string name="notification_safe_app_activity">Open Olive Branch to view your updates.</string>
+    <string name="notification_new_app_update">New App Update</string>
 </resources>
