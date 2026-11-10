@@ -13,6 +13,17 @@ import org.junit.Test
 
 class MediaPreprocessorTest {
     @Test
+    fun pickerRoutesVideoToCompressionWhileImagesRetainDocumentOcrSemantics() {
+        listOf("video/mp4"," VIDEO/QUICKTIME; codecs=hevc","video/webm").forEach {
+            assertEquals(MediaKind.VIDEO,pickerMediaKind(it))
+        }
+        assertEquals(MediaKind.AUDIO,pickerMediaKind("audio/mpeg"))
+        listOf("image/jpeg","image/heic","application/pdf","text/plain","").forEach {
+            assertEquals(MediaKind.DOCUMENT,pickerMediaKind(it))
+        }
+    }
+
+    @Test
     fun eligibleMimeTypesCoverStillImageInputsOnly() {
         listOf("image/jpeg","image/png","image/webp","image/heic","image/heif").forEach { mime ->
             assertTrue(ImageCompressionPolicy.isEligible(mime,MediaKind.IMAGE))

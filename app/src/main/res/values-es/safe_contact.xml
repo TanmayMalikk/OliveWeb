@@ -38,6 +38,8 @@
     <string name="camera_save">Guardar de forma privada</string>
     <string name="camera_saving">Guardando de forma privada…</string>
     <string name="documents_upload_failed">No se pudo subir el archivo.</string>
+    <string name="documents_video_memory_failed">Este video requiere más memoria de la que el dispositivo puede usar de forma segura. Grábalo en 1080p/30 FPS o elige un video más corto.</string>
+    <string name="documents_media_memory_failed">Este archivo requiere más memoria de la que el dispositivo puede usar de forma segura. Elige un archivo más pequeño e inténtalo de nuevo.</string>
     <string name="documents_preparing_upload">Preparando la carga cifrada</string>
     <string name="documents_preparing_upload_help">El archivo seleccionado se está procesando y cifrando en este dispositivo.</string>
     <string name="documents_upload_queued">Esperando una conexión</string>

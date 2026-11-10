@@ -4,8 +4,24 @@ package com.olive.app.data.media
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Approved upper bound for one encrypted R2 media object. */
+internal const val MAX_MEDIA_CIPHERTEXT_BYTES=250L*1024L*1024L
+
+/** Leaves room for the versioned AES-GCM container when an original file bypasses compression. */
+internal const val MAX_MEDIA_PLAINTEXT_FALLBACK_BYTES=MAX_MEDIA_CIPHERTEXT_BYTES-64L
+
+/** Safe domain signal used instead of exposing VM allocation details to the UI. */
+internal class MediaPreparationMemoryException:IllegalStateException()
+
 /** Domain classification used to select preprocessing rules such as OCR and compression. */
 enum class MediaKind { DOCUMENT, IMAGE, VIDEO, AUDIO, OTHER }
+
+/** Classifies picker inputs without treating document photos as generic gallery images. */
+internal fun pickerMediaKind(mimeType:String)=when {
+    mimeType.substringBefore(';').trim().lowercase().startsWith("video/") -> MediaKind.VIDEO
+    mimeType.substringBefore(';').trim().lowercase().startsWith("audio/") -> MediaKind.AUDIO
+    else -> MediaKind.DOCUMENT
+}
 
 /**
  * Result of the advisory document-quality/OCR stage.

@@ -1,6 +1,7 @@
 // Safe-app roles: validates and compresses eligible video locally before encryption.
 package com.olive.app.data.media
 
+import android.app.ActivityManager
 import android.content.Context
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -13,6 +14,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
+import androidx.media3.effect.FrameDropEffect
 import androidx.media3.transformer.AudioEncoderSettings
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.DefaultEncoderFactory
@@ -47,11 +49,19 @@ internal class VideoMediaCompressor(private val context:Context) {
         } catch(_:VideoNotCompressibleException) {
             return original(source,declaredMimeType)
         }
+        val memoryClassMb=(context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).memoryClass
+        if(VideoCompressionPolicy.shouldAvoidTranscode(
+                input.width,input.height,input.frameRate,memoryClassMb)) {
+            if(source.length()<=MAX_MEDIA_PLAINTEXT_FALLBACK_BYTES) {
+                return original(source,declaredMimeType)
+            }
+            throw MediaPreparationMemoryException()
+        }
         val target=VideoCompressionPolicy.targetSize(input.width,input.height,input.rotationDegrees)
         val bitrate=VideoCompressionPolicy.targetBitrate(target.first,target.second,input.frameRate)
         val output=File.createTempFile(OUTPUT_PREFIX,".mp4",outputFolder)
         try {
-            export(source,output,target,bitrate)
+            export(source,output,target,bitrate,input.frameRate)
             require(output.isFile && output.length()>0) { "Video compression produced an empty result" }
             val exported=inspect(output)
             require(maxOf(exported.width,exported.height)<=MAX_LONG_SIDE &&
@@ -65,6 +75,9 @@ internal class VideoMediaCompressor(private val context:Context) {
         } catch(_:ExportException) {
             output.delete()
             return original(source,declaredMimeType)
+        } catch(_:OutOfMemoryError) {
+            output.delete()
+            throw MediaPreparationMemoryException()
         } catch(failure:Throwable) {
             output.delete()
             throw failure
@@ -119,12 +132,25 @@ internal class VideoMediaCompressor(private val context:Context) {
         }
     }
 
-    private suspend fun export(source:File,output:File,target:Pair<Int,Int>,bitrate:Int):Unit =
+    private suspend fun export(
+        source:File,
+        output:File,
+        target:Pair<Int,Int>,
+        bitrate:Int,
+        sourceFrameRate:Float,
+    ):Unit =
         withContext(Dispatchers.Main.immediate) {
             suspendCancellableCoroutine { continuation ->
+                val videoEffects=buildList {
+                    add(Presentation.createForWidthAndHeight(
+                        target.first,target.second,Presentation.LAYOUT_SCALE_TO_FIT))
+                    if(sourceFrameRate>MAX_OUTPUT_FRAME_RATE) {
+                        add(FrameDropEffect.createSimpleFrameDropEffect(
+                            sourceFrameRate,MAX_OUTPUT_FRAME_RATE))
+                    }
+                }
                 val edited=EditedMediaItem.Builder(MediaItem.fromUri(Uri.fromFile(source)))
-                    .setEffects(Effects(emptyList(),listOf(Presentation.createForWidthAndHeight(
-                        target.first,target.second,Presentation.LAYOUT_SCALE_TO_FIT))))
+                    .setEffects(Effects(emptyList(),videoEffects))
                     .build()
                 @Suppress("DEPRECATION")
                 val sequence=EditedMediaItemSequence.Builder(listOf(edited)).build()
@@ -198,6 +224,7 @@ internal class VideoMediaCompressor(private val context:Context) {
         const val OUTPUT_PREFIX="olive-video-output-"
         const val AUDIO_BITRATE=128_000
         const val DEFAULT_FRAME_RATE=30f
+        const val MAX_OUTPUT_FRAME_RATE=30f
         const val MAX_LONG_SIDE=1_920
         const val MAX_SHORT_SIDE=1_080
     }
@@ -250,12 +277,16 @@ internal object VideoCompressionPolicy {
 
     fun targetBitrate(width:Int,height:Int,frameRate:Float):Int {
         require(width>0 && height>0 && frameRate.isFinite() && frameRate>0)
-        return (width.toLong()*height*frameRate*BITS_PER_PIXEL_FRAME).roundToInt()
+        val outputFrameRate=minOf(frameRate,MAX_OUTPUT_FRAME_RATE)
+        return (width.toLong()*height*outputFrameRate*BITS_PER_PIXEL_FRAME).roundToInt()
             .coerceIn(MIN_VIDEO_BITRATE,MAX_VIDEO_BITRATE)
     }
 
-    /** Contract seam for the low-memory preflight; implemented after its tests define the policy. */
-    fun shouldAvoidTranscode(width:Int,height:Int,frameRate:Float,memoryClassMb:Int)=false
+    fun shouldAvoidTranscode(width:Int,height:Int,frameRate:Float,memoryClassMb:Int):Boolean {
+        require(width>0 && height>0 && frameRate.isFinite() && frameRate>0 && memoryClassMb>0)
+        val inputIsUhd=maxOf(width,height)>MAX_LONG_SIDE && minOf(width,height)>MAX_SHORT_SIDE
+        return inputIsUhd && memoryClassMb<=LOW_MEMORY_CLASS_MB
+    }
 
     fun extensionFor(value:String)=when(normalizedMimeType(value)) {
         "video/quicktime" -> "mov"
@@ -273,4 +304,6 @@ internal object VideoCompressionPolicy {
     private const val BITS_PER_PIXEL_FRAME=0.08
     private const val MIN_VIDEO_BITRATE=1_000_000
     private const val MAX_VIDEO_BITRATE=10_000_000
+    private const val MAX_OUTPUT_FRAME_RATE=30f
+    private const val LOW_MEMORY_CLASS_MB=256
 }

@@ -38,6 +38,8 @@
     <string name="camera_save">Enregistrer en privé</string>
     <string name="camera_saving">Enregistrement privé…</string>
     <string name="documents_upload_failed">Le fichier n’a pas pu être téléversé.</string>
+    <string name="documents_video_memory_failed">Cette vidéo nécessite plus de mémoire que cet appareil ne peut en utiliser en toute sécurité. Enregistrez-la en 1080p à 30 i/s ou choisissez une vidéo plus courte.</string>
+    <string name="documents_media_memory_failed">Ce fichier nécessite plus de mémoire que cet appareil ne peut en utiliser en toute sécurité. Choisissez un fichier plus petit et réessayez.</string>
     <string name="documents_preparing_upload">Préparation du téléversement chiffré</string>
     <string name="documents_preparing_upload_help">Le fichier sélectionné est traité et chiffré sur cet appareil.</string>
     <string name="documents_upload_queued">En attente d’une connexion</string>

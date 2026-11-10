@@ -1,12 +1,14 @@
 package com.olive.app.ui.users.user.documents
 
 import android.content.Context
+import com.olive.app.R
 import com.olive.app.data.AccountIdentity
 import com.olive.app.data.media.CloudMediaRecord
 import com.olive.app.data.media.MediaCompletedPart
 import com.olive.app.data.media.MediaDownloadTicket
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.MediaPreprocessor
+import com.olive.app.data.media.MediaPreparationMemoryException
 import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.data.media.MediaUploadJob
 import com.olive.app.data.media.MediaUploadSession
@@ -29,6 +31,21 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class MediaPreparationMemoryTest {
     @Test
+    fun memoryFailuresMapToLocalizedGuidanceResources() {
+        assertEquals(
+            R.string.documents_video_memory_failed,
+            preparationFailureResource(OutOfMemoryError("private allocation detail"),MediaKind.VIDEO),
+        )
+        listOf(MediaKind.DOCUMENT,MediaKind.IMAGE,MediaKind.AUDIO,MediaKind.OTHER).forEach { kind ->
+            assertEquals(
+                R.string.documents_media_memory_failed,
+                preparationFailureResource(MediaPreparationMemoryException(),kind),
+            )
+        }
+        assertEquals(null,preparationFailureResource(IllegalArgumentException("invalid"),MediaKind.VIDEO))
+    }
+
+    @Test
     fun memoryFailureUsesGuidanceAndDeletesPartialCiphertext() {
         val context:Context=RuntimeEnvironment.getApplication()
         val outbox=File(context.noBackupFilesDir,"media-outbox")
@@ -41,6 +58,10 @@ class MediaPreparationMemoryTest {
             repository=UnusedMediaRepository,
             preprocessor=MediaPreprocessor { _,_,_ ->
                 ProcessedMedia(FailingAfterFirstChunkInput(),"video/mp4","mp4")
+            },
+            preparationFailureResolver={ _,failure,kind ->
+                if(failure is OutOfMemoryError && kind==MediaKind.VIDEO) EXPECTED_VIDEO_GUIDANCE
+                else error("Unexpected preparation failure: $failure")
             },
         )
         val source=File.createTempFile("memory-test-",".mp4",context.cacheDir).apply {
@@ -62,11 +83,7 @@ class MediaPreparationMemoryTest {
             )
 
             assertTrue("Timed out waiting for the preparation failure",latch.await(5,TimeUnit.SECONDS))
-            assertEquals(
-                "This video requires more memory than this device can safely use. " +
-                    "Try recording at 1080p/30 FPS or choose a shorter video.",
-                message,
-            )
+            assertEquals(EXPECTED_VIDEO_GUIDANCE,message)
             assertEquals(filesBefore,outbox.listFiles()?.map(File::getName)?.toSet().orEmpty())
         } finally {
             source.delete()
@@ -104,5 +121,11 @@ class MediaPreparationMemoryTest {
         ):CloudMediaRecord=error("unused")
         override suspend fun updateEvidence(mediaId:String,evidence:Boolean)=Unit
         override suspend fun deleteMedia(mediaId:String)=Unit
+    }
+
+    private companion object {
+        const val EXPECTED_VIDEO_GUIDANCE=
+            "This video requires more memory than this device can safely use. " +
+                "Try recording at 1080p/30 FPS or choose a shorter video."
     }
 }
