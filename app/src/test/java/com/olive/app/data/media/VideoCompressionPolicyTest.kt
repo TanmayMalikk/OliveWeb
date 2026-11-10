@@ -55,6 +55,31 @@ class VideoCompressionPolicyTest {
     }
 
     @Test
+    fun lowMemoryDevicesAvoidUhdTranscodeWithoutBlockingOrdinaryVideo() {
+        listOf(30f,60f,120f).forEach { frameRate ->
+            assertTrue(VideoCompressionPolicy.shouldAvoidTranscode(3_840,2_160,frameRate,256))
+            assertTrue(VideoCompressionPolicy.shouldAvoidTranscode(2_160,3_840,frameRate,256))
+        }
+        assertFalse(VideoCompressionPolicy.shouldAvoidTranscode(1_920,1_080,30f,256))
+        assertFalse(VideoCompressionPolicy.shouldAvoidTranscode(1_080,1_920,60f,256))
+        assertFalse(VideoCompressionPolicy.shouldAvoidTranscode(3_840,2_160,30f,512))
+    }
+
+    @Test
+    fun repeatedMemoryPreflightStressIsDeterministic() {
+        repeat(10_000) { index ->
+            val width=640+(index*1_103%4_480)
+            val height=360+(index*2_017%2_520)
+            val frameRate=listOf(24f,30f,60f,120f)[index%4]
+            val memoryClass=listOf(128,192,256,512)[index%4]
+            val first=VideoCompressionPolicy.shouldAvoidTranscode(
+                width,height,frameRate,memoryClass)
+            assertEquals(first,VideoCompressionPolicy.shouldAvoidTranscode(
+                width,height,frameRate,memoryClass))
+        }
+    }
+
+    @Test
     fun isoAndEbmlSignaturesRejectSpoofedContainers() {
         val iso=temporary(ByteArray(24).apply { "ftyp".encodeToByteArray().copyInto(this,4) })
         val ebml=temporary(byteArrayOf(0x1a,0x45,0xdf.toByte(),0xa3.toByte())+ByteArray(20))

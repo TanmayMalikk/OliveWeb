@@ -254,6 +254,9 @@ internal object VideoCompressionPolicy {
             .coerceIn(MIN_VIDEO_BITRATE,MAX_VIDEO_BITRATE)
     }
 
+    /** Contract seam for the low-memory preflight; implemented after its tests define the policy. */
+    fun shouldAvoidTranscode(width:Int,height:Int,frameRate:Float,memoryClassMb:Int)=false
+
     fun extensionFor(value:String)=when(normalizedMimeType(value)) {
         "video/quicktime" -> "mov"
         "video/webm" -> "webm"
