@@ -38,6 +38,8 @@
     <string name="camera_save">Save privately</string>
     <string name="camera_saving">Saving privately…</string>
     <string name="documents_upload_failed">The file could not be uploaded.</string>
+    <string name="documents_video_memory_failed">This video requires more memory than this device can safely use. Try recording at 1080p/30 FPS or choose a shorter video.</string>
+    <string name="documents_media_memory_failed">This file requires more memory than this device can safely use. Choose a smaller file and try again.</string>
     <string name="documents_preparing_upload">Preparing encrypted upload</string>
     <string name="documents_preparing_upload_help">The selected file is being processed and encrypted on this device.</string>
     <string name="documents_upload_queued">Waiting for a connection</string>
@@ -48,6 +50,7 @@
     <string name="documents_upload_complete">Upload complete</string>
     <string name="documents_upload_cancelled">Upload cancelled</string>
     <string name="documents_load_failed">Your saved files could not be loaded.</string>
+    <string name="documents_opening_securely">Opening securely…</string>
 <string name="documents_share_failed">This secure file could not be shared.</string>
     <string name="documents_shared_in_chat">Secure file shared.</string>
     <string name="shared_secure_file">Shared secure file</string>

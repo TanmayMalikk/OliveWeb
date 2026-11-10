@@ -202,6 +202,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 }, onShare = { sharing = file }, onDelete = { controller.delete(file, uid) },
                     onMakeOffline = { controller.makeAvailableOffline(file) },
                     onRemoveOffline = { controller.removeOfflineCopy(file) },
+                    opening = file.id in state.openingDocumentIds,
                     evidenceUpdating = file.id in state.evidenceUpdates,
                     onEvidenceChange = { evidence -> controller.setEvidence(file, uid, evidence) })
             }

@@ -145,6 +145,10 @@ dependencies {
     // Media transfers use OkHttp directly; do not rely on Coil's transitive dependency.
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("io.livekit:livekit-android:2.30.0")
+    val media3Version = "1.11.1"
+    implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-effect:$media3Version")
+    implementation("androidx.media3:media3-transformer:$media3Version")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("com.google.firebase:firebase-appcheck-debug")
     testImplementation("junit:junit:4.13.2")
