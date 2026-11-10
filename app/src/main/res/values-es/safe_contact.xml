@@ -101,4 +101,5 @@
     <string name="documents_download_failed">No se pudo descargar el archivo cifrado. Inténtalo de nuevo.</string>
     <string name="documents_device_verification_failed">No se pudo verificar esta instalación. Vuelve a abrir la aplicación e inténtalo de nuevo.</string>
     <string name="documents_open_failed">No se pudo abrir el archivo cifrado.</string>
+    <string name="documents_opening_securely">Abriendo de forma segura…</string>
 </resources>

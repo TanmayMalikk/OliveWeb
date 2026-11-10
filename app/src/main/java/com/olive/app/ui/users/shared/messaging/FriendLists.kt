@@ -42,6 +42,7 @@ import com.olive.app.data.FriendRelationship
 import com.olive.app.data.FriendRequest
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.ui.shared.SecureFileOpeningIndicator
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import android.Manifest
 import android.content.pm.PackageManager
@@ -457,7 +458,7 @@ internal fun SharedMediaMessage(
     id: String, name: String, session: SessionViewModel, mine: Boolean,
     onOpen: (SafetyDocument, File) -> Unit
 ) {
-    var opening by remember(id) { mutableStateOf(false) }
+    val opening = id in session.documents.state.openingDocumentIds
     val document = session.documents.state.files.firstOrNull { it.id == id }
     val offline = session.media?.offlineCopies?.get(id) ?: OfflineMediaAvailability.NOT_CACHED
     val error = session.documents.state.attachmentErrors[id]
@@ -466,12 +467,11 @@ internal fun SharedMediaMessage(
         onClick = {
             val uid = session.coverAccountId ?: return@Surface
             if (opening) return@Surface
-            opening = true
             session.documents.openShared(
                 uid,
                 id,
                 { document, local -> onOpen(document, local) },
-                { opening = false })
+            )
         }, enabled = !opening, shape = MaterialTheme.shapes.medium,
         color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
@@ -480,7 +480,7 @@ internal fun SharedMediaMessage(
             Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (opening) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+            if (opening) SecureFileOpeningIndicator()
             else Icon(Icons.Outlined.AttachFile, stringResource(R.string.shared_secure_file))
             Column {
                 Text(
