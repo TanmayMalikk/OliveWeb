@@ -44,7 +44,7 @@ test('sync invalidation markers are owner-readable and server-write-only', async
   const bob = env.authenticatedContext('sync-bob').firestore();
   const anonymous = env.unauthenticatedContext().firestore();
   const marker = {
-    ownerUid:'sync-alice', allowedUsers:['sync-alice'], revision:5,
+    ownerUid:'sync-alice', allowedUsers:['sync-alice'], revision:5, urgentRevision:2,
     safetyRevision:1, mediaRevision:2, conversationRevision:3, accountRevision:4,
     updatedAt:serverTimestamp(),
   };
@@ -64,7 +64,7 @@ test('sync invalidation markers are owner-readable and server-write-only', async
 test('malformed server sync markers are unreadable even by their path owner', async () => {
   const alice = env.authenticatedContext('sync-shape-alice').firestore();
   const base = {
-    ownerUid:'sync-shape-alice', allowedUsers:['sync-shape-alice'], revision:1,
+    ownerUid:'sync-shape-alice', allowedUsers:['sync-shape-alice'], revision:1, urgentRevision:1,
     safetyRevision:1, mediaRevision:1, conversationRevision:1, accountRevision:1,
     updatedAt:serverTimestamp(),
   };
@@ -72,9 +72,15 @@ test('malformed server sync markers are unreadable even by their path owner', as
     extra:{...base, unexpected:'schema pollution'},
     wrongOwner:{...base, ownerUid:'sync-other'},
     mixedReaders:{...base, allowedUsers:['sync-shape-alice','sync-other']},
-    missingRevision:{ownerUid:base.ownerUid, allowedUsers:base.allowedUsers,
+    missingRevision:{ownerUid:base.ownerUid, allowedUsers:base.allowedUsers, urgentRevision:1,
       safetyRevision:1, mediaRevision:1, conversationRevision:1, accountRevision:1,
       updatedAt:serverTimestamp()},
+    missingUrgentRevision:{ownerUid:base.ownerUid, allowedUsers:base.allowedUsers, revision:1,
+      safetyRevision:1, mediaRevision:1, conversationRevision:1, accountRevision:1,
+      updatedAt:serverTimestamp()},
+    negativeUrgentRevision:{...base, urgentRevision:-1},
+    wrongUrgentRevisionType:{...base, urgentRevision:'1'},
+    fractionalUrgentRevision:{...base, urgentRevision:1.5},
     negative:{...base, safetyRevision:-1},
     wrongType:{...base, mediaRevision:'1'},
     fractional:{...base, conversationRevision:1.5},

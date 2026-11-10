@@ -23,8 +23,11 @@ import com.olive.app.data.MessageOutboxStore
 import com.olive.app.data.SafetyPlanStore
 import com.olive.app.data.SafetyAccessIndexStore
 import com.olive.app.data.media.OfflineMediaCache
+import com.olive.app.security.DeviceStore
+import com.olive.app.security.EncryptedVault
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 
 class PriorityReconciliationWorker(
     context: Context,
@@ -54,13 +57,18 @@ class PriorityReconciliationWorker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: FirebaseAuthInvalidUserException) {
-            purgeRevokedAccount(uid, checkpoints)
-            auth.signOut()
-            Result.success()
+            revoke(uid, checkpoints, auth)
         } catch (failure: FirebaseFirestoreException) {
             when (failure.code) {
                 FirebaseFirestoreException.Code.PERMISSION_DENIED,
-                FirebaseFirestoreException.Code.UNAUTHENTICATED -> Result.failure()
+                FirebaseFirestoreException.Code.UNAUTHENTICATED -> try {
+                    AccountAccessReconciler(auth).reconcile(uid)
+                    Result.failure()
+                } catch (_: FirebaseAuthInvalidUserException) {
+                    revoke(uid, checkpoints, auth)
+                } catch (_: Exception) {
+                    Result.retry()
+                }
                 else -> Result.retry()
             }
         } catch (_: FirebaseNetworkException) {
@@ -68,6 +76,17 @@ class PriorityReconciliationWorker(
         } catch (_: Exception) {
             Result.retry()
         }
+    }
+
+    private fun revoke(
+        uid: String,
+        checkpoints: SyncCheckpointDataSource,
+        auth: FirebaseAuth,
+    ): Result {
+        purgeRevokedAccount(uid, checkpoints)
+        auth.signOut()
+        AccountRevocationEvents.publish(uid)
+        return Result.success()
     }
 
     private fun purgeRevokedAccount(uid: String, checkpoints: SyncCheckpointDataSource) {
@@ -78,13 +97,34 @@ class PriorityReconciliationWorker(
         SafetyPlanStore(applicationContext, false).purge(uid)
         SafetyAccessIndexStore(applicationContext).purge(uid)
         checkpoints.purge(uid)
+        DeviceStore(
+            EncryptedVault(applicationContext, "firebase"),
+            EncryptedVault(applicationContext, "firebase-activity"),
+        ).forgetDevice()
     }
 
     companion object {
         private const val INPUT_UID = "uid"
 
-        fun enqueue(context: Context, uid: String, expedited: Boolean = false) {
+        private val scheduledRevisions = ConcurrentHashMap<String, Long>()
+
+        fun enqueue(
+            context: Context,
+            uid: String,
+            revision: Long? = null,
+            expedited: Boolean = false,
+        ) {
             if (!BuildConfig.FIREBASE_CONFIGURED || uid.isBlank()) return
+            if (revision != null) {
+                var accepted = false
+                scheduledRevisions.compute(uid) { _, previous ->
+                    if (previous == null || revision > previous) {
+                        accepted = true
+                        revision
+                    } else previous
+                }
+                if (!accepted) return
+            }
             val builder = OneTimeWorkRequestBuilder<PriorityReconciliationWorker>()
                 .setInputData(Data.Builder().putString(INPUT_UID, uid).build())
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
@@ -93,12 +133,13 @@ class PriorityReconciliationWorker(
             val request = builder.build()
             WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
                 "olive-priority-reconciliation-$uid",
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                if (expedited) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
                 request,
             )
         }
 
         fun cancel(context: Context, uid: String) {
+            scheduledRevisions.remove(uid)
             WorkManager.getInstance(context.applicationContext)
                 .cancelUniqueWork("olive-priority-reconciliation-$uid")
         }

@@ -14,6 +14,7 @@ import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.data.messaging.VoipPushTokenRegistration
 import com.olive.app.data.sync.PriorityReconciliationWorker
 import com.olive.app.data.sync.SyncCheckpointStore
+import com.olive.app.data.sync.AccountRevocationEvents
 import com.olive.app.data.SafetyAccessIndexStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
@@ -25,10 +26,32 @@ import android.os.SystemClock
 import android.os.Build
 import android.view.accessibility.AccessibilityManager
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 
 
 // Restores enrollment, signs accounts in/out and runs onboarding; stale account-choice callbacks cannot restart setup.
 internal class AccountSessionController(private val runtime: SessionRuntime) {
+    init {
+        runtime.scope.launch {
+            AccountRevocationEvents.events.collect(::closeRevokedAccount)
+        }
+    }
+
+    private fun closeRevokedAccount(uid: String) = with(runtime) {
+        if (enrollment?.uid != uid) return@with
+        accountSyncSubscription?.close()
+        accountSyncSubscription = null
+        prioritySync.stop()
+        LocalNotificationEventHandler.cancel(application)
+        navigation.quickExit()
+        enrollment = null
+        state.profile = null
+        state.accountRole = AccountRole.USER
+        state.privateEntries = emptyList()
+        state.viewedSharedEntry = null
+        state.screen = SessionScreen.Cover
+    }
+
     // Restores the saved account and sends the person to the correct first screen.
     fun load() {
         val state = runtime.state
@@ -384,7 +407,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
     }
 
     // Reloads Storage data when the same account changes on another phone or browser.
-    private fun watchAccountChanges(identity: AccountIdentity) = with(runtime) {
+    internal fun watchAccountChanges(identity: AccountIdentity) = with(runtime) {
         accountSyncSubscription?.close()
         accountSyncSubscription = null
         if (localMode) return@with

@@ -49,6 +49,28 @@ class PriorityReconciliationRunnerTest {
     }
 
     @Test
+    fun `account switch during reconciliation stops all later domains`() = runBlocking {
+        var active = OWNER
+        val calls = mutableListOf<SyncDomain>()
+        val store = MemoryCheckpoints(SyncCheckpoint())
+        val runner = PriorityReconciliationRunner(
+            store,
+            activeUid = { active },
+            reconcilers = SyncDomain.entries.associateWith { domain -> PriorityDomainReconciler {
+                calls += domain
+                if (domain == SyncDomain.SAFETY) active = "bob"
+            } },
+        )
+
+        assertEquals(
+            ReconciliationOutcome.STALE_ACCOUNT,
+            runner.reconcile(OWNER, SyncRevisions(4, 1, 1, 1, 1)),
+        )
+        assertEquals(listOf(SyncDomain.ACCOUNT, SyncDomain.SAFETY), calls)
+        assertEquals(SyncRevisions(0, 1, 1, 0, 0), store.read(OWNER).revisions)
+    }
+
+    @Test
     fun `repeated duplicate invalidations become deterministic no ops`() = runBlocking {
         val fixture = Fixture()
         val target = SyncRevisions(40, 10, 20, 30, 40)

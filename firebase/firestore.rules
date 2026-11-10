@@ -21,7 +21,7 @@ service cloud.firestore {
     // Server-owned, payload-free reconciliation marker:
     // ownerUid: string equal to the document UID (required, immutable by virtue of client-write denial).
     // allowedUsers: single-item list containing only ownerUid (required).
-    // revision, safetyRevision, mediaRevision, conversationRevision, accountRevision:
+    // revision, urgentRevision, safetyRevision, mediaRevision, conversationRevision, accountRevision:
     // non-negative integers no larger than JavaScript's safe-integer maximum (required).
     // updatedAt: server timestamp (required).
     // Clients may read only their own valid marker. Only trusted Admin SDK code may write it.
@@ -78,14 +78,15 @@ service cloud.firestore {
     }
 
     function validSyncInvalidation(data, uid) {
-      return data.keys().hasAll(['ownerUid','allowedUsers','revision','safetyRevision',
+      return data.keys().hasAll(['ownerUid','allowedUsers','revision','urgentRevision','safetyRevision',
           'mediaRevision','conversationRevision','accountRevision','updatedAt'])
-        && data.keys().hasOnly(['ownerUid','allowedUsers','revision','safetyRevision',
+        && data.keys().hasOnly(['ownerUid','allowedUsers','revision','urgentRevision','safetyRevision',
           'mediaRevision','conversationRevision','accountRevision','updatedAt'])
         && data.ownerUid is string && data.ownerUid == uid
         && data.allowedUsers is list && data.allowedUsers.size() == 1
         && data.allowedUsers[0] is string && data.allowedUsers[0] == uid
         && validSyncRevision(data.revision)
+        && validSyncRevision(data.urgentRevision)
         && validSyncRevision(data.safetyRevision)
         && validSyncRevision(data.mediaRevision)
         && validSyncRevision(data.conversationRevision)

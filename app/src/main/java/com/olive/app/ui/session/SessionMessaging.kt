@@ -522,5 +522,9 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
             state.screen = SessionScreen.Portal
             if (profile.role == AccountRole.ADMIN) runtime.organization.queueAdminRefresh()
         }
+        if (!runtime.localMode) {
+            MessageSendWorker.enqueuePending(runtime.application, enrolled.uid)
+            runtime.accountSession.watchAccountChanges(identity)
+        }
     }
 }
