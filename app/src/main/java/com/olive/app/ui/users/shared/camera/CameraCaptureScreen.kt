@@ -438,6 +438,45 @@ private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
         TextButton(onClick = back) { Text(stringResource(R.string.cancel), color = Color.White) }
     }
 }
+
+// Draws the shutter button and gives TalkBack its action label.
+@Composable
+private fun CameraShutter(
+    mode: CameraMode,
+    recording: Boolean,
+    busy: Boolean,
+    ready: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    FilledIconButton(
+        onClick = onClick,
+        enabled = ready && (!busy || recording),
+        modifier = modifier.size(84.dp).testTag("camera_shutter"),
+        shape = CircleShape,
+        colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = if (recording) Color.Red else Color.White
+        )
+    ) {
+        Icon(
+            when (mode) {
+                CameraMode.Photo -> Icons.Outlined.PhotoCamera
+                CameraMode.Video -> Icons.Outlined.Videocam
+                CameraMode.Document -> Icons.Outlined.Description
+            },
+            stringResource(
+                when {
+                    recording -> R.string.camera_stop_recording
+                    mode == CameraMode.Photo -> R.string.camera_take_photo
+                    mode == CameraMode.Document -> R.string.camera_scan_document
+                    else -> R.string.camera_start_recording
+                }
+            ),
+            tint = if (recording) Color.White else Color.Black,
+            modifier = Modifier.size(38.dp)
+        )
+    }
+}
 // Previews the captured file before the user saves or retakes it.
 @Composable
 private fun CameraReview(
