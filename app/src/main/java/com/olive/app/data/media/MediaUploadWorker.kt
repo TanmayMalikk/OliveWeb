@@ -35,8 +35,6 @@ import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
 import kotlinx.coroutines.tasks.await
-import java.io.Closeable
-import java.io.InputStream
 
 
 /**
@@ -444,48 +442,6 @@ private fun Map<*,*>.record()=CloudMediaRecord(string("mediaId"),string("ownerUi
     string("encryptedMetadata"),stringMap("wrappedKeys"),stringList("allowedUsers"),long("ciphertextSize"),
     string("ciphertextSha256"),(get("encryptionVersion") as? Number)?.toInt() ?: 1,long("createdAt"),
     stringMap("deviceWrappedKeys"))
-
-// Safe-app users: prepares images and video before encrypted upload.
-
-/**
- * Pluggable boundary between document-quality review and encryption.
- *
- * Intended pipeline: OCR recommendation -> [MediaPreprocessor] ->
- * [com.olive.app.security.MediaCipher] -> [MediaTransferStore] -> [MediaUploadWorker].
- *
- * A future compressor can replace [PassThroughMediaPreprocessor] without depending on Firebase,
- * WorkManager, R2, or UI classes. Implementations operate entirely on-device and return a stream
- * that the controller immediately encrypts. They must never upload plaintext or persist it outside
- * app-private storage.
- */
-fun interface MediaPreprocessor {
-    /** Opens the processed representation; ownership of [input] transfers to the returned object. */
-    fun process(input:InputStream,mimeType:String,kind:MediaKind):ProcessedMedia
-}
-
-/**
- * Closeable result of preprocessing.
- *
- * [cleanup] exists for compressors that must create an app-private temporary plaintext file. It is
- * guaranteed to run after the processed stream closes, including when encryption throws.
- */
-class ProcessedMedia(
-    val input:InputStream,
-    val mimeType:String,
-    private val cleanup:()->Unit={},
-):Closeable {
-    // Closes the source and destination files after media preprocessing ends.
-    override fun close() {
-        try { input.close() } finally { cleanup() }
-    }
-}
-
-/** No-op implementation used until the parallel compression implementation is ready. */
-object PassThroughMediaPreprocessor:MediaPreprocessor {
-    // Passes through files that do not need image or video cleanup.
-    override fun process(input:InputStream,mimeType:String,kind:MediaKind)=ProcessedMedia(input,mimeType)
-}
-
 
 /** Deletes expired, unpinned upload-reuse ciphertext even if no document screen is opened. */
 class OfflineMediaCleanupWorker(context: Context, parameters: WorkerParameters) :

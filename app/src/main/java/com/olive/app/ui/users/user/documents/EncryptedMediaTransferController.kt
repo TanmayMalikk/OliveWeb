@@ -4,14 +4,40 @@ package com.olive.app.ui.users.user.documents
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import com.olive.app.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.olive.app.data.*
-import com.olive.app.data.media.*
-import com.olive.app.security.*
+import com.olive.app.data.AccountIdentity
+import com.olive.app.data.DocumentOcrMetadata
+import com.olive.app.data.SafetyDocument
+import com.olive.app.data.hasValidatedInternetConnection
+import com.olive.app.data.media.DocumentDownloadGate
+import com.olive.app.data.media.MAX_MEDIA_CIPHERTEXT_BYTES
+import com.olive.app.data.media.MediaKind
+import com.olive.app.data.media.copyAndVerifyEncryptedDownload
+import com.olive.app.data.media.MediaPreprocessor
+import com.olive.app.data.media.MediaPreparationMemoryException
+import com.olive.app.data.media.MediaTicketDataSource
+import com.olive.app.data.media.MediaTransferState
+import com.olive.app.data.media.MediaTransferStatus
+import com.olive.app.data.media.MediaTransferStore
+import com.olive.app.data.media.MediaUploadJob
+import com.olive.app.data.media.MediaUploadPresentation
+import com.olive.app.data.media.MediaUploadWorker
+import com.olive.app.data.media.OcrReview
+import com.olive.app.data.media.pickerMediaKind
+import com.olive.app.data.media.OfflineMediaAvailability
+import com.olive.app.data.media.OfflineMediaCache
+import com.olive.app.data.media.MediaAccessError
+import com.olive.app.data.media.MediaAccessException
+import com.olive.app.data.media.OnDeviceMediaPreprocessor
+import com.olive.app.data.media.PreparedEncryptedMedia
+import com.olive.app.security.EncryptionUtils
+import com.olive.app.security.KeyManager
+import com.olive.app.security.MediaCipher
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
@@ -25,20 +51,21 @@ import org.json.JSONObject
 
 // Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
 internal class MediaTransferController(
-    context: Context,
-    private val scope: CoroutineScope,
-    private val repository: MediaTicketDataSource,
-    private val store: MediaTransferStore = MediaTransferStore(context),
-    private val offlineCache: OfflineMediaCache = OfflineMediaCache(context),
-    private val client: OkHttpClient = OkHttpClient(),
-    private val preprocessor: MediaPreprocessor = PassThroughMediaPreprocessor,
-) : MediaTransferOperations {
-    private val applicationContext = context.applicationContext
-    private var observedOwnerUid: String? = null
-    private var publishedMediaIds: Set<String> = emptySet()
-    private val observationJobs = mutableMapOf<String, Job>()
-    private val workProgress = mutableMapOf<String, Pair<Long, Long>>()
-    private val downloadGate = DocumentDownloadGate()
+    context:Context,
+    private val scope:CoroutineScope,
+    private val repository:MediaTicketDataSource,
+    private val store:MediaTransferStore=MediaTransferStore(context),
+    private val offlineCache:OfflineMediaCache=OfflineMediaCache(context),
+    private val client:OkHttpClient=OkHttpClient(),
+    private val preprocessor:MediaPreprocessor=OnDeviceMediaPreprocessor(context.applicationContext),
+    private val preparationFailureResolver:(Context,Throwable,MediaKind)->String=::preparationFailureMessage,
+):MediaTransferOperations {
+    private val applicationContext=context.applicationContext
+    private var observedOwnerUid:String?=null
+    private var publishedMediaIds:Set<String> = emptySet()
+    private val observationJobs=mutableMapOf<String,Job>()
+    private val workProgress=mutableMapOf<String,Pair<Long,Long>>()
+    private val downloadGate=DocumentDownloadGate()
     var state by mutableStateOf<MediaTransferState>(MediaTransferState.Idle)
         private set
     var uploads by mutableStateOf<List<MediaUploadPresentation>>(emptyList())
@@ -106,6 +133,7 @@ internal class MediaTransferController(
             onFailure("Document quality review recommends another capture")
             return
         }
+        val kind=pickerMediaKind(applicationContext.contentResolver.getType(uri).orEmpty())
         scope.launch {
             state=MediaTransferState.Preparing("encrypting")
             runCatching { withContext(Dispatchers.IO) { prepareUri(uri,owner,ocrReview,tags) } }
@@ -117,7 +145,7 @@ internal class MediaTransferController(
                     state = MediaTransferState.Queued(job.id)
                     onQueued(job.id)
                 }.onFailure { failure ->
-                    val message=failure.localizedMessage ?: "Unable to prepare encrypted media"
+                    val message=preparationFailureResolver(applicationContext,failure,kind)
                     state = MediaTransferState.Failed(null, message, false)
                     onFailure(message)
                 }
@@ -150,7 +178,7 @@ internal class MediaTransferController(
                 state = MediaTransferState.Queued(job.id)
                 onQueued(job.id)
             }.onFailure { failure ->
-                val message=failure.localizedMessage ?: "Unable to prepare encrypted media"
+                val message=preparationFailureResolver(applicationContext,failure,kind)
                 state = MediaTransferState.Failed(null, message, false)
                 onFailure(message)
             }
@@ -344,7 +372,7 @@ internal class MediaTransferController(
     }
 
     /** Resolves picker metadata, then hands the stream to the shared preparation pipeline. */
-    private fun prepareUri(
+    private suspend fun prepareUri(
         uri:Uri, owner:AccountIdentity, ocrReview:OcrReview, tags:Set<String>
     ):MediaUploadJob {
         val resolver=applicationContext.contentResolver
@@ -352,9 +380,8 @@ internal class MediaTransferController(
         val name=resolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use { cursor ->
             if(cursor.moveToFirst()) cursor.getString(0) else null
         }?.trim()?.take(160).orEmpty().ifBlank { "Document" }
-        // This entry point is domain-specific: an image selected here represents a
-        // photographed/scanned document and therefore participates in OCR review.
-        val kind=MediaKind.DOCUMENT
+        // Images selected here remain document scans for OCR, while videos use the video pipeline.
+        val kind=pickerMediaKind(mime)
         return prepare(
             resolver.openInputStream(uri) ?: error("Unable to read the selected file"),
             name,mime,owner,kind,ocrReview,tags=tags
@@ -365,7 +392,7 @@ internal class MediaTransferController(
      * Security-critical preparation boundary. Plaintext is consumed here, optionally compressed,
      * and immediately encrypted into the app-private outbox before a durable/network job exists.
      */
-    private fun prepare(
+    private suspend fun prepare(
         input:InputStream,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,ocrReview:OcrReview,
         ocr:DocumentOcrMetadata?=null,
         tags:Set<String> = emptySet(),
@@ -377,15 +404,19 @@ internal class MediaTransferController(
         // Turn an unexpected prepare failure into a readable message.
         try {
             var processedMimeType=mimeType
+            var processedName=name
             // The preprocessor owns compression only. Its output is immediately consumed by the
             // cipher, and ProcessedMedia.close() guarantees adapter-specific plaintext cleanup.
             input.use { source -> preprocessor.process(source,mimeType,kind).use { processed ->
                 processedMimeType=processed.mimeType
+                processedName=processed.displayName(name)
                 target.outputStream().buffered().use { MediaCipher.encrypt(processed.input,it,key) }
             } }
-            require(target.length() in 1..MAX_CIPHERTEXT_BYTES) { "Encrypted media must be smaller than 250 MB" }
+            require(target.length() in 1..MAX_MEDIA_CIPHERTEXT_BYTES) {
+                "Encrypted media must be smaller than 250 MB"
+            }
             val metadata=JSONObject().apply {
-                put("name", name.trim().take(160).ifBlank { "Document" })
+                put("name", processedName.trim().take(160).ifBlank { "Document" })
                 put("mimeType", processedMimeType.take(120))
                 put("kind", kind.name)
                 put("ocrReview", ocrReview.name)
@@ -407,7 +438,7 @@ internal class MediaTransferController(
                 EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
                 KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped)
             return MediaUploadJob(jobId,owner.uid,prepared)
-        } catch (failure: Exception) {
+        } catch (failure: Throwable) {
             target.delete()
             throw failure
         }
@@ -530,10 +561,26 @@ internal class MediaTransferController(
     }
 
     private companion object {
-        const val MAX_CIPHERTEXT_BYTES=250L*1024L*1024L
         const val MAX_OCR_TEXT=50_000
         // Rejects a download when its encrypted byte count differs from metadata.
         fun sizeMismatch(expected:Long,received:Long)=
             "Encrypted download size does not match (expected $expected bytes, received $received bytes)"
     }
+}
+
+internal fun preparationFailureResource(failure:Throwable,kind:MediaKind):Int?=
+    if(failure is OutOfMemoryError || failure is MediaPreparationMemoryException) {
+        if(kind==MediaKind.VIDEO) R.string.documents_video_memory_failed
+        else R.string.documents_media_memory_failed
+    } else null
+
+private fun preparationFailureMessage(
+    context:Context,
+    failure:Throwable,
+    kind:MediaKind,
+):String {
+    val resource=preparationFailureResource(failure,kind)
+    return resource?.let(context::getString)
+        ?: failure.localizedMessage
+        ?: context.getString(R.string.documents_upload_failed)
 }
