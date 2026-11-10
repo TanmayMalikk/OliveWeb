@@ -38,6 +38,8 @@
     <string name="camera_save">حفظ بشكل خاص</string>
     <string name="camera_saving">جارٍ الحفظ بشكل خاص…</string>
     <string name="documents_upload_failed">تعذر رفع الملف.</string>
+    <string name="documents_video_memory_failed">يتطلب هذا الفيديو ذاكرة أكبر مما يمكن لهذا الجهاز استخدامه بأمان. سجّل بدقة 1080p وبمعدل 30 إطارًا في الثانية أو اختر فيديو أقصر.</string>
+    <string name="documents_media_memory_failed">يتطلب هذا الملف ذاكرة أكبر مما يمكن لهذا الجهاز استخدامه بأمان. اختر ملفًا أصغر وحاول مرة أخرى.</string>
     <string name="documents_preparing_upload">جارٍ تحضير الرفع المشفر</string>
     <string name="documents_preparing_upload_help">تتم معالجة الملف المحدد وتشفيره على هذا الجهاز.</string>
     <string name="documents_upload_queued">في انتظار الاتصال</string>
