@@ -9,6 +9,7 @@ import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.google.firebase.FirebaseNetworkException
@@ -82,13 +83,14 @@ class PriorityReconciliationWorker(
     companion object {
         private const val INPUT_UID = "uid"
 
-        fun enqueue(context: Context, uid: String) {
+        fun enqueue(context: Context, uid: String, expedited: Boolean = false) {
             if (!BuildConfig.FIREBASE_CONFIGURED || uid.isBlank()) return
-            val request = OneTimeWorkRequestBuilder<PriorityReconciliationWorker>()
+            val builder = OneTimeWorkRequestBuilder<PriorityReconciliationWorker>()
                 .setInputData(Data.Builder().putString(INPUT_UID, uid).build())
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
-                .build()
+            if (expedited) builder.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            val request = builder.build()
             WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
                 "olive-priority-reconciliation-$uid",
                 ExistingWorkPolicy.APPEND_OR_REPLACE,

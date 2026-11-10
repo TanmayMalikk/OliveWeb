@@ -22,7 +22,9 @@ internal class PrioritySyncCoordinator(
         PriorityReconciliationWorker.enqueue(application, uid)
         subscription = repository.observe(
             uid,
-            onUpdate = { if (activeUid == uid) PriorityReconciliationWorker.enqueue(application, uid) },
+            onUpdate = {
+                if (activeUid == uid) PriorityReconciliationWorker.enqueue(application, uid, expedited = true)
+            },
             onError = { if (activeUid == uid) PriorityReconciliationWorker.enqueue(application, uid) },
         )
     }
