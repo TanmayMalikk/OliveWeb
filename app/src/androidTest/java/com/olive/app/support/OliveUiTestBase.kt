@@ -166,7 +166,7 @@ abstract class OliveUiTestBase {
     protected fun openOnboarding(grantPermissions: Boolean = true) {
         if (grantPermissions) grantFeaturePermissions()
         waitCover()
-        click("cover_tab_account")
+        click("fitness_account_settings")
         waitFor("discreet_cover_olive")
         visibleNode("discreet_cover_olive").performTouchInput { doubleClick() }
         waitFor("new_user")

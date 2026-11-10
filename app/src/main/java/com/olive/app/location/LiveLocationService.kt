@@ -15,14 +15,13 @@ import androidx.core.content.edit
 import com.google.android.gms.location.*
 import com.google.firebase.database.DatabaseReference
 import com.olive.app.R
+import com.olive.app.notification.OliveNotificationManager
 import com.olive.app.data.LocationDatabase
 import com.olive.app.data.MapLocationPoint
 import com.olive.app.security.EncryptionUtils
 import org.json.JSONObject
 import javax.crypto.SecretKey
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import com.google.android.gms.location.LocationCallback
@@ -62,7 +61,7 @@ class LiveLocationService : Service() {
         super.onCreate()
         fused =
             LocationServices.getFusedLocationProviderClient(this)
-        createChannel()
+        OliveNotificationManager.createNotificationChannels(this)
     }
 
     // This foreground location service is command-based, so screens do not bind to it.
@@ -246,23 +245,12 @@ class LiveLocationService : Service() {
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
 
-    // Creates the low-visibility Android channel used while live sharing runs in the background.
-    private fun createChannel() {
-        getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.location_notification_channel),
-                NotificationManager.IMPORTANCE_LOW
-            )
-        )
-    }
-
     // Builds the notification shown while location sharing is running.
     private fun notification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_app_info_blank)
+        return NotificationCompat.Builder(this, OliveNotificationManager.CHANNEL_LOCATION)
+            .setSmallIcon(R.drawable.ic_notification_olive_branch)
             .setContentTitle(getString(R.string.location_notification_title))
-            .setContentText(getString(R.string.location_notification_text))
+            .setContentText(getString(R.string.location_notification_sharing_text))
             .setOngoing(true).setOnlyAlertOnce(true).setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -277,7 +265,6 @@ class LiveLocationService : Service() {
         const val STOP = "stop"
         const val PING = "ping"
         const val RESET_TRAIL = "reset_trail"
-        private const val CHANNEL_ID = "olive_live_location_v3"
         private const val NOTIFICATION_ID = 4102
         private const val MOVING_SAMPLE_MILLIS = 2_000L
         private const val MOVING_UPLOAD_MILLIS = 2_000L
@@ -305,7 +292,7 @@ class AdminLocationService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createChannel()
+        OliveNotificationManager.createNotificationChannels(this)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -395,18 +382,8 @@ class AdminLocationService : Service() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED
 
-    private fun createChannel() {
-        getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.location_notification_channel),
-                NotificationManager.IMPORTANCE_LOW,
-            )
-        )
-    }
-
-    private fun notification(): Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setSmallIcon(R.drawable.ic_app_info_blank)
+    private fun notification(): Notification = NotificationCompat.Builder(this, OliveNotificationManager.CHANNEL_LOCATION)
+        .setSmallIcon(R.drawable.ic_notification_olive_branch)
         .setContentTitle(getString(R.string.location_notification_title))
         .setContentText(getString(R.string.location_notification_text))
         .setOngoing(true)
@@ -425,7 +402,6 @@ class AdminLocationService : Service() {
         private const val EXTRA_NAME = "name"
         private const val ACTION_STOP = "com.olive.app.location.STOP_ADMIN_LOCATION"
         private const val ADMIN_LOCATION_PATH = "adminLiveLocations"
-        private const val CHANNEL_ID = "olive_admin_location_v1"
         private const val NOTIFICATION_ID = 4103
         private const val SAMPLE_MILLIS = 2_000L
         private const val MIN_SAMPLE_MILLIS = 1_000L

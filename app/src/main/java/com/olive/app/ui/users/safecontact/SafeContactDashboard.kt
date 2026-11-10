@@ -51,7 +51,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 // Safe-contact accounts use a connection-focused dashboard and can open only records explicitly shared with them.
 @Composable
-internal fun SafeContactArea(session: SessionViewModel) {
+internal fun SafeContactArea(session: SessionViewModel, exit: () -> Unit) {
     val profile = session.profile ?: return
     LaunchedEffect(session.coverAccountId) { session.messages.ensureMessagingObservation() }
     AnimatedContent(
@@ -60,7 +60,7 @@ internal fun SafeContactArea(session: SessionViewModel) {
         // Opens the selected trusted-contact dashboard section.
         when (page) {
             SafePage.Home -> SafeContactHome(session)
-            SafePage.Messages -> MessagesScreen(session)
+            SafePage.Messages -> MessagesScreen(session, exit)
             SafePage.Notes -> PrivateNotes(session)
             SafePage.Profile -> SafeContactProfile(session, profile)
             SafePage.Settings -> SettingsEditor(session, profile)
@@ -244,6 +244,7 @@ private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) 
 @Composable
 internal fun SharedEntryViewer(session: SessionViewModel) {
     val entry = session.viewedSharedEntry ?: return
+    val quickExit = LocalQuickExit.current
 
     // Immediately clear the state if the user uses the system back swipe
     BackHandler {
@@ -273,11 +274,16 @@ internal fun SharedEntryViewer(session: SessionViewModel) {
                         modifier = Modifier.padding(start = 12.dp).semantics { heading() },
                         color = MaterialTheme.colorScheme.primary
                     )
-                    IconButton(onClick = { session.messages.closeSharedPrivateEntry() }) {
-                        Icon(
-                            Icons.Filled.Close,
-                            contentDescription = stringResource(R.string.close_shared_entry)
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (quickExit != null) TextButton(onClick = quickExit) {
+                            Text(stringResource(R.string.quick_exit))
+                        }
+                        IconButton(onClick = { session.messages.closeSharedPrivateEntry() }) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = stringResource(R.string.close_shared_entry)
+                            )
+                        }
                     }
                 }
 
@@ -339,7 +345,7 @@ internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) 
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().testTag("safe_contact_identity"),
         shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFF0F4EC),
+        color = CardSoftMint,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, OliveGreen.copy(alpha = .18f))
     ) {
@@ -395,7 +401,7 @@ internal fun SafeContactActionCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = 104.dp).testTag(tag),
         shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFF4F6EF),
+        color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, OliveGreen.copy(alpha = .22f)),
         tonalElevation = 1.dp
@@ -405,7 +411,7 @@ internal fun SafeContactActionCard(
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             BadgedBox(badge = { if (badgeCount > 0) Badge { Text(if (badgeCount > 99) "99+" else badgeCount.toString()) } }) {
-                Surface(shape = CircleShape, color = Color(0xFFDDE7D6), contentColor = OliveGreen) {
+                Surface(shape = CircleShape, color = IconBadgeEnabled, contentColor = OliveGreen) {
                     Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                         Icon(
                             icon,

@@ -63,6 +63,20 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Signed-in devices register their own FCM tokens so Cloud Functions can deliver discreet push alerts.
+    match /notificationTokens/{uid}/devices/{deviceId} {
+      function validNotificationToken(data) {
+        return data.keys().hasOnly(['uid','deviceId','token','updatedAt'])
+          && data.uid == uid
+          && data.deviceId == deviceId
+          && data.deviceId.matches('^[A-Za-z0-9_-]{16,64}$')
+          && data.token is string && data.token.size() > 0 && data.token.size() <= 512;
+      }
+      allow get, list: if owner(uid);
+      allow create, update: if owner(uid) && validNotificationToken(request.resource.data);
+      allow delete: if owner(uid);
+    }
+
     function validMessageUsername(username) {
       return username is string && username.matches('[a-z0-9_]{4,24}');
     }
