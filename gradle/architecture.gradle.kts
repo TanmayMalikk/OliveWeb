@@ -36,8 +36,8 @@ tasks.register("checkArchitecture") {
             if(productionKotlin.size>100) add(
                 "Android production source has ${productionKotlin.size} Kotlin files; keep the consolidated layout at 100 or fewer"
             )
-            productionKotlin.filter { it.readLines().size>600 }.forEach { source ->
-                add("Android source ${source.relativeTo(rootDir)} exceeds the 600-line limit")
+            productionKotlin.filter { it.readLines().size>550 }.forEach { source ->
+                add("Android source ${source.relativeTo(rootDir)} exceeds the 550-line limit")
             }
         }
         val layoutViolations=androidRoots.flatMap { (directory,label) ->

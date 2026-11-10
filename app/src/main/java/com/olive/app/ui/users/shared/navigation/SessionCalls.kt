@@ -2,92 +2,42 @@
 package com.olive.app.ui.users.shared.navigation
 
 import android.app.Application
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import com.olive.app.data.AccountRole
-import com.olive.app.data.ChatConversation
-import com.olive.app.data.messaging.VoipInvitation
-import com.olive.app.data.messaging.VoipManager
-import com.olive.app.data.messaging.VoipSessionController
-import com.olive.app.data.messaging.VoipSessionState
-import com.olive.app.data.messaging.VoipCall
-import com.olive.app.data.messaging.VoipCallForegroundService
-import com.olive.app.data.messaging.VoipCallStatus
-import com.olive.app.data.messaging.VoipParticipantStatus
-import com.olive.app.data.messaging.VoipPushTokenRegistration
-import com.olive.app.data.messaging.canBeJoinedBy
-import com.olive.app.data.messaging.isVoipApiConfigured
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.error
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.R
-import com.olive.app.ui.shared.AccessibleMessage
-import com.olive.app.ui.shared.LocalizedIcon as Icon
-import com.olive.app.ui.shared.Muted
-import com.olive.app.ui.shared.OliveGreen
-import com.olive.app.ui.shared.keepVisibleWhileTyping
-import com.olive.app.ui.shared.oliveScrollbar
-import com.olive.app.ui.shared.rememberResourceText
-import com.olive.app.data.DeliveryAddress
-import com.olive.app.data.NewsArticle
-import com.olive.app.data.PrivateEntryKind
+import com.olive.app.data.*
+import com.olive.app.data.messaging.*
 import com.olive.app.ui.session.SessionRuntime
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.shared.LocalizedIcon as Icon
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 
 
 // Calls are private-account features. Direct and personal group chats can call; support chats cannot.
@@ -544,61 +494,4 @@ internal fun Field(
             }
         )
     )
-}
-
-// Signed-in users: connects cover, private note, activity, and privacy screens to their workflows.
-
-internal interface SessionCoverNotesActivityActions {
-    val runtime: SessionRuntime
-
-    // Passes the private-note button action to the session privacy controller.
-    fun noteInteraction() = runtime.privacy.noteInteraction()
-    // Records that Android detected a screenshot or screen recording.
-    fun captureDetected(kind: String) = runtime.privacy.captureDetected(kind)
-    // Records when Android reports that screen recording has stopped.
-    fun recordingStopped() = runtime.privacy.recordingStopped()
-    // Adds a settings change to the user's private activity history.
-    fun recordSettingsInteraction(area: String, action: String) =
-        runtime.history.recordSettingsInteraction(area, action)
-
-    // Adds or removes an article from the news cover's bookmarks.
-    fun toggleNewsBookmark(article: NewsArticle) = runtime.covers.toggleNewsBookmark(article)
-
-    // Opens one category in the private activity-history screen.
-    fun showActivityCategory(value: ActivityCategory) = runtime.history.showActivityCategory(value)
-    // Returns from an activity category to the full history list.
-    fun activityBack() = runtime.history.activityBack()
-
-    // Clears the note editor's success or error message before the next action.
-    fun clearPrivateEntryStatus() = runtime.notes.clearPrivateEntryStatus()
-    // Creates a private note or updates the note with the matching ID.
-    fun savePrivateEntry(
-        id: String?, kind: PrivateEntryKind, title: String, body: String,
-        incidentDate: String = "", incidentTime: String = "", incidentLocation: String = "",
-        incidentLatitude: Double? = null, incidentLongitude: Double? = null,
-        attachmentIds: List<String> = emptyList(),
-    ) = runtime.notes.savePrivateEntry(
-        id, kind, title, body, incidentDate, incidentTime, incidentLocation,
-        incidentLatitude, incidentLongitude, attachmentIds,
-    )
-
-    // Pins or unpins a private note so important notes stay easy to find.
-    fun togglePrivateEntryPin(id: String) = runtime.notes.togglePrivateEntryPin(id)
-    // Moves a private note into the note trash.
-    fun trashPrivateEntry(id: String) = runtime.notes.trashPrivateEntry(id)
-    // Restores a private note from the note trash.
-    fun restorePrivateEntry(id: String) = runtime.notes.restorePrivateEntry(id)
-}
-
-// All app roles: opens and closes the app's root screens and safe-app pages.
-
-internal class SessionScreenNavigation(private val runtime: SessionRuntime) {
-    // Gives navigation screens the same quick-exit action from the current session.
-    fun quickExit() = runtime.navigation.quickExit()
-    // Sends the app to the background when the user presses Quick Exit.
-    fun background() = runtime.navigation.background()
-    // Returns to the previous Safe App screen.
-    fun back() = runtime.navigation.back()
-    // Opens the requested Safe App page from shared navigation.
-    fun openSafePage(page: SafePage) = runtime.navigation.navigate(page)
 }

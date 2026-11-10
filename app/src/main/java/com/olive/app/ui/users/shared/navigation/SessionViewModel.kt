@@ -4,24 +4,12 @@ package com.olive.app.ui.users.shared.navigation
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.olive.app.data.*
 import com.olive.app.ui.session.SessionRuntime
+import com.olive.app.ui.users.shared.organization.AdminLocationMapController
 import com.olive.app.ui.users.user.documents.MediaTransferController
 import com.olive.app.ui.users.user.documents.SafetyDocumentsController
 import com.olive.app.ui.users.user.location.LocationMapController
-import com.olive.app.ui.users.admin.AdminLocationMapController
-import com.olive.app.data.ChatConversation
-import com.olive.app.data.ChatMessage
-import com.olive.app.data.DirectoryUser
-import com.olive.app.data.Friend
-import com.olive.app.data.FriendRelationship
-import com.olive.app.data.FriendRequest
-import com.olive.app.data.PrivateEntry
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.AdminAccountDraft
-import com.olive.app.data.AdminAccountSummary
-import com.olive.app.data.CoverType
-import com.olive.app.data.DeliveryAddress
-import com.olive.app.data.SafeContact
 
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
@@ -300,4 +288,59 @@ internal interface SessionAccountManagementActions {
     // Checks the current password before replacing it with the new password.
     fun changePassword(currentPassword: String, newPassword: String, confirmation: String) =
         runtime.settings.changePassword(currentPassword, newPassword, confirmation)
+}
+
+// Connects cover, private note, activity, and privacy screens to their workflows.
+internal interface SessionCoverNotesActivityActions {
+    val runtime: SessionRuntime
+
+    // Passes the private-note button action to the session privacy controller.
+    fun noteInteraction() = runtime.privacy.noteInteraction()
+    // Records that Android detected a screenshot or screen recording.
+    fun captureDetected(kind: String) = runtime.privacy.captureDetected(kind)
+    // Records when Android reports that screen recording has stopped.
+    fun recordingStopped() = runtime.privacy.recordingStopped()
+    // Adds a settings change to the user's private activity history.
+    fun recordSettingsInteraction(area: String, action: String) =
+        runtime.history.recordSettingsInteraction(area, action)
+
+    // Adds or removes an article from the news cover's bookmarks.
+    fun toggleNewsBookmark(article: NewsArticle) = runtime.covers.toggleNewsBookmark(article)
+
+    // Opens one category in the private activity-history screen.
+    fun showActivityCategory(value: ActivityCategory) = runtime.history.showActivityCategory(value)
+    // Returns from an activity category to the full history list.
+    fun activityBack() = runtime.history.activityBack()
+
+    // Clears the note editor's success or error message before the next action.
+    fun clearPrivateEntryStatus() = runtime.notes.clearPrivateEntryStatus()
+    // Creates a private note or updates the note with the matching ID.
+    fun savePrivateEntry(
+        id: String?, kind: PrivateEntryKind, title: String, body: String,
+        incidentDate: String = "", incidentTime: String = "", incidentLocation: String = "",
+        incidentLatitude: Double? = null, incidentLongitude: Double? = null,
+        attachmentIds: List<String> = emptyList(),
+    ) = runtime.notes.savePrivateEntry(
+        id, kind, title, body, incidentDate, incidentTime, incidentLocation,
+        incidentLatitude, incidentLongitude, attachmentIds,
+    )
+
+    // Pins or unpins a private note so important notes stay easy to find.
+    fun togglePrivateEntryPin(id: String) = runtime.notes.togglePrivateEntryPin(id)
+    // Moves a private note into the note trash.
+    fun trashPrivateEntry(id: String) = runtime.notes.trashPrivateEntry(id)
+    // Restores a private note from the note trash.
+    fun restorePrivateEntry(id: String) = runtime.notes.restorePrivateEntry(id)
+}
+
+// Opens and closes the app's root screens and safe-app pages.
+internal class SessionScreenNavigation(private val runtime: SessionRuntime) {
+    // Gives navigation screens the same quick-exit action from the current session.
+    fun quickExit() = runtime.navigation.quickExit()
+    // Sends the app to the background when the user presses Quick Exit.
+    fun background() = runtime.navigation.background()
+    // Returns to the previous Safe App screen.
+    fun back() = runtime.navigation.back()
+    // Opens the requested Safe App page from shared navigation.
+    fun openSafePage(page: SafePage) = runtime.navigation.navigate(page)
 }

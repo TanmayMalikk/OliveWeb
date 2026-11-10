@@ -1,55 +1,38 @@
 // Admins: shows account records and controls for admins.
 package com.olive.app.ui.users.admin
 
-import com.olive.app.ui.shared.*
-import com.olive.app.ui.users.shared.navigation.*
-import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
-import com.olive.app.R
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
-import com.olive.app.ui.shared.LocalizedIcon as Icon
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
-import com.olive.app.ui.users.shared.messaging.PrivateContactNoteDialog
-import com.olive.app.ui.users.shared.organization.OrganizationSettings
-import com.olive.app.ui.users.shared.organization.OrganizationMap
-import com.olive.app.ui.users.shared.organization.OrganizationDashboardCard
-import com.olive.app.ui.users.staff.SafetyConsultations
-import com.olive.app.ui.users.shared.messaging.MessagesScreen
-import com.olive.app.ui.users.safecontact.SharedEntryViewer
-import androidx.activity.compose.BackHandler
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.HealthAndSafety
-import androidx.compose.material.icons.outlined.ManageAccounts
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material.icons.outlined.Badge
-import androidx.compose.material.icons.outlined.ExpandLess
-import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.olive.app.data.AdminAccountSummary
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import com.olive.app.data.AccountRole
-import com.olive.app.data.AdminLocationRepository
-import com.olive.app.data.ChatSubscription
-import com.olive.app.data.MapLocationPoint
+import com.olive.app.R
+import com.olive.app.data.*
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.users.safecontact.SharedEntryViewer
+import com.olive.app.ui.users.shared.messaging.MessagesScreen
+import com.olive.app.ui.users.shared.messaging.PrivateContactNoteDialog
+import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
+import com.olive.app.ui.users.shared.organization.*
+import com.olive.app.ui.users.staff.SafetyConsultations
 
 
 
@@ -541,149 +524,5 @@ private fun AdminDashboard(
             enabled = !session.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.sign_out)) }
-    }
-}
-
-// Admin dashboard keeps open and closed support totals visible without opening the chat list.
-@Composable
-private fun TicketCountGrid(counts: AccountCounts) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        TicketCountCard(
-            label = stringResource(R.string.admin_open_tickets),
-            count = counts.openTickets,
-            modifier = Modifier.weight(1f),
-        )
-        TicketCountCard(
-            label = stringResource(R.string.admin_closed_tickets),
-            count = counts.closedTickets,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-// One ticket card reads as a single TalkBack item instead of separate count and label items.
-@Composable
-private fun TicketCountCard(label: String, count: Int, modifier: Modifier = Modifier) {
-    ElevatedCard(modifier.clearAndSetSemantics { contentDescription = "$count $label" }) {
-        Column(Modifier.fillMaxWidth().padding(14.dp)) {
-            Text(count.toString(), style = MaterialTheme.typography.headlineSmall, color = OliveGreen)
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = Muted)
-        }
-    }
-}
-
-// Admin staff management shows each staff member's active and completed plan and support work.
-@Composable
-private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
-    val uiText = rememberResourceText()
-    LaunchedEffect(Unit) { session.refreshAdminStaff() }
-    val staff = session.adminAccounts.filter { it.role == AccountRole.STAFF }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.ui_back))
-            }
-            Column {
-                Text(
-                    stringResource(R.string.admin_staff_management),
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Text(stringResource(R.string.admin_staff_management_description), color = Muted)
-            }
-        }
-        OutlinedButton(
-            onClick = session::refreshAdminStaff,
-            enabled = !session.busy,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.refresh)) }
-        if (staff.isEmpty() && !session.busy) {
-            Text(stringResource(R.string.admin_no_staff_accounts), color = Muted)
-        }
-        staff.forEach { account -> StaffWorkloadCard(account) }
-        Status(session)
-    }
-}
-
-// A staff workload card summarizes plans and chats with completed counts kept beside their totals.
-@Composable
-private fun StaffWorkloadCard(account: AdminAccountSummary) {
-    val summary = stringResource(
-        R.string.admin_staff_workload_accessibility,
-        account.username,
-        account.safetyPlans,
-        account.completedSafetyPlans,
-        account.supportChats,
-        account.closedSupportChats,
-    )
-    OutlinedCard(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = summary }) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(account.username, style = MaterialTheme.typography.titleLarge)
-            account.fullName.takeIf { it.isNotBlank() }?.let { Text(it, color = Muted) }
-            HorizontalDivider()
-            WorkloadRow(
-                stringResource(R.string.admin_safety_plan_tasks),
-                account.safetyPlans,
-                account.completedSafetyPlans,
-                stringResource(R.string.admin_completed),
-            )
-            WorkloadRow(
-                stringResource(R.string.admin_support_chat_tasks),
-                account.supportChats,
-                account.closedSupportChats,
-                stringResource(R.string.admin_closed),
-            )
-        }
-    }
-}
-
-// Each workload row keeps its total and finished count together for quick comparison.
-@Composable
-private fun WorkloadRow(label: String, total: Int, finished: Int, finishedLabel: String) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, style = MaterialTheme.typography.titleMedium)
-        Text("$total ($finished $finishedLabel)", color = OliveGreen)
-    }
-}
-
-// Admins: holds the live user locations shown on the organization map.
-
-internal data class AdminLocationMapState(
-    val points: List<MapLocationPoint> = emptyList(),
-    val loading: Boolean = false,
-    val error: String? = null,
-)
-
-/** Opens the protected organization location feed for staff and admin accounts. */
-internal class AdminLocationMapController(
-    private val repository: AdminLocationRepository?,
-) {
-    var state by mutableStateOf(AdminLocationMapState())
-        private set
-    private var subscription: ChatSubscription? = null
-
-    // Starts the organization feed only for an authenticated staff or admin account.
-    fun open(role: AccountRole) {
-        if (role !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || repository == null || subscription != null) return
-        state = AdminLocationMapState(loading = true)
-        subscription = repository.observe(
-            onUpdate = { points ->
-                state = AdminLocationMapState(points = points)
-            },
-            onError = { message ->
-                state = state.copy(loading = false, error = message)
-            },
-        )
-    }
-
-    // Stops Firebase updates and clears sensitive map data from memory.
-    fun close() {
-        subscription?.close()
-        subscription = null
-        state = AdminLocationMapState()
     }
 }

@@ -9,104 +9,49 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.DocumentOcrMetadata
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.hasValidatedInternetConnection
-import com.olive.app.data.media.DocumentDownloadGate
-import com.olive.app.data.media.MediaKind
-import com.olive.app.data.media.copyAndVerifyEncryptedDownload
-import com.olive.app.data.media.MediaPreprocessor
-import com.olive.app.data.media.MediaTicketDataSource
-import com.olive.app.data.media.MediaTransferState
-import com.olive.app.data.media.MediaTransferStatus
-import com.olive.app.data.media.MediaTransferStore
-import com.olive.app.data.media.MediaUploadJob
-import com.olive.app.data.media.MediaUploadPresentation
-import com.olive.app.data.media.MediaUploadWorker
-import com.olive.app.data.media.OcrReview
-import com.olive.app.data.media.OfflineMediaAvailability
-import com.olive.app.data.media.OfflineMediaCache
-import com.olive.app.data.media.MediaAccessError
-import com.olive.app.data.media.MediaAccessException
-import com.olive.app.data.media.PassThroughMediaPreprocessor
-import com.olive.app.data.media.PreparedEncryptedMedia
-import com.olive.app.security.EncryptionUtils
-import com.olive.app.security.KeyManager
-import com.olive.app.security.MediaCipher
+import com.olive.app.data.*
+import com.olive.app.data.media.*
+import com.olive.app.security.*
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
 import org.json.JSONArray
+import org.json.JSONObject
 
-
-/**
- * Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
- *
- * Ownership and dependency graph:
- * - `SessionViewModel` owns one controller for the signed-in session;
- * - `SafetyDocumentsController` delegates document upload/download actions here;
- * - [MediaPreprocessor] supplies the replaceable on-device compression stage;
- * - [MediaTransferStore] persists restartable jobs;
- * - [MediaUploadWorker] owns background upload execution;
- * - [MediaTicketDataSource] supplies authorized R2 download capabilities;
- * - [MediaCipher] and [KeyManager] enforce client-side encryption and per-user key wrapping.
- *
- * Upload workflow:
- * `OCR decision -> preprocess/compress -> AES-GCM encrypt -> checksum/wrap key -> persist job ->
- * WorkManager -> Firebase ticket -> direct R2 PUT -> Firebase finalization`.
- *
- * Download workflow:
- * `Firebase authorization ticket -> direct R2 GET -> ciphertext size/hash verification -> unwrap key
- * -> AES-GCM decrypt into .part -> atomic rename`.
- *
- * This is deliberately a controller rather than another AndroidX ViewModel: WorkManager/store provide
- * durable state, while `SessionViewModel` remains the single lifecycle owner for session features.
- */
+// Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
 internal class MediaTransferController(
-    context:Context,
-    private val scope:CoroutineScope,
-    private val repository:MediaTicketDataSource,
-    private val store:MediaTransferStore=MediaTransferStore(context),
-    private val offlineCache:OfflineMediaCache=OfflineMediaCache(context),
-    private val client:OkHttpClient=OkHttpClient(),
-    private val preprocessor:MediaPreprocessor=PassThroughMediaPreprocessor,
-):MediaTransferOperations {
-    private val applicationContext=context.applicationContext
-    private var observedOwnerUid:String?=null
-    private var publishedMediaIds:Set<String> = emptySet()
-    private val observationJobs=mutableMapOf<String,Job>()
-    private val workProgress=mutableMapOf<String,Pair<Long,Long>>()
-    private val downloadGate=DocumentDownloadGate()
+    context: Context,
+    private val scope: CoroutineScope,
+    private val repository: MediaTicketDataSource,
+    private val store: MediaTransferStore = MediaTransferStore(context),
+    private val offlineCache: OfflineMediaCache = OfflineMediaCache(context),
+    private val client: OkHttpClient = OkHttpClient(),
+    private val preprocessor: MediaPreprocessor = PassThroughMediaPreprocessor,
+) : MediaTransferOperations {
+    private val applicationContext = context.applicationContext
+    private var observedOwnerUid: String? = null
+    private var publishedMediaIds: Set<String> = emptySet()
+    private val observationJobs = mutableMapOf<String, Job>()
+    private val workProgress = mutableMapOf<String, Pair<Long, Long>>()
+    private val downloadGate = DocumentDownloadGate()
     var state by mutableStateOf<MediaTransferState>(MediaTransferState.Idle)
         private set
     var uploads by mutableStateOf<List<MediaUploadPresentation>>(emptyList())
         private set
-    var offlineCopies by mutableStateOf<Map<String,OfflineMediaAvailability>>(emptyMap())
+    var offlineCopies by mutableStateOf<Map<String, OfflineMediaAvailability>>(emptyMap())
         private set
     var recentCachingEnabled by mutableStateOf(false)
         private set
-    private var cachePreferenceOwnerUid:String?=null
+    private var cachePreferenceOwnerUid: String? = null
 
-    /**
-     * Restores and observes every durable upload belonging to the visible account.
-     *
-     * WorkManager owns execution, while this controller owns only the device-local presentation.
-     * Re-entering the screen after process death reconstructs pending cards from the encrypted
-     * [MediaTransferStore] and reconnects to the already scheduled unique work chains.
-     */
-    override fun observeUploads(ownerUid:String) {
-        if(observedOwnerUid!=ownerUid) {
+    // Restores and observes every durable upload belonging to the visible account.
+    override fun observeUploads(ownerUid: String) {
+        if (observedOwnerUid != ownerUid) {
             observationJobs.values.forEach(Job::cancel)
             observationJobs.clear()
             workProgress.clear()
@@ -116,28 +61,29 @@ internal class MediaTransferController(
             offlineCopies = emptyMap()
         }
         loadRecentCachingPreference(ownerUid)
-        scope.launch { refreshUploads(ownerUid)
-            .filterNot { it.status in setOf(MediaTransferStatus.COMPLETE,MediaTransferStatus.FAILED,MediaTransferStatus.CANCELLED) }
-            .forEach { observe(it.jobId) } }
+        scope.launch {
+            refreshUploads(ownerUid)
+                .filterNot { it.status in setOf(MediaTransferStatus.COMPLETE, MediaTransferStatus.FAILED, MediaTransferStatus.CANCELLED) }
+                .forEach { observe(it.jobId) }
+        }
     }
 
-    /** Retries a durable job without repeating OCR, compression, or encryption. */
-    fun retryUpload(jobId:String) {
+    // Retries a durable job without repeating OCR, compression, or encryption.
+    fun retryUpload(jobId: String) {
         retry(jobId)
         observedOwnerUid?.let { owner -> scope.launch { refreshUploads(owner) } }
     }
 
-    /**
-     * Removes completed local bookkeeping only after Firestore publishes the matching media record.
-     * This prevents a blank gap: the pending card remains until the finalized document can replace it.
-     */
-    override fun acknowledgePublished(mediaIds:Set<String>) {
-        val owner=observedOwnerUid ?: return
-        publishedMediaIds=mediaIds
+    // Removes completed local bookkeeping only after Firestore publishes the matching media record.
+    override fun acknowledgePublished(mediaIds: Set<String>) {
+        val owner = observedOwnerUid ?: return
+        publishedMediaIds = mediaIds
         scope.launch {
-            val completed=withContext(Dispatchers.IO) { store.all().filter {
-                it.ownerUid==owner && it.status==MediaTransferStatus.COMPLETE && it.mediaId in mediaIds
-            } }
+            val completed = withContext(Dispatchers.IO) {
+                store.all().filter {
+                    it.ownerUid == owner && it.status == MediaTransferStatus.COMPLETE && it.mediaId in mediaIds
+                }
+            }
             withContext(Dispatchers.IO) { completed.forEach { store.remove(it.id) } }
             completed.forEach {
                 observationJobs.remove(it.id)?.cancel()
@@ -147,11 +93,7 @@ internal class MediaTransferController(
         }
     }
 
-    /**
-     * Entry point for picker-selected safety documents. The caller supplies the OCR recommendation.
-     * [OcrReview.RETAKE_RECOMMENDED] pauses before any plaintext processing; declining is represented
-     * by calling again with [OcrReview.RETAKE_DECLINED].
-     */
+    // Entry point for picker-selected safety documents after OCR review.
     override fun queueDocument(
         uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
         tags:Set<String>,

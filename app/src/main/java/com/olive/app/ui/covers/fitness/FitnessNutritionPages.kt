@@ -63,8 +63,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
+import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
-import com.olive.app.ui.shared.oliveScrollbar
 import kotlinx.coroutines.launch
 
 // Shows today's calorie and macro totals with meal logging.

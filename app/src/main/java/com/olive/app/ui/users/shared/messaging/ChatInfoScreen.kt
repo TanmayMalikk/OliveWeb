@@ -1,54 +1,19 @@
 // All chat roles: shows conversation members and shared items away from the message timeline.
 package com.olive.app.ui.users.shared.messaging
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.FolderShared
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.PersonOutline
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.PersonAdd
-import androidx.compose.material.icons.outlined.SupportAgent
-import androidx.compose.material.icons.outlined.PersonRemove
-import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -60,16 +25,15 @@ import com.olive.app.R
 import com.olive.app.data.AccountRole
 import com.olive.app.data.ChatMessage
 import com.olive.app.data.SafetyDocument
-import com.olive.app.ui.shared.Muted
-import com.olive.app.ui.shared.OliveGreen
+import com.olive.app.data.messaging.VoipCall
+import com.olive.app.data.messaging.VoipCallStatus
+import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import java.io.File
-
-private val ChatInfoBackground = Color(0xFFF8F7F1)
-private val ChatInfoCard = Color.White
-private val ChatInfoBorder = Color(0xFFD8DDCE)
-private val ChatInfoDanger = Color(0xFF9D3E37)
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 private data class SharedChatItem(
     val key: String,
@@ -181,10 +145,10 @@ internal fun ChatInfoDialog(
     ) {
         Surface(
             Modifier.fillMaxSize().testTag("chat_info_screen"),
-            color = ChatInfoBackground,
+            color = ChatPageBackground,
         ) {
             Scaffold(
-                containerColor = ChatInfoBackground,
+                containerColor = ChatPageBackground,
                 topBar = {
                     Row(
                         Modifier.fillMaxWidth().background(Color.White)
@@ -242,7 +206,7 @@ internal fun ChatInfoDialog(
                         }
                     }
                     item {
-                        HorizontalDivider(color = ChatInfoBorder)
+                        HorizontalDivider(color = ChatBorder)
                         Text(stringResource(R.string.chat_members).uppercase(),
                             style = MaterialTheme.typography.labelLarge,
                             color = Muted,
@@ -260,8 +224,8 @@ internal fun ChatInfoDialog(
                             else -> conversation.participantUsernames[uid].orEmpty().ifBlank { stringResource(R.string.account) }
                         }
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = ChatInfoCard),
-                            border = BorderStroke(1.dp, ChatInfoBorder),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(1.dp, ChatBorder),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.fillMaxWidth().testTag("chat_member_$uid"),
                         ) { ListItem(
@@ -364,9 +328,9 @@ internal fun ChatInfoDialog(
                                 },
                                 enabled = session.staffSupport.saving == 0,
                                 colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
-                                    contentColor = ChatInfoDanger,
+                                    contentColor = ChatDangerRed,
                                 ),
-                                border = BorderStroke(1.dp, ChatInfoDanger.copy(alpha = .45f)),
+                                border = BorderStroke(1.dp, ChatDangerRed.copy(alpha = .45f)),
                                 shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier.fillMaxWidth().height(52.dp)
                                     .testTag("chat_request_staff"),
@@ -446,6 +410,61 @@ internal fun ChatInfoDialog(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+// Shows one voice call status card in the conversation timeline.
+@Composable
+internal fun CallHistoryRow(
+    call: VoipCall,
+    canJoin: Boolean = false,
+    onJoin: () -> Unit = {},
+) {
+    val label = stringResource(
+        when (call.status) {
+            VoipCallStatus.MISSED -> R.string.ui_missed_call
+            VoipCallStatus.DECLINED -> R.string.ui_call_declined
+            VoipCallStatus.ENDED -> R.string.ui_call_ended
+            VoipCallStatus.ACTIVE -> R.string.ui_call_in_progress
+        }
+    )
+    val activeColor = MaterialTheme.colorScheme.primaryContainer
+    Surface(
+        color = if (call.status == VoipCallStatus.ACTIVE) activeColor
+        else MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp)
+            .testTag("call_history_${call.callId}")
+            .then(if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                Modifier.clickable(onClick = onJoin)
+            } else Modifier),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Call, null, tint = OliveGreen)
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.titleSmall)
+                val timestamp = call.endedAt.takeIf { it > 0 } ?: call.createdAt
+                if (timestamp > 0) Text(
+                    DateTimeFormatter.ofPattern("MMM d, HH:mm")
+                        .withZone(ZoneId.systemDefault())
+                        .format(Instant.ofEpochMilli(timestamp)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Muted,
+                )
+            }
+            if (call.status == VoipCallStatus.ACTIVE && canJoin) {
+                FilledTonalButton(
+                    onClick = onJoin,
+                    modifier = Modifier.testTag("join_call_${call.callId}"),
+                ) {
+                    Text(stringResource(R.string.ui_join_call))
                 }
             }
         }
