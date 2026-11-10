@@ -1,10 +1,10 @@
-// The QR opens the permanent download page, which then serves the newest signed APK.
+// The QR code encodes the direct download URL for the newest signed APK.
 import QRCode from "qrcode";
 import { fileURLToPath } from "node:url";
 
 await QRCode.toFile(
   fileURLToPath(new URL("../public/android-download-qr.svg", import.meta.url)),
-  "https://yourolivebranch.ca/get",
+  "https://yourolivebranch.ca/download/android",
   {
     type: "svg",
     errorCorrectionLevel: "H",

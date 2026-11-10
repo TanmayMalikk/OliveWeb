@@ -31,7 +31,7 @@ Add these public browser settings to the `yourolivebranch.ca` app:
 - `VITE_FIREBASE_APPCHECK_SITE_KEY`
 - `VITE_USE_FIREBASE_EMULATORS=false`
 
-The permanent QR opens `/get`. Its download button uses `/download/android`, where the server reads
+The permanent QR directly triggers `/download/android`, where the server reads
 the validated `public/android/latest.json` release manifest and redirects to that signed, immutable
 APK. The app uses `/api/android/releases/latest` to check the same manifest for updates.
 

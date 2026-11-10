@@ -67,11 +67,11 @@ export default function DownloadPage() {
             </p>
             <a
               className="download-qr"
-              href={ANDROID_DOWNLOAD_PAGE_URL}
-              aria-label="Open the Android download page"
+              href={ANDROID_DOWNLOAD_URL}
+              aria-label="Download signed Android APK"
             >
               <img
-                src="/android-download-qr.svg?v=get-page-v1"
+                src="/android-download-qr.svg?v=direct-apk-v2"
                 alt="QR code for the latest signed Android app"
               />
             </a>
