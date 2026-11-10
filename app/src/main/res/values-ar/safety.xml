@@ -17,6 +17,13 @@
     <string name="safety_account_required">تتطلب الاستشارة تسجيل الدخول إلى حساب. تبقى خططك متاحة دون اتصال.</string>
     <string name="safety_conflict">تغيّر هذا القسم على جهاز آخر. تم الاحتفاظ بتعديلك. اختر النسخة التي تريد الاحتفاظ بها.</string>
     <string name="safety_synced_version">النسخة المتزامنة: %1$s</string>
+    <string name="safety_incoming_changes">التغييرات الواردة</string>
+    <string name="safety_incoming_added">تمت الإضافة: %1$s</string>
+    <string name="safety_incoming_removed">تمت الإزالة: %1$s</string>
+    <string name="safety_incoming_text_changed">تم التغيير: %1$s ← %2$s</string>
+    <string name="safety_incoming_completed">تم وضع علامة مكتمل: %1$s</string>
+    <string name="safety_incoming_incomplete">تم وضع علامة غير مكتمل: %1$s</string>
+    <string name="safety_incoming_attachments_changed">تم تحديث المرفقات: %1$s</string>
     <string name="safety_keep_mine">الاحتفاظ بتعديلي</string>
     <string name="safety_use_synced">استخدام النسخة المتزامنة</string>
     <string name="safety_destination">وجهة آمنة</string>

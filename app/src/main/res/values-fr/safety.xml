@@ -17,6 +17,13 @@
     <string name="safety_account_required">La consultation nécessite une connexion à votre compte. Vos plans restent accessibles hors ligne.</string>
     <string name="safety_conflict">Cette section a changé sur un autre appareil. Votre modification est conservée. Choisissez la version à garder.</string>
     <string name="safety_synced_version">Version synchronisée : %1$s</string>
+    <string name="safety_incoming_changes">Modifications reçues</string>
+    <string name="safety_incoming_added">Ajouté : %1$s</string>
+    <string name="safety_incoming_removed">Supprimé : %1$s</string>
+    <string name="safety_incoming_text_changed">Modifié : %1$s → %2$s</string>
+    <string name="safety_incoming_completed">Marqué comme terminé : %1$s</string>
+    <string name="safety_incoming_incomplete">Marqué comme non terminé : %1$s</string>
+    <string name="safety_incoming_attachments_changed">Pièces jointes mises à jour : %1$s</string>
     <string name="safety_keep_mine">Garder ma modification</string>
     <string name="safety_use_synced">Utiliser la version synchronisée</string>
     <string name="safety_destination">Destination sûre</string>

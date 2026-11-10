@@ -17,6 +17,13 @@
     <string name="safety_account_required">La consulta requiere iniciar sesión en una cuenta. Tus planes siguen disponibles sin conexión.</string>
     <string name="safety_conflict">Esta sección cambió en otro dispositivo. Tu edición se conserva. Elige qué versión guardar.</string>
     <string name="safety_synced_version">Versión sincronizada: %1$s</string>
+    <string name="safety_incoming_changes">Cambios recibidos</string>
+    <string name="safety_incoming_added">Añadido: %1$s</string>
+    <string name="safety_incoming_removed">Eliminado: %1$s</string>
+    <string name="safety_incoming_text_changed">Cambiado: %1$s → %2$s</string>
+    <string name="safety_incoming_completed">Marcado como completado: %1$s</string>
+    <string name="safety_incoming_incomplete">Marcado como pendiente: %1$s</string>
+    <string name="safety_incoming_attachments_changed">Archivos adjuntos actualizados: %1$s</string>
     <string name="safety_keep_mine">Conservar mi edición</string>
     <string name="safety_use_synced">Usar versión sincronizada</string>
     <string name="safety_destination">Destino seguro</string>
