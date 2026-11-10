@@ -243,7 +243,12 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                     requestPermission,
                     application.getString(R.string.location_permission_required),
                     application.getString(R.string.location_start_failed),
-                    onError = { message = it })
+                    onError = { message = it },
+                    onStarted = { expiresAt ->
+                        // Posts a normal encrypted timeline item after location sharing has actually started.
+                        conversationActions.sendMessage("SHARED_LOCATION:$expiresAt")
+                    },
+                )
             }
         }
     }
@@ -495,6 +500,7 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var outgoingFriendRequests by mutableStateOf(emptyList<FriendRequest>())
     var conversations by mutableStateOf(emptyList<ChatConversation>())
     var archivedConversationIds by mutableStateOf(emptySet<String>())
+    var restoredClosedConversationIds by mutableStateOf(emptySet<String>())
     var privateContactNotes by mutableStateOf(emptyMap<String, PrivateContactNote>())
     // Counts changes to read message.
     var readMessageVersion by mutableIntStateOf(0)

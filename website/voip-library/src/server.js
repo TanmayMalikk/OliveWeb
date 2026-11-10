@@ -94,7 +94,7 @@ function toApiCall(call) {
         endedAt: call.endedAt || 0,
         endReason: call.endReason || '',
         participants: [
-            { userId: call.callerId, status: 'accepted' },
+            { userId: call.callerId, status: getParticipantStatus(call, call.callerId) },
             ...Object.entries(call.participants || {}).map(([userId, participant]) => ({
                 userId,
                 status: typeof participant === 'string' ? participant : participant.status
@@ -246,12 +246,50 @@ function createApiServer({
                         'The invitation is no longer available to this user'
                     );
                 }
-                if (invitationMatch[2] === 'decline' && typeof liveKit.endRoom === 'function') {
+                return sendJson(response, 200, toApiCall(call));
+            }
+
+            const leaveMatch = url.pathname.match(/^\/api\/calls\/([^/]+)\/leave$/);
+            if (request.method === 'POST' && leaveMatch) {
+                const callId = decodeCallId(leaveMatch[1]);
+                await expireCall(callId);
+                const call = await callStore.getCall(callId);
+                requireActiveCall(call);
+                if (getParticipantStatus(call, identity.uid) !== 'accepted') {
+                    throw new ApiError(403, 'not_call_member', 'Only an accepted participant can leave');
+                }
+                const updated = await callStore.leaveCall(callId, identity.uid);
+                if (!updated) {
+                    throw new ApiError(409, 'call_not_active', 'Call is no longer active');
+                }
+                if (updated.status === 'ended' && typeof liveKit.endRoom === 'function') {
                     await liveKit.endRoom(`call-${callId}`).catch((error) =>
-                        logger.warn?.('Could not close the declined LiveKit room:', error)
+                        logger.warn?.('Could not close the empty LiveKit room:', error)
                     );
                 }
-                return sendJson(response, 200, toApiCall(call));
+                return sendJson(response, 200, toApiCall(updated));
+            }
+
+            const rejoinMatch = url.pathname.match(/^\/api\/calls\/([^/]+)\/rejoin$/);
+            if (request.method === 'POST' && rejoinMatch) {
+                const callId = decodeCallId(rejoinMatch[1]);
+                await expireCall(callId);
+                const call = await callStore.getCall(callId);
+                requireActiveCall(call);
+                const wasMember = call.callerId === identity.uid ||
+                    getParticipantStatus(call, identity.uid) != null;
+                if (!wasMember) {
+                    throw new ApiError(403, 'not_call_member', 'Only a previous call member can rejoin');
+                }
+                const updated = await callStore.rejoinCall(callId, identity.uid);
+                if (!updated) {
+                    throw new ApiError(
+                        409,
+                        'rejoin_unavailable',
+                        'At least two people must still be connected before rejoining'
+                    );
+                }
+                return sendJson(response, 200, toApiCall(updated));
             }
 
             if (request.method === 'POST' && url.pathname === '/calls/token') {
@@ -285,6 +323,17 @@ function createApiServer({
                 requireActiveCall(call);
                 if (getParticipantStatus(call, identity.uid) !== 'accepted') {
                     throw new ApiError(403, 'not_call_member', 'Only a call participant can end this call');
+                }
+                const inviteeCount = Object.keys(call.participants || {}).length;
+                const acceptedInvitees = Object.values(call.participants || {}).filter((participant) =>
+                    (typeof participant === 'string' ? participant : participant?.status) === 'accepted'
+                ).length;
+                if (inviteeCount > 1 && acceptedInvitees > 0) {
+                    throw new ApiError(
+                        409,
+                        'group_member_must_leave',
+                        'Members must leave individually after a group call has connected'
+                    );
                 }
 
                 const ended = await callStore.endCall(callId, identity.uid);

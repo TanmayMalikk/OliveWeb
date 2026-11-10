@@ -6,12 +6,16 @@ Educational purposes only.
 
 ---------------------------------------------
 # Installation
-Currently, there is no way to download the .apk file directly to your android device.
-Instead, Clone this GitHub repository "https://github.com/macewanCS/F26_D1.git" and open the repository in Android Studio.
-Then run the Gradle build/sync, to compile the application
-then you can run the application on an emulated or physical device.
+Published signed Android releases are downloaded from
+`https://yourolivebranch.ca/download/android`. The website QR code uses that same permanent address,
+so scanning it directly starts downloading the newest published APK. Android asks the user to approve installation
+because Olive is distributed outside Google Play.
 
-The app runs fine currently however, to enable some of the database features. You need to set up your debug token on the firebase.
+Developers can clone `https://github.com/macewanCS/F26_D1.git`, open it in Android Studio, sync
+Gradle, and run a debug build on an emulator or physical device.
+
+Debug builds need a Firebase App Check debug token for protected Firebase features. Signed release
+builds use the release key registered with Firebase App Check and do not use per-device debug tokens.
 ## Debug Token
 On emulators this is a process you need to do every time you start a new emulator.
 on a physical device the debug token is static.

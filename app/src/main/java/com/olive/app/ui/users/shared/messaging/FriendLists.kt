@@ -3,27 +3,16 @@ package com.olive.app.ui.users.shared.messaging
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Badge
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +29,8 @@ import com.olive.app.data.DirectoryUser
 import com.olive.app.data.Friend
 import com.olive.app.data.FriendRelationship
 import com.olive.app.data.FriendRequest
+import com.olive.app.data.SafetyDocument
+import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.SecureFileOpeningIndicator
@@ -49,51 +40,12 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.olive.app.ui.shared.*
-import com.olive.app.ui.users.shared.navigation.*
-import com.olive.app.ui.users.shared.camera.AttachmentPicker
-import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.paneTitle
 import com.olive.app.ui.shared.LocalizedIcon as Icon
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.AttachFile
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Warning
-import androidx.compose.material.icons.outlined.NorthEast
-import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material.icons.outlined.HealthAndSafety
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.milliseconds
+import com.olive.app.ui.users.shared.navigation.*
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.MessageDeliveryStatus
-import com.olive.app.data.media.OfflineMediaAvailability
-import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
-import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
-import com.olive.app.data.messaging.VoipSessionState
-import com.olive.app.data.messaging.VoipCall
-import com.olive.app.data.messaging.VoipCallStatus
-import androidx.core.content.ContextCompat
-import java.io.File
 
 
 // Keeps the four friend-related lists together while the parent screen handles chat lists.
@@ -238,7 +190,7 @@ private fun LazyItemScope.SearchResultRow(
     val relationship = session.messages.relationshipFor(user.uid)
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF3F6F0),
+        color = SoftCardSurface,
         modifier = Modifier.animateItem().fillMaxWidth().animateContentSize(),
     ) {
         Row(
@@ -283,7 +235,7 @@ private fun LazyItemScope.SearchResultRow(
 private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFFFF7E1),
+        color = WarmBannerYellow,
         modifier = Modifier.animateItem().fillMaxWidth().animateContentSize(),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -308,7 +260,7 @@ private fun LazyItemScope.IncomingRequestRow(session: SessionViewModel, request:
 private fun LazyItemScope.OutgoingRequestRow(session: SessionViewModel, request: FriendRequest) {
     Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF3F6F0),
+        color = SoftCardSurface,
         modifier = Modifier.animateItem().fillMaxWidth().animateContentSize(),
     ) {
         Row(
@@ -368,22 +320,43 @@ internal fun ChatMessageBody(
     }
     // An unsent location card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_LOCATION") {
+        val expiresAt = parts.getOrNull(1)?.toLongOrNull() ?: 0L
+        val active = expiresAt > System.currentTimeMillis()
+        val status = if (active) {
+            stringResource(
+                R.string.shared_location_active_until,
+                DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
+                    .format(Instant.ofEpochMilli(expiresAt)),
+            )
+        } else stringResource(R.string.shared_location_ended)
         Surface(
             onClick = { session.navigation.openSafePage(SafePage.Location) }, shape = MaterialTheme.shapes.medium,
             color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 .testTag("shared_live_location")
         ) {
-            Row(
-                Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Outlined.LocationOn, stringResource(R.string.shared_live_location))
-                Column {
+            Column {
+                Surface(
+                    color = OliveGreen.copy(alpha = if (mine) .55f else .16f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(Icons.Outlined.LocationOn, null)
+                        Text(
+                            stringResource(R.string.shared_live_location),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        )
+                    }
+                }
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        stringResource(R.string.shared_live_location),
-                        style = MaterialTheme.typography.labelSmall
+                        status,
+                        style = MaterialTheme.typography.bodySmall,
                     )
                     Text(
                         stringResource(R.string.open_location_map),

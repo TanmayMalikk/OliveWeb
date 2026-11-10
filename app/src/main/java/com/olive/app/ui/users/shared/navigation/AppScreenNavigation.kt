@@ -47,8 +47,8 @@ import com.olive.app.ui.users.user.account.TriggerSetup
 import com.olive.app.ui.users.user.dashboard.SafeArea
 import com.olive.app.ui.users.user.dashboard.SafeSupportControls
 import com.olive.app.data.messaging.VoipSessionState
-import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.ui.users.shared.messaging.ActiveCallDialog
+import com.olive.app.ui.users.shared.messaging.DraggableCallBubble
 import com.olive.app.ui.users.shared.messaging.IncomingCallDialog
 import androidx.core.content.ContextCompat
 import java.security.MessageDigest
@@ -64,31 +64,24 @@ import com.olive.app.ui.session.SessionRuntime
 // UI sizing/color: this root fills the window; the 12dp quick-exit inset and OliveGreen button styling live in its Scaffold.
 internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
-internal fun shouldShowCallOverlay(screen: SessionScreen, role: AccountRole): Boolean =
-    screen == SessionScreen.Safe && role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
-
-internal fun resolveIncomingCaller(
-    invitation: VoipInvitation,
-    conversations: List<ChatConversation>,
-    currentUid: String,
-): VoipInvitation? {
-    val callerUsername = conversations.firstOrNull { conversation ->
-        invitation.callerId in conversation.participantIds && currentUid in conversation.participantIds
-    }?.participantUsernames?.get(invitation.callerId).orEmpty()
-    return invitation.copy(name = callerUsername).takeIf { callerUsername.isNotBlank() }
-}
+internal val LocalQuickExit = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 // Chooses the account, cover, onboarding, or Safe App root screen.
 @Composable
-internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int = 0) {
+internal fun OliveRoot(
+    session: SessionViewModel,
+    locationPermissionVersion: Int = 0,
+    closeApp: () -> Unit = {},
+) {
     val uiText = rememberResourceText()
     val callState by session.calls.state.collectAsState()
     val callAccountId = session.coverAccountId.orEmpty()
+    var callMinimized by remember(callAccountId) { mutableStateOf(false) }
     val incomingCall = session.calls.invitations.firstOrNull()?.let {
         resolveIncomingCaller(it, session.messages.conversations, callAccountId)
     }
     val callOverlayVisible = shouldShowCallOverlay(session.screen, session.accountRole) &&
-        (incomingCall != null || callState != VoipSessionState.Idle)
+        (incomingCall != null || shouldShowActiveCall(callState))
     val context = LocalContext.current
     var pendingCallPermissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val microphonePermission = rememberLauncherForActivityResult(
@@ -97,8 +90,10 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
         session.endCallPermissionRequest()
         val action = pendingCallPermissionAction
         pendingCallPermissionAction = null
-        if (granted) action?.invoke()
-        else session.calls.report(uiText(R.string.ui_microphone_permission_required))
+        if (action != null && session.screen == SessionScreen.Safe) {
+            if (granted) action()
+            else session.calls.report(uiText(R.string.ui_microphone_permission_required))
+        }
     }
     val withMicrophonePermission: (() -> Unit) -> Unit = { action ->
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
@@ -118,6 +113,9 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
         if (callOverlayVisible) session.pauseIdleTimerForCall()
         else session.resumeIdleTimerAfterCall()
     }
+    LaunchedEffect(callState) {
+        if (!shouldShowActiveCall(callState)) callMinimized = false
+    }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val isCover = session.screen == SessionScreen.Cover
@@ -130,16 +128,22 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
             else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
     }
     val exit: () -> Unit = {
-        session.navigation.quickExit()
+        pendingCallPermissionAction = null
         keyboard?.hide()
         focus.clearFocus(force = true)
+        if (session.screen in setOf(SessionScreen.Loading, SessionScreen.StorageError)) {
+            closeApp()
+        } else {
+            session.quickExit()
+            if (!session.usesCover) closeApp()
+        }
     }
     val coverTitle = session.coverType.localizedTitle(uiText)
     val inActiveChat = session.page == SafePage.Messages && session.messages.activeConversation != null
     val safeUser = session.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER
     val showSupport = safeUser && !inActiveChat && session.page != SafePage.Camera
-    val showQuickExit = (safeUser && !inActiveChat && session.page != SafePage.Camera) ||
-            (session.screen == SessionScreen.Pin && session.usesCover)
+    val chatHasQuickExit = session.screen == SessionScreen.Safe && inActiveChat
+    val showQuickExit = !isCover && !chatHasQuickExit
     var supportExpanded by remember(
         session.screen,
         session.page,
@@ -286,7 +290,10 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                                     SessionScreen.StorageError -> uiText(R.string.unable_to_open_local_storage)
                                     SessionScreen.Cover -> session.coverType.localizedTitle(uiText)
                                 }
-                                CompositionLocalProvider(LocalAccessibilityMessagesVisible provides (targetScreen == session.screen && !supportExpanded)) {
+                                CompositionLocalProvider(
+                                    LocalAccessibilityMessagesVisible provides (targetScreen == session.screen && !supportExpanded),
+                                    LocalQuickExit provides exit,
+                                ) {
                                     // Entry setup owns its pane title because choosing New PIN changes its local screen.
                                     Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
                                         paneTitle = pane
@@ -317,16 +324,16 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
 
                                             SessionScreen.DevicePin -> DevicePin(session)
                                             SessionScreen.Pin -> PinPrompt(session)
-                                            SessionScreen.Safe -> if (session.accountRole == AccountRole.SAFE_CONTACT)
-                                                SafeContactArea(session) else SafeArea(
-                                                session,
-                                                exit
-                                            )
+                                            SessionScreen.Safe -> if (session.accountRole == AccountRole.SAFE_CONTACT) {
+                                                key(session.coverReset) { SafeContactArea(session, exit) }
+                                            } else SafeArea(session, exit)
 
-                                            SessionScreen.Portal -> when (session.accountRole) {
-                                                AccountRole.ADMIN -> AdminPortal(session)
-                                                AccountRole.STAFF -> StaffPortal(session)
-                                                else -> Unit
+                                            SessionScreen.Portal -> key(session.coverReset) {
+                                                when (session.accountRole) {
+                                                    AccountRole.ADMIN -> AdminPortal(session)
+                                                    AccountRole.STAFF -> StaffPortal(session)
+                                                    else -> Unit
+                                                }
                                             }
                                             SessionScreen.StorageError -> FormColumn {
                                                 Heading(
@@ -411,14 +418,24 @@ internal fun OliveRoot(session: SessionViewModel, locationPermissionVersion: Int
                     onDecline = {
                         session.calls.decline(invitation, callAccountId, session.accountRole)
                     },
+                    onQuickExit = {
+                        session.calls.decline(invitation, callAccountId, session.accountRole)
+                        exit()
+                    },
                 )
             }
-            if (callState != VoipSessionState.Idle) ActiveCallDialog(
+            if (shouldShowActiveCall(callState) && !callMinimized) ActiveCallDialog(
                 state = callState,
                 currentUid = callAccountId,
                 onMute = session.calls::setMuted,
                 onSpeaker = session.calls::setSpeakerEnabled,
                 onFinish = { session.calls.finish(callAccountId) },
+                onMinimize = { callMinimized = true },
+                onQuickExit = exit,
+            )
+            if (shouldShowActiveCall(callState) && callMinimized) DraggableCallBubble(
+                state = callState,
+                onOpen = { callMinimized = false },
             )
         }
     }

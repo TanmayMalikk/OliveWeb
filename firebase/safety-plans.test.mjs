@@ -61,8 +61,12 @@ test("full consultation workflow enforces owner consent, assigned-staff edits, c
   assert.equal(supportConversation.data().supportTag,"NEEDS_ADMIN");
   await assert.rejects(call(staffSupportClose,owner,{conversationId:consultationId}));
   await assert.rejects(call(staffSupportClose,otherStaff,{conversationId:consultationId}));
-  await call(staffSupportClose,staff,{conversationId:consultationId});
-  assert.ok((await db.collection("conversations").doc(consultationId).get()).get("closedAt"));
+  // The assigned admin can close an escalated ticket for every participant.
+  await call(staffSupportClose,"plan-admin",{conversationId:consultationId});
+  const completedConsultation = await db.collection("conversations").doc(consultationId).get();
+  assert.ok(completedConsultation.get("closedAt"));
+  assert.ok(completedConsultation.get("completedAt"));
+  assert.equal(completedConsultation.get("ticketStatus"), "COMPLETED");
   response=await call(safetyPlanConsult,owner,{action:"request"});
   const secondConsultationId=response.plan.consultationConversationId;
   staff=response.plan.staffUid;
@@ -105,6 +109,8 @@ test("support tickets create an anonymous chat without sharing the safety plan",
   const response=await call(staffSupportRequest,owner,{action:"request"});
   assert.equal(response.ticket.requested,true);
   assert.ok(response.ticket.staffUid);
+  assert.equal(Number.isSafeInteger(response.ticket.ticketNumber),true);
+  assert.equal(response.ticket.ticketNumber >= 0,true);
   assert.equal((await db.collection("safetyPlans").doc(owner).get()).exists,false);
   await assert.rejects(call(safetyPlanSync,response.ticket.staffUid,{ownerUid:owner,changes:[]}));
   const firstConversationId=response.ticket.conversationId;
@@ -117,11 +123,12 @@ test("support tickets create an anonymous chat without sharing the safety plan",
   assert.ok((await db.collection("conversations").doc(firstConversationId).get()).get("closedAt"));
   const secondResponse=await call(staffSupportRequest,owner,{action:"request"});
   const secondConversationId=secondResponse.ticket.conversationId;
+  assert.equal(secondResponse.ticket.ticketNumber,response.ticket.ticketNumber+1);
   assert.notEqual(secondConversationId,firstConversationId);
   assert.ok((await db.collection("conversations").doc(firstConversationId).get()).get("closedAt"));
   assert.equal((await db.collection("conversations").doc(secondConversationId).get()).get("closedAt"),undefined);
   assert.equal((await call(safetyPlanConsultations,response.ticket.staffUid)).plans.some((plan) => plan.ownerUid===owner),false);
-  await call(staffSupportRequest,owner,{action:"stop"});
+  await call(staffSupportRequest,owner,{action:"stop",conversationId:secondConversationId});
   assert.ok((await db.collection("conversations").doc(secondConversationId).get()).get("closedAt"));
 });
 test("owners can share a read-only plan with an accepted safe contact and revoke it", async () => {

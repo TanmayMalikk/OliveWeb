@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="ui_olive_8f62f4">Olive</string>
     <string name="ui_the_user_sets_their_own_trigger_word_and_device_pin_on_first_sign">用户在首次登录时设置自己的触发词和设备 PIN。</string>
     <string name="ui_value_seconds_remaining">剩余 %1$s 秒</string>
     <string name="ui_value_days_remaining">剩余 %1$s 天</string>

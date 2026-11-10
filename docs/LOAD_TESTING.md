@@ -1,6 +1,7 @@
-# Load testing accounts and locations
+# Load testing 360 accounts, support workflows, and locations
 
-This guide creates fictional accounts and Alberta locations for testing the Admin map and support features. Do not use a real account password.
+This guide creates fictional Alberta and British Columbia accounts for testing maps, staff
+assignment, safety plans, friendships, and support tickets. Do not use a real account password.
 
 ## 1. Open the project
 
@@ -53,15 +54,17 @@ npm run provision-load-test-accounts
 
 This creates:
 
-- 40 users named `loaduser01` through `loaduser40`
-- 8 staff accounts named `loadstaff01` through `loadstaff08`
-- 5 safe-contact accounts named `loadsafe01` through `loadsafe05`
+- 250 users named `loaduser001` through `loaduser250`
+- 100 safe-contact accounts named `loadsafe001` through `loadsafe100`
+- 10 staff accounts named `loadstaff01` through `loadstaff10`
 
-All test profiles use different fictional identities and Alberta locations. The shared trigger is `help`. A backup PIN must still be added from a device because the PIN is encrypted on that device.
+Every profile has a unique fictional name and a repeatable random point 600–1,900 metres away
+from an Alberta or British Columbia city centre. The shared trigger is `help`. A backup PIN must
+still be added from a device because the PIN is encrypted on that device.
 
-## 7. Add the Alberta map locations
+## 7. Add the Alberta and British Columbia map locations
 
-Mark 20 users active and 20 users last-known:
+Mark 125 users active and 125 users last-known:
 
 ```powershell
 $env:OLIVE_LOAD_TEST_LOCATIONS_ACTIVE="true"
@@ -71,44 +74,46 @@ npm run seed-load-test-locations
 The command should finish with:
 
 ```text
-Seeded 40 admin-map locations: 20 active and 20 last-known.
+Seeded 250 admin-map locations: 125 active and 125 last-known.
 ```
 
 ## 7a. Add staff support and shared safety-plan test data
 
-Create one plan consultation and one regular support request for every load-test user:
+Create one plan consultation and one regular support-button ticket for every load-test user:
 
 ```powershell
 npm run seed-load-test-support
 ```
 
-This gives each of the eight load-test staff accounts five plan consultations and five support
-requests. Every fictional user's populated safety plan is assigned to staff and shared with a
-rotating load-test safe contact. The conversation summaries are initially unread so notification
-badges can be tested. The command is deterministic and can safely be rerun to restore the fixtures.
+The script follows the app's least-busy assignment policy across all ten load staff. It marks
+exactly 55% of support tickets and 55% of plan consultations complete. Each of the 100 safe
+contacts becomes an accepted friend of five load users, producing 500 two-way friendships and
+blank direct-message chats. The command preserves existing fixture ticket numbers when rerun.
 
-## 8. Simulate 10 moving users
+## 8. Simulate 50 moving users
 
 ```powershell
 npm run simulate-load-test-locations
 ```
 
-Keep this terminal open while testing. The simulator updates the locations every two seconds and moves these users at 60 km/h:
+Keep this terminal open while testing. The simulator updates 50 locations every two seconds and
+moves `loaduser001` through `loaduser050` at 60 km/h. The first ten start in these communities:
 
-| Account | Alberta location |
+| Account | Starting location |
 | --- | --- |
-| `loaduser01` | Edmonton |
-| `loaduser02` | Calgary |
-| `loaduser03` | Red Deer |
-| `loaduser04` | Lethbridge |
-| `loaduser05` | Medicine Hat |
-| `loaduser06` | Grande Prairie |
-| `loaduser07` | Fort McMurray |
-| `loaduser08` | Airdrie |
-| `loaduser09` | Spruce Grove |
-| `loaduser10` | St. Albert |
+| `loaduser001` | Edmonton |
+| `loaduser002` | Calgary |
+| `loaduser003` | Red Deer |
+| `loaduser004` | Lethbridge |
+| `loaduser005` | Medicine Hat |
+| `loaduser006` | Grande Prairie |
+| `loaduser007` | Fort McMurray |
+| `loaduser008` | Airdrie |
+| `loaduser009` | St. Albert |
+| `loaduser010` | Spruce Grove |
 
-Each moving user follows a separate loop around the seeded location. Ten other users remain active and stationary. Twenty users remain last-known.
+Each moving user follows a separate loop around its off-centre seeded location. Another 75 users
+remain active and stationary. The remaining 125 users remain last-known.
 
 Press `Ctrl+C` to stop the simulator. Their final positions then become last-known locations.
 
@@ -163,6 +168,10 @@ Do this only after the stress test is finished:
 
 ```powershell
 cd C:\Users\Tanma\StudioProjects\F26_D1\functions
+$env:OLIVE_LOAD_TEST_DELETE_CONFIRM="DELETE-360-olive-21239"
+$env:OLIVE_LOAD_TEST_FIREBASE_API_KEY="YOUR_FIREBASE_WEB_API_KEY"
+$env:OLIVE_LOAD_TEST_ADMIN_EMAIL="YOUR_PROTECTED_ADMIN_EMAIL"
+$env:OLIVE_LOAD_TEST_ADMIN_PASSWORD="YOUR_ADMIN_PASSWORD"
 npm run delete-load-test-accounts
 ```
 

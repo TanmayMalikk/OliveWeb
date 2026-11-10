@@ -30,11 +30,13 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
+import com.olive.app.ui.shared.CarbohydrateBlue
+import com.olive.app.ui.shared.FatPlum
+import com.olive.app.ui.shared.FitnessDarkCard
 import com.olive.app.ui.shared.Paper
+import com.olive.app.ui.shared.ProteinLime
 import java.util.Locale
 import kotlin.math.roundToInt
-
-private val MacroRingColor = Color(0xFF875E78)
 
 // Shows today's movement summary and the 14-day activity graphs.
 @Composable
@@ -57,7 +59,7 @@ internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
             contentDescription = description
         },
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF263722)),
+        colors = CardDefaults.cardColors(containerColor = FitnessDarkCard),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -81,17 +83,17 @@ internal fun FitnessActivityDashboard(snapshot: FitnessSnapshot) {
                     DashboardMetric(
                         snapshot.stepsToday.toString(),
                         stringResource(R.string.fitness_steps_unit),
-                        Color(0xFFA7CA65),
+                        ProteinLime,
                     )
                     DashboardMetric(
                         String.format(Locale.ROOT, "%.2f", distance),
                         stringResource(R.string.fitness_kilometres_unit),
-                        Color(0xFF53BBD8),
+                        CarbohydrateBlue,
                     )
                     DashboardMetric(
                         burned.roundToInt().toString(),
                         stringResource(R.string.fitness_kilocalories_unit),
-                        MacroRingColor,
+                        FatPlum,
                     )
                 }
                 ActivityProgressRings(progress)
@@ -120,7 +122,7 @@ private fun ActivityProgressRings(progress: Float) {
         val centre = Offset(size.width / 2f, size.height / 2f)
         val widths = floatArrayOf(11.dp.toPx(), 10.dp.toPx(), 9.dp.toPx())
         val radii = floatArrayOf(size.minDimension * 0.43f, size.minDimension * 0.32f, size.minDimension * 0.21f)
-        val colours = listOf(Color(0xFFA7CA65), Color(0xFF53BBD8), MacroRingColor)
+        val colours = listOf(ProteinLime, CarbohydrateBlue, FatPlum)
         radii.indices.forEach { index ->
             drawCircle(
                 color = Paper.copy(alpha = 0.12f),

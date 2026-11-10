@@ -3,9 +3,75 @@ import express from "express";
 import { news, article } from "./newsProxy.mjs";
 import siteConfig from "../site.config.json" with { type: "json" };
 
-const ANDROID_APK_STORAGE_PATH =
-  "/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2Folive-branch.apk";
-const ANDROID_APK_STORAGE_URL = `https://firebasestorage.googleapis.com${ANDROID_APK_STORAGE_PATH}?alt=media`;
+const ANDROID_STORAGE_PREFIX =
+  "/v0/b/olive-21239.firebasestorage.app/o/public%2Fandroid%2F";
+const ANDROID_RELEASE_MANIFEST_URL = `https://firebasestorage.googleapis.com${ANDROID_STORAGE_PREFIX}latest.json?alt=media`;
+
+// Only signed Olive APKs in the public release folder can be returned by the public updater API.
+export function validateAndroidRelease(value) {
+  if (!value || value.packageName !== "com.olive.app") return null;
+  if (!Number.isSafeInteger(value.versionCode) || value.versionCode < 1)
+    return null;
+  if (typeof value.versionName !== "string" || !value.versionName.trim())
+    return null;
+  if (
+    value.minimumSupportedVersionCode !== undefined &&
+    (!Number.isSafeInteger(value.minimumSupportedVersionCode) ||
+      value.minimumSupportedVersionCode < 1 ||
+      value.minimumSupportedVersionCode > value.versionCode)
+  )
+    return null;
+  if (!Number.isSafeInteger(value.sizeBytes) || value.sizeBytes < 1)
+    return null;
+  if (!/^[a-f0-9]{64}$/.test(value.sha256 ?? "")) return null;
+  let apk;
+  try {
+    apk = new URL(value.apkUrl);
+  } catch {
+    return null;
+  }
+  if (
+    apk.protocol !== "https:" ||
+    apk.hostname !== "firebasestorage.googleapis.com" ||
+    !apk.pathname.startsWith(ANDROID_STORAGE_PREFIX) ||
+    !apk.pathname.toLowerCase().includes(".apk")
+  )
+    return null;
+  return {
+    packageName: value.packageName,
+    versionCode: value.versionCode,
+    versionName: value.versionName.trim(),
+    minimumSupportedVersionCode: Number.isSafeInteger(
+      value.minimumSupportedVersionCode,
+    )
+      ? value.minimumSupportedVersionCode
+      : 1,
+    apkUrl: apk.href,
+    sha256: value.sha256,
+    sizeBytes: value.sizeBytes,
+    publishedAt: typeof value.publishedAt === "string" ? value.publishedAt : "",
+    mandatory: value.mandatory === true,
+    releaseNotes: Array.isArray(value.releaseNotes)
+      ? value.releaseNotes
+          .filter((note) => typeof note === "string")
+          .slice(0, 20)
+      : [],
+  };
+}
+
+async function latestAndroidRelease() {
+  const endpoint =
+    process.env.ANDROID_RELEASE_MANIFEST_URL || ANDROID_RELEASE_MANIFEST_URL;
+  const response = await fetch(endpoint, {
+    signal: AbortSignal.timeout(5000),
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw new Error(`Release storage returned ${response.status}`);
+  const release = validateAndroidRelease(await response.json());
+  if (!release) throw new Error("Release storage returned an invalid manifest");
+  return release;
+}
 
 export function createServerApp({ development = false } = {}) {
   const app = express();
@@ -37,7 +103,11 @@ export function createServerApp({ development = false } = {}) {
     const z = Number(req.params.z);
     const x = Number(req.params.x);
     const y = Number(req.params.y);
-    if (!key) return res.status(503).type("text/plain").send("Map tiles are not configured.");
+    if (!key)
+      return res
+        .status(503)
+        .type("text/plain")
+        .send("Map tiles are not configured.");
     if (![z, x, y].every(Number.isInteger) || z < 0 || z > 20 || x < 0 || y < 0)
       return res.status(400).type("text/plain").send("Invalid map tile.");
     const maximum = 2 ** z;
@@ -60,29 +130,27 @@ export function createServerApp({ development = false } = {}) {
       return res.status(502).type("text/plain").send("Map tile unavailable.");
     }
   });
-  app.get("/download/android", (_req, res) => {
-    let destination;
+  app.get("/api/android/releases/latest", async (_req, res) => {
     try {
-      destination = new URL(
-        process.env.ANDROID_APK_URL || ANDROID_APK_STORAGE_URL,
-      );
+      res.setHeader("Cache-Control", "public, max-age=60, stale-if-error=300");
+      return res.json(await latestAndroidRelease());
+    } catch {
+      return res
+        .status(503)
+        .json({ error: "The Android release is temporarily unavailable." });
+    }
+  });
+  app.get("/download/android", async (_req, res) => {
+    try {
+      const release = await latestAndroidRelease();
+      res.setHeader("Cache-Control", "no-store");
+      return res.redirect(302, release.apkUrl);
     } catch {
       return res
         .status(503)
         .type("text/plain")
-        .send("APK download is not configured.");
+        .send("APK download is temporarily unavailable.");
     }
-    if (
-      destination.protocol !== "https:" ||
-      destination.hostname !== "firebasestorage.googleapis.com" ||
-      destination.pathname !== ANDROID_APK_STORAGE_PATH
-    )
-      return res
-        .status(503)
-        .type("text/plain")
-        .send("APK download is not configured.");
-    res.setHeader("Cache-Control", "no-store");
-    return res.redirect(302, destination.href);
   });
   app.get(
     [
@@ -189,9 +257,13 @@ export function createServerApp({ development = false } = {}) {
       latitude <= 90 &&
       longitude >= -180 &&
       longitude <= 180;
-    const query = String(req.query.q ?? "").trim().slice(0, 200);
+    const query = String(req.query.q ?? "")
+      .trim()
+      .slice(0, 200);
     if (!hasCoordinates && query.length < 2) {
-      return res.status(400).json({ error: "Enter at least two address characters." });
+      return res
+        .status(400)
+        .json({ error: "Enter at least two address characters." });
     }
     const endpoint = hasCoordinates
       ? new URL("https://api.geoapify.com/v1/geocode/reverse")
@@ -212,13 +284,25 @@ export function createServerApp({ development = false } = {}) {
       });
       if (!response.ok) throw new Error(`Geoapify returned ${response.status}`);
       const payload = await response.json();
-      const locations = (payload.features ?? []).slice(0, 5).map((feature) => ({
-        label: String(feature.properties?.formatted ?? "Selected map location"),
-        latitude: Number(feature.properties?.lat ?? feature.geometry?.coordinates?.[1]),
-        longitude: Number(feature.properties?.lon ?? feature.geometry?.coordinates?.[0]),
-      })).filter((location) =>
-        location.label && Number.isFinite(location.latitude) && Number.isFinite(location.longitude),
-      );
+      const locations = (payload.features ?? [])
+        .slice(0, 5)
+        .map((feature) => ({
+          label: String(
+            feature.properties?.formatted ?? "Selected map location",
+          ),
+          latitude: Number(
+            feature.properties?.lat ?? feature.geometry?.coordinates?.[1],
+          ),
+          longitude: Number(
+            feature.properties?.lon ?? feature.geometry?.coordinates?.[0],
+          ),
+        }))
+        .filter(
+          (location) =>
+            location.label &&
+            Number.isFinite(location.latitude) &&
+            Number.isFinite(location.longitude),
+        );
       return res.json({ locations });
     } catch {
       return res.status(502).json({

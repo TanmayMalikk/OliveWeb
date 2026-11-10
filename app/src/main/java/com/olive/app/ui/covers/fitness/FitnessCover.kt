@@ -77,16 +77,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.olive.app.R
 import com.olive.app.ui.covers.CoverSettingsPage
+import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
-import com.olive.app.ui.shared.Cream
-import com.olive.app.ui.shared.Ink
-import com.olive.app.ui.shared.LightSage
-import com.olive.app.ui.shared.Muted
-import com.olive.app.ui.shared.OliveGreen
-import com.olive.app.ui.shared.OliveTheme
-import com.olive.app.ui.shared.PaleOlive
-import com.olive.app.ui.shared.Paper
-import com.olive.app.ui.shared.oliveScrollbar
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -95,14 +87,6 @@ import androidx.core.content.edit
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
 
-
-internal val FitnessBackground = Cream
-internal val FitnessSurface = Paper
-internal val FitnessAccent = OliveGreen
-internal val FitnessText = Ink
-internal val FitnessSubtle = Muted
-internal val FitnessHeroEnd = Color(0xFF6F8459)
-internal val FitnessWarmCard = Color(0xFFF1F3E9)
 
 private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, FOOD_SEARCH, GOALS, ACCOUNT }
 

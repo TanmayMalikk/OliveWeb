@@ -65,15 +65,11 @@
     <string name="ui_new_headlines_are_available">عناوين جديدة متاحة.</string>
     <string name="ui_a_new_update_is_available">تحديث جديد متاح.</string>
     <string name="ui_an_account_update_is_available">تحديث الحساب متاح.</string>
-    <string name="ui_fresh_menu_updates_are_available">تتوفر تحديثات القائمة الطازجة.</string>
-    <string name="ui_see_what_s_new_from_olive">شاهد الجديد من الزيتون.</string>
-    <string name="ui_new_kitchen_picks_are_ready_to_browse">اختيارات المطبخ الجديدة جاهزة للتصفح.</string>
     <string name="ui_your_latest_digest_is_ready">أحدث ملخصك جاهز.</string>
     <string name="ui_there_are_new_stories_to_browse">هناك قصص جديدة للتصفح.</string>
 
     <string name="ui_open_the_app_to_see_what_s_new">افتح التطبيق لمعرفة الجديد.</string>
     <string name="ui_new_activity_is_waiting">نشاط جديد في انتظارك.</string>
-    <string name="ui_order_status_and_delivery_notifications_for_olive">حالة الطلب وإخطارات التسليم للزيتون</string>
     <string name="ui_daily_digest_briefings">ملخصات الملخص اليومي</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">العناوين اليومية وإخطارات ملخص الأخبار</string>
 
@@ -86,9 +82,13 @@
     <string name="ui_speaker_off">إيقاف مكبر الصوت</string>
     <string name="ui_incoming_call">مكالمة واردة</string>
     <string name="ui_voice_call">مكالمة صوتية</string>
+    <string name="ui_minimize_call">تصغير المكالمة</string>
+    <string name="ui_return_to_call">العودة إلى المكالمة</string>
+    <string name="ui_call_running_in_background">تستمر المكالمة في الخلفية</string>
     <string name="ui_start_voice_call">بدء مكالمة صوتية</string>
     <string name="ui_calling">جارٍ الاتصال…</string>
     <string name="ui_call_in_progress">المكالمة جارية</string>
+    <string name="ui_join_call">الانضمام إلى المكالمة</string>
     <string name="ui_missed_call">مكالمة فائتة</string>
     <string name="ui_call_declined">تم رفض المكالمة</string>
     <string name="ui_call_ended">انتهت المكالمة</string>
@@ -114,4 +114,8 @@
     <string name="password_excludes_username">يجب ألا تحتوي كلمة المرور على اسم المستخدم.</string>
 <string name="ocr_no_text">لم يتم التعرف على نص في المستند.</string>
     <string name="ocr_error_detail">خطأ OCR: %1$s</string>
+    <string name="notification_active_voice_calls">المكالمات الصوتية النشطة</string>
+    <string name="notification_safe_app_updates">تحديثات التطبيق الآمن</string>
+    <string name="notification_safe_app_activity">افتح Olive Branch لعرض تحديثاتك.</string>
+    <string name="notification_new_app_update">تحديث جديد للتطبيق</string>
 </resources>

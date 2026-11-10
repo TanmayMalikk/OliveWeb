@@ -7,6 +7,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.olive.app.data.sync.PriorityReconciliationWorker
 import com.olive.app.data.sync.syncInvalidationFrom
+import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.notification.OliveNotificationManager
 
 class OliveFirebaseMessagingService : FirebaseMessagingService() {
@@ -16,6 +17,7 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
             .onFailure { error ->
                 Log.e(VoipPushTokenRegistration.TAG, "Could not persist the Firebase messaging registration", error)
             }
+        runCatching { LocalNotificationEventHandler.onFcmTokenRefreshed(this, installationId) }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -32,8 +34,18 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
             }
             return
         }
-        if (data["type"] != CALL_INVITATION) return
-        showCall(data)
+        if (data["type"] == CALL_INVITATION) {
+            if (VoipPushTokenRegistration.isEnabled(this)) showCall(data)
+            return
+        }
+        runCatching {
+            LocalNotificationEventHandler.onFcmMessageReceived(
+                this,
+                data,
+                message.notification?.title,
+                message.notification?.body,
+            )
+        }
     }
 
     private fun showCall(data: Map<String, String>) {

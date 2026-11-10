@@ -7,17 +7,20 @@
   },
   "scripts": {
     "test": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/functions-tests.xml",
+    "test:coverage": "c8 --reporter=lcov --reporter=text --reporter=html --include='src/**/*.js' --include='index.js' node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/functions-tests.xml",
     "provision-demo-accounts": "node scripts/provision-demo-accounts.js",
     "provision-load-test-accounts": "node scripts/provision-load-test-accounts.js",
     "seed-load-test-support": "node scripts/seed-load-test-support.js",
     "seed-load-test-locations": "node scripts/seed-load-test-locations.js",
     "simulate-load-test-locations": "node scripts/simulate-load-test-locations.js",
     "delete-load-test-accounts": "node scripts/delete-load-test-accounts.js",
-    "purge-plaintext-ocr": "node scripts/purgePlaintextOcr.js"
+    "backfill-account-directory-summaries": "node scripts/backfill-account-directory-summaries.js",
+    "purge-plaintext-ocr": "node scripts/purgePlaintextOcr.js",
+    "publish-android-release": "node scripts/publish-android-release.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1158.0",
-    "@aws-sdk/s3-request-presigner": "^3.1158.0",
+    "@aws-sdk/client-s3": "^3.1165.0",
+    "@aws-sdk/s3-request-presigner": "^3.1165.0",
     "firebase-admin": "^14.5.0",
     "firebase-functions": "^7.4.0"
   },
@@ -25,5 +28,8 @@
     "uuid": "^11.1.1",
     "glob": "^14.0.3",
     "minimatch": "^11.0.3"
+  },
+  "devDependencies": {
+    "c8": "^12.0.0"
   }
 }

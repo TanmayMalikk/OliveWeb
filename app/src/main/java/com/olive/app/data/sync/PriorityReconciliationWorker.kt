@@ -1,4 +1,4 @@
-// Signed-in accounts: performs durable, sequential priority reconciliation after connectivity returns.
+// Schedules priority reconciliation and persists or reports its progress.
 package com.olive.app.data.sync
 
 import android.content.Context
@@ -20,14 +20,19 @@ import com.olive.app.BuildConfig
 import com.olive.app.data.ChatCacheStore
 import com.olive.app.data.DocumentIndexStore
 import com.olive.app.data.MessageOutboxStore
-import com.olive.app.data.SafetyPlanStore
 import com.olive.app.data.SafetyAccessIndexStore
+import com.olive.app.data.SafetyPlanStore
 import com.olive.app.data.media.OfflineMediaCache
 import com.olive.app.security.DeviceStore
 import com.olive.app.security.EncryptedVault
-import kotlinx.coroutines.CancellationException
-import java.util.concurrent.TimeUnit
+import com.olive.app.security.JsonVault
+import com.olive.app.security.child
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import org.json.JSONObject
 
 class PriorityReconciliationWorker(
     context: Context,
@@ -144,4 +149,78 @@ class PriorityReconciliationWorker(
                 .cancelUniqueWork("olive-priority-reconciliation-$uid")
         }
     }
+}
+
+// Signed-in accounts: persists account-scoped reconciliation checkpoints in Keystore-protected storage.
+internal class SyncCheckpointStore(
+    private val vault: JsonVault,
+) : SyncCheckpointDataSource {
+    constructor(context: Context) : this(EncryptedVault(context.applicationContext, "priority-sync"))
+
+    override fun read(uid: String): SyncCheckpoint {
+        require(validUid(uid))
+        val value = runCatching { vault.read().optJSONObject(ACCOUNTS)?.optJSONObject(uid) }
+            .getOrNull() ?: return SyncCheckpoint()
+        return runCatching {
+            SyncCheckpoint(
+                initialized = value.optBoolean(INITIALIZED, false),
+                revisions = SyncRevisions(
+                    revision = value.nonNegative(REVISION),
+                    account = value.nonNegative(ACCOUNT),
+                    safety = value.nonNegative(SAFETY),
+                    media = value.nonNegative(MEDIA),
+                    conversation = value.nonNegative(CONVERSATION),
+                ),
+            )
+        }.getOrElse {
+            purge(uid)
+            SyncCheckpoint()
+        }
+    }
+
+    override fun write(uid: String, checkpoint: SyncCheckpoint) {
+        require(validUid(uid))
+        val revisions = checkpoint.revisions
+        vault.update { root ->
+            root.child(ACCOUNTS).put(uid, JSONObject()
+                .put(INITIALIZED, checkpoint.initialized)
+                .put(REVISION, revisions.revision)
+                .put(ACCOUNT, revisions.account)
+                .put(SAFETY, revisions.safety)
+                .put(MEDIA, revisions.media)
+                .put(CONVERSATION, revisions.conversation))
+        }
+    }
+
+    override fun purge(uid: String) {
+        require(validUid(uid))
+        runCatching { vault.update { it.optJSONObject(ACCOUNTS)?.remove(uid) } }
+    }
+
+    private fun JSONObject.nonNegative(name: String): Long = getLong(name).also { require(it >= 0) }
+    private fun validUid(uid: String) = uid.isNotBlank() && uid.length <= 128
+
+    private companion object {
+        const val ACCOUNTS = "accounts"
+        const val INITIALIZED = "initialized"
+        const val REVISION = "revision"
+        const val ACCOUNT = "accountRevision"
+        const val SAFETY = "safetyRevision"
+        const val MEDIA = "mediaRevision"
+        const val CONVERSATION = "conversationRevision"
+    }
+}
+
+// Signed-in accounts: lets active screens reload encrypted local results without adding backend listeners.
+internal object SyncCompletionEvents {
+    private val mutableEvents = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val events = mutableEvents.asSharedFlow()
+    fun publish(uid: String) { mutableEvents.tryEmit(uid) }
+}
+
+// Signed-in accounts: closes an active private session after authoritative account revocation.
+internal object AccountRevocationEvents {
+    private val mutableEvents = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val events = mutableEvents.asSharedFlow()
+    fun publish(uid: String) { mutableEvents.tryEmit(uid) }
 }

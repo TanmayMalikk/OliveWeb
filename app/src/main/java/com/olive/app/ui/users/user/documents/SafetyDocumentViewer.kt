@@ -56,43 +56,7 @@ import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.util.zip.ZipFile
-import android.content.Context
-import android.net.Uri
-import android.provider.OpenableColumns
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.DocumentOcrMetadata
-import com.olive.app.data.hasValidatedInternetConnection
-import com.olive.app.data.media.DocumentDownloadGate
-import com.olive.app.data.media.MediaKind
-import com.olive.app.data.media.copyAndVerifyEncryptedDownload
-import com.olive.app.data.media.MediaPreprocessor
-import com.olive.app.data.media.MediaTicketDataSource
-import com.olive.app.data.media.MediaTransferState
-import com.olive.app.data.media.MediaTransferStatus
-import com.olive.app.data.media.MediaTransferStore
-import com.olive.app.data.media.MediaUploadJob
-import com.olive.app.data.media.MediaUploadPresentation
-import com.olive.app.data.media.MediaUploadWorker
-import com.olive.app.data.media.OcrReview
-import com.olive.app.data.media.OfflineMediaAvailability
-import com.olive.app.data.media.OfflineMediaCache
-import com.olive.app.data.media.MediaAccessError
-import com.olive.app.data.media.MediaAccessException
-import com.olive.app.data.media.PassThroughMediaPreprocessor
-import com.olive.app.data.media.PreparedEncryptedMedia
-import com.olive.app.security.EncryptionUtils
-import com.olive.app.security.KeyManager
-import com.olive.app.security.MediaCipher
-import java.io.InputStream
-import java.security.MessageDigest
-import java.util.UUID
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
+
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
@@ -511,32 +475,3 @@ private fun UnsupportedViewer() {
     }
 }
 
-// Safe-app users: starts encrypted document uploads and opens downloaded media.
-
-
-internal interface MediaTransferOperations {
-    // Watches pending uploads for this account and reports progress to the screen.
-    fun observeUploads(ownerUid:String)
-    // Marks an uploaded encrypted file as published after the server accepts it.
-    fun acknowledgePublished(mediaIds:Set<String>)
-    // Adds document metadata to the user's encrypted document list.
-    fun queueDocument(
-        uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
-        tags:Set<String> = emptySet(),
-        onQueued:(String)->Unit,onFailure:(String)->Unit,
-    )
-    // Encrypts the selected file and queues its upload.
-    fun queueFile(
-        file:File,name:String,mimeType:String,owner:AccountIdentity,kind:MediaKind,
-        ocrReview:OcrReview,ocr:DocumentOcrMetadata?,
-        tags:Set<String> = emptySet(),
-        onQueued:(String)->Unit,onFailure:(String)->Unit,
-    )
-    // Downloads, checks, and decrypts one allowed media file.
-    suspend fun downloadFile(document:SafetyDocument,viewerUid:String):File
-    suspend fun makeAvailableOffline(document:SafetyDocument,viewerUid:String)
-    suspend fun removeOfflineCopy(document:SafetyDocument,viewerUid:String)
-    fun onDocumentSnapshot(viewerUid:String,documents:List<SafetyDocument>,serverConfirmed:Boolean)
-    // Clears upload progress and errors when the document screen closes.
-    fun clearState()
-}

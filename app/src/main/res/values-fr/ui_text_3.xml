@@ -65,15 +65,11 @@
     <string name="ui_new_headlines_are_available">De nouveaux titres sont disponibles.</string>
     <string name="ui_a_new_update_is_available">Une nouvelle mise à jour est disponible.</string>
     <string name="ui_an_account_update_is_available">Une mise à jour du compte est disponible.</string>
-    <string name="ui_fresh_menu_updates_are_available">De nouvelles mises à jour du menu sont disponibles.</string>
-    <string name="ui_see_what_s_new_from_olive">Découvrez les nouveautés d\'Olive.</string>
-    <string name="ui_new_kitchen_picks_are_ready_to_browse">De nouveaux choix de cuisine sont prêts à être consultés.</string>
     <string name="ui_your_latest_digest_is_ready">Votre dernier résumé est prêt.</string>
     <string name="ui_there_are_new_stories_to_browse">Il y a de nouvelles histoires à parcourir.</string>
 
     <string name="ui_open_the_app_to_see_what_s_new">Ouvrez l\'application pour voir les nouveautés.</string>
     <string name="ui_new_activity_is_waiting">Une nouvelle activité vous attend.</string>
-    <string name="ui_order_status_and_delivery_notifications_for_olive">État de la commande et notifications de livraison pour Olive</string>
     <string name="ui_daily_digest_briefings">Briefings quotidiens</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">Titres quotidiens et notifications de résumés d\'actualités</string>
 
@@ -86,9 +82,13 @@
     <string name="ui_speaker_off">Désactiver le haut-parleur</string>
     <string name="ui_incoming_call">Appel entrant</string>
     <string name="ui_voice_call">Appel vocal</string>
+    <string name="ui_minimize_call">Réduire l’appel</string>
+    <string name="ui_return_to_call">Revenir à l’appel</string>
+    <string name="ui_call_running_in_background">L’appel continue en arrière-plan</string>
     <string name="ui_start_voice_call">Démarrer un appel vocal</string>
     <string name="ui_calling">Appel en cours…</string>
     <string name="ui_call_in_progress">Appel en cours</string>
+    <string name="ui_join_call">Rejoindre l’appel</string>
     <string name="ui_missed_call">Appel manqué</string>
     <string name="ui_call_declined">Appel refusé</string>
     <string name="ui_call_ended">Appel terminé</string>
@@ -114,4 +114,8 @@
     <string name="password_excludes_username">Le mot de passe ne doit pas contenir votre nom d’utilisateur.</string>
 <string name="ocr_no_text">Aucun texte reconnu dans le document.</string>
     <string name="ocr_error_detail">Erreur OCR : %1$s</string>
+    <string name="notification_active_voice_calls">Appels vocaux en cours</string>
+    <string name="notification_safe_app_updates">Mises à jour de l’espace sécurisé</string>
+    <string name="notification_safe_app_activity">Ouvrez Olive Branch pour consulter vos mises à jour.</string>
+    <string name="notification_new_app_update">Nouvelle mise à jour de l’application</string>
 </resources>

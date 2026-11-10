@@ -1,56 +1,34 @@
-// All safe-app roles: shows staff and admin account settings.
+// All safe-app roles: shows staff and admin account settings, workload cards, and live organization map.
 package com.olive.app.ui.users.shared.organization
 
-import com.olive.app.ui.shared.*
-import com.olive.app.ui.users.shared.navigation.*
-import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
+import android.util.Patterns
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.ui.shared.LocalizedIcon as Icon
-import com.olive.app.ui.users.shared.onboarding.*
-import android.util.Patterns
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import com.olive.app.data.*
 import com.olive.app.security.InputPolicy
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.runtime.DisposableEffect
-import com.olive.app.ui.shared.Muted
-import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.shared.onboarding.*
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material3.Card
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.ui.graphics.vector.ImageVector
 
 
 // Shows profile and sign-out settings for staff and admin accounts.
@@ -240,9 +218,9 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
     }
 }
 
-// Admins: shows every available user location on the protected organization map.
+// Staff and admins: shows every available user location on the protected organization map.
 
-/** Opens the admin feed and draws each user as a red live or last-known marker. */
+/** Opens the organization feed and draws each user as a red live or last-known marker. */
 @Composable
 internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
     BackHandler(onBack = onBack)
@@ -261,7 +239,6 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.semantics { heading() },
         )
-        Text(stringResource(R.string.organization_live_map_description), color = Muted)
         Box(
             Modifier.fillMaxWidth().height(420.dp),
             contentAlignment = Alignment.Center,
@@ -270,6 +247,7 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
                 points = state.points,
                 ownPointUid = null,
                 detailsOnlyForSelectedPoint = true,
+                userSearchEnabled = true,
                 modifier = Modifier.fillMaxSize(),
             )
             if (state.loading) CircularProgressIndicator()
@@ -305,11 +283,44 @@ internal fun OrganizationDashboardCard(
             }) {
                 Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(description, style = MaterialTheme.typography.bodySmall, color = Muted)
             }
             Icon(Icons.AutoMirrored.Outlined.ArrowForward, null)
         }
+    }
+}
+
+// Holds the live user locations shown on the organization map.
+internal data class AdminLocationMapState(
+    val points: List<MapLocationPoint> = emptyList(),
+    val loading: Boolean = false,
+    val error: String? = null,
+)
+
+// Opens the protected organization location feed for staff and admin accounts.
+internal class AdminLocationMapController(
+    private val repository: AdminLocationRepository?,
+) {
+    var state by mutableStateOf(AdminLocationMapState())
+        private set
+    private var subscription: ChatSubscription? = null
+
+    // Starts the organization feed only for an authenticated staff or admin account.
+    fun open(role: AccountRole) {
+        if (role !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || repository == null || subscription != null) return
+        state = AdminLocationMapState(loading = true)
+        subscription = repository.observe(
+            onUpdate = { points -> state = AdminLocationMapState(points = points) },
+            onError = { message -> state = state.copy(loading = false, error = message) },
+        )
+    }
+
+    // Stops Firebase updates and clears sensitive map data from memory.
+    fun close() {
+        subscription?.close()
+        subscription = null
+        state = AdminLocationMapState()
     }
 }
