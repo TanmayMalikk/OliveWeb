@@ -371,37 +371,3 @@ object OliveNotificationManager {
     }
 
 }
-
-// Coalesces Safe App activity into a notification.
-class SafeUpdateNotificationWorker(context: Context, parameters: WorkerParameters) :
-    Worker(context, parameters) {
-    override fun doWork(): Result {
-        if (FirebaseAuth.getInstance().currentUser == null) return Result.success()
-        OliveNotificationManager.showSafeUpdate(applicationContext)
-        return Result.success()
-    }
-}
-
-// Schedules Safe App notifications with a random delay to prevent bursts.
-object SafeUpdateNotificationScheduler {
-    private const val WORK_NAME = "olive_pending_safe_update_notification"
-    internal const val MIN_DELAY_SECONDS = 5L
-    internal const val MAX_DELAY_SECONDS = 10L
-
-    // Schedules the background task for safe update notification worker.
-    fun schedule(context: Context) {
-        val request = OneTimeWorkRequestBuilder<SafeUpdateNotificationWorker>()
-            .setInitialDelay(randomDelaySeconds(), TimeUnit.SECONDS)
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
-    }
-
-    // Cancels the active background notification timer.
-    fun cancel(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
-    }
-
-    // Spreads background checks across a small random delay to avoid bursts.
-    internal fun randomDelaySeconds(random: Random = Random.Default): Long =
-        random.nextLong(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS + 1)
-}
