@@ -1,9 +1,9 @@
 # Signed APK distribution
 
-Olive is distributed from `https://yourolivebranch.ca/get`, not Google Play. The QR code always
-points to that stable download page. Each release uploads an immutable APK and replaces only
-`public/android/latest.json`, so the page's download button always serves the latest release and the
-QR image never needs to change.
+Olive is distributed from `https://yourolivebranch.ca/get`, not Google Play. The QR code directly
+triggers the download from `https://yourolivebranch.ca/download/android`. Each release uploads an immutable APK and replaces only
+`public/android/latest.json`, so the QR code and download button always serve the latest release and the
+QR image address never needs to change.
 
 ## One-time local signing setup
 
