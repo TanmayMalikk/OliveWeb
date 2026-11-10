@@ -6,5 +6,10 @@ export default defineConfig({
     environment: "node",
     reporters: ["default", "junit"],
     outputFile: { junit: "../build/reports/web-unit-tests.xml" },
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}", "server/**/*.{js,mjs}"],
+      reporter: ["text", "lcov", "html"],
+    },
   },
 });

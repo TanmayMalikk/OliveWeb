@@ -27,6 +27,14 @@ This automatically runs:
 
 The script stops at the first failure and returns a nonzero exit code. A successful run ends with `All requested Olive tests passed.` It uses Android Studio's bundled Java runtime when that runtime is installed in the standard location.
 
+## GitHub Actions and coverage
+
+The `CI` workflow runs Android, web, and Cloud Functions unit tests with coverage on every push and pull request. On pull requests only, it also builds and lints Android, runs web browser/accessibility tests, audits Cloud Functions production dependencies, and runs Firebase rules tests in emulators. These jobs run independently so a failure identifies the affected suite.
+
+Coverage HTML and machine-readable reports are uploaded as separate GitHub Actions artifacts for 14 days. The initial minimum line-coverage gates are 10% for Android, 10% for web, and 30% for Cloud Functions; raise these gradually as coverage improves. The workflow also creates or comments on one open `CI failure on default branch` issue for failed pushes to the repository's default branch. Pull-request failures are reported in Actions without creating tickets.
+
+The issue-reporting job requires Actions to be enabled and `GITHUB_TOKEN` to have Issues write permission. The workflow grants that permission only to the reporting job.
+
 ## Include phone or emulator UI tests
 
 Start and unlock a disposable Android emulator. Then run:

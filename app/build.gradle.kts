@@ -64,6 +64,9 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            enableUnitTestCoverage = true
+        }
         getByName("release") {
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("oliveRelease")
             // Real phones and Apple Silicon emulators use arm64-v8a; PC emulators (Pixel 9a/10) use x86_64.
