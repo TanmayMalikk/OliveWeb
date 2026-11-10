@@ -142,11 +142,10 @@ internal fun SafetyChecklistSection(
                 stringResource(R.string.safety_conflict),
                 modifier = Modifier.testTag("safety_conflict_$fieldKey")
             )
-            Text(
-                stringResource(
-                    R.string.safety_synced_version,
-                    safetyChecklistPreview(field.conflictValue.orEmpty())
-                )
+            IncomingChecklistChanges(
+                local = items,
+                remote = readSafetyChecklist(field.conflictValue.orEmpty()),
+                modifier = Modifier.testTag("safety_incoming_changes_$fieldKey"),
             )
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = {
@@ -164,6 +163,53 @@ internal fun SafetyChecklistSection(
             }
         }
     }
+}
+
+@Composable
+private fun IncomingChecklistChanges(
+    local: List<SafetyChecklistItem>,
+    remote: List<SafetyChecklistItem>,
+    modifier: Modifier = Modifier,
+) {
+    val changes = remember(local, remote) { safetyChecklistIncomingChanges(local, remote) }
+    if (changes.isEmpty()) return
+    Column(modifier) {
+        Text(
+            stringResource(R.string.safety_incoming_changes),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.semantics { heading() },
+        )
+        changes.forEach { change ->
+            Text(incomingChecklistChangeLabel(change), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun incomingChecklistChangeLabel(change: SafetyChecklistChange): String = when (change) {
+    is SafetyChecklistChange.Added -> stringResource(
+        R.string.safety_incoming_added, checklistItemLabel(change.text),
+    )
+    is SafetyChecklistChange.Removed -> stringResource(
+        R.string.safety_incoming_removed, checklistItemLabel(change.text),
+    )
+    is SafetyChecklistChange.TextChanged -> stringResource(
+        R.string.safety_incoming_text_changed,
+        checklistItemLabel(change.before),
+        checklistItemLabel(change.after),
+    )
+    is SafetyChecklistChange.CompletionChanged -> stringResource(
+        if (change.after) R.string.safety_incoming_completed else R.string.safety_incoming_incomplete,
+        checklistItemLabel(change.text),
+    )
+    is SafetyChecklistChange.AttachmentsChanged -> stringResource(
+        R.string.safety_incoming_attachments_changed, checklistItemLabel(change.text),
+    )
+}
+
+@Composable
+private fun checklistItemLabel(text: String): String = text.ifBlank {
+    stringResource(R.string.safety_empty_item)
 }
 
 // shared safe app safety plan form components shows this checklist row view so the user can view its details and use its actions.
