@@ -3,7 +3,7 @@
     <string name="activity">Activity</string>
     <string name="nutrition">Nutrition</string>
     <string name="nutrition_work_in_progress">Nutrition (WORK IN PROGRESS)</string>
-    <string name="fitness_home_message">Your daily activity and nutrition, together in one place.</string>
+    <string name="fitness_home_message">Your daily activity and nutrition, all in one place.</string>
     <string name="today_summary">Today’s summary</string>
     <string name="edit_fitness_goals">Update activity and nutrition goals</string>
     <string name="activity_message">Keep moving at your own pace. Every step adds to today’s progress.</string>
