@@ -15,7 +15,7 @@ class SessionCallsTest {
     // A User can call the other person in an open direct conversation.
     @Test
     fun userCanCallFromDirectConversation() {
-        assertTrue(canCallFromConversation(AccountRole.USER, directConversation(), "user-1"))
+        assertTrue(canCallFromConversation(AccountRole.USER, directConversation(), "user-1", featureAvailable = true))
     }
 
     // A personal group call includes every User and Safe Contact already in the chat.
@@ -25,13 +25,13 @@ class SessionCallsTest {
             type = "GROUP",
             participantIds = listOf("user-1", "safe-1", "user-2"),
         )
-        assertTrue(canCallFromConversation(AccountRole.USER, group, "user-1"))
+        assertTrue(canCallFromConversation(AccountRole.USER, group, "user-1", featureAvailable = true))
     }
 
     // A Safe Contact gets the same direct-call access as a User.
     @Test
     fun safeContactCanCallFromDirectConversation() {
-        assertTrue(canCallFromConversation(AccountRole.SAFE_CONTACT, directConversation(), "safe-1"))
+        assertTrue(canCallFromConversation(AccountRole.SAFE_CONTACT, directConversation(), "safe-1", featureAvailable = true))
     }
 
     // Staff and Admin accounts cannot reveal or bypass the call button policy.
@@ -39,8 +39,8 @@ class SessionCallsTest {
     fun organizationAccountsCannotStartDirectCalls() {
         assertFalse(canUseVoip(AccountRole.STAFF))
         assertFalse(canUseVoip(AccountRole.ADMIN))
-        assertFalse(canCallFromConversation(AccountRole.STAFF, directConversation(), "user-1"))
-        assertFalse(canCallFromConversation(AccountRole.ADMIN, directConversation(), "user-1"))
+        assertFalse(canCallFromConversation(AccountRole.STAFF, directConversation(), "user-1", featureAvailable = true))
+        assertFalse(canCallFromConversation(AccountRole.ADMIN, directConversation(), "user-1", featureAvailable = true))
     }
 
     // Only personal User and Safe Contact accounts register for incoming calls.
@@ -56,15 +56,15 @@ class SessionCallsTest {
     @Test
     fun supportConversationCannotStartCall() {
         val support = directConversation().copy(type = "SUPPORT", staffUid = "staff-1")
-        assertFalse(canCallFromConversation(AccountRole.USER, support, "user-1"))
-        assertFalse(canCallFromConversation(AccountRole.SAFE_CONTACT, support, "safe-1"))
+        assertFalse(canCallFromConversation(AccountRole.USER, support, "user-1", featureAvailable = true))
+        assertFalse(canCallFromConversation(AccountRole.SAFE_CONTACT, support, "safe-1", featureAvailable = true))
     }
 
     // Closed chats and unrelated accounts cannot be used to construct a call.
     @Test
     fun closedOrUnrelatedConversationCannotStartCall() {
-        assertFalse(canCallFromConversation(AccountRole.USER, directConversation().copy(closedAt = 1L), "user-1"))
-        assertFalse(canCallFromConversation(AccountRole.USER, directConversation(), "outsider"))
+        assertFalse(canCallFromConversation(AccountRole.USER, directConversation().copy(closedAt = 1L), "user-1", featureAvailable = true))
+        assertFalse(canCallFromConversation(AccountRole.USER, directConversation(), "outsider", featureAvailable = true))
     }
 
     // Missing optional VoIP configuration hides calling while the rest of messaging stays available.

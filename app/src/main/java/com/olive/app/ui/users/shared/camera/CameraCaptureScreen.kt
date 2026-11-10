@@ -1,33 +1,20 @@
 // All safe-app roles: captures photos, video, and OCR documents.
 package com.olive.app.ui.users.shared.camera
 
-import com.olive.app.ui.shared.*
-
-
-import com.olive.app.ui.users.shared.navigation.*
-
-
 import android.Manifest
 import android.content.pm.PackageManager
-import android.widget.VideoView
 import android.view.ScaleGestureDetector
+import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.background
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.Cameraswitch
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Videocam
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -53,10 +40,12 @@ import com.olive.app.data.AccountIdentity
 import com.olive.app.data.DocumentOcrMetadata
 import com.olive.app.data.media.MediaKind
 import com.olive.app.ocr.OcrResult
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.users.shared.navigation.*
 import java.io.File
 import java.util.UUID
 
-private enum class CameraMode { Photo, Video, Document }
+internal enum class CameraMode { Photo, Video, Document }
 private data class CapturedMedia(
     val file: File,
     val mimeType: String,
@@ -70,7 +59,7 @@ private data class CapturedMedia(
 internal fun isLowOcrConfidence(result: OcrResult) =
     !result.success || !result.confidence.isFinite() || result.confidence !in .75f..1f
 
-/** Embedded camera whose temporary media stays inside the app cache until it reaches safe storage. */
+// Embedded camera whose temporary media stays inside the app cache until it reaches safe storage.
 @Composable
 internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel = viewModel()) {
     val context = LocalContext.current
@@ -79,17 +68,9 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     val controller = session.documents
     val uploadError = stringResource(R.string.documents_upload_failed)
     var permissionGranted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.CAMERA
-            ) == PackageManager.PERMISSION_GRANTED
-        )
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
-    val audioGranted = ContextCompat.checkSelfPermission(
-        context,
-        Manifest.permission.RECORD_AUDIO
-    ) == PackageManager.PERMISSION_GRANTED
+    val audioGranted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
     var mode by rememberSaveable { mutableStateOf(CameraMode.Photo) }
     var captured by remember { mutableStateOf<CapturedMedia?>(null) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
@@ -442,6 +423,7 @@ private fun RowScope.CameraModeButton(
         Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
 }
+
 // Explains why camera access is needed and lets the user request it.
 @Composable
 private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
@@ -454,43 +436,6 @@ private fun CameraPermissionPrompt(request: () -> Unit, back: () -> Unit) {
         Spacer(Modifier.height(16.dp))
         Button(onClick = request) { Text(stringResource(R.string.grant_camera_permission)) }
         TextButton(onClick = back) { Text(stringResource(R.string.cancel), color = Color.White) }
-    }
-}
-
-// Draws the shutter button and gives TalkBack its action label.
-@Composable
-private fun CameraShutter(
-    mode: CameraMode,
-    recording: Boolean,
-    busy: Boolean,
-    ready: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    FilledIconButton(
-        onClick = onClick,
-        enabled = ready && (!busy || recording),
-        modifier = modifier.size(84.dp).testTag("camera_shutter"),
-        shape = CircleShape,
-        colors = IconButtonDefaults.filledIconButtonColors(containerColor = if (recording) Color.Red else Color.White)
-    ) {
-        Icon(
-            when (mode) {
-                CameraMode.Photo -> Icons.Outlined.PhotoCamera
-                CameraMode.Video -> Icons.Outlined.Videocam
-                CameraMode.Document -> Icons.Outlined.Description
-            },
-            stringResource(
-                // Takes a photo, starts video, or scans a document based on the selected mode.
-                when {
-                    recording -> R.string.camera_stop_recording
-                    mode == CameraMode.Photo -> R.string.camera_take_photo
-                    mode == CameraMode.Document -> R.string.camera_scan_document
-                    else -> R.string.camera_start_recording
-                }
-            ),
-            tint = if (recording) Color.White else Color.Black, modifier = Modifier.size(38.dp)
-        )
     }
 }
 // Previews the captured file before the user saves or retakes it.

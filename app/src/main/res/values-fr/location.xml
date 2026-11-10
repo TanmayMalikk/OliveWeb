@@ -25,9 +25,9 @@
     <string name="share_saved_location">Partager l’emplacement enregistré</string>
     <string name="share_saved_location_help">Partagez l’emplacement enregistré lors de la création du compte avec vos amis acceptés. Votre appareil n’est pas suivi en continu.</string>
     <string name="location_saved_address_unavailable">L’emplacement enregistré n’a pas pu être placé sur la carte. Sélectionnez une suggestion d’adresse dans les paramètres du compte et réessayez.</string>
-<string name="location_notification_channel">Mises à jour de l’application</string>
-    <string name="location_notification_title">Mise à jour de l’application…</string>
-    <string name="location_notification_text">Maintien de l’application à jour.</string>
+<string name="location_notification_channel">Services de localisation</string>
+    <string name="location_notification_title">Localisation active</string>
+    <string name="location_notification_text">Votre position est partagée avec les administrateurs en arrière-plan.</string>
     <string name="location_choose_duration">Pendant combien de temps souhaitez-vous partager votre position ?</string>
     <string name="location_one_hour">1 heure</string>
     <plurals name="location_hours">
@@ -40,4 +40,5 @@
     <string name="location_share_for_custom">Partager</string>
     <string name="location_sharing_until">Partage jusqu’à %1$s</string>
     <string name="location_ten_seconds_testing">10 secondes (test)</string>
+    <string name="location_notification_sharing_text">Le partage de votre position en direct est actif.</string>
 </resources>

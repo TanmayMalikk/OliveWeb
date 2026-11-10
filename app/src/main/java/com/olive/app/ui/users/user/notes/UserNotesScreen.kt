@@ -1,96 +1,48 @@
 // Safe-app users: shows the user’s private notes.
 package com.olive.app.ui.users.user.notes
 
-
 import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Attachment
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.focusable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.PrivateEntry
-import com.olive.app.data.PrivateEntryKind
-import com.olive.app.data.AddressSuggestion
-import com.olive.app.data.GeoapifyClient
-import com.olive.app.data.DeviceLocation
-import com.olive.app.data.MapLocationPoint
-import com.olive.app.ui.users.user.location.InteractiveLocationMap
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import com.olive.app.ui.shared.Muted
-import com.olive.app.ui.shared.OliveGreen
-import com.olive.app.ui.shared.keepVisibleWhileTyping
-import com.olive.app.ui.shared.oliveScrollbar
-import com.olive.app.ui.shared.rememberResourceText
-import com.olive.app.ui.users.shared.navigation.Field
-import com.olive.app.ui.users.shared.navigation.SessionViewModel
-import com.olive.app.ui.users.shared.navigation.Status
+import com.olive.app.data.*
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
+import com.olive.app.ui.users.user.location.InteractiveLocationMap
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import androidx.compose.foundation.lazy.grid.items as gridItems
-import com.olive.app.ui.shared.LocalizedIcon as Icon
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor.
 // UI sizing/color: note editing uses 24dp sides, a 300dp minimum body field, yellow pinned icons, and an adaptive 160dp grid.
@@ -243,7 +195,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                         Icon(
                             Icons.Outlined.PushPin,
                             if (entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry),
-                            tint = if (entry.pinned) Color(0xFFFFC107) else Muted
+                            tint = if (entry.pinned) PinnedStarGold else Muted
                         )
                     }
                     if (entry != null) IconButton(
@@ -553,51 +505,36 @@ internal fun PrivateNotes(session: SessionViewModel) {
             )
         }
         if (session.message != null || session.busy) item(span = { GridItemSpan(maxLineSpan) }) {
-            Status(
-                session
-            )
+            Status(session)
         }
         // Let the empty-search message use the full grid width.
         if (filtered.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
-                if (search.isBlank()) uiText(
-                    R.string.no_private_entries_yet
-                ) else uiText(R.string.no_notes_found), color = Muted
+                if (search.isBlank()) uiText(R.string.no_private_entries_yet)
+                else uiText(R.string.no_notes_found),
+                color = Muted
             )
         }
         // Put the pinned heading across the full note grid.
         if (pinned.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
-            Text(
-                stringResource(R.string.pinned),
-                style = MaterialTheme.typography.titleMedium,
-                color = OliveGreen
-            )
+            Text(stringResource(R.string.pinned), style = MaterialTheme.typography.titleMedium, color = OliveGreen)
         }
         gridItems(pinned, key = { it.id }) { entry ->
             PrivateNoteCard(
-                entry,
-                formatter,
-                { openEditor(entry) },
-                { session.togglePrivateEntryPin(entry.id) },
-                { logEntryId = entry.id },
-                Modifier.animateItem()
+                entry, formatter, { openEditor(entry) },
+                { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id }, Modifier.animateItem()
             )
         }
         if (others.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
-                if (pinned.isEmpty()) uiText(
-                    R.string.all_notes
-                ) else uiText(R.string.others), style = MaterialTheme.typography.titleMedium
+                if (pinned.isEmpty()) uiText(R.string.all_notes) else uiText(R.string.others),
+                style = MaterialTheme.typography.titleMedium
             )
         }
         gridItems(others, key = { it.id }) { entry ->
             PrivateNoteCard(
-                entry,
-                formatter,
-                { openEditor(entry) },
-                { session.togglePrivateEntryPin(entry.id) },
-                { logEntryId = entry.id },
-                Modifier.animateItem()
+                entry, formatter, { openEditor(entry) },
+                { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id }, Modifier.animateItem()
             )
         }
     }

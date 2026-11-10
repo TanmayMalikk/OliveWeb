@@ -436,124 +436,14 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (!authorized() || runtime.state.accountRole != AccountRole.STAFF || runtime.localMode) return
         val actor = runtime.coverAccountId
         runtime.scope.launch {
-            // Turn an unexpected change availability failure into a readable message.
             try {
                 repository.available(value)
-                if (authorized() && actor == runtime.coverAccountId) available =
-                    value
+                if (authorized() && actor == runtime.coverAccountId) available = value
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) { // Keep the current availability value when the staff setting cannot be updated.
-                if (authorized() && actor == runtime.coverAccountId) error =
-                    R.string.safety_sync_error
+            } catch (_: Exception) {
+                if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
             }
         }
     }
-}
-
-// Signed-in users: checks device-lock and PIN entry.
-
-internal class DeviceLockRequest internal constructor(
-    val challenge: DeviceLockChallenge,
-    val settingsChange: Boolean = false
-) {
-    internal val result = CompletableDeferred<Cipher?>()
-    // Session device access: Finishes the active task.
-    fun complete(cipher: Cipher?) {
-        result.complete(cipher)
-    }
-}
-
-// A prompt result is useful only to its original account, screen and cancellation epoch.
-internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
-    private val keys = DeviceLockKey(if (runtime.localMode) "demo" else "firebase")
-
-    // Authenticates the account for session device access.
-    fun authenticate(enroll: Boolean, trigger: String? = null): Unit = with(runtime) {
-        with(state) {
-            if (busy || privacyBlackout) return
-            if (accountRole != AccountRole.USER) return
-            val identity = pendingIdentity
-            val value = pendingProfile
-            val device = enrollment
-            val expectedScreen =
-                if (enroll) SessionScreen.DevicePin else if (trigger != null) SessionScreen.Safe else SessionScreen.Pin
-            if (screen != expectedScreen) return
-            if (enroll && (identity == null || value == null || device != null || value.role != AccountRole.USER)) return
-            if (!enroll && device?.entryMethod != SafeEntryMethod.DEVICE_LOCK) return
-            if (!enroll && device?.role != AccountRole.USER) return
-            if (!enroll && trigger == null && activeTriggerId == null) return
-            if (trigger != null && !InputPolicy.validTrigger(trigger)) {
-                message = application.getString(R.string.entry_invalid_trigger)
-                return
-            }
-            val uid = if (enroll) identity!!.uid else device!!.uid
-            // Counts changes to value.
-            val version = pinChallengeVersion
-            operations.runOperation(
-                application.getString(R.string.entry_auth_failed),
-                timeoutMillis = 120_000
-            ) { token ->
-                val challenge = withContext(Dispatchers.IO) {
-                    keys.prepare(uid, if (enroll) null else store.deviceLockGrant(uid))
-                }
-                if (!current(token, expectedScreen, uid, enroll)) {
-                    challenge.close()
-                    return@runOperation
-                }
-                val request = DeviceLockRequest(challenge, settingsChange = trigger != null)
-                deviceLockRequest = request
-                // Use the fallback when authenticate is unavailable.
-                try {
-                    val cipher = request.result.await()
-                    if (!current(token, expectedScreen, uid, enroll)) return@runOperation
-                    if (cipher == null) {
-                        message =
-                            application.getString(R.string.entry_auth_cancelled)
-                        return@runOperation
-                    }
-                    // The callback alone grants no access: Android Keystore must complete the protected operation.
-                    val grant = withContext(Dispatchers.IO) { challenge.finish(cipher) }
-                    if (!current(token, expectedScreen, uid, enroll)) return@runOperation
-                    // Save device-lock enrolment only when this prompt came from setup.
-                    if (enroll) {
-                        val saved = withContext(Dispatchers.IO) {
-                            store.enrollDeviceLock(identity!!, value!!, checkNotNull(grant))
-                                .also { challenge.markEnrolled() }
-                        }
-                        if (current(token, expectedScreen, uid, true)) accountSession.finishEnrollment(
-                            saved,
-                            value!!,
-                            token
-                        )
-                    } else if (trigger != null) {
-                        settings.saveVerifiedTrigger(device!!, trigger, token)
-                    } else {
-                        withContext(Dispatchers.IO) {
-                            triggerJob?.join()
-                            activeTriggerId?.let { store.recordTriggerAttempt(uid, it, true) }
-                        }
-                        if (current(
-                                token,
-                                expectedScreen,
-                                uid,
-                                false
-                            ) && version == pinChallengeVersion
-                        )
-                            access.unlockVerifiedDevice(device!!, token, expectedScreen, version)
-                    }
-                } finally {
-                    if (deviceLockRequest === request) deviceLockRequest = null
-                    challenge.close()
-                }
-            }
-        }
-    }
-
-    // Reads the current private-entry settings before changing them.
-    private fun current(token: Long, expected: SessionScreen, uid: String, enroll: Boolean) =
-        with(runtime) {
-            epoch == token && state.screen == expected && !state.privacyBlackout && state.accountRole == AccountRole.USER &&
-                    (if (enroll) pendingIdentity?.uid == uid else enrollment?.uid == uid)
-        }
 }
