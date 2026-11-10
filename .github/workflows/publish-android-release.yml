@@ -148,9 +148,6 @@ jobs:
       - name: Install publisher dependencies
         run: npm ci --prefix functions
 
-      - name: Deploy public Storage rules
-        run: npx --yes firebase-tools@latest deploy --only storage --project olive-21239 --non-interactive
-
       - name: Publish immutable APK and latest manifest
         env:
           OLIVE_RELEASE_APK: ${{ github.workspace }}/app/build/outputs/apk/release/app-release.apk
