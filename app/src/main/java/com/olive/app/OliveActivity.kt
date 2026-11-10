@@ -28,6 +28,7 @@ import com.olive.app.location.AdminLocationService
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.fragment.app.FragmentActivity
 import com.olive.app.data.CoverType
 import com.olive.app.data.AccountRole
@@ -45,6 +46,7 @@ import com.olive.app.ui.covers.fitness.FitnessWatchSync
 import android.app.Activity
 import com.olive.app.data.update.AppUpdateScheduler
 import com.olive.app.data.messaging.VoipCallForegroundService
+import kotlinx.coroutines.launch
 
 
 // Prevents Android from showing private content in the recent-apps preview.
@@ -79,8 +81,12 @@ class OliveActivity : FragmentActivity() {
                 VoipCallForegroundService.ACTION_END_CALL ->
                     session.calls.finish(session.coverAccountId.orEmpty(), callId)
                 VoipCallForegroundService.ACTION_QUICK_EXIT -> {
-                    session.quickExit(callId)
-                    closeAfterQuickExit()
+                    val hangup = session.quickExit(callId)
+                    lifecycleScope.launch {
+                        // Removing the task clears the ViewModel, which owns the hangup job.
+                        hangup.join()
+                        finishAndRemoveTask()
+                    }
                 }
             }
         }

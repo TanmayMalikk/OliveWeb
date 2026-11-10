@@ -285,9 +285,9 @@ internal class SessionCalls(
     }
 
     // A caller ends the room. A member leaving a group only disconnects their own phone.
-    fun finish(currentUid: String, expectedCallId: String? = null) {
+    fun finish(currentUid: String, expectedCallId: String? = null): Job {
         val joining = callJoinJob
-        scope.launch {
+        return scope.launch {
             if (state.value == VoipSessionState.Idle) joining?.join()
             runCallAction {
                 val active = state.value

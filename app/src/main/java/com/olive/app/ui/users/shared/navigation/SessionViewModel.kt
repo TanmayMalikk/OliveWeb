@@ -4,6 +4,7 @@ package com.olive.app.ui.users.shared.navigation
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
 import com.olive.app.data.*
 import com.olive.app.ui.session.SessionRuntime
 import com.olive.app.ui.users.shared.organization.AdminLocationMapController
@@ -116,10 +117,11 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     fun shareLiveLocationInChat(durationMillis: Long, requestPermission: suspend () -> Boolean) =
         runtime.secureSharing.shareLiveLocation(durationMillis, locationMap, requestPermission)
 
-    fun quickExit(expectedCallId: String? = null) {
-        calls.finish(coverAccountId.orEmpty(), expectedCallId)
+    fun quickExit(expectedCallId: String? = null): Job {
+        val hangup = calls.finish(coverAccountId.orEmpty(), expectedCallId)
         pendingCameraUploadTags = emptySet()
         navigation.quickExit()
+        return hangup
     }
 
     // Closing this session also clears document and map data held by their screen controllers.
