@@ -39,6 +39,63 @@ test('VoIP call records and push-token registrations are server-only', async () 
   await assertFails(set(ref(alice, 'users/alice-uid/fcmTokens/phone'), 'forged-token'));
 });
 
+test('sync invalidation markers are owner-readable and server-write-only', async () => {
+  const alice = env.authenticatedContext('sync-alice').firestore();
+  const bob = env.authenticatedContext('sync-bob').firestore();
+  const anonymous = env.unauthenticatedContext().firestore();
+  const marker = {
+    ownerUid:'sync-alice', allowedUsers:['sync-alice'], revision:5,
+    safetyRevision:1, mediaRevision:2, conversationRevision:3, accountRevision:4,
+    updatedAt:serverTimestamp(),
+  };
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(),'syncInvalidations/sync-alice'),marker);
+  });
+
+  await assertSucceeds(getDoc(doc(alice,'syncInvalidations/sync-alice')));
+  await assertFails(getDoc(doc(bob,'syncInvalidations/sync-alice')));
+  await assertFails(getDoc(doc(anonymous,'syncInvalidations/sync-alice')));
+  await assertFails(getDocs(collection(alice,'syncInvalidations')));
+  await assertFails(setDoc(doc(alice,'syncInvalidations/sync-alice'),marker));
+  await assertFails(updateDoc(doc(alice,'syncInvalidations/sync-alice'),{revision:6}));
+  await assertFails(deleteDoc(doc(alice,'syncInvalidations/sync-alice')));
+});
+
+test('malformed server sync markers are unreadable even by their path owner', async () => {
+  const alice = env.authenticatedContext('sync-shape-alice').firestore();
+  const base = {
+    ownerUid:'sync-shape-alice', allowedUsers:['sync-shape-alice'], revision:1,
+    safetyRevision:1, mediaRevision:1, conversationRevision:1, accountRevision:1,
+    updatedAt:serverTimestamp(),
+  };
+  const malformed = {
+    extra:{...base, unexpected:'schema pollution'},
+    wrongOwner:{...base, ownerUid:'sync-other'},
+    mixedReaders:{...base, allowedUsers:['sync-shape-alice','sync-other']},
+    missingRevision:{ownerUid:base.ownerUid, allowedUsers:base.allowedUsers,
+      safetyRevision:1, mediaRevision:1, conversationRevision:1, accountRevision:1,
+      updatedAt:serverTimestamp()},
+    negative:{...base, safetyRevision:-1},
+    wrongType:{...base, mediaRevision:'1'},
+    fractional:{...base, conversationRevision:1.5},
+    wrongTimestamp:{...base, updatedAt:Date.now()},
+  };
+  await env.withSecurityRulesDisabled(async context => {
+    for (const [id, value] of Object.entries(malformed)) {
+      await setDoc(doc(context.firestore(),`syncInvalidations/${id}`),value);
+    }
+  });
+
+  // Seed malformed rows at the authenticated owner's path one at a time to prove the schema gate,
+  // not only the path ownership check, denies every invalid shape.
+  for (const value of Object.values(malformed)) {
+    await env.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(),'syncInvalidations/sync-shape-alice'),value);
+    });
+    await assertFails(getDoc(doc(alice,'syncInvalidations/sync-shape-alice')));
+  }
+});
+
 
 
 test('owner can create/read a profile; another user and anonymous visitors cannot', async () => {

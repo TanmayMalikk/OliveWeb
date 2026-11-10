@@ -16,6 +16,16 @@ service cloud.firestore {
     // ciphertext_size, ciphertext_sha256, encryption_version, created_at.
     // encrypted_metadata contains the file name, MIME type, media kind, and optional OCR result.
     // ===============================================================
+    // Assumed data model: syncInvalidations/{uid}
+    // ===============================================================
+    // Server-owned, payload-free reconciliation marker:
+    // ownerUid: string equal to the document UID (required, immutable by virtue of client-write denial).
+    // allowedUsers: single-item list containing only ownerUid (required).
+    // revision, safetyRevision, mediaRevision, conversationRevision, accountRevision:
+    // non-negative integers no larger than JavaScript's safe-integer maximum (required).
+    // updatedAt: server timestamp (required).
+    // Clients may read only their own valid marker. Only trusted Admin SDK code may write it.
+    // ===============================================================
 
     // Web entry URLs are a discreet entry gate, never a replacement for account authentication.
     // Each authenticated owner may rotate their own token hash; anonymous lookups are forbidden.
@@ -61,6 +71,33 @@ service cloud.firestore {
         && request.resource.data.revision >= 1
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
+    }
+
+    function validSyncRevision(value) {
+      return value is int && value >= 0 && value <= 9007199254740991;
+    }
+
+    function validSyncInvalidation(data, uid) {
+      return data.keys().hasAll(['ownerUid','allowedUsers','revision','safetyRevision',
+          'mediaRevision','conversationRevision','accountRevision','updatedAt'])
+        && data.keys().hasOnly(['ownerUid','allowedUsers','revision','safetyRevision',
+          'mediaRevision','conversationRevision','accountRevision','updatedAt'])
+        && data.ownerUid is string && data.ownerUid == uid
+        && data.allowedUsers is list && data.allowedUsers.size() == 1
+        && data.allowedUsers[0] is string && data.allowedUsers[0] == uid
+        && validSyncRevision(data.revision)
+        && validSyncRevision(data.safetyRevision)
+        && validSyncRevision(data.mediaRevision)
+        && validSyncRevision(data.conversationRevision)
+        && validSyncRevision(data.accountRevision)
+        && data.updatedAt is timestamp;
+    }
+
+    // Priority sync markers contain no user payload. Server code owns every mutation so a client
+    // cannot manufacture a revision, target another account, or use the collection as storage.
+    match /syncInvalidations/{uid} {
+      allow get: if owner(uid) && validSyncInvalidation(resource.data, uid);
+      allow list, create, update, delete: if false;
     }
 
     function validMessageUsername(username) {
