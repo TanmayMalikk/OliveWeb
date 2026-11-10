@@ -16,8 +16,10 @@ import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.data.AccountRole
+import com.olive.app.data.update.AppUpdateScheduler
 import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.notification.OliveNotificationManager
 import java.io.IOException
@@ -261,6 +263,13 @@ class VoipFirebaseMessagingService : FirebaseMessagingService() {
             if (recipientId != currentUid || callId.isBlank() || callerId.isBlank()) return
             runCatching {
                 OliveNotificationManager.showIncomingCall(this, callId, callerId, data["callName"].orEmpty())
+            }
+            return
+        }
+        if (data["type"] == "app_update") {
+            val remoteVersion = data["versionCode"]?.toLongOrNull() ?: Long.MAX_VALUE
+            if (remoteVersion > BuildConfig.VERSION_CODE) {
+                runCatching { AppUpdateScheduler.triggerNow(this) }
             }
             return
         }
