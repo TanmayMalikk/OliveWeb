@@ -19,6 +19,7 @@ import { siteHref } from "../sites/SiteRouting";
 import config from "../../site.config.json";
 
 const ANDROID_DOWNLOAD_URL = new URL("/download/android", location.origin).href;
+const ANDROID_DOWNLOAD_PAGE_URL = new URL("/get", location.origin).href;
 
 export default function DownloadPage() {
   const { go } = useSession();
@@ -66,8 +67,8 @@ export default function DownloadPage() {
             </p>
             <a
               className="download-qr"
-              href={ANDROID_DOWNLOAD_URL}
-              aria-label="Download the signed Android app"
+              href={ANDROID_DOWNLOAD_PAGE_URL}
+              aria-label="Open the Android download page"
             >
               <img
                 src="/android-download-qr.svg"

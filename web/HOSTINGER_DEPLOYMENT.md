@@ -31,9 +31,9 @@ Add these public browser settings to the `yourolivebranch.ca` app:
 - `VITE_FIREBASE_APPCHECK_SITE_KEY`
 - `VITE_USE_FIREBASE_EMULATORS=false`
 
-The download page and its permanent QR use `/download/android`. The server reads the validated
-`public/android/latest.json` release manifest and redirects to that signed, immutable APK. The app
-uses `/api/android/releases/latest` to check the same manifest for updates.
+The permanent QR opens `/get`. Its download button uses `/download/android`, where the server reads
+the validated `public/android/latest.json` release manifest and redirects to that signed, immutable
+APK. The app uses `/api/android/releases/latest` to check the same manifest for updates.
 
 Every `VITE_` variable is readable by visitors. Never put a Firebase Admin
 service account, private key, signing keystore, password, FatSecret secret, or

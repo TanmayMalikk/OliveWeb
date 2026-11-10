@@ -6,9 +6,9 @@ Educational purposes only.
 
 ---------------------------------------------
 # Installation
-Published signed Android releases are downloaded from
-`https://yourolivebranch.ca/download/android`. The website QR code uses that same permanent address,
-so it always resolves to the newest published APK. Android asks the user to approve installation
+Published signed Android releases are available from
+`https://yourolivebranch.ca/get`. The permanent website QR code opens that page, where the download
+button always resolves to the newest published APK. Android asks the user to approve installation
 because Olive is distributed outside Google Play.
 
 Developers can clone `https://github.com/macewanCS/F26_D1.git`, open it in Android Studio, sync
