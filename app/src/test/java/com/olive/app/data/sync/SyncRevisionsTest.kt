@@ -8,7 +8,7 @@ class SyncRevisionsTest {
     @Test
     fun `strict marker parsing accepts only the matching account`() {
         val valid = marker()
-        assertEquals(SyncRevisions(9, 1, 2, 3, 4), syncRevisionsFrom(OWNER, valid))
+        assertEquals(SyncRevisions(9, 1, 2, 3, 4, 5), syncRevisionsFrom(OWNER, valid))
         assertNull(syncRevisionsFrom("another", valid))
         assertNull(syncRevisionsFrom(OWNER, valid + ("allowedUsers" to listOf(OWNER, "another"))))
         assertNull(syncRevisionsFrom(OWNER, valid + ("mediaRevision" to -1)))
@@ -18,13 +18,16 @@ class SyncRevisionsTest {
     @Test
     fun `push parser rejects payload content and malformed revisions`() {
         assertEquals(
-            SyncInvalidation(12),
-            syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "12")),
+            SyncInvalidation(12, true),
+            syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "12", "urgent" to "1")),
         )
-        assertNull(syncInvalidationFrom(mapOf("type" to "call_invitation", "revision" to "12")))
-        assertNull(syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "-1")))
-        assertNull(syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "NaN")))
-        assertNull(syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "12", "fileName" to "private.pdf")))
+        assertEquals(SyncInvalidation(12, false), syncInvalidationFrom(
+            mapOf("type" to "sync_invalidation", "revision" to "12", "urgent" to "0")))
+        assertNull(syncInvalidationFrom(mapOf("type" to "call_invitation", "revision" to "12", "urgent" to "1")))
+        assertNull(syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "-1", "urgent" to "1")))
+        assertNull(syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "NaN", "urgent" to "1")))
+        assertNull(syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "12", "urgent" to "true")))
+        assertNull(syncInvalidationFrom(mapOf("type" to "sync_invalidation", "revision" to "12", "urgent" to "1", "fileName" to "private.pdf")))
     }
 
     private fun marker() = mapOf<String, Any?>(
@@ -35,6 +38,7 @@ class SyncRevisionsTest {
         "safetyRevision" to 2,
         "mediaRevision" to 3,
         "conversationRevision" to 4,
+        "urgentRevision" to 5,
     )
 
     private companion object { const val OWNER = "alice" }

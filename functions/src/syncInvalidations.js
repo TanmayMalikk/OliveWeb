@@ -20,12 +20,23 @@ function safetyAudience(before = {}, after = {}) {
   ]);
 }
 
+function safetyAccessChanged(before, after) {
+  if (!before || !after) return true;
+  return ["staffUid", "adminUid", "safeContactUids", "supportSafeContactUid", "consultationRequested"]
+      .some((field) => stable(before[field]) !== stable(after[field]));
+}
+
 function mediaAudience(before = {}, after = {}) {
   return strings([
     before.owner_id, after.owner_id,
     ...(before.allowed_users || []),
     ...(after.allowed_users || []),
   ]);
+}
+
+function revokedMediaUids(before = {}, after = {}) {
+  const retained = new Set(strings(after.allowed_users || []));
+  return strings(before.allowed_users || []).filter((uid) => !retained.has(uid));
 }
 
 function stable(value) {
@@ -51,7 +62,7 @@ async function adminUids() {
   return strings(snapshot.docs.map((row) => row.get("uid")));
 }
 
-async function writeMarker(uid, domain) {
+async function writeMarker(uid, domain, urgent) {
   if (!DOMAINS.has(domain)) throw new Error("Unknown sync domain");
   const reference = db.collection("syncInvalidations").doc(uid);
   return db.runTransaction(async (transaction) => {
@@ -72,6 +83,7 @@ async function writeMarker(uid, domain) {
       safetyRevision: domain === "safety" ? next("safetyRevision") : currentRevision("safetyRevision"),
       mediaRevision: domain === "media" ? next("mediaRevision") : currentRevision("mediaRevision"),
       conversationRevision: domain === "conversation" ? next("conversationRevision") : currentRevision("conversationRevision"),
+      urgentRevision: urgent ? next("urgentRevision") : currentRevision("urgentRevision"),
       updatedAt: FieldValue.serverTimestamp(),
     };
     transaction.set(reference, marker);
@@ -87,13 +99,13 @@ async function deviceTokens(uid) {
       .map(([deviceId, token]) => ({deviceId, token}));
 }
 
-async function notify(uid, revision) {
+async function notify(uid, revision, urgent) {
   const registrations = await deviceTokens(uid);
   for (let offset = 0; offset < registrations.length; offset += 500) {
     const batch = registrations.slice(offset, offset + 500);
     const result = await messaging.sendEachForMulticast({
       tokens: batch.map(({token}) => token),
-      data: {type: "sync_invalidation", revision: String(revision)},
+      data: {type: "sync_invalidation", revision: String(revision), urgent: urgent ? "1" : "0"},
       android: {priority: "high"},
     });
     const removals = {};
@@ -108,49 +120,57 @@ async function notify(uid, revision) {
   }
 }
 
-async function invalidate(uids, domain) {
+async function invalidate(uids, domain, urgentUids = []) {
+  const expedited = new Set(strings(urgentUids));
   await Promise.all(strings(uids).map(async (uid) => {
-    const revision = await writeMarker(uid, domain);
-    await notify(uid, revision);
+    const urgent = expedited.has(uid);
+    const revision = await writeMarker(uid, domain, urgent);
+    await notify(uid, revision, urgent);
   }));
 }
 
 exports.syncSafetyPlanInvalidation = onDocumentWritten("safetyPlans/{ownerUid}", async (event) => {
   const before = event.data?.before.exists ? event.data.before.data() : {};
   const after = event.data?.after.exists ? event.data.after.data() : {};
-  await invalidate([...safetyAudience(before, after), ...await adminUids()], "safety");
+  const audience = [...safetyAudience(before, after), ...await adminUids()];
+  await invalidate(audience, "safety", safetyAccessChanged(before, after) ? audience : []);
 });
 
 exports.syncMediaInvalidation = onDocumentWritten("files/{fileId}", async (event) => {
   const before = event.data?.before.exists ? event.data.before.data() : {};
   const after = event.data?.after.exists ? event.data.after.data() : {};
-  await invalidate(mediaAudience(before, after), "media");
+  await invalidate(mediaAudience(before, after), "media", revokedMediaUids(before, after));
 });
 
 exports.syncConversationInvalidation = onDocumentWritten("conversations/{conversationId}", async (event) => {
   const before = event.data?.before.exists ? event.data.before.data() : null;
   const after = event.data?.after.exists ? event.data.after.data() : null;
   if (!conversationAccessChanged(before, after)) return;
-  await invalidate(conversationAudience(before || {}, after || {}), "conversation");
+  const audience = conversationAudience(before || {}, after || {});
+  await invalidate(audience, "conversation", audience);
 });
 
 exports.syncConversationDeviceKeyInvalidation = onDocumentWritten(
     "conversations/{conversationId}/deviceKeys/{deviceKeyId}", async (event) => {
       const before = event.data?.before.exists ? event.data.before.data() : {};
       const after = event.data?.after.exists ? event.data.after.data() : {};
-      await invalidate(strings([before.uid, after.uid]), "conversation");
+      const audience = strings([before.uid, after.uid]);
+      await invalidate(audience, "conversation", audience);
     });
 
 exports.syncAccountInvalidation = onDocumentWritten("accountDirectory/{username}", async (event) => {
   const before = event.data?.before.exists ? event.data.before.data() : {};
   const after = event.data?.after.exists ? event.data.after.data() : {};
-  await invalidate(strings([before.uid, after.uid]), "account");
+  const audience = strings([before.uid, after.uid]);
+  await invalidate(audience, "account", audience);
 });
 
 exports._test = {
   strings,
   safetyAudience,
+  safetyAccessChanged,
   mediaAudience,
+  revokedMediaUids,
   conversationAudience,
   conversationAccessChanged,
 };

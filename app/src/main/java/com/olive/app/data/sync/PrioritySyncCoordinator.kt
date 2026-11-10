@@ -11,6 +11,7 @@ internal class PrioritySyncCoordinator(
     private val application = context.applicationContext
     private var activeUid: String? = null
     private var subscription: ChatSubscription? = null
+    private var lastUrgentRevision = 0L
 
     fun start(uid: String) {
         if (activeUid == uid && subscription != null) {
@@ -22,8 +23,17 @@ internal class PrioritySyncCoordinator(
         PriorityReconciliationWorker.enqueue(application, uid)
         subscription = repository.observe(
             uid,
-            onUpdate = {
-                if (activeUid == uid) PriorityReconciliationWorker.enqueue(application, uid, expedited = true)
+            onUpdate = { revisions ->
+                if (activeUid == uid) {
+                    val urgent = revisions.urgent > lastUrgentRevision
+                    lastUrgentRevision = maxOf(lastUrgentRevision, revisions.urgent)
+                    PriorityReconciliationWorker.enqueue(
+                        application,
+                        uid,
+                        revision = revisions.revision,
+                        expedited = urgent,
+                    )
+                }
             },
             onError = { if (activeUid == uid) PriorityReconciliationWorker.enqueue(application, uid) },
         )
@@ -37,6 +47,7 @@ internal class PrioritySyncCoordinator(
         subscription?.close()
         subscription = null
         activeUid = null
+        lastUrgentRevision = 0L
     }
 }
 

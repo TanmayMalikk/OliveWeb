@@ -20,9 +20,15 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
-        if (syncInvalidationFrom(data) != null) {
+        val invalidation = syncInvalidationFrom(data)
+        if (invalidation != null) {
             FirebaseAuth.getInstance().currentUser?.uid?.let { uid ->
-                PriorityReconciliationWorker.enqueue(this, uid, expedited = true)
+                PriorityReconciliationWorker.enqueue(
+                    this,
+                    uid,
+                    revision = invalidation.revision,
+                    expedited = invalidation.urgent,
+                )
             }
             return
         }

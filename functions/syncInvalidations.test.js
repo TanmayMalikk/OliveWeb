@@ -15,11 +15,23 @@ test("safety invalidations include previous and new authorized roles", () => {
   ).sort(), ["admin", "new-staff", "old-staff", "owner", "safe-a", "safe-b"]);
 });
 
+test("only safety access changes are urgent", () => {
+  const before = {ownerUid:"owner", staffUid:"staff", safeContactUids:["safe"], fields:{a:1}};
+  assert.equal(sync.safetyAccessChanged(before, {...before, fields:{a:2}, updatedAt:2}), false);
+  assert.equal(sync.safetyAccessChanged(before, {...before, staffUid:"new-staff"}), true);
+  assert.equal(sync.safetyAccessChanged(before, {...before, safeContactUids:[]}), true);
+});
+
 test("media revocation invalidates both removed and retained viewers", () => {
   assert.deepEqual(sync.mediaAudience(
       {owner_id:"owner", allowed_users:["owner", "revoked"]},
       {owner_id:"owner", allowed_users:["owner", "retained"]},
   ).sort(), ["owner", "retained", "revoked"]);
+  assert.deepEqual(sync.revokedMediaUids(
+      {allowed_users:["owner", "revoked"]}, {allowed_users:["owner", "retained"]}),
+  ["revoked"]);
+  assert.deepEqual(sync.revokedMediaUids(
+      {allowed_users:["owner", "revoked"]}, {}), ["owner", "revoked"]);
 });
 
 test("ordinary chat message markers do not trigger conversation reconciliation", () => {

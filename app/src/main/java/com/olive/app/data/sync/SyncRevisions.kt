@@ -9,9 +9,10 @@ internal data class SyncRevisions(
     val safety: Long = 0,
     val media: Long = 0,
     val conversation: Long = 0,
+    val urgent: Long = 0,
 ) {
     init {
-        require(listOf(revision, account, safety, media, conversation).all { it >= 0 })
+        require(listOf(revision, account, safety, media, conversation, urgent).all { it >= 0 })
     }
 
     fun value(domain: SyncDomain): Long = when (domain) {
@@ -39,6 +40,7 @@ internal fun syncRevisionsFrom(uid: String, data: Map<String, Any?>?): SyncRevis
         safety = revision("safetyRevision") ?: return null,
         media = revision("mediaRevision") ?: return null,
         conversation = revision("conversationRevision") ?: return null,
+        urgent = revision("urgentRevision") ?: return null,
     )
 }
 
