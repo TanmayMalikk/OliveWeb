@@ -237,6 +237,8 @@ jobs:
     permissions:
       issues: write
     steps:
+      - uses: actions/checkout@v5
+
       - name: Create or update the CI failure issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -249,10 +251,10 @@ jobs:
           Workflow run: ${RUN_URL}
 
           The workflow will update this open issue on subsequent failures rather than opening a duplicate."
-          existing_issue="$(gh issue list --state open --search "in:title ${title}" --json number,title --jq '.[] | select(.title == "CI failure on default branch") | .number' | head -n 1)"
+          existing_issue="$(gh issue list --repo "${{ github.repository }}" --state open --search "in:title ${title}" --json number,title --jq '.[] | select(.title == "CI failure on default branch") | .number' | head -n 1)"
 
           if [[ -n "$existing_issue" ]]; then
-            gh issue comment "$existing_issue" --body "$body"
+            gh issue comment "$existing_issue" --repo "${{ github.repository }}" --body "$body"
           else
-            gh issue create --title "$title" --body "$body"
+            gh issue create --repo "${{ github.repository }}" --title "$title" --body "$body"
           fi
