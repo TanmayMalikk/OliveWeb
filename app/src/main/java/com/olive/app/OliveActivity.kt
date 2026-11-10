@@ -188,6 +188,7 @@ class OliveActivity : FragmentActivity() {
     // Coming back just refreshes screen protection; it never auto-reopens private pages.
     override fun onResume() {
         super.onResume()
+        session.reconcilePriorityData()
         session.account.refreshDeviceSecurity()
         deviceLock.resume()
         applyScreenCaptureProtection()

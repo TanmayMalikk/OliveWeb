@@ -20,6 +20,7 @@ import com.olive.app.data.ChatCacheStore
 import com.olive.app.data.DocumentIndexStore
 import com.olive.app.data.MessageOutboxStore
 import com.olive.app.data.SafetyPlanStore
+import com.olive.app.data.SafetyAccessIndexStore
 import com.olive.app.data.media.OfflineMediaCache
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
@@ -47,6 +48,7 @@ class PriorityReconciliationWorker(
                 ),
             )
             runner.reconcile(uid, target)
+            SyncCompletionEvents.publish(uid)
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -73,6 +75,7 @@ class PriorityReconciliationWorker(
         DocumentIndexStore(applicationContext).purge(uid)
         OfflineMediaCache(applicationContext).purge(uid)
         SafetyPlanStore(applicationContext, false).purge(uid)
+        SafetyAccessIndexStore(applicationContext).purge(uid)
         checkpoints.purge(uid)
     }
 
