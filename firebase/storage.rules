@@ -25,14 +25,14 @@ service firebase.storage {
 
     // Each account owns its activity history plus private notes and incident records.
     match /accounts/{uid}/history/{kind}/{entry} {
-      allow read: if owner(uid) && kind in ['settings', 'triggers', 'checkouts', 'private_entries'];
+      allow read: if owner(uid) && kind in ['settings', 'triggers', 'private_entries'];
       allow create, update: if owner(uid)
-        && kind in ['settings', 'triggers', 'checkouts', 'private_entries']
+        && kind in ['settings', 'triggers', 'private_entries']
         && entry.matches('[A-Za-z0-9-]{8,64}\\.json')
         && ((kind == 'private_entries' && request.resource.size <= 5 * 1024 * 1024)
           || (kind != 'private_entries' && request.resource.size <= 64 * 1024))
         && request.resource.contentType == 'application/json';
-      allow delete: if owner(uid) && kind in ['settings', 'triggers', 'checkouts', 'private_entries'];
+      allow delete: if owner(uid) && kind in ['settings', 'triggers', 'private_entries'];
     }
 
     // The Android fitness cover publishes an owner-only summary for the web activity viewer.

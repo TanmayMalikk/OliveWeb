@@ -53,7 +53,6 @@
         <item quantity="many">Graphique %1$s sur %2$d jours.</item>
         <item quantity="other">Graphique %1$s sur %2$d jours.</item>
     </plurals>
-    <string name="fitness_chart_latest">Dernier résultat %1$s : %2$s %3$s.</string>
     <string name="fitness_chart_average">Moyenne de %1$s : %2$s %3$s.</string>
     <string name="fitness_calories_burned">Dépensées</string>
     <string name="fitness_calories_eaten">Consommées</string>

@@ -191,9 +191,9 @@ internal fun OliveBranchAnimationContent(
                 path = subAndroidPath.asComposePath(),
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        Color(0xFF5D4037).copy(alpha = branchAlpha),
-                        Color(0xFF6B583E).copy(alpha = branchAlpha),
-                        Color(0xFF7A6B48).copy(alpha = branchAlpha)
+                        BranchBarkDark.copy(alpha = branchAlpha),
+                        BranchBarkMid.copy(alpha = branchAlpha),
+                        BranchBarkLight.copy(alpha = branchAlpha)
                     ),
                     start = Offset(0f, 0f),
                     end = Offset(w, h * 0.25f)
@@ -269,7 +269,7 @@ internal fun OliveBranchAnimationContent(
                     // Thin connecting stem
                     if (branchAlpha > 0.01f) {
                         drawLine(
-                            color = Color(0xFF6B583E).copy(alpha = branchAlpha),
+                            color = BranchBarkMid.copy(alpha = branchAlpha),
                             start = Offset(anchorX, anchorY),
                             end = Offset(currentOliveX, currentOliveY - (oliveRadius * 0.7f * budScale)),
                             strokeWidth = 1.8.dp.toPx(),
@@ -305,7 +305,7 @@ internal fun OliveBranchAnimationContent(
                     // Skip the ripple once it is too transparent to see.
                     if (rAlpha > 0.01f) {
                         drawCircle(
-                            color = Color(0xFF6B8E23).copy(alpha = rAlpha * 0.45f),
+                            color = LeafRippleOlive.copy(alpha = rAlpha * 0.45f),
                             radius = currentRadius,
                             center = Offset(currentOliveX, h * 0.92f),
                             style = Stroke(width = 2.dp.toPx())
@@ -353,9 +353,9 @@ private fun DrawScope.drawOliveLeaf(
             path = leafPath,
             brush = Brush.linearGradient(
                 colors = listOf(
-                    Color(0xFF556B2F).copy(alpha = alpha),
-                    Color(0xFF6E8B3D).copy(alpha = alpha),
-                    Color(0xFF8F9E6D).copy(alpha = alpha)
+                    LeafBodyDark.copy(alpha = alpha),
+                    LeafBodyMid.copy(alpha = alpha),
+                    LeafBodyLight.copy(alpha = alpha)
                 ),
                 start = center,
                 end = Offset(center.x + sLength, center.y)
@@ -363,7 +363,7 @@ private fun DrawScope.drawOliveLeaf(
         )
 
         drawLine(
-            color = Color(0x66334411).copy(alpha = 0.4f * alpha),
+            color = LeafShadowTint.copy(alpha = 0.4f * alpha),
             start = center,
             end = Offset(center.x + sLength * 0.82f, center.y),
             strokeWidth = 1.dp.toPx(),
@@ -390,9 +390,9 @@ private fun DrawScope.drawOliveFruit(
         drawOval(
             brush = Brush.radialGradient(
                 colors = listOf(
-                    Color(0xFF7A933B).copy(alpha = alpha),
-                    Color(0xFF4A6223).copy(alpha = alpha),
-                    Color(0xFF2C3E14).copy(alpha = alpha)
+                    FruitHighlight.copy(alpha = alpha),
+                    FruitMid.copy(alpha = alpha),
+                    FruitShadow.copy(alpha = alpha)
                 ),
                 center = Offset(center.x - radius * 0.35f, center.y - radius * 0.35f),
                 radius = radius * 1.4f

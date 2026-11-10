@@ -323,7 +323,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 val device = enrollment ?: return
                 if (localMode) return
                 if (accounts.authenticatedUid() == device.uid)
-                    LocalNotificationEventHandler.start(application, coverType, accountRole)
+                    LocalNotificationEventHandler.start(application)
             }
         }
     }

@@ -52,7 +52,6 @@
         <item quantity="one">%1$s chart for %2$d day.</item>
         <item quantity="other">%1$s chart for %2$d days.</item>
     </plurals>
-    <string name="fitness_chart_latest">%1$s latest %2$s %3$s.</string>
     <string name="fitness_chart_average">%1$s average %2$s %3$s.</string>
     <string name="fitness_calories_burned">Burned</string>
     <string name="fitness_calories_eaten">Eaten</string>

@@ -36,7 +36,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
     fun cleanInstallOpensOnboardingOnlyAfterTheOliveIsDoubleTapped() {
         waitCover()
         compose.onNodeWithTag("new_user").assertDoesNotExist()
-        click("cover_tab_account")
+        click("fitness_account_settings")
         waitFor("discreet_cover_olive")
         compose.onNodeWithTag("new_user").assertDoesNotExist()
         compose.onNodeWithText("Set up account").assertDoesNotExist()
@@ -45,6 +45,25 @@ class OnboardingFlowTest : OliveUiTestBase() {
 
         waitFor("new_user")
         compose.onNodeWithTag("new_user").assertIsDisplayed()
+    }
+
+    @Test
+    fun quickExitFromOnboardingReturnsToCoverAndDiscardsForm() {
+        openOnboarding()
+        click("account_role")
+        click("role_safe_contact")
+        click("new_user")
+        fill("username", "unfinished_contact")
+
+        click("quick_exit")
+
+        waitCover()
+        compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+        compose.onNodeWithTag("username").assertDoesNotExist()
+
+        openOnboarding()
+        click("new_user")
+        compose.onNodeWithText("unfinished_contact").assertDoesNotExist()
     }
 
     // Checks the credentials use live requirements and inline errors step with the test's sample data.
@@ -104,7 +123,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("sign_out").assertDoesNotExist()
         compose.onNodeWithTag("safe_contact_activity").assertDoesNotExist()
         compose.onNodeWithTag("change_device_pin").assertDoesNotExist()
-        compose.onNodeWithTag("quick_exit").assertDoesNotExist()
+        compose.onNodeWithTag("quick_exit").assertIsDisplayed()
         click("safe_contact_settings")
         waitFor("save_settings")
         compose.onNodeWithTag("sign_out").assertExists()

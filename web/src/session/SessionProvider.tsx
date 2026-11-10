@@ -1,64 +1,32 @@
 // Signed-in users: loads the account and keeps web session state in sync.
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import {
-  accounts,
-  cloudMode,
-  triggerHash,
-  firebase,
-  observeAccountChanges,
+  accounts, cloudMode, triggerHash, firebase, observeAccountChanges,
 } from "../services/AccountService";
 import { database } from "../services/LocalDataStore";
 import {
-  issueEntryLink,
-  savedEntryLink,
-  verifyEntryLink,
-  validEntryToken,
+  issueEntryLink, savedEntryLink, verifyEntryLink, validEntryToken,
 } from "../services/PrivateEntryLinks";
 import {
-  canonicalPath,
-  coverForRoute,
-  siteDestination,
-  siteMode,
-  type SiteMode,
+  canonicalPath, coverForRoute, siteDestination, siteMode, type SiteMode,
 } from "../sites/SiteRouting";
 import {
-  coverPath,
-  covers,
-  emptyHistory,
-  friendlyError,
-  newEvent,
-  normalizeCover,
-  type Cover,
-  type Enrollment,
-  type History,
-  type Profile,
-  type Role,
-  type Page,
-  type Entry,
-  type Event,
-  type Category,
+  coverPath, covers, emptyHistory, friendlyError, newEvent, normalizeCover,
+  type Cover, type Enrollment, type History, type Profile, type Role,
+  type Page, type Entry, type Event, type Category,
 } from "../domain/DomainModels";
-import {
-  SessionContext,
-  useSession,
-  type SessionValue,
-} from "./SessionContext";
+import { SessionContext, useSession, type SessionValue } from "./SessionContext";
 import { useSessionSecurity } from "./useSessionSecurity";
 export { useSession };
+
+// Converts Firestore permission errors into a clear user-facing explanation.
 function accountSyncError(error: unknown) {
   const code = (error as { code?: string })?.code;
   if (code === "permission-denied" || code === "firestore/permission-denied")
     return "You are signed in, but Firebase is blocking live account sync. Deploy the current Firestore rules to enable it.";
-  return error instanceof Error
-    ? error.message
-    : "Account sync is unavailable.";
+  return error instanceof Error ? error.message : "Account sync is unavailable.";
 }
+
 const initialEntryToken =
   (location.pathname === "/" || location.pathname === "/entry") &&
   validEntryToken(location.hash.slice(1))
@@ -66,6 +34,7 @@ const initialEntryToken =
     : null;
 if (location.hash || location.pathname === "/entry")
   window.history.replaceState({}, "", "/");
+
 // Keeps sign-in, private-entry, and account data together for every web screen.
 export function SessionProvider({
   children,
@@ -92,24 +61,21 @@ export function SessionProvider({
   const [history, setHistory] = useState<History>(emptyHistory);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [page, setPage] = useState<Page>("Home");
-  const [onboardingProfile, setOnboardingProfile] = useState<Profile | null>(
-    null,
-  );
+  const [onboardingProfile, setOnboardingProfile] = useState<Profile | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [idleSeconds, setIdleSeconds] = useState<number | null>(null);
   const epoch = useRef(0);
   const working = useRef(false);
-  const routeCover = coverForRoute(path, location.origin)?.id as
-    Cover | undefined;
+  const routeCover = coverForRoute(path, location.origin)?.id as Cover | undefined;
   const cover = normalizeCover(
     routeCover ?? enrollment?.cover ?? profile?.coverType ?? "FITNESS",
   );
+
   // Reloads account files when another phone or browser changes this account.
   useEffect(() => {
     const identity = accounts.identity;
-    if (!cloudMode || !identity || (phase !== "safe" && phase !== "portal"))
-      return;
+    if (!cloudMode || !identity || (phase !== "safe" && phase !== "portal")) return;
     let active = true;
     let timer = 0;
     let stop: (() => void) | undefined;
@@ -147,6 +113,7 @@ export function SessionProvider({
       stop?.();
     };
   }, [phase, accounts.identity?.uid]);
+
   const go = useCallback(
     (to: string) => {
       pendingEntry.current = null;
@@ -166,20 +133,20 @@ export function SessionProvider({
         window.location.assign(destination.href);
         return;
       }
-      const shellPath =
-        mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/";
+      const shellPath = mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/";
       window.history.replaceState({}, "", shellPath);
       setPath(canonical);
       window.scrollTo({ top: 0 });
     },
     [mode],
   );
+
   useEffect(() => {
-    const shellPath =
-      mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/";
+    const shellPath = mode === "admin" ? "/admin" : mode === "download" ? "/get" : "/";
     if (location.pathname !== shellPath || location.search || location.hash)
       window.history.replaceState({}, "", shellPath);
   }, [mode]);
+
   // Restores this browser's saved enrollment and continues a pending private entry.
   useEffect(() => {
     let live = true;
@@ -187,9 +154,7 @@ export function SessionProvider({
       .then((db) => db.get("device", "current"))
       .then(async (value) => {
         if (!live) return;
-        const savedEnrollment = value
-          ? { ...value, cover: normalizeCover(value.cover) }
-          : null;
+        const savedEnrollment = value ? { ...value, cover: normalizeCover(value.cover) } : null;
         setEnrollment(savedEnrollment);
         if (savedEnrollment && savedEnrollment.cover !== value?.cover)
           await (await database).put("device", savedEnrollment, "current");
@@ -202,26 +167,20 @@ export function SessionProvider({
             authenticated = auth.currentUser?.uid === savedEnrollment?.uid;
           }
           const entryToken = pendingEntry.current;
-          if (
-            entryToken &&
-            authenticated &&
-            live &&
-            pendingEntry.current === entryToken
-          ) {
+          if (entryToken && authenticated && live && pendingEntry.current === entryToken) {
             entryOwner.current = savedEnrollment.uid;
             setPhase("pin");
           }
         }
       })
       .catch(() =>
-        setMessage(
-          "Browser storage is unavailable. Enable site storage and try again.",
-        ),
+        setMessage("Browser storage is unavailable. Enable site storage and try again."),
       );
     return () => {
       live = false;
     };
   }, [entryAttempt]);
+
   const quickExit = useCallback(() => {
     const returnPath =
       profile?.role === "SAFE_CONTACT"
@@ -252,26 +211,14 @@ export function SessionProvider({
     setPath(returnPath);
     window.scrollTo({ top: 0 });
   }, [cover, mode, profile?.coverType, profile?.role]);
+
   const noteInteraction = useSessionSecurity({
-    enrollment,
-    entryOwner,
-    epoch,
-    mode,
-    pendingEntry,
-    phase,
-    role: profile?.role ?? null,
-    quickExit,
-    setBusy,
-    setEnrollmentAttempt: setEntryAttempt,
-    setHistory,
-    setIdleSeconds,
-    setMessage,
-    setOnboardingProfile,
-    setPath,
-    setPersonalLink,
-    setPhase,
-    setProfile,
+    enrollment, entryOwner, epoch, mode, pendingEntry, phase,
+    role: profile?.role ?? null, quickExit, setBusy,
+    setEnrollmentAttempt: setEntryAttempt, setHistory, setIdleSeconds,
+    setMessage, setOnboardingProfile, setPath, setPersonalLink, setPhase, setProfile,
   });
+
   // Keeps the browser-tab title matched to the current cover or workspace.
   useEffect(() => {
     document.title =
@@ -279,9 +226,9 @@ export function SessionProvider({
         ? "Olive Branch Workspace"
         : mode === "download"
           ? "Olive Branch"
-          : (covers.find((candidate) => candidate.id === cover)?.name ??
-            "Game");
+          : (covers.find((candidate) => candidate.id === cover)?.name ?? "Game");
   }, [cover, mode]);
+
   // Runs one account task at a time and keeps loading and error messages consistent.
   async function perform(work: () => Promise<void>) {
     if (working.current) return;
@@ -289,25 +236,18 @@ export function SessionProvider({
     setBusy(true);
     setMessage("");
     const token = epoch.current;
-    // Only show errors from the account task that is still active.
     try {
       await work();
     } catch (error) {
       if (token === epoch.current) setMessage(friendlyError(error));
     } finally {
       working.current = false;
-      if (token === epoch.current) {
-        setBusy(false);
-      }
+      if (token === epoch.current) setBusy(false);
     }
   }
+
   // Signs in or creates an account, then opens the screen allowed for its role.
-  async function authenticate(
-    username: string,
-    password: string,
-    role: Role,
-    create: boolean,
-  ) {
+  async function authenticate(username: string, password: string, role: Role, create: boolean) {
     if ((role === "STAFF" || role === "ADMIN") !== (mode === "admin"))
       throw new Error(
         mode === "admin"
@@ -315,21 +255,14 @@ export function SessionProvider({
           : "Organization accounts sign in at yourolivebranch.ca/admin.",
       );
     const token = epoch.current;
-    const loaded = await accounts.authenticate(
-      username,
-      password,
-      role,
-      create,
-    );
+    const loaded = await accounts.authenticate(username, password, role, create);
     if (token !== epoch.current) {
       accounts.lock();
       return;
     }
     const p = loaded.profile;
     if (pendingEntry.current) {
-      if (
-        !(await verifyEntryLink(accounts.identity!.uid, pendingEntry.current))
-      ) {
+      if (!(await verifyEntryLink(accounts.identity!.uid, pendingEntry.current))) {
         accounts.lock();
         throw new Error(
           "This link is invalid, has been replaced, or belongs to another account.",
@@ -342,7 +275,6 @@ export function SessionProvider({
       setPhase("setup");
       return;
     }
-    // Staff and administrators go directly to their organization workspace.
     if (role === "STAFF" || role === "ADMIN") {
       setProfile(p);
       setHistory(loaded.history);
@@ -356,10 +288,7 @@ export function SessionProvider({
       setPage("Home");
       return;
     }
-    const current: Enrollment | undefined = await (
-      await database
-    ).get("device", "current");
-    // The account-link page creates or restores this browser's private entry link.
+    const current: Enrollment | undefined = await (await database).get("device", "current");
     if (path === "/account/link") {
       setPersonalLink(await issueEntryLink(accounts.identity!.uid));
       setEnrollment(
@@ -370,18 +299,13 @@ export function SessionProvider({
       setPhase("link");
       return;
     }
-    // A matching browser enrollment can reuse its saved private entry link.
     if (current && current.uid === accounts.identity?.uid) {
-      setEnrollment({
-        ...current,
-        cover: p.coverType,
-        triggerHash: p.triggerHash,
-      });
+      setEnrollment({ ...current, cover: p.coverType, triggerHash: p.triggerHash });
       accounts.lock();
       const saved = await savedEntryLink(current.uid);
-      const token = saved ? new URL(saved).hash.slice(1) : "";
-      if (validEntryToken(token)) {
-        pendingEntry.current = token;
+      const savedToken = saved ? new URL(saved).hash.slice(1) : "";
+      if (validEntryToken(savedToken)) {
+        pendingEntry.current = savedToken;
         entryOwner.current = current.uid;
         setPhase("pin");
       } else {
@@ -393,6 +317,7 @@ export function SessionProvider({
       setPhase("setup");
     }
   }
+
   // Opens PIN entry only when this browser has a valid saved private link.
   async function beginEntry() {
     setMessage("");
@@ -413,6 +338,7 @@ export function SessionProvider({
     setPhase("pin");
     window.history.replaceState({}, "", "/");
   }
+
   // Saves the new profile and PIN, then creates this browser's private entry link.
   async function completeSetup(p: Profile, pin: string) {
     const token = epoch.current;
@@ -443,12 +369,11 @@ export function SessionProvider({
     setPersonalLink(await issueEntryLink(device.uid));
     setPhase("link");
   }
+
   // Checks cover-app input for the user's private trigger phrase.
   async function searchTrigger(value: string) {
-    if (!enrollment || enrollment.cover !== cover || enrollment.role !== "USER")
-      return false;
+    if (!enrollment || enrollment.cover !== cover || enrollment.role !== "USER") return false;
     if ((await triggerHash(value)) !== enrollment.triggerHash) return false;
-    // Restore the saved link when this entry attempt has not claimed the account yet.
     if (entryOwner.current !== enrollment.uid) {
       const saved = await savedEntryLink(enrollment.uid);
       const token = saved ? new URL(saved).hash.slice(1) : "";
@@ -460,6 +385,7 @@ export function SessionProvider({
     setPhase("pin");
     return true;
   }
+
   // Verifies the link and PIN before loading private account data.
   async function unlock(pin: string) {
     const token = epoch.current;
@@ -486,14 +412,12 @@ export function SessionProvider({
     await accounts.saveRecord("triggers", event);
     if (token !== epoch.current) return;
     setProfile(loaded.profile);
-    setHistory({
-      ...loaded.history,
-      triggers: [event, ...loaded.history.triggers],
-    });
+    setHistory({ ...loaded.history, triggers: [event, ...loaded.history.triggers] });
     setPhase("safe");
     setPage("Home");
     noteInteraction();
   }
+
   // Saves a note or history entry, then refreshes the screen with the new record.
   async function record(category: Category, value: Event | Entry) {
     const token = epoch.current;
@@ -504,6 +428,7 @@ export function SessionProvider({
       [category]: [value, ...old[category].filter((e) => e.id !== value.id)],
     }));
   }
+
   // Saves account settings and tells the other signed-in devices to refresh.
   async function saveProfile(p: Profile, action = "Saved profile settings") {
     const token = epoch.current;
@@ -511,19 +436,17 @@ export function SessionProvider({
     if (token !== epoch.current) return;
     setProfile(p);
     if (enrollment)
-      setEnrollment({
-        ...enrollment,
-        cover: p.coverType,
-        triggerHash: p.triggerHash,
-      });
+      setEnrollment({ ...enrollment, cover: p.coverType, triggerHash: p.triggerHash });
     await record("settings", newEvent(action));
     setMessage("Changes saved.");
   }
+
   // Saves a private note, then reloads the list so it appears immediately.
   async function saveEntry(entry: Entry) {
     await record("private_entries", entry);
     setMessage("Entry saved.");
   }
+
   // Reloads profile, history, and notes changed by another signed-in device.
   async function refresh() {
     const token = epoch.current;
@@ -534,6 +457,7 @@ export function SessionProvider({
       setMessage("Account is up to date.");
     }
   }
+
   // Ends the web session and returns to the public cover.
   async function signOut() {
     const returnPath =
@@ -551,39 +475,15 @@ export function SessionProvider({
     setPhase("public");
     go(returnPath);
   }
+
   return (
     <SessionContext.Provider
       value={{
-        path,
-        go,
-        phase,
-        personalLink,
-        hasEntryToken: Boolean(pendingEntry.current),
-        profile,
-        history,
-        enrollment,
-        cover,
-        page,
-        setPage,
-        busy,
-        message,
-        clearMessage: () => setMessage(""),
-        perform,
-        authenticate,
-        completeSetup,
-        beginEntry,
-        quickExit,
-        searchTrigger,
-        unlock,
-        saveProfile,
-        saveEntry,
-        record,
-        refresh,
-        signOut,
-        idleSeconds,
-        noteInteraction,
-        cloudMode,
-        onboardingProfile,
+        path, go, phase, personalLink, hasEntryToken: Boolean(pendingEntry.current),
+        profile, history, enrollment, cover, page, setPage, busy, message,
+        clearMessage: () => setMessage(""), perform, authenticate, completeSetup,
+        beginEntry, quickExit, searchTrigger, unlock, saveProfile, saveEntry,
+        record, refresh, signOut, idleSeconds, noteInteraction, cloudMode, onboardingProfile,
       }}
     >
       {children}

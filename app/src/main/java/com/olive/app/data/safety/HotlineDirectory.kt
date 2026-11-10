@@ -1,43 +1,33 @@
 // Safe-app users and support staff: lists support phone numbers for users.
 package com.olive.app.data
 
-import org.json.JSONObject
-import java.net.URI
-import java.text.Normalizer
-import java.util.Locale
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Camera
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.Preview
+import android.util.Size
+import androidx.camera.core.*
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.lifecycle.awaitInstance
-import androidx.camera.video.FileOutputOptions
-import androidx.camera.video.Quality
-import androidx.camera.video.QualitySelector
-import androidx.camera.video.Recorder
-import androidx.camera.video.Recording
-import androidx.camera.video.VideoCapture
-import androidx.camera.video.VideoRecordEvent
+import androidx.camera.video.*
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.functions.FirebaseFunctions
 import java.io.File
-import android.util.Size
+import java.net.URI
+import java.text.Normalizer
+import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
-import com.google.firebase.functions.FirebaseFunctions
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
+import org.json.JSONObject
 
 
 enum class HotlineResourceKind { Hotline, Shelter }
