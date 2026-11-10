@@ -114,4 +114,8 @@
     <string name="password_excludes_username">يجب ألا تحتوي كلمة المرور على اسم المستخدم.</string>
 <string name="ocr_no_text">لم يتم التعرف على نص في المستند.</string>
     <string name="ocr_error_detail">خطأ OCR: %1$s</string>
+    <string name="notification_active_voice_calls">المكالمات الصوتية النشطة</string>
+    <string name="notification_safe_app_updates">تحديثات التطبيق الآمن</string>
+    <string name="notification_safe_app_activity">افتح Olive Branch لعرض تحديثاتك.</string>
+    <string name="notification_new_app_update">تحديث جديد للتطبيق</string>
 </resources>

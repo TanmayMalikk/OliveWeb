@@ -2,7 +2,6 @@
 package com.olive.app.data.update
 
 import android.app.Activity
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -17,6 +16,7 @@ import androidx.core.content.FileProvider
 import androidx.work.*
 import com.olive.app.BuildConfig
 import com.olive.app.R
+import com.olive.app.notification.OliveNotificationManager
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
@@ -218,9 +218,7 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
     // The notification opens a small installer screen; Android owns the final confirmation.
     private fun notifyReady(release: AppReleaseManifest) {
         val manager = applicationContext.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(
-            NotificationChannel(CHANNEL, applicationContext.getString(R.string.ui_app_updates), NotificationManager.IMPORTANCE_DEFAULT)
-        )
+        OliveNotificationManager.createNotificationChannels(applicationContext)
         val intent = Intent(applicationContext, AppUpdateInstallerActivity::class.java)
             .putExtra(AppUpdateInstallerActivity.EXTRA_RELEASE_JSON, release.toJson())
         val pending = PendingIntent.getActivity(
@@ -231,7 +229,7 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
         )
         manager.notify(
             NOTIFICATION,
-            NotificationCompat.Builder(applicationContext, CHANNEL)
+            NotificationCompat.Builder(applicationContext, OliveNotificationManager.CHANNEL_APP_UPDATES)
                 .setSmallIcon(R.drawable.ic_notification_olive)
                 .setContentTitle(applicationContext.getString(R.string.ui_a_new_update_is_available))
                 .setContentText(release.versionName)
@@ -255,7 +253,6 @@ internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
     }.toString()
 
     companion object {
-        private const val CHANNEL = "app-updates"
         private const val NOTIFICATION = 7401
     }
 }

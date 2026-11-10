@@ -1,4 +1,4 @@
-// Signed-in users: handles FCM registration and discreet account/support alerts on the device.
+// Signed-in users: handles FCM registration and account/support alerts on the device.
 package com.olive.app.notification
 
 import android.Manifest
@@ -22,8 +22,6 @@ import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import com.olive.app.OliveActivity
 import com.olive.app.R
-import com.olive.app.data.AccountRole
-import com.olive.app.data.CoverType
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.random.Random
@@ -111,11 +109,9 @@ object LocalNotificationEventHandler {
     private var conversationIndexListener: ListenerRegistration? = null
 
     // Starts FCM registration and foreground listeners for account events that create local notifications.
-    fun start(context: Context, coverType: CoverType, role: AccountRole) {
+    fun start(context: Context) {
         val currentUid = FirebaseAuth.getInstance().currentUser?.uid
         context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE).edit {
-            putString("cover_type", coverType.name)
-            putString("account_role", role.name)
             if (!currentUid.isNullOrBlank()) putString(KEY_ACTIVE_UID, currentUid)
         }
         enqueueFcmTokenSync(context.applicationContext, null)
@@ -152,7 +148,7 @@ object LocalNotificationEventHandler {
         enqueueFcmTokenSync(context.applicationContext, token)
     }
 
-    // Writes the device's FCM token to Firestore so Cloud Functions can push discreet update alerts.
+    // Writes the device's FCM token to Firestore so Cloud Functions can push update alerts.
     internal suspend fun saveFcmTokenToFirestore(context: Context, uid: String, token: String) {
         if (uid.isBlank() || token.isBlank()) return
         val devId = deviceId(context)
@@ -167,7 +163,7 @@ object LocalNotificationEventHandler {
             .await()
     }
 
-    // Evaluates whether an incoming FCM data payload should trigger a discreet safe-update notification.
+    // Evaluates whether an incoming FCM data payload should trigger a Safe App update notification.
     internal fun shouldHandleFcmNotification(
         data: Map<String, String>, currentUid: String?, previousMessageId: String? = null,
         hasNotificationPayload: Boolean = false,
@@ -185,7 +181,7 @@ object LocalNotificationEventHandler {
             messageId.isNotBlank() || data["conversationId"].orEmpty().isNotBlank() || hasNotificationPayload
     }
 
-    // Handles an incoming FCM message by deduplicating its conversation marker and scheduling a discreet alert.
+    // Handles an incoming FCM message by deduplicating its conversation marker and scheduling an alert.
     internal fun onFcmMessageReceived(
         context: Context, data: Map<String, String>, title: String? = null, body: String? = null,
     ) {
@@ -245,18 +241,6 @@ object LocalNotificationEventHandler {
     // The unlocked messaging UI has its own listeners; pause these to avoid reading the same documents twice.
     fun pauseForegroundListeners() = stopForegroundListeners()
 
-    // Reads which cover icon and title should be used for this notification.
-    internal fun currentCoverType(context: Context) = CoverType.fromStored(
-        context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
-            .getString("cover_type", null).orEmpty(),
-    )
-
-    // Reads the account role attached to this notification event.
-    internal fun currentRole(context: Context) = AccountRole.fromStored(
-        context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
-            .getString("account_role", null).orEmpty(),
-    )
-
     // Live listeners detect updates while the process runs; FCM delivers push updates in the background.
     private fun startForegroundListeners(context: Context) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
@@ -302,47 +286,34 @@ object LocalNotificationEventHandler {
 
 // Signed-in users: posts app alerts on Android.
 object OliveNotificationManager {
-    const val CHANNEL_NEWS = "olive_news_channel"
-    const val CHANNEL_FITNESS = "olive_fitness_channel"
-    const val CHANNEL_GAME = "olive_game_channel"
-    const val CHANNEL_BRANCH = "olive_branch_channel"
-    const val CHANNEL_TREE = "olive_tree_channel"
-    const val CHANNEL_CALLS = "olive_calls_channel"
+    internal const val CHANNEL_CALL_INVITES = "olive_calls_channel"
+    internal const val CHANNEL_ACTIVE_CALLS = "olive_voice_call"
+    internal const val CHANNEL_SAFE_UPDATES = "olive_safe_app_updates"
+    internal const val CHANNEL_LOCATION = "olive_admin_location_v1"
+    internal const val CHANNEL_APP_UPDATES = "app-updates"
+    private val legacyChannels = setOf(
+        "olive_news_channel", "olive_fitness_channel", "olive_game_channel",
+        "olive_branch_channel", "olive_tree_channel", "olive_live_location_v3",
+    )
     const val EXTRA_INCOMING_CALL_ID = "com.olive.app.INCOMING_CALL_ID"
     const val EXTRA_INCOMING_CALL_CALLER_ID = "com.olive.app.INCOMING_CALL_CALLER_ID"
     const val EXTRA_INCOMING_CALL_NAME = "com.olive.app.INCOMING_CALL_NAME"
 
-    // Each cover gets a matching public-facing notification category in Android settings.
     fun createNotificationChannels(context: Context) {
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannels(
             listOf(
-                NotificationChannel(
-                    CHANNEL_NEWS, context.getString(R.string.ui_daily_digest_briefings),
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply { description = context.getString(R.string.ui_daily_headlines_and_news_digest_notifications) },
-                NotificationChannel(
-                    CHANNEL_FITNESS, context.getString(R.string.fitness_updates),
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply { description = context.getString(R.string.fitness_reminder) },
-                NotificationChannel(
-                    CHANNEL_GAME, context.getString(R.string.ui_app_updates),
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply { description = context.getString(R.string.ui_general_app_activity_notifications) },
-                NotificationChannel(
-                    CHANNEL_BRANCH, context.getString(R.string.ui_olive_branch_updates),
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ),
-                NotificationChannel(
-                    CHANNEL_TREE, context.getString(R.string.ui_olive_tree_updates),
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ),
-                NotificationChannel(
-                    CHANNEL_CALLS, context.getString(R.string.ui_call_invitation_notifications),
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply { description = context.getString(R.string.ui_call_invitation_notifications) }
+                NotificationChannel(CHANNEL_CALL_INVITES, context.getString(R.string.ui_call_invitation_notifications), NotificationManager.IMPORTANCE_HIGH),
+                NotificationChannel(CHANNEL_ACTIVE_CALLS, context.getString(R.string.notification_active_voice_calls), NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CHANNEL_SAFE_UPDATES, context.getString(R.string.notification_safe_app_updates), NotificationManager.IMPORTANCE_DEFAULT),
+                NotificationChannel(CHANNEL_LOCATION, context.getString(R.string.location_notification_channel), NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CHANNEL_APP_UPDATES, context.getString(R.string.notification_new_app_update), NotificationManager.IMPORTANCE_DEFAULT),
             )
         )
+        manager.notificationChannels.filter { it.id in legacyChannels }.forEach {
+            // Android prevents deletion while an upgraded location service is using this channel.
+            runCatching { manager.deleteNotificationChannel(it.id) }
+        }
     }
 
     // Displays a high-priority incoming call notification with a 20-second timeout.
@@ -361,7 +332,7 @@ object OliveNotificationManager {
         val pendingIntent = PendingIntent.getActivity(
             context, callId.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notification = NotificationCompat.Builder(context, CHANNEL_CALLS)
+        val notification = NotificationCompat.Builder(context, CHANNEL_CALL_INVITES)
             .setSmallIcon(R.drawable.ic_notification_olive)
             .setContentTitle(context.getString(R.string.ui_incoming_call))
             .setContentText(context.getString(R.string.ui_open_olive_to_respond_to_this_call))
@@ -375,140 +346,43 @@ object OliveNotificationManager {
         NotificationManagerCompat.from(context).notify(callId.hashCode(), notification)
     }
 
-    // Builds the title and message shown in this app notification.
-    internal fun contentFor(
-        title: String?, body: String?, coverType: CoverType, text: com.olive.app.ui.shared.ResourceText
-    ) = AppNotifications.contentFor(title, body, coverType, text = text)
-
-    // Posts role- and cover-safe notification text without revealing private app activity.
-    fun showDiscreetNotification(
-        context: Context, title: String?, body: String?,
-        coverType: CoverType = CoverType.FITNESS, role: AccountRole = AccountRole.USER,
-        notificationId: Int = (System.currentTimeMillis() % 100000).toInt()
-    ) {
+    fun showSafeUpdate(context: Context) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
         ) return
         createNotificationChannels(context)
-        val content = AppNotifications.contentFor(
-            title, body, coverType, role, com.olive.app.ui.shared.ResourceText(context.resources)
-        )
         val intent = Intent(context, OliveActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notification = NotificationCompat.Builder(context, content.channelId)
-            .setSmallIcon(iconFor(coverType, role))
-            .setContentTitle(content.title)
-            .setContentText(content.body)
+        val notification = NotificationCompat.Builder(context, CHANNEL_SAFE_UPDATES)
+            .setSmallIcon(R.drawable.ic_notification_olive_branch)
+            .setContentTitle(context.getString(R.string.notification_safe_app_updates))
+            .setContentText(context.getString(R.string.notification_safe_app_activity))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(notificationId, notification) }
+        val notificationId = (System.currentTimeMillis() % 100000).toInt()
+        runCatching { NotificationManagerCompat.from(context).notify("safe-app-update", notificationId, notification) }
     }
 
-    // Chooses the notification icon that matches this event.
-    internal fun iconFor(coverType: CoverType, role: AccountRole = AccountRole.USER) = when {
-        role == AccountRole.SAFE_CONTACT -> R.drawable.ic_notification_olive
-        role == AccountRole.STAFF || role == AccountRole.ADMIN -> R.drawable.ic_notification_olive_tree
-        coverType == CoverType.NEWS -> R.drawable.ic_notification_daily_digest
-        coverType == CoverType.FITNESS -> R.drawable.ic_notification_fitness
-        coverType == CoverType.GAME -> R.drawable.ic_notification_olive
-        else -> R.drawable.ic_notification_olive
-    }
 }
 
-// Cover users: chooses notification text that does not reveal private activity.
-internal data class CoverNotificationContent(val channelId: String, val title: String, val body: String)
-
-// Select cover-specific resource IDs here; notification wording lives in Android language resources.
-object AppNotifications {
-    private val NEWS_DEFAULT_TITLE = R.string.ui_daily_digest
-    private val NEWS_DEFAULT_BODY = R.string.ui_new_headlines_are_available
-    private val FITNESS_DEFAULT_TITLE = R.string.fitness_tracker
-    private val FITNESS_DEFAULT_BODY = R.string.fitness_reminder
-    private val GAME_DEFAULT_TITLE = R.string.app_name
-    private val GAME_DEFAULT_BODY = R.string.ui_a_new_update_is_available
-    private val BRANCH_DEFAULT_TITLE = R.string.olive_branch
-    private val BRANCH_DEFAULT_BODY = R.string.ui_a_new_update_is_available
-    private val TREE_DEFAULT_TITLE = R.string.olive_tree
-    private val TREE_DEFAULT_BODY = R.string.ui_an_account_update_is_available
-
-    private val NEWS_SAFE_UPDATES = listOf(
-        R.string.ui_new_headlines_are_available,
-        R.string.ui_your_latest_digest_is_ready,
-        R.string.ui_there_are_new_stories_to_browse,
-    )
-    private val FITNESS_SAFE_UPDATES = listOf(R.string.fitness_reminder)
-    private val GAME_SAFE_UPDATES = listOf(
-        R.string.ui_a_new_update_is_available,
-        R.string.ui_open_the_app_to_see_what_s_new,
-        R.string.ui_new_activity_is_waiting,
-    )
-
-    // Chooses a harmless update message that matches the active cover and posts it locally.
-    fun showRandomSafeUpdate(
-        context: Context, coverType: CoverType, role: AccountRole = AccountRole.USER,
-        random: Random = Random.Default
-    ) {
-        val choices = when (coverType) {
-            CoverType.NEWS -> NEWS_SAFE_UPDATES
-            CoverType.FITNESS -> FITNESS_SAFE_UPDATES
-            CoverType.GAME -> GAME_SAFE_UPDATES
-        }
-        val bodyId = when (role) {
-            AccountRole.SAFE_CONTACT -> BRANCH_DEFAULT_BODY
-            AccountRole.STAFF, AccountRole.ADMIN -> TREE_DEFAULT_BODY
-            AccountRole.USER -> choices[random.nextInt(choices.size)]
-        }
-        OliveNotificationManager.showDiscreetNotification(context, "", context.getString(bodyId), coverType, role)
-    }
-
-    // Builds the title and message shown in this app notification.
-    internal fun contentFor(
-        title: String?, body: String?, coverType: CoverType,
-        role: AccountRole = AccountRole.USER, text: com.olive.app.ui.shared.ResourceText
-    ) = when {
-        role == AccountRole.SAFE_CONTACT -> CoverNotificationContent(
-            OliveNotificationManager.CHANNEL_BRANCH, title.orDefault(text(BRANCH_DEFAULT_TITLE)), body.orDefault(text(BRANCH_DEFAULT_BODY)),
-        )
-        role == AccountRole.STAFF || role == AccountRole.ADMIN -> CoverNotificationContent(
-            OliveNotificationManager.CHANNEL_TREE, title.orDefault(text(TREE_DEFAULT_TITLE)), body.orDefault(text(TREE_DEFAULT_BODY)),
-        )
-        coverType == CoverType.NEWS -> CoverNotificationContent(
-            OliveNotificationManager.CHANNEL_NEWS, title.orDefault(text(NEWS_DEFAULT_TITLE)), body.orDefault(text(NEWS_DEFAULT_BODY)),
-        )
-        coverType == CoverType.FITNESS -> CoverNotificationContent(
-            OliveNotificationManager.CHANNEL_FITNESS, title.orDefault(text(FITNESS_DEFAULT_TITLE)), body.orDefault(text(FITNESS_DEFAULT_BODY)),
-        )
-        else -> CoverNotificationContent(
-            OliveNotificationManager.CHANNEL_GAME, title.orDefault(text(GAME_DEFAULT_TITLE)), body.orDefault(text(GAME_DEFAULT_BODY)),
-        )
-    }
-
-    // Reads a notification field and uses its safe default when it is missing.
-    private fun String?.orDefault(fallback: String) = takeUnless { it.isNullOrBlank() } ?: fallback
-}
-
-// Safe updates wait a random amount of time, then appear as a normal notification from the chosen cover.
+// Coalesces Safe App activity into a notification.
 class SafeUpdateNotificationWorker(context: Context, parameters: WorkerParameters) :
     Worker(context, parameters) {
     override fun doWork(): Result {
         if (FirebaseAuth.getInstance().currentUser == null) return Result.success()
-        AppNotifications.showRandomSafeUpdate(
-            applicationContext,
-            LocalNotificationEventHandler.currentCoverType(applicationContext),
-            LocalNotificationEventHandler.currentRole(applicationContext),
-        )
+        OliveNotificationManager.showSafeUpdate(applicationContext)
         return Result.success()
     }
 }
 
-// Schedules discreet cover-themed notifications with a random delay to prevent bursts.
+// Schedules Safe App notifications with a random delay to prevent bursts.
 object SafeUpdateNotificationScheduler {
     private const val WORK_NAME = "olive_pending_safe_update_notification"
     internal const val MIN_DELAY_SECONDS = 5L

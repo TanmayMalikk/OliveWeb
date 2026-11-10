@@ -114,4 +114,8 @@
     <string name="password_excludes_username">Le mot de passe ne doit pas contenir votre nom d’utilisateur.</string>
 <string name="ocr_no_text">Aucun texte reconnu dans le document.</string>
     <string name="ocr_error_detail">Erreur OCR : %1$s</string>
+    <string name="notification_active_voice_calls">Appels vocaux en cours</string>
+    <string name="notification_safe_app_updates">Mises à jour de l’espace sécurisé</string>
+    <string name="notification_safe_app_activity">Ouvrez Olive Branch pour consulter vos mises à jour.</string>
+    <string name="notification_new_app_update">Nouvelle mise à jour de l’application</string>
 </resources>

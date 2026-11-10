@@ -25,9 +25,9 @@
     <string name="share_saved_location">مشاركة الموقع المحفوظ</string>
     <string name="share_saved_location_help">شارك الموقع المحفوظ عند إنشاء الحساب مع أصدقائك المقبولين. لا يتم تتبع جهازك باستمرار.</string>
     <string name="location_saved_address_unavailable">تعذر وضع الموقع المحفوظ على الخريطة. اختر اقتراح عنوان في إعدادات الحساب وحاول مرة أخرى.</string>
-<string name="location_notification_channel">تحديثات التطبيق</string>
-    <string name="location_notification_title">جارٍ تحديث التطبيق…</string>
-    <string name="location_notification_text">يتم إبقاء التطبيق محدثًا.</string>
+<string name="location_notification_channel">خدمات الموقع</string>
+    <string name="location_notification_title">الموقع نشط</string>
+    <string name="location_notification_text">تتم مشاركة موقعك مع المسؤولين في الخلفية.</string>
     <string name="location_choose_duration">ما المدة التي تريد مشاركة موقعك خلالها؟</string>
     <string name="location_one_hour">ساعة واحدة</string>
     <plurals name="location_hours">
@@ -43,4 +43,5 @@
     <string name="location_share_for_custom">مشاركة</string>
     <string name="location_sharing_until">تتم المشاركة حتى %1$s</string>
     <string name="location_ten_seconds_testing">10 ثوانٍ (للاختبار)</string>
+    <string name="location_notification_sharing_text">مشاركة موقعك المباشر نشطة.</string>
 </resources>
