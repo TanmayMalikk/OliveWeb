@@ -84,6 +84,8 @@ test('malformed server sync markers are unreadable even by their path owner', as
     negative:{...base, safetyRevision:-1},
     wrongType:{...base, mediaRevision:'1'},
     fractional:{...base, conversationRevision:1.5},
+    domainAheadOfGlobal:{...base, revision:1, accountRevision:2},
+    urgentAheadOfGlobal:{...base, revision:1, urgentRevision:2},
     wrongTimestamp:{...base, updatedAt:Date.now()},
   };
   await env.withSecurityRulesDisabled(async context => {
@@ -100,6 +102,57 @@ test('malformed server sync markers are unreadable even by their path owner', as
     });
     await assertFails(getDoc(doc(alice,'syncInvalidations/sync-shape-alice')));
   }
+});
+
+test('account sync revisions are owner-only, exact, and monotonic', async () => {
+  const alice = env.authenticatedContext('account-sync-alice').firestore();
+  const bob = env.authenticatedContext('account-sync-bob').firestore();
+  const newAccount = env.authenticatedContext('account-sync-new').firestore();
+  const anonymous = env.unauthenticatedContext().firestore();
+  const target = doc(alice,'accountSync/account-sync-alice');
+
+  await assertSucceeds(setDoc(target,{revision:1,updatedAt:serverTimestamp()}));
+  await assertSucceeds(getDoc(target));
+  await assertFails(getDoc(doc(bob,'accountSync/account-sync-alice')));
+  await assertFails(getDoc(doc(anonymous,'accountSync/account-sync-alice')));
+  await assertFails(getDocs(collection(alice,'accountSync')));
+  await assertSucceeds(setDoc(target,{revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(target,{revision:1,updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(target,{revision:4,updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(target,{revision:'3',updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(target,{revision:3,updatedAt:serverTimestamp(),extra:true}));
+  await assertFails(setDoc(doc(newAccount,'accountSync/account-sync-new'),{revision:2,updatedAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(bob,'accountSync/account-sync-alice'),{revision:3,updatedAt:serverTimestamp()}));
+  await assertFails(deleteDoc(target));
+});
+
+test('safety plan reads require valid path identity and bounded access fields', async () => {
+  const ownerUid='rules-plan-owner';
+  const owner=env.authenticatedContext(ownerUid,{role:'USER'}).firestore();
+  const contact=env.authenticatedContext('rules-plan-contact',{role:'SAFE_CONTACT'}).firestore();
+  const staff=env.authenticatedContext('rules-plan-staff',{role:'STAFF'}).firestore();
+  const admin=env.authenticatedContext('rules-plan-admin',{role:'ADMIN'}).firestore();
+  const stranger=env.authenticatedContext('rules-plan-stranger',{role:'SAFE_CONTACT'}).firestore();
+  const valid={ownerUid,ownerName:'Owner',staffUid:'rules-plan-staff',staffName:'Staff',
+    adminUid:'',adminName:'',consultationRequested:true,safeContactUids:['rules-plan-contact'],
+    safeContactNames:{'rules-plan-contact':'Contact'},supportSafeContactUid:'',fields:{},updatedAt:1};
+  await env.withSecurityRulesDisabled(async context => {
+    const firestore=context.firestore();
+    await setDoc(doc(firestore,`safetyPlans/${ownerUid}`),valid);
+    await setDoc(doc(firestore,'safetyPlans/path-mismatch'),{...valid,ownerUid:'another-owner'});
+    await setDoc(doc(firestore,'safetyPlans/bad-contact-type'),{...valid,ownerUid:'bad-contact-type',safeContactUids:[7]});
+    await setDoc(doc(firestore,'safetyPlans/too-many-contacts'),{...valid,ownerUid:'too-many-contacts',
+      safeContactUids:Array.from({length:11},(_,index)=>`contact-${index}`)});
+  });
+
+  await assertSucceeds(getDoc(doc(owner,`safetyPlans/${ownerUid}`)));
+  await assertSucceeds(getDoc(doc(contact,`safetyPlans/${ownerUid}`)));
+  await assertSucceeds(getDoc(doc(staff,`safetyPlans/${ownerUid}`)));
+  await assertSucceeds(getDoc(doc(admin,`safetyPlans/${ownerUid}`)));
+  await assertFails(getDoc(doc(stranger,`safetyPlans/${ownerUid}`)));
+  await assertFails(getDoc(doc(admin,'safetyPlans/path-mismatch')));
+  await assertFails(getDoc(doc(admin,'safetyPlans/bad-contact-type')));
+  await assertFails(getDoc(doc(admin,'safetyPlans/too-many-contacts')));
 });
 
 
