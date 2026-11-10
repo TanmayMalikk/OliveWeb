@@ -48,7 +48,6 @@ enum class VoipParticipantStatus {
     ACCEPTED,
     DECLINED
 }
-
 enum class VoipCallStatus { ACTIVE, ENDED, DECLINED, MISSED }
 
 data class VoipParticipant(
@@ -497,39 +496,6 @@ class VoipPushTokenRegistrationWorker(
         } catch (error: IllegalArgumentException) {
             Log.e(VoipPushTokenRegistration.TAG, "VoIP API configuration is invalid; token remains stored locally", error)
             Result.failure()
-        }
-    }
-}
-
-class VoipFirebaseMessagingService : com.google.firebase.messaging.FirebaseMessagingService() {
-    override fun onRegistered(installationId: String) {
-        super.onRegistered(installationId)
-        try {
-            VoipPushTokenRegistration.onTokenRefreshed(this, installationId)
-        } catch (error: Exception) {
-            Log.e(VoipPushTokenRegistration.TAG, "Could not persist the Firebase messaging registration", error)
-        }
-    }
-
-    override fun onMessageReceived(message: RemoteMessage) {
-        val data = message.data
-        if (data["type"] != "call_invitation") return
-
-        val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val recipientId = data["recipientId"] ?: return
-        val callId = data["callId"] ?: return
-        val callerId = data["callerId"] ?: return
-        if (recipientId != currentUid || callId.isBlank() || callerId.isBlank()) return
-
-        try {
-            OliveNotificationManager.showIncomingCall(
-                this,
-                callId,
-                callerId,
-                data["callName"].orEmpty()
-            )
-        } catch (error: Exception) {
-            Log.e(VoipPushTokenRegistration.TAG, "Could not show the incoming call notification", error)
         }
     }
 }
