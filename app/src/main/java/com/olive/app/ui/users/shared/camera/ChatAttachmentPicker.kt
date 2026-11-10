@@ -1,14 +1,17 @@
 // All safe-app roles: lets chat participants choose a photo, video, or document.
 package com.olive.app.ui.users.shared.camera
 
-import com.olive.app.ui.users.shared.navigation.*
-import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
-import com.olive.app.ui.users.user.location.ShareDurationDialog
+import android.app.Application
+import android.graphics.*
+import android.graphics.pdf.PdfDocument
+import android.media.ExifInterface
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
@@ -18,44 +21,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.PrivateEntryKind
-import androidx.compose.ui.res.stringResource
-import com.olive.app.R
-import android.app.Application
-import androidx.camera.view.PreviewView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
+import com.olive.app.R
 import com.olive.app.data.CameraManager
+import com.olive.app.data.PrivateEntryKind
 import com.olive.app.ocr.OcrResult
 import com.olive.app.ocr.PaddleOcrManager
+import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
+import com.olive.app.ui.users.user.location.ShareDurationDialog
 import java.io.File
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Color
-import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.RectF
-import android.graphics.pdf.PdfDocument
-import android.media.ExifInterface
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
+import java.util.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 
 private enum class AttachmentCategory { Notes, Incidents, Media, SafetyPlan, Location }
@@ -137,9 +127,7 @@ internal fun AttachmentPicker(
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.incident_reports)) },
                     leadingContent = { Icon(Icons.Outlined.Warning, null) },
-                    modifier = Modifier.clickable {
-                        selectedCategory = AttachmentCategory.Incidents
-                    }
+                    modifier = Modifier.clickable { selectedCategory = AttachmentCategory.Incidents }
                 )
                 ListItem(
                     headlineContent = { Text(stringResource(R.string.saved_media)) },
@@ -151,10 +139,7 @@ internal fun AttachmentPicker(
                     headlineContent = { Text(stringResource(R.string.shared_safety_plan)) },
                     supportingContent = { Text(stringResource(R.string.share_safety_plan_support_chat)) },
                     leadingContent = { Icon(Icons.Outlined.HealthAndSafety, null) },
-                    modifier = Modifier.clickable {
-                        session.messages.shareSafetyPlanInChat()
-                        onDismiss()
-                    },
+                    modifier = Modifier.clickable { session.messages.shareSafetyPlanInChat(); onDismiss() },
                 )
                 if (session.accountRole == com.olive.app.data.AccountRole.USER) ListItem(
                     headlineContent = { Text(stringResource(R.string.start_sharing_location)) },
@@ -162,65 +147,42 @@ internal fun AttachmentPicker(
                     leadingContent = { Icon(Icons.Outlined.LocationOn, null) },
                     modifier = Modifier.clickable { locationDuration = true }
                 )
-            }
-            // STEP 2: Show Specific Items based on the selection
-            else {
+            } else {
                 LazyColumn {
                     // Opens the selected photo, video, document, or camera source.
                     when (selectedCategory) {
                         AttachmentCategory.Notes -> {
-                            val notes =
-                                session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Note }
+                            val notes = session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Note }
                             if (notes.isEmpty()) item {
-                                Text(
-                                    stringResource(R.string.no_private_notes_found),
-                                    Modifier.padding(16.dp)
-                                )
+                                Text(stringResource(R.string.no_private_notes_found), Modifier.padding(16.dp))
                             }
                             items(notes) { note ->
                                 ListItem(
                                     headlineContent = { Text(note.title.ifBlank { stringResource(R.string.untitled_note) }) },
-                                    modifier = Modifier.clickable {
-                                        session.messages.sharePrivateEntryInChat(note)
-                                        onDismiss()
-                                    }
+                                    modifier = Modifier.clickable { session.messages.sharePrivateEntryInChat(note); onDismiss() }
                                 )
                             }
                         }
 
                         AttachmentCategory.Incidents -> {
-                            val incidents =
-                                session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Incident }
-                            // Tell the user when there are no incident reports to attach.
+                            val incidents = session.privateEntries.filter { it.deletedAt == null && it.kind == PrivateEntryKind.Incident }
                             if (incidents.isEmpty()) item {
-                                Text(
-                                    stringResource(R.string.no_incident_reports_found),
-                                    Modifier.padding(16.dp)
-                                )
+                                Text(stringResource(R.string.no_incident_reports_found), Modifier.padding(16.dp))
                             }
                             items(incidents) { incident ->
                                 ListItem(
                                     headlineContent = { Text(incident.title) },
-                                    modifier = Modifier.clickable {
-                                        session.messages.sharePrivateEntryInChat(incident)
-                                        onDismiss()
-                                    }
+                                    modifier = Modifier.clickable { session.messages.sharePrivateEntryInChat(incident); onDismiss() }
                                 )
                             }
                         }
 
                         AttachmentCategory.Media -> {
                             val media = documentState.files.filter { it.ownerUid == uid }
-                            // Show progress while encrypted documents are loading.
                             if (documentState.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                             if (documentState.error != null) item {
-                                Text(
-                                    stringResource(R.string.documents_load_failed),
-                                    Modifier.padding(16.dp),
-                                    color = MaterialTheme.colorScheme.error
-                                )
+                                Text(stringResource(R.string.documents_load_failed), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
                             }
-                            // Show document choices after loading succeeds and at least one file exists.
                             if (!documentState.loading && documentState.error == null && media.isEmpty()) item {
                                 Text(
                                     stringResource(if (session.localMode) R.string.documents_account_required else R.string.documents_empty),
@@ -240,34 +202,26 @@ internal fun AttachmentPicker(
                                             }, null
                                         )
                                     },
-                                    modifier = Modifier.clickable {
-                                        session.messages.shareSafetyDocumentInChat(document)
-                                        onDismiss()
-                                    }
+                                    modifier = Modifier.clickable { session.messages.shareSafetyDocumentInChat(document); onDismiss() }
                                 )
                             }
                         }
 
-                        AttachmentCategory.Location -> Unit
-                        AttachmentCategory.SafetyPlan -> Unit
-                        null -> {}
+                        AttachmentCategory.Location, AttachmentCategory.SafetyPlan, null -> Unit
                     }
                 }
             }
         }
     }
     // Show duration choices only when the user is sharing live location.
-    if (locationDuration) ShareDurationDialog(onDismiss = {
-        locationDuration = false
-    }) { duration ->
+    if (locationDuration) ShareDurationDialog(onDismiss = { locationDuration = false }) { duration ->
         locationDuration = false
         session.shareLiveLocationInChat(duration, requestLocationPermission)
         onDismiss()
     }
 }
 
-// All safe-app roles: holds camera view state.
-
+// Holds camera view state across photo, video, and document capture modes.
 internal class CameraViewModel(application: Application) : AndroidViewModel(application) {
     private val camera = CameraManager(application)
     private val ocr = PaddleOcrManager(application)
@@ -290,16 +244,8 @@ internal class CameraViewModel(application: Application) : AndroidViewModel(appl
     fun bind(owner: LifecycleOwner, preview: PreviewView) {
         viewModelScope.launch {
             _ready.value = false
-            runCatching {
-                camera.bindCamera(
-                    owner,
-                    preview,
-                    _frontFacing.value
-                )
-            }.onSuccess {
-                _zoomRatio.value = 1f
-                _ready.value = true
-            }
+            runCatching { camera.bindCamera(owner, preview, _frontFacing.value) }
+                .onSuccess { _zoomRatio.value = 1f; _ready.value = true }
                 .onFailure { _error.value = it.localizedMessage ?: "Camera unavailable" }
         }
     }
@@ -548,4 +494,43 @@ internal fun builtInCameraFileName(
         this.timeZone = timeZone
     }
     return "${type.prefix}${formatter.format(Date(timestampMillis))}.${type.extension}"
+}
+
+// Draws the shutter button and gives TalkBack its action label.
+@Composable
+internal fun CameraShutter(
+    mode: CameraMode,
+    recording: Boolean,
+    busy: Boolean,
+    ready: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    FilledIconButton(
+        onClick = onClick,
+        enabled = ready && (!busy || recording),
+        modifier = modifier.size(84.dp).testTag("camera_shutter"),
+        shape = CircleShape,
+        colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = if (recording) ComposeColor.Red else ComposeColor.White
+        )
+    ) {
+        Icon(
+            when (mode) {
+                CameraMode.Photo -> Icons.Outlined.PhotoCamera
+                CameraMode.Video -> Icons.Outlined.Videocam
+                CameraMode.Document -> Icons.Outlined.Description
+            },
+            stringResource(
+                when {
+                    recording -> R.string.camera_stop_recording
+                    mode == CameraMode.Photo -> R.string.camera_take_photo
+                    mode == CameraMode.Document -> R.string.camera_scan_document
+                    else -> R.string.camera_start_recording
+                }
+            ),
+            tint = if (recording) ComposeColor.White else ComposeColor.Black,
+            modifier = Modifier.size(38.dp)
+        )
+    }
 }

@@ -1,53 +1,36 @@
 // All safe-app roles: draws editable safety-plan fields.
 package com.olive.app.ui.users.shared.safetyplan
 
-import com.olive.app.ui.shared.*
-import com.olive.app.ui.users.shared.navigation.*
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Attachment
-import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
-import com.olive.app.data.SafetyChecklistItem
-import com.olive.app.data.writeSafetyChecklist
 import com.olive.app.R
+import com.olive.app.data.*
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
-import android.content.Context
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.LinkOff
-import com.olive.app.data.Friend
-
-
 
 // Sections share one continuous note surface. Each heading and checkbox remains separately navigable with TalkBack.
 @Composable
 internal fun SafetyChecklistSection(
-    plan: SafetyPlan,
-    fieldKey: String,
-    onEdit: (String, String) -> Unit,
-    onResolve: (String, Boolean) -> Unit,
-    contacts: List<SafeContact> = emptyList(),
-    contactsEditable: Boolean = false,
-    onContactsChange: ((List<SafeContact>) -> Unit)? = null,
-    editable: Boolean = true,
-    attachmentsEditable: Boolean = editable,
-    onUploadDocument: ((String) -> Unit)? = null,
-    documents: List<SafetyDocument> = emptyList(),
+    plan: SafetyPlan, fieldKey: String, onEdit: (String, String) -> Unit,
+    onResolve: (String, Boolean) -> Unit, contacts: List<SafeContact> = emptyList(),
+    contactsEditable: Boolean = false, onContactsChange: ((List<SafeContact>) -> Unit)? = null,
+    editable: Boolean = true, attachmentsEditable: Boolean = editable,
+    onUploadDocument: ((String) -> Unit)? = null, documents: List<SafetyDocument> = emptyList(),
     onOpenDocument: ((SafetyDocument) -> Unit)? = null,
 ) {
     val field = plan.fields[fieldKey] ?: return

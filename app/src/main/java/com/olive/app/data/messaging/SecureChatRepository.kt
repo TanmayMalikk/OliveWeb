@@ -546,22 +546,3 @@ internal fun supportTicketNumber(conversationId: String): String {
 internal const val SUPPORT_TAG_PLAN_CONSULT = "PLAN_CONSULT"
 internal const val SUPPORT_TAG_SUPPORT = "SUPPORT"
 internal const val SUPPORT_TAG_NEEDS_ADMIN = "NEEDS_ADMIN"
-
-data class ChatMessage(
-    val id: String,
-    val senderUid: String,
-    val senderUsername: String,
-    val body: String,
-    val sentAt: Long,
-    val unsent: Boolean = false,
-    val deliveryStatus: MessageDeliveryStatus = MessageDeliveryStatus.SENT,
-    val deliveryFailureCode: String? = null,
-)
-
-// Messaging: Represents a live chat listener. It gives each screen one operation for stopping that listener safely.
-fun interface ChatSubscription {
-    // Removes the Firebase listener that was delivering live chat updates.
-    fun close()
-}
-
-// Firestore handles friend state and live DMs while message bodies stay out of its on-device disk cache.

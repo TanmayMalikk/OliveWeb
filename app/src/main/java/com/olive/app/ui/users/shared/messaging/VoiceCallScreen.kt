@@ -1,82 +1,44 @@
+// Voice calls and private contact note dialogs for safe-app messaging.
 package com.olive.app.ui.users.shared.messaging
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.CallEnd
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.MicOff
-import androidx.compose.material.icons.outlined.Headphones
-import androidx.compose.material.icons.outlined.Group
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
+import com.olive.app.data.DirectoryUser
 import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.otherPartyName
-import kotlinx.coroutines.delay
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import kotlin.math.roundToInt
-
-private val CallBackground = Color(0xFF172219)
-private val CallControlBackground = Color(0xFF2B382D)
-private val CallGreen = Color(0xFF789C68)
-private val CallRed = Color(0xFFD4423C)
+import kotlinx.coroutines.delay
 
 internal fun formatCallDuration(totalSeconds: Long): String {
     val hours = totalSeconds / 3600
@@ -441,4 +403,68 @@ private fun CallAction(
         Spacer(Modifier.height(8.dp))
         Text(label, color = Color.White, style = MaterialTheme.typography.labelLarge)
     }
+}
+
+// Shows the private note dialog for a selected contact.
+@Composable
+internal fun PrivateContactNoteDialog(
+    session: SessionViewModel,
+    targets: List<DirectoryUser>,
+    onDismiss: () -> Unit,
+) {
+    var selected by remember(targets) { mutableStateOf(targets.singleOrNull()) }
+    var addition by remember(selected?.uid) { mutableStateOf("") }
+    val target = selected
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.private_contact_note)) },
+        text = {
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(stringResource(R.string.private_contact_note_explanation), color = Muted)
+                if (target == null) {
+                    Text(stringResource(R.string.choose_person), style = MaterialTheme.typography.titleMedium)
+                    targets.forEach { person ->
+                        OutlinedButton(
+                            onClick = { selected = person },
+                            modifier = Modifier.fillMaxWidth().testTag("private_note_person_${person.uid}"),
+                        ) { Text(person.username) }
+                    }
+                } else {
+                    Text(target.username, style = MaterialTheme.typography.titleMedium)
+                    session.messages.privateContactNotes[target.uid]?.body?.let { existing ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = MaterialTheme.shapes.medium,
+                        ) {
+                            Text(existing, Modifier.fillMaxWidth().padding(12.dp))
+                        }
+                    }
+                    OutlinedTextField(
+                        value = addition,
+                        onValueChange = { addition = it.take(2_000) },
+                        label = { Text(stringResource(R.string.add_to_private_note)) },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth().testTag("private_contact_note_text"),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            if (target != null) Button(
+                onClick = { session.messages.appendPrivateContactNote(target, addition, onDismiss) },
+                enabled = addition.isNotBlank() && !session.messages.busy,
+                modifier = Modifier.testTag("save_private_contact_note"),
+            ) { Text(stringResource(R.string.append_note)) }
+        },
+        dismissButton = {
+            TextButton(onClick = if (target != null && targets.size > 1) {
+                { selected = null }
+            } else onDismiss) {
+                Text(stringResource(if (target != null && targets.size > 1) R.string.back else R.string.cancel))
+            }
+        },
+    )
 }

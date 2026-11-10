@@ -1,35 +1,29 @@
 // Signed-in users: handles account and support alerts on the device.
 package com.olive.app.notification
 
-import android.content.Context
-import androidx.core.content.edit
-import androidx.work.Constraints
-import androidx.work.CoroutineWorker
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.WorkerParameters
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
-import com.olive.app.data.AccountRole
-import com.olive.app.data.CoverType
-import kotlinx.coroutines.tasks.await
-import java.util.concurrent.TimeUnit
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.work.*
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.olive.app.OliveActivity
 import com.olive.app.R
+import com.olive.app.data.AccountRole
+import com.olive.app.data.CoverType
+import java.util.concurrent.TimeUnit
 import kotlin.random.Random
+import kotlinx.coroutines.tasks.await
 
 
 // The phone checks conversation markers itself, so sending notifications needs no Cloud Function.
@@ -486,4 +480,44 @@ object AppNotifications {
 
     // Reads a notification field and uses its safe default when it is missing.
     private fun String?.orDefault(fallback: String) = takeUnless { it.isNullOrBlank() } ?: fallback
+}
+
+// Safe updates wait a random amount of time, then appear as a normal notification from the chosen cover.
+class SafeUpdateNotificationWorker(context: Context, parameters: WorkerParameters) :
+    Worker(context, parameters) {
+    // Checks for a safe update in the background and posts a local notification when needed.
+    override fun doWork(): Result {
+        if (FirebaseAuth.getInstance().currentUser == null) return Result.success()
+        AppNotifications.showRandomSafeUpdate(
+            applicationContext,
+            LocalNotificationEventHandler.currentCoverType(applicationContext),
+            LocalNotificationEventHandler.currentRole(applicationContext),
+        )
+        return Result.success()
+    }
+}
+
+// Schedules discreet cover-themed notifications with a random delay to prevent bursts.
+object SafeUpdateNotificationScheduler {
+    private const val WORK_NAME = "olive_pending_safe_update_notification"
+    internal const val MIN_DELAY_SECONDS = 5L
+    internal const val MAX_DELAY_SECONDS = 10L
+
+    // Schedules the background task for safe update notification worker.
+    fun schedule(context: Context) {
+        val request = OneTimeWorkRequestBuilder<SafeUpdateNotificationWorker>()
+            .setInitialDelay(randomDelaySeconds(), TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+    }
+
+    // Cancels the active background notification timer.
+    fun cancel(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+    }
+
+    // Spreads background checks across a small random delay to avoid bursts.
+    internal fun randomDelaySeconds(random: Random = Random.Default): Long =
+        random.nextLong(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS + 1)
 }

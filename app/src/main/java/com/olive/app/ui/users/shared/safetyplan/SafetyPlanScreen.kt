@@ -140,49 +140,36 @@ internal fun SafetyPlanScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    SafetyBackButton(onClick = {
-                        leaveEditor()
-                        onBack()
-                    }, tag = "safety_back")
+                    SafetyBackButton(onClick = { leaveEditor(); onBack() }, tag = "safety_back")
                     Text(
                         stringResource(R.string.support_safety_plan),
                         style = MaterialTheme.typography.headlineSmall,
-                        modifier = Modifier.weight(1f).semantics { heading() })
+                        modifier = Modifier.weight(1f).semantics { heading() }
+                    )
                     if (!organizationEditor && !safeContact) IconButton(
                         onClick = {
                             leaveEditor()
                             scope.launch {
-                                val consultationIndex =
-                                    1 + SAFETY_CHECKLIST_SECTIONS.size + (if (older.isNotEmpty()) 1 else 0) + (if (olderOpen) older.size else 0)
-                                state.animateScrollToItem(consultationIndex)
+                                val index = 1 + SAFETY_CHECKLIST_SECTIONS.size +
+                                    (if (older.isNotEmpty()) 1 else 0) + (if (olderOpen) older.size else 0)
+                                state.animateScrollToItem(index)
                             }
                         },
                         enabled = plan != null,
                         modifier = Modifier.testTag("safety_jump_consultation")
-                    ) {
-                        Icon(Icons.Outlined.SupportAgent, stringResource(R.string.safety_consult))
-                    }
+                    ) { Icon(Icons.Outlined.SupportAgent, stringResource(R.string.safety_consult)) }
                 }
-                if (organizationEditor || safeContact) Text(
-                    displayOwnerName,
-                    style = MaterialTheme.typography.labelLarge
-                )
+                if (organizationEditor || safeContact) Text(displayOwnerName, style = MaterialTheme.typography.labelLarge)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(
                         selected = !backup,
-                        onClick = {
-                            leaveEditor()
-                            backup = false
-                        },
+                        onClick = { leaveEditor(); backup = false },
                         label = { Text(stringResource(R.string.safety_primary)) },
                         modifier = Modifier.weight(1f).testTag("safety_primary")
                     )
                     FilterChip(
                         selected = backup,
-                        onClick = {
-                            leaveEditor()
-                            backup = true
-                        },
+                        onClick = { leaveEditor(); backup = true },
                         label = { Text(stringResource(R.string.safety_backup)) },
                         modifier = Modifier.weight(1f).testTag("safety_backup")
                     )
@@ -192,9 +179,7 @@ internal fun SafetyPlanScreen(
                         onClick = onCompleteConsultation,
                         enabled = controller.saving == 0 && session.staffSupport.saving == 0,
                         modifier = Modifier.fillMaxWidth().testTag("complete_safety_consultation"),
-                    ) {
-                        Text(stringResource(R.string.safety_mark_consultation_complete))
-                    }
+                    ) { Text(stringResource(R.string.safety_mark_consultation_complete)) }
                 }
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -207,14 +192,8 @@ internal fun SafetyPlanScreen(
                             else -> safetySectionLabel(section)
                         }
                         OutlinedButton(
-                            onClick = {
-                                leaveEditor()
-                                scope.launch {
-                                    state.animateScrollToItem(
-                                        index + 1
-                                    )
-                                }
-                            }, enabled = plan != null,
+                            onClick = { leaveEditor(); scope.launch { state.animateScrollToItem(index + 1) } },
+                            enabled = plan != null,
                             modifier = Modifier.testTag("safety_jump_$section")
                         ) { Text(stringResource(label)) }
                     }
@@ -528,49 +507,30 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
         }
         if (message != null) Text(
             message, style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.testTag("safety_sharing_status")
-                .semantics { liveRegion = LiveRegionMode.Polite })
+            modifier = Modifier.testTag("safety_sharing_status").semantics { liveRegion = LiveRegionMode.Polite })
         if (plan.shareAction != "request" && !plan.consultationRequested) {
             OutlinedButton(
-                onClick = { controller.consult() },
-                enabled = !plan.hasConflicts && controller.saving == 0,
+                onClick = { controller.consult() }, enabled = !plan.hasConflicts && controller.saving == 0,
                 modifier = Modifier.testTag("safety_request_consultation")
-            ) {
-                Text(stringResource(R.string.safety_request))
-            }
+            ) { Text(stringResource(R.string.safety_request)) }
         } else OutlinedButton(
-            onClick = { controller.consult(stop = true) },
-            enabled = plan.shareAction != "stop" && controller.saving == 0,
+            onClick = { controller.consult(stop = true) }, enabled = plan.shareAction != "stop" && controller.saving == 0,
             modifier = Modifier.testTag("safety_stop_sharing")
-        ) {
-            Text(stringResource(R.string.safety_stop))
-        }
+        ) { Text(stringResource(R.string.safety_stop)) }
         // Show sharing choices only when the plan is not already shared with staff or a safe contact.
         if (plan.staffUid.isNotBlank() && plan.safeContactUids.isNotEmpty()) {
-            Text(
-                stringResource(R.string.support_chat_contact),
-                style = MaterialTheme.typography.titleSmall,
-            )
+            Text(stringResource(R.string.support_chat_contact), style = MaterialTheme.typography.titleSmall)
             plan.safeContactUids.forEach { uid ->
                 val selected = plan.supportSafeContactUid == uid
                 FilterChip(
-                    selected = selected,
-                    onClick = { controller.setSupportContact(if (selected) "" else uid) },
+                    selected = selected, onClick = { controller.setSupportContact(if (selected) "" else uid) },
                     label = { Text(plan.safeContactNames[uid] ?: stringResource(R.string.safe_contact)) },
                     enabled = controller.saving == 0,
                 )
             }
-            Text(
-                stringResource(R.string.support_chat_contact_help),
-                style = MaterialTheme.typography.bodySmall,
-                color = Muted,
-            )
+            Text(stringResource(R.string.support_chat_contact_help), style = MaterialTheme.typography.bodySmall, color = Muted)
         }
-        Text(
-            stringResource(R.string.safety_consult_description),
-            style = MaterialTheme.typography.bodySmall,
-            color = Muted
-        )
+        Text(stringResource(R.string.safety_consult_description), style = MaterialTheme.typography.bodySmall, color = Muted)
     }
 }
 

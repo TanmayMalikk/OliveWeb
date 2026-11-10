@@ -339,7 +339,7 @@ internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) 
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().testTag("safe_contact_identity"),
         shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFF0F4EC),
+        color = CardSoftMint,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, OliveGreen.copy(alpha = .18f))
     ) {
@@ -395,7 +395,7 @@ internal fun SafeContactActionCard(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().heightIn(min = 104.dp).testTag(tag),
         shape = RoundedCornerShape(24.dp),
-        color = Color(0xFFF4F6EF),
+        color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, OliveGreen.copy(alpha = .22f)),
         tonalElevation = 1.dp
@@ -405,7 +405,7 @@ internal fun SafeContactActionCard(
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             BadgedBox(badge = { if (badgeCount > 0) Badge { Text(if (badgeCount > 99) "99+" else badgeCount.toString()) } }) {
-                Surface(shape = CircleShape, color = Color(0xFFDDE7D6), contentColor = OliveGreen) {
+                Surface(shape = CircleShape, color = IconBadgeEnabled, contentColor = OliveGreen) {
                     Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                         Icon(
                             icon,

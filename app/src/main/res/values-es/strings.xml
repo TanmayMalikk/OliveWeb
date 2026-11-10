@@ -109,7 +109,6 @@
 <string name="note">Nota</string>
     <string name="incident">Incidente</string>
     <string name="title_optional">Título (opcional)</string>
-    <string name="private_details">Detalles privados</string>
     <string name="save_private_entry">Guardar entrada privada</string>
     <string name="update_private_entry">Actualizar entrada privada</string>
     <string name="cancel_edit">Cancelar edición</string>
@@ -169,9 +168,6 @@
     <string name="unable_to_save_this_device_s_pin_please_retry">No se puede guardar el PIN de este dispositivo. Vuelva a intentarlo.</string>
     <string name="enter_your_4_6_digit_pin">Ingrese su PIN de 4 a 6 dígitos.</string>
     <string name="unable_to_check_the_pin_or_record_this_attempt_access_remains_locked">No se puede verificar el PIN ni registrar este intento. El acceso permanece bloqueado.</string>
-    <string name="enter_a_complete_delivery_address">Ingrese una dirección de entrega completa.</string>
-    <string name="unable_to_save_the_address_please_retry">No se puede guardar la dirección. Vuelva a intentarlo.</string>
-    <string name="address_saved">Dirección guardada.</string>
     <string name="unable_to_save_profile_changes">No se pueden guardar los cambios del perfil.</string>
     <string name="changes_saved">Cambios guardados.</string>
     <string name="enter_a_trigger_of_3_64_characters_and_your_4_6_digit_pin">Ingrese un activador de 3 a 64 caracteres y su PIN de 4 a 6 dígitos.</string>
@@ -261,7 +257,6 @@
     <string name="cancel_request">Cancelar solicitud</string>
     <string name="no_friends_yet">Aún no hay amigos.</string>
     <string name="direct_messages">Mensajes directos</string>
-    <string name="direct_message">mensaje directo</string>
     <string name="support_conversation">Conversación de apoyo</string>
     <string name="request_admin_help">Solicitar ayuda de administración</string>
     <string name="select_a_friend_or_conversation_to_start_messaging">Seleccione un amigo o una conversación para comenzar a enviar mensajes.</string>
@@ -313,8 +308,6 @@
     <string name="support_chat_contact">Contacto seguro en el chat de apoyo</string>
     <string name="support_chat_contact_help">Elige un contacto seguro que ya tenga acceso a este plan de seguridad.</string>
     <string name="organization_live_map">Mapa de ubicación en vivo</string>
-    <string name="organization_live_map_description">Esta vista protegida está lista para mostrar a los usuarios asignados como puntos rojos parpadeantes.</string>
-    <string name="organization_location_feed_not_enabled">La ubicación en vivo de la organización aún no está habilitada. Esta vista no recopila ubicaciones.</string>
     <string name="organization_live_map_admin_description">Ver todas las ubicaciones.</string>
     <string name="organization_location_feed_empty">Todavía no se ha informado ninguna ubicación de usuario.</string>
     <string name="support_conversations">Conversaciones de apoyo</string>
@@ -324,7 +317,6 @@
     <string name="shared_safety_plan">Plan de seguridad compartido</string>
     <string name="safety_admin_intro">Ver planes de seguridad.</string>
     <string name="staff_conversations_assigned_help">Ver chats de apoyo asignados.</string>
-    <string name="no_assigned_support_conversations">Actualmente no tienes usuarios asignados para apoyo por chat.</string>
     <string name="staff_safety_plans_description">Ver planes asignados.</string>
     <string name="admin_safety_plans_description">Ver planes de usuarios.</string>
     <string name="admin_accounts_description">Ver y administrar cuentas.</string>
@@ -396,7 +388,6 @@
     <string name="incident_show_location">Show my current location</string>
     <string name="attachments">Attachments</string>
     <string name="incident_attachments_help">Choose saved photos, videos, or documents. Incident attachments are automatically tagged as evidence.</string>
-    <string name="upload_new_attachment">Upload a new attachment</string>
     <string name="attachments_empty_help">Upload files in Documents, then attach them here.</string>
     <string name="title">Title</string>
     <string name="incident_body">Detalles del incidente</string>
@@ -427,7 +418,6 @@
     <string name="olive_storage_help">Elige un archivo que ya guardaste en Olive. Se vinculará sin subir otra copia.</string>
     <string name="add_attachment">Añadir archivo adjunto</string>
     <string name="note_content">Nota</string>
-    <string name="incident_information">Información del incidente</string>
     <string name="note_attachments_help">Añade un archivo nuevo o elige uno que ya guardaste en el almacenamiento OLIVE.</string>
     <string name="ui_group_voice_call">Llamada de voz grupal</string>
     <string name="ui_group_call_status">%1$d conectados • %2$s</string>

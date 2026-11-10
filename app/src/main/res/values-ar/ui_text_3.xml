@@ -65,15 +65,11 @@
     <string name="ui_new_headlines_are_available">عناوين جديدة متاحة.</string>
     <string name="ui_a_new_update_is_available">تحديث جديد متاح.</string>
     <string name="ui_an_account_update_is_available">تحديث الحساب متاح.</string>
-    <string name="ui_fresh_menu_updates_are_available">تتوفر تحديثات القائمة الطازجة.</string>
-    <string name="ui_see_what_s_new_from_olive">شاهد الجديد من الزيتون.</string>
-    <string name="ui_new_kitchen_picks_are_ready_to_browse">اختيارات المطبخ الجديدة جاهزة للتصفح.</string>
     <string name="ui_your_latest_digest_is_ready">أحدث ملخصك جاهز.</string>
     <string name="ui_there_are_new_stories_to_browse">هناك قصص جديدة للتصفح.</string>
 
     <string name="ui_open_the_app_to_see_what_s_new">افتح التطبيق لمعرفة الجديد.</string>
     <string name="ui_new_activity_is_waiting">نشاط جديد في انتظارك.</string>
-    <string name="ui_order_status_and_delivery_notifications_for_olive">حالة الطلب وإخطارات التسليم للزيتون</string>
     <string name="ui_daily_digest_briefings">ملخصات الملخص اليومي</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">العناوين اليومية وإخطارات ملخص الأخبار</string>
 

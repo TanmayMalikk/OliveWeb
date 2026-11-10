@@ -2,37 +2,16 @@
 package com.olive.app.ui.users.user.notes
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.RestoreFromTrash
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,66 +21,13 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.PRIVATE_ENTRY_TRASH_RETENTION_MS
-import com.olive.app.data.PrivateEntry
-import com.olive.app.data.PrivateEntryKind
-import com.olive.app.data.trashDaysRemaining
-import com.olive.app.data.trashSecondsRemaining
-import com.olive.app.ui.shared.Muted
-import com.olive.app.ui.shared.OliveGreen
-import com.olive.app.ui.shared.oliveScrollbar
-import com.olive.app.ui.shared.rememberResourceText
-import kotlinx.coroutines.delay
+import com.olive.app.data.*
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.shared.LocalizedIcon as Icon
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration.Companion.milliseconds
-import com.olive.app.ui.shared.LocalizedIcon as Icon
-import android.Manifest
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.PushPin
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.focusable
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.paneTitle
-import com.olive.app.data.AddressSuggestion
-import com.olive.app.data.GeoapifyClient
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.DeviceLocation
-import com.olive.app.data.MapLocationPoint
-import com.olive.app.ui.users.user.location.InteractiveLocationMap
-import kotlinx.coroutines.launch
-import com.olive.app.ui.shared.keepVisibleWhileTyping
-import com.olive.app.ui.users.shared.navigation.Field
-import com.olive.app.ui.users.shared.navigation.SessionViewModel
-import com.olive.app.ui.users.shared.navigation.Status
-import java.time.ZoneId
-import java.util.Locale
-import androidx.compose.foundation.lazy.grid.items as gridItems
+import kotlinx.coroutines.delay
 
 
 
@@ -153,7 +79,7 @@ internal fun Trash(
             Card(
                 Modifier.animateItem().fillMaxWidth().testTag("scratchpad_entry"),
                 border = BorderStroke(1.dp, Color.Black),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF4))
+                colors = CardDefaults.cardColors(containerColor = NotePaperCream)
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     entry.kind.let {
@@ -253,7 +179,7 @@ internal fun PrivateEntryEditLog(
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = CircleShape, color = Color(0xFFE7EDE2)) {
+                        Surface(shape = CircleShape, color = NoteTagMint) {
                             Text(
                                 revision.toString(),
                                 Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
@@ -278,7 +204,7 @@ internal fun PrivateEntryEditLog(
                         Surface(
                             Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.medium,
-                            color = Color(0xFFF5F3EC)
+                            color = NoteMutedSurface
                         ) {
                             Column(
                                 Modifier.padding(12.dp),
@@ -327,7 +253,7 @@ internal fun PrivateNoteCard(
         onClick = open,
         modifier = modifier.fillMaxWidth().testTag("private_entry_row"),
         border = BorderStroke(1.dp, Color.Black),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF4))
+        colors = CardDefaults.cardColors(containerColor = NotePaperCream)
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -348,7 +274,7 @@ internal fun PrivateNoteCard(
                     Icon(
                         Icons.Outlined.PushPin,
                         if (entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry),
-                        tint = if (entry.pinned) Color(0xFFFFC107) else Muted
+                        tint = if (entry.pinned) PinnedStarGold else Muted
                     )
                 }
             }

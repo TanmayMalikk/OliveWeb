@@ -18,8 +18,8 @@
     "publish-android-release": "node scripts/publish-android-release.js"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1158.0",
-    "@aws-sdk/s3-request-presigner": "^3.1158.0",
+    "@aws-sdk/client-s3": "^3.1165.0",
+    "@aws-sdk/s3-request-presigner": "^3.1165.0",
     "firebase-admin": "^14.5.0",
     "firebase-functions": "^7.4.0"
   },

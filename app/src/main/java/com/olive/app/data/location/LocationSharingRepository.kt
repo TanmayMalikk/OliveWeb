@@ -7,30 +7,23 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.database.*
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.olive.app.BuildConfig
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
-import kotlinx.coroutines.tasks.await
-import org.json.JSONObject
-import javax.crypto.SecretKey
-import com.olive.app.BuildConfig
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.net.URLEncoder
+import javax.crypto.SecretKey
 import javax.net.ssl.HttpsURLConnection
-
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 data class LocationTrailPoint(val latitude: Double, val longitude: Double, val updatedAt: Long)
 
 data class MapLocationPoint(
-    val uid: String,
-    val name: String,
-    val latitude: Double,
-    val longitude: Double,
-    val updatedAt: Long,
-    val live: Boolean,
-    val accuracy: Float? = null,
-    val lastKnown: Boolean = false,
-    val trail: List<LocationTrailPoint> = emptyList()
+    val uid: String, val name: String, val latitude: Double, val longitude: Double,
+    val updatedAt: Long, val live: Boolean, val accuracy: Float? = null,
+    val lastKnown: Boolean = false, val trail: List<LocationTrailPoint> = emptyList()
 )
 
 internal object LocationDatabase {
@@ -498,17 +491,11 @@ internal object GeoapifyClient {
     // Converts Geoapify result fields into map coordinates.
     suspend fun coordinates(address: DeliveryAddress): Pair<Double, Double>? {
         address.latitude?.let { lat -> address.longitude?.let { return lat to it } }
-        val query = listOf(
-            address.line1,
-            address.city,
-            address.province,
-            address.postalCode,
-            address.country
-        ).filter(String::isNotBlank).joinToString(", ")
-        return autocomplete(
-            query,
-            false
-        ).firstOrNull()?.address?.let { value -> value.latitude?.let { lat -> value.longitude?.let { lat to it } } }
+        val query = listOf(address.line1, address.city, address.province, address.postalCode, address.country)
+            .filter(String::isNotBlank).joinToString(", ")
+        return autocomplete(query, false).firstOrNull()?.address?.let { value ->
+            value.latitude?.let { lat -> value.longitude?.let { lat to it } }
+        }
     }
 
     // Converts Geoapify results into the address suggestions shown by the app.

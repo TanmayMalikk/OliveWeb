@@ -31,7 +31,6 @@
     <string name="safety_staff_intro">查看和编辑与您共享的计划。</string>
     <string name="safety_retry_save">重试保存</string>
     <string name="safety_back">返回</string>
-    <string name="safety_open_plan">打开 %1$s 的计划</string>
     <string name="safety_source">规划参考：加拿大公共卫生局。请与可信的人一起调整这些提示。</string>
     <string name="safety_upload_document">上传文件</string>
     <string name="safety_upload_for">为%1$s上传文件。</string>

@@ -51,7 +51,6 @@
     <plurals name="fitness_chart_description">
         <item quantity="other">%1$s的 %2$d 天图表。</item>
     </plurals>
-    <string name="fitness_chart_latest">%1$s最新为 %2$s %3$s。</string>
     <string name="fitness_chart_average">%1$s平均为 %2$s %3$s。</string>
     <string name="fitness_calories_burned">消耗</string>
     <string name="fitness_calories_eaten">摄入</string>
