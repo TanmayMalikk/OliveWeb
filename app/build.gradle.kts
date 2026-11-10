@@ -66,6 +66,10 @@ android {
     buildTypes {
         getByName("release") {
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("oliveRelease")
+            // Real phones and Apple Silicon emulators use arm64-v8a; PC emulators (Pixel 9a/10) use x86_64.
+            ndk {
+                abiFilters += listOf("arm64-v8a", "x86_64")
+            }
         }
     }
     namespace = "com.olive.app"
@@ -94,7 +98,17 @@ android {
     }
     // These third-party binaries arrive without removable debug sections. Declaring that they
     // should be packaged intact avoids a misleading strip warning on every debug/test build.
-    packaging { jniLibs.keepDebugSymbols += "**/*.so" }
+    // Compressing native libraries and DEX files inside the APK drastically reduces download size
+    // without changing runtime performance after installation.
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "**/*.so"
+            useLegacyPackaging = true
+        }
+        dex {
+            useLegacyPackaging = true
+        }
+    }
 }
 val cameraxVersion = "1.6.2"
 
