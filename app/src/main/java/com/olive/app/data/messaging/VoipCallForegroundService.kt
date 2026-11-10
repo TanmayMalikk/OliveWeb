@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -40,6 +41,11 @@ class VoipCallForegroundService : Service() {
 
     // Android requires the foreground notification immediately after the call service starts.
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val callId = intent?.getStringExtra(EXTRA_CALL_ID)
+        if (callId.isNullOrBlank()) {
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         val returnToApp = packageManager.getLaunchIntentForPackage(packageName)?.apply {
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
@@ -57,6 +63,17 @@ class VoipCallForegroundService : Service() {
             .setContentText(getString(R.string.ui_call_running_in_background))
             .setContentIntent(pendingIntent)
             .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setVisibility(NotificationCompat.VISIBILITY_SECRET)
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                getString(R.string.ui_end_call),
+                callAction(ACTION_END_CALL, callId),
+            )
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                getString(R.string.quick_exit),
+                callAction(ACTION_QUICK_EXIT, callId),
+            )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .build()
@@ -64,17 +81,29 @@ class VoipCallForegroundService : Service() {
         return START_NOT_STICKY
     }
 
+    private fun callAction(action: String, callId: String): PendingIntent {
+        val intent = Intent(action)
+            .setPackage(packageName)
+            .setData(Uri.Builder().scheme(CALL_ACTION_SCHEME).authority("call").appendPath(callId).build())
+            .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY)
+        return PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        internal const val ACTION_END_CALL = "com.olive.app.voip.END_CALL"
+        internal const val ACTION_QUICK_EXIT = "com.olive.app.voip.QUICK_EXIT"
+        internal const val CALL_ACTION_SCHEME = "olive-call-action"
+        private const val EXTRA_CALL_ID = "call_id"
         private const val CHANNEL_ID = "olive_voice_call"
         private const val NOTIFICATION_ID = 8_107
 
         // Starts the notification while the call room is connecting or connected.
-        fun start(context: Context) {
+        fun start(context: Context, callId: String) {
             ContextCompat.startForegroundService(
                 context,
-                Intent(context, VoipCallForegroundService::class.java),
+                Intent(context, VoipCallForegroundService::class.java).putExtra(EXTRA_CALL_ID, callId),
             )
         }
 

@@ -33,12 +33,11 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
     fun quickExit() {
         with(runtime) {
             with(state) {
-                enrollment?.let { accountRole = it.role }
-                if (accountRole == AccountRole.USER && screen in setOf(
-                        SessionScreen.Safe,
-                        SessionScreen.Pin
-                    )
-                ) accessibilityExitVersion++
+                val enrolledRole = enrollment?.role
+                accountRole = enrolledRole ?: AccountRole.USER
+                if (accountRole == AccountRole.USER && screen != SessionScreen.Cover) {
+                    accessibilityExitVersion++
+                }
                 safety.close()
                 epoch++
                 pinAuthorizedUid = null
@@ -54,22 +53,8 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 busy = false
                 coverReset++
                 viewedSharedEntry = null
-                profile?.coverType?.let { coverType = it }
-                // Safe contacts return to account entry because they do not use a cover app.
-                if (accountRole == AccountRole.SAFE_CONTACT) {
-                    page = SafePage.Home
-                    activityCategory =
-                        null
-                    screenHistory.clear()
-                    safePageHistory.clear()
-                    message = null
-                    messaging.stopMessaging()
-                    activeTriggerId = null
-                    triggerJob =
-                        null
-                    screen = SessionScreen.Safe
-                    return
-                }
+                if (enrolledRole == null) coverType = CoverType.FITNESS
+                else profile?.coverType?.let { coverType = it }
                 screen = when (accountRole) {
                     AccountRole.USER -> SessionScreen.Cover
                     AccountRole.SAFE_CONTACT -> SessionScreen.Safe
@@ -79,7 +64,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 activityCategory = null
                 screenHistory.clear()
                 safePageHistory.clear()
-                profile = null
+                if (accountRole == AccountRole.USER) profile = null
                 attempts = emptyList()
                 message = null
                 pendingSync = false
@@ -94,6 +79,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 triggerJob = null
                 pendingIdentity = null
                 pendingProfile = null
+                credentialFieldError = null
             }
         }
     }

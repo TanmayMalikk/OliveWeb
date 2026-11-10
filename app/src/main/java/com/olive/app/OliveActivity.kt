@@ -17,7 +17,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import androidx.core.content.ContextCompat
 import com.olive.app.location.LiveLocationController
 import com.olive.app.location.LiveLocationService
@@ -41,6 +44,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.olive.app.ui.covers.fitness.FitnessWatchSync
 import android.app.Activity
 import com.olive.app.data.update.AppUpdateScheduler
+import com.olive.app.data.messaging.VoipCallForegroundService
 
 
 // Prevents Android from showing private content in the recent-apps preview.
@@ -67,6 +71,21 @@ class OliveActivity : FragmentActivity() {
         resources.getBoolean(R.bool.screen_capture_protection_enabled)
     }
     private val session: SessionViewModel by viewModels()
+    private val callActionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val callId = intent.data?.lastPathSegment ?: return
+            if (!session.calls.canHandleNotification(callId)) return
+            when (intent.action) {
+                VoipCallForegroundService.ACTION_END_CALL ->
+                    session.calls.finish(session.coverAccountId.orEmpty(), callId)
+                VoipCallForegroundService.ACTION_QUICK_EXIT -> {
+                    session.quickExit(callId)
+                    closeAfterQuickExit()
+                }
+            }
+        }
+    }
+    private var closingForQuickExit = false
     private var screenshotCallback: ScreenCaptureCallback? = null
     private var recordingCallback: Consumer<Int>? = null
     private var recentPrivacyCover: View? = null
@@ -85,6 +104,16 @@ class OliveActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         OliveNotificationManager.createNotificationChannels(this)
+        ContextCompat.registerReceiver(
+            this,
+            callActionReceiver,
+            IntentFilter().apply {
+                addAction(VoipCallForegroundService.ACTION_END_CALL)
+                addAction(VoipCallForegroundService.ACTION_QUICK_EXIT)
+                addDataScheme(VoipCallForegroundService.CALL_ACTION_SCHEME)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         receiveIncomingCallIntent(intent)
         CoverLauncher.ensureStudioLauncher(this)
         applyScreenCaptureProtection()
@@ -134,9 +163,16 @@ class OliveActivity : FragmentActivity() {
                 }
             }
             CompositionLocalProvider(com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest provides permissions::requestLocation) {
-                OliveTheme { OliveRoot(session, locationPermissionVersion) }
+                OliveTheme {
+                    OliveRoot(session, locationPermissionVersion, closeApp = ::closeAfterQuickExit)
+                }
             }
         }
+    }
+
+    override fun onDestroy() {
+        unregisterReceiver(callActionReceiver)
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -183,6 +219,7 @@ class OliveActivity : FragmentActivity() {
     // Coming back just refreshes screen protection; it never auto-reopens private pages.
     override fun onResume() {
         super.onResume()
+        closingForQuickExit = false
         session.account.refreshDeviceSecurity()
         deviceLock.resume()
         applyScreenCaptureProtection()
@@ -269,11 +306,22 @@ class OliveActivity : FragmentActivity() {
         runCatching { CoverLauncher.apply(this, session.coverType, session.accountRole) }
     }
 
-    // Apply the resource flag to FLAG_SECURE and recent-app screenshots; lifecycle methods register capture callbacks separately.
+    private fun closeAfterQuickExit() {
+        // The task can be snapshotted before Compose redraws the cover or dashboard.
+        closingForQuickExit = true
+        applyScreenCaptureProtection()
+        if (!moveTaskToBack(true)) {
+            closingForQuickExit = false
+            applyScreenCaptureProtection()
+        }
+    }
+
+    // Lifecycle methods register the capture callbacks separately.
     private fun applyScreenCaptureProtection() {
-        if (screenCaptureProtectionEnabled) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val protect = screenCaptureProtectionEnabled || closingForQuickExit
+        if (protect) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!screenCaptureProtectionEnabled)
+        if (Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!protect)
     }
 
     // When capture protection is enabled, cover sensitive content and remove its native accessibility descendants together.

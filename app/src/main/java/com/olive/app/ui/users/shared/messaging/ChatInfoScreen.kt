@@ -28,6 +28,7 @@ import com.olive.app.data.SafetyDocument
 import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipCallStatus
 import com.olive.app.ui.shared.*
+import com.olive.app.ui.users.shared.navigation.LocalQuickExit
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import java.io.File
@@ -78,6 +79,7 @@ internal fun ChatInfoDialog(
         onDispose(session.staffSupport::clearChatInfoErrors)
     }
     val conversation = session.messages.activeConversation ?: return
+    val quickExit = LocalQuickExit.current
     val personalViewer = session.accountRole in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
     val sharedItems = sharedChatItems(session.messages.chatMessages)
     val canAddPeople = conversation.closedAt == 0L && when {
@@ -163,6 +165,9 @@ internal fun ChatInfoDialog(
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.weight(1f),
                         )
+                        if (quickExit != null) TextButton(onClick = quickExit) {
+                            Text(stringResource(R.string.quick_exit))
+                        }
                     }
                 },
             ) { padding ->

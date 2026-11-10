@@ -37,7 +37,8 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 
 // Calls are private-account features. Direct and personal group chats can call; support chats cannot.
@@ -55,6 +56,29 @@ internal fun canCallFromConversation(
 
 internal fun canUseVoip(role: AccountRole): Boolean =
     role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
+
+internal fun shouldShowCallOverlay(screen: SessionScreen, role: AccountRole): Boolean =
+    screen == SessionScreen.Safe && role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
+
+// A failed call with no room attached is shown inside its eligible chat instead of covering every safe-app page.
+internal fun shouldShowActiveCall(state: VoipSessionState): Boolean = when (state) {
+    is VoipSessionState.Connecting,
+    is VoipSessionState.Active,
+    is VoipSessionState.Leaving -> true
+    is VoipSessionState.Error -> state.call != null
+    VoipSessionState.Idle -> false
+}
+
+internal fun resolveIncomingCaller(
+    invitation: VoipInvitation,
+    conversations: List<ChatConversation>,
+    currentUid: String,
+): VoipInvitation? {
+    val callerUsername = conversations.firstOrNull { conversation ->
+        invitation.callerId in conversation.participantIds && currentUid in conversation.participantIds
+    }?.participantUsernames?.get(invitation.callerId).orEmpty()
+    return invitation.copy(name = callerUsername).takeIf { callerUsername.isNotBlank() }
+}
 
 internal fun shouldLeaveGroupCall(
     call: VoipCall,
@@ -74,6 +98,7 @@ internal class SessionCalls(
     )
     private val controller = VoipSessionController.create(application, manager)
     private var invitationJob: Job? = null
+    private var callJoinJob: Job? = null
     private var observedUid: String? = null
     private var configuredRole: AccountRole? = null
     private val suppressedInvitationIds = invitationPreferences
@@ -93,12 +118,16 @@ internal class SessionCalls(
     init {
         // Keeps the microphone session running while the phone is on Home or another app is open.
         scope.launch {
-            state.collectLatest { callState ->
+            state.map { callState ->
                 when (callState) {
-                    is VoipSessionState.Connecting,
-                    is VoipSessionState.Active -> VoipCallForegroundService.start(application)
-                    else -> VoipCallForegroundService.stop(application)
+                    is VoipSessionState.Connecting -> callState.call.callId
+                    is VoipSessionState.Active -> callState.call.callId
+                    is VoipSessionState.Leaving -> callState.call.callId
+                    else -> null
                 }
+            }.distinctUntilChanged().collect { callId ->
+                if (callId == null) VoipCallForegroundService.stop(application)
+                else VoipCallForegroundService.start(application, callId)
             }
         }
     }
@@ -185,16 +214,14 @@ internal class SessionCalls(
         val callerName = conversation.participantUsernames[callerUid]
             .orEmpty()
             .ifBlank { "Private call" }
-        scope.launch {
-            runCallAction {
-                controller.startAndJoin(
-                    recipientName,
-                    callerUid,
-                    recipients,
-                    callerName,
-                    conversation.id,
-                )
-            }
+        launchCallJoin {
+            controller.startAndJoin(
+                recipientName,
+                callerUid,
+                recipients,
+                callerName,
+                conversation.id,
+            )
         }
     }
 
@@ -202,11 +229,7 @@ internal class SessionCalls(
     fun accept(invitation: VoipInvitation, currentUid: String, role: AccountRole) {
         if (!canUseVoip(role) || currentUid.isBlank()) return
         suppressInvitation(invitation.callId)
-        scope.launch {
-            runCallAction {
-                controller.acceptAndJoin(invitation.callId, currentUid)
-            }
-        }
+        launchCallJoin { controller.acceptAndJoin(invitation.callId, currentUid) }
     }
 
     // Hides the invitation before Android opens its microphone permission window. This prevents
@@ -231,14 +254,12 @@ internal class SessionCalls(
         if (!canUseVoip(role) ||
             !call.canBeJoinedBy(currentUid)
         ) return
-        scope.launch {
-            runCallAction {
-                when (call.participants.firstOrNull { it.userId == currentUid }?.status) {
-                    VoipParticipantStatus.PENDING -> controller.acceptAndJoin(call.callId, currentUid)
-                    VoipParticipantStatus.DECLINED -> controller.rejoinCall(call.callId)
-                    VoipParticipantStatus.ACCEPTED -> controller.joinCall(call)
-                    null -> Unit
-                }
+        launchCallJoin {
+            when (call.participants.firstOrNull { it.userId == currentUid }?.status) {
+                VoipParticipantStatus.PENDING -> controller.acceptAndJoin(call.callId, currentUid)
+                VoipParticipantStatus.DECLINED -> controller.rejoinCall(call.callId)
+                VoipParticipantStatus.ACCEPTED -> controller.joinCall(call)
+                null -> Unit
             }
         }
     }
@@ -252,9 +273,22 @@ internal class SessionCalls(
         scope.launch { runCallAction { controller.setSpeakerEnabled(enabled) } }
     }
 
+    private fun launchCallJoin(action: suspend () -> Unit) {
+        if (callJoinJob?.isActive == true) return
+        callJoinJob = scope.launch { runCallAction(action) }
+    }
+
+    fun canHandleNotification(callId: String): Boolean = when (val current = state.value) {
+        is VoipSessionState.Connecting -> current.call.callId == callId
+        is VoipSessionState.Active -> current.call.callId == callId
+        else -> false
+    }
+
     // A caller ends the room. A member leaving a group only disconnects their own phone.
-    fun finish(currentUid: String) {
+    fun finish(currentUid: String, expectedCallId: String? = null) {
+        val joining = callJoinJob
         scope.launch {
+            if (state.value == VoipSessionState.Idle) joining?.join()
             runCallAction {
                 val active = state.value
                 val call = when (active) {
@@ -263,6 +297,7 @@ internal class SessionCalls(
                     is VoipSessionState.Error -> active.call
                     else -> null
                 } ?: return@runCallAction
+                if (expectedCallId != null && call.callId != expectedCallId) return@runCallAction
                 val remoteParticipantCount = (active as? VoipSessionState.Active)
                     ?.remoteParticipantCount
                     ?: 0
