@@ -57,6 +57,8 @@ async function publish() {
     resumable: false,
     metadata: {
       contentType: "application/vnd.android.package-archive",
+      // Mobile browsers otherwise name the download after the encoded Storage path.
+      contentDisposition: `attachment; filename="olive-branch-${versionName}.apk"`,
       cacheControl: "public,max-age=31536000,immutable",
       metadata: { versionCode: String(versionCode), versionName, sha256 },
     },
