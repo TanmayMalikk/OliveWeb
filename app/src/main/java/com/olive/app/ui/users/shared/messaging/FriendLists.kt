@@ -29,6 +29,8 @@ import com.olive.app.data.DirectoryUser
 import com.olive.app.data.Friend
 import com.olive.app.data.FriendRelationship
 import com.olive.app.data.FriendRequest
+import com.olive.app.data.SafetyDocument
+import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.SecureFileOpeningIndicator
