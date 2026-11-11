@@ -45,4 +45,14 @@
     <string name="safety_storage_videos">Vidéos</string>
     <string name="safety_storage_documents">Images de documents</string>
     <string name="safety_document_upload_hint">Les fichiers téléversés apparaissent aussi dans Documents.</string>
+    <string name="safety_conflict_step">Étape</string>
+    <string name="safety_conflict_text">Texte</string>
+    <string name="safety_conflict_completion">État</string>
+    <string name="safety_conflict_attachments">Pièces jointes</string>
+    <string name="safety_conflict_excluded_attachments">Pièces jointes exclues</string>
+    <string name="safety_conflict_present">Présente</string>
+    <string name="safety_conflict_removed">Supprimée</string>
+    <string name="safety_conflict_complete">Terminée</string>
+    <string name="safety_conflict_not_complete">Non terminée</string>
+    <string name="safety_conflict_changed">Modifiées</string>
 </resources>

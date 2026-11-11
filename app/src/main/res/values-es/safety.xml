@@ -45,4 +45,14 @@
     <string name="safety_storage_videos">Vídeos</string>
     <string name="safety_storage_documents">Imágenes de documentos</string>
     <string name="safety_document_upload_hint">Los archivos subidos también aparecen en Documentos.</string>
+    <string name="safety_conflict_step">Paso</string>
+    <string name="safety_conflict_text">Texto</string>
+    <string name="safety_conflict_completion">Estado</string>
+    <string name="safety_conflict_attachments">Archivos adjuntos</string>
+    <string name="safety_conflict_excluded_attachments">Archivos adjuntos excluidos</string>
+    <string name="safety_conflict_present">Presente</string>
+    <string name="safety_conflict_removed">Eliminado</string>
+    <string name="safety_conflict_complete">Completado</string>
+    <string name="safety_conflict_not_complete">Sin completar</string>
+    <string name="safety_conflict_changed">Modificados</string>
 </resources>
