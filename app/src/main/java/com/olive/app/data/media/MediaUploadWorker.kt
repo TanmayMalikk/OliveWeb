@@ -287,6 +287,8 @@ interface MediaTicketDataSource {
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        grantIndependentRecipients:List<String> = emptyList(),
+        revokeIndependentRecipients:List<String> = emptyList(),
     ):CloudMediaRecord
     suspend fun updatePlanAccess(
         mediaId: String,
@@ -376,6 +378,8 @@ class MediaRepository(
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        grantIndependentRecipients:List<String>,
+        revokeIndependentRecipients:List<String>,
     ):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         require(deviceWrappedKeys.size<=250)
@@ -383,6 +387,8 @@ class MediaRepository(
             "mediaId" to mediaId,
             "wrappedKeys" to wrappedKeys,
             "deviceWrappedKeys" to deviceWrappedKeys,
+            "grantIndependentRecipients" to grantIndependentRecipients,
+            "revokeIndependentRecipients" to revokeIndependentRecipients,
         )).record()
     }
 

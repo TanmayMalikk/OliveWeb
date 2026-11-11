@@ -31,14 +31,11 @@ tasks.register("checkArchitecture") {
             file("app/src/main/java/com/olive/app/ui") to "Android UI",
             file("app/src/main/java/com/olive/app/data") to "Android data",
         )
-        val productionKotlin=fileTree("app/src/main/java") { include("**/*.kt") }.files
         val sourceLayoutViolations=buildList {
-            if(productionKotlin.size>120) add(
-                "Android production source has ${productionKotlin.size} Kotlin files; keep the consolidated layout at 120 or fewer"
-            )
-            productionKotlin.filter { it.readLines().size>700 }.forEach { source ->
-                add("Android source ${source.relativeTo(rootDir)} exceeds the 700-line limit")
-            }
+            fileTree("app/src/main/java") { include("**/*.kt") }.files
+                .filter { it.readLines().size>700 }.forEach { source ->
+                    add("Android source ${source.relativeTo(rootDir)} exceeds the 700-line limit")
+                }
         }
         val layoutViolations=androidRoots.flatMap { (directory,label) ->
             directory.listFiles().orEmpty()

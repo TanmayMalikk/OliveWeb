@@ -130,6 +130,39 @@ test("open user, safe contact and staff listeners receive edits and a completed 
   assert.ok(completed.plansCompletedAt > 0);
   assert.equal((await call(safetyPlanConsultations, staff)).plans.some(row => row.ownerUid === owner), false);
 });
+
+test("removing a plan attachment preserves an overlapping independent chat share", async () => {
+  const owner = "media-overlap-owner", contact = "media-overlap-contact", staff = "media-overlap-staff";
+  const fileId = "media-plan-chat-overlap";
+  const plan = db.collection("safetyPlans").doc(owner);
+  const checklist = items => JSON.stringify({oliveSafetyChecklist: 1, items});
+  await plan.set({
+    safeContactUids: [contact], consultationRequested: true, staffUid: staff,
+    fields: {primary_documents: {value: checklist([{id: "doc", attachmentIds: [fileId]}])}},
+  });
+  const file = db.collection("files").doc(fileId);
+  await file.set({
+    owner_id: owner, object_key: `users/${owner}/media/${fileId}`, encrypted_metadata: "metadata",
+    allowed_users: [owner], wrapped_keys: {[owner]: "owner-key"}, device_wrapped_keys: {},
+    ciphertext_size: 1024, ciphertext_sha256: "0".repeat(64), encryption_version: 2,
+  });
+  const accountKey = Buffer.alloc(32, 9).toString("base64");
+  await db.collection("mediaAccessKeys").doc(fileId).set({owner_id: owner, key: accountKey});
+
+  await call(mediaUpdateAccess, owner, {mediaId: fileId, forPlan: true, wrappedKeys: {
+    [owner]: "owner-key", [contact]: "contact-plan-key", [staff]: "staff-plan-key",
+  }});
+  await call(mediaUpdateAccess, owner, {mediaId: fileId, grantIndependentRecipients: [contact], wrappedKeys: {
+    [owner]: "owner-key", [contact]: "contact-chat-key", [staff]: "staff-plan-key",
+  }});
+
+  await plan.update("fields.primary_documents.value", checklist([]));
+  await reconcilePlanMediaGrants(owner);
+
+  assert.deepEqual(new Set((await file.get()).get("allowed_users")), new Set([owner, contact]));
+  assert.equal((await call(mediaAccountAccessKey, contact, {mediaId: fileId})).accountAccessKey, accountKey);
+  await assert.rejects(call(mediaAccountAccessKey, staff, {mediaId: fileId}), {code: "permission-denied"});
+});
 after(async () => { auth.getUser=originalGetUser;auth.listUsers=originalListUsers;bucket.file=originalFile;await env.cleanup();await db.terminate(); });
 const call=(endpoint,uid,data={}) => endpoint.run({auth:{uid},data});
 

@@ -416,10 +416,21 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   const reference = mediaRef(mediaId);
   const grant = planMediaGrantRef(uid, mediaId);
   const forPlan = request.data?.forPlan === true;
+  const grantIndependentRecipients = recipientList(
+    request.data?.grantIndependentRecipients, access.allowedUsers, uid, "grantIndependentRecipients",
+  );
+  const revokeIndependentRecipients = recipientList(
+    request.data?.revokeIndependentRecipients, null, uid, "revokeIndependentRecipients",
+  );
+  if (forPlan && (grantIndependentRecipients.length || revokeIndependentRecipients.length)) {
+    throw new HttpsError("invalid-argument", "Plan access cannot change independent grants.");
+  }
   await db.runTransaction(async transaction => {
     const snapshot = await transaction.get(reference);
     const tracked = await transaction.get(grant);
-    const plan = forPlan ? (await transaction.get(db.collection("safetyPlans").doc(uid))).data() : null;
+    const planSnapshot = forPlan || revokeIndependentRecipients.length ?
+      await transaction.get(db.collection("safetyPlans").doc(uid)) : null;
+    const plan = planSnapshot?.data() || null;
     if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
     const value = snapshot.data();
     if (value.owner_id !== uid) {
@@ -428,7 +439,7 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
     if (typeof value.object_key !== "string" || typeof value.encrypted_metadata !== "string") {
       throw new HttpsError("failed-precondition", "Only encrypted media supports this access update");
     }
-    let wrappedKeys = access.wrappedKeys;
+    let wrappedKeys = {...access.wrappedKeys};
     let deviceWrappedKeys = access.deviceWrappedKeys ?? retainedDeviceKeys(value.device_wrapped_keys, access.allowedUsers);
     if (forPlan) {
       const recipients = planMediaReaders(plan, mediaId);
@@ -436,17 +447,41 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
       if (added.some(id => !recipients.has(id))) {
         throw new HttpsError("permission-denied", "The document is not shared with that plan reader.");
       }
-      const trackedReaders = new Set(tracked.get("readers") || []);
-      for (const id of added) {
-        if (!value.allowed_users?.includes(id)) trackedReaders.add(id);
-      }
-      transaction.set(grant, {readers: [...trackedReaders]});
+      const trackedReaders = new Set([...(tracked.get("readers") || []), ...added]);
+      transaction.set(grant, {
+        readers: [...trackedReaders], independentReaders: tracked.get("independentReaders") || [],
+      });
       wrappedKeys = {...value.wrapped_keys, ...Object.fromEntries(added.map(id => [id, access.wrappedKeys[id]]))};
       deviceWrappedKeys = {...value.device_wrapped_keys, ...deviceWrappedKeys};
-    } else if (tracked.exists) {
-      const readers = (tracked.get("readers") || []).filter(id => access.allowedUsers.includes(id));
-      if (readers.length) transaction.update(grant, {readers});
-      else transaction.delete(grant);
+    } else if (grantIndependentRecipients.length || revokeIndependentRecipients.length || tracked.exists) {
+      const independentReaders = new Set(tracked.get("independentReaders") || []);
+      const previouslyAllowed = new Set(value.allowed_users || []);
+      for (const id of access.allowedUsers) {
+        if (!previouslyAllowed.has(id) && id !== uid) independentReaders.add(id);
+      }
+      for (const id of previouslyAllowed) {
+        if (!access.allowedUsers.includes(id)) independentReaders.delete(id);
+      }
+      grantIndependentRecipients.forEach(id => independentReaders.add(id));
+      revokeIndependentRecipients.forEach(id => independentReaders.delete(id));
+
+      // Removing a direct share must keep the existing wrapper when an active plan still grants access.
+      const stillPlanAuthorized = new Set(planMediaReaders(plan, mediaId));
+      for (const id of revokeIndependentRecipients) {
+        if (!stillPlanAuthorized.has(id) || access.allowedUsers.includes(id)) continue;
+        const existingAccountKey = value.wrapped_keys?.[id];
+        if (existingAccountKey) wrappedKeys[id] = existingAccountKey;
+        for (const [deviceId, key] of Object.entries(value.device_wrapped_keys || {})) {
+          if (deviceId.startsWith(`${id}--`)) deviceWrappedKeys[deviceId] = key;
+        }
+      }
+
+      const planReaders = tracked.get("readers") || [];
+      if (planReaders.length || independentReaders.size) {
+        transaction.set(grant, {readers: planReaders, independentReaders: [...independentReaders]});
+      } else if (tracked.exists) {
+        transaction.delete(grant);
+      }
     }
     if (Object.keys(wrappedKeys).length > 25 || Object.keys(deviceWrappedKeys).length > 250) {
       throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
@@ -469,9 +504,20 @@ async function requireActivePlanGrant(ownerUid, mediaId, readerUid) {
   const grant = await planMediaGrantRef(ownerUid, mediaId).get();
   if (!grant.get("readers")?.includes(readerUid)) return;
   const plan = await db.collection("safetyPlans").doc(ownerUid).get();
-  if (!planMediaReaders(plan.data(), mediaId).has(readerUid)) {
+  if (!planMediaReaders(plan.data(), mediaId).has(readerUid) &&
+      !grant.get("independentReaders")?.includes(readerUid)) {
     throw new HttpsError("permission-denied", "Plan attachment access was removed.");
   }
+}
+
+function recipientList(value, allowedUsers, ownerUid, field) {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > 25 || value.some(uid =>
+    typeof uid !== "string" || !uid || uid.length > 128 || uid === ownerUid ||
+    (allowedUsers && !allowedUsers.includes(uid)))) {
+    throw new HttpsError("invalid-argument", `Invalid ${field}`);
+  }
+  return [...new Set(value)];
 }
 
 function retainedDeviceKeys(keys, allowedUsers) {
@@ -508,11 +554,13 @@ async function reconcilePlanMediaGrants(ownerUid) {
       ]);
       if (!currentGrant.exists) return;
       const readers = currentGrant.get("readers") || [];
+      const independentReaders = currentGrant.get("independentReaders") || [];
       const permitted = planMediaReaders(plan.data(), grant.id);
       const revoked = readers.filter(id => !permitted.has(id));
-      if (media.exists && media.get("owner_id") === ownerUid && revoked.length) {
+      const removeAccess = revoked.filter(id => !independentReaders.includes(id));
+      if (media.exists && media.get("owner_id") === ownerUid && removeAccess.length) {
         const wrappedKeys = Object.fromEntries(Object.entries(media.get("wrapped_keys") || {})
-            .filter(([id]) => !revoked.includes(id)));
+            .filter(([id]) => !removeAccess.includes(id)));
         const allowedUsers = Object.keys(wrappedKeys);
         transaction.update(reference, {
           wrapped_keys: wrappedKeys, allowed_users: allowedUsers,
@@ -520,7 +568,7 @@ async function reconcilePlanMediaGrants(ownerUid) {
         });
       }
       const kept = readers.filter(id => permitted.has(id));
-      if (!media.exists || !kept.length) transaction.delete(grant.ref);
+      if (!media.exists || (!kept.length && !independentReaders.length)) transaction.delete(grant.ref);
       else if (revoked.length) transaction.update(grant.ref, {readers: kept});
     });
   }
@@ -589,7 +637,7 @@ exports.mediaDelete = onCall(options, async (request) => {
 // Keep validation helpers available to Node tests without exporting another deployed endpoint.
 Object.defineProperty(exports, "_test", {
   value: {
-    accessRequest, validateDeviceWrappedKeys, validateAccessDeviceWrappedKeys,
+    accessRequest, validateDeviceWrappedKeys, validateAccessDeviceWrappedKeys, recipientList,
     accountAccessKey, evidenceRequest,
   },
   enumerable: false,

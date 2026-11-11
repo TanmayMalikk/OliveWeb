@@ -158,11 +158,11 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 messagingBusy = true
                 message = null
                 scope.launch {
-                    val newlyGrantedRecipients = mutableListOf<String>()
+                    val newlyGrantedConversationGrants = mutableListOf<String>()
                     // Turn an unexpected share failure into a readable message.
                     try {
                         conversation.participantIds.filter { it != device.uid }.forEach { recipient ->
-                            if (recipient !in document.allowedUsers) newlyGrantedRecipients += recipient
+                            newlyGrantedConversationGrants += recipient
                             val username = conversation.participantUsernames[recipient]
                                 ?: error("Recipient username is unavailable")
                             documents.grantAccess(document, device.uid, recipient, username)
@@ -174,14 +174,14 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         if (epoch == token) message =
                             runtime.application.getString(R.string.documents_shared_in_chat)
                     } catch (error: CancellationException) {
-                        newlyGrantedRecipients.forEach { recipient ->
+                        newlyGrantedConversationGrants.forEach { recipient ->
                             runCatching {
                                 documents.revokeAccess(document.id, device.uid, recipient)
                             }
                         }
                         throw error
                     } catch (_: Exception) { // Revoke any access granted before a later recipient or chat update failed.
-                        newlyGrantedRecipients.forEach { recipient ->
+                        newlyGrantedConversationGrants.forEach { recipient ->
                             runCatching {
                                 documents.revokeAccess(document.id, device.uid, recipient)
                             }
