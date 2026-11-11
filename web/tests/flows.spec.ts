@@ -337,6 +337,7 @@ for (const size of [
     for (const path of [
       "/",
       "/account",
+      "/account/create",
       "/admin",
       "/get",
       "/cover/daily-digest",

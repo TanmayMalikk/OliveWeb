@@ -20,10 +20,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.CircularProgressIndicator
+import androidx.wear.compose.material3.ProgressIndicatorDefaults
+import androidx.wear.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -110,8 +111,10 @@ internal fun CircularStepSummary(
             CircularProgressIndicator(
                 progress = { stepProgress },
                 modifier = Modifier.fillMaxSize(),
-                color = WatchAccent,
-                trackColor = WatchLightSage,
+                colors = ProgressIndicatorDefaults.colors(
+                    indicatorColor = WatchAccent,
+                    trackColor = WatchLightSage,
+                ),
                 strokeWidth = 9.dp,
             )
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
