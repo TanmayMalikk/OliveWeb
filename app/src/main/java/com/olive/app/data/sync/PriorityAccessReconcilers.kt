@@ -10,12 +10,10 @@ import com.olive.app.data.DocumentListSource
 import com.olive.app.data.MessagingRepository
 import com.olive.app.data.SafetyAccessIndexStore
 import com.olive.app.data.SafetyDocumentRepository
-import com.olive.app.data.SafetyPlan
 import com.olive.app.data.SafetyPlanRepository
 import com.olive.app.data.SafetyPlanStore
 import com.olive.app.data.media.MediaRepository
 import com.olive.app.data.media.OfflineMediaCache
-import com.olive.app.data.mergeSafetyPlan
 import kotlinx.coroutines.tasks.await
 
 // Signed-in accounts: validates the authoritative Firebase account before other protected data is refreshed.
@@ -37,7 +35,9 @@ internal class ConversationAccessReconciler(
     private val cache = ChatCacheStore(context.applicationContext)
 
     override suspend fun reconcile(uid: String) {
-        cache.replaceIndex(uid, repository.listConversations(uid), System.currentTimeMillis())
+        val conversations = repository.listConversations(uid)
+        check(FirebaseAuth.getInstance().currentUser?.uid == uid) { "Signed-in account changed" }
+        cache.replaceIndex(uid, conversations, System.currentTimeMillis())
     }
 }
 
@@ -50,6 +50,7 @@ internal class DocumentAccessReconciler(
     override suspend fun reconcile(uid: String) {
         val snapshot = SafetyDocumentRepository(media = MediaRepository()).listFor(uid)
         check(snapshot.source == DocumentListSource.SERVER)
+        check(FirebaseAuth.getInstance().currentUser?.uid == uid) { "Signed-in account changed" }
         val syncedAt = snapshot.lastSyncedAt ?: System.currentTimeMillis()
         DocumentIndexStore(application).replace(uid, snapshot.documents, syncedAt)
         OfflineMediaCache(application).reconcile(uid, snapshot.documents)
@@ -78,14 +79,12 @@ internal class SafetyPlanReconciler(
                 accessIndex.replaceConsultations(uid, result.first, result.second)
             }.second.map { it.ownerUid }
         }.distinct()
-        val remote = owners.map { repository.get(it) }
+        check(auth.currentUser?.uid == uid) { "Signed-in account changed" }
         store.all(uid).filterNot { it.ownerUid in owners }.forEach { store.remove(uid, it.ownerUid) }
-        remote.forEach { plan -> store.write(uid, plan.ownerUid, merge(plan, store.read(uid, plan.ownerUid))) }
-    }
-
-    private fun merge(remote: SafetyPlan, local: SafetyPlan?): SafetyPlan {
-        if (local == null || !local.pending) return remote
-        val combined = local.copy(fields = remote.fields + local.fields)
-        return mergeSafetyPlan(combined, combined, remote)
+        for (owner in owners) {
+            val remote = repository.get(owner) ?: continue
+            check(auth.currentUser?.uid == uid) { "Signed-in account changed" }
+            store.mergeRemote(uid, remote)
+        }
     }
 }
