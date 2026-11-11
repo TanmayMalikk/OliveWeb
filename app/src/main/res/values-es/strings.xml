@@ -422,7 +422,14 @@
     <string name="ui_group_voice_call">Llamada de voz grupal</string>
     <string name="ui_group_call_status">%1$d conectados • %2$s</string>
     <string name="organization_live_map_staff_description">Ver todas las ubicaciones.</string>
-    <string name="safety_mark_consultation_complete">Marcar consulta como completada</string>
+    <string name="safety_mark_consultation_complete">Marcar como completado</string>
+    <string name="safety_plans_completed">Tu plan de seguridad y tu plan alternativo están completos.</string>
+    <string name="safety_staff_assigned">Un miembro del equipo de apoyo está trabajando contigo.</string>
+    <string name="safety_open_consultation">Abrir el caso de consulta</string>
+    <string name="safety_conflicts_title">Conflictos</string>
+    <string name="safety_your_change">Tu cambio</string>
+    <string name="safety_incoming_change">Cambio recibido</string>
+    <string name="safety_empty_value">Sección vacía</string>
     <string name="safety_complete_consultation_title">¿Completar esta consulta?</string>
     <string name="safety_complete_consultation_description">Esto archiva el chat de consulta para todos y elimina este plan de seguridad de tu bandeja de personal.</string>
     <string name="safety_mark_complete">Marcar como completada</string>

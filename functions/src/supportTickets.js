@@ -16,6 +16,12 @@ const STALE_FCM_CODES = new Set([
 
 // Determines which conversation participants should receive a discreet FCM update push.
 function fcmTargetsForConversationUpdate(before, after, conversationId) {
+  if (after?.plansCompleted === true && before?.plansCompleted !== true && after.ownerUid) {
+    return {
+      recipients: [after.ownerUid],
+      data: {type: "safety_plans_completed", conversationId},
+    };
+  }
   const messageId = typeof after?.lastMessageId === "string" ? after.lastMessageId.trim() : "";
   const previousId = typeof before?.lastMessageId === "string" ? before.lastMessageId.trim() : "";
   if (!messageId || messageId === previousId || !Array.isArray(after?.participantIds)) {

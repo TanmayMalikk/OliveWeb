@@ -67,6 +67,41 @@ class SafetyPlanMergeTest {
         assertEquals(2L, merged.conflictRevision)
     }
 
+    @Test
+    fun staleStaffEditStaysQueuedUntilItReachesTheOwner() {
+        val key = "primary_destination"
+        val staff = old.copy(fields = mapOf(key to SafetyField("Staff draft", 1, "staff-draft")))
+        val remote = old.copy(fields = mapOf(key to SafetyField("Owner edit", 2, "owner-edit")))
+        val queued = mergeSafetyPlan(staff, staff, remote, ownerEditing = false)
+        assertTrue(queued.pending)
+        assertNull(queued.fields.getValue(key).conflictRevision)
+
+        val pending = remote.copy(pendingConflicts = mapOf(key to SafetyConflict("Staff draft", "staff-draft")))
+        val acknowledged = mergeSafetyPlan(queued, queued, pending, ownerEditing = false)
+        assertFalse(acknowledged.pending)
+        assertEquals("Owner edit", acknowledged.fields.getValue(key).value)
+        assertEquals("Staff draft", acknowledged.pendingConflicts.getValue(key).value)
+
+        val resolved = remote.copy(resolvedConflicts = mapOf(key to listOf("staff-draft")))
+        assertFalse(mergeSafetyPlan(queued, queued, resolved, ownerEditing = false).pending)
+        assertEquals(resolved, SafetyPlan.fromJson(resolved.toJson()))
+    }
+
+    @Test
+    fun finishedUploadAddsOnlyTheMatchingPlanAttachment() {
+        val field = "backup_documents"
+        val checklist = writeSafetyChecklist(listOf(
+            SafetyChecklistItem("passport", "Passport", excludedAttachmentIds = listOf("removed")),
+        ))
+        val matching = SafetyDocument("uploaded", "owner", "", "Passport", "application/pdf", listOf("owner"),
+            tags = listOf(safetyChecklistAttachmentTag(field, "passport")))
+        val unrelated = matching.copy(id = "unrelated", tags = listOf("Other"))
+        val updated = safetyChecklistWithPublishedDocuments(field, checklist, listOf(matching, unrelated, matching.copy(id = "removed")))
+        assertEquals(listOf("uploaded"), readSafetyChecklist(updated).single().attachmentIds)
+        assertEquals(updated, safetyChecklistWithPublishedDocuments(field, updated, listOf(matching)))
+        assertEquals(checklist, safetyChecklistWithPublishedDocuments("primary_documents", checklist, listOf(matching)))
+    }
+
     // Inputs: the values shown below. Expected: acknowledged edits clear the queue but newer typing survives.
     @Test
     fun acknowledgedEditsClearTheQueueButNewerTypingSurvives() {

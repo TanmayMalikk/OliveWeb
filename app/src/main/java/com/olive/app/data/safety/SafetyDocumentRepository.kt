@@ -95,6 +95,7 @@ interface SafetyDocumentDataSource {
         ownerUid: String,
         recipientUid: String,
         recipientUsername: String,
+        forPlan: Boolean = false,
     ) { error("Encrypted media sharing is unavailable") }
     suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) {
         error("Encrypted media revocation is unavailable")
@@ -208,17 +209,28 @@ class SafetyDocumentRepository(
         ownerUid: String,
         recipientUid: String,
         recipientUsername: String,
+        forPlan: Boolean,
     ) {
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
         val current = getFor(ownerUid, document.id)
         if (current.objectKey.isNotBlank()) {
             val documentKey = unwrapDocumentKey(current, ownerUid)
             val recipient = recipientAccess(documentKey, recipientUid, recipientUsername)
+            if (forPlan) {
+                if (recipientUid in current.allowedUsers &&
+                    current.deviceWrappedKeys.keys.containsAll(recipient.deviceKeys.keys)) return
+                media.updatePlanAccess(current.id, mapOf(
+                    ownerUid to checkNotNull(current.wrappedKeys[ownerUid]),
+                    recipientUid to recipient.accountKey,
+                ), recipient.deviceKeys)
+                return
+            }
             val wrapped = current.wrappedKeys + (recipientUid to recipient.accountKey)
             val devices = retainAuthorizedDeviceKeys(current.deviceWrappedKeys, wrapped.keys) + recipient.deviceKeys
             media.updateAccess(current.id, wrapped, devices)
             return
         }
+        check(!forPlan) { "Upload an encrypted copy before attaching this legacy document." }
         val updated = current.allowedUsers.toSet() + recipientUid
         updateStorageAccess(current, current.allowedUsers.toSet(), updated)
         // Turn an unexpected grant access failure into a readable message.
@@ -514,7 +526,8 @@ class IndexedSafetyDocumentRepository(
         ownerUid: String,
         recipientUid: String,
         recipientUsername: String,
-    ) = remote.grantAccess(document, ownerUid, recipientUid, recipientUsername)
+        forPlan: Boolean,
+    ) = remote.grantAccess(document, ownerUid, recipientUid, recipientUsername, forPlan)
 
     override suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) =
         remote.revokeAccess(documentId, ownerUid, recipientUid)

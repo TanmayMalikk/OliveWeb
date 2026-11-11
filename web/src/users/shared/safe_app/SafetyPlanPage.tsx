@@ -1,17 +1,21 @@
 // All safe-app roles: shows and edits safety plans for allowed roles.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { Button, Empty } from "../../../components/SharedComponents";
+import { Button, Empty, Modal } from "../../../components/SharedComponents";
 import { accounts, cloudMode } from "../../../services/AccountService";
 import {
   consultation,
   loadPlan,
   observePlan,
+  observeSafetyAccess,
+  planMediaRecipients,
+  resolvePlanConflict,
   readSafetyChecklist,
   safetyChecklistText,
   safetySections,
   saveField,
   sharedPlans,
+  sharePlanWithContacts,
   writeSafetyChecklist,
   type SafetyChecklistItem,
   type SafetyPlan as Plan,
@@ -19,11 +23,14 @@ import {
 import { useSession } from "../../../session/SessionProvider";
 import {
   observeBrowserDocuments,
+  observeDocumentRecipientDevices,
   openBrowserDocument,
+  shareBrowserPlanDocument,
   uploadBrowserDocument,
   type BrowserDocument,
 } from "../../../services/MediaService";
 import { SafeMediaViewer } from "./SafeMediaViewer";
+import { subscribeSocial, type Friend } from "../../../services/MessagingService";
 
 // Changes a safety-plan field key into a readable section label.
 const label = (value: string) =>
@@ -42,6 +49,17 @@ export default function SafetyPlan() {
   const [documents, setDocuments] = useState<BrowserDocument[]>([]);
   const [viewer, setViewer] = useState<{ document: BrowserDocument; url: string } | null>(null);
   const [documentError, setDocumentError] = useState("");
+  const [sharedOwnerUid, setSharedOwnerUid] = useState("");
+  const [sharedOwners, setSharedOwners] = useState<Awaited<ReturnType<typeof sharedPlans>>>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
+  const baseRevisions = useRef<Record<string, number>>({});
+  const lastAttempt = useRef<{ key: string; value: string } | null>(null);
+  const [localConflict, setLocalConflict] = useState<{ key: string; mine: string } | null>(null);
+  const [keepMine, setKeepMine] = useState(false);
+  const remoteConflictKey = Object.keys(plan?.pendingConflicts ?? {})[0];
+  const conflictKey = localConflict?.key ?? remoteConflictKey;
+  useEffect(() => setKeepMine(false), [conflictKey, plan?.pendingConflicts?.[conflictKey ?? ""]?.mutationId]);
 
   useEffect(() => {
     if (!identity || !cloudMode) return;
@@ -71,21 +89,90 @@ export default function SafetyPlan() {
     if (!viewer) return;
     return () => URL.revokeObjectURL(viewer.url);
   }, [viewer]);
+  useEffect(() => {
+    if (viewer && !documents.some((file) => file.id === viewer.document.id && file.approved)) setViewer(null);
+  }, [documents, viewer]);
+  useEffect(() => {
+    if (!identity || !cloudMode || editable) return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    let request = 0;
+    const refresh = () => {
+      const token = ++request;
+      void sharedPlans().then((plans) => {
+        if (!active || token !== request) return;
+        setSharedOwners(plans);
+        setSharedOwnerUid((uid) => plans.some((item) => item.ownerUid === uid) ? uid : plans[0]?.ownerUid ?? "");
+        setFeedback(plans.length ? "" : "No safety plan is currently shared with you.");
+      }).catch(() => { if (active) setFeedback("Unable to load shared plans."); });
+    };
+    refresh();
+    void observeSafetyAccess(identity.uid, refresh, () => undefined).then((cleanup) => {
+      if (active) stop = cleanup;
+      else cleanup();
+    });
+    return () => { active = false; stop?.(); };
+  }, [identity?.uid, editable]);
+  useEffect(() => {
+    if (!identity || !cloudMode || !editable) return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    void subscribeSocial(identity.uid, (value) => {
+      if (active) setFriends(value.friends);
+    }, () => undefined).then((cleanup) => {
+      if (active) stop = cleanup;
+      else cleanup();
+    }).catch(() => undefined);
+    return () => { active = false; stop?.(); };
+  }, [identity?.uid, editable]);
+  const sharedContacts = JSON.stringify(plan?.safeContactUids ?? []);
+  useEffect(() => setSelectedContacts(plan?.safeContactUids ?? []), [sharedContacts]);
+  const attachedIds = plan ? [...new Set(Object.values(plan.fields).flatMap((field) =>
+    readSafetyChecklist(field.value).flatMap((item) => item.attachmentIds ?? []),
+  ))] : [];
+  const attachmentScope = JSON.stringify([attachedIds, plan?.staffUid, plan?.safeContactUids]);
+  useEffect(() => {
+    if (!editable || !identity || !attachedIds.length) return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    let timer: number | undefined;
+    void planMediaRecipients().then(async (recipients) => {
+      if (!active || !recipients.length) return;
+      const share = () => {
+        if (!active) return;
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          void Promise.allSettled(attachedIds.map((id) => shareBrowserPlanDocument(id, identity, recipients)))
+            .then((results) => {
+              if (active && results.some((result) => result.status === "rejected")) {
+                setDocumentError("Unable to share one or more attached documents.");
+              }
+            });
+        }, 100);
+      };
+      share();
+      const cleanup = await observeDocumentRecipientDevices(recipients, share);
+      if (active) stop = cleanup;
+      else cleanup();
+    }).catch(() => { if (active) setDocumentError("Unable to share one or more attached documents."); });
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+      stop?.();
+    };
+  }, [editable, identity?.uid, attachmentScope]);
   // Copy new plan data into the editor without replacing unsaved typing.
   useEffect(() => {
     if (!cloudMode || !identity) return;
     let live = true;
     let stop: (() => void) | undefined;
-    const owner =
-      identity.role === "SAFE_CONTACT"
-        ? sharedPlans().then((plans) => plans[0]?.ownerUid ?? "")
-        : Promise.resolve(identity.uid);
-    void owner
-      .then((uid) => {
-        if (!uid)
-          throw new Error("No safety plan is currently shared with you.");
-        return loadPlan(uid);
-      })
+    const ownerUid = editable ? identity.uid : sharedOwnerUid;
+    setPlan(null);
+    setViewer(null);
+    setLocalConflict(null);
+    baseRevisions.current = {};
+    if (!ownerUid) return;
+    void loadPlan(ownerUid)
       .then(async (value) => {
         if (!live) return;
         setPlan(value);
@@ -109,13 +196,20 @@ export default function SafetyPlan() {
               const next = { ...current };
               for (const [key, field] of Object.entries(remote.fields)) {
                 const oldValue = previous.fields[key]?.value ?? "";
-                if ((current[key] ?? oldValue) === oldValue)
+                if (!(key in baseRevisions.current) && (current[key] ?? oldValue) === oldValue)
                   next[key] = field.value;
               }
               return next;
             });
           },
-          (error) => live && setFeedback(error.message),
+          (error) => {
+            if (!live) return;
+            setFeedback(error.message);
+            if (!editable) {
+              setPlan(null);
+              setViewer(null);
+            }
+          },
         );
         if (live) stop = cleanup;
         else cleanup();
@@ -130,7 +224,44 @@ export default function SafetyPlan() {
       live = false;
       stop?.();
     };
-  }, [identity?.uid]);
+  }, [identity?.uid, sharedOwnerUid, editable]);
+  const updateSection = async (
+    key: string,
+    items: SafetyChecklistItem[],
+    message: string,
+  ) => {
+    if (!plan) return;
+    const value = writeSafetyChecklist(items);
+    if (value.length > 4000) throw new Error("This section is full. Remove a step or document before adding more.");
+    setDrafts((current) => ({ ...current, [key]: value }));
+    const { plan: next, conflicts } = await saveField(plan, key, value, baseRevisions.current[key]);
+    delete baseRevisions.current[key];
+    setPlan(next);
+    if (conflicts.includes(key) && next.fields[key]?.value !== value) {
+      setLocalConflict({ key, mine: value });
+      return;
+    }
+    setDrafts((current) => ({
+      ...current,
+      [key]: next.fields[key]?.value ?? value,
+    }));
+    setFeedback(message);
+  };
+
+  useEffect(() => {
+    if (!editable || !plan || session.busy || conflictKey) return;
+    const key = Object.keys(baseRevisions.current).find((field) =>
+      drafts[field] !== plan.fields[field]?.value &&
+      (lastAttempt.current?.key !== field || lastAttempt.current.value !== drafts[field]),
+    );
+    if (!key) return;
+    const timer = window.setTimeout(() => {
+      lastAttempt.current = { key, value: drafts[key] };
+      void session.perform(() => updateSection(key, readSafetyChecklist(drafts[key]), `${label(key)} saved.`));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [drafts, plan, editable, session.busy, conflictKey]);
+
   if (!cloudMode)
     return (
       <Empty title="Safety plans use your shared account.">
@@ -144,26 +275,6 @@ export default function SafetyPlan() {
         {feedback || "Loading the latest shared sections."}
       </Empty>
     );
-
-  const updateSection = async (
-    key: string,
-    items: SafetyChecklistItem[],
-    message: string,
-  ) => {
-    const value = writeSafetyChecklist(items);
-    if (value.length > 4000) throw new Error("This section is full. Remove a step or document before adding more.");
-    setDrafts((current) => ({ ...current, [key]: value }));
-    const next = await saveField(plan, key, value);
-    setPlan(next);
-    setDrafts((current) => ({
-      ...current,
-      [key]: next.fields[key]?.value ?? value,
-    }));
-    if (next.fields[key]?.value !== value) {
-      throw new Error("This section changed on another device. Review the latest version and try again.");
-    }
-    setFeedback(message);
-  };
 
   const changeAttachment = (
     key: string, items: SafetyChecklistItem[], itemId: string,
@@ -181,6 +292,14 @@ export default function SafetyPlan() {
 
   return (
     <div className="safety-plan-web">
+      {!editable && sharedOwners.length > 1 && (
+        <label className="field">
+          <span>Shared safety plan</span>
+          <select value={sharedOwnerUid} onChange={(event) => setSharedOwnerUid(event.currentTarget.value)}>
+            {sharedOwners.map((owner) => <option key={owner.ownerUid} value={owner.ownerUid}>{owner.ownerName || "Shared plan"}</option>)}
+          </select>
+        </label>
+      )}
       <section className="panel safety-plan-summary">
         <ShieldCheck size={28} />
         <div>
@@ -193,7 +312,15 @@ export default function SafetyPlan() {
             Changes sync through the same protected Firebase functions used by
             the Android app.
           </p>
-          {plan.staffName && <small>Consultation: {plan.staffName}</small>}
+          {plan.staffUid && <small>A support staff member is working with you.</small>}
+          {editable && !plan.consultationRequested && Boolean(plan.plansCompletedAt) &&
+            <p role="status">Your safety plan and backup plan are complete.</p>}
+          {editable && plan.staffUid && plan.consultationConversationId && identity && (
+            <Button variant="quiet" onClick={() => {
+              session.setRequestedConversation({ id: plan.consultationConversationId!, uid: identity.uid });
+              session.setPage("Messages");
+            }}>Open consultation ticket</Button>
+          )}
         </div>
         {editable && (
           <Button
@@ -205,6 +332,15 @@ export default function SafetyPlan() {
                   plan.consultationRequested ? "stop" : "request",
                 );
                 setPlan(next);
+                if (identity && next.staffUid && next.consultationConversationId) {
+                  if (attachedIds.length) {
+                    void planMediaRecipients().then((recipients) => Promise.allSettled(
+                      attachedIds.map((id) => shareBrowserPlanDocument(id, identity, recipients)),
+                    )).catch(() => undefined);
+                  }
+                  session.setRequestedConversation({ id: next.consultationConversationId, uid: identity.uid });
+                  session.setPage("Messages");
+                }
               })
             }
           >
@@ -275,11 +411,13 @@ export default function SafetyPlan() {
                           ) : (
                             <input
                               type="text"
-                              disabled={section === "documents" && session.busy}
+                              readOnly={session.busy}
                               value={item.text}
                               maxLength={1000}
                               aria-label={`${label(section)} step ${index + 1}`}
                               onChange={(event) => {
+                                lastAttempt.current = null;
+                                baseRevisions.current[key] ??= plan.fields[key]?.revision ?? 0;
                                 const changed = items.map((candidate) =>
                                   candidate.id === item.id
                                     ? { ...candidate, text: event.target.value }
@@ -291,9 +429,12 @@ export default function SafetyPlan() {
                                 }));
                               }}
                               onBlur={() => {
+                                if (session.busy) return;
                                 const changed = readSafetyChecklist(drafts[key] ?? "");
-                                if (writeSafetyChecklist(changed) === plan.fields[key]?.value)
+                                if (writeSafetyChecklist(changed) === plan.fields[key]?.value) {
+                                  delete baseRevisions.current[key];
                                   return;
+                                }
                                 void session.perform(() =>
                                   updateSection(key, changed, `${label(section)} saved.`),
                                 );
@@ -321,7 +462,7 @@ export default function SafetyPlan() {
                           {section === "documents" && (
                             <div className="safety-step-documents">
                               {attachedIds.map((id) => {
-                                const document = documents.find((file) => file.id === id);
+                                const document = documents.find((file) => file.id === id && file.ownerUid === plan.ownerUid);
                                 return (
                                   <div className="safety-step-document" key={id}>
                                     {document?.approved ? (
@@ -406,9 +547,65 @@ export default function SafetyPlan() {
           </div>
         </section>
       ))}
+      {editable && (friends.length > 0 || selectedContacts.length > 0) && (
+        <section className="panel">
+          <h3>Share with safe contacts</h3>
+          {friends.map((friend) => (
+            <label className="field" key={friend.friendUid}>
+              <span><input type="checkbox" checked={selectedContacts.includes(friend.friendUid)}
+                disabled={session.busy || (selectedContacts.length >= 10 && !selectedContacts.includes(friend.friendUid))}
+                onChange={(event) => {
+                  const checked = event.currentTarget.checked;
+                  setSelectedContacts((current) => checked
+                    ? [...current, friend.friendUid]
+                    : current.filter((uid) => uid !== friend.friendUid));
+                }} /> {friend.friendUsername}</span>
+            </label>
+          ))}
+          <Button disabled={session.busy} onClick={() => void session.perform(async () => {
+            const selected = friends.filter((friend) => selectedContacts.includes(friend.friendUid));
+            setPlan(await sharePlanWithContacts(selected));
+            setFeedback("Safe contact access updated.");
+          })}>Save sharing</Button>
+        </section>
+      )}
       {documentError && <p className="error" role="status">{documentError}</p>}
       {feedback && <p role="status">{feedback}</p>}
       {viewer && <SafeMediaViewer {...viewer} onClose={() => setViewer(null)} />}
+      {editable && conflictKey && (
+        <Modal title="Conflicts">
+          {[
+            { mine: true, label: "Your change", value: localConflict?.mine ?? plan.fields[conflictKey]?.value ?? "" },
+            { mine: false, label: "Incoming change", value: localConflict
+              ? plan.fields[conflictKey]?.value ?? ""
+              : plan.pendingConflicts?.[conflictKey]?.value ?? "" },
+          ].map((choice) => (
+            <label className="field" key={choice.label}>
+              <span><input type="radio" name="safety-conflict" checked={keepMine === choice.mine}
+                onChange={() => setKeepMine(choice.mine)} /> {choice.label}</span>
+              <span>{readSafetyChecklist(choice.value).map((item) =>
+                (item.checked ? "☑ " : "☐ ") + safetyChecklistText(item),
+              ).join(" · ") || "Empty section"}</span>
+            </label>
+          ))}
+          <Button disabled={session.busy} onClick={() => void session.perform(async () => {
+            if (!localConflict) {
+              setPlan(await resolvePlanConflict(plan, conflictKey, !keepMine));
+              return;
+            }
+            const current = plan.fields[conflictKey]?.value ?? "";
+            if (keepMine) {
+              const result = await saveField(plan, conflictKey, localConflict.mine);
+              setPlan(result.plan);
+              if (result.conflicts.includes(conflictKey)) return;
+              setDrafts((draft) => ({ ...draft, [conflictKey]: localConflict.mine }));
+            } else {
+              setDrafts((draft) => ({ ...draft, [conflictKey]: current }));
+            }
+            setLocalConflict(null);
+          })}>{keepMine ? "Keep my change" : "Use incoming change"}</Button>
+        </Modal>
+      )}
     </div>
   );
 }

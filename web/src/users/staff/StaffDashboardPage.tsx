@@ -3,8 +3,11 @@ import { useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { Button, Empty, Logo } from "../../components/SharedComponents";
 import { useSession } from "../../session/SessionProvider";
+import { accounts } from "../../services/AccountService";
+import { register } from "../../services/MessagingService";
 import {
   loadPlan,
+  observeSafetyAccess,
   setStaffAvailability,
   staffConsultations,
   type SafetyPlan,
@@ -21,13 +24,29 @@ export default function StaffPortal() {
   const [plan, setPlan] = useState<SafetyPlan | null>(null);
 
   // Reload staff tickets when the signed-in session changes.
+  const identity = accounts.identity;
+  const uid = identity?.uid;
   useEffect(() => {
-    void session.perform(async () => {
-      const value = await staffConsultations();
-      setConsultations(value.plans);
-      setAvailable(value.available);
+    if (!uid) return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    let request = 0;
+    const refresh = () => {
+      const token = ++request;
+      void staffConsultations().then((value) => {
+        if (!active || token !== request) return;
+        setConsultations(value.plans);
+        setAvailable(value.available);
+      }).catch(() => undefined);
+    };
+    refresh();
+    if (identity) void register(identity).catch(() => undefined);
+    void observeSafetyAccess(uid, refresh, () => undefined).then((cleanup) => {
+      if (active) stop = cleanup;
+      else cleanup();
     });
-  }, []);
+    return () => { active = false; stop?.(); };
+  }, [uid]);
 
   return (
     <div className="page-width private-shell portal">
@@ -93,7 +112,8 @@ export default function StaffPortal() {
             ))}
           </div>
         )}
-        {plan && <SafetyPlanEditor plan={plan} onChange={setPlan} />}
+        {plan && <SafetyPlanEditor plan={plan} onChange={setPlan}
+          onCompleted={() => setConsultations((current) => current.filter((item) => item.ownerUid !== plan.ownerUid))} />}
         <OrganizationSupportInbox />
         <Button
           variant="quiet"

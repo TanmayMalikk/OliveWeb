@@ -186,6 +186,10 @@ object LocalNotificationEventHandler {
         context: Context, data: Map<String, String>, title: String? = null, body: String? = null,
     ) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        if (data["type"] == "safety_plans_completed" && data["recipientId"] == uid) {
+            OliveNotificationManager.showSafeUpdate(context, R.string.safety_plans_completed)
+            return
+        }
         val preferences = context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
         val conversationId = data["conversationId"].orEmpty()
         val messageId = data["messageId"].orEmpty()
@@ -346,7 +350,7 @@ object OliveNotificationManager {
         NotificationManagerCompat.from(context).notify(callId.hashCode(), notification)
     }
 
-    fun showSafeUpdate(context: Context) {
+    fun showSafeUpdate(context: Context, body: Int = R.string.notification_safe_app_activity) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
@@ -361,7 +365,7 @@ object OliveNotificationManager {
         val notification = NotificationCompat.Builder(context, CHANNEL_SAFE_UPDATES)
             .setSmallIcon(R.drawable.ic_notification_olive_branch)
             .setContentTitle(context.getString(R.string.notification_safe_app_updates))
-            .setContentText(context.getString(R.string.notification_safe_app_activity))
+            .setContentText(context.getString(body))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)

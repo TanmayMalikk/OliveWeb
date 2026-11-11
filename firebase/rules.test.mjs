@@ -2,7 +2,7 @@ import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebas
 
 import {
   doc, setDoc, getDoc, collection, getDocs, query, where,
-  serverTimestamp, writeBatch, updateDoc, deleteDoc
+  serverTimestamp, writeBatch, updateDoc, deleteDoc, onSnapshot
 } from 'firebase/firestore';
 import { ref, set, get, remove } from 'firebase/database';
 
@@ -70,6 +70,27 @@ test('a new account can reconcile before a marker or safety plan exists', async 
     if (empty.exists()) throw new Error('Bootstrap fixture unexpectedly exists');
     await assertFails(getDoc(doc(other, path, uid)));
   }
+});
+
+test('an open sync marker listener receives a later server write', {timeout: 15000}, async (t) => {
+  const uid = 'sync-listener-user';
+  const client = env.authenticatedContext(uid).firestore();
+  await new Promise((resolve, reject) => {
+    let published = false;
+    const stop = onSnapshot(doc(client, 'syncInvalidations', uid), snapshot => {
+      if (snapshot.metadata.fromCache) return;
+      if (snapshot.get('revision') === 1) {
+        resolve();
+      } else if (!published) {
+        published = true;
+        env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'syncInvalidations', uid), {
+          ownerUid: uid, allowedUsers: [uid], revision: 1, urgentRevision: 0, safetyRevision: 1,
+          mediaRevision: 0, conversationRevision: 0, accountRevision: 0, updatedAt: serverTimestamp(),
+        })).catch(reject);
+      }
+    }, reject);
+    t.after(stop);
+  });
 });
 
 test('malformed server sync markers are unreadable even by their path owner', async () => {

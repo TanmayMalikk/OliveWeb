@@ -3,6 +3,7 @@ package com.olive.app.data
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
@@ -25,12 +26,13 @@ internal class SafetyPlanRepository(
         onUpdate: (SafetyPlan) -> Unit,
         onError: (Exception) -> Unit,
     ): ListenerRegistration = firestore.collection("safetyPlans").document(ownerUid)
-        .addSnapshotListener { snapshot, error ->
+        .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
             if (error != null) {
                 onError(error)
                 return@addSnapshotListener
             }
-            val data = snapshot?.data ?: return@addSnapshotListener
+            if (snapshot?.metadata?.isFromCache != false) return@addSnapshotListener
+            val data = snapshot.data ?: return@addSnapshotListener
             try {
                 onUpdate(SafetyPlan.fromJson(JSONObject(data)))
             } catch (failure: Exception) {
@@ -46,7 +48,7 @@ internal class SafetyPlanRepository(
     }
 
     // Sends changed safety-plan fields and returns the merged server version.
-    suspend fun sync(plan: SafetyPlan): SafetyPlan {
+    suspend fun sync(plan: SafetyPlan, resolution: Map<String, Any>? = null): SafetyPlan {
         val changes =
             plan.fields.filterValues { it.mutationId != null && it.conflictRevision == null }
                 .map { (key, field) ->
@@ -63,7 +65,7 @@ internal class SafetyPlanRepository(
                 "ownerUid" to plan.ownerUid,
                 "defaults" to plan.fields.mapValues { it.value.value },
                 "changes" to changes
-            )
+            ) + (resolution?.let { mapOf("resolution" to it) } ?: emptyMap())
         )
         return SafetyPlan.fromJson(result.getJSONObject("plan"))
     }
@@ -90,6 +92,12 @@ internal class SafetyPlanRepository(
             row.getString("uid") to row.getString("username")
         }
     }
+
+    fun observeRecipientDevices(usernames: Collection<String>, onChange: () -> Unit): List<ListenerRegistration> =
+        usernames.distinct().map { username ->
+            firestore.collection("messageDirectory").document(username).collection("devices")
+                .addSnapshotListener { snapshot, error -> if (snapshot != null && error == null) onChange() }
+        }
 
     // Saves which trusted contact should receive safety-plan support access.
     suspend fun setSupportContact(uid: String) {

@@ -47,7 +47,7 @@ export function readSafetyChecklist(value: string): SafetyChecklistItem[] {
     return items;
   } catch {
     return value.trim()
-      ? [{ id: crypto.randomUUID(), text: value, checked: false }]
+      ? [{ id: "legacy-note", text: value, checked: false }]
       : [];
   }
 }

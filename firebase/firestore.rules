@@ -128,7 +128,8 @@ service cloud.firestore {
         && data.revision >= data.mediaRevision
         && data.revision >= data.conversationRevision
         && data.revision >= data.accountRevision
-        && data.updatedAt is timestamp && data.updatedAt <= request.time;
+        // An open watch can evaluate later writes against its initial request time.
+        && data.updatedAt is timestamp;
     }
 
     // Priority sync markers contain no user payload. Server code owns every mutation so a client

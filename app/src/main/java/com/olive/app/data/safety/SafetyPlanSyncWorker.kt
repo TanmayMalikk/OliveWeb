@@ -16,6 +16,7 @@ import org.json.JSONObject
 import java.util.UUID
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.child
+import com.olive.app.data.media.MediaRepository
 
 
 // Each upload reads the durable encrypted queue. Replacing a worker is safe because mutations are idempotent.
@@ -29,19 +30,14 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
         if (FirebaseAuth.getInstance().currentUser?.uid != actor) return Result.success()
         if (!hasValidatedInternetConnection(applicationContext)) return Result.retry()
         return try {
+            val store = SafetyPlanStore(applicationContext, false)
+            val repository = SafetyPlanRepository()
+            val attachment = inputData.getString(ATTACHMENT)
             withTimeout(40.seconds) {
-                syncSafetyPlan(
-                    SafetyPlanStore(applicationContext, false),
-                    SafetyPlanRepository(),
-                    actor,
-                    owner
-                )
+                if (attachment == null) syncSafetyPlan(store, repository, actor, owner)
+                else publishAttachment(store, repository, owner, attachment)
             }
-            if (SafetyPlanStore(applicationContext, false).read(
-                    actor,
-                    owner
-                )?.pending == true
-            ) Result.retry() else Result.success()
+            if (store.read(actor, owner)?.pending == true) Result.retry() else Result.success()
         } catch (_: TimeoutCancellationException) {
             Result.retry()
         } catch (cancelled: CancellationException) {
@@ -69,7 +65,52 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
         }
     }
 
+    private suspend fun publishAttachment(store: SafetyPlanStore, repository: SafetyPlanRepository, owner: String, id: String) {
+        val documents = SafetyDocumentRepository(media = MediaRepository())
+        val document = documents.getFor(owner, id)
+        if (store.read(owner, owner) == null) {
+            val remote = repository.get(owner) ?: return
+            store.mergeRemote(owner, remote)
+        }
+        store.update(owner, owner) { plan ->
+            plan.copy(fields = plan.fields.mapValues { (key, field) ->
+                val value = safetyChecklistWithPublishedDocuments(key, field.value, listOf(document))
+                if (value == field.value || value.length > 4000 || field.conflictRevision != null) field
+                else field.edit(value)
+            })
+        }
+        syncSafetyPlan(store, repository, owner, owner)
+        val confirmed = repository.get(owner) ?: return
+        val attached = confirmed.fields.filterKeys { it.endsWith("_documents") }.values.any { field ->
+            readSafetyChecklist(field.value).any { id in it.attachmentIds && id !in it.excludedAttachmentIds }
+        }
+        if (!attached) return
+        var failure: Exception? = null
+        repository.mediaRecipients().forEach { (uid, username) ->
+            if (FirebaseAuth.getInstance().currentUser?.uid != owner) return
+            try {
+                documents.grantAccess(document, owner, uid, username, forPlan = true)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                failure = error
+            }
+        }
+        failure?.let { throw it }
+    }
+
     companion object {
+        private const val ATTACHMENT = "attachment"
+
+        fun enqueueAttachment(context: Context, owner: String, documentId: String) {
+            val request = OneTimeWorkRequestBuilder<SafetyPlanSyncWorker>()
+                .setInputData(workDataOf("actor" to owner, "owner" to owner, ATTACHMENT to documentId))
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                "olive_safety_attachment_${owner}_${documentId}", ExistingWorkPolicy.KEEP, request,
+            )
+        }
         // Queues a background safety-plan sync without creating duplicate work.
         fun enqueue(context: Context, actor: String, owner: String) {
             if (!BuildConfig.FIREBASE_CONFIGURED) return
@@ -102,16 +143,13 @@ internal suspend fun syncSafetyPlan(
 ) {
     val sent = store.read(actor, owner) ?: return
     val remote = repository.sync(sent)
-    val merged = store.update(actor, owner) { mergeSafetyPlan(it, sent, remote) }
+    val merged = store.update(actor, owner) { mergeSafetyPlan(it, sent, remote, ownerEditing = actor == owner) }
     val action = merged.shareAction
     if (actor == owner && action.isNotEmpty() && (action == "stop" || !merged.hasEdits)) {
         val result = repository.consult(action)
         store.update(actor, owner) { current ->
             val completed = action == "stop" || result.staffUid.isNotBlank()
-            current.copy(
-                staffUid = result.staffUid,
-                staffName = result.staffName,
-                consultationRequested = result.consultationRequested,
+            mergeSafetyPlan(current, merged, result).copy(
                 shareAction = if (current.shareAction == action && completed) "" else current.shareAction
             )
         }
@@ -136,6 +174,17 @@ private const val SAFETY_ATTACHMENT_PREFIX = "safety-plan:"
 /** Identifies the exact safety-plan checklist row that created an uploaded document. */
 internal fun safetyChecklistAttachmentTag(fieldKey: String, itemId: String): String =
     "$SAFETY_ATTACHMENT_PREFIX$fieldKey:$itemId".take(80)
+
+internal fun safetyChecklistWithPublishedDocuments(fieldKey: String, value: String, documents: List<SafetyDocument>): String {
+    if (!fieldKey.endsWith("_documents")) return value
+    val items = readSafetyChecklist(value)
+    val updated = items.map { item ->
+        val tag = safetyChecklistAttachmentTag(fieldKey, item.id)
+        val uploaded = documents.filter { tag in it.tags && it.id !in item.excludedAttachmentIds }
+        item.copy(attachmentIds = (item.attachmentIds + uploaded.map { it.id }).distinct().takeLast(80))
+    }
+    return if (updated == items) value else writeSafetyChecklist(updated)
+}
 
 internal fun safetyChecklistAttachments(
     fieldKey: String,
@@ -286,7 +335,7 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
             val local = actor.optJSONObject(remote.ownerUid)?.let(SafetyPlan::fromJson)
             if (local != null) {
                 val combined = local.copy(fields = remote.fields + local.fields)
-                merged = mergeSafetyPlan(combined, combined, remote)
+                merged = mergeSafetyPlan(combined, combined, remote, ownerEditing = actorUid == remote.ownerUid)
             }
             actor.put(remote.ownerUid, merged.toJson())
         }

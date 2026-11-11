@@ -61,6 +61,7 @@ export function SessionProvider({
   const [history, setHistory] = useState<History>(emptyHistory);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [page, setPage] = useState<Page>("Home");
+  const [requestedConversation, setRequestedConversation] = useState<{ id: string; uid: string } | null>(null);
   const [onboardingProfile, setOnboardingProfile] = useState<Profile | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -199,6 +200,7 @@ export function SessionProvider({
     setPersonalLink("");
     setHistory(emptyHistory());
     setPage("Home");
+    setRequestedConversation(null);
     setMessage("");
     setIdleSeconds(null);
     setBusy(false);
@@ -468,6 +470,7 @@ export function SessionProvider({
           : "/";
     await accounts.signOut();
     epoch.current++;
+    setRequestedConversation(null);
     setProfile(null);
     setHistory(emptyHistory());
     setEnrollment(null);
@@ -480,7 +483,7 @@ export function SessionProvider({
     <SessionContext.Provider
       value={{
         path, go, phase, personalLink, hasEntryToken: Boolean(pendingEntry.current),
-        profile, history, enrollment, cover, page, setPage, busy, message,
+        profile, history, enrollment, cover, page, setPage, requestedConversation, setRequestedConversation, busy, message,
         clearMessage: () => setMessage(""), perform, authenticate, completeSetup,
         beginEntry, quickExit, searchTrigger, unlock, saveProfile, saveEntry,
         record, refresh, signOut, idleSeconds, noteInteraction, cloudMode, onboardingProfile,

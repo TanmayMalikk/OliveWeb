@@ -224,6 +224,8 @@ internal data class SafetyField(
     }
 }
 
+internal data class SafetyConflict(val value: String, val mutationId: String)
+
 internal data class SafetyPlan(
     val ownerUid: String,
     val ownerName: String,
@@ -238,10 +240,14 @@ internal data class SafetyPlan(
     val safeContactNames: Map<String, String> = emptyMap(),
     val supportSafeContactUid: String = "",
     val consultationConversationId: String = "",
+    val pendingConflicts: Map<String, SafetyConflict> = emptyMap(),
+    val plansCompletedAt: Long = 0L,
+    val resolvedConflicts: Map<String, List<String>> = emptyMap(),
 ) {
     val hasEdits get() = fields.values.any { it.mutationId != null }
-    val hasConflicts get() = fields.values.any { it.conflictRevision != null }
-    val pending get() = hasEdits || shareAction.isNotEmpty()
+    val hasConflicts get() = pendingConflicts.isNotEmpty() || fields.values.any { it.conflictRevision != null }
+    val pending get() = fields.values.any { it.mutationId != null && it.conflictRevision == null } ||
+        (shareAction.isNotEmpty() && (shareAction == "stop" || !hasEdits))
     // Safety: Converts this record into JSON.
     fun toJson(): JSONObject = JSONObject().put("ownerUid", ownerUid).put("ownerName", ownerName)
         .put(
@@ -261,6 +267,11 @@ internal data class SafetyPlan(
         .put("safeContactNames", JSONObject(safeContactNames))
         .put("supportSafeContactUid", supportSafeContactUid)
         .put("consultationConversationId", consultationConversationId)
+        .put("plansCompletedAt", plansCompletedAt)
+        .put("pendingConflicts", JSONObject(pendingConflicts.mapValues { (_, conflict) ->
+            JSONObject().put("value", conflict.value).put("mutationId", conflict.mutationId)
+        }))
+        .put("resolvedConflicts", JSONObject(resolvedConflicts.mapValues { (_, ids) -> org.json.JSONArray(ids) }))
 
     companion object {
         // Rebuilds a safety plan from its encrypted JSON fields.
@@ -285,6 +296,21 @@ internal data class SafetyPlan(
                     .orEmpty(),
                 json.optString("supportSafeContactUid"),
                 json.optString("consultationConversationId"),
+                json.optJSONObject("pendingConflicts")?.let { conflicts ->
+                    SAFETY_FIELD_KEYS.mapNotNull { key ->
+                        conflicts.optJSONObject(key)?.let {
+                            key to SafetyConflict(it.getString("value"), it.getString("mutationId"))
+                        }
+                    }.toMap()
+                }.orEmpty(),
+                json.optLong("plansCompletedAt"),
+                json.optJSONObject("resolvedConflicts")?.let { resolved ->
+                    SAFETY_FIELD_KEYS.mapNotNull { key ->
+                        resolved.optJSONArray(key)?.let { ids ->
+                            key to (0 until ids.length()).map(ids::getString)
+                        }
+                    }.toMap()
+                }.orEmpty(),
             )
         }
     }
@@ -294,23 +320,28 @@ internal data class SafetyPlan(
 internal fun mergeSafetyPlan(
     current: SafetyPlan,
     sent: SafetyPlan,
-    remote: SafetyPlan
+    remote: SafetyPlan,
+    ownerEditing: Boolean = true,
 ): SafetyPlan {
-    val fields = current.fields.mapValues { (key, local) ->
+    val fields = remote.fields.mapValues { (_, field) -> field.copy(mutationId = null) } + current.fields.mapValues { (key, local) ->
         val cloud = remote.fields[key] ?: return@mapValues local
         // Chooses the newer safety-plan value when phone and cloud edits differ.
         when {
             cloud.revision < local.revision -> local
             local.mutationId == null -> cloud.copy(mutationId = null)
             local.mutationId == cloud.mutationId -> cloud.copy(mutationId = null)
+            local.mutationId == remote.pendingConflicts[key]?.mutationId -> cloud.copy(mutationId = null)
+            local.mutationId in remote.resolvedConflicts[key].orEmpty() -> cloud.copy(mutationId = null)
+            local.value == cloud.value && local.revision < cloud.revision -> cloud.copy(mutationId = null)
             sent.fields[key]?.mutationId != null && sent.fields[key]?.mutationId == cloud.mutationId ->
                 local.copy(revision = cloud.revision, conflictValue = null, conflictRevision = null)
 
-            local.revision != cloud.revision -> local.copy(
+            ownerEditing && local.revision != cloud.revision -> local.copy(
                 conflictValue = cloud.value,
                 conflictRevision = cloud.revision
             )
 
+            !ownerEditing -> local.copy(conflictValue = null, conflictRevision = null)
             else -> local
         }
     }
@@ -324,7 +355,10 @@ internal fun mergeSafetyPlan(
         consultationConversationId = remote.consultationConversationId,
         safeContactUids = remote.safeContactUids,
         safeContactNames = remote.safeContactNames,
-        supportSafeContactUid = remote.supportSafeContactUid
+        supportSafeContactUid = remote.supportSafeContactUid,
+        pendingConflicts = remote.pendingConflicts,
+        plansCompletedAt = remote.plansCompletedAt,
+        resolvedConflicts = remote.resolvedConflicts,
     )
 }
 

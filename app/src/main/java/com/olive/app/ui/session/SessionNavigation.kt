@@ -373,7 +373,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
     }
 
     // Staff support controller: Closes the active feature.
-    fun close(conversationId: String, onClosed: () -> Unit = {}) {
+    fun close(conversationId: String, planCompleted: Boolean = false, onClosed: () -> Unit = {}) {
         if (runtime.localMode ||
             runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) ||
             conversationId.isBlank() || saving > 0
@@ -384,7 +384,8 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         runtime.scope.launch {
             // Closing a ticket is safe to retry because the server treats an already-closed ticket as success.
             try {
-                withContext(Dispatchers.IO) { repository.close(conversationId) }
+                if (planCompleted) runtime.safety.flushConsultation(conversationId)
+                withContext(Dispatchers.IO) { repository.close(conversationId, planCompleted) }
                 if (runtime.coverAccountId == actor) onClosed()
                 if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
                     runtime.conversationActions.closeConversation()
@@ -393,7 +394,8 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
                 throw cancelled
             } catch (_: Exception) { // Retry once in case the server closed the ticket but its first reply was lost.
                 try {
-                    withContext(Dispatchers.IO) { repository.close(conversationId) }
+                    if (planCompleted) runtime.safety.flushConsultation(conversationId)
+                    withContext(Dispatchers.IO) { repository.close(conversationId, planCompleted) }
                     if (runtime.coverAccountId == actor) onClosed()
                     if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
                         runtime.conversationActions.closeConversation()

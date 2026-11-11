@@ -32,6 +32,8 @@ export type SessionValue = {
   cover: Cover;
   page: Page;
   setPage: (page: Page) => void;
+  requestedConversation: { id: string; uid: string } | null;
+  setRequestedConversation: (conversation: { id: string; uid: string } | null) => void;
   busy: boolean;
   message: string;
   clearMessage: () => void;

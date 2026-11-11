@@ -1,5 +1,5 @@
 // All safe-app roles: routes signed-in users between safe-app pages.
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   History as HistoryIcon,
   Camera,
@@ -20,6 +20,9 @@ import {
 import { useSession } from "../../../session/SessionProvider";
 import { Button, Modal } from "../../../components/SharedComponents";
 import type { Page } from "../../../domain/DomainModels";
+import { accounts } from "../../../services/AccountService";
+import { observePlan } from "../../../services/SafetyPlanService";
+import { register } from "../../../services/MessagingService";
 import Activity from "./ActivityHistoryPage";
 import Home from "./SafeAppDashboard";
 import Profile from "./AccountProfilePage";
@@ -54,6 +57,25 @@ const nav: { page: Page; icon: typeof House }[] = [
 export default function SafeApp() {
   const s = useSession();
   const p = s.profile!;
+  const identity = accounts.identity;
+  const uid = identity?.uid;
+  const [completedAt, setCompletedAt] = useState(0);
+  const [dismissedAt, setDismissedAt] = useState(0);
+  useEffect(() => {
+    if (identity && s.cloudMode) void register(identity).catch(() => undefined);
+  }, [uid, s.cloudMode]);
+  useEffect(() => {
+    if (!uid || p.role !== "USER" || !s.cloudMode) return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    void observePlan(uid, (plan) => {
+      if (active) setCompletedAt(plan.consultationRequested ? 0 : plan.plansCompletedAt ?? 0);
+    }, () => undefined).then((cleanup) => {
+      if (active) stop = cleanup;
+      else cleanup();
+    }).catch(() => undefined);
+    return () => { active = false; stop?.(); };
+  }, [uid, p.role, s.cloudMode]);
   return (
     <div className="safe-shell private-shell">
       <aside className="safe-sidebar">
@@ -136,6 +158,12 @@ export default function SafeApp() {
               })}
             </small>
           </div>
+          {s.page !== "SafetyPlan" && completedAt > dismissedAt && (
+            <div className="status-banner" role="status">
+              Your safety plan and backup plan are complete.
+              <button className="text-link" onClick={() => setDismissedAt(completedAt)}>Dismiss</button>
+            </div>
+          )}
           {s.message && (
             <div className="status-banner" role="status">
               {s.message}

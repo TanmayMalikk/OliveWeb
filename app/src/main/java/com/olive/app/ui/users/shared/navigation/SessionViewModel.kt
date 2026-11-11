@@ -245,8 +245,8 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun requestStaffForConversation(conversationId: String, onCreated: (String) -> Unit) =
         runtime.staffSupport.requestStaffForConversation(conversationId, onCreated)
     // Closes the support ticket and archives it for every participant.
-    fun closeSupportChat(conversationId: String, onClosed: () -> Unit = {}) =
-        runtime.staffSupport.close(conversationId, onClosed)
+    fun closeSupportChat(conversationId: String, planCompleted: Boolean = false, onClosed: () -> Unit = {}) =
+        runtime.staffSupport.close(conversationId, planCompleted, onClosed)
 }
 
 // Signed-in accounts and admins: connects profile, cover settings, and account management screens.
