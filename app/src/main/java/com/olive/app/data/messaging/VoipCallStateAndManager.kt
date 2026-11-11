@@ -16,6 +16,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
@@ -109,7 +110,11 @@ internal fun isVoipApiConfigured(apiBaseUrl: String = BuildConfig.VOIP_API_BASE_
 
 class VoipManager(
     private val apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    // The call API is served through a proxy. Use HTTP/1.1 over TLS to avoid failed HTTP/2
+    // handshakes without replaying call-creation requests on a second connection.
+    private val httpClient: OkHttpClient = OkHttpClient.Builder()
+        .protocols(listOf(Protocol.HTTP_1_1))
+        .build(),
     private val bearerTokenProvider: suspend () -> String? = {
         FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
     },
