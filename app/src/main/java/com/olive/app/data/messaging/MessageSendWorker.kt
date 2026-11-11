@@ -13,6 +13,10 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.media.MediaRepository
+import com.olive.app.data.media.MediaTransferStatus
+import com.olive.app.data.media.MediaTransferStore
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.olive.app.security.EncryptionUtils
@@ -31,14 +35,22 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
     private val store = MessageOutboxStore(context)
     private val repository = SecureChatRepository()
+    private val conversations = MessagingRepository()
+    private val transfers = MediaTransferStore(context.applicationContext)
+    private val documents = SafetyDocumentRepository(media = MediaRepository())
 
     override suspend fun doWork(): Result {
         val ownerUid = inputData.getString(OWNER_UID) ?: return Result.failure()
         val conversationId = inputData.getString(CONVERSATION_ID) ?: return Result.failure()
+        val delivery = OutgoingDeliveryDispatcher(
+            deliverText = repository::deliver,
+            resolveUpload = { resolveUpload(ownerUid, it) },
+            deliverAttachment = ::deliverAttachment,
+        )
         val outcome = MessageQueueDrainer(
             store = store,
             activeOwnerUid = { FirebaseAuth.getInstance().currentUser?.uid },
-            deliver = repository::deliver,
+            deliver = delivery::deliver,
             classifyFailure = ::messageDeliveryFailure,
         ).drain(ownerUid, conversationId)
         return when (outcome) {
@@ -46,6 +58,34 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
             MessageDrainOutcome.RETRY -> Result.retry()
             MessageDrainOutcome.BLOCKED -> Result.failure()
         }
+    }
+
+    private fun resolveUpload(ownerUid: String, uploadJobId: String): String? {
+        val job = transfers.get(uploadJobId)
+            ?: throw AttachmentDeliveryRejected("ATTACHMENT_NOT_FOUND")
+        if (job.ownerUid != ownerUid) throw AttachmentDeliveryRejected("ACCOUNT_MISMATCH")
+        return when (job.status) {
+            MediaTransferStatus.COMPLETE -> job.mediaId.takeIf(String::isNotBlank)
+                ?: throw AttachmentDeliveryRejected("ATTACHMENT_NOT_FOUND")
+            MediaTransferStatus.FAILED,
+            MediaTransferStatus.CANCELLED -> throw AttachmentDeliveryRejected("ATTACHMENT_UPLOAD_FAILED")
+            else -> null
+        }
+    }
+
+    private suspend fun deliverAttachment(message: OutgoingMessage, mediaId: String) {
+        val conversation = conversations.getConversation(message.conversationId)
+            ?: throw AttachmentDeliveryRejected("CONVERSATION_NOT_FOUND")
+        if (message.ownerUid !in conversation.participantIds) {
+            throw AttachmentDeliveryRejected("PERMISSION_DENIED")
+        }
+        val recipients = conversation.participantIds.filter { it != message.ownerUid }.associateWith { uid ->
+            conversation.participantUsernames[uid]
+                ?: throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
+        }
+        if (recipients.isEmpty()) throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
+        val document = documents.getFor(message.ownerUid, mediaId)
+        documents.shareInChat(document, message, recipients)
     }
 
     companion object {
@@ -94,12 +134,19 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     }
 }
 
-private fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure =
-    if (failure is FirebaseFirestoreException) {
+internal fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure = when (failure) {
+    is AttachmentDependencyPending -> MessageDeliveryFailure(
+        "ATTACHMENT_UPLOAD_PENDING",
+        permanent = false,
+        countsTowardLimit = false,
+    )
+    is AttachmentDeliveryRejected -> MessageDeliveryFailure(failure.failureCode, permanent = true)
+    is FirebaseFirestoreException ->
         MessageDeliveryFailure(failure.code.name, isPermanentMessageFailure(failure.code))
-    } else {
-        MessageDeliveryFailure("TEMPORARY_FAILURE", permanent = false)
-    }
+    is FirebaseFunctionsException ->
+        MessageDeliveryFailure(failure.code.name, isPermanentMessageFailure(failure.code.name))
+    else -> MessageDeliveryFailure("TEMPORARY_FAILURE", permanent = false)
+}
 
 internal fun isPermanentMessageFailure(code: FirebaseFirestoreException.Code) =
     isPermanentMessageFailure(code.name)
@@ -295,6 +342,7 @@ internal enum class MessageDrainOutcome {
 internal data class MessageDeliveryFailure(
     val code: String,
     val permanent: Boolean,
+    val countsTowardLimit: Boolean = true,
 )
 
 /**
@@ -344,8 +392,13 @@ internal class MessageQueueDrainer(
                 throw cancelled
             } catch (failure: Exception) {
                 val deliveryFailure = classifyFailure(failure)
+                val persistedAttempts = if (deliveryFailure.countsTowardLimit) {
+                    sending.attemptCount
+                } else {
+                    (sending.attemptCount - 1).coerceAtLeast(0)
+                }
                 val permanent = deliveryFailure.permanent ||
-                        sending.attemptCount >= maxAutomaticAttempts
+                        (deliveryFailure.countsTowardLimit && persistedAttempts >= maxAutomaticAttempts)
                 store.update(sending.id) {
                     it.copy(
                         status = if (permanent) {
@@ -353,6 +406,7 @@ internal class MessageQueueDrainer(
                         } else {
                             MessageDeliveryStatus.FAILED_RETRYABLE
                         },
+                        attemptCount = persistedAttempts,
                         failureCode = deliveryFailure.code,
                     )
                 }

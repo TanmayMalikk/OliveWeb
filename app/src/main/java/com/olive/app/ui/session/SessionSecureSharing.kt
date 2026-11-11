@@ -149,7 +149,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             with(state) {
                 val conversation = activeConversation ?: return
                 val device = enrollment ?: return
-                val documents = safetyDocumentRepository ?: return
+                safetyDocumentRepository ?: return
                 if (messagingBusy || document.ownerUid != device.uid) return
                 val token = epoch
                 messagingBusy = true
@@ -157,17 +157,14 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 scope.launch {
                     // Turn an unexpected share failure into a readable message.
                     try {
-                        val recipients = conversation.participantIds.filter { it != device.uid }
-                            .associateWith { recipient -> conversation.participantUsernames[recipient]
-                                ?: error("Recipient username is unavailable")
-                            }
                         val outgoing = prepareOutgoingMessage(
                             conversation.id, AccountIdentity(device.uid, coverUsername),
                             "SHARED_MEDIA:${document.id}:${document.name}", roomKey(conversation)
-                        )
-                        documents.shareInChat(document, outgoing, recipients)
+                        ).copy(attachment = OutgoingAttachment(mediaId = document.id))
+                        val queued = withContext(Dispatchers.IO) { messageOutbox.write(outgoing) }
+                        MessageSendWorker.enqueue(application, queued)
                         if (epoch == token) message =
-                            runtime.application.getString(R.string.documents_shared_in_chat)
+                            runtime.application.getString(R.string.message_delivery_queued)
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: Exception) {

@@ -40,6 +40,10 @@ data class OutgoingAttachment(
 /** A pending upload keeps its sequence position and asks WorkManager to retry later. */
 internal class AttachmentDependencyPending : IllegalStateException("Encrypted media upload is still pending")
 
+internal class AttachmentDeliveryRejected(
+    val failureCode: String,
+) : IllegalStateException(failureCode)
+
 /** Routes one sequenced outbox head without allowing attachments to bypass the text-message queue. */
 internal class OutgoingDeliveryDispatcher(
     private val deliverText: suspend (OutgoingMessage) -> Unit,
