@@ -365,3 +365,93 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         vault.update { it.remove(actorUid) }
     }
 }
+
+internal data class SafetyChecklistMerge(
+    val localValue: String,
+    val remoteValue: String,
+    val conflicted: Boolean,
+)
+
+private fun checklistRows(value: String?): Map<String, Map<String, Any?>>? = runCatching {
+    val document = JSONObject(requireNotNull(value))
+    require(document.optInt("oliveSafetyChecklist") == 1)
+    val items = document.getJSONArray("items")
+    require(items.length() <= 80)
+    val result = linkedMapOf<String, Map<String, Any?>>()
+    repeat(items.length()) { index ->
+        val row = items.getJSONObject(index)
+        val id = row.getString("id")
+        require(id.isNotBlank() && id !in result && row.get("text") is String && row.get("checked") is Boolean)
+        result[id] = row.keys().asSequence().associateWith { key ->
+            when (val property = row.get(key)) {
+                is JSONArray -> (0 until property.length()).map { property.get(it) }
+                JSONObject.NULL -> null
+                else -> property
+            }
+        }
+    }
+    result
+}.getOrNull()
+
+// Merge individual checklist properties against the text visible when editing began.
+internal fun mergeSafetyChecklist(baseValue: String?, localValue: String, remoteValue: String): SafetyChecklistMerge? {
+    val base = checklistRows(baseValue) ?: return null
+    val local = checklistRows(localValue) ?: return null
+    val remote = checklistRows(remoteValue) ?: return null
+    val mine = mutableListOf<Map<String, Any?>>()
+    val incoming = mutableListOf<Map<String, Any?>>()
+    var conflicted = false
+    for (id in remote.keys + local.keys) {
+        val before = base[id]
+        val a = local[id]
+        val b = remote[id]
+        val localRow: Map<String, Any?>?
+        val remoteRow: Map<String, Any?>?
+        when {
+            a == before -> { localRow = b; remoteRow = b }
+            b == before || a == b -> { localRow = a; remoteRow = a }
+            a == null || b == null -> {
+                conflicted = true
+                localRow = a
+                remoteRow = b
+            }
+            else -> {
+                val localProperties = linkedMapOf<String, Any?>()
+                val remoteProperties = linkedMapOf<String, Any?>()
+                for (key in before.orEmpty().keys + a.keys + b.keys) {
+                    val localProperty: Any?
+                    val remoteProperty: Any?
+                    when {
+                        a[key] == before?.get(key) -> { localProperty = b[key]; remoteProperty = b[key] }
+                        b[key] == before?.get(key) || a[key] == b[key] -> { localProperty = a[key]; remoteProperty = a[key] }
+                        key in setOf("attachmentIds", "excludedAttachmentIds") &&
+                            a[key] is List<*> && b[key] is List<*> &&
+                            (before?.get(key) == null || before[key] is List<*>) -> {
+                            val first = a[key] as List<*>
+                            val second = b[key] as List<*>
+                            val original = (before?.get(key) as? List<*>).orEmpty()
+                            val removed = original.filter { it !in first || it !in second }.toSet()
+                            localProperty = (second + first).distinct().filter { it !in removed }
+                            remoteProperty = localProperty
+                        }
+                        else -> {
+                            conflicted = true
+                            localProperty = a[key]
+                            remoteProperty = b[key]
+                        }
+                    }
+                    if (localProperty != null) localProperties[key] = localProperty
+                    if (remoteProperty != null) remoteProperties[key] = remoteProperty
+                }
+                localRow = localProperties
+                remoteRow = remoteProperties
+            }
+        }
+        localRow?.let(mine::add)
+        remoteRow?.let(incoming::add)
+    }
+    fun encode(rows: List<Map<String, Any?>>) = JSONObject().put("oliveSafetyChecklist", 1)
+        .put("items", JSONArray(rows.map { JSONObject(it) })).toString()
+    val result = SafetyChecklistMerge(encode(mine), encode(incoming), conflicted)
+    return result.takeIf { mine.size <= 80 && incoming.size <= 80 && it.localValue.length <= 4000 && it.remoteValue.length <= 4000 }
+}

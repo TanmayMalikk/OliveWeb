@@ -74,7 +74,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     emptyList()
                 privateEntries = emptyList()
                 messaging.stopMessaging()
-                if (accountRole == AccountRole.USER && !localMode) messaging.syncLocalNotificationHandler()
+                if (!localMode) messaging.syncLocalNotificationHandler()
                 activeTriggerId = null
                 triggerJob = null
                 pendingIdentity = null

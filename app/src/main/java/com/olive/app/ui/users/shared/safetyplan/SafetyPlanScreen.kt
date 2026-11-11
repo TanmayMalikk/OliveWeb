@@ -395,6 +395,7 @@ internal fun SafetyPlanScreen(
 @Composable
 internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     val controller = session.safetyPlans
+    LaunchedEffect(session.coverAccountId) { controller.observeAccess() }
     var selected by rememberSaveable { mutableStateOf<SharedSafetyPlan?>(null) }
     LaunchedEffect(Unit) { controller.refreshSharedPlans() }
     if (selected != null) SafetyPlanScreen(
@@ -525,7 +526,7 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
         if (message != null) Text(
             message, style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.testTag("safety_sharing_status").semantics { liveRegion = LiveRegionMode.Polite })
-        if (plan.consultationRequested && plan.staffUid.isNotBlank()) {
+        if (plan.consultationRequested && plan.consultationConversationId.isNotBlank()) {
             OutlinedButton(onClick = { controller.openConsultation(plan.consultationConversationId) }) {
                 Text(stringResource(R.string.safety_open_consultation))
             }

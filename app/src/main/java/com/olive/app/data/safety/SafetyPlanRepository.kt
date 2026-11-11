@@ -56,7 +56,8 @@ internal class SafetyPlanRepository(
                         "key" to key,
                         "value" to field.value,
                         "revision" to field.revision,
-                        "mutationId" to checkNotNull(field.mutationId)
+                        "mutationId" to checkNotNull(field.mutationId),
+                        "baseValue" to field.baseValue,
                     )
                 }
         val result = call(
@@ -98,6 +99,19 @@ internal class SafetyPlanRepository(
             firestore.collection("messageDirectory").document(username).collection("devices")
                 .addSnapshotListener { snapshot, error -> if (snapshot != null && error == null) onChange() }
         }
+
+    fun observeAccess(uid: String, onChange: () -> Unit): ListenerRegistration {
+        var revision = -1L
+        return firestore.collection("syncInvalidations").document(uid)
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, failure ->
+                if (failure != null || snapshot?.metadata?.isFromCache != false) return@addSnapshotListener
+                val next = snapshot.getLong("safetyRevision") ?: 0L
+                if (next != revision) {
+                    revision = next
+                    onChange()
+                }
+            }
+    }
 
     // Saves which trusted contact should receive safety-plan support access.
     suspend fun setSupportContact(uid: String) {

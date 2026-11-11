@@ -204,12 +204,14 @@ internal val SAFETY_FIELD_KEYS =
 
 internal data class SafetyField(
     val value: String, val revision: Long = 0, val mutationId: String? = null,
-    val conflictValue: String? = null, val conflictRevision: Long? = null
+    val conflictValue: String? = null, val conflictRevision: Long? = null,
+    val baseValue: String? = null,
 ) {
     // Safety: Converts this record into JSON.
     fun toJson(): JSONObject =
         JSONObject().put("value", value).put("revision", revision).put("mutationId", mutationId)
             .put("conflictValue", conflictValue).put("conflictRevision", conflictRevision)
+            .put("baseValue", baseValue)
 
     companion object {
         // Rebuilds this safety-plan record from protected JSON data.
@@ -220,7 +222,8 @@ internal data class SafetyField(
             json.optString("conflictValue")
                 .takeIf { json.has("conflictValue") && !json.isNull("conflictValue") },
             json.optLong("conflictRevision")
-                .takeIf { json.has("conflictRevision") && !json.isNull("conflictRevision") })
+                .takeIf { json.has("conflictRevision") && !json.isNull("conflictRevision") },
+            json.optString("baseValue").takeIf { json.has("baseValue") && !json.isNull("baseValue") })
     }
 }
 
@@ -325,6 +328,8 @@ internal fun mergeSafetyPlan(
 ): SafetyPlan {
     val fields = remote.fields.mapValues { (_, field) -> field.copy(mutationId = null) } + current.fields.mapValues { (key, local) ->
         val cloud = remote.fields[key] ?: return@mapValues local
+        val checklistMerge = if (local.mutationId != null && local.revision < cloud.revision)
+            mergeSafetyChecklist(local.baseValue, local.value, cloud.value) else null
         // Chooses the newer safety-plan value when phone and cloud edits differ.
         when {
             cloud.revision < local.revision -> local
@@ -334,7 +339,19 @@ internal fun mergeSafetyPlan(
             local.mutationId in remote.resolvedConflicts[key].orEmpty() -> cloud.copy(mutationId = null)
             local.value == cloud.value && local.revision < cloud.revision -> cloud.copy(mutationId = null)
             sent.fields[key]?.mutationId != null && sent.fields[key]?.mutationId == cloud.mutationId ->
-                local.copy(revision = cloud.revision, conflictValue = null, conflictRevision = null)
+                local.copy(revision = cloud.revision, conflictValue = null, conflictRevision = null,
+                    baseValue = cloud.value)
+
+            checklistMerge != null -> {
+                if (checklistMerge.localValue == cloud.value && !checklistMerge.conflicted) cloud.copy(mutationId = null)
+                else local.copy(
+                    value = checklistMerge.localValue,
+                    revision = if (checklistMerge.conflicted) local.revision else cloud.revision,
+                    baseValue = if (checklistMerge.conflicted) local.baseValue else cloud.value,
+                    conflictValue = checklistMerge.remoteValue.takeIf { checklistMerge.conflicted && ownerEditing },
+                    conflictRevision = cloud.revision.takeIf { checklistMerge.conflicted && ownerEditing },
+                )
+            }
 
             ownerEditing && local.revision != cloud.revision -> local.copy(
                 conflictValue = cloud.value,
@@ -364,7 +381,8 @@ internal fun mergeSafetyPlan(
 
 // Gives the safety plan the safety fields with defaults it needs.
 internal fun SafetyField.edit(value: String) =
-    copy(value = value, mutationId = UUID.randomUUID().toString())
+    copy(value = value, mutationId = UUID.randomUUID().toString(),
+        baseValue = if (mutationId == null) this.value else baseValue)
 
 // Upgrade only untouched local placeholders. User-cleared checklists, drafts and remote revisions remain intact.
 internal fun safetyFieldsWithDefaults(

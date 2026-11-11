@@ -65,9 +65,7 @@ internal fun MessagesScreen(
     val currentUid = session.coverAccountId.orEmpty()
     // Keep the chosen list visible while a phone opens a chat and returns from it.
     var showingArchived by rememberSaveable { mutableStateOf(false) }
-    val chatExit = exit.takeUnless {
-        session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
-    }
+    val chatExit = exit.takeIf { session.accountRole == AccountRole.USER }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         // Wide screens place the conversation list and open chat beside each other.
@@ -296,7 +294,11 @@ private fun MessagingSidebar(
                 modifier = Modifier.semantics { heading() })
         }
         item {
-            Text(stringResource(R.string.support_conversations), style = MaterialTheme.typography.titleMedium,
+            Text(stringResource(if (!organizationAccount) R.string.support_conversations else when (supportFilter) {
+                SUPPORT_TAG_PLAN_CONSULT -> R.string.support_filter_plan_consults
+                SUPPORT_TAG_NEEDS_ADMIN -> R.string.support_filter_needs_admin
+                else -> R.string.support_filter_support
+            }), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() })
         }
         if (supportConversations.isEmpty() && showingArchived) item {

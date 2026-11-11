@@ -161,6 +161,10 @@ object LocalNotificationEventHandler {
             .collection("devices").document(devId)
             .set(mapOf("uid" to uid, "deviceId" to devId, "token" to token, "updatedAt" to FieldValue.serverTimestamp()))
             .await()
+        if (FirebaseAuth.getInstance().currentUser?.uid != uid) {
+            FirebaseFirestore.getInstance().collection("notificationTokens").document(uid)
+                .collection("devices").document(devId).delete().await()
+        }
     }
 
     // Evaluates whether an incoming FCM data payload should trigger a Safe App update notification.

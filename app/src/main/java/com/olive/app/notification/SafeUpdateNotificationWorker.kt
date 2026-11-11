@@ -11,7 +11,8 @@ import kotlin.random.Random
 class SafeUpdateNotificationWorker(context: Context, parameters: WorkerParameters) :
     Worker(context, parameters) {
     override fun doWork(): Result {
-        if (FirebaseAuth.getInstance().currentUser == null) return Result.success()
+        val uid = inputData.getString("uid") ?: return Result.success()
+        if (FirebaseAuth.getInstance().currentUser?.uid != uid) return Result.success()
         OliveNotificationManager.showSafeUpdate(applicationContext)
         return Result.success()
     }
@@ -25,7 +26,9 @@ object SafeUpdateNotificationScheduler {
 
     // Schedules the background task for safe update notification worker.
     fun schedule(context: Context) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val request = OneTimeWorkRequestBuilder<SafeUpdateNotificationWorker>()
+            .setInputData(workDataOf("uid" to uid))
             .setInitialDelay(randomDelaySeconds(), TimeUnit.SECONDS)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)

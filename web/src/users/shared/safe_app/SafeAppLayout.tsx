@@ -114,9 +114,9 @@ export default function SafeApp() {
       <div className="safe-main">
         <header className="safe-header">
           <span className="eyebrow">YOUR SPACE, AT YOUR PACE</span>
-          <Button variant="exit" onClick={s.quickExit}>
+          {p.role === "USER" && <Button variant="exit" onClick={s.quickExit}>
             Quick Exit <LogOut size={17} />
-          </Button>
+          </Button>}
         </header>
         <main id="main" tabIndex={-1}>
           <div className="safe-page-title">
@@ -224,9 +224,9 @@ export default function SafeApp() {
             {s.idleSeconds} seconds.
           </p>
           <Button onClick={s.noteInteraction}>Stay here</Button>
-          <Button variant="quiet" onClick={s.quickExit}>
+          {p.role === "USER" && <Button variant="quiet" onClick={s.quickExit}>
             Quick Exit
-          </Button>
+          </Button>}
         </Modal>
       )}
     </div>

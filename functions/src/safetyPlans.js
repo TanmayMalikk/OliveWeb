@@ -4,7 +4,9 @@ const {auth, db} = require("./firebaseAdminClient");
 const {readProfile} = require("./accountStorage");
 const {roleFromUser, text} = require("./accountPolicy");
 const {mergeFields} = require("./safetyPlanPolicy");
+const {mergeChecklist} = require("./safetyChecklistMerge");
 const {safetyCaller, planReference, canEdit, canRead} = require("./safetyPlanAccess");
+const {repairPlanTicket} = require("./supportTicketRepair");
 exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   const ownerUid = request.data?.ownerUid;
@@ -16,15 +18,25 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
     const old = snapshot.data();
     if (!canRead(caller, old, ownerUid)) throw new HttpsError("permission-denied", "Plan is no longer shared with this account.");
     if (changes.length && !canEdit(caller, old, ownerUid)) throw new HttpsError("permission-denied", "This shared plan is read only.");
-    const {fields, conflicts} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes);
+    const {fields, conflicts, conflictValues} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes);
     const pendingConflicts = {...old?.pendingConflicts};
     const resolvedConflicts = {...old?.resolvedConflicts};
     if (caller.role === "STAFF" || caller.role === "ADMIN") {
       for (const change of changes) {
         if (conflicts.includes(change.key) && fields[change.key]?.value !== change.value &&
             !resolvedConflicts[change.key]?.includes(change.mutationId)) {
-          pendingConflicts[change.key] = {value: change.value, mutationId: change.mutationId};
+          pendingConflicts[change.key] = {
+            value: conflictValues[change.key] || change.value, mutationId: change.mutationId,
+            baseValue: fields[change.key].value,
+          };
         }
+      }
+    }
+    for (const [key, proposal] of Object.entries(pendingConflicts)) {
+      const current = fields[key]?.value;
+      if (proposal.baseValue != null && current != null && proposal.baseValue !== current) {
+        const merged = mergeChecklist(proposal.baseValue, proposal.value, current);
+        if (merged) pendingConflicts[key] = {...proposal, value: merged.localValue, baseValue: current};
       }
     }
     const resolution = request.data?.resolution;
@@ -50,7 +62,7 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
       safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}),
     fields, pendingConflicts, resolvedConflicts, updatedAt: Date.now()} : old;
     if (changed) transaction.set(reference, plan);
-    return {plan, conflicts};
+    return {plan, conflicts, conflictValues};
   });
 });
 exports.safetyPlanShareContacts = onCall({invoker: "public"}, async (request) => {
@@ -115,7 +127,13 @@ exports.safetyPlanConsultations = onCall({invoker: "public"}, async (request) =>
     await db.collection("safetyPlans").where("consultationRequested", "==", true).get() :
     await db.collection("safetyPlans").where("staffUid", "==", caller.uid).get();
   const settings = caller.role === "STAFF" ? await db.collection("safetyStaff").doc(caller.uid).get() : null;
-  const requestedPlans = snapshot.docs.filter(document => document.data().consultationRequested === true);
+  const requestedRows = snapshot.docs.filter(document => document.data().consultationRequested === true);
+  for (const document of requestedRows) {
+    if (!document.get("consultationConversationId") || !Number.isSafeInteger(document.get("ticketNumber"))) {
+      await repairPlanTicket(document.id);
+    }
+  }
+  const requestedPlans = requestedRows.length ? await db.getAll(...requestedRows.map(row => row.ref)) : [];
   const conversationIds = [...new Set(requestedPlans.map(document =>
     text(document.data().consultationConversationId, 300)).filter(Boolean))];
   const conversationSnapshots = conversationIds.length ?

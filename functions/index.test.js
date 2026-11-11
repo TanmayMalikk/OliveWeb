@@ -21,11 +21,25 @@ test("deployment keeps the existing callable endpoint names", () => {
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
     "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
     "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant",
-    "conversationRemoveParticipant", "conversationRequestStaff", "staffSupportClose", "nutritionFoodSearch",
+    "conversationRemoveParticipant", "conversationRequestStaff", "conversationPrepareKeys", "supportTicketsPrepare", "staffSupportClose", "nutritionFoodSearch",
     "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",
     "syncConversationDeviceKeyInvalidation", "syncAccountInvalidation"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+test("ticket assignments notify staff and newly added administrators through the shared FCM payload", () => {
+  const {fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
+  const ticket = {type: "SUPPORT", ownerUid: "user", participantIds: ["user", "staff"], lastMessageId: ""};
+  const assigned = fcmTargetsForConversationUpdate(undefined, ticket, "support-user-ticket");
+  assert.deepEqual(assigned.recipients, ["staff"]);
+  assert.equal(assigned.data.type, "safe_update");
+  const escalated = fcmTargetsForConversationUpdate(ticket, {
+    ...ticket, participantIds: ["user", "staff", "admin"],
+  }, "support-user-ticket");
+  assert.deepEqual(escalated.recipients, ["admin"]);
+  assert.equal(escalated.data.type, "safe_update");
+  assert.deepEqual(fcmTargetsForConversationUpdate(ticket, ticket, "support-user-ticket").recipients, []);
 });
 
 // Inputs: a three-person group, its owner, and one other member. Expected: only the owner can

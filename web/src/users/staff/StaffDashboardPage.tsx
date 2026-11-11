@@ -1,6 +1,5 @@
 // Staff: shows assigned users and support chats to staff.
 import { useEffect, useState } from "react";
-import { LogOut } from "lucide-react";
 import { Button, Empty, Logo } from "../../components/SharedComponents";
 import { useSession } from "../../session/SessionProvider";
 import { accounts } from "../../services/AccountService";
@@ -18,7 +17,7 @@ import OrganizationSupportInbox from "../shared/OrganizationSupportInbox";
 export default function StaffPortal() {
   const session = useSession();
   const [consultations, setConsultations] = useState<
-    { ownerUid: string; ownerName: string; updatedAt: number }[]
+    { ownerUid: string; ownerName: string; updatedAt: number; ticketNumber: number }[]
   >([]);
   const [available, setAvailable] = useState(true);
   const [plan, setPlan] = useState<SafetyPlan | null>(null);
@@ -53,9 +52,6 @@ export default function StaffPortal() {
       <header className="site-header">
         <Logo />
         <span className="eyebrow">STAFF PORTAL</span>
-        <Button variant="exit" onClick={session.quickExit}>
-          Quick Exit <LogOut size={17} />
-        </Button>
       </header>
       <main id="main">
         <div className="safe-page-title">
@@ -107,7 +103,7 @@ export default function StaffPortal() {
                   )
                 }
               >
-                Open {item.ownerName || "shared plan"}
+                {item.ticketNumber >= 0 ? `Consult Ticket #${item.ticketNumber}` : "Consult Ticket"}
               </button>
             ))}
           </div>

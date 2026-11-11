@@ -37,6 +37,9 @@ export default function OrganizationSupportInbox() {
   const [feedback, setFeedback] = useState("");
   const [category, setCategory] = useState<TicketCategory>("SUPPORT");
   const [showArchived, setShowArchived] = useState(false);
+  useEffect(() => {
+    setSelected((current) => conversations.find((ticket) => ticket.id === current?.id) ?? current);
+  }, [conversations]);
 
   // Keeps the inbox current while the organization user is signed in.
   useEffect(() => {
@@ -44,6 +47,7 @@ export default function OrganizationSupportInbox() {
     let active = true;
     let stop: (() => void) | undefined;
     void messaging.register(identity)
+      .then(() => messaging.prepareSupportTickets())
       .then(() => {
         if (!active) return undefined;
         return messaging.subscribeConversations(
@@ -95,7 +99,7 @@ export default function OrganizationSupportInbox() {
       active = false;
       stop?.();
     };
-  }, [selected?.id, identity?.uid]);
+  }, [selected?.id, selected?.participantIds.join(","), identity?.uid]);
 
   const visible = useMemo(
     () =>

@@ -2,7 +2,7 @@ import {before, after, test} from "node:test";
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 import {initializeTestEnvironment, assertFails} from "@firebase/rules-unit-testing";
-import {doc, getDoc, getDocFromServer, onSnapshot, setDoc} from "firebase/firestore";
+import {doc, getDoc, getDocFromServer, onSnapshot, setDoc, updateDoc, serverTimestamp} from "firebase/firestore";
 import {readFile} from "node:fs/promises";
 const require = createRequire(new URL("../functions/package.json", import.meta.url));
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId:"demo-olive-rules",storageBucket:"demo-olive-rules.appspot.com"});
@@ -12,12 +12,15 @@ const {safetyPlanSync, safetyPlanConsultations, safetyPlanAvailability, safetyPl
   safetyPlansSharedWithMe} = require("./src/safetyPlans");
 const {safetyPlanConsult} = require("./src/safetyConsultations");
 const {safetySupportAdmin, staffSupportClose} = require("./src/supportGroups");
+const {conversationPrepareKeys, supportTicketsPrepare, repairPlanTicket, repairConversation} = require("./src/supportTicketRepair");
 const {staffSupportRequest} = require("./src/supportTickets");
 const {mediaUpdateAccess, mediaAccountAccessKey, reconcilePlanMediaGrants} = require("./src/mediaTickets");
 const {fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
 const users = new Map([
   ["plan-owner",{uid:"plan-owner",email:"owner@users.olive.invalid",displayName:"Owner"}],
   ["plan-live-owner",{uid:"plan-live-owner",email:"live-owner@users.olive.invalid",displayName:"Live owner"}],
+  ["plan-legacy-owner",{uid:"plan-legacy-owner",email:"legacy@users.olive.invalid",displayName:"Legacy owner"}],
+  ["plan-checklist-owner",{uid:"plan-checklist-owner",email:"checklist@users.olive.invalid",displayName:"Checklist owner"}],
   ["support-owner",{uid:"support-owner",email:"support-owner@users.olive.invalid",displayName:"Support owner"}],
   ["plan-share-owner",{uid:"plan-share-owner",email:"share-owner@users.olive.invalid",displayName:"Sharing owner"}],
   ["plan-other",{uid:"plan-other",email:"other@users.olive.invalid"}],
@@ -129,6 +132,98 @@ test("open user, safe contact and staff listeners receive edits and a completed 
 });
 after(async () => { auth.getUser=originalGetUser;auth.listUsers=originalListUsers;bucket.file=originalFile;await env.cleanup();await db.terminate(); });
 const call=(endpoint,uid,data={}) => endpoint.run({auth:{uid},data});
+
+test("only competing checklist properties create owner proposals and later independent edits survive resolution", async () => {
+  const owner = "plan-checklist-owner", key = "primary_documents";
+  const reference = db.collection("safetyPlans").doc(owner);
+  const rows = [{id:"a",text:"Original",checked:false},{id:"b",text:"Second",checked:false}];
+  const encode = items => JSON.stringify({oliveSafetyChecklist:1,items});
+  const base = encode(rows);
+  await reference.set({ownerUid:owner,staffUid:"plan-staff",consultationRequested:true,
+    safeContactUids:[],fields:{[key]:{value:base,revision:1,mutationId:"initial"}}});
+  const edit = (uid,value,revision,mutationId,baseValue) =>
+    call(safetyPlanSync,uid,{ownerUid:owner,changes:[{key,value,revision,mutationId,baseValue}]});
+  await edit(owner,encode([{...rows[0],text:"Owner"},rows[1]]),1,"owner-change",base);
+  const independent=await edit("plan-staff",encode([rows[0],{...rows[1],checked:true}]),1,"staff-other",base);
+  assert.deepEqual(independent.conflicts,[]);
+  assert.deepEqual(independent.plan.pendingConflicts,{});
+  const current=independent.plan.fields[key];
+  const conflict=await edit("plan-staff",encode([{...rows[0],text:"Staff"},rows[1]]),1,"staff-conflict",base);
+  assert.deepEqual(conflict.conflicts,[key]);
+  const laterRows=JSON.parse(current.value).items.map(item=>item.id==="b"?{...item,text:"Later independent edit"}:item);
+  const later=await edit(owner,encode(laterRows),current.revision,"owner-later",current.value);
+  const resolved=await call(safetyPlanSync,owner,{ownerUid:owner,resolution:{
+    key,revision:later.plan.fields[key].revision,mutationId:"staff-conflict",useIncoming:true,
+  }});
+  const finalRows=JSON.parse(resolved.plan.fields[key].value).items;
+  assert.equal(finalRows[0].text,"Staff");
+  assert.equal(finalRows[1].text,"Later independent edit");
+  assert.equal(finalRows[1].checked,true);
+  await reference.delete();
+});
+
+test("a legacy support ticket with mixed-case usernames can initialize encryption after repair", async () => {
+  const id = "support-plan-owner-key-test";
+  const reference = db.collection("conversations").doc(id);
+  await reference.set({
+    type: "SUPPORT", ownerUid: "plan-owner", staffUid: "plan-staff", adminUid: "",
+    supportOrigin: "SUPPORT", supportTag: "SUPPORT", ticketNumber: 42,
+    friendshipId: id, participantIds: ["plan-owner", "plan-staff"],
+    participantUsernames: {"plan-owner": "PLAN_OWNER", "plan-staff": "Plan_Staff"},
+    lastMessage: "", lastMessageId: "", lastSenderUid: "",
+    createdAt: new Date(), updatedAt: new Date(),
+  });
+  await db.collection("messageDirectory").doc("plan_owner").set({
+    uid: "plan-owner", username: "plan_owner", publicKey: "owner-key",
+  });
+  await db.collection("messageDirectory").doc("plan_staff").set({
+    uid: "plan-staff", username: "plan_staff", publicKey: "staff-key",
+  });
+  const owner = env.authenticatedContext("plan-owner", {role: "USER"}).firestore();
+  const keys = {
+    roomKeys: {"plan-owner": "wrapped-owner", "plan-staff": "wrapped-staff"},
+    participantPublicKeys: {"plan-owner": "owner-key", "plan-staff": "staff-key"},
+    updatedAt: serverTimestamp(),
+  };
+  await assertFails(updateDoc(doc(owner, "conversations", id), keys));
+  await assert.rejects(call(conversationPrepareKeys, "plan-other", {conversationId: id}));
+  const prepared = await call(conversationPrepareKeys, "plan-owner", {conversationId: id});
+  assert.deepEqual(prepared.participantUsernames, {"plan-owner": "plan_owner", "plan-staff": "plan_staff"});
+  await updateDoc(doc(owner, "conversations", id), keys);
+  await call(conversationPrepareKeys, "plan-staff", {conversationId: id});
+  assert.deepEqual((await reference.get()).get("roomKeys"), keys.roomKeys);
+});
+
+test("legacy safety plan and its existing chat share one durable ticket number", async () => {
+  const owner = "plan-legacy-owner";
+  const id = "support-" + owner;
+  const plan = db.collection("safetyPlans").doc(owner);
+  const chat = db.collection("conversations").doc(id);
+  await plan.set({ownerUid: owner, ownerName: "Legacy", fields: {}, consultationRequested: true,
+    staffUid: "plan-staff", staffName: "", adminUid: "", safeContactUids: []});
+  await chat.set({type: "SUPPORT", ownerUid: owner, staffUid: "plan-staff", adminUid: "",
+    friendshipId: id, participantIds: [owner, "plan-staff"],
+    participantUsernames: {[owner]: "legacy_owner", "plan-staff": "plan_staff"},
+    lastMessage: "", lastMessageId: "", lastSenderUid: ""});
+  const messages = chat.collection("messages").doc("existing");
+  await messages.set({ciphertext: "historical-ciphertext"});
+  await Promise.all([repairPlanTicket(owner), repairPlanTicket(owner)]);
+  const savedPlan = (await plan.get()).data();
+  const savedChat = (await chat.get()).data();
+  assert.equal(savedPlan.consultationConversationId, id);
+  assert.ok(Number.isSafeInteger(savedPlan.ticketNumber));
+  assert.equal(savedPlan.ticketNumber, savedChat.ticketNumber);
+  assert.equal(savedChat.supportOrigin, "PLAN_CONSULT");
+  assert.equal(savedChat.supportTag, "PLAN_CONSULT");
+  const assigned = await call(safetyPlanConsultations, "plan-staff");
+  const row = assigned.plans.find(item => item.ownerUid === owner);
+  assert.equal(row.conversationId, id);
+  assert.equal(row.ticketNumber, savedPlan.ticketNumber);
+  await call(supportTicketsPrepare, "plan-staff");
+  assert.equal((await chat.get()).get("ticketNumber"), savedPlan.ticketNumber);
+  assert.equal((await messages.get()).get("ciphertext"), "historical-ciphertext");
+  await call(safetyPlanConsult, owner, {action: "stop"});
+});
 test("full consultation workflow enforces owner consent, assigned-staff edits, conflicts and revocation", async () => {
   const owner="plan-owner";
   let response=await call(safetyPlanSync,owner,{ownerUid:owner,defaults:{primary_destination:"Initial",backup_destination:"Backup"},changes:[]});
@@ -192,9 +287,21 @@ test("no available staff leaves a durable waiting request and repeated requests 
   await call(safetyPlanAvailability,"plan-staff2",{available:false});
   let response=await call(safetyPlanConsult,"plan-owner",{action:"request"});
   assert.equal(response.plan.staffUid,"");assert.equal(response.plan.consultationRequested,true);
+  const pendingId = response.plan.consultationConversationId;
+  const pendingNumber = response.plan.ticketNumber;
+  const waiting = await db.collection("conversations").doc(pendingId).get();
+  assert.equal(waiting.exists, true);
+  assert.equal(waiting.get("supportOrigin"), "PLAN_CONSULT");
+  assert.equal(waiting.get("ticketNumber"), pendingNumber);
+  assert.deepEqual(waiting.get("participantIds"), ["plan-owner"]);
+  const client = env.authenticatedContext("plan-owner", {role: "USER"}).firestore();
+  assert.equal((await getDocFromServer(doc(client, "conversations", pendingId))).exists(), true);
   await call(safetyPlanAvailability,"plan-staff2",{available:true});
   response=await call(safetyPlanConsult,"plan-owner",{action:"request"});
   assert.equal(response.plan.staffUid,"plan-staff2");
+  assert.equal(response.plan.consultationConversationId, pendingId);
+  assert.equal(response.plan.ticketNumber, pendingNumber);
+  assert.equal((await db.collection("conversations").doc(pendingId).get()).get("staffUid"), "plan-staff2");
   await Promise.all([call(safetyPlanConsult,"plan-owner",{action:"request"}),call(safetyPlanConsult,"plan-owner",{action:"request"})]);
   assert.equal((await db.collection("safetyStaff").doc("plan-staff2").get()).data().activeCount,1);
   await call(safetyPlanConsult,"plan-owner",{action:"stop"});

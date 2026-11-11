@@ -43,10 +43,12 @@ export function StaffHelpPage() {
     requested: boolean;
     staffName?: string;
     conversationId?: string;
+    ticketNumber?: number;
   } | null>(null);
   return (
     <section className="panel safe-feature-page">
-      <h2>Request help from staff</h2>
+      <h2>{ticket?.requested && ticket.ticketNumber !== undefined
+        ? `Support Ticket #${ticket.ticketNumber}` : "Request help from staff"}</h2>
       <p>
         This opens a private support ticket. It does not share your safety plan.
       </p>
@@ -57,8 +59,13 @@ export function StaffHelpPage() {
               ? "Olive Staff is assigned."
               : "Looking for an available staff member…"}
           </strong>
-          <Button variant="outline" onClick={() => session.setPage("Messages")}>
-            Open support chats
+          <Button variant="outline" onClick={() => {
+            if (ticket.conversationId && accounts.identity) {
+              session.setRequestedConversation({ id: ticket.conversationId, uid: accounts.identity.uid });
+            }
+            session.setPage("Messages");
+          }}>
+            {ticket.ticketNumber !== undefined ? `Support Ticket #${ticket.ticketNumber}` : "Open support ticket"}
           </Button>
           <Button
             variant="quiet"
@@ -66,7 +73,7 @@ export function StaffHelpPage() {
               void session.perform(async () => {
                 const result = await callable<{ ticket: typeof ticket }>(
                   "staffSupportRequest",
-                  { action: "stop" },
+                  { action: "stop", conversationId: ticket.conversationId },
                 );
                 setTicket(result.ticket);
               })

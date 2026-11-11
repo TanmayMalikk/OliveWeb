@@ -5,6 +5,39 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafetyPlanMergeTest {
+    @Test
+    fun concurrentChecklistRowsMergeWithoutAConflictPopup() {
+        val key = "primary_documents"
+        val rows = listOf(SafetyChecklistItem("a", "First"), SafetyChecklistItem("b", "Second"))
+        val initial = SafetyPlan("owner", "owner", mapOf(key to SafetyField(writeSafetyChecklist(rows), 1)))
+        val draft = initial.copy(fields = mapOf(key to initial.fields.getValue(key).edit(
+            writeSafetyChecklist(listOf(rows[0], rows[1].copy(text = "User edit"))),
+        )))
+        val remote = initial.copy(fields = mapOf(key to SafetyField(
+            writeSafetyChecklist(listOf(rows[0].copy(checked = true), rows[1])), 2, "staff",
+        )))
+        val merged = mergeSafetyPlan(draft, draft, remote)
+        assertFalse(merged.hasConflicts)
+        val saved = readSafetyChecklist(merged.fields.getValue(key).value)
+        assertTrue(saved[0].checked)
+        assertEquals("User edit", saved[1].text)
+        assertEquals(2L, merged.fields.getValue(key).revision)
+        assertEquals(remote.fields.getValue(key).value, merged.fields.getValue(key).baseValue)
+    }
+
+    @Test
+    fun conflictingChecklistTextPreservesOtherIncomingRowsInBothChoices() {
+        val rows = listOf(SafetyChecklistItem("a", "Original"), SafetyChecklistItem("b", "Second"))
+        val base = writeSafetyChecklist(rows)
+        val mine = writeSafetyChecklist(listOf(rows[0].copy(text = "Mine"), rows[1]))
+        val remote = writeSafetyChecklist(listOf(rows[0].copy(text = "Incoming"), rows[1].copy(checked = true)))
+        val merged = checkNotNull(mergeSafetyChecklist(base, mine, remote))
+        assertTrue(merged.conflicted)
+        assertEquals("Mine", readSafetyChecklist(merged.localValue)[0].text)
+        assertEquals("Incoming", readSafetyChecklist(merged.remoteValue)[0].text)
+        assertTrue(readSafetyChecklist(merged.localValue)[1].checked)
+        assertTrue(readSafetyChecklist(merged.remoteValue)[1].checked)
+    }
     private val old =
         SafetyPlan("owner", "owner", mapOf("primary_destination" to SafetyField("Old", 1)))
 
