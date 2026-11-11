@@ -1,9 +1,8 @@
 // All safe-app roles: handles web account sign-in and registration.
 import { useState } from "react";
 import { siteHref } from "../../../sites/SiteRouting";
-import { ArrowLeft, ArrowRight, Building2, Leaf, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Leaf, UserRound, UserRoundPlus } from "lucide-react";
 import {
-  Branch,
   Button,
   Field,
   Form,
@@ -33,6 +32,7 @@ export function AuthPage({
   const form = (
     <>
       <Form
+        key={create ? "create-account" : "sign-in"}
         onSubmit={async (data) => {
           const username = String(data.get("username"));
           const password = String(data.get("password"));
@@ -51,25 +51,43 @@ export function AuthPage({
           });
         }}
       >
-        <label className="field">
-          <span>Account type</span>
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-          >
-            {organizationOnly ? (
-              <>
-                <option value="STAFF">Organization staff</option>
-                <option value="ADMIN">Organization administrator</option>
-              </>
-            ) : (
-              <>
-                <option value="USER">Personal account</option>
-                <option value="SAFE_CONTACT">Safe contact</option>
-              </>
-            )}
-          </select>
-        </label>
+        {create ? (
+          <fieldset className="signup-account-types">
+            <legend>Account type</legend>
+            <div className="signup-role-options">
+              <label className="signup-role">
+                <input type="radio" name="signup-role" checked={role === "USER"}
+                  onChange={() => setRole("USER")} />
+                <span><strong>Personal account</strong><small>Use your own Safe Space.</small></span>
+              </label>
+              <label className="signup-role">
+                <input type="radio" name="signup-role" checked={role === "SAFE_CONTACT"}
+                  onChange={() => setRole("SAFE_CONTACT")} />
+                <span><strong>Safe contact</strong><small>Support someone who shares a safety plan with you.</small></span>
+              </label>
+            </div>
+          </fieldset>
+        ) : (
+          <label className="field">
+            <span>Account type</span>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as Role)}
+            >
+              {organizationOnly ? (
+                <>
+                  <option value="STAFF">Organization staff</option>
+                  <option value="ADMIN">Organization administrator</option>
+                </>
+              ) : (
+                <>
+                  <option value="USER">Personal account</option>
+                  <option value="SAFE_CONTACT">Safe contact</option>
+                </>
+              )}
+            </select>
+          </label>
+        )}
         <Field
           label={
             role === "STAFF" || role === "ADMIN"
@@ -80,7 +98,7 @@ export function AuthPage({
           autoComplete="username"
           required
           minLength={create ? 8 : 4}
-          maxLength={254}
+          maxLength={create ? 24 : 254}
           hint={
             create ? "8–24 letters, numbers, or underscores." : undefined
           }
@@ -139,22 +157,14 @@ export function AuthPage({
           </button>
         </p>
       )}
-      {!organizationOnly && (
+      {!organizationOnly && !create && (
         <div className="account-utility-links">
-          {create && <a className="text-link" href={siteHref("/get")}>
-            Download & installation <ArrowRight size={15} aria-hidden="true" />
-          </a>}
-          {!create && (
-            <button
-              className="text-link"
-              onClick={() => {
-                session.clearMessage();
-                session.go("/account/link");
-              }}
-            >
-              Replace a lost personal link <ArrowRight size={15} />
-            </button>
-          )}
+          <button className="text-link" type="button" onClick={() => {
+            session.clearMessage();
+            session.go("/account/link");
+          }}>
+            Replace a lost personal link <ArrowRight size={15} aria-hidden="true" />
+          </button>
         </div>
       )}
       {!session.cloudMode && (
@@ -166,69 +176,43 @@ export function AuthPage({
     </>
   );
 
-  if (!create) {
-    const Icon = organizationOnly ? Building2 : UserRound;
-    return (
-      <div className="access-page">
-        <header className="access-header">
-          <Logo small />
-          {!organizationOnly && (
-            <a className="text-link" href={siteHref("/get")}>Get the app <ArrowRight size={16} aria-hidden="true" /></a>
-          )}
-        </header>
-        <main className="access-sign-in" id="main">
-          <section className="access-context" aria-labelledby="sign-in-context">
-            <span className="access-mark"><Icon size={25} aria-hidden="true" /></span>
-            <p className="access-context-title" id="sign-in-context">{organizationOnly ? "Organization portal" : "Personal and safe contact accounts"}</p>
-            <p>{organizationOnly
-              ? "Access the staff or administrator workspace with your organization account."
-              : "Choose the account type you registered with to continue."}</p>
-            {!organizationOnly && (
-              <button className="text-link" type="button" onClick={() => session.go("/")}>
-                <ArrowLeft size={16} aria-hidden="true" /> Back to Little Grove
-              </button>
-            )}
-          </section>
-          <section className="access-card" aria-labelledby="sign-in-heading">
-            <h1 id="sign-in-heading">{organizationOnly ? "Organization sign-in" : "Sign in to Olive Branch"}</h1>
-            {form}
-          </section>
-        </main>
-      </div>
-    );
-  }
+  const Icon = create ? UserRoundPlus : organizationOnly ? Building2 : UserRound;
+  const contextTitle = create
+    ? "What comes next"
+    : organizationOnly ? "Organization portal" : "Personal and safe contact accounts";
+  const heading = create
+    ? "Create your account"
+    : organizationOnly ? "Organization sign-in" : "Sign in to Olive Branch";
 
   return (
-    <div className="account-layout">
-      <aside className="account-aside">
-        <Logo />
-        <div>
-          <span className="eyebrow">YOUR OLIVE BRANCH</span>
-          <h1>
-            A familiar place.
-            <br />
-            <em>A fresh start.</em>
-          </h1>
-          <p>
-            Your everyday app is just the beginning. Let’s make this space your
-            own.
-          </p>
-        </div>
-        <Branch />
-        <span className="aside-bottom">A little more room to be you.</span>
-      </aside>
-      <main className="account-main" id="main">
+    <div className="access-page">
+      <header className="access-header">
+        <Logo small />
         {!organizationOnly && (
-          <button className="text-link" onClick={() => session.go("/")}>
-            <ArrowLeft size={17} /> Back to home
-          </button>
+          <a className="text-link" href={siteHref("/get")}>
+            Get the app <ArrowRight size={16} aria-hidden="true" />
+          </a>
         )}
-        <div className="account-form">
-          <span className="eyebrow">A SIMPLE START</span>
-          <h2>Create your account.</h2>
-          <p>Your details first. Your everyday app next.</p>
+      </header>
+      <main className={create ? "access-sign-in access-sign-up" : "access-sign-in"} id="main">
+        <section className="access-context" aria-labelledby="account-context">
+          <span className="access-mark"><Icon size={25} aria-hidden="true" /></span>
+          <p className="access-context-title" id="account-context">{contextTitle}</p>
+          <p>{create
+            ? "Set up your profile after signup. Personal accounts also choose a browser PIN and get a private entry link."
+            : organizationOnly
+              ? "Access the staff or administrator workspace with your organization account."
+              : "Choose the account type you registered with to continue."}</p>
+          {!organizationOnly && (
+            <button className="text-link" type="button" onClick={() => session.go("/")}>
+              <ArrowLeft size={16} aria-hidden="true" /> Back to Little Grove
+            </button>
+          )}
+        </section>
+        <section className="access-card" aria-labelledby="account-heading">
+          <h1 id="account-heading">{heading}</h1>
           {form}
-        </div>
+        </section>
       </main>
     </div>
   );
