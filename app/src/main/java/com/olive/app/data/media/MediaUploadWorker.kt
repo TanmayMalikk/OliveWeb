@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.messaging.MessageSendWorker
 import com.olive.app.data.messaging.OutgoingMessage
 import java.io.File
 import java.io.IOException
@@ -61,6 +62,9 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
     private val offlineCache=OfflineMediaCache(context)
     private val repository:MediaTicketDataSource=MediaRepository()
     private val client=mediaUploadHttpClient()
+    private val dependencyNotifier=MediaUploadDependencyNotifier { ownerUid ->
+        MessageSendWorker.enqueuePending(applicationContext,ownerUid)
+    }
 
     // Uploads one encrypted file in the background and saves its cloud record.
     override suspend fun doWork():Result {
@@ -94,6 +98,10 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             store.update(job.id) { it.copy(status=MediaTransferStatus.FINALIZING,error=null) }
             val record=repository.completeUpload(job.id,parts)
             store.update(job.id) { it.copy(status=MediaTransferStatus.COMPLETE,mediaId=record.id,error=null) }
+            // A queued chat attachment may be the current per-conversation ordering barrier. Wake
+            // that account only after both the remote record and durable COMPLETE state exist.
+            runCatching { dependencyNotifier.uploadCompleted(job.ownerUid) }
+                .onFailure { Log.e("OliveMediaUpload", "Unable to wake upload-dependent messages", it) }
             // Preserve a bounded reuse window so an owner can pin the already-uploaded ciphertext
             // without downloading it from R2. Cleanup remains durable if the UI never opens.
             runCatching {
