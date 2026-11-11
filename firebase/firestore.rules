@@ -68,6 +68,8 @@ service cloud.firestore {
 
     // Safety-plan listeners may read only the same owner, shared-contact, or assigned support plan as the callable API.
     match /safetyPlans/{ownerUid} {
+      allow get: if signedIn() && request.auth.uid == ownerUid
+        && request.auth.token.role == 'USER' && resource == null;
       allow get: if signedIn() && validSafetyPlanAccessShape(resource.data, ownerUid) && (
         (request.auth.uid == ownerUid && request.auth.token.role == 'USER')
         || (request.auth.token.role == 'SAFE_CONTACT'
@@ -132,7 +134,7 @@ service cloud.firestore {
     // Priority sync markers contain no user payload. Server code owns every mutation so a client
     // cannot manufacture a revision, target another account, or use the collection as storage.
     match /syncInvalidations/{uid} {
-      allow get: if owner(uid) && validSyncInvalidation(resource.data, uid);
+      allow get: if owner(uid) && (resource == null || validSyncInvalidation(resource.data, uid));
       allow list, create, update, delete: if false;
     }
 

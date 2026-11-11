@@ -6,7 +6,8 @@ process.env.FIREBASE_CONFIG = JSON.stringify({
   storageBucket: "olive-test.appspot.com",
   databaseURL: "https://olive-test.firebaseio.com",
 });
-const sync = require("./src/syncInvalidations")._test;
+const {db, messaging} = require("./src/firebaseAdminClient");
+const {syncAccountInvalidation, _test: sync} = require("./src/syncInvalidations");
 
 test("safety invalidations include previous and new authorized roles", () => {
   assert.deepEqual(sync.safetyAudience(
@@ -49,4 +50,49 @@ test("audience parsing rejects malformed and oversized identifiers under repetit
   for (let iteration = 0; iteration < 1000; iteration += 1) {
     assert.deepEqual(sync.strings(["valid", "valid", "", 42, null, "x".repeat(129)]), ["valid"]);
   }
+});
+
+test("account changes write a revision and wake devices registered for app notifications", async (t) => {
+  const marker = {};
+  const deviceRef = {};
+  const sent = [];
+  t.mock.method(db, "collection", (name) => {
+    if (name === "syncInvalidations") return {doc: (uid) => {
+      assert.equal(uid, "staff");
+      return marker;
+    }};
+    assert.equal(name, "notificationTokens");
+    return {doc: (uid) => {
+      assert.equal(uid, "staff");
+      return {collection: (subcollection) => {
+        assert.equal(subcollection, "devices");
+        return {get: async () => ({docs: [{ref: deviceRef, get: () => "staff-device-token"}]})};
+      }};
+    }};
+  });
+  t.mock.method(db, "runTransaction", async (callback) => callback({
+    get: async (ref) => {
+      assert.equal(ref, marker);
+      return {data: () => ({revision: 4, accountRevision: 1})};
+    },
+    set: (ref, value) => {
+      assert.equal(ref, marker);
+      assert.equal(value.accountRevision, 2);
+      assert.deepEqual(value.allowedUsers, ["staff"]);
+    },
+  }));
+  t.mock.method(messaging, "sendEachForMulticast", async (message) => {
+    sent.push(message);
+    return {responses: [{success: true}]};
+  });
+
+  await syncAccountInvalidation.run({
+    data: {before: {exists: false}, after: {exists: true, data: () => ({uid: "staff"})}},
+  });
+
+  assert.deepEqual(sent, [{
+    tokens: ["staff-device-token"],
+    data: {type: "sync_invalidation", revision: "5", urgent: "1"},
+    android: {priority: "normal"},
+  }]);
 });

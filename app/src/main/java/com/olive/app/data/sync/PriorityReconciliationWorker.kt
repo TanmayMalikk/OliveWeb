@@ -2,6 +2,7 @@
 package com.olive.app.data.sync
 
 import android.content.Context
+import android.os.Build
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -56,8 +57,9 @@ class PriorityReconciliationWorker(
                     SyncDomain.CONVERSATION to ConversationAccessReconciler(applicationContext),
                 ),
             )
-            runner.reconcile(uid, target)
-            SyncCompletionEvents.publish(uid)
+            if (runner.reconcile(uid, target) == ReconciliationOutcome.COMPLETE) {
+                SyncCompletionEvents.publish(uid)
+            }
             Result.success()
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -88,8 +90,9 @@ class PriorityReconciliationWorker(
         checkpoints: SyncCheckpointDataSource,
         auth: FirebaseAuth,
     ): Result {
+        if (auth.currentUser?.uid?.let { it != uid } == true) return Result.success()
         purgeRevokedAccount(uid, checkpoints)
-        auth.signOut()
+        if (auth.currentUser?.uid == uid) auth.signOut()
         AccountRevocationEvents.publish(uid)
         return Result.success()
     }
@@ -105,7 +108,7 @@ class PriorityReconciliationWorker(
         DeviceStore(
             EncryptedVault(applicationContext, "firebase"),
             EncryptedVault(applicationContext, "firebase-activity"),
-        ).forgetDevice()
+        ).forgetDevice(expectedUid = uid)
     }
 
     companion object {
@@ -134,11 +137,15 @@ class PriorityReconciliationWorker(
                 .setInputData(Data.Builder().putString(INPUT_UID, uid).build())
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
-            if (expedited) builder.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            // Older Android versions require a foreground service for expedited work.
+            if (expedited && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                builder.setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            }
             val request = builder.build()
             WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
                 "olive-priority-reconciliation-$uid",
-                if (expedited) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP,
+                // A running worker may already have read the previous server marker.
+                if (revision != null) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.KEEP,
                 request,
             )
         }
@@ -202,7 +209,8 @@ internal class SyncCheckpointStore(
 
     private companion object {
         const val ACCOUNTS = "accounts"
-        const val INITIALIZED = "initialized"
+        // Older versions could mark the baseline initialized before all domains completed.
+        const val INITIALIZED = "baselineComplete"
         const val REVISION = "revision"
         const val ACCOUNT = "accountRevision"
         const val SAFETY = "safetyRevision"

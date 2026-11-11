@@ -61,6 +61,17 @@ test('sync invalidation markers are owner-readable and server-write-only', async
   await assertFails(deleteDoc(doc(alice,'syncInvalidations/sync-alice')));
 });
 
+test('a new account can reconcile before a marker or safety plan exists', async () => {
+  const uid = 'sync-bootstrap-user';
+  const owner = env.authenticatedContext(uid, {role:'USER'}).firestore();
+  const other = env.authenticatedContext('sync-bootstrap-other', {role:'USER'}).firestore();
+  for (const path of ['syncInvalidations', 'safetyPlans']) {
+    const empty = await assertSucceeds(getDoc(doc(owner, path, uid)));
+    if (empty.exists()) throw new Error('Bootstrap fixture unexpectedly exists');
+    await assertFails(getDoc(doc(other, path, uid)));
+  }
+});
+
 test('malformed server sync markers are unreadable even by their path owner', async () => {
   const alice = env.authenticatedContext('sync-shape-alice').firestore();
   const base = {
