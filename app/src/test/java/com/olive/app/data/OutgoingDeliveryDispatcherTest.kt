@@ -62,6 +62,22 @@ class OutgoingDeliveryDispatcherTest {
         }
     }
 
+    @Test
+    fun `attachment dependency failures have stable retry classifications`() {
+        assertEquals(
+            MessageDeliveryFailure(
+                "ATTACHMENT_UPLOAD_PENDING",
+                permanent = false,
+                countsTowardLimit = false,
+            ),
+            messageDeliveryFailure(AttachmentDependencyPending()),
+        )
+        assertEquals(
+            MessageDeliveryFailure("ATTACHMENT_NOT_FOUND", permanent = true),
+            messageDeliveryFailure(AttachmentDeliveryRejected("ATTACHMENT_NOT_FOUND")),
+        )
+    }
+
     private fun dispatcher(
         text: suspend (OutgoingMessage) -> Unit = {},
         resolve: suspend (String) -> String? = { error("Upload resolution was not expected") },
