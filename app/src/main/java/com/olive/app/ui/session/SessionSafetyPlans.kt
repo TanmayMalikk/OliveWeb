@@ -130,10 +130,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                         runtime.scope.launch {
                             // Keep unsent local edits while refreshing every section changed on another device.
                             val updated = withContext(Dispatchers.IO) {
-                                store.update(actor, ownerUid) { local ->
-                                    val combined = local.copy(fields = remote.fields + local.fields)
-                                    mergeSafetyPlan(combined, combined, remote)
-                                }
+                                store.mergeRemote(actor, remote)
                             }
                             if (current(actor, ownerUid, token)) {
                                 plan = updated
