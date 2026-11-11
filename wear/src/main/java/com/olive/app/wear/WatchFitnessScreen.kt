@@ -11,11 +11,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.lightColorScheme
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.ColorScheme
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,14 +54,13 @@ internal enum class WatchPage(val label: String) {
 @Composable
 internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
     MaterialTheme(
-        colorScheme = lightColorScheme(
+        colorScheme = ColorScheme(
             primary = WatchAccent,
             onPrimary = WatchSurface,
             background = WatchBackground,
             onBackground = WatchText,
-            surface = WatchSurface,
+            surfaceContainer = WatchSurface,
             onSurface = WatchText,
-            surfaceVariant = WatchPaleOlive,
             onSurfaceVariant = WatchText,
         )
     ) {
