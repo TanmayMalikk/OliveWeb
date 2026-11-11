@@ -36,8 +36,6 @@ import com.olive.app.R
 import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
 import java.io.File
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private data class SafetyAttachmentTarget(
@@ -72,13 +70,9 @@ internal fun SafetyPlanScreen(
     val defaults = remember(context) { safetyDefaults(context) }
     // Stop this screen's plan listener when it leaves composition.
     DisposableEffect(lease) { onDispose { controller.close(lease) } }
-    // Open the plan and refresh it every five seconds while this screen is visible.
+    // Open once; its Firestore listener and durable reconciliation worker deliver later changes.
     LaunchedEffect(lease) {
         controller.open(ownerUid, ownerName, defaults, lease)
-        while (true) {
-            delay(5.seconds)
-            controller.refresh()
-        }
     }
     val organizationEditor = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     val viewerUid = session.coverAccountId.orEmpty()

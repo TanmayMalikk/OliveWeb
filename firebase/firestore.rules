@@ -16,6 +16,16 @@ service cloud.firestore {
     // ciphertext_size, ciphertext_sha256, encryption_version, created_at.
     // encrypted_metadata contains the file name, MIME type, media kind, and optional OCR result.
     // ===============================================================
+    // Assumed data model: syncInvalidations/{uid}
+    // ===============================================================
+    // Server-owned, payload-free reconciliation marker:
+    // ownerUid: string equal to the document UID (required, immutable by virtue of client-write denial).
+    // allowedUsers: single-item list containing only ownerUid (required).
+    // revision, urgentRevision, safetyRevision, mediaRevision, conversationRevision, accountRevision:
+    // non-negative integers no larger than JavaScript's safe-integer maximum (required).
+    // updatedAt: server timestamp (required).
+    // Clients may read only their own valid marker. Only trusted Admin SDK code may write it.
+    // ===============================================================
 
     // Web entry URLs are a discreet entry gate, never a replacement for account authentication.
     // Each authenticated owner may rotate their own token hash; anonymous lookups are forbidden.
@@ -34,9 +44,31 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
+    function safetyContactUidAt(values, index) {
+      return values.size() <= index || (values[index] is string
+        && values[index].size() > 0 && values[index].size() <= 128);
+    }
+
+    function validSafetyPlanAccessShape(data, ownerUid) {
+      return data.ownerUid is string && data.ownerUid == ownerUid
+        && data.staffUid is string && data.staffUid.size() <= 128
+        && data.consultationRequested is bool
+        && data.safeContactUids is list && data.safeContactUids.size() <= 10
+        && safetyContactUidAt(data.safeContactUids, 0)
+        && safetyContactUidAt(data.safeContactUids, 1)
+        && safetyContactUidAt(data.safeContactUids, 2)
+        && safetyContactUidAt(data.safeContactUids, 3)
+        && safetyContactUidAt(data.safeContactUids, 4)
+        && safetyContactUidAt(data.safeContactUids, 5)
+        && safetyContactUidAt(data.safeContactUids, 6)
+        && safetyContactUidAt(data.safeContactUids, 7)
+        && safetyContactUidAt(data.safeContactUids, 8)
+        && safetyContactUidAt(data.safeContactUids, 9);
+    }
+
     // Safety-plan listeners may read only the same owner, shared-contact, or assigned support plan as the callable API.
     match /safetyPlans/{ownerUid} {
-      allow get: if signedIn() && (
+      allow get: if signedIn() && validSafetyPlanAccessShape(resource.data, ownerUid) && (
         (request.auth.uid == ownerUid && request.auth.token.role == 'USER')
         || (request.auth.token.role == 'SAFE_CONTACT'
           && resource.data.safeContactUids is list
@@ -55,12 +87,53 @@ service cloud.firestore {
     match /accountSync/{uid} {
       allow get: if owner(uid);
       allow list: if false;
-      allow create, update: if owner(uid)
-        && request.resource.data.keys().hasOnly(['revision','updatedAt'])
-        && request.resource.data.revision is int
-        && request.resource.data.revision >= 1
-        && request.resource.data.updatedAt == request.time;
+      allow create: if owner(uid) && validAccountSyncMarker(request.resource.data)
+        && request.resource.data.revision == 1;
+      allow update: if owner(uid) && validAccountSyncMarker(request.resource.data)
+        && resource.data.revision is int
+        && request.resource.data.revision == resource.data.revision + 1;
       allow delete: if false;
+    }
+
+    function validAccountSyncMarker(data) {
+      return data.keys().hasAll(['revision','updatedAt'])
+        && data.keys().hasOnly(['revision','updatedAt'])
+        && data.revision is int && data.revision >= 1
+        && data.revision <= 9007199254740991
+        && data.updatedAt == request.time;
+    }
+
+    function validSyncRevision(value) {
+      return value is int && value >= 0 && value <= 9007199254740991;
+    }
+
+    function validSyncInvalidation(data, uid) {
+      return data.keys().hasAll(['ownerUid','allowedUsers','revision','urgentRevision','safetyRevision',
+          'mediaRevision','conversationRevision','accountRevision','updatedAt'])
+        && data.keys().hasOnly(['ownerUid','allowedUsers','revision','urgentRevision','safetyRevision',
+          'mediaRevision','conversationRevision','accountRevision','updatedAt'])
+        && data.ownerUid is string && data.ownerUid == uid
+        && data.allowedUsers is list && data.allowedUsers.size() == 1
+        && data.allowedUsers[0] is string && data.allowedUsers[0] == uid
+        && validSyncRevision(data.revision)
+        && validSyncRevision(data.urgentRevision)
+        && validSyncRevision(data.safetyRevision)
+        && validSyncRevision(data.mediaRevision)
+        && validSyncRevision(data.conversationRevision)
+        && validSyncRevision(data.accountRevision)
+        && data.revision >= data.urgentRevision
+        && data.revision >= data.safetyRevision
+        && data.revision >= data.mediaRevision
+        && data.revision >= data.conversationRevision
+        && data.revision >= data.accountRevision
+        && data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // Priority sync markers contain no user payload. Server code owns every mutation so a client
+    // cannot manufacture a revision, target another account, or use the collection as storage.
+    match /syncInvalidations/{uid} {
+      allow get: if owner(uid) && validSyncInvalidation(resource.data, uid);
+      allow list, create, update, delete: if false;
     }
 
     // Signed-in devices register their own FCM tokens so Cloud Functions can deliver discreet push alerts.

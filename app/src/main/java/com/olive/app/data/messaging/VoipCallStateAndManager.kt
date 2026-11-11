@@ -27,22 +27,6 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
-import android.content.Context
-import android.util.Log
-import androidx.work.CoroutineWorker
-import androidx.work.Constraints
-import androidx.work.Data
-import androidx.work.ExistingWorkPolicy
-import androidx.work.NetworkType
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import androidx.work.WorkerParameters
-import com.google.firebase.installations.FirebaseInstallations
-import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.messaging.RemoteMessage
-import com.olive.app.notification.OliveNotificationManager
-import com.olive.app.data.AccountRole
-import java.util.UUID
 
 
 enum class VoipParticipantStatus {
@@ -50,7 +34,6 @@ enum class VoipParticipantStatus {
     ACCEPTED,
     DECLINED
 }
-
 enum class VoipCallStatus { ACTIVE, ENDED, DECLINED, MISSED }
 
 data class VoipParticipant(
