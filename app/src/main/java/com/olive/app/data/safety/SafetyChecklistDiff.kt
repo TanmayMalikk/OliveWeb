@@ -1,5 +1,7 @@
 package com.olive.app.data
 
+import org.json.JSONObject
+
 // Represents one meaningful remote checklist change without exposing unrelated rows.
 internal sealed interface SafetyChecklistChange {
     val id: String
@@ -32,6 +34,71 @@ internal sealed interface SafetyChecklistChange {
         override val id: String,
         val text: String,
     ) : SafetyChecklistChange
+}
+
+internal data class SafetyChecklistConflictPreview(
+    val item: String,
+    val property: String,
+    val value: String,
+)
+
+/** Shows only checklist row properties that differ between the owner's and incoming versions. */
+internal fun safetyChecklistConflictPreview(
+    mine: String,
+    incoming: String,
+    showMine: Boolean,
+): List<SafetyChecklistConflictPreview>? {
+    fun parse(value: String): List<SafetyChecklistItem>? = runCatching {
+        require(JSONObject(value).optInt("oliveSafetyChecklist") == 1)
+        readSafetyChecklist(value)
+    }.getOrNull()
+
+    val mineRows = parse(mine) ?: return null
+    val incomingRows = parse(incoming) ?: return null
+    val mineById = mineRows.associateBy(SafetyChecklistItem::id)
+    val incomingById = incomingRows.associateBy(SafetyChecklistItem::id)
+    return buildList {
+        (mineById.keys + incomingById.keys).forEach { id ->
+            val yourItem = mineById[id]
+            val incomingItem = incomingById[id]
+            when {
+                yourItem == incomingItem -> Unit
+                yourItem == null || incomingItem == null -> {
+                    val item = yourItem ?: incomingItem ?: return@forEach
+                    add(
+                        SafetyChecklistConflictPreview(
+                            item = item.text,
+                            property = "Step",
+                            value = if (showMine) {
+                                if (yourItem == null) "Removed" else "Present"
+                            } else {
+                                if (incomingItem == null) "Removed" else "Present"
+                            },
+                        ),
+                    )
+                }
+                else -> {
+                    val item = if (showMine) yourItem else incomingItem
+                    if (yourItem.text != incomingItem.text) add(
+                        SafetyChecklistConflictPreview(item.text, "Text", item.text),
+                    )
+                    if (yourItem.checked != incomingItem.checked) add(
+                        SafetyChecklistConflictPreview(
+                            item.text,
+                            "Completion",
+                            if (item.checked) "Complete" else "Not complete",
+                        ),
+                    )
+                    if (yourItem.attachmentIds != incomingItem.attachmentIds) add(
+                        SafetyChecklistConflictPreview(item.text, "Attachments", "Changed"),
+                    )
+                    if (yourItem.excludedAttachmentIds != incomingItem.excludedAttachmentIds) add(
+                        SafetyChecklistConflictPreview(item.text, "Excluded attachments", "Changed"),
+                    )
+                }
+            }
+        }
+    }
 }
 
 // Finds semantic changes by stable row ID; row order alone is not a plan change.

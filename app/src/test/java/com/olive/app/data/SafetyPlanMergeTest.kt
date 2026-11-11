@@ -38,6 +38,26 @@ class SafetyPlanMergeTest {
         assertTrue(readSafetyChecklist(merged.localValue)[1].checked)
         assertTrue(readSafetyChecklist(merged.remoteValue)[1].checked)
     }
+
+    @Test
+    fun conflictPreviewShowsOnlyDivergingChecklistProperties() {
+        val rows = listOf(SafetyChecklistItem("a", "Original"), SafetyChecklistItem("b", "Other"))
+        val base = writeSafetyChecklist(rows)
+        val mine = writeSafetyChecklist(listOf(rows[0].copy(text = "Mine"), rows[1]))
+        val remote = writeSafetyChecklist(listOf(rows[0].copy(text = "Incoming"), rows[1].copy(checked = true)))
+        val merged = checkNotNull(mergeSafetyChecklist(base, mine, remote))
+
+        assertEquals(
+            listOf(SafetyChecklistConflictPreview("Mine", "Text", "Mine")),
+            safetyChecklistConflictPreview(merged.localValue, merged.remoteValue, true),
+        )
+        assertEquals(
+            listOf(SafetyChecklistConflictPreview("Incoming", "Text", "Incoming")),
+            safetyChecklistConflictPreview(merged.localValue, merged.remoteValue, false),
+        )
+        assertNull(safetyChecklistConflictPreview("Plain text", "Other text", true))
+    }
+
     private val old =
         SafetyPlan("owner", "owner", mapOf("primary_destination" to SafetyField("Old", 1)))
 

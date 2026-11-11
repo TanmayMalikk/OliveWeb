@@ -45,4 +45,14 @@
     <string name="safety_storage_videos">مقاطع الفيديو</string>
     <string name="safety_storage_documents">صور الوثائق</string>
     <string name="safety_document_upload_hint">تظهر الملفات المرفوعة أيضًا في المستندات.</string>
+    <string name="safety_conflict_step">الخطوة</string>
+    <string name="safety_conflict_text">النص</string>
+    <string name="safety_conflict_completion">الإكمال</string>
+    <string name="safety_conflict_attachments">المرفقات</string>
+    <string name="safety_conflict_excluded_attachments">المرفقات المستبعدة</string>
+    <string name="safety_conflict_present">موجود</string>
+    <string name="safety_conflict_removed">محذوف</string>
+    <string name="safety_conflict_complete">مكتمل</string>
+    <string name="safety_conflict_not_complete">غير مكتمل</string>
+    <string name="safety_conflict_changed">تم التغيير</string>
 </resources>

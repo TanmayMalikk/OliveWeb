@@ -11,6 +11,7 @@ import {
   planMediaRecipients,
   resolvePlanConflict,
   readSafetyChecklist,
+  safetyChecklistConflictPreview,
   safetyChecklistText,
   safetySections,
   saveField,
@@ -590,9 +591,24 @@ export default function SafetyPlan() {
             <label className="field" key={choice.label}>
               <span><input type="radio" name="safety-conflict" checked={keepMine === choice.mine}
                 onChange={() => setKeepMine(choice.mine)} /> {choice.label}</span>
-              <span>{readSafetyChecklist(choice.value).map((item) =>
-                (item.checked ? "☑ " : "☐ ") + safetyChecklistText(item),
-              ).join(" · ") || "Empty section"}</span>
+              {(() => {
+                const conflicts = safetyChecklistConflictPreview(
+                  localConflict?.mine ?? plan.fields[conflictKey]?.value ?? "",
+                  localConflict
+                    ? plan.fields[conflictKey]?.value ?? ""
+                    : plan.pendingConflicts?.[conflictKey]?.value ?? "",
+                  choice.mine,
+                );
+                return conflicts === null ? (
+                  <span>{readSafetyChecklist(choice.value).map((item) =>
+                    (item.checked ? "☑ " : "☐ ") + safetyChecklistText(item),
+                  ).join(" · ") || "Empty section"}</span>
+                ) : conflicts.map((conflict, index) => (
+                  <span key={`${conflict.item}-${conflict.property}-${index}`}>
+                    {conflict.item}: {conflict.property}: {conflict.value}
+                  </span>
+                ));
+              })()}
             </label>
           ))}
           <Button disabled={session.busy} onClick={() => void session.perform(async () => {

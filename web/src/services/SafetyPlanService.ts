@@ -5,6 +5,7 @@ import { writeSafetyChecklist } from "./SafetyChecklistCodec";
 import type { Friend } from "./MessagingService";
 export {
   readSafetyChecklist,
+  safetyChecklistConflictPreview,
   safetyChecklistText,
   writeSafetyChecklist,
 } from "./SafetyChecklistCodec";

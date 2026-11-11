@@ -45,4 +45,14 @@
     <string name="safety_storage_videos">视频</string>
     <string name="safety_storage_documents">文件图片</string>
     <string name="safety_document_upload_hint">上传的文件也会显示在“文件”中。</string>
+    <string name="safety_conflict_step">步骤</string>
+    <string name="safety_conflict_text">文字</string>
+    <string name="safety_conflict_completion">完成状态</string>
+    <string name="safety_conflict_attachments">附件</string>
+    <string name="safety_conflict_excluded_attachments">已排除的附件</string>
+    <string name="safety_conflict_present">存在</string>
+    <string name="safety_conflict_removed">已移除</string>
+    <string name="safety_conflict_complete">已完成</string>
+    <string name="safety_conflict_not_complete">未完成</string>
+    <string name="safety_conflict_changed">已更改</string>
 </resources>

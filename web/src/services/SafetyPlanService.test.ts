@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   readSafetyChecklist,
+  safetyChecklistConflictPreview,
   safetyChecklistText,
   writeSafetyChecklist,
 } from "./SafetyChecklistCodec";
@@ -50,5 +51,24 @@ describe("web and Android safety checklist compatibility", () => {
         checked: false,
       }),
     ).toBe("Alex: 555-0100");
+  });
+
+  it("shows only conflicting checklist properties in each resolution choice", () => {
+    const mine = writeSafetyChecklist([
+      { id: "same-row", text: "My wording", checked: false },
+      { id: "other-row", text: "Unrelated", checked: true },
+    ]);
+    const incoming = writeSafetyChecklist([
+      { id: "same-row", text: "Incoming wording", checked: false },
+      { id: "other-row", text: "Unrelated", checked: true },
+    ]);
+
+    expect(safetyChecklistConflictPreview(mine, incoming, true)).toEqual([
+      { item: "My wording", property: "Text", value: "My wording" },
+    ]);
+    expect(safetyChecklistConflictPreview(mine, incoming, false)).toEqual([
+      { item: "Incoming wording", property: "Text", value: "Incoming wording" },
+    ]);
+    expect(safetyChecklistConflictPreview("mine", "incoming", true)).toBeNull();
   });
 });

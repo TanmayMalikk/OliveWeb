@@ -558,6 +558,30 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
 }
 
 @Composable
+private fun safetyConflictPropertyLabel(property: String) = stringResource(
+    when (property) {
+        "Step" -> R.string.safety_conflict_step
+        "Completion" -> R.string.safety_conflict_completion
+        "Attachments" -> R.string.safety_conflict_attachments
+        "Excluded attachments" -> R.string.safety_conflict_excluded_attachments
+        else -> R.string.safety_conflict_text
+    },
+)
+
+@Composable
+private fun safetyConflictValueLabel(value: String): String {
+    val resource = when (value) {
+        "Present" -> R.string.safety_conflict_present
+        "Removed" -> R.string.safety_conflict_removed
+        "Complete" -> R.string.safety_conflict_complete
+        "Not complete" -> R.string.safety_conflict_not_complete
+        "Changed" -> R.string.safety_conflict_changed
+        else -> return value
+    }
+    return stringResource(resource)
+}
+
+@Composable
 private fun SafetyConflictDialog(key: String, mine: String, incoming: String, enabled: Boolean, resolve: (Boolean) -> Unit) {
     var keepMine by remember(key, mine, incoming) { mutableStateOf(false) }
     AlertDialog(
@@ -570,7 +594,17 @@ private fun SafetyConflictDialog(key: String, mine: String, incoming: String, en
                         RadioButton(selected = keepMine == isMine, onClick = { keepMine = isMine })
                         Column {
                             Text(stringResource(if (isMine) R.string.safety_your_change else R.string.safety_incoming_change))
-                            Text(safetyChecklistPreview(value).ifBlank { stringResource(R.string.safety_empty_value) })
+                            val conflicts = remember(mine, incoming, isMine) {
+                                safetyChecklistConflictPreview(mine, incoming, isMine)
+                            }
+                            if (conflicts == null) {
+                                Text(safetyChecklistPreview(value).ifBlank { stringResource(R.string.safety_empty_value) })
+                            } else {
+                                conflicts.forEach { conflict ->
+                                    Text(conflict.item, style = MaterialTheme.typography.labelLarge)
+                                    Text("${safetyConflictPropertyLabel(conflict.property)}: ${safetyConflictValueLabel(conflict.value)}")
+                                }
+                            }
                         }
                     }
                 }
