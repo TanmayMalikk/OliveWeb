@@ -1,6 +1,7 @@
 package com.olive.app.data
 
 import kotlinx.coroutines.runBlocking
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -50,6 +51,24 @@ class OutgoingDeliveryDispatcherTest {
     }
 
     @Test
+    fun `pending attachment survives store recreation and delivers once after upload completes`() = runBlocking {
+        val vault = DispatcherTestVault()
+        MessageOutboxStore(vault).write(message("attachment").copy(
+            attachment = OutgoingAttachment(uploadJobId = "upload-job"),
+        ))
+        val restored = MessageOutboxStore(vault)
+        val delivered = mutableListOf<String>()
+        val dispatcher = dispatcher(
+            resolve = { "published-media" },
+            attachment = { message, mediaId -> delivered += "${message.id}:$mediaId" },
+        )
+
+        dispatcher.deliver(checkNotNull(restored.get("attachment")))
+
+        assertEquals(listOf("attachment:published-media"), delivered)
+    }
+
+    @Test
     fun `unfinished upload remains a retryable queue barrier`() {
         val dispatcher = dispatcher(resolve = { null })
 
@@ -92,4 +111,16 @@ class OutgoingDeliveryDispatcherTest {
         ciphertext = "ciphertext-$id",
         clientSentAt = 1,
     )
+
+    private class DispatcherTestVault : MessageOutboxVault {
+        private var root = JSONObject()
+
+        override fun read() = JSONObject(root.toString())
+
+        override fun update(change: (JSONObject) -> Unit) {
+            val updated = JSONObject(root.toString())
+            change(updated)
+            root = updated
+        }
+    }
 }
