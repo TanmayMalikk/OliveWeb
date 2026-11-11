@@ -160,19 +160,15 @@ export function createServerApp({ development = false } = {}) {
     ],
     (req, res) => {
       res.setHeader("Cache-Control", "no-cache");
-      const hostSite = siteConfig.covers.find(
-        (site) => site.origin && new URL(site.origin).hostname === req.hostname,
-      );
-      const site = req.params.slug
-        ? siteConfig.covers.find((site) => site.slug === req.params.slug)
-        : hostSite;
-      if (req.params.slug && !site) return res.status(404).end();
+      const site = siteConfig.webCover;
+      if (req.params.slug && ![site.slug, "daily-digest", "fitness"].includes(req.params.slug))
+        return res.status(404).end();
       const start = "/";
-      const icon = site?.slug ?? "fitness";
+      const icon = site.slug;
       res.type("application/manifest+json").json({
         id: start,
-        name: site?.name ?? "Fitness Tracker",
-        short_name: site?.name ?? "Fitness Tracker",
+        name: site.name,
+        short_name: site.name,
         start_url: start,
         scope: "/",
         display: "standalone",

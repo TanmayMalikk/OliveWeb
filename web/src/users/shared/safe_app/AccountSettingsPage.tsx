@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Copy, RefreshCw } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
 import { Button, Field, Form, Modal } from "../../../components/SharedComponents";
-import { newEvent, validPassword, validPin, type Profile } from "../../../domain/DomainModels";
+import { newEvent, validPassword, validPin } from "../../../domain/DomainModels";
 import { accounts, triggerHash } from "../../../services/AccountService";
 import { issueEntryLink, savedEntryLink } from "../../../services/PrivateEntryLinks";
 export default function Settings() {
@@ -27,33 +27,25 @@ export default function Settings() {
   return (
     <div className="settings-grid">
       <section className="panel">
-        <h2>Your everyday.</h2>
-        <p>The cover you return to when you leave this space.</p>
+        <h2>Preferences</h2>
+        <p>Website cover: Little Grove.</p>
         <Form
           onSubmit={async (data) => {
             await s.perform(() =>
               s.saveProfile(
                 {
                   ...p,
-                  coverType: String(data.get("cover")) as Profile["coverType"],
                   language: String(data.get("language")),
                 },
-                "Updated cover and language",
+                "Updated profile language",
               ),
             );
           }}
         >
           <label className="field">
-            <span>Cover app</span>
-            <select name="cover" defaultValue={p.coverType}>
-              <option value="NEWS">Daily Digest</option>
-              <option value="FITNESS">Fitness Tracker</option>
-              <option value="GAME">Little Grove</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>Profile language</span>
-            <select name="language" defaultValue={p.language}>
+            <span id="profile-language-label">Profile language</span>
+            <select name="language" defaultValue={p.language} aria-labelledby="profile-language-label"
+              aria-describedby="profile-language-help">
               {[
                 "English",
                 "French",
@@ -66,7 +58,7 @@ export default function Settings() {
                 <option key={l}>{l}</option>
               ))}
             </select>
-            <small>
+            <small id="profile-language-help">
               Your language preference syncs with mobile. The web interface
               currently uses English.
             </small>

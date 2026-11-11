@@ -60,47 +60,6 @@
 .cover-hidden-olive svg { width: 1.35rem; height: 1.35rem; }
 .cover-hidden-olive:focus-visible { outline: 2px solid var(--olive); outline-offset: 3px; }
 
-.cover-container.news-cover,
-.cover-container.fitness-cover {
-  width: 100%;
-  max-width: none;
-  margin: 0;
-}
-
-/* Daily Digest uses a publication layout with one clear lead story and supporting columns. */
-.news-page {
-  width: min(100%, 96rem);
-  max-width: none;
-  margin-inline: auto;
-  padding: 1.5rem clamp(1rem, 4vw, 4rem) 5rem;
-}
-.news-masthead { padding-block: clamp(1.6rem, 4vw, 3rem); }
-.news-masthead h1 { font-size: clamp(4rem, 8vw, 8rem); }
-.news-toolbar {
-  position: sticky;
-  z-index: 25;
-  top: 0;
-  background: rgb(247 247 239 / 0.96);
-  backdrop-filter: blur(14px);
-}
-.news-search-row { align-items: center; }
-.newspaper-grid {
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  align-items: start;
-  gap: 1.25rem;
-}
-.newspaper-card { grid-column: span 4; }
-.newspaper-card.lead-story {
-  grid-column: span 8;
-  grid-row: span 2;
-  padding: clamp(1.4rem, 2.5vw, 2.25rem);
-  background: #fffef8;
-}
-.lead-story .article-open h2 { max-width: 52rem; font-size: clamp(2.4rem, 4.5vw, 4.8rem); }
-.lead-story .article-open > img { aspect-ratio: 2.15; }
-.lead-story .article-open > p { max-width: 60rem; font-size: 1.1rem; }
-.newspaper-card:not(.lead-story) .article-open h2 { font-size: clamp(1.4rem, 2vw, 2rem); }
-
 /* Little Grove uses a game-library rail and gives the selected game the main workspace. */
 @media (min-width: 72rem) {
   .grove {

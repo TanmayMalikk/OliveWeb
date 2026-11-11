@@ -1,7 +1,6 @@
-// Safe-app users: provides staff requests, support directories, browser location, and camera capture.
+// Safe-app users: provides staff requests, support directories, and browser location.
 import { useEffect, useState } from "react";
 import {
-  Camera,
   ExternalLink,
   FileLock2,
   LocateFixed,
@@ -222,84 +221,6 @@ export function LocationPage() {
         <Empty title="Waiting for location.">
           Allow location access to show your position.
         </Empty>
-      )}
-    </section>
-  );
-}
-
-// Lets the user take a photo or choose a file without leaving the safe app.
-export function CameraPage() {
-  const session = useSession();
-  const [preview, setPreview] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [progress, setProgress] = useState<number | null>(null);
-  useEffect(
-    () => () => {
-      if (preview) URL.revokeObjectURL(preview);
-    },
-    [preview],
-  );
-  return (
-    <section className="panel safe-feature-page">
-      <h2>Take a photo or document image</h2>
-      <p>
-        Capture with your device or choose an existing file. Saved files are
-        encrypted and shared with the same account vault as the phone app.
-      </p>
-      <label className="button">
-        <Camera size={17} /> Open camera
-        <input
-          className="sr-only"
-          type="file"
-          accept="image/*,video/*"
-          capture="environment"
-          onChange={(event) => {
-            const selected = event.target.files?.[0];
-            if (selected) {
-              setFile(selected);
-              setPreview(URL.createObjectURL(selected));
-            }
-          }}
-        />
-      </label>
-      {preview &&
-        (file?.type.startsWith("video/") ? (
-          <video
-            className="camera-preview"
-            src={preview}
-            controls
-            aria-label="Captured video preview"
-          />
-        ) : (
-          <img
-            className="camera-preview"
-            src={preview}
-            alt="Captured preview"
-          />
-        ))}
-      {file && (
-        <p>
-          {file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB
-        </p>
-      )}
-      {file && (
-        <Button
-          disabled={session.busy}
-          onClick={() =>
-            void session.perform(async () => {
-              if (!accounts.identity)
-                throw new Error("Sign in again before saving this file.");
-              await uploadBrowserDocument(file, accounts.identity, setProgress);
-              setFile(null);
-              setPreview("");
-              setProgress(null);
-            })
-          }
-        >
-          {progress === null
-            ? "Save encrypted file"
-            : `Uploading ${Math.round(progress * 100)}%`}
-        </Button>
       )}
     </section>
   );

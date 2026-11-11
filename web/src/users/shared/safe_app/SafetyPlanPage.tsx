@@ -14,6 +14,8 @@ import {
   safetyChecklistConflictPreview,
   safetyChecklistText,
   safetySections,
+  olderSafetySections,
+  safetySectionLabels,
   saveField,
   sharedPlans,
   sharePlanWithContacts,
@@ -35,7 +37,7 @@ import { subscribeSocial, type Friend } from "../../../services/MessagingService
 
 // Changes a safety-plan field key into a readable section label.
 const label = (value: string) =>
-  value.replace(
+  safetySectionLabels[value] ?? value.replace(
     /(^|_)(\w)/g,
     (_, space, letter) => `${space ? " " : ""}${letter.toUpperCase()}`,
   );
@@ -306,56 +308,6 @@ export default function SafetyPlan() {
           </select>
         </label>
       )}
-      <section className="panel safety-plan-summary">
-        <ShieldCheck size={28} />
-        <div>
-          <h2>
-            {editable
-              ? "Your safety plan."
-              : `${plan.ownerName}'s shared plan.`}
-          </h2>
-          <p>
-            Changes sync through the same protected Firebase functions used by
-            the Android app.
-          </p>
-          {plan.staffUid && <small>A support staff member is working with you.</small>}
-          {editable && !plan.consultationRequested && Boolean(plan.plansCompletedAt) &&
-            <p role="status">Your safety plan and backup plan are complete.</p>}
-          {editable && plan.consultationRequested && plan.consultationConversationId && identity && (
-            <Button variant="quiet" onClick={() => {
-              session.setRequestedConversation({ id: plan.consultationConversationId!, uid: identity.uid });
-              session.setPage("Messages");
-            }}>Open consultation ticket</Button>
-          )}
-        </div>
-        {editable && (
-          <Button
-            variant="outline"
-            disabled={session.busy}
-            onClick={() =>
-              void session.perform(async () => {
-                const next = await consultation(
-                  plan.consultationRequested ? "stop" : "request",
-                );
-                setPlan(next);
-                if (identity && next.consultationRequested && next.consultationConversationId) {
-                  if (attachedIds.length) {
-                    void planMediaRecipients().then((recipients) => Promise.allSettled(
-                      attachedIds.map((id) => shareBrowserPlanDocument(id, identity, recipients)),
-                    )).catch(() => undefined);
-                  }
-                  session.setRequestedConversation({ id: next.consultationConversationId, uid: identity.uid });
-                  session.setPage("Messages");
-                }
-              })
-            }
-          >
-            {plan.consultationRequested
-              ? "End consultation request"
-              : "Request consultation"}
-          </Button>
-        )}
-      </section>
       <div className="safety-plan-tabs" role="tablist" aria-label="Safety plans">
         {(["primary", "backup"] as const).map((kind) => (
           <button
@@ -370,16 +322,26 @@ export default function SafetyPlan() {
           </button>
         ))}
       </div>
+      <nav className="safety-section-links" aria-label="Jump to a checklist">
+        {safetySections.map((section) => (
+          <button key={section} type="button" onClick={() => {
+            const checklist = document.getElementById(`${activeKind}_${section}`);
+            checklist?.focus({ preventScroll: true });
+            checklist?.scrollIntoView({ block: "start" });
+          }}>{section === "documents" ? "Documents" : section === "grab" ? "Quick-grab" : label(section)}</button>
+        ))}
+      </nav>
       {([activeKind] as const).map((kind) => (
         <section key={kind} className="panel safety-plan-group">
           <div id={`${kind}-plan-panel`} role="tabpanel">
-          <h2>{label(kind)} plan</h2>
-          <div className="form-grid">
-            {safetySections.map((section) => {
+          <div className="safety-checklist-stack">
+            {[...safetySections, ...olderSafetySections.filter((section) =>
+              readSafetyChecklist(drafts[`${kind}_${section}`] ?? "").length > 0,
+            )].map((section) => {
               const key = `${kind}_${section}`;
               const items = readSafetyChecklist(drafts[key] ?? "");
               return (
-                <fieldset className="safety-checklist" key={key}>
+                <fieldset className="safety-checklist" id={key} key={key} tabIndex={-1}>
                   <legend>{label(section)}</legend>
                   <p className="safety-progress">
                     {items.filter((item) => item.checked).length} of {items.length} prepared
@@ -555,6 +517,52 @@ export default function SafetyPlan() {
           </div>
         </section>
       ))}
+      <section className="panel safety-plan-summary">
+        <ShieldCheck size={28} />
+        <div>
+          <h2>
+            {editable
+              ? "Your safety plan."
+              : `${plan.ownerName}'s shared plan.`}
+          </h2>
+          {plan.staffUid && <small>A support staff member is working with you.</small>}
+          {editable && !plan.consultationRequested && Boolean(plan.plansCompletedAt) &&
+            <p role="status">Your safety plan and backup plan are complete.</p>}
+          {editable && plan.consultationRequested && plan.consultationConversationId && identity && (
+            <Button variant="quiet" onClick={() => {
+              session.setRequestedConversation({ id: plan.consultationConversationId!, uid: identity.uid });
+              session.setPage("Messages");
+            }}>Open consultation ticket</Button>
+          )}
+        </div>
+        {editable && (
+          <Button
+            variant="outline"
+            disabled={session.busy}
+            onClick={() =>
+              void session.perform(async () => {
+                const next = await consultation(
+                  plan.consultationRequested ? "stop" : "request",
+                );
+                setPlan(next);
+                if (identity && next.consultationRequested && next.consultationConversationId) {
+                  if (attachedIds.length) {
+                    void planMediaRecipients().then((recipients) => Promise.allSettled(
+                      attachedIds.map((id) => shareBrowserPlanDocument(id, identity, recipients)),
+                    )).catch(() => undefined);
+                  }
+                  session.setRequestedConversation({ id: next.consultationConversationId, uid: identity.uid });
+                  session.setPage("Messages");
+                }
+              })
+            }
+          >
+            {plan.consultationRequested
+              ? "End consultation request"
+              : "Request consultation"}
+          </Button>
+        )}
+      </section>
       {editable && (friends.length > 0 || selectedContacts.length > 0) && (
         <section className="panel">
           <h3>Share with safe contacts</h3>

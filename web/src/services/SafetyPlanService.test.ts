@@ -3,10 +3,15 @@ import {
   readSafetyChecklist,
   safetyChecklistConflictPreview,
   safetyChecklistText,
+  safetySections,
   writeSafetyChecklist,
 } from "./SafetyChecklistCodec";
 
 describe("web and Android safety checklist compatibility", () => {
+  it("uses the Android checklist order for both web plans", () => {
+    expect(safetySections).toEqual(["documents", "grab", "destination", "travel", "contacts", "aftercare"]);
+  });
+
   it("round-trips the structured checklist without displaying its JSON", () => {
     const original = [
       { id: "destination-1", text: "Choose a safe place", checked: true },

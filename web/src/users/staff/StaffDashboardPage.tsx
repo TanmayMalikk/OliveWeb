@@ -1,5 +1,6 @@
 // Staff: shows assigned users and support chats to staff.
 import { useEffect, useState } from "react";
+import { ArrowLeft, MessageCircle, ShieldCheck } from "lucide-react";
 import { Button, Empty, Logo } from "../../components/SharedComponents";
 import { useSession } from "../../session/SessionProvider";
 import { accounts } from "../../services/AccountService";
@@ -21,6 +22,7 @@ export default function StaffPortal() {
   >([]);
   const [available, setAvailable] = useState(true);
   const [plan, setPlan] = useState<SafetyPlan | null>(null);
+  const [view, setView] = useState<"home" | "plans" | "messages">("home");
 
   // Reload staff tickets when the signed-in session changes.
   const identity = accounts.identity;
@@ -54,17 +56,21 @@ export default function StaffPortal() {
         <span className="eyebrow">STAFF PORTAL</span>
       </header>
       <main id="main">
-        <div className="safe-page-title">
-          <div>
-            <span className="eyebrow">STAFF</span>
-            <h1>Safety-plan consultations.</h1>
-          </div>
-        </div>
+        <header className="organization-page-heading">
+          {view !== "home" && <button className="safe-icon-button" aria-label="Back to staff panel"
+            onClick={() => { setPlan(null); setView("home"); }}><ArrowLeft size={22} /></button>}
+          <h1>{view === "plans" ? "Safety-plan consultations" : view === "messages" ? "Support chats" : "Staff panel"}</h1>
+        </header>
         {session.message && (
           <p role="alert" className="form-error">
             {session.message}
           </p>
         )}
+        {view === "home" && <div className="organization-feature-grid">
+          <button className="safe-feature-tile" onClick={() => setView("plans")}><ShieldCheck size={26} /> Safety-plan consultations</button>
+          <button className="safe-feature-tile" onClick={() => setView("messages")}><MessageCircle size={26} /> Support chats</button>
+        </div>}
+        {view === "plans" && <>
         <section className="panel safety-plan-summary">
           <div>
             <h2>Availability</h2>
@@ -110,7 +116,8 @@ export default function StaffPortal() {
         )}
         {plan && <SafetyPlanEditor plan={plan} onChange={setPlan}
           onCompleted={() => setConsultations((current) => current.filter((item) => item.ownerUid !== plan.ownerUid))} />}
-        <OrganizationSupportInbox />
+        </>}
+        {view === "messages" && <OrganizationSupportInbox />}
         <Button
           variant="quiet"
           onClick={() => void session.perform(session.signOut)}
