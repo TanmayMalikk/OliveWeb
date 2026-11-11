@@ -39,11 +39,10 @@ internal class SafetyPlanRepository(
         }
 
     // Reads a server-confirmed plan without modifying any fields.
-    suspend fun get(ownerUid: String): SafetyPlan {
+    suspend fun get(ownerUid: String): SafetyPlan? {
         val snapshot = firestore.collection("safetyPlans").document(ownerUid)
             .get(com.google.firebase.firestore.Source.SERVER).await()
-        val data = snapshot.data ?: error("Safety plan is unavailable")
-        return SafetyPlan.fromJson(JSONObject(data))
+        return snapshot.data?.let { SafetyPlan.fromJson(JSONObject(it)) }
     }
 
     // Sends changed safety-plan fields and returns the merged server version.

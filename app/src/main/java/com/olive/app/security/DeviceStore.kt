@@ -380,8 +380,10 @@ class DeviceStore(
         histories.mergeHistory(uid, records)
 
     // Removes this account's saved enrollment and private phone data.
-    fun forgetDevice() {
-        vault.update { it.remove("activeUid") }
+    fun forgetDevice(expectedUid: String? = null) {
+        vault.update {
+            if (expectedUid == null || it.optString("activeUid") == expectedUid) it.remove("activeUid")
+        }
     }
 }
 
