@@ -71,25 +71,17 @@ class OutgoingMessageModelsTest {
         val published = outgoing("published", MessageDeliveryStatus.QUEUED, 0).copy(
             attachment = OutgoingAttachment(mediaId = "media-123"),
         )
-        val pendingUpload = outgoing("uploading", MessageDeliveryStatus.QUEUED, 1).copy(
-            attachment = OutgoingAttachment(uploadJobId = "upload-456"),
-        )
 
         assertEquals(published, OutgoingMessage.fromJson(published.toJson()))
-        assertEquals(pendingUpload, OutgoingMessage.fromJson(pendingUpload.toJson()))
         assertEquals(null, OutgoingMessage.fromJson(
             outgoing("legacy", MessageDeliveryStatus.QUEUED, 2).toJson().apply { remove("attachment") },
         ).attachment)
     }
 
     @Test
-    fun `attachment dependency identifies exactly one encrypted media source`() {
-        assertThrows(IllegalArgumentException::class.java) { OutgoingAttachment() }
-        assertThrows(IllegalArgumentException::class.java) {
-            OutgoingAttachment(mediaId = "media", uploadJobId = "upload")
-        }
+    fun `attachment dependency accepts only a valid published media id`() {
         assertThrows(IllegalArgumentException::class.java) { OutgoingAttachment(mediaId = " ") }
-        assertThrows(IllegalArgumentException::class.java) { OutgoingAttachment(uploadJobId = " ") }
+        assertThrows(IllegalArgumentException::class.java) { OutgoingAttachment(mediaId = "media/id") }
     }
 
     @Test
