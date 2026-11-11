@@ -15,7 +15,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.media.MediaRepository
-import com.olive.app.data.media.MediaTransferStore
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import com.olive.app.security.EncryptionUtils
@@ -35,7 +34,6 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     private val store = MessageOutboxStore(context)
     private val repository = SecureChatRepository()
     private val conversations = MessagingRepository()
-    private val transfers = MediaTransferStore(context.applicationContext)
     private val documents = SafetyDocumentRepository(media = MediaRepository())
 
     override suspend fun doWork(): Result {
@@ -43,7 +41,6 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
         val conversationId = inputData.getString(CONVERSATION_ID) ?: return Result.failure()
         val delivery = OutgoingDeliveryDispatcher(
             deliverText = repository::deliver,
-            resolveUpload = { resolveUpload(ownerUid, it) },
             deliverAttachment = ::deliverAttachment,
         )
         val outcome = MessageQueueDrainer(
@@ -57,10 +54,6 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
             MessageDrainOutcome.RETRY -> Result.retry()
             MessageDrainOutcome.BLOCKED -> Result.failure()
         }
-    }
-
-    private fun resolveUpload(ownerUid: String, uploadJobId: String): String? {
-        return resolveAttachmentUpload(ownerUid, transfers.get(uploadJobId))
     }
 
     private suspend fun deliverAttachment(message: OutgoingMessage, mediaId: String) {
@@ -125,11 +118,6 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
 }
 
 internal fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure = when (failure) {
-    is AttachmentDependencyPending -> MessageDeliveryFailure(
-        "ATTACHMENT_UPLOAD_PENDING",
-        permanent = false,
-        countsTowardLimit = false,
-    )
     is AttachmentDeliveryRejected -> MessageDeliveryFailure(failure.failureCode, permanent = true)
     is FirebaseFirestoreException ->
         MessageDeliveryFailure(failure.code.name, isPermanentMessageFailure(failure.code))
@@ -332,7 +320,6 @@ internal enum class MessageDrainOutcome {
 internal data class MessageDeliveryFailure(
     val code: String,
     val permanent: Boolean,
-    val countsTowardLimit: Boolean = true,
 )
 
 /**
@@ -382,13 +369,8 @@ internal class MessageQueueDrainer(
                 throw cancelled
             } catch (failure: Exception) {
                 val deliveryFailure = classifyFailure(failure)
-                val persistedAttempts = if (deliveryFailure.countsTowardLimit) {
-                    sending.attemptCount
-                } else {
-                    (sending.attemptCount - 1).coerceAtLeast(0)
-                }
                 val permanent = deliveryFailure.permanent ||
-                        (deliveryFailure.countsTowardLimit && persistedAttempts >= maxAutomaticAttempts)
+                        sending.attemptCount >= maxAutomaticAttempts
                 store.update(sending.id) {
                     it.copy(
                         status = if (permanent) {
@@ -396,7 +378,6 @@ internal class MessageQueueDrainer(
                         } else {
                             MessageDeliveryStatus.FAILED_RETRYABLE
                         },
-                        attemptCount = persistedAttempts,
                         failureCode = deliveryFailure.code,
                     )
                 }
