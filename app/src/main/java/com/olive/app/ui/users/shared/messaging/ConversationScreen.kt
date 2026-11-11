@@ -399,7 +399,7 @@ internal fun ChatPane(
                     }
                 }
                 Status(session)
-                Surface(
+                if (active.closedAt == 0L) Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
                     border = BorderStroke(1.dp, ChatBorder),
@@ -433,7 +433,7 @@ internal fun ChatPane(
                     FilledIconButton(
                         onClick = { session.messages.sendMessage(draft) { draft = "" } },
                         enabled = draft.isNotBlank() && !session.messages.busy &&
-                            (active.type != "SUPPORT" || active.staffUid.isNotBlank()),
+                            (active.type != "SUPPORT" || active.participantIds.size >= 2),
                         modifier = Modifier.size(50.dp).testTag("send_message")
                     ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
                 }

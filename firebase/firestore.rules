@@ -638,6 +638,7 @@ service cloud.firestore {
         }
         allow read: if conversationParticipant(parentConversation());
         allow create: if conversationParticipant(parentConversation())
+          && !parentConversation().keys().hasAny(['closedAt'])
           && request.resource.data.keys().hasOnly(['senderUid','senderUsername','body','ciphertext','deleted','sentAt','clientSentAt'])
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderUsername is string

@@ -385,10 +385,9 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
       conversation.requestSource === "GROUP_CHAT" && conversation.sourceConversationId ?
         db.collection("conversations").doc(conversation.sourceConversationId) :
         db.collection("supportRequests").doc(conversation.sourceConversationId || conversation.ownerUid);
-    if (!conversation.staffUid) throw new HttpsError("failed-precondition", "This ticket has no assigned staff member.");
-    const staffReference = db.collection("safetyStaff").doc(conversation.staffUid);
+    const staffReference = conversation.staffUid ? db.collection("safetyStaff").doc(conversation.staffUid) : null;
     const sourceSnapshot = await transaction.get(sourceReference);
-    const staffSnapshot = await transaction.get(staffReference);
+    const staffSnapshot = staffReference && await transaction.get(staffReference);
     if (planCompleted && sourceSnapshot.get("consultationConversationId") !== conversationId) {
       throw new HttpsError("failed-precondition", "This consultation is no longer active.");
     }
@@ -423,8 +422,10 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
         }
       }
     }
-    const activeCount = staffSnapshot.data()?.activeCount || 0;
-    transaction.set(staffReference, {activeCount: Math.max(0, activeCount - 1)}, {merge: true});
+    if (staffReference) {
+      const activeCount = staffSnapshot.data()?.activeCount || 0;
+      transaction.set(staffReference, {activeCount: Math.max(0, activeCount - 1)}, {merge: true});
+    }
   });
   return {conversationId};
 });

@@ -201,6 +201,21 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun openConversation(conversation: ChatConversation) =
         runtime.conversationActions.openConversation(conversation)
 
+    suspend fun findRequestedConversation(id: String): ChatConversation? {
+        if (id.isBlank()) return null
+        val uid = runtime.coverAccountId ?: return null
+        return try {
+            runtime.messagingRepository?.getConversation(id)?.takeIf {
+                runtime.coverAccountId == uid && uid in it.participantIds && it.closedAt == 0L
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // The live conversation list can still deliver the ticket after a transient read failure.
+            null
+        }
+    }
+
     // Closes the current conversation and returns to the chat list.
     fun closeConversation() = runtime.conversationActions.closeConversation()
     // Archives or restores the selected conversation for this account.
