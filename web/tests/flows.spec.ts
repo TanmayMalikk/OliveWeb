@@ -13,6 +13,7 @@ async function onboard(page: Page) {
   await expect(
     page.getByRole("heading", { name: "Set up your profile" }),
   ).toBeVisible();
+  await expect(page.getByLabel("Language", { exact: true })).toHaveCount(0);
   await page.getByLabel("Full name", { exact: true }).fill("Test Person");
   await page.getByLabel("Date of birth", { exact: true }).fill("2000-01-02");
   await page.getByLabel("City", { exact: true }).fill("Edmonton");
@@ -155,11 +156,8 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
     page.getByRole("heading", { name: "Trusted Friend" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Profile language", exact: true })
-    .selectOption("French");
-  await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByRole("status")).toContainText("Changes saved.");
+  await expect(page.getByRole("combobox", { name: /language/i })).toHaveCount(0);
+  await expect(page.getByLabel("Personal entry link", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Quick Exit", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText("Private fixture note")).toHaveCount(0);
@@ -205,6 +203,7 @@ test("returning account opens the PIN gate at the root URL without revealing pri
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByLabel("Browser PIN", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Quick Exit", exact: true })).toBeVisible();
   await expect(
     page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);
@@ -303,13 +302,13 @@ test("PWA manifests use the Little Grove identity and the download page offers t
   expect(manifest.icons[0].src).toContain("game-192");
   await page.goto("/get");
   await expect(
-    page.getByRole("heading", { name: "A place on your Home Screen." }),
+    page.getByRole("heading", { name: "iPhone and iPad" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Begin onboarding" }),
+    page.getByRole("link", { name: "Create an account" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Download the signed Android app." }),
+    page.getByRole("heading", { name: "Android", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Download signed APK/i }),
@@ -318,7 +317,7 @@ test("PWA manifests use the Little Grove identity and the download page offers t
     page.getByAltText("QR code for the latest signed Android app"),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Your space, on the web." }),
+    page.getByRole("heading", { name: "Use Olive Branch in your browser" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Open the web app/i }),
@@ -338,6 +337,7 @@ for (const size of [
     for (const path of [
       "/",
       "/account",
+      "/admin",
       "/get",
       "/cover/daily-digest",
       "/cover/fitness",
@@ -364,11 +364,16 @@ test("Safe Space navigation fits narrow phones through wide desktops", async ({ 
     const overflow = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
     expect(await overflow(), `Safe Space at ${width}px`).toBe(false);
     const menu = page.getByRole("button", { name: "Navigation", exact: true });
-    if (width <= 960) await menu.click();
+    if (width <= 960) {
+      await menu.focus();
+      await menu.press("Enter");
+      await expect(menu).toHaveAttribute("aria-expanded", "true");
+    }
     const navigation = page.getByRole("navigation", { name: "Safe Space navigation" });
     await expect(navigation.getByRole("button", { name: "Camera", exact: true })).toHaveCount(0);
     await navigation.getByRole("button", { name: "Safety plan", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Safety plan", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Safety plan", exact: true })).toBeFocused();
+    if (width <= 960) await expect(menu).toHaveAttribute("aria-expanded", "false");
     expect(await overflow(), `Safety plan at ${width}px`).toBe(false);
     await page.getByRole("button", { name: "Back to Safe Space" }).click();
   }
@@ -378,7 +383,7 @@ test("Safe Space navigation fits narrow phones through wide desktops", async ({ 
 test("public game and account screens meet core accessibility checks", async ({
   page,
 }) => {
-  for (const path of ["/", "/account/create", "/get"]) {
+  for (const path of ["/", "/account/create", "/account/sign-in", "/admin", "/get"]) {
     await page.goto(path);
     await expect(page.locator("h1,h2").first()).toBeVisible();
     const results = await new AxeBuilder({ page })

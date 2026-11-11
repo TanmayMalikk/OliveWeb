@@ -9,9 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import { createRoot } from "react-dom/client";
-import { LogOut, Delete, ArrowLeft, Leaf } from "lucide-react";
+import { LogOut, Delete, ArrowRight, Leaf, LockKeyhole } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
-import { accounts } from "./services/AccountService";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
 import { Button, Field, Form } from "./components/SharedComponents";
 import Game from "./public/covers/OliveGamesCover";
@@ -27,23 +26,19 @@ function PinGate() {
   const s = useSession();
   const [pin, setPin] = useState("");
   return (
-    <main id="main" className="pin-page private-shell">
-      <div className="pin-top">
-        <span>
-          <Leaf size={20} /> A little space.
-        </span>
-        {(s.profile?.role ?? accounts.identity?.role) === "USER" && <Button variant="exit" onClick={s.quickExit}>
-          Quick Exit <LogOut size={17} />
-        </Button>}
+    <main id="main" className="access-page pin-page private-shell">
+      <div className="access-header">
+        <span className="access-wordmark"><Leaf size={21} aria-hidden="true" /> Olive Branch</span>
+        {s.enrollment?.role === "USER" && (
+          <Button variant="exit" onClick={s.quickExit}>
+            <LogOut size={17} aria-hidden="true" /> Quick Exit
+          </Button>
+        )}
       </div>
-      <div className="pin-card">
-        <span className="eyebrow">YOUR PERSONAL ENTRY</span>
-        <h1>
-          A familiar
-          <br />
-          <em>way back.</em>
-        </h1>
-        <p>Enter your browser PIN to open your space.</p>
+      <section className="access-card pin-card" aria-labelledby="pin-heading">
+        <span className="access-mark"><LockKeyhole size={24} aria-hidden="true" /></span>
+        <h1 id="pin-heading">Unlock Safe Space</h1>
+        <p>Enter your browser PIN to continue.</p>
         <Form
           onSubmit={async () => {
             await s.perform(async () => {
@@ -68,73 +63,46 @@ function PinGate() {
             required
             maxLength={6}
           />
-          <div
-            className="pin-count"
-            aria-live="polite"
-            aria-label={`Digits entered: ${pin.length}`}
-          >
-            {Array.from({ length: 6 }, (_, i) => (
-              <i key={i} className={i < pin.length ? "entered" : ""} />
-            ))}
-          </div>
-          <div className="pin-keypad">
-            {[
-              "1",
-              "2",
-              "3",
-              "4",
-              "5",
-              "6",
-              "7",
-              "8",
-              "9",
-              "delete",
-              "0",
-              "unlock",
-            ].map((key) => (
+          <div className="pin-keypad" role="group" aria-label="PIN keypad">
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
               <button
-                type={key === "unlock" ? "submit" : "button"}
-                key={key}
-                aria-label={
-                  key === "delete"
-                    ? "Delete digit"
-                    : key === "unlock"
-                      ? "Unlock"
-                      : key
-                }
-                disabled={s.busy || (key === "unlock" && pin.length < 4)}
-                onClick={() => {
-                  if (key === "delete") setPin((v) => v.slice(0, -1));
-                  else if (key !== "unlock")
-                    setPin((v) => (v + key).slice(0, 6));
-                }}
+                type="button"
+                key={digit}
+                disabled={s.busy}
+                onClick={() => setPin((value) => (value + digit).slice(0, 6))}
               >
-                {key === "delete" ? (
-                  <Delete size={22} />
-                ) : key === "unlock" ? (
-                  <LogOut size={22} />
-                ) : (
-                  key
-                )}
+                {digit}
               </button>
             ))}
+            <button
+              type="button"
+              aria-label="Delete digit"
+              disabled={s.busy || pin.length === 0}
+              onClick={() => setPin((value) => value.slice(0, -1))}
+            >
+              <Delete size={20} aria-hidden="true" />
+            </button>
           </div>
           {s.message && (
             <p role="alert" className="form-error">
               {s.message}
             </p>
           )}
+          <Button type="submit" disabled={s.busy || pin.length < 4}>
+            {s.busy ? "Unlocking…" : "Unlock"} <ArrowRight size={17} aria-hidden="true" />
+          </Button>
         </Form>
         <button
           className="text-link"
+          type="button"
           onClick={() => {
             s.quickExit();
             s.go("/account/link");
           }}
         >
-          Need a new browser PIN or link? <ArrowLeft size={15} />
+          Need a new browser PIN or link? <ArrowRight size={15} aria-hidden="true" />
         </button>
-      </div>
+      </section>
     </main>
   );
 }

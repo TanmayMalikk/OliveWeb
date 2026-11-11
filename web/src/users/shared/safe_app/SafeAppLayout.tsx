@@ -1,9 +1,10 @@
 // All safe-app roles: routes signed-in users between safe-app pages.
-import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import {
   History as HistoryIcon,
   ArrowLeft,
   Menu,
+  X,
   FileLock2,
   HeartHandshake,
   House,
@@ -39,20 +40,40 @@ import {
 
 const Messages = lazy(() => import("./FriendsAndMessagesPage"));
 const SafetyPlan = lazy(() => import("./SafetyPlanPage"));
-const nav: { page: Page; label: string; icon: typeof House; userOnly?: boolean }[] = [
-  { page: "Home", label: "Home", icon: House },
-  { page: "Notes", label: "Notes & incidents", icon: NotebookPen },
-  { page: "Messages", label: "Friends & messages", icon: MessageCircle },
-  { page: "SafetyPlan", label: "Safety plan", icon: ShieldCheck },
-  { page: "Documents", label: "Documents", icon: FileLock2 },
-  { page: "Location", label: "Location", icon: MapPinned },
-  { page: "Hotlines", label: "Hotlines", icon: PhoneCall, userOnly: true },
-  { page: "StaffHelp", label: "Staff help", icon: HeartHandshake, userOnly: true },
-  { page: "Contacts", label: "Trusted contacts", icon: Users, userOnly: true },
-  { page: "Profile", label: "My profile", icon: UserRound },
-  { page: "Activity", label: "Account activity", icon: HistoryIcon },
-  { page: "Settings", label: "Settings", icon: Settings },
+type NavItem = { page: Page; label: string; icon: typeof House; userOnly?: boolean };
+const navigation: { label: string; items: NavItem[] }[] = [
+  { label: "Workspace", items: [
+    { page: "Home", label: "Home", icon: House },
+    { page: "SafetyPlan", label: "Safety plan", icon: ShieldCheck },
+    { page: "Notes", label: "Notes & incidents", icon: NotebookPen },
+    { page: "Documents", label: "Documents", icon: FileLock2 },
+  ] },
+  { label: "Connections", items: [
+    { page: "Messages", label: "Friends & messages", icon: MessageCircle },
+    { page: "Contacts", label: "Trusted contacts", icon: Users, userOnly: true },
+    { page: "Location", label: "Location", icon: MapPinned },
+    { page: "StaffHelp", label: "Staff help", icon: HeartHandshake, userOnly: true },
+    { page: "Hotlines", label: "Hotlines", icon: PhoneCall, userOnly: true },
+  ] },
+  { label: "Account", items: [
+    { page: "Profile", label: "My profile", icon: UserRound },
+    { page: "Activity", label: "Account activity", icon: HistoryIcon },
+    { page: "Settings", label: "Settings", icon: Settings },
+  ] },
 ];
+const contactNavigation = [
+  { label: "Shared with you", items: [
+    { page: "Home", label: "Home", icon: House },
+    { page: "SafetyPlan", label: "Shared safety plans", icon: ShieldCheck },
+    { page: "Messages", label: "Friends & messages", icon: MessageCircle },
+    { page: "Documents", label: "Documents", icon: FileLock2 },
+  ] },
+  { label: "Personal tools", items: [
+    { page: "Notes", label: "Notes & incidents", icon: NotebookPen },
+    { page: "Location", label: "Location", icon: MapPinned },
+  ] },
+  navigation[2],
+] satisfies typeof navigation;
 
 const pages: Record<Page, ComponentType> = {
   Home, Notes, Contacts, Profile, Settings: SettingsPage, Activity,
@@ -65,11 +86,15 @@ export default function SafeApp() {
   const p = s.profile!;
   const identity = accounts.identity;
   const uid = identity?.uid;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const previousPage = useRef(s.page);
   const [menuOpen, setMenuOpen] = useState(false);
   const [completedAt, setCompletedAt] = useState(0);
   const [dismissedAt, setDismissedAt] = useState(0);
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" });
+    if (previousPage.current !== s.page) heading.current?.focus({ preventScroll: true });
+    previousPage.current = s.page;
   }, [s.page]);
   useEffect(() => {
     if (identity && s.cloudMode) void register(identity).catch(() => undefined);
@@ -86,13 +111,16 @@ export default function SafeApp() {
     }).catch(() => undefined);
     return () => { active = false; stop?.(); };
   }, [uid, p.role, s.cloudMode]);
+  const isSafeContact = p.role === "SAFE_CONTACT";
+  const groups = isSafeContact ? contactNavigation : navigation;
   const CurrentPage = pages[s.page];
   const title = s.page === "Home"
-    ? p.role === "SAFE_CONTACT" ? "Safe contact space" : "Your Safe Space"
-    : nav.find(({ page }) => page === s.page)?.label;
+    ? isSafeContact ? "Safe contact space" : "Your Safe Space"
+    : groups.flatMap(({ items }) => items).find(({ page }) => page === s.page)?.label;
   const navigate = (page: Page) => {
     setMenuOpen(false);
     s.clearMessage();
+    if (s.page === page) heading.current?.focus();
     s.setPage(page);
   };
 
@@ -100,25 +128,30 @@ export default function SafeApp() {
     <div className="safe-shell private-shell">
       <aside className="safe-sidebar" data-menu-open={menuOpen}>
         <button className="safe-brand" type="button" onClick={() => navigate("Home")}>
-          <Leaf size={24} aria-hidden="true" />
-          <span>Olive Branch</span>
+          <span className="safe-brand-mark"><Leaf size={21} aria-hidden="true" /></span>
+          <span>Olive Branch <small>Safe Space</small></span>
         </button>
         <button className="safe-menu-toggle" type="button" aria-label="Navigation"
           aria-expanded={menuOpen} aria-controls="safe-navigation" onClick={() => setMenuOpen((open) => !open)}>
-          <Menu size={22} aria-hidden="true" />
+          {menuOpen ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
         </button>
         <nav id="safe-navigation" aria-label="Safe Space navigation">
-          {nav.filter(({ userOnly }) => !userOnly || p.role === "USER").map(({ page, label, icon: Icon }) => (
-            <button key={page} type="button" aria-current={s.page === page ? "page" : undefined}
-              onClick={() => navigate(page)}>
-              <Icon size={20} aria-hidden="true" />
-              <span>{label}</span>
-            </button>
+          {groups.map(({ label, items }) => (
+            <div className="safe-nav-group" key={label}>
+              <p>{label}</p>
+              {items.filter(({ userOnly }) => !userOnly || p.role === "USER").map(({ page, label: itemLabel, icon: Icon }) => (
+                <button key={page} type="button" aria-current={s.page === page ? "page" : undefined}
+                  onClick={() => navigate(page)}>
+                  <Icon size={18} aria-hidden="true" />
+                  <span>{itemLabel}</span>
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="safe-sidebar-bottom">
           <span className="avatar" aria-hidden="true">{p.username.charAt(0).toUpperCase()}</span>
-          <strong>@{p.username}</strong>
+          <div><strong>@{p.username}</strong><small>Signed in</small></div>
         </div>
       </aside>
       <div className="safe-main">
@@ -128,7 +161,7 @@ export default function SafeApp() {
               <button type="button" className="safe-icon-button" aria-label="Back to Safe Space"
                 onClick={() => navigate("Home")}><ArrowLeft size={22} aria-hidden="true" /></button>
             )}
-            <h1>{title}</h1>
+            <h1 tabIndex={-1} ref={heading}>{title}</h1>
           </div>
           <div className="safe-header-actions">
             {s.page === "Home" && (
@@ -136,7 +169,7 @@ export default function SafeApp() {
                 <Settings size={21} aria-hidden="true" />
               </button>
             )}
-            {p.role === "USER" && <Button variant="exit" onClick={s.quickExit}>Quick Exit <LogOut size={17} /></Button>}
+            {p.role === "USER" && <Button variant="exit" onClick={s.quickExit}><LogOut size={17} aria-hidden="true" /> Quick Exit</Button>}
           </div>
         </header>
         <main id="main" tabIndex={-1}>

@@ -347,7 +347,7 @@ export class Accounts {
     return this.serialize(async () => {
       const { identity, raw } = this.active();
       let savedProfile = profile;
-      // Keep the phone's cover preference when writing other profile fields from the web.
+      // Preserve preferences that can only be changed on the phone.
       if (cloudMode) {
         const { storage } = await firebase();
         const { ref, getBytes, uploadBytes } = await import("firebase/storage");
@@ -355,7 +355,11 @@ export class Accounts {
         try {
           const current = readStoredObject(await getBytes(profileRef, 65536));
           if (!current) throw new Error("The existing profile could not be read.");
-          savedProfile = { ...profile, coverType: normalizeCover(current.coverType) };
+          savedProfile = {
+            ...profile,
+            coverType: normalizeCover(current.coverType),
+            language: typeof current.language === "string" ? current.language : profile.language,
+          };
         } catch (error) {
           if ((error as { code?: string }).code !== "storage/object-not-found") throw error;
         }

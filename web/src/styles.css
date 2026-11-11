@@ -5,6 +5,9 @@
 @import "./styles/base.css";
 @import "./styles/fluid-layout.css";
 @import "./styles/responsive-app.css";
+@import "./styles/private-workspace.css";
+@import "./styles/access-pages.css";
+@import "./styles/organization-workspace.css";
 .page-width {
   width: var(--fluid-page-width);
   margin-inline: auto;

@@ -279,8 +279,8 @@ export default function SafetyPlan() {
     );
   if (!plan)
     return (
-      <Empty title="Opening your safety plan…">
-        {feedback || "Loading the latest shared sections."}
+      <Empty title={!editable && feedback ? feedback : "Opening safety plans…"}>
+        {editable && feedback ? feedback : !feedback ? "Loading the latest sections." : null}
       </Empty>
     );
 
@@ -298,42 +298,66 @@ export default function SafetyPlan() {
     };
   }), attach ? "Document attached." : "Document removed from this step.");
 
+  const kind = activeKind;
   return (
     <div className="safety-plan-web">
-      {!editable && sharedOwners.length > 1 && (
-        <label className="field">
-          <span>Shared safety plan</span>
-          <select value={sharedOwnerUid} onChange={(event) => setSharedOwnerUid(event.currentTarget.value)}>
-            {sharedOwners.map((owner) => <option key={owner.ownerUid} value={owner.ownerUid}>{owner.ownerName || "Shared plan"}</option>)}
-          </select>
-        </label>
+      {!editable && (
+        <section className="panel shared-plan-heading">
+          <div>
+            <h2>{plan.ownerName ? plan.ownerName + "’s safety plan" : "Shared safety plan"}</h2>
+            <p>View the primary and backup plans shared with you.</p>
+          </div>
+          {sharedOwners.length > 1 && (
+            <label className="field">
+              <span>Choose a shared plan</span>
+              <select value={sharedOwnerUid} onChange={(event) => setSharedOwnerUid(event.currentTarget.value)}>
+                {sharedOwners.map((owner) => (
+                  <option key={owner.ownerUid} value={owner.ownerUid}>{owner.ownerName || "Shared plan"}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </section>
       )}
-      <div className="safety-plan-tabs" role="tablist" aria-label="Safety plans">
-        {(["primary", "backup"] as const).map((kind) => (
-          <button
-            key={kind}
-            type="button"
-            role="tab"
-            aria-selected={activeKind === kind}
-            aria-controls={`${kind}-plan-panel`}
-            onClick={() => setActiveKind(kind)}
-          >
-            {label(kind)} plan
-          </button>
-        ))}
-      </div>
-      <nav className="safety-section-links" aria-label="Jump to a checklist">
-        {safetySections.map((section) => (
-          <button key={section} type="button" onClick={() => {
-            const checklist = document.getElementById(`${activeKind}_${section}`);
-            checklist?.focus({ preventScroll: true });
-            checklist?.scrollIntoView({ block: "start" });
-          }}>{section === "documents" ? "Documents" : section === "grab" ? "Quick-grab" : label(section)}</button>
-        ))}
-      </nav>
-      {([activeKind] as const).map((kind) => (
-        <section key={kind} className="panel safety-plan-group">
-          <div id={`${kind}-plan-panel`} role="tabpanel">
+      <div className="safety-workspace">
+        <div className="safety-workspace-nav">
+          <div className="safety-plan-tabs" role="tablist" aria-label="Safety plans">
+            {(["primary", "backup"] as const).map((kind) => (
+              <button
+                key={kind}
+                type="button"
+                id={kind + "-plan-tab"}
+                role="tab"
+                tabIndex={activeKind === kind ? 0 : -1}
+                aria-selected={activeKind === kind}
+                aria-controls={activeKind === kind ? `${kind}-plan-panel` : undefined}
+                onClick={() => setActiveKind(kind)}
+                onKeyDown={(event) => {
+                  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                  event.preventDefault();
+                  const next = event.key === "Home" ? "primary" : event.key === "End" ? "backup"
+                    : kind === "primary" ? "backup" : "primary";
+                  setActiveKind(next);
+                  document.getElementById(next + "-plan-tab")?.focus();
+                }}
+              >
+                {label(kind)} plan
+              </button>
+            ))}
+          </div>
+          <p className="safety-rail-label" aria-hidden="true">Checklists</p>
+          <nav className="safety-section-links" aria-label="Jump to a checklist">
+            {safetySections.map((section) => (
+              <button key={section} type="button" onClick={() => {
+                const checklist = document.getElementById(`${activeKind}_${section}`);
+                checklist?.focus({ preventScroll: true });
+                checklist?.scrollIntoView({ block: "start" });
+              }}>{section === "documents" ? "Documents" : section === "grab" ? "Quick-grab" : label(section)}</button>
+            ))}
+          </nav>
+        </div>
+        <section key={kind} className="safety-plan-group" id={kind + "-plan-panel"}
+          role="tabpanel" aria-labelledby={kind + "-plan-tab"}>
           <div className="safety-checklist-stack">
             {[...safetySections, ...olderSafetySections.filter((section) =>
               readSafetyChecklist(drafts[`${kind}_${section}`] ?? "").length > 0,
@@ -514,28 +538,22 @@ export default function SafetyPlan() {
               );
             })}
           </div>
-          </div>
         </section>
-      ))}
-      <section className="panel safety-plan-summary">
+      </div>
+      {editable && <section className="panel safety-plan-summary">
         <ShieldCheck size={28} />
         <div>
-          <h2>
-            {editable
-              ? "Your safety plan."
-              : `${plan.ownerName}'s shared plan.`}
-          </h2>
+          <h2>Plan consultation</h2>
           {plan.staffUid && <small>A support staff member is working with you.</small>}
-          {editable && !plan.consultationRequested && Boolean(plan.plansCompletedAt) &&
+          {!plan.consultationRequested && Boolean(plan.plansCompletedAt) &&
             <p role="status">Your safety plan and backup plan are complete.</p>}
-          {editable && plan.consultationRequested && plan.consultationConversationId && identity && (
+          {plan.consultationRequested && plan.consultationConversationId && identity && (
             <Button variant="quiet" onClick={() => {
               session.setRequestedConversation({ id: plan.consultationConversationId!, uid: identity.uid });
               session.setPage("Messages");
             }}>Open consultation ticket</Button>
           )}
         </div>
-        {editable && (
           <Button
             variant="outline"
             disabled={session.busy}
@@ -561,8 +579,7 @@ export default function SafetyPlan() {
               ? "End consultation request"
               : "Request consultation"}
           </Button>
-        )}
-      </section>
+      </section>}
       {editable && (friends.length > 0 || selectedContacts.length > 0) && (
         <section className="panel">
           <h3>Share with safe contacts</h3>

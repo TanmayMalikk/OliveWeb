@@ -1,0 +1,207 @@
+.access-page {
+  --paper: #f4f5ef;
+  --white: #fff;
+  --ink: #202c25;
+  --muted: #526057;
+  --olive: #284b3c;
+  --soft: #e9efe6;
+  --line: #d9e1d9;
+  --access-gutter: clamp(0.85rem, 4vw, 3.5rem);
+  min-height: 100svh;
+  padding-inline: var(--access-gutter);
+  background: var(--paper);
+  color: var(--ink);
+}
+.access-header {
+  width: min(100%, 74rem);
+  min-height: 4.25rem;
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  border-bottom: 1px solid var(--line);
+}
+.access-page .button {
+  border-radius: 0.65rem;
+  padding: 0.7rem 1rem;
+  gap: 0.55rem;
+}
+.access-page .button:hover:not(:disabled) { transform: none; }
+.access-page .button.exit {
+  background: #f6e6de;
+  color: #663527;
+  border-color: #dfc0b2;
+}
+.access-page .button.exit:hover:not(:disabled) { background: #eed5ca; }
+.access-card {
+  min-width: 0;
+  padding: clamp(1rem, 4vw, 2rem);
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+.access-mark {
+  width: 2.8rem;
+  height: 2.8rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 0.72rem;
+  background: var(--soft);
+  color: var(--olive);
+}
+.access-card h1 {
+  font: 650 clamp(1.45rem, 3.5vw, 2.1rem)/1.15 system-ui, sans-serif;
+  letter-spacing: -0.04em;
+}
+.access-card h2 {
+  font: 650 clamp(1.2rem, 2.2vw, 1.55rem)/1.2 system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+.access-card h3 { font: 650 0.91rem/1.35 system-ui, sans-serif; }
+.access-card p { color: var(--muted); }
+.access-card .form-error { color: #8b3b30; }
+
+.access-sign-in {
+  width: min(100%, 59rem);
+  margin-inline: auto;
+  padding-block: clamp(1rem, 7vh, 4rem);
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1fr);
+}
+.access-context {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 0.85rem;
+  padding: clamp(1.25rem, 5vw, 3rem);
+  background: #284b3c;
+  color: #f6faf3;
+  border-radius: 1rem 0 0 1rem;
+}
+.access-context .access-context-title {
+  font: clamp(1.65rem, 3.5vw, 2.5rem)/1.08 var(--serif);
+  letter-spacing: -0.035em;
+  color: #f6faf3;
+}
+.access-context p { color: #e1ebe0; max-width: 32ch; }
+.access-context .text-link { color: #f6faf3; }
+.access-context :focus-visible { outline-color: #f0e1aa; }
+.access-sign-in .access-card { border-radius: 0 1rem 1rem 0; }
+.access-sign-in .access-card h1 { margin-bottom: 1.25rem; }
+.access-card :is(input, select) { border-radius: 0.6rem; font-size: 1rem; }
+.access-sign-in form > .button,
+.pin-card form > .button { width: 100%; }
+.access-sign-in .auth-switch { margin: 0.75rem 0 0; }
+.access-sign-in .account-utility-links { margin-top: 0.35rem; }
+.access-sign-in .storage-note { margin-top: 0.8rem; }
+
+.access-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font: 1.2rem/1.1 var(--serif);
+}
+.access-wordmark > svg { flex-shrink: 0; }
+.pin-page { padding-bottom: 1rem; }
+.pin-card {
+  width: min(100%, 25rem);
+  margin: clamp(0.85rem, 4vh, 2.5rem) auto 0;
+  text-align: center;
+}
+.pin-card h1 { margin: 0.7rem 0 0.3rem; }
+.pin-card > p { margin-bottom: 0.9rem; }
+.pin-card .field { margin-bottom: 0.75rem; text-align: left; }
+.pin-card input { text-align: center; letter-spacing: 0.38em; }
+.pin-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+.pin-keypad > button {
+  display: grid;
+  place-items: center;
+  min-height: 2.75rem;
+  padding: 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--paper);
+  font-size: 1.18rem;
+  font-weight: 600;
+}
+.pin-keypad > button:nth-child(10) { grid-column: 2; }
+.pin-keypad > button:hover:not(:disabled) { background: var(--soft); }
+.pin-card .form-error { margin-bottom: 0.75rem; text-align: left; }
+.pin-card > .text-link { margin-top: 0.45rem; }
+
+.install-main {
+  width: min(100%, 68rem);
+  margin-inline: auto;
+  padding-block: 0.65rem clamp(1.5rem, 6vh, 3.5rem);
+}
+.install-heading { margin: 0.7rem 0 1.3rem; }
+.install-heading h1 {
+  font: clamp(2.15rem, 5.5vw, 4rem)/1.05 var(--serif);
+  letter-spacing: -0.04em;
+}
+.install-heading p { max-width: 54ch; color: var(--muted); margin-top: 0.55rem; }
+.install-platforms {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+.install-platform { display: grid; align-content: start; justify-items: start; gap: 0.65rem; }
+.install-android { border-top: 0.3rem solid var(--olive); }
+.install-platform .install-note { font-size: 0.83rem; }
+.install-qr-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.7rem;
+  border-radius: 0.7rem;
+  background: var(--paper);
+}
+.install-qr {
+  display: block;
+  width: clamp(5.5rem, 12vw, 7.5rem);
+  padding: 0.25rem;
+  border-radius: 0.35rem;
+  background: white;
+}
+.install-qr img { display: block; width: 100%; height: auto; }
+.install-qr-panel h3 { display: flex; align-items: center; gap: 0.35rem; }
+.install-qr-panel h3 svg { flex-shrink: 0; }
+.install-qr-panel p, .install-guide p { font-size: 0.86rem; margin-top: 0.2rem; }
+.install-guide { width: 100%; padding: 0; margin: 0; list-style: none; }
+.install-guide li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.6rem;
+  padding-block: 0.65rem;
+  border-bottom: 1px solid var(--line);
+}
+.install-guide li a { text-decoration: underline; text-underline-offset: 0.2em; }
+.install-guide li svg { margin-top: 0.1rem; color: var(--olive); }
+.install-browser {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.9rem;
+}
+.install-browser p { margin-top: 0.35rem; }
+.install-browser-actions { display: flex; gap: 0.4rem 0.75rem; flex-wrap: wrap; align-items: center; }
+@media (max-width: 46rem) {
+  .access-sign-in, .install-platforms { grid-template-columns: minmax(0, 1fr); }
+  .access-context { border-radius: 1rem 1rem 0 0; padding: 1rem; gap: 0.45rem; }
+  .access-context .access-mark { display: none; }
+  .access-context p { max-width: none; }
+  .access-sign-in .access-card { border-radius: 0 0 1rem 1rem; }
+  .install-browser { grid-template-columns: auto minmax(0, 1fr); }
+  .install-browser-actions { grid-column: 1 / -1; }
+}

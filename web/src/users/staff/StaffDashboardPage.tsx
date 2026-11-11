@@ -1,7 +1,7 @@
 // Staff: shows assigned users and support chats to staff.
 import { useEffect, useState } from "react";
-import { ArrowLeft, MessageCircle, ShieldCheck } from "lucide-react";
-import { Button, Empty, Logo } from "../../components/SharedComponents";
+import { LayoutDashboard, MessageCircle, ShieldCheck } from "lucide-react";
+import { Button } from "../../components/SharedComponents";
 import { useSession } from "../../session/SessionProvider";
 import { accounts } from "../../services/AccountService";
 import { register } from "../../services/MessagingService";
@@ -12,8 +12,16 @@ import {
   staffConsultations,
   type SafetyPlan,
 } from "../../services/SafetyPlanService";
-import SafetyPlanEditor from "./StaffSafetyPlanEditor";
+import { ConsultationWorkspace } from "./ConsultationWorkspace";
+import { OrganizationWorkspace, WorkspaceShortcuts, type WorkspacePage } from "../shared/OrganizationWorkspace";
 import OrganizationSupportInbox from "../shared/OrganizationSupportInbox";
+
+type StaffView = "home" | "plans" | "messages";
+const pages: WorkspacePage<StaffView>[] = [
+  { id: "home", label: "Overview", title: "Staff overview", description: "Manage your consultation availability and respond to assigned tickets.", icon: LayoutDashboard },
+  { id: "plans", label: "Consultations", title: "Safety-plan consultations", description: "Review and update the plans assigned to you.", icon: ShieldCheck },
+  { id: "messages", label: "Support chats", description: "Read and reply to your assigned tickets.", icon: MessageCircle },
+];
 
 export default function StaffPortal() {
   const session = useSession();
@@ -22,7 +30,7 @@ export default function StaffPortal() {
   >([]);
   const [available, setAvailable] = useState(true);
   const [plan, setPlan] = useState<SafetyPlan | null>(null);
-  const [view, setView] = useState<"home" | "plans" | "messages">("home");
+  const [view, setView] = useState<StaffView>("home");
 
   // Reload staff tickets when the signed-in session changes.
   const identity = accounts.identity;
@@ -49,82 +57,41 @@ export default function StaffPortal() {
     return () => { active = false; stop?.(); };
   }, [uid]);
 
+  const availability = (
+    <section className="panel organization-toolbar">
+      <div>
+        <h2>Consultation availability</h2>
+        <p>{available ? "Available for new requests" : "Not accepting new requests"}</p>
+      </div>
+      <Button variant="outline" disabled={session.busy} onClick={() =>
+        void session.perform(async () => {
+          const value = await setStaffAvailability(!available);
+          setAvailable(value.available);
+        })
+      }>
+        {available ? "Pause availability" : "Become available"}
+      </Button>
+    </section>
+  );
+
+  const navigate = (next: StaffView) => {
+    if (next !== "plans") setPlan(null);
+    setView(next);
+  };
+
   return (
-    <div className="page-width private-shell portal">
-      <header className="site-header">
-        <Logo />
-        <span className="eyebrow">STAFF PORTAL</span>
-      </header>
-      <main id="main">
-        <header className="organization-page-heading">
-          {view !== "home" && <button className="safe-icon-button" aria-label="Back to staff panel"
-            onClick={() => { setPlan(null); setView("home"); }}><ArrowLeft size={22} /></button>}
-          <h1>{view === "plans" ? "Safety-plan consultations" : view === "messages" ? "Support chats" : "Staff panel"}</h1>
-        </header>
-        {session.message && (
-          <p role="alert" className="form-error">
-            {session.message}
-          </p>
-        )}
-        {view === "home" && <div className="organization-feature-grid">
-          <button className="safe-feature-tile" onClick={() => setView("plans")}><ShieldCheck size={26} /> Safety-plan consultations</button>
-          <button className="safe-feature-tile" onClick={() => setView("messages")}><MessageCircle size={26} /> Support chats</button>
-        </div>}
-        {view === "plans" && <>
-        <section className="panel safety-plan-summary">
-          <div>
-            <h2>Availability</h2>
-            <p>
-              {available
-                ? "Available for new requests"
-                : "Not accepting new requests"}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            disabled={session.busy}
-            onClick={() =>
-              void session.perform(async () => {
-                const value = await setStaffAvailability(!available);
-                setAvailable(value.available);
-              })
-            }
-          >
-            {available ? "Pause availability" : "Become available"}
-          </Button>
-        </section>
-        {!consultations.length ? (
-          <Empty title="No active consultations.">
-            New assigned plans will appear here.
-          </Empty>
-        ) : (
-          <div className="panel-list">
-            {consultations.map((item) => (
-              <button
-                className="panel text-link"
-                key={item.ownerUid}
-                onClick={() =>
-                  void session.perform(async () =>
-                    setPlan(await loadPlan(item.ownerUid)),
-                  )
-                }
-              >
-                {item.ticketNumber >= 0 ? `Consult Ticket #${item.ticketNumber}` : "Consult Ticket"}
-              </button>
-            ))}
-          </div>
-        )}
-        {plan && <SafetyPlanEditor plan={plan} onChange={setPlan}
-          onCompleted={() => setConsultations((current) => current.filter((item) => item.ownerUid !== plan.ownerUid))} />}
-        </>}
-        {view === "messages" && <OrganizationSupportInbox />}
-        <Button
-          variant="quiet"
-          onClick={() => void session.perform(session.signOut)}
-        >
-          Sign out
-        </Button>
-      </main>
-    </div>
+    <OrganizationWorkspace role="Staff" pages={pages} view={view} onNavigate={navigate}>
+      {view === "home" && <>
+        {availability}
+        <WorkspaceShortcuts pages={pages.slice(1)} onNavigate={navigate} />
+      </>}
+      {view === "plans" && <>
+        {availability}
+        <ConsultationWorkspace items={consultations} plan={plan} busy={session.busy} onChange={setPlan}
+          onOpen={(ownerUid) => void session.perform(async () => setPlan(await loadPlan(ownerUid)))}
+          onCompleted={() => setConsultations((current) => current.filter((item) => item.ownerUid !== plan?.ownerUid))} />
+      </>}
+      {view === "messages" && <OrganizationSupportInbox />}
+    </OrganizationWorkspace>
   );
 }
