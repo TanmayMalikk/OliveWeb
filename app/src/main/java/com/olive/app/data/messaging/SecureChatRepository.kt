@@ -4,6 +4,13 @@ package com.olive.app.data
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.MetadataChanges
+import com.google.firebase.firestore.Source
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
@@ -19,6 +26,25 @@ import org.json.JSONObject
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
 class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+    // Reads established keys directly after confirming current membership on the server.
+    internal suspend fun readyRoomKey(conversation: ChatConversation, uid: String): KeyManager.UnwrappedKeyEnvelope? {
+        val snapshot = firestore.collection("conversations").document(conversation.id).get(Source.SERVER).await()
+        val participants = (snapshot.get("participantIds") as? List<*>)?.toSet() ?: return null
+        if (uid !in participants || participants != conversation.participantIds.toSet()) return null
+        val roomKeys = snapshot.roomKeys().orEmpty()
+        if (roomKeys.keys != participants || snapshot.participantPublicKeys()?.keys != participants) return null
+        val accountEnvelope = roomKeys[uid] ?: return null
+        val accountKey = withContext(Dispatchers.Default) {
+            runCatching { KeyManager.unwrapFirstWithEnvelope(listOf(accountEnvelope)) }.getOrNull()
+        }
+        if (accountKey != null) return accountKey
+        val deviceEnvelope = snapshot.reference.collection("deviceKeys")
+            .document("$uid--${KeyManager.deviceId()}").get(Source.SERVER).await().getString("wrappedKey") ?: return null
+        return withContext(Dispatchers.Default) {
+            runCatching { KeyManager.unwrapFirstWithEnvelope(listOf(deviceEnvelope)) }.getOrNull()
+        }
+    }
+
     // Opens the copy of an existing room key that was encrypted for this account.
     suspend fun existingRoomKey(conversationId: String, currentUid: String): SecretKey? {
         return roomKeyAccess(conversationId, currentUid)?.secretKey
@@ -203,9 +229,14 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         onError: (String) -> Unit,
         onServerCiphertext: ((List<EncryptedChatMessage>) -> Unit)? = null,
     ): ChatSubscription {
+        val deliveryScope = CoroutineScope(Dispatchers.Main.immediate)
+        var delivery: Job? = null
+        var lastEncrypted: List<EncryptedChatMessage>? = null
+        var lastDecoded = emptyList<ChatMessage>()
         val listener = firestore.collection("conversations").document(conversationId)
             .collection("messages").orderBy("sentAt").limitToLast(250)
             .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                delivery?.cancel()
                 if (error != null) {
                     onError(error.localizedMessage.orEmpty())
                     return@addSnapshotListener
@@ -222,14 +253,25 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                         deleted = row.getBoolean("deleted") ?: false,
                     )
                 }
-                val decrypted = runCatching { decryptMessages(encrypted, roomKey) }.getOrElse {
-                    onError("Encrypted message authentication failed.")
-                    return@addSnapshotListener
+                delivery = deliveryScope.launch {
+                    if (lastEncrypted != encrypted) {
+                        val decoded = withContext(Dispatchers.Default) {
+                            runCatching { decryptMessages(encrypted, roomKey) }
+                        }.getOrElse {
+                            onError("Encrypted message authentication failed.")
+                            return@launch
+                        }
+                        lastEncrypted = encrypted
+                        lastDecoded = decoded
+                    }
+                    if (snapshot?.metadata?.isFromCache != true || encrypted.isNotEmpty()) onUpdate(lastDecoded)
+                    if (snapshot != null && !snapshot.metadata.isFromCache) onServerCiphertext?.invoke(encrypted)
                 }
-                if (snapshot?.metadata?.isFromCache != true || encrypted.isNotEmpty()) onUpdate(decrypted)
-                if (snapshot != null && !snapshot.metadata.isFromCache) onServerCiphertext?.invoke(encrypted)
             }
-        return ChatSubscription { listener.remove() }
+        return ChatSubscription {
+            listener.remove()
+            deliveryScope.cancel()
+        }
     }
 
     // Authenticates ciphertext before any message is exposed to the UI.

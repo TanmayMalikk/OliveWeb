@@ -135,6 +135,7 @@ internal fun ChatInfoDialog(
     // Opens the new support chat after the live conversation listener receives it from Firebase.
     LaunchedEffect(requestedConversationId, session.messages.conversations) {
         val created = session.messages.conversations.firstOrNull { it.id == requestedConversationId }
+            ?: session.messages.findRequestedConversation(requestedConversationId)
         if (created != null) {
             session.messages.openConversation(created)
             onClose()

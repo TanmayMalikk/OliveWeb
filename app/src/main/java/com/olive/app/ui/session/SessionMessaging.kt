@@ -30,6 +30,8 @@ import com.olive.app.ui.users.shared.navigation.SessionScreen
 
 // Connects account messaging and manages live subscriptions.
 internal class SessionMessaging(private val runtime: SessionRuntime) {
+    private var preparedSupportUid: String? = null
+
     // Session messaging: Reports whether messaging screen active.
     private fun messagingScreenActive() = with(runtime.state) {
         screen == SessionScreen.Safe ||
@@ -79,52 +81,36 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 // active while the message list listener drives unread badges on the dashboard.
                 LocalNotificationEventHandler.start(application)
                 val token = epoch
-                messagingBusy = true
                 if (showFeedback) message = null
+                observeConversations(token)
+                socialSubscription = repository.observeSocial(device.uid, { social ->
+                    if (epoch == token && messagingScreenActive()) {
+                        friends = social.friends
+                        incomingFriendRequests = social.incoming
+                        outgoingFriendRequests = social.outgoing
+                    }
+                }, { error ->
+                    if (epoch == token && messagingScreenActive() && (showFeedback || page == SafePage.Messages)) {
+                        message = application.getString(R.string.ui_unable_to_load_friend_information_value, error)
+                    }
+                })
                 scope.launch {
-                    // Use the fallback when start messaging is unavailable.
                     try {
                         registerMessagingIdentity(identity)
-                        repository.prepareSupportTickets()
-                        if (epoch != token || !messagingScreenActive()) return@launch
-                        socialSubscription = repository.observeSocial(device.uid, { social ->
-                            // Apply messages only to the same chat session that started the listener.
-                            if (epoch == token && messagingScreenActive()) {
-                                friends = social.friends
-                                incomingFriendRequests = social.incoming
-                                outgoingFriendRequests = social.outgoing
-                                observeFriendConversations(social.friends, token)
-                                messagingBusy = false
-                            }
-                        }, { error ->
-                            // Ignore this result after the session changes.
-                            if (epoch == token) {
-                                messagingBusy = false
-                                if (showFeedback || page == SafePage.Messages) message =
-                                    runtime.application.getString(
-                                        R.string.ui_unable_to_load_friend_information_value,
-                                        error
-                                    )
-                            }
-                        })
-                        // The live listeners are attached; their first rows can populate after loading ends.
-                        if (epoch == token && messagingScreenActive()) messagingBusy = false
                     } catch (error: CancellationException) {
                         throw error
                     } catch (error: Exception) {
-                        // Apply this result only to the session that requested it.
-                        if (epoch == token) {
-                            messagingBusy = false
-                            // A permission error means Firebase needs the user to sign in again before messaging.
-                            if (error is FirebaseFirestoreException && error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                                messagingNeedsReconnect = true
-                                if (showFeedback || page == SafePage.Messages)
-                                    message =
-                                        runtime.application.getString(R.string.ui_firebase_needs_your_account_password_again_before_friends_and_mes)
-                            } else if (showFeedback || page == SafePage.Messages)
-                                message =
-                                    runtime.application.getString(R.string.ui_unable_to_start_messaging)
-                        }
+                        android.util.Log.w("OliveMessaging", "Messaging key registration failed", error)
+                    }
+                }
+                if (preparedSupportUid != device.uid) scope.launch {
+                    try {
+                        repository.prepareSupportTickets()
+                        if (epoch == token) preparedSupportUid = device.uid
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        android.util.Log.w("OliveMessaging", "Ticket maintenance failed", error)
                     }
                 }
             }
@@ -168,15 +154,11 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Watches friend conversations for changes.
-    fun observeFriendConversations(currentFriends: List<Friend>, token: Long) {
+    // Watches all conversations, including tickets for accounts without friends.
+    private fun observeConversations(token: Long) {
         with(runtime) {
             with(state) {
                 val ownerUid = enrollment?.uid ?: return
-                // The marker keeps support conversations observable even when this account has no friends.
-                val ids = currentFriends.map { it.friendshipId }.toSet() + "__support__"
-                if (ids == observedFriendshipIds) return
-                observedFriendshipIds = ids
                 conversationSubscription?.close()
                 conversationSubscription =
                     messagingRepository?.observeConversations(ownerUid, { rows ->
@@ -214,14 +196,14 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                             )
                         }
                     }, { serverRows ->
+                        if (epoch == token) {
+                            activeConversation?.takeIf { active ->
+                                serverRows.none { it.id == active.id }
+                            }?.let { conversationActions.closeConversation() }
+                        }
                         scope.launch {
                             withContext(Dispatchers.IO) {
                                 chatCache.replaceIndex(ownerUid, serverRows, System.currentTimeMillis())
-                            }
-                            if (epoch == token) {
-                                activeConversation?.takeIf { active ->
-                                    serverRows.none { it.id == active.id }
-                                }?.let { conversationActions.closeConversation() }
                             }
                         }
                     })
@@ -277,7 +259,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 socialSubscription = null
                 conversationSubscription?.close()
                 conversationSubscription = null
-                observedFriendshipIds = emptySet()
                 conversationLoadFailed = false
                 messageSubscription?.close()
                 messageSubscription = null

@@ -400,8 +400,12 @@ export async function roomKey(id: string, current: Identity, conversationData: C
     const raw = await unwrapRoomKeyBytes(current.uid, String(savedDeviceKey.data().wrappedKey)).catch(() => null);
     if (raw) {
       try {
-        await shareRoomKeyWithDevices(id, conversationData, raw);
-        return await crypto.subtle.importKey("raw", raw.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
+        const key = await crypto.subtle.importKey("raw", raw.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
+        const sharingKey = raw.slice();
+        void shareRoomKeyWithDevices(id, conversationData, sharingKey)
+          .catch(() => { /* Another device can retry approval on its next open. */ })
+          .finally(() => sharingKey.fill(0));
+        return key;
       } finally {
         raw.fill(0);
       }

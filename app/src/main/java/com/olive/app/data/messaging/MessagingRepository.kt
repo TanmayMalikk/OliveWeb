@@ -220,8 +220,9 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 if (key is String && value is String) key to value else null
             }?.toMap().orEmpty()
         val ref = firestore.collection("conversations").document(friend.friendshipId)
-        if (!ref.get().await().exists())
-            ref.set(directConversationData(friend.friendshipId, ids, names)).await()
+        val existing = ref.get().await()
+        if (existing.exists()) return checkNotNull(conversationFrom(existing))
+        ref.set(directConversationData(friend.friendshipId, ids, names)).await()
         return ChatConversation(friend.friendshipId, friend.friendshipId, ids, names)
     }
 
@@ -252,6 +253,11 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 }
         return listener.asSubscription()
     }
+
+    // Reads a newly created ticket before it reaches the conversation index.
+    suspend fun getConversation(id: String): ChatConversation? =
+        conversationFrom(firestore.collection("conversations").document(id)
+            .get(com.google.firebase.firestore.Source.SERVER).await())
 
     // Loads a server-confirmed conversation index for background membership and key reconciliation.
     suspend fun listConversations(currentUid: String): List<ChatConversation> =
@@ -289,7 +295,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             (row.get("participantUsernames") as? Map<*, *>)?.entries?.mapNotNull { (key, value) ->
                 if (key is String && value is String) key to value else null
             }?.toMap().orEmpty()
-        val friendshipId = row.getString("friendshipId") ?: return null
+        val friendshipId = row.getString("friendshipId") ?: row.id.takeIf { row.getString("type") == "SUPPORT" }
+            ?: return null
         return ChatConversation(
             row.id,
             friendshipId,

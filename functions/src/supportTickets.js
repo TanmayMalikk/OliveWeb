@@ -1,11 +1,11 @@
 // Users and staff: opens regular support tickets and sends FCM alerts for conversation updates.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
-const {db, messaging} = require("./firebaseAdminClient");
+const {db, messaging, FieldValue} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller} = require("./safetyPlanAccess");
-const {saveSupportConversation, closeSupportConversation, supportConversationId, SUPPORT} =
+const {saveSupportConversation, supportConversationId, SUPPORT} =
   require("./supportGroups");
 const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
 
@@ -77,26 +77,31 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
   const reference = db.collection("supportRequests").doc(
       action === "request" ? newConversationId : (requestedConversationId || caller.uid));
   if (action === "stop") {
-    const current = (await reference.get()).data();
-    if (current && current.ownerUid !== caller.uid) {
-      throw new HttpsError("permission-denied", "You can cancel only your own support ticket.");
-    }
-    if (current?.staffUid) {
-      const staffReference = db.collection("safetyStaff").doc(current.staffUid);
-      await db.runTransaction(async transaction => {
-        const settings = (await transaction.get(staffReference)).data() || {};
-        transaction.set(staffReference, {
-          activeCount: Math.max(0, (settings.activeCount || 0) - 1),
-        }, {merge: true});
-        transaction.delete(reference);
-      });
-    } else await reference.delete();
-    await closeSupportConversation(current?.conversationId || "");
+    await db.runTransaction(async transaction => {
+      const current = (await transaction.get(reference)).data();
+      if (!current || current.requested === false) return;
+      if (current.ownerUid !== caller.uid) {
+        throw new HttpsError("permission-denied", "You can cancel only your own support ticket.");
+      }
+      const chatRef = current.conversationId && db.collection("conversations").doc(current.conversationId);
+      const chat = chatRef && await transaction.get(chatRef);
+      if (current.staffUid && !chat?.get("closedAt")) {
+        const staffRef = db.collection("safetyStaff").doc(current.staffUid);
+        const settings = (await transaction.get(staffRef)).data() || {};
+        transaction.set(staffRef, {activeCount: Math.max(0, (settings.activeCount || 0) - 1)}, {merge: true});
+      }
+      if (chat?.exists && !chat.get("closedAt")) {
+        transaction.update(chatRef, {closedAt: FieldValue.serverTimestamp(), completedAt: FieldValue.serverTimestamp(),
+          ticketStatus: "COMPLETED", updatedAt: FieldValue.serverTimestamp()});
+      }
+      transaction.delete(reference);
+    });
     return {ticket: {ownerUid: caller.uid, requested: false, staffUid: "", conversationId: ""}};
   }
 
   const staffCandidates = await candidates();
   const ticket = await db.runTransaction(async transaction => {
+    const chat = await transaction.get(db.collection("conversations").doc(newConversationId));
     const references = new Map(staffCandidates.map(staff => [
       staff.uid, db.collection("safetyStaff").doc(staff.uid),
     ]));
@@ -117,9 +122,9 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
       conversationId: newConversationId, ticketNumber, updatedAt: Date.now(),
     };
     transaction.set(reference, created);
+    await saveSupportConversation(created, "", false, {transaction, snapshot: chat});
     return created;
   });
-  if (ticket.requested) await saveSupportConversation(ticket, "", false);
   return {ticket};
 });
 

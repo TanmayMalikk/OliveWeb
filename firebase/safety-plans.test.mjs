@@ -323,6 +323,13 @@ test("support tickets create an anonymous chat without sharing the safety plan",
   assert.equal(supportConversation.data().supportTag,"SUPPORT");
   await call(staffSupportClose,response.ticket.staffUid,{conversationId:firstConversationId});
   assert.ok((await db.collection("conversations").doc(firstConversationId).get()).get("closedAt"));
+  const ownerClient = env.authenticatedContext(owner, {email: "support_owner@users.olive.invalid"}).firestore();
+  const archived = doc(ownerClient, "conversations", firstConversationId);
+  assert.equal((await getDocFromServer(archived)).get("ticketStatus"), "COMPLETED");
+  await assertFails(setDoc(doc(archived, "messages", "after-close"), {
+    senderUid: owner, senderUsername: supportConversation.get("participantUsernames")[owner],
+    ciphertext: "encrypted", deleted: false, sentAt: serverTimestamp(), clientSentAt: Date.now(),
+  }));
   const secondResponse=await call(staffSupportRequest,owner,{action:"request"});
   const secondConversationId=secondResponse.ticket.conversationId;
   assert.equal(secondResponse.ticket.ticketNumber,response.ticket.ticketNumber+1);
@@ -330,7 +337,13 @@ test("support tickets create an anonymous chat without sharing the safety plan",
   assert.ok((await db.collection("conversations").doc(firstConversationId).get()).get("closedAt"));
   assert.equal((await db.collection("conversations").doc(secondConversationId).get()).get("closedAt"),undefined);
   assert.equal((await call(safetyPlanConsultations,response.ticket.staffUid)).plans.some((plan) => plan.ownerUid===owner),false);
-  await call(staffSupportRequest,owner,{action:"stop",conversationId:secondConversationId});
+  const staffRef = db.collection("safetyStaff").doc(secondResponse.ticket.staffUid);
+  const activeCount = (await staffRef.get()).get("activeCount");
+  await Promise.all([
+    call(staffSupportRequest,owner,{action:"stop",conversationId:secondConversationId}),
+    call(staffSupportClose,secondResponse.ticket.staffUid,{conversationId:secondConversationId}),
+  ]);
+  assert.equal((await staffRef.get()).get("activeCount"),activeCount - 1);
   assert.ok((await db.collection("conversations").doc(secondConversationId).get()).get("closedAt"));
 });
 test("owners can share a read-only plan with an accepted safe contact and revoke it", async () => {
