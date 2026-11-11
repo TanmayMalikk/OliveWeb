@@ -271,7 +271,7 @@ export class Accounts {
     const enrollment: Enrollment = {
       uid: identity.uid,
       username: identity.username,
-      cover: profile.coverType,
+      webCover: "GAME",
       role: profile.role,
       triggerHash: profile.triggerHash,
       pinKey: await wrapKey(pin, raw),
@@ -346,13 +346,22 @@ export class Accounts {
       throw new Error("Account mismatch.");
     return this.serialize(async () => {
       const { identity, raw } = this.active();
-      // Cloud accounts also remove their Firebase sign-in record.
+      let savedProfile = profile;
+      // Keep the phone's cover preference when writing other profile fields from the web.
       if (cloudMode) {
         const { storage } = await firebase();
-        const { ref, uploadBytes } = await import("firebase/storage");
+        const { ref, getBytes, uploadBytes } = await import("firebase/storage");
+        const profileRef = ref(storage, `accounts/${identity.uid}/profile.json`);
+        try {
+          const current = readStoredObject(await getBytes(profileRef, 65536));
+          if (!current) throw new Error("The existing profile could not be read.");
+          savedProfile = { ...profile, coverType: normalizeCover(current.coverType) };
+        } catch (error) {
+          if ((error as { code?: string }).code !== "storage/object-not-found") throw error;
+        }
         await uploadBytes(
-          ref(storage, `accounts/${identity.uid}/profile.json`),
-          new TextEncoder().encode(JSON.stringify(profile, null, 2)),
+          profileRef,
+          new TextEncoder().encode(JSON.stringify(savedProfile, null, 2)),
           {
             contentType: "application/json",
             customMetadata: { schemaVersion: "2", format: "pretty-json" },
@@ -361,7 +370,7 @@ export class Accounts {
         await notifyAccountChanged(identity.uid);
       }
       const cache = await readLocal(identity.uid, raw);
-      await writeLocal(identity.uid, raw, { ...cache, profile });
+      await writeLocal(identity.uid, raw, { ...cache, profile: savedProfile });
       const enrollment: Enrollment | undefined = await (
         await database
       ).get("device", "current");
@@ -372,11 +381,12 @@ export class Accounts {
           "device",
           {
             ...enrollment,
-            cover: profile.coverType,
+            webCover: "GAME",
             triggerHash: profile.triggerHash,
           },
           "current",
         );
+      return savedProfile;
     });
   }
   async saveRecord(category: Category, record: Event | Entry) {

@@ -1,3 +1,24 @@
+// Keep the same display order as Android's SAFETY_CHECKLIST_SECTIONS.
+export const safetySections = [
+  "documents",
+  "grab",
+  "destination",
+  "travel",
+  "contacts",
+  "aftercare",
+] as const;
+export const olderSafetySections = ["essentials", "dependants"] as const;
+export const safetySectionLabels: Record<string, string> = {
+  documents: "Important documents",
+  grab: "Quick-grab necessities",
+  destination: "Safe destination",
+  travel: "Transportation",
+  contacts: "Trusted contact / safe place to stay",
+  aftercare: "After leaving",
+  essentials: "Essential items and documents",
+  dependants: "Children, dependants and pets",
+};
+
 export type SafetyChecklistItem = {
   id: string;
   text: string;

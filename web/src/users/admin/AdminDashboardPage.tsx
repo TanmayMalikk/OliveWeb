@@ -1,6 +1,6 @@
 // Admins: shows account totals and controls to admins.
 import { useEffect, useState } from "react";
-import { Plus, RefreshCw } from "lucide-react";
+import { ArrowLeft, MessageCircle, Plus, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import {
   Button,
   Field,
@@ -33,6 +33,7 @@ export default function AdminPortal() {
     { ownerUid: string; ownerName: string; updatedAt: number }[]
   >([]);
   const [selectedPlan, setSelectedPlan] = useState<SafetyPlan | null>(null);
+  const [view, setView] = useState<"home" | "plans" | "accounts" | "messages">("home");
 
   // Web admin: Reloads the latest data.
   async function refresh() {
@@ -54,17 +55,17 @@ export default function AdminPortal() {
         <span className="eyebrow">ADMINISTRATOR PORTAL</span>
       </header>
       <main id="main">
-        <div className="safe-page-title">
-          <div>
-            <span className="eyebrow">ADMINISTRATOR</span>
-            <h1>Manage organization accounts.</h1>
-          </div>
-        </div>
+        <header className="organization-page-heading">
+          {view !== "home" && <button className="safe-icon-button" aria-label="Back to admin panel"
+            onClick={() => { setSelectedPlan(null); setView("home"); }}><ArrowLeft size={22} /></button>}
+          <h1>{{ home: "Admin panel", plans: "Safety-plan consultations", accounts: "Accounts", messages: "Escalation chats" }[view]}</h1>
+        </header>
         {session.message && (
           <p role="alert" className="form-error">
             {session.message}
           </p>
         )}
+        {view === "home" && <>
         <section className="panel organization-overview">
           <h2>Organization overview</h2>
           <div className="organization-counts">
@@ -88,6 +89,13 @@ export default function AdminPortal() {
             )}
           </div>
         </section>
+        <div className="organization-feature-grid">
+          <button className="safe-feature-tile" onClick={() => setView("plans")}><ShieldCheck size={26} /> Safety-plan consultations</button>
+          <button className="safe-feature-tile" onClick={() => setView("accounts")}><Users size={26} /> Accounts</button>
+          <button className="safe-feature-tile" onClick={() => setView("messages")}><MessageCircle size={26} /> Escalation chats</button>
+        </div>
+        </>}
+        {view === "accounts" && <>
         <div className="page-toolbar">
           <Field
             label="Search accounts"
@@ -149,7 +157,8 @@ export default function AdminPortal() {
             </tbody>
           </table>
         </div>
-        <section className="panel organization-plans">
+        </>}
+        {view === "plans" && <section className="panel organization-plans">
           <div className="organization-inbox-heading">
             <div>
               <span className="eyebrow">PLAN CONSULTS</span>
@@ -191,8 +200,8 @@ export default function AdminPortal() {
           {selectedPlan && (
             <SafetyPlanEditor plan={selectedPlan} onChange={setSelectedPlan} />
           )}
-        </section>
-        <OrganizationSupportInbox />
+        </section>}
+        {view === "messages" && <OrganizationSupportInbox />}
         <Button
           variant="quiet"
           onClick={() => void session.perform(session.signOut)}

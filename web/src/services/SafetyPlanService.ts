@@ -1,26 +1,19 @@
 // All safe-app roles: loads and saves shared safety plans.
 import { firebase } from "./AccountService";
 import { doc, onSnapshot } from "firebase/firestore";
-import { writeSafetyChecklist } from "./SafetyChecklistCodec";
+import { olderSafetySections, safetySections, writeSafetyChecklist } from "./SafetyChecklistCodec";
 import type { Friend } from "./MessagingService";
 export {
+  olderSafetySections,
   readSafetyChecklist,
+  safetySectionLabels,
+  safetySections,
   safetyChecklistConflictPreview,
   safetyChecklistText,
   writeSafetyChecklist,
 } from "./SafetyChecklistCodec";
 export type { SafetyChecklistItem } from "./SafetyChecklistCodec";
 
-export const safetySections = [
-  "destination",
-  "travel",
-  "contacts",
-  "essentials",
-  "dependants",
-  "aftercare",
-  "documents",
-  "grab",
-] as const;
 export type SafetyField = {
   value: string;
   revision: number;
@@ -88,7 +81,7 @@ const starterItems: Record<string, string[]> = {
 function initialDefaults() {
   return Object.fromEntries(
     ["primary", "backup"].flatMap((kind) =>
-      safetySections.map((section) => {
+      [...safetySections, ...olderSafetySections].map((section) => {
         const items = (starterItems[section] ?? []).map((text) => ({
           id: crypto.randomUUID(),
           text,
