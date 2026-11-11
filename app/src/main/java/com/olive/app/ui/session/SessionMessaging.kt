@@ -31,6 +31,8 @@ import com.olive.app.ui.users.shared.navigation.SessionScreen
 // Connects account messaging and manages live subscriptions.
 internal class SessionMessaging(private val runtime: SessionRuntime) {
     private var preparedSupportUid: String? = null
+    private var serverConversationIndexLoaded = false
+    private var cacheIndexUpdate: kotlinx.coroutines.Job? = null
 
     // Session messaging: Reports whether messaging screen active.
     private fun messagingScreenActive() = with(runtime.state) {
@@ -62,7 +64,8 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 val cacheToken = epoch
                 scope.launch {
                     val cached = withContext(Dispatchers.IO) { chatCache.conversations(device.uid) }
-                    if (epoch == cacheToken && enrollment?.uid == device.uid && conversations.isEmpty()) {
+                    if (epoch == cacheToken && enrollment?.uid == device.uid &&
+                        !serverConversationIndexLoaded && conversations.isEmpty()) {
                         conversations = cached
                     }
                 }
@@ -196,14 +199,20 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                             )
                         }
                     }, { serverRows ->
-                        if (epoch == token) {
-                            activeConversation?.takeIf { active ->
-                                serverRows.none { it.id == active.id }
-                            }?.let { conversationActions.closeConversation() }
+                        if (epoch != token || enrollment?.uid != ownerUid) return@observeConversations
+                        serverConversationIndexLoaded = true
+                        val visibleIds = serverRows.mapTo(mutableSetOf(), ChatConversation::id)
+                        activeConversation?.takeIf { it.id !in visibleIds }?.let {
+                            conversationActions.closeConversation()
                         }
-                        scope.launch {
+                        archivedConversationIds = archivedConversationIds.intersect(visibleIds)
+                        restoredClosedConversationIds = restoredClosedConversationIds.intersect(visibleIds)
+                        val previousUpdate = cacheIndexUpdate
+                        cacheIndexUpdate = scope.launch {
+                            previousUpdate?.join()
                             withContext(Dispatchers.IO) {
                                 chatCache.replaceIndex(ownerUid, serverRows, System.currentTimeMillis())
+                                store.retainConversationPreferences(ownerUid, visibleIds)
                             }
                         }
                     })
@@ -252,6 +261,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
 
     // Removes friend and conversation listeners when messaging is no longer needed.
     fun stopMessaging(clearRows: Boolean = true) {
+        serverConversationIndexLoaded = false
         runtime.conversationActions.stopKeyObservation()
         with(runtime) {
             with(state) {

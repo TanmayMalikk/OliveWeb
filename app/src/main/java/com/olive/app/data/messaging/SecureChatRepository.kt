@@ -52,18 +52,20 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
 
     // Returns a verified envelope for protected offline retention.
     suspend fun wrappedRoomKey(conversationId: String, currentUid: String): String? {
-        return roomKeyAccess(conversationId, currentUid)?.wrappedKeyBase64
+        return roomKeyAccess(conversationId, currentUid, Source.SERVER)?.wrappedKeyBase64
     }
 
     // Tries the device envelope first, then the same account's recovery envelope.
     private suspend fun roomKeyAccess(
         conversationId: String,
         currentUid: String,
+        source: Source = Source.DEFAULT,
     ): KeyManager.UnwrappedKeyEnvelope? {
-        val snapshot = firestore.collection("conversations").document(conversationId).get().await()
+        val snapshot = firestore.collection("conversations").document(conversationId).get(source).await()
+        if (currentUid !in (snapshot.get("participantIds") as? List<*>).orEmpty()) return null
         val deviceId = KeyManager.deviceId()
         val deviceKey = snapshot.reference.collection("deviceKeys")
-            .document("$currentUid--$deviceId").get().await().getString("wrappedKey")
+            .document("$currentUid--$deviceId").get(source).await().getString("wrappedKey")
         val candidates = listOfNotNull(deviceKey, snapshot.roomKeys().orEmpty()[currentUid])
         return runCatching { KeyManager.unwrapFirstWithEnvelope(candidates) }.getOrNull()
     }
@@ -380,15 +382,18 @@ class ChatCacheStore internal constructor(
         wrappedRoomKey: String,
         deviceId: String,
         validatedAt: Long,
+        requireIndexed: Boolean = false,
     ) {
         require(ownerUid in conversation.participantIds)
         require(wrappedRoomKey.isNotBlank() && deviceId.isNotBlank())
         vault.update { root ->
             val account = root.child(ACCOUNTS).child(ownerUid)
-            val entry = conversations(account).optJSONObject(conversation.id) ?: JSONObject().also {
-                conversations(account).put(conversation.id, it)
+            val entries = conversations(account)
+            val entry = entries.optJSONObject(conversation.id) ?: run {
+                if (requireIndexed) return@update
+                JSONObject().also { entries.put(conversation.id, it) }
             }
-            entry.put(CONVERSATION, conversation.toCacheJson())
+            if (!requireIndexed) entry.put(CONVERSATION, conversation.toCacheJson())
             entry.put(WRAPPED_ROOM_KEY, wrappedRoomKey)
             entry.put(DEVICE_ID, deviceId)
             entry.put(VALIDATED_AT, validatedAt)

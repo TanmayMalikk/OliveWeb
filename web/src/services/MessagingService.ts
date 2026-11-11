@@ -408,26 +408,43 @@ export async function subscribeConversations(
   const { db } = await firebase();
   return onSnapshot(
     query(collection(db, "conversations"), where("participantIds", "array-contains", uid)),
-    (snapshot) => callback(snapshot.docs.map((row) => {
-      const data = row.data();
-      return {
-        id: row.id,
-        friendshipId: String(data.friendshipId ?? row.id),
-        participantIds: Array.isArray(data.participantIds) ? data.participantIds : [],
-        participantUsernames: data.participantUsernames ?? {},
-        lastMessage: String(data.lastMessage ?? ""),
-        updatedAt: data.updatedAt?.toMillis?.() ?? 0,
-        type: data.type === "SUPPORT" ? "SUPPORT" : "DIRECT",
-        ownerUid: String(data.ownerUid ?? ""),
-        staffUid: String(data.staffUid ?? ""),
-        adminUid: String(data.adminUid ?? ""),
-        supportOrigin: data.supportOrigin ?? "",
-        supportTag: data.supportTag ?? "",
-        closedAt: data.closedAt?.toMillis?.() ?? 0,
-        ticketNumber: Number.isSafeInteger(data.ticketNumber) && data.ticketNumber >= 0 ? data.ticketNumber : undefined,
-      } as Conversation;
-    }).sort((a, b) => b.updatedAt - a.updatedAt)),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      if (snapshot.metadata.fromCache) return;
+      callback(snapshot.docs.map((row) => {
+        const data = row.data();
+        return {
+          id: row.id,
+          friendshipId: String(data.friendshipId ?? row.id),
+          participantIds: Array.isArray(data.participantIds) ? data.participantIds : [],
+          participantUsernames: data.participantUsernames ?? {},
+          lastMessage: String(data.lastMessage ?? ""),
+          updatedAt: data.updatedAt?.toMillis?.() ?? 0,
+          type: data.type === "SUPPORT" ? "SUPPORT" : "DIRECT",
+          ownerUid: String(data.ownerUid ?? ""),
+          staffUid: String(data.staffUid ?? ""),
+          adminUid: String(data.adminUid ?? ""),
+          supportOrigin: data.supportOrigin ?? "",
+          supportTag: data.supportTag ?? "",
+          closedAt: data.closedAt?.toMillis?.() ?? 0,
+          ticketNumber: Number.isSafeInteger(data.ticketNumber) && data.ticketNumber >= 0 ? data.ticketNumber : undefined,
+        } as Conversation;
+      }).sort((a, b) => b.updatedAt - a.updatedAt));
+    },
     onError,
+  );
+}
+
+export async function subscribeChatDeviceKey(id: string, uid: string, onAvailability: (available: boolean) => void) {
+  const { db } = await firebase();
+  const device = await messageDevice(uid);
+  return onSnapshot(
+    doc(db, "conversations", id, "deviceKeys", `${uid}--${device.deviceId}`),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      if (!snapshot.metadata.fromCache) onAvailability(snapshot.exists());
+    },
+    () => onAvailability(false),
   );
 }
 // Chooses the chat title. Users see an anonymous Olive Staff label, while staff see the user's name.
