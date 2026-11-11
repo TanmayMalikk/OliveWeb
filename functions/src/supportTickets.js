@@ -14,7 +14,18 @@ const STALE_FCM_CODES = new Set([
   "messaging/invalid-registration-token",
 ]);
 
-// Determines which conversation participants should receive a discreet FCM update push.
+// Assignment changes are independent of message updates and ordinary group membership changes.
+function ticketAssignmentForUpdate(before, after, conversationId) {
+  if (after?.type !== "SUPPORT" || after.closedAt || !Array.isArray(after.participantIds)) return null;
+  const recipients = [...new Set(["staffUid", "adminUid"].flatMap(role => {
+    const uid = after[role];
+    return uid && uid !== before?.[role] && after.participantIds.includes(uid) ? [uid] : [];
+  }))];
+  if (!recipients.length) return null;
+  return {recipients, data: {type: "safe_update", conversationId, eventId: "ticket-assigned"}};
+}
+
+// Determines which conversation participants should receive a message or completion push.
 function fcmTargetsForConversationUpdate(before, after, conversationId) {
   if (after?.plansCompleted === true && before?.plansCompleted !== true && after.ownerUid) {
     return {
@@ -24,14 +35,6 @@ function fcmTargetsForConversationUpdate(before, after, conversationId) {
   }
   const messageId = typeof after?.lastMessageId === "string" ? after.lastMessageId.trim() : "";
   const previousId = typeof before?.lastMessageId === "string" ? before.lastMessageId.trim() : "";
-  if (after?.type === "SUPPORT" && Array.isArray(after.participantIds) && (!messageId || messageId === previousId)) {
-    const previous = new Set(before?.participantIds || []);
-    const added = after.participantIds.filter(uid => uid !== after.ownerUid && !previous.has(uid));
-    if (added.length) return {
-      recipients: [...new Set(added)],
-      data: {type: "safe_update", conversationId, eventId: "ticket-assigned"},
-    };
-  }
   if (!messageId || messageId === previousId || !Array.isArray(after?.participantIds)) {
     return {recipients: [], data: null};
   }
@@ -120,17 +123,19 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
   return {ticket};
 });
 
-// Sends discreet data-only FCM notifications to conversation recipients when a new message arrives.
+// Sends data-only FCM notifications for assignments, messages, and completed plans.
 exports.notifyConversationUpdate = onDocumentWritten(
     "conversations/{conversationId}",
     async event => {
       const before = event.data?.before?.data();
       const after = event.data?.after?.data();
-      const {recipients, data} = fcmTargetsForConversationUpdate(
-          before, after, event.params.conversationId,
-      );
-      if (!data || recipients.length === 0) return;
-      await Promise.all(recipients.map(async recipientId => {
+      const conversationId = event.params.conversationId;
+      const assignment = ticketAssignmentForUpdate(before, after, conversationId);
+      const update = fcmTargetsForConversationUpdate(before, after, conversationId);
+      const deliveries = new Map(update.recipients.map(uid => [uid, update.data]));
+      // A single assignment alert is sufficient when the same write adds a message.
+      for (const uid of assignment?.recipients || []) deliveries.set(uid, assignment.data);
+      await Promise.all([...deliveries].map(async ([recipientId, data]) => {
         const snapshot = await db.collection("notificationTokens")
             .doc(recipientId)
             .collection("devices")
@@ -158,6 +163,6 @@ exports.notifyConversationUpdate = onDocumentWritten(
 );
 
 Object.defineProperty(exports, "_test", {
-  value: {fcmTargetsForConversationUpdate},
+  value: {fcmTargetsForConversationUpdate, ticketAssignmentForUpdate},
   enumerable: false,
 });
