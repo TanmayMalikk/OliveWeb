@@ -46,6 +46,16 @@ export interface Message {
   deleted: boolean;
   clientSentAt: number;
 }
+
+export interface ChatMembershipEvent {
+  id: string;
+  action: "ADDED" | "REMOVED" | "ADMIN_HELP_REQUESTED";
+  actorUid: string;
+  actorName: string;
+  participantUid: string;
+  participantName: string;
+  createdAt: number;
+}
 export interface Conversation {
   id: string;
   friendshipId: string;
@@ -61,6 +71,61 @@ export interface Conversation {
   supportTag: "" | "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
   closedAt: number;
   ticketNumber?: number;
+}
+
+export function chatSenderName(
+  conversation: Conversation, message: Pick<Message, "senderUid" | "senderUsername">, viewerRole: Identity["role"],
+): string {
+  if (conversation.type === "SUPPORT") {
+    if (conversation.adminUid && message.senderUid === conversation.adminUid) return "Olive Admin";
+    if ((viewerRole === "STAFF" || viewerRole === "ADMIN") &&
+        message.senderUid !== conversation.staffUid && message.senderUid !== conversation.adminUid) {
+      return message.senderUid === conversation.ownerUid
+        ? conversation.ticketNumber === undefined ? "Ticket" : `Ticket #${conversation.ticketNumber}`
+        : "Friend";
+    }
+    if (viewerRole !== "STAFF" && viewerRole !== "ADMIN" &&
+        conversation.staffUid && message.senderUid === conversation.staffUid) return "Olive Staff";
+  }
+  return message.senderUsername;
+}
+
+export function membershipEventText(conversation: Conversation, event: ChatMembershipEvent, role: Identity["role"]): string {
+  if (event.action === "ADMIN_HELP_REQUESTED") return "Admin help requested";
+  const action = event.action === "ADDED" ? "added" : "removed";
+  if (conversation.type === "SUPPORT" && (role === "STAFF" || role === "ADMIN")) {
+    const ticket = conversation.ticketNumber === undefined ? "Ticket" : `Ticket #${conversation.ticketNumber}`;
+    return `${ticket} ${action} a friend`;
+  }
+  return `${event.actorName || "Chat member"} ${action} ${event.participantName || "Chat member"}`;
+}
+
+export async function subscribeMembershipEvents(
+  id: string, onUpdate: (events: ChatMembershipEvent[]) => void, actorUid?: string,
+) {
+  const { db } = await firebase();
+  const events = collection(db, "conversations", id, "membershipEvents");
+  return onSnapshot(
+    actorUid ? query(events, where("actorUid", "==", actorUid)) : query(events, orderBy("createdAt"), limitToLast(250)),
+    { includeMetadataChanges: true },
+    (snapshot) => {
+      if (snapshot.metadata.fromCache) return;
+      onUpdate(snapshot.docs.flatMap((row) => {
+        const { action, actorUid, actorName, participantUid, participantName, createdAt } = row.data();
+        if ((action !== "ADDED" && action !== "REMOVED" && action !== "ADMIN_HELP_REQUESTED") || typeof actorUid !== "string" ||
+            typeof participantUid !== "string" || !createdAt?.toMillis) return [];
+        return [{ id: row.id, action, actorUid, actorName: String(actorName ?? ""),
+          participantUid, participantName: String(participantName ?? ""), createdAt: createdAt.toMillis() }];
+      }));
+    },
+    () => onUpdate([]),
+  );
+}
+
+export async function removeTicketFriend(conversationId: string, participantUid: string) {
+  const { functions } = await firebase();
+  const { httpsCallable } = await import("firebase/functions");
+  await httpsCallable(functions, "conversationRemoveParticipant")({ conversationId, participantUid });
 }
 // Makes one chat ID from two account IDs. Sorting them means both users get the same ID.
 export const pairId = (a: string, b: string) => [a, b].sort().join("--");
@@ -400,8 +465,12 @@ export async function roomKey(id: string, current: Identity, conversationData: C
     const raw = await unwrapRoomKeyBytes(current.uid, String(savedDeviceKey.data().wrappedKey)).catch(() => null);
     if (raw) {
       try {
-        await shareRoomKeyWithDevices(id, conversationData, raw);
-        return await crypto.subtle.importKey("raw", raw.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
+        const key = await crypto.subtle.importKey("raw", raw.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
+        const sharingKey = raw.slice();
+        void shareRoomKeyWithDevices(id, conversationData, sharingKey)
+          .catch(() => { /* Another device can retry approval on its next open. */ })
+          .finally(() => sharingKey.fill(0));
+        return key;
       } finally {
         raw.fill(0);
       }

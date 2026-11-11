@@ -94,9 +94,11 @@ class MessagingModelsEdgeCaseTest {
     fun organizationSenderNamesAreHiddenOnlyFromPersonalAccounts() {
         val chat = conversation()
 
-        assertEquals("Olive Staff", chat.senderDisplayName("staff", "real_staff", AccountRole.USER, "Olive Staff"))
-        assertEquals("Olive Staff", chat.senderDisplayName("admin", "real_admin", AccountRole.SAFE_CONTACT, "Olive Staff"))
-        assertEquals("real_staff", chat.senderDisplayName("staff", "real_staff", AccountRole.ADMIN, "Olive Staff"))
-        assertEquals("visible_user", chat.senderDisplayName("owner", "visible_user", AccountRole.USER, "Olive Staff"))
+        assertEquals("Olive Staff", chat.senderDisplayName("staff", "real_staff", AccountRole.USER, "Olive Staff", "Olive Admin"))
+        AccountRole.entries.forEach { role ->
+            assertEquals("Olive Admin", chat.senderDisplayName("admin", "real_admin", role, "Olive Staff", "Olive Admin"))
+        }
+        assertEquals("real_staff", chat.senderDisplayName("staff", "real_staff", AccountRole.ADMIN, "Olive Staff", "Olive Admin"))
+        assertEquals("visible_user", chat.senderDisplayName("owner", "visible_user", AccountRole.USER, "Olive Staff", "Olive Admin"))
     }
 }

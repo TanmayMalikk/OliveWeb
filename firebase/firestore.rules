@@ -632,12 +632,19 @@ service cloud.firestore {
         );
       allow delete: if false;
 
+      match /membershipEvents/{eventId} {
+        allow read: if conversationParticipant(
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data);
+        allow write: if false;
+      }
+
       match /messages/{messageId} {
         function parentConversation() {
           return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
         }
         allow read: if conversationParticipant(parentConversation());
         allow create: if conversationParticipant(parentConversation())
+          && !parentConversation().keys().hasAny(['closedAt'])
           && request.resource.data.keys().hasOnly(['senderUid','senderUsername','body','ciphertext','deleted','sentAt','clientSentAt'])
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderUsername is string

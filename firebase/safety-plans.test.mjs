@@ -2,7 +2,7 @@ import {before, after, test} from "node:test";
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 import {initializeTestEnvironment, assertFails} from "@firebase/rules-unit-testing";
-import {doc, getDoc, getDocFromServer, onSnapshot, setDoc, updateDoc, serverTimestamp} from "firebase/firestore";
+import {collection, doc, getDoc, getDocFromServer, getDocsFromServer, onSnapshot, setDoc, updateDoc, serverTimestamp} from "firebase/firestore";
 import {readFile} from "node:fs/promises";
 const require = createRequire(new URL("../functions/package.json", import.meta.url));
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId:"demo-olive-rules",storageBucket:"demo-olive-rules.appspot.com"});
@@ -11,7 +11,7 @@ const {auth, db, bucket} = require("./src/firebaseAdminClient");
 const {safetyPlanSync, safetyPlanConsultations, safetyPlanAvailability, safetyPlanShareContacts,
   safetyPlansSharedWithMe} = require("./src/safetyPlans");
 const {safetyPlanConsult} = require("./src/safetyConsultations");
-const {safetySupportAdmin, staffSupportClose} = require("./src/supportGroups");
+const {safetySupportAdmin, staffSupportClose, conversationAddParticipant, conversationRemoveParticipant} = require("./src/supportGroups");
 const {conversationPrepareKeys, supportTicketsPrepare, repairPlanTicket, repairConversation} = require("./src/supportTicketRepair");
 const {staffSupportRequest} = require("./src/supportTickets");
 const {mediaUpdateAccess, mediaAccountAccessKey, reconcilePlanMediaGrants} = require("./src/mediaTickets");
@@ -133,6 +133,81 @@ test("open user, safe contact and staff listeners receive edits and a completed 
 after(async () => { auth.getUser=originalGetUser;auth.listUsers=originalListUsers;bucket.file=originalFile;await env.cleanup();await db.terminate(); });
 const call=(endpoint,uid,data={}) => endpoint.run({auth:{uid},data});
 
+test("chat membership changes record one server-authored event and revoke history access after removal", async () => {
+  const owner = "plan-owner", friend = "plan-other", contact = "plan-contact";
+  const id = "membership-history-test";
+  const reference = db.collection("conversations").doc(id);
+  await reference.set({
+    friendshipId: id,
+    participantIds: [owner, friend],
+    participantUsernames: {[owner]: "owner", [friend]: "other"},
+  });
+  await db.collection("friendLists").doc(owner).collection("friends").doc("membership-contact")
+    .set({friendUid: contact, friendUsername: "contact"});
+  const args = {conversationId: id, participantUid: contact};
+  const addedClient = env.authenticatedContext(contact, {email: "contact@safe.olive.invalid"}).firestore();
+  const ownerClient = env.authenticatedContext(owner, {email: "owner@users.olive.invalid"}).firestore();
+  const eventsFor = (client) => collection(client, "conversations", id, "membershipEvents");
+  await assertFails(getDocsFromServer(eventsFor(addedClient)));
+  await Promise.all([
+    call(conversationAddParticipant, owner, args),
+    call(conversationAddParticipant, owner, args),
+  ]);
+  const added = await getDocsFromServer(eventsFor(addedClient));
+  assert.equal(added.size, 1);
+  assert.deepEqual(added.docs.map(event => [event.get("action"), event.get("actorName"), event.get("participantName")]),
+      [["ADDED", "owner", "contact"]]);
+  await assertFails(setDoc(doc(eventsFor(ownerClient), "forged"), {action: "REMOVED"}));
+  await assert.rejects(call(conversationRemoveParticipant, friend, args), {code: "permission-denied"});
+  await call(conversationRemoveParticipant, owner, args);
+  await assertFails(getDocsFromServer(eventsFor(addedClient)));
+  const remaining = await getDocsFromServer(eventsFor(ownerClient));
+  assert.deepEqual(remaining.docs.map(event => event.get("action")).sort(), ["ADDED", "REMOVED"]);
+  assert.equal(remaining.docs.find(event => event.get("action") === "REMOVED").get("participantName"), "contact");
+  assert.deepEqual((await reference.get()).get("participantIds"), [owner, friend]);
+});
+
+test("ticket owners can remove friends they added, while staff, admins, and original members stay", async () => {
+  const owner = "plan-owner", friend = "plan-contact", original = "plan-other";
+  const staff = "plan-staff", admin = "plan-admin";
+  const id = "support-plan-owner-removal-test";
+  const ticket = db.collection("conversations").doc(id);
+  const originalMembers = [owner, original, staff, admin];
+  await db.collection("friendLists").doc(owner).collection("friends").doc("membership-contact")
+    .set({friendUid: friend, friendUsername: "contact"});
+  await ticket.set({
+    type: "SUPPORT", ownerUid: owner, staffUid: staff, adminUid: admin,
+    sourceConversationId: id,
+    participantIds: originalMembers,
+    participantUsernames: Object.fromEntries(originalMembers.map(uid => [uid, uid])),
+  });
+  const args = participantUid => ({conversationId: id, participantUid});
+  for (const protectedUid of [staff, admin, original]) {
+    await assert.rejects(call(conversationRemoveParticipant, owner, args(protectedUid)), {code: "permission-denied"});
+  }
+  await call(conversationAddParticipant, owner, args(friend));
+  await assert.rejects(call(conversationRemoveParticipant, staff, args(friend)), {code: "permission-denied"});
+  await assert.rejects(call(conversationRemoveParticipant, admin, args(friend)), {code: "permission-denied"});
+  const ownerClient = env.authenticatedContext(owner, {email: "owner@users.olive.invalid"}).firestore();
+  const friendClient = env.authenticatedContext(friend, {email: "contact@safe.olive.invalid"}).firestore();
+  const clientEvents = client => collection(client, "conversations", id, "membershipEvents");
+  assert.equal((await getDocsFromServer(clientEvents(friendClient))).size, 1);
+  await ticket.update({roomKeys: {[owner]: "owner-envelope", [friend]: "friend-envelope"},
+    participantPublicKeys: {[owner]: "owner-key", [friend]: "friend-key"}});
+  await Promise.all([
+    call(conversationRemoveParticipant, owner, args(friend)),
+    call(safetySupportAdmin, staff, {conversationId: id}),
+  ]);
+  const remaining = await ticket.get();
+  assert.deepEqual(remaining.get("participantIds"), originalMembers);
+  assert.deepEqual(remaining.get("roomKeys"), {[owner]: "owner-envelope"});
+  assert.deepEqual(remaining.get("participantPublicKeys"), {[owner]: "owner-key"});
+  await assertFails(getDocFromServer(doc(friendClient, "conversations", id)));
+  await assertFails(getDocsFromServer(clientEvents(friendClient)));
+  assert.deepEqual((await getDocsFromServer(clientEvents(ownerClient))).docs.map(event => event.get("action")).sort(),
+      ["ADDED", "REMOVED"]);
+});
+
 test("only competing checklist properties create owner proposals and later independent edits survive resolution", async () => {
   const owner = "plan-checklist-owner", key = "primary_documents";
   const reference = db.collection("safetyPlans").doc(owner);
@@ -242,9 +317,12 @@ test("full consultation workflow enforces owner consent, assigned-staff edits, c
   });
   const escalation=await call(safetySupportAdmin,staff,{conversationId:consultationId});
   assert.equal(escalation.adminUid,"plan-admin");
+  await call(safetySupportAdmin,staff,{conversationId:consultationId});
   const otherStaff=staff==="plan-staff" ? "plan-staff2" : "plan-staff";
   await assert.rejects(call(safetySupportAdmin,otherStaff,{conversationId:consultationId}));
   const supportConversation=await db.collection("conversations").doc(consultationId).get();
+  const events = await supportConversation.ref.collection("membershipEvents").get();
+  assert.deepEqual(events.docs.map(event => event.get("action")), ["ADMIN_HELP_REQUESTED"]);
   assert.deepEqual(new Set(supportConversation.data().participantIds),new Set([owner,staff,"plan-admin"]));
   assert.deepEqual(supportConversation.data().roomKeys,originalRoomKeys);
   assert.equal(supportConversation.data().supportOrigin,"PLAN_CONSULT");
@@ -323,6 +401,13 @@ test("support tickets create an anonymous chat without sharing the safety plan",
   assert.equal(supportConversation.data().supportTag,"SUPPORT");
   await call(staffSupportClose,response.ticket.staffUid,{conversationId:firstConversationId});
   assert.ok((await db.collection("conversations").doc(firstConversationId).get()).get("closedAt"));
+  const ownerClient = env.authenticatedContext(owner, {email: "support_owner@users.olive.invalid"}).firestore();
+  const archived = doc(ownerClient, "conversations", firstConversationId);
+  assert.equal((await getDocFromServer(archived)).get("ticketStatus"), "COMPLETED");
+  await assertFails(setDoc(doc(archived, "messages", "after-close"), {
+    senderUid: owner, senderUsername: supportConversation.get("participantUsernames")[owner],
+    ciphertext: "encrypted", deleted: false, sentAt: serverTimestamp(), clientSentAt: Date.now(),
+  }));
   const secondResponse=await call(staffSupportRequest,owner,{action:"request"});
   const secondConversationId=secondResponse.ticket.conversationId;
   assert.equal(secondResponse.ticket.ticketNumber,response.ticket.ticketNumber+1);
@@ -330,7 +415,13 @@ test("support tickets create an anonymous chat without sharing the safety plan",
   assert.ok((await db.collection("conversations").doc(firstConversationId).get()).get("closedAt"));
   assert.equal((await db.collection("conversations").doc(secondConversationId).get()).get("closedAt"),undefined);
   assert.equal((await call(safetyPlanConsultations,response.ticket.staffUid)).plans.some((plan) => plan.ownerUid===owner),false);
-  await call(staffSupportRequest,owner,{action:"stop",conversationId:secondConversationId});
+  const staffRef = db.collection("safetyStaff").doc(secondResponse.ticket.staffUid);
+  const activeCount = (await staffRef.get()).get("activeCount");
+  await Promise.all([
+    call(staffSupportRequest,owner,{action:"stop",conversationId:secondConversationId}),
+    call(staffSupportClose,secondResponse.ticket.staffUid,{conversationId:secondConversationId}),
+  ]);
+  assert.equal((await staffRef.get()).get("activeCount"),activeCount - 1);
   assert.ok((await db.collection("conversations").doc(secondConversationId).get()).get("closedAt"));
 });
 test("owners can share a read-only plan with an accepted safe contact and revoke it", async () => {

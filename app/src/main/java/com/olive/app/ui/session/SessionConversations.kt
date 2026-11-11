@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import com.olive.app.security.*
 
 
@@ -20,7 +21,9 @@ import com.olive.app.security.*
 internal class SessionConversations(private val runtime: SessionRuntime) {
     private var keyListeners = emptyList<com.google.firebase.firestore.ListenerRegistration>()
     private val observedKeys = mutableMapOf<String, String>()
+    private var keyParticipants = emptyMap<String, String>()
     private var keyVersion = 0
+    private var openingChat: Job? = null
     // Opens a conversation after loading its participants and encryption access.
     fun openConversation(conversation: ChatConversation, preserveMessages: Boolean = false) {
         with(runtime) {
@@ -29,14 +32,17 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)))) return
                 val uid = enrollment?.uid ?: return
                 if (uid !in conversation.participantIds) return
+                openingChat?.cancel()
                 messageSubscription?.close()
+                messageSubscription = null
                 messageOutboxObservation?.cancel()
                 messageOutboxObservation = null
                 val sameConversation = activeConversation?.id == conversation.id
-                if (!sameConversation) {
+                if (!sameConversation || keyParticipants != conversation.participantUsernames) {
                     val observationEpoch = epoch
                     keyListeners.forEach { it.remove() }
                     observedKeys.clear()
+                    keyParticipants = conversation.participantUsernames
                     keyVersion = 0
                     val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
                     val sources = listOf(
@@ -69,7 +75,8 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             val availableKey = activeRoomKey ?: return@addSnapshotListener
                             scope.launch {
                                 try {
-                                    if (epoch == observationEpoch && enrollment?.uid == uid) {
+                                    if (epoch == observationEpoch && enrollment?.uid == uid &&
+                                        activeConversation?.participantIds == conversation.participantIds) {
                                         secureChatRepository?.shareWithRegisteredDevices(conversation, availableKey)
                                     }
                                 } catch (cancelled: CancellationException) {
@@ -95,30 +102,21 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 if (chatQuickExitHintVisible) chatQuickExitHintShown = true
                 val token = epoch
                 val initialKeyVersion = keyVersion
-                if (conversation.type == "SUPPORT" && conversation.staffUid.isBlank()) {
+                if (conversation.type == "SUPPORT" && conversation.participantIds.size < 2) {
                     activeRoomKey = null
                     messagingBusy = false
                     return
                 }
                 messagingBusy = true
-                scope.launch {
+                openingChat = scope.launch {
                     try {
                         val secure = checkNotNull(secureChatRepository)
+                        var establishedKey = false
                         val key = try {
                             withTimeoutOrNull(8_000) {
-                                val onlineKey = secureSharing.roomKey(conversation)
-                                val wrapped = secure.wrappedRoomKey(conversation.id, uid)
-                                    ?: error("Wrapped room key unavailable")
-                                withContext(Dispatchers.IO) {
-                                    chatCache.saveAccess(
-                                        uid,
-                                        conversation,
-                                        wrapped,
-                                        com.olive.app.security.KeyManager.deviceId(),
-                                        System.currentTimeMillis(),
-                                    )
-                                }
-                                onlineKey
+                                val ready = secure.readyRoomKey(conversation, uid)
+                                establishedKey = ready != null
+                                ready?.secretKey ?: secureSharing.roomKey(conversation)
                             } ?: error("Online room key timed out")
                         } catch (onlineFailure: Exception) {
                             if (onlineFailure is CancellationException) throw onlineFailure
@@ -142,6 +140,15 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         if (epoch != token || activeConversation?.id != conversation.id) return@launch
                         activeRoomKey = key
                         startMessageObservation(conversation, uid, key, token)
+                        if (establishedKey) launch {
+                            try {
+                                secure.shareWithRegisteredDevices(conversation, key)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                // Reading an established chat does not depend on approving other devices.
+                            }
+                        }
                         publishMessages(conversation.id, uid, key, null, token)
                     } catch (error: CancellationException) {
                         throw error
@@ -149,7 +156,8 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_secure_conversation)
                     } finally {
-                        if (epoch == token) {
+                        if (epoch == token && activeConversation?.id == conversation.id &&
+                            kotlinx.coroutines.currentCoroutineContext()[Job]?.isCancelled != true) {
                             messagingBusy = false
                             val updated = activeConversation
                             if (messageSubscription == null && updated?.id == conversation.id &&
@@ -165,8 +173,11 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     }
 
     fun stopKeyObservation() {
+        openingChat?.cancel()
+        openingChat = null
         keyListeners.forEach { it.remove() }
         keyListeners = emptyList()
+        keyParticipants = emptyMap()
         observedKeys.clear()
     }
 

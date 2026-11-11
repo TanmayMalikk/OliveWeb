@@ -65,6 +65,11 @@ internal fun MessagesScreen(
     val currentUid = session.coverAccountId.orEmpty()
     // Keep the chosen list visible while a phone opens a chat and returns from it.
     var showingArchived by rememberSaveable { mutableStateOf(false) }
+    val allowedSupportTags = visibleSupportTags(session.accountRole)
+    var supportFilter by rememberSaveable(initialSupportFilter, session.accountRole) {
+        mutableStateOf(initialSupportFilter?.takeIf { it in allowedSupportTags }
+            ?: allowedSupportTags.firstOrNull() ?: SUPPORT_TAG_SUPPORT)
+    }
     val chatExit = exit.takeIf { session.accountRole == AccountRole.USER }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
@@ -72,7 +77,8 @@ internal fun MessagesScreen(
         if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
             MessagingSidebar(
                 session, currentUid, portalExit(session, exit), showingArchived,
-                initialSupportFilter = initialSupportFilter,
+                supportFilter = supportFilter,
+                onSupportFilterChange = { supportFilter = it },
                 onShowingArchivedChange = { showingArchived = it },
                 modifier = Modifier.width(340.dp).fillMaxHeight(),
             )
@@ -88,7 +94,8 @@ internal fun MessagesScreen(
             } else ChatPane(session, currentUid, false, chatExit, Modifier.weight(1f).fillMaxHeight())
         } else if (active == null) MessagingSidebar(
             session, currentUid, portalExit(session, exit), showingArchived,
-            initialSupportFilter = initialSupportFilter,
+            supportFilter = supportFilter,
+            onSupportFilterChange = { supportFilter = it },
             onShowingArchivedChange = { showingArchived = it },
             modifier = Modifier.fillMaxSize(),
         )
@@ -111,26 +118,13 @@ private fun MessagingSidebar(
     exit: (() -> Unit)?,
     showingArchived: Boolean,
     onShowingArchivedChange: (Boolean) -> Unit,
+    supportFilter: String,
+    onSupportFilterChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    initialSupportFilter: String? = null,
 ) {
     val uiText = rememberResourceText()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     val allowedSupportTags = visibleSupportTags(session.accountRole)
-    val defaultSupportFilter = when {
-        initialSupportFilter in allowedSupportTags -> initialSupportFilter!!
-        allowedSupportTags.isNotEmpty() -> allowedSupportTags.first()
-        else -> SUPPORT_TAG_SUPPORT
-    }
-    var supportFilter by rememberSaveable(initialSupportFilter) {
-        mutableStateOf(defaultSupportFilter)
-    }
-    // A role change cannot leave an admin viewing a staff-only ticket category.
-    LaunchedEffect(session.accountRole, allowedSupportTags) {
-        if (allowedSupportTags.isNotEmpty() && supportFilter !in allowedSupportTags) {
-            supportFilter = allowedSupportTags.first()
-        }
-    }
     val roleConversations = if (organizationAccount) session.messages.conversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
     } else session.messages.conversations
@@ -239,7 +233,7 @@ private fun MessagingSidebar(
                     val unreadCount = session.messages.unreadCountForSupportTag(tag)
                     FilterChip(
                         selected = supportFilter == tag,
-                        onClick = { supportFilter = tag },
+                        onClick = { onSupportFilterChange(tag) },
                         label = {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,

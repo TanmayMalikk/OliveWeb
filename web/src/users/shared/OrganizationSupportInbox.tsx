@@ -10,6 +10,7 @@ import {
   requestAdministratorHelp,
 } from "../../services/OrganizationSupportService";
 import { useSession } from "../../session/SessionProvider";
+import { useChatTimeline } from "./useChatTimeline";
 
 type TicketCategory = "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
 const categories: { id: TicketCategory; label: string }[] = [
@@ -37,6 +38,7 @@ export default function OrganizationSupportInbox() {
   const [feedback, setFeedback] = useState("");
   const [category, setCategory] = useState<TicketCategory>("SUPPORT");
   const [showArchived, setShowArchived] = useState(false);
+  const timeline = useChatTimeline(selected?.id, identity?.uid, messages);
   useEffect(() => {
     setSelected((current) => conversations.find((ticket) => ticket.id === current?.id) ?? current);
   }, [conversations]);
@@ -253,18 +255,22 @@ export default function OrganizationSupportInbox() {
               aria-label="Support messages"
               aria-live="polite"
             >
-              {messages.length === 0 ? (
+              {timeline.length === 0 ? (
                 <p className="help-note">No messages yet.</p>
               ) : (
-                messages.map((message) => (
+                timeline.map((item) => item.kind === "membership" ? (
+                  <p key={`membership-${item.event.id}`} className="chat-membership-event">
+                    {messaging.membershipEventText(selected, item.event, identity.role)}
+                  </p>
+                ) : (
                   <article
-                    key={message.id}
-                    className={`chat-bubble ${message.senderUid === identity.uid ? "own" : ""}`}
+                    key={item.message.id}
+                    className={`chat-bubble ${item.message.senderUid === identity.uid ? "own" : ""}`}
                   >
-                    <small>{message.senderUsername}</small>
-                    <p>{message.deleted ? "Message unsent" : message.body}</p>
+                    <small>{messaging.chatSenderName(selected, item.message, identity.role)}</small>
+                    <p>{item.message.deleted ? "Message unsent" : item.message.body}</p>
                     <time>
-                      {new Date(message.clientSentAt).toLocaleString()}
+                      {new Date(item.message.clientSentAt).toLocaleString()}
                     </time>
                   </article>
                 ))

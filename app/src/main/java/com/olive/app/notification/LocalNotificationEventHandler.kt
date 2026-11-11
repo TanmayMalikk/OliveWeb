@@ -190,12 +190,20 @@ object LocalNotificationEventHandler {
         context: Context, data: Map<String, String>, title: String? = null, body: String? = null,
     ) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val conversationId = data["conversationId"].orEmpty()
+        if (data["eventId"] == "ticket-assigned") {
+            if (data["recipientId"] == uid && conversationId.isNotBlank()) {
+                OliveNotificationManager.showSafeUpdate(
+                    context, R.string.notification_ticket_assigned, "ticket-assigned:$uid:$conversationId",
+                )
+            }
+            return
+        }
         if (data["type"] == "safety_plans_completed" && data["recipientId"] == uid) {
             OliveNotificationManager.showSafeUpdate(context, R.string.safety_plans_completed)
             return
         }
         val preferences = context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
-        val conversationId = data["conversationId"].orEmpty()
         val messageId = data["messageId"].orEmpty()
         val markerKey = if (conversationId.isNotBlank()) LocalSafeUpdateCheckWorker.messageKey(uid, conversationId) else null
         val previousMessageId = markerKey?.let { preferences.getString(it, null) }
@@ -354,7 +362,7 @@ object OliveNotificationManager {
         NotificationManagerCompat.from(context).notify(callId.hashCode(), notification)
     }
 
-    fun showSafeUpdate(context: Context, body: Int = R.string.notification_safe_app_activity) {
+    fun showSafeUpdate(context: Context, body: Int = R.string.notification_safe_app_activity, tag: String? = null) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
@@ -374,8 +382,8 @@ object OliveNotificationManager {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
-        val notificationId = (System.currentTimeMillis() % 100000).toInt()
-        runCatching { NotificationManagerCompat.from(context).notify("safe-app-update", notificationId, notification) }
+        val notificationId = if (tag != null) 0 else (System.currentTimeMillis() % 100000).toInt()
+        runCatching { NotificationManagerCompat.from(context).notify(tag ?: "safe-app-update", notificationId, notification) }
     }
 
 }
