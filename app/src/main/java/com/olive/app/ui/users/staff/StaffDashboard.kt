@@ -36,9 +36,6 @@ import com.olive.app.ui.users.shared.safetyplan.SafetyPlanScreen
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import com.olive.app.data.SafetyConsultation
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.delay
-
 
 private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages, Map }
 
@@ -187,12 +184,9 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
         }
         return
     }
-    // Reload assigned plan consultations when staff return to this screen.
+    // Load once on entry; account invalidations refresh the encrypted consultation index afterward.
     LaunchedEffect(Unit) {
-        while (true) {
-            controller.refreshConsultations()
-            delay(15.seconds)
-        }
+        controller.refreshConsultations()
     }
     FormColumn {
         TextButton(onClick = onBack) { Text(stringResource(R.string.safety_back)) }

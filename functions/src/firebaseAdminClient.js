@@ -5,6 +5,7 @@ const {getAuth} = require("firebase-admin/auth");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getMessaging} = require("firebase-admin/messaging");
 const {getStorage} = require("firebase-admin/storage");
+const {getDatabase} = require("firebase-admin/database");
 
 initializeApp();
 setGlobalOptions({region: "northamerica-northeast1", maxInstances: 10});
@@ -12,7 +13,8 @@ setGlobalOptions({region: "northamerica-northeast1", maxInstances: 10});
 module.exports = {
   auth: getAuth(),
   db: getFirestore(),
-  messaging: getMessaging(),
   bucket: getStorage().bucket(),
+  realtime: () => getDatabase(),
+  messaging: getMessaging(),
   FieldValue,
 };
