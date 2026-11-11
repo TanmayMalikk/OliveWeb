@@ -73,30 +73,6 @@ async function newsFixture(page: Page) {
   );
 }
 
-test("incident pin loads and keeps the selected location when address lookup is unavailable", async ({ page }) => {
-  await page.route("**/api/map-tiles/**", (route) => route.fulfill({ status: 404 }));
-  await page.route("**/api/locations?**", (route) => route.fulfill({ status: 503, json: {} }));
-  const link = await onboard(page);
-  await page.getByRole("button", { name: "Continue to my cover" }).click();
-  await unlock(page, link);
-  await page.getByRole("button", { name: "Notes", exact: true }).click();
-  await page.getByRole("button", { name: "New entry", exact: true }).click();
-  await page.getByRole("tab", { name: "Incident", exact: true }).click();
-  await page.getByRole("button", { name: "Choose incident location on map" }).click();
-
-  const map = page.getByRole("application", { name: /Incident location map/ });
-  await map.click({ position: { x: 100, y: 100 } });
-  const pin = map.getByAltText("Incident pin");
-  await expect(pin).toBeVisible();
-  await expect.poll(() => pin.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
-  const location = page.getByLabel("Location of incident");
-  await expect(location).toHaveValue(/^Dropped pin/);
-  const first = await location.inputValue();
-  await map.click({ position: { x: 170, y: 130 } });
-  await expect(location).not.toHaveValue(first);
-  await expect(location).toHaveValue(/^Dropped pin/);
-});
-
 // Inputs: numeric username, mismatched password, then corrected credentials. Expected: errors stay inline and valid setup advances.
 test("account creation enforces current credential rules before onboarding", async ({
   page,

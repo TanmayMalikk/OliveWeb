@@ -210,28 +210,6 @@
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
-.safety-step-documents {
-  grid-column: 2 / -1;
-  display: grid;
-  justify-items: start;
-  gap: 0.45rem;
-  min-width: 0;
-}
-.safety-step-documents .field {
-  width: 100%;
-  min-width: 0;
-}
-.safety-step-document {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  overflow-wrap: anywhere;
-}
-.safety-step-documents .button:focus-within {
-  outline: 2px solid var(--olive);
-  outline-offset: 2px;
-}
 .safety-checklist-row .completed {
   color: var(--muted);
   text-decoration: line-through;
