@@ -164,7 +164,6 @@ exports.safetySupportAdmin = onCall({invoker: "public"}, async (request) => {
   if (!conversationSnapshot.exists || conversationSnapshot.get("staffUid") !== caller.uid) {
     throw new HttpsError("permission-denied", "Only the assigned staff member can request admin help.");
   }
-  const conversation = conversationSnapshot.data();
   const candidates = [];
   // Builds the list from trusted admin claims and completed profiles.
   for (const user of await listEveryUser()) {
@@ -173,25 +172,45 @@ exports.safetySupportAdmin = onCall({invoker: "public"}, async (request) => {
     candidates.push({uid: user.uid, name: profile?.fullName || user.displayName || "Administrator"});
   }
   if (!candidates.length) throw new HttpsError("failed-precondition", "No administrator is available.");
-  const selected = candidates.find(admin => admin.uid === conversation.adminUid) ||
-    candidates[Math.floor(Math.random() * candidates.length)];
-  const origin = conversation.supportOrigin === PLAN_CONSULT ? PLAN_CONSULT : SUPPORT;
-  const sourceReference = origin === PLAN_CONSULT ? planReference(conversation.ownerUid) :
-    conversation.requestSource === "GROUP_CHAT" && conversation.sourceConversationId ?
-      db.collection("conversations").doc(conversation.sourceConversationId) :
-      db.collection("supportRequests").doc(conversation.sourceConversationId || conversation.ownerUid);
-  // Group-created support tickets keep organization details out of the original personal chat.
-  if (conversation.requestSource !== "GROUP_CHAT") {
-    await sourceReference.set({adminUid: selected.uid, adminName: selected.name, updatedAt: Date.now()}, {merge: true});
-  }
-  const personalParticipantUids = (conversation.participantIds || []).filter(uid =>
-    ![conversation.ownerUid, conversation.staffUid, conversation.adminUid].includes(uid));
-  await saveSupportConversation({
-    ...conversation, adminUid: selected.uid, adminName: selected.name,
-    conversationId, supportOrigin: origin, personalParticipantUids,
+  return db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(conversationReference);
+    const conversation = snapshot.data();
+    if (conversation?.staffUid !== caller.uid) {
+      throw new HttpsError("permission-denied", "Only the assigned staff member can request admin help.");
+    }
+    const selected = candidates.find(admin => admin.uid === conversation.adminUid) ||
+      candidates[Math.floor(Math.random() * candidates.length)];
+    const origin = conversation.supportOrigin === PLAN_CONSULT ? PLAN_CONSULT : SUPPORT;
+    const personalParticipantUids = (conversation.participantIds || []).filter(uid =>
+      ![conversation.ownerUid, conversation.staffUid, conversation.adminUid].includes(uid));
+    await saveSupportConversation({
+      ...conversation, adminUid: selected.uid, adminName: selected.name,
+      conversationId, supportOrigin: origin, personalParticipantUids,
+    }, "", false, {transaction, snapshot});
+    if (conversation.adminUid !== selected.uid) {
+      recordMembershipEvent(transaction, conversationReference, "ADMIN_HELP_REQUESTED", caller.uid, selected.uid, {});
+    }
+    // Group-created support tickets keep organization details out of the original personal chat.
+    if (conversation.requestSource !== "GROUP_CHAT") {
+      const sourceReference = origin === PLAN_CONSULT ? planReference(conversation.ownerUid) :
+        db.collection("supportRequests").doc(conversation.sourceConversationId || conversation.ownerUid);
+      transaction.set(sourceReference, {adminUid: selected.uid, adminName: selected.name, updatedAt: Date.now()}, {merge: true});
+    }
+    return {conversationId, adminUid: selected.uid, adminName: selected.name};
   });
-  return {conversationId, adminUid: selected.uid, adminName: selected.name};
 });
+
+// Writes a server-authored timeline entry alongside the membership change.
+function recordMembershipEvent(transaction, reference, action, actorUid, participantUid, names) {
+  transaction.create(reference.collection("membershipEvents").doc(), {
+    action,
+    actorUid,
+    actorName: names[actorUid] || "",
+    participantUid,
+    participantName: names[participantUid] || "",
+    createdAt: FieldValue.serverTimestamp(),
+  });
+}
 
 /** Adds one accepted trusted contact without replacing the conversation or its encrypted history. */
 exports.conversationAddParticipant = onCall({invoker: "public"}, async (request) => {
@@ -234,45 +253,98 @@ exports.conversationAddParticipant = onCall({invoker: "public"}, async (request)
     throw new HttpsError("permission-denied", "Organization accounts cannot change personal group members.");
   }
 
-  const updatedIds = [...participantIds, participantUid];
-  const updatedNames = await participantNames(updatedIds);
-  const update = {
-    participantIds: updatedIds,
-    participantUsernames: updatedNames,
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-  // The person who first expands a direct chat becomes the permanent group owner.
-  if (conversation.type !== "SUPPORT") {
-    update.type = "GROUP";
-    if (conversation.type !== "GROUP" || !conversation.ownerUid) update.ownerUid = caller.uid;
-  }
-  await reference.update(update);
+  const targetName = String(targetProfile?.username || friend.docs[0].get("friendUsername") || "").trim().toLowerCase();
+  await db.runTransaction(async transaction => {
+    const current = (await transaction.get(reference)).data();
+    if (!Array.isArray(current?.participantIds) || !current.participantIds.includes(caller.uid)) {
+      throw new HttpsError("permission-denied", "Only a conversation member can add someone.");
+    }
+    if (current.participantIds.includes(participantUid)) return;
+    if (current.closedAt) {
+      throw new HttpsError("failed-precondition", "This conversation cannot add another person.");
+    }
+    const updatedNames = {...current.participantUsernames, [participantUid]: targetName || participantUid};
+    const update = {
+      participantIds: [...current.participantIds, participantUid],
+      participantUsernames: updatedNames,
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    // The person who first expands a direct chat becomes the permanent group owner.
+    if (current.type !== "SUPPORT") {
+      update.type = "GROUP";
+      if (current.type !== "GROUP" || !current.ownerUid) update.ownerUid = caller.uid;
+    }
+    transaction.update(reference, update);
+    recordMembershipEvent(transaction, reference, "ADDED", caller.uid, participantUid, updatedNames);
+  });
   return {conversationId, participantUid};
 });
 
-/** Lets a group owner remove another member while keeping at least two people in the chat. */
+// Only a ticket owner may remove a personal account they added through Chat Info.
+async function validateTicketRemoval(transaction, reference, conversation, caller, participantUid) {
+  if (conversation.closedAt) throw new HttpsError("failed-precondition", "This ticket is closed.");
+  if (conversation.ownerUid !== caller.uid || !["USER", "SAFE_CONTACT"].includes(caller.role)) {
+    throw new HttpsError("permission-denied", "Only the ticket owner can remove friends.");
+  }
+  if ([conversation.staffUid, conversation.adminUid].includes(participantUid)) {
+    throw new HttpsError("permission-denied", "Staff and administrators stay in the ticket.");
+  }
+  if (!Array.isArray(conversation.participantIds) || !conversation.participantIds.includes(participantUid)) {
+    throw new HttpsError("not-found", "This person is not in the ticket.");
+  }
+  const history = await transaction.get(reference.collection("membershipEvents").where("participantUid", "==", participantUid));
+  const latest = history.docs.reduce((previous, event) =>
+    !previous || event.get("createdAt").toMillis() > previous.get("createdAt").toMillis() ? event : previous, null);
+  if (latest?.get("action") !== "ADDED" || latest.get("actorUid") !== caller.uid) {
+    throw new HttpsError("permission-denied", "You can only remove friends you added to this ticket.");
+  }
+  const target = await auth.getUser(participantUid).catch(error => {
+    if (error.code === "auth/user-not-found") return null;
+    throw error;
+  });
+  if (target && !["USER", "SAFE_CONTACT"].includes(roleFromUser(target))) {
+    throw new HttpsError("permission-denied", "Staff and administrators stay in the ticket.");
+  }
+  return conversation.participantIds.filter(uid => uid !== participantUid);
+}
+
+/** Removes a member using the authorization rules for the conversation type. */
 exports.conversationRemoveParticipant = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   const conversationId = typeof request.data?.conversationId === "string" ? request.data.conversationId : "";
   const participantUid = typeof request.data?.participantUid === "string" ? request.data.participantUid : "";
   if (!conversationId || !participantUid || participantUid === caller.uid) {
-    throw new HttpsError("invalid-argument", "Choose another group member to remove.");
+    throw new HttpsError("invalid-argument", "Choose another member to remove.");
   }
   const reference = db.collection("conversations").doc(conversationId);
   await db.runTransaction(async transaction => {
     const snapshot = await transaction.get(reference);
     if (!snapshot.exists) throw new HttpsError("not-found", "Conversation not found.");
     const conversation = snapshot.data();
-    const updatedIds = validateGroupRemoval(conversation, caller.uid, participantUid);
+    const isTicket = conversation.type === "SUPPORT";
+    const updatedIds = isTicket ?
+      await validateTicketRemoval(transaction, reference, conversation, caller, participantUid) :
+      validateGroupRemoval(conversation, caller.uid, participantUid);
     const updatedNames = Object.fromEntries(updatedIds.map(uid => [
       uid,
       conversation.participantUsernames?.[uid] || uid,
     ]));
-    transaction.update(reference, {
+    const update = {
       participantIds: updatedIds,
       participantUsernames: updatedNames,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    };
+    if (isTicket) {
+      for (const field of ["roomKeys", "participantPublicKeys"]) {
+        if (conversation[field]?.[participantUid]) {
+          const retainedKeys = {...conversation[field]};
+          delete retainedKeys[participantUid];
+          update[field] = retainedKeys;
+        }
+      }
+    }
+    transaction.update(reference, update);
+    recordMembershipEvent(transaction, reference, "REMOVED", caller.uid, participantUid, conversation.participantUsernames || {});
   });
   return {conversationId, participantUid};
 });
@@ -385,10 +457,9 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
       conversation.requestSource === "GROUP_CHAT" && conversation.sourceConversationId ?
         db.collection("conversations").doc(conversation.sourceConversationId) :
         db.collection("supportRequests").doc(conversation.sourceConversationId || conversation.ownerUid);
-    if (!conversation.staffUid) throw new HttpsError("failed-precondition", "This ticket has no assigned staff member.");
-    const staffReference = db.collection("safetyStaff").doc(conversation.staffUid);
+    const staffReference = conversation.staffUid ? db.collection("safetyStaff").doc(conversation.staffUid) : null;
     const sourceSnapshot = await transaction.get(sourceReference);
-    const staffSnapshot = await transaction.get(staffReference);
+    const staffSnapshot = staffReference && await transaction.get(staffReference);
     if (planCompleted && sourceSnapshot.get("consultationConversationId") !== conversationId) {
       throw new HttpsError("failed-precondition", "This consultation is no longer active.");
     }
@@ -423,8 +494,10 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
         }
       }
     }
-    const activeCount = staffSnapshot.data()?.activeCount || 0;
-    transaction.set(staffReference, {activeCount: Math.max(0, activeCount - 1)}, {merge: true});
+    if (staffReference) {
+      const activeCount = staffSnapshot.data()?.activeCount || 0;
+      transaction.set(staffReference, {activeCount: Math.max(0, activeCount - 1)}, {merge: true});
+    }
   });
   return {conversationId};
 });

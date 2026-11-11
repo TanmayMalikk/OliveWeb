@@ -10,6 +10,12 @@
     <string name="support_looking_for_staff">正在寻找工作人员…</string>
     <string name="support_staff_ready">已分配一名工作人员。正在打开 Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
+    <string name="support_admin_chat_name">Olive Admin</string>
+    <string name="ticket_added_friend">工单 %1$s 添加了一位好友</string>
+    <string name="ticket_removed_friend">工单 %1$s 移除了一位好友</string>
+    <string name="chat_admin_help_requested">已请求管理员协助</string>
+    <string name="chat_member_added">%1$s 添加了 %2$s</string>
+    <string name="chat_member_removed">%1$s 移除了 %2$s</string>
     <string name="support_no_conversations">暂无支持对话。</string>
     <string name="messaging_send_denied">服务器拒绝了这条消息。请重新打开对话并重试。</string>
     <string name="support_ticket_consultation">咨询</string>

@@ -1,9 +1,9 @@
 # Signed APK distribution
 
 Olive is distributed from `https://yourolivebranch.ca/get`, not Google Play. The QR code directly
-triggers the download from `https://yourolivebranch.ca/download/android`. Each release uploads an immutable APK and replaces only
-`public/android/latest.json`, so the QR code and download button always serve the latest release and the
-QR image address never needs to change.
+triggers the download from `https://yourolivebranch.ca/download/android`. Each release uploads an immutable APK and updates
+`public/android/latest.json`. After the manifest switches, the publisher removes older release APKs from Firebase Storage,
+keeping the latest build and the previous build. The QR code and download button always serve the latest release.
 
 ## One-time local signing setup
 
@@ -55,7 +55,7 @@ On Windows, create the keystore secret without changing the binary:
   Set-Clipboard
 ```
 
-The Firebase service account needs permission to write release objects to Storage. Storage rules are
+The Firebase service account needs permission to list, read, write, and delete release objects in Storage. Storage rules are
 deployed separately by a privileged maintainer rather than by the APK publishing job. Paste the
 complete JSON as `FIREBASE_RELEASE_SERVICE_ACCOUNT`; never commit it.
 

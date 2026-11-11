@@ -1,11 +1,11 @@
 // Users and staff: opens regular support tickets and sends FCM alerts for conversation updates.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
-const {db, messaging} = require("./firebaseAdminClient");
+const {db, messaging, FieldValue} = require("./firebaseAdminClient");
 const {listEveryUser, readProfile} = require("./accountStorage");
 const {staffEligible, chooseStaff} = require("./safetyPlanPolicy");
 const {safetyCaller} = require("./safetyPlanAccess");
-const {saveSupportConversation, closeSupportConversation, supportConversationId, SUPPORT} =
+const {saveSupportConversation, supportConversationId, SUPPORT} =
   require("./supportGroups");
 const {reserveSupportTicketNumber} = require("./supportTicketNumbers");
 
@@ -14,7 +14,18 @@ const STALE_FCM_CODES = new Set([
   "messaging/invalid-registration-token",
 ]);
 
-// Determines which conversation participants should receive a discreet FCM update push.
+// Assignment changes are independent of message updates and ordinary group membership changes.
+function ticketAssignmentForUpdate(before, after, conversationId) {
+  if (after?.type !== "SUPPORT" || after.closedAt || !Array.isArray(after.participantIds)) return null;
+  const recipients = [...new Set(["staffUid", "adminUid"].flatMap(role => {
+    const uid = after[role];
+    return uid && uid !== before?.[role] && after.participantIds.includes(uid) ? [uid] : [];
+  }))];
+  if (!recipients.length) return null;
+  return {recipients, data: {type: "safe_update", conversationId, eventId: "ticket-assigned"}};
+}
+
+// Determines which conversation participants should receive a message or completion push.
 function fcmTargetsForConversationUpdate(before, after, conversationId) {
   if (after?.plansCompleted === true && before?.plansCompleted !== true && after.ownerUid) {
     return {
@@ -24,14 +35,6 @@ function fcmTargetsForConversationUpdate(before, after, conversationId) {
   }
   const messageId = typeof after?.lastMessageId === "string" ? after.lastMessageId.trim() : "";
   const previousId = typeof before?.lastMessageId === "string" ? before.lastMessageId.trim() : "";
-  if (after?.type === "SUPPORT" && Array.isArray(after.participantIds) && (!messageId || messageId === previousId)) {
-    const previous = new Set(before?.participantIds || []);
-    const added = after.participantIds.filter(uid => uid !== after.ownerUid && !previous.has(uid));
-    if (added.length) return {
-      recipients: [...new Set(added)],
-      data: {type: "safe_update", conversationId, eventId: "ticket-assigned"},
-    };
-  }
   if (!messageId || messageId === previousId || !Array.isArray(after?.participantIds)) {
     return {recipients: [], data: null};
   }
@@ -74,26 +77,31 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
   const reference = db.collection("supportRequests").doc(
       action === "request" ? newConversationId : (requestedConversationId || caller.uid));
   if (action === "stop") {
-    const current = (await reference.get()).data();
-    if (current && current.ownerUid !== caller.uid) {
-      throw new HttpsError("permission-denied", "You can cancel only your own support ticket.");
-    }
-    if (current?.staffUid) {
-      const staffReference = db.collection("safetyStaff").doc(current.staffUid);
-      await db.runTransaction(async transaction => {
-        const settings = (await transaction.get(staffReference)).data() || {};
-        transaction.set(staffReference, {
-          activeCount: Math.max(0, (settings.activeCount || 0) - 1),
-        }, {merge: true});
-        transaction.delete(reference);
-      });
-    } else await reference.delete();
-    await closeSupportConversation(current?.conversationId || "");
+    await db.runTransaction(async transaction => {
+      const current = (await transaction.get(reference)).data();
+      if (!current || current.requested === false) return;
+      if (current.ownerUid !== caller.uid) {
+        throw new HttpsError("permission-denied", "You can cancel only your own support ticket.");
+      }
+      const chatRef = current.conversationId && db.collection("conversations").doc(current.conversationId);
+      const chat = chatRef && await transaction.get(chatRef);
+      if (current.staffUid && !chat?.get("closedAt")) {
+        const staffRef = db.collection("safetyStaff").doc(current.staffUid);
+        const settings = (await transaction.get(staffRef)).data() || {};
+        transaction.set(staffRef, {activeCount: Math.max(0, (settings.activeCount || 0) - 1)}, {merge: true});
+      }
+      if (chat?.exists && !chat.get("closedAt")) {
+        transaction.update(chatRef, {closedAt: FieldValue.serverTimestamp(), completedAt: FieldValue.serverTimestamp(),
+          ticketStatus: "COMPLETED", updatedAt: FieldValue.serverTimestamp()});
+      }
+      transaction.delete(reference);
+    });
     return {ticket: {ownerUid: caller.uid, requested: false, staffUid: "", conversationId: ""}};
   }
 
   const staffCandidates = await candidates();
   const ticket = await db.runTransaction(async transaction => {
+    const chat = await transaction.get(db.collection("conversations").doc(newConversationId));
     const references = new Map(staffCandidates.map(staff => [
       staff.uid, db.collection("safetyStaff").doc(staff.uid),
     ]));
@@ -114,23 +122,25 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
       conversationId: newConversationId, ticketNumber, updatedAt: Date.now(),
     };
     transaction.set(reference, created);
+    await saveSupportConversation(created, "", false, {transaction, snapshot: chat});
     return created;
   });
-  if (ticket.requested) await saveSupportConversation(ticket, "", false);
   return {ticket};
 });
 
-// Sends discreet data-only FCM notifications to conversation recipients when a new message arrives.
+// Sends data-only FCM notifications for assignments, messages, and completed plans.
 exports.notifyConversationUpdate = onDocumentWritten(
     "conversations/{conversationId}",
     async event => {
       const before = event.data?.before?.data();
       const after = event.data?.after?.data();
-      const {recipients, data} = fcmTargetsForConversationUpdate(
-          before, after, event.params.conversationId,
-      );
-      if (!data || recipients.length === 0) return;
-      await Promise.all(recipients.map(async recipientId => {
+      const conversationId = event.params.conversationId;
+      const assignment = ticketAssignmentForUpdate(before, after, conversationId);
+      const update = fcmTargetsForConversationUpdate(before, after, conversationId);
+      const deliveries = new Map(update.recipients.map(uid => [uid, update.data]));
+      // A single assignment alert is sufficient when the same write adds a message.
+      for (const uid of assignment?.recipients || []) deliveries.set(uid, assignment.data);
+      await Promise.all([...deliveries].map(async ([recipientId, data]) => {
         const snapshot = await db.collection("notificationTokens")
             .doc(recipientId)
             .collection("devices")
@@ -158,6 +168,6 @@ exports.notifyConversationUpdate = onDocumentWritten(
 );
 
 Object.defineProperty(exports, "_test", {
-  value: {fcmTargetsForConversationUpdate},
+  value: {fcmTargetsForConversationUpdate, ticketAssignmentForUpdate},
   enumerable: false,
 });
