@@ -15,7 +15,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.media.MediaRepository
-import com.olive.app.data.media.MediaTransferStatus
 import com.olive.app.data.media.MediaTransferStore
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -61,16 +60,7 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     }
 
     private fun resolveUpload(ownerUid: String, uploadJobId: String): String? {
-        val job = transfers.get(uploadJobId)
-            ?: throw AttachmentDeliveryRejected("ATTACHMENT_NOT_FOUND")
-        if (job.ownerUid != ownerUid) throw AttachmentDeliveryRejected("ACCOUNT_MISMATCH")
-        return when (job.status) {
-            MediaTransferStatus.COMPLETE -> job.mediaId.takeIf(String::isNotBlank)
-                ?: throw AttachmentDeliveryRejected("ATTACHMENT_NOT_FOUND")
-            MediaTransferStatus.FAILED,
-            MediaTransferStatus.CANCELLED -> throw AttachmentDeliveryRejected("ATTACHMENT_UPLOAD_FAILED")
-            else -> null
-        }
+        return resolveAttachmentUpload(ownerUid, transfers.get(uploadJobId))
     }
 
     private suspend fun deliverAttachment(message: OutgoingMessage, mediaId: String) {
