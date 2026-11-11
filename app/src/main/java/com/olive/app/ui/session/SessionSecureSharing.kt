@@ -27,7 +27,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.job
 import kotlinx.coroutines.sync.Mutex
-import com.olive.app.data.sync.PrioritySyncCoordinator
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
@@ -338,7 +337,6 @@ internal class SessionRuntime(
     val chatCache get() = localStorage.chatCache
     val documentIndex get() = localStorage.documentIndex
     val offlineMediaCache get() = localStorage.offlineMediaCache
-    val prioritySync = PrioritySyncCoordinator(application)
     val dataSources = dataSourcesOverride ?: SessionDataSources.create(
         application,
         localMode,

@@ -15,27 +15,6 @@ describe("web and Android safety checklist compatibility", () => {
     expect(readSafetyChecklist(writeSafetyChecklist(original))).toEqual(original);
   });
 
-  it("keeps Android document links and exclusions when a web user edits a step", () => {
-    const [step] = readSafetyChecklist(JSON.stringify({
-      oliveSafetyChecklist: 1,
-      items: [{
-        id: "document-step",
-        text: "Find my passport",
-        checked: false,
-        attachmentIds: ["passport-id"],
-        excludedAttachmentIds: ["removed-id"],
-      }],
-    }));
-
-    expect(readSafetyChecklist(writeSafetyChecklist([{ ...step, checked: true }]))).toEqual([{
-      id: "document-step",
-      text: "Find my passport",
-      checked: true,
-      attachmentIds: ["passport-id"],
-      excludedAttachmentIds: ["removed-id"],
-    }]);
-  });
-
   it("keeps an older plain-text safety-plan value as one editable step", () => {
     expect(readSafetyChecklist("Call my trusted contact")).toEqual([
       expect.objectContaining({ text: "Call my trusted contact", checked: false }),

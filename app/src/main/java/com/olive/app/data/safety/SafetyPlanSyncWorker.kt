@@ -278,21 +278,6 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         return checkNotNull(updated)
     }
 
-    // Reconciles a server snapshot with the latest draft under the same encrypted-store lock.
-    fun mergeRemote(actorUid: String, remote: SafetyPlan): SafetyPlan {
-        var merged = remote
-        vault.update { root ->
-            val actor = root.child(actorUid)
-            val local = actor.optJSONObject(remote.ownerUid)?.let(SafetyPlan::fromJson)
-            if (local != null) {
-                val combined = local.copy(fields = remote.fields + local.fields)
-                merged = mergeSafetyPlan(combined, combined, remote)
-            }
-            actor.put(remote.ownerUid, merged.toJson())
-        }
-        return merged
-    }
-
     // Replaces one safety plan in encrypted local storage.
     fun write(actorUid: String, ownerUid: String, value: SafetyPlan) {
         require(value.ownerUid == ownerUid)
@@ -309,10 +294,5 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
     // Removes one locally cached safety plan for this signed-in actor.
     fun remove(actorUid: String, ownerUid: String) {
         vault.update { it.optJSONObject(actorUid)?.remove(ownerUid) }
-    }
-
-    // Removes every cached plan belonging to one signed-in actor.
-    fun purge(actorUid: String) {
-        vault.update { it.remove(actorUid) }
     }
 }

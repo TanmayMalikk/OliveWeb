@@ -17,13 +17,10 @@ exports.conversationRequestStaff = supportGroups.conversationRequestStaff;
 exports.staffSupportClose = supportGroups.staffSupportClose;
 Object.assign(exports, require("./src/mediaTickets"));
 Object.assign(exports, require("./src/nutritionFoods"));
-const syncInvalidations = require("./src/syncInvalidations");
-Object.entries(syncInvalidations).filter(([name]) => name !== "_test")
-    .forEach(([name, value]) => { exports[name] = value; });
 
 const {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,
   organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text,
   protectedAccount, roleFromUser, defaultProfile} = require("./src/accountPolicy");
 exports._test = {normalizedUsername, normalizedExistingUsername, normalizedRole, signInEmail,
   organizationEmailKey, isTemporaryEmail, profileComplete, validPassword, text,
-  protectedAccount, roleFromUser, defaultProfile, syncInvalidations: syncInvalidations._test};
+  protectedAccount, roleFromUser, defaultProfile};

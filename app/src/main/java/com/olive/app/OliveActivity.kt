@@ -226,7 +226,6 @@ class OliveActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         closingForQuickExit = false
-        session.reconcilePriorityData()
         session.account.refreshDeviceSecurity()
         deviceLock.resume()
         applyScreenCaptureProtection()

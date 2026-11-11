@@ -44,7 +44,6 @@ export type BrowserDocument = {
   ciphertextSha256: string;
   key?: CryptoKey;
   evidence: boolean;
-  tags?: string[];
 };
 
 // Turns stored Base64 text back into bytes before a file is decrypted.
@@ -172,7 +171,6 @@ async function uploadCiphertext(
       report((index + 1) / count);
     }
     await httpsCallable(functions, "mediaCompleteUpload")({ jobId, parts });
-    return mediaId;
   } catch (error) {
     if (mediaId)
       await httpsCallable(
@@ -233,7 +231,7 @@ export async function uploadBrowserDocument(
     const device = await messageDevice(identity.uid);
     const wrappedKey = await wrapForPublicKey(rawKey, publicKey, "SHA-1");
     const deviceWrappedKey = await wrapForPublicKey(rawKey, device.publicKey, "SHA-256");
-    return await uploadCiphertext(
+    await uploadCiphertext(
       crypto.randomUUID(),
       ciphertext,
       encryptedMetadata,
@@ -242,8 +240,10 @@ export async function uploadBrowserDocument(
       identity.uid,
       report,
     );
-  } finally {
     rawKey.fill(0);
+  } catch (error) {
+    rawKey.fill(0);
+    throw error;
   }
 }
 
@@ -268,7 +268,6 @@ async function decryptMetadata(value: string, key: CryptoKey) {
   return JSON.parse(new TextDecoder().decode(plain)) as {
     name?: unknown;
     mimeType?: unknown;
-    tags?: unknown;
   };
 }
 
@@ -326,7 +325,6 @@ async function resolveBrowserDocuments(
       let key: CryptoKey | undefined;
       let name = "Encrypted document";
       let mimeType = "application/octet-stream";
-      let tags: string[] = [];
       // New uploads keep their private details in one encrypted metadata value.
       if (typeof value.encrypted_metadata === "string") {
         // Keep the document in the list when old metadata cannot be decrypted on this browser.
@@ -340,8 +338,6 @@ async function resolveBrowserDocuments(
             name = metadata.name;
           if (typeof metadata.mimeType === "string" && metadata.mimeType.trim())
             mimeType = metadata.mimeType;
-          if (Array.isArray(metadata.tags))
-            tags = metadata.tags.filter((tag): tag is string => typeof tag === "string");
         } catch {
           key = undefined;
         }
@@ -364,7 +360,6 @@ async function resolveBrowserDocuments(
             : "",
         key,
         evidence: value.evidence === true,
-        tags,
       };
     }),
   ).then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt));

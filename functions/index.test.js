@@ -1,11 +1,7 @@
 // Tests that cloud endpoints for accounts, support, media, and nutrition keep their public names.
 const test = require("node:test");
 const assert = require("node:assert/strict");
-process.env.FIREBASE_CONFIG = JSON.stringify({
-  projectId: "olive-test",
-  storageBucket: "olive-test.appspot.com",
-  databaseURL: "https://olive-test.firebaseio.com",
-});
+process.env.FIREBASE_CONFIG = JSON.stringify({projectId: "olive-test", storageBucket: "olive-test.appspot.com"});
 const { _test } = require("./index");
 const mediaTest = require("./src/mediaTickets")._test;
 const supportGroups = require("./src/supportGroups");
@@ -20,10 +16,9 @@ test("deployment keeps the existing callable endpoint names", () => {
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
     "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
-    "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant",
-    "conversationRemoveParticipant", "conversationRequestStaff", "staffSupportClose", "nutritionFoodSearch",
-    "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",
-    "syncConversationDeviceKeyInvalidation", "syncAccountInvalidation"];
+    "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant", "conversationRemoveParticipant",
+    "conversationRequestStaff", "staffSupportClose",
+    "nutritionFoodSearch"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
 });
