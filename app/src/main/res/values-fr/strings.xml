@@ -422,7 +422,14 @@
     <string name="ui_group_voice_call">Appel vocal de groupe</string>
     <string name="ui_group_call_status">%1$d connectés • %2$s</string>
     <string name="organization_live_map_staff_description">Voir toutes les positions.</string>
-    <string name="safety_mark_consultation_complete">Marquer la consultation comme terminée</string>
+    <string name="safety_mark_consultation_complete">Marquer comme terminé</string>
+    <string name="safety_plans_completed">Votre plan de sécurité et votre plan de secours sont terminés.</string>
+    <string name="safety_staff_assigned">Un membre de l’équipe de soutien vous accompagne.</string>
+    <string name="safety_open_consultation">Ouvrir le ticket de consultation</string>
+    <string name="safety_conflicts_title">Conflits</string>
+    <string name="safety_your_change">Votre modification</string>
+    <string name="safety_incoming_change">Modification reçue</string>
+    <string name="safety_empty_value">Section vide</string>
     <string name="safety_complete_consultation_title">Terminer cette consultation ?</string>
     <string name="safety_complete_consultation_description">Cela archive la discussion pour tout le monde et retire ce plan de sécurité de votre boîte de réception.</string>
     <string name="safety_mark_complete">Marquer comme terminée</string>

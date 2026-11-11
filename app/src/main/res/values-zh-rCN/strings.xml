@@ -422,7 +422,14 @@
     <string name="ui_group_voice_call">群组语音通话</string>
     <string name="ui_group_call_status">%1$d 人已连接 • %2$s</string>
     <string name="organization_live_map_staff_description">查看所有用户位置。</string>
-    <string name="safety_mark_consultation_complete">将咨询标记为已完成</string>
+    <string name="safety_mark_consultation_complete">标记为已完成</string>
+    <string name="safety_plans_completed">您的安全计划和备用计划已完成。</string>
+    <string name="safety_staff_assigned">一名支持人员正在协助您。</string>
+    <string name="safety_open_consultation">打开咨询工单</string>
+    <string name="safety_conflicts_title">冲突</string>
+    <string name="safety_your_change">您的更改</string>
+    <string name="safety_incoming_change">传入的更改</string>
+    <string name="safety_empty_value">空白部分</string>
     <string name="safety_complete_consultation_title">完成此咨询？</string>
     <string name="safety_complete_consultation_description">这会为所有人归档咨询聊天，并从工作人员收件箱中移除此安全计划。</string>
     <string name="safety_mark_complete">标记为已完成</string>

@@ -2,7 +2,7 @@ import {before, after, test} from "node:test";
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 import {initializeTestEnvironment, assertFails} from "@firebase/rules-unit-testing";
-import {doc, getDoc, setDoc} from "firebase/firestore";
+import {doc, getDoc, getDocFromServer, onSnapshot, setDoc} from "firebase/firestore";
 import {readFile} from "node:fs/promises";
 const require = createRequire(new URL("../functions/package.json", import.meta.url));
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId:"demo-olive-rules",storageBucket:"demo-olive-rules.appspot.com"});
@@ -13,12 +13,16 @@ const {safetyPlanSync, safetyPlanConsultations, safetyPlanAvailability, safetyPl
 const {safetyPlanConsult} = require("./src/safetyConsultations");
 const {safetySupportAdmin, staffSupportClose} = require("./src/supportGroups");
 const {staffSupportRequest} = require("./src/supportTickets");
+const {mediaUpdateAccess, mediaAccountAccessKey, reconcilePlanMediaGrants} = require("./src/mediaTickets");
+const {fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
 const users = new Map([
   ["plan-owner",{uid:"plan-owner",email:"owner@users.olive.invalid",displayName:"Owner"}],
+  ["plan-live-owner",{uid:"plan-live-owner",email:"live-owner@users.olive.invalid",displayName:"Live owner"}],
   ["support-owner",{uid:"support-owner",email:"support-owner@users.olive.invalid",displayName:"Support owner"}],
   ["plan-share-owner",{uid:"plan-share-owner",email:"share-owner@users.olive.invalid",displayName:"Sharing owner"}],
   ["plan-other",{uid:"plan-other",email:"other@users.olive.invalid"}],
   ["plan-contact",{uid:"plan-contact",email:"contact@safe.olive.invalid",displayName:"Safe contact"}],
+  ["plan-live-contact",{uid:"plan-live-contact",email:"live-contact@safe.olive.invalid",displayName:"Live safe contact"}],
   ["plan-staff",{uid:"plan-staff",customClaims:{role:"STAFF"},displayName:"Staff"}],
   ["plan-staff2",{uid:"plan-staff2",customClaims:{role:"STAFF"},displayName:"Staff two"}],
   ["plan-admin",{uid:"plan-admin",customClaims:{role:"ADMIN"},displayName:"Admin"}],
@@ -31,6 +35,97 @@ before(async () => {
   auth.getUser=async (uid) => { const user=users.get(uid);if(!user) throw Error("Unknown account");return user; };
   auth.listUsers=async () => ({users:[...users.values()]});
   bucket.file=() => ({download:async () => [Buffer.from(JSON.stringify({role:"STAFF",fullName:"Verified staff",email:"staff@example.ca",dob:"2000-01-01"}))]});
+});
+
+test("open user, safe contact and staff listeners receive edits and a completed consultation revokes plan grants", {timeout: 25000}, async (t) => {
+  const owner = "plan-live-owner", contact = "plan-live-contact";
+  const fileId = "plan-live-attachment";
+  const documents = JSON.stringify({oliveSafetyChecklist: 1, items: [
+    {id: "documents", text: "Test attachment", checked: false, attachmentIds: [fileId]},
+  ]});
+  const update = (uid, value, revision, mutationId) => call(safetyPlanSync, uid, {ownerUid: owner,
+    changes: [{key: "primary_destination", value, revision, mutationId}]});
+  await call(safetyPlanSync, owner, {ownerUid: owner, defaults: {
+    primary_destination: "Initial", primary_documents: documents,
+  }});
+  await db.collection("friendLists").doc(owner).collection("friends").doc("live-contact").set({friendUid: contact});
+  await call(safetyPlanShareContacts, owner, {contacts: [{uid: contact, friendshipId: "live-contact"}]});
+  await Promise.all(["plan-staff", "plan-staff2"].map(uid => call(safetyPlanAvailability, uid, {available: true})));
+  const {plan} = await call(safetyPlanConsult, owner, {action: "request"});
+  const staff = plan.staffUid;
+  assert.equal(plan.staffName, "");
+  const ticket = db.collection("conversations").doc(plan.consultationConversationId);
+  assert.equal((await ticket.get()).get("staffUid"), staff);
+  const listeners = [
+    [owner, "USER"], [contact, "SAFE_CONTACT"], [staff, "STAFF"],
+  ].map(([uid, role]) => {
+    const client = env.authenticatedContext(uid, {role}).firestore();
+    const seen = new Set();
+    const unsubscribe = onSnapshot(doc(client, "safetyPlans", owner), snapshot => {
+      if (!snapshot.metadata.fromCache) seen.add(snapshot.get("fields.primary_destination.value"));
+    }, error => seen.add(error.code));
+    t.after(unsubscribe);
+    return {client, seen};
+  });
+  const waitFor = async condition => {
+    const end = Date.now() + 7000;
+    while (!condition()) {
+      assert.ok(Date.now() < end, "Timed out waiting for live Firestore listeners");
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+  };
+  await waitFor(() => listeners.every(({seen}) => seen.has("Initial")));
+  await update(owner, "Owner edit", 1, "owner-live");
+  await waitFor(() => listeners.every(({seen}) => seen.has("Owner edit")));
+  await update(staff, "Staff edit", 2, "staff-live");
+  await waitFor(() => listeners.every(({seen}) => seen.has("Staff edit")));
+  const stale = await update(staff, "Staff proposal", 2, "staff-stale");
+  assert.deepEqual(stale.conflicts, ["primary_destination"]);
+  assert.equal(stale.plan.pendingConflicts.primary_destination.value, "Staff proposal");
+  const resolution = {key: "primary_destination", revision: 3, mutationId: "staff-stale", useIncoming: true};
+  await assert.rejects(call(safetyPlanSync, staff, {ownerUid: owner, resolution}));
+  await call(safetyPlanSync, owner, {ownerUid: owner, resolution});
+  await waitFor(() => listeners.every(({seen}) => seen.has("Staff proposal")));
+  await update(staff, "Another proposal", 2, "staff-older");
+  const kept = await call(safetyPlanSync, owner, {ownerUid: owner, resolution: {
+    key: "primary_destination", revision: 4, mutationId: "staff-older", useIncoming: false,
+  }});
+  assert.equal(kept.plan.fields.primary_destination.value, "Staff proposal");
+  assert.deepEqual(kept.plan.pendingConflicts, {});
+  const retried = await update(staff, "Another proposal", 2, "staff-older");
+  assert.deepEqual(retried.plan.pendingConflicts, {});
+
+  const file = db.collection("files").doc(fileId);
+  await file.set({
+    owner_id: owner, object_key: `users/${owner}/media/${fileId}`, encrypted_metadata: "metadata",
+    allowed_users: [owner], wrapped_keys: {[owner]: "owner-key"}, ciphertext_size: 1024,
+    ciphertext_sha256: "0".repeat(64), encryption_version: 2, created_at: new Date(),
+  });
+  await assert.rejects(call(mediaUpdateAccess, owner, {mediaId: fileId, forPlan: true,
+    wrappedKeys: {[owner]: "owner-key", "plan-other": "outsider-key"}}));
+  // Independent grants can arrive concurrently from the owner's Android and web clients.
+  await Promise.all([contact, staff].map(uid => call(mediaUpdateAccess, owner, {mediaId: fileId, forPlan: true,
+    wrappedKeys: {[owner]: "owner-key", [uid]: "reader-key"}, deviceWrappedKeys: {
+      [`${uid}--test-device-id-1234`]: "device-key",
+    }})));
+  for (const {client} of listeners) {
+    assert.equal((await getDocFromServer(doc(client, "files", fileId))).exists(), true);
+  }
+  const before = (await ticket.get()).data();
+  await assert.rejects(call(staffSupportClose, owner, {conversationId: ticket.id, planCompleted: true}));
+  await call(staffSupportClose, staff, {conversationId: ticket.id, planCompleted: true});
+  await call(staffSupportClose, staff, {conversationId: ticket.id, planCompleted: true});
+  const after = (await ticket.get()).data();
+  assert.equal(after.ticketStatus, "COMPLETED");
+  assert.deepEqual(fcmTargetsForConversationUpdate(before, after, ticket.id).recipients, [owner]);
+  await assert.rejects(call(mediaAccountAccessKey, staff, {mediaId: fileId}), {code: "permission-denied"});
+  await reconcilePlanMediaGrants(owner);
+  assert.deepEqual(new Set((await file.get()).get("allowed_users")), new Set([owner, contact]));
+  await waitFor(() => listeners[2].seen.has("permission-denied"));
+  const completed = (await call(safetyPlanSync, owner, {ownerUid: owner})).plan;
+  assert.equal(completed.staffUid, "");
+  assert.ok(completed.plansCompletedAt > 0);
+  assert.equal((await call(safetyPlanConsultations, staff)).plans.some(row => row.ownerUid === owner), false);
 });
 after(async () => { auth.getUser=originalGetUser;auth.listUsers=originalListUsers;bucket.file=originalFile;await env.cleanup();await db.terminate(); });
 const call=(endpoint,uid,data={}) => endpoint.run({auth:{uid},data});

@@ -51,6 +51,17 @@ export default function Messages() {
   const messageEnd = useRef<HTMLDivElement>(null);
   const identity = accounts.identity;
   useEffect(() => {
+    const requested = session.requestedConversation;
+    if (!requested || requested.uid !== identity?.uid) return;
+    const ticket = conversations.find((item) => item.id === requested.id);
+    if (!ticket) return;
+    setConversation(ticket);
+    session.setRequestedConversation(null);
+  }, [conversations, identity?.uid, session.requestedConversation, session.setRequestedConversation]);
+  useEffect(() => {
+    setConversation((active) => conversations.find((item) => item.id === active?.id) ?? active);
+  }, [conversations]);
+  useEffect(() => {
     messageEnd.current?.scrollIntoView({ block: "end" });
   }, [rows, conversation?.id]);
   useEffect(() => {

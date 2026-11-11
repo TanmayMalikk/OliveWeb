@@ -54,7 +54,7 @@ function validateGroupRemoval(conversation, callerUid, participantUid) {
 }
 
 // Creates or updates the encrypted support chat for a support request or consultation.
-async function saveSupportConversation(plan, safeContactUid = "", reopen = false) {
+async function saveSupportConversation(plan, safeContactUid = "", reopen = false, writeContext = null) {
   if (!plan?.ownerUid || !plan?.staffUid) return;
   const origin = plan.supportOrigin === PLAN_CONSULT ? PLAN_CONSULT : SUPPORT;
   const conversationId = plan.conversationId || supportConversationId(plan.ownerUid, origin);
@@ -70,7 +70,7 @@ async function saveSupportConversation(plan, safeContactUid = "", reopen = false
   }
   const participantUsernames = await participantNames(participantIds);
   const reference = db.collection("conversations").doc(conversationId);
-  const current = await reference.get();
+  const current = writeContext ? writeContext.snapshot : await reference.get();
   // Completed tickets stay immutable. A later request must receive a new ID and ticket number.
   if (current.exists && current.get("closedAt")) {
     throw new HttpsError("failed-precondition", "Create a new ticket instead of reopening a completed chat.");
@@ -97,7 +97,8 @@ async function saveSupportConversation(plan, safeContactUid = "", reopen = false
     value.roomKeys = FieldValue.delete();
     value.participantPublicKeys = FieldValue.delete();
   }
-  await reference.set(value, {merge: true});
+  if (writeContext) writeContext.transaction.set(reference, value, {merge: true});
+  else await reference.set(value, {merge: true});
 }
 
 // Archives one support conversation for every participant without deleting its messages.
@@ -364,10 +365,19 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
       throw new HttpsError("permission-denied", "Support conversation not found.");
     }
     const conversation = snapshot.data();
+    const planCompleted = request.data?.planCompleted === true;
     if (!canCloseSupportConversation(conversation, caller)) {
       throw new HttpsError("permission-denied", "Only organization support in this chat can close it.");
     }
-    if (snapshot.get("closedAt")) return;
+    if (planCompleted && (conversation.supportOrigin !== PLAN_CONSULT || conversation.staffUid !== caller.uid)) {
+      throw new HttpsError("permission-denied", "Only the assigned staff member can complete the plans.");
+    }
+    if (snapshot.get("closedAt")) {
+      if (planCompleted && !conversation.plansCompleted) {
+        throw new HttpsError("failed-precondition", "This consultation was already closed.");
+      }
+      return;
+    }
     const sourceReference = conversation.supportOrigin === PLAN_CONSULT ?
       planReference(conversation.ownerUid) :
       conversation.requestSource === "GROUP_CHAT" && conversation.sourceConversationId ?
@@ -377,10 +387,14 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
     const staffReference = db.collection("safetyStaff").doc(conversation.staffUid);
     const sourceSnapshot = await transaction.get(sourceReference);
     const staffSnapshot = await transaction.get(staffReference);
+    if (planCompleted && sourceSnapshot.get("consultationConversationId") !== conversationId) {
+      throw new HttpsError("failed-precondition", "This consultation is no longer active.");
+    }
     transaction.update(reference, {
       closedAt: FieldValue.serverTimestamp(),
       completedAt: FieldValue.serverTimestamp(),
       ticketStatus: "COMPLETED",
+      ...(planCompleted ? {plansCompleted: true} : {}),
       updatedAt: FieldValue.serverTimestamp(),
     });
     // Clears only the ticket that still points to this exact conversation.
@@ -394,6 +408,8 @@ exports.staffSupportClose = onCall({invoker: "public"}, async (request) => {
           transaction.set(sourceReference, {
             consultationRequested: false, staffUid: "", staffName: "", adminUid: "", adminName: "",
             consultationConversationId: "",
+            supportSafeContactUid: "",
+            ...(planCompleted ? {plansCompletedAt: Date.now()} : {}),
             updatedAt: Date.now(),
           }, {merge: true});
         } else if (conversation.requestSource === "GROUP_CHAT") {

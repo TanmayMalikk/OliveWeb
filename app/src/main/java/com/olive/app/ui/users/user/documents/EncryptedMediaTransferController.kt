@@ -464,7 +464,8 @@ internal class MediaTransferController(
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
                 EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
                 KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped)
-            return MediaUploadJob(jobId,owner.uid,prepared)
+            return MediaUploadJob(jobId,owner.uid,prepared,
+                attachToSafetyPlan = tags.any { it.startsWith("safety-plan:") })
         } catch (failure: Throwable) {
             target.delete()
             throw failure

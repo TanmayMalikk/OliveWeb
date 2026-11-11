@@ -422,7 +422,14 @@
     <string name="ui_group_voice_call">مكالمة صوتية جماعية</string>
     <string name="ui_group_call_status">%1$d متصلون • %2$s</string>
     <string name="organization_live_map_staff_description">اعرض مواقع جميع المستخدمين.</string>
-    <string name="safety_mark_consultation_complete">وضع علامة مكتمل على الاستشارة</string>
+    <string name="safety_mark_consultation_complete">وضع علامة كمكتمل</string>
+    <string name="safety_plans_completed">اكتملت خطة الأمان والخطة الاحتياطية.</string>
+    <string name="safety_staff_assigned">يعمل معك أحد أعضاء فريق الدعم.</string>
+    <string name="safety_open_consultation">فتح تذكرة الاستشارة</string>
+    <string name="safety_conflicts_title">التعارضات</string>
+    <string name="safety_your_change">تغييرك</string>
+    <string name="safety_incoming_change">التغيير الوارد</string>
+    <string name="safety_empty_value">قسم فارغ</string>
     <string name="safety_complete_consultation_title">هل تريد إكمال هذه الاستشارة؟</string>
     <string name="safety_complete_consultation_description">يؤدي هذا إلى أرشفة محادثة الاستشارة للجميع وإزالة خطة الأمان هذه من صندوق الوارد الخاص بالموظف.</string>
     <string name="safety_mark_complete">وضع علامة مكتمل</string>

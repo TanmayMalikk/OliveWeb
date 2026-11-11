@@ -362,6 +362,7 @@ exports.mediaDownloadTicket = onCall(options, async (request) => {
   if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
     throw new HttpsError("permission-denied", "Media access was denied");
   }
+  await requireActivePlanGrant(value.owner_id, mediaId, uid);
   const url = await getSignedUrl(
     client(),
     new GetObjectCommand({ Bucket: bucketName.value(), Key: value.object_key }),
@@ -382,6 +383,7 @@ exports.mediaAccountAccessKey = onCall(options, async (request) => {
   if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
     throw new HttpsError("permission-denied", "Media access was denied");
   }
+  await requireActivePlanGrant(value.owner_id, mediaId, uid);
   if (!recovery.exists) {
     throw new HttpsError("failed-precondition", "This older document has not been upgraded for account access");
   }
@@ -412,18 +414,119 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   const mediaId = string(request.data?.mediaId, "mediaId", 64);
   const access = accessRequest(request.data, uid);
   const reference = mediaRef(mediaId);
-  const snapshot = await reference.get();
-  if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
-  const value = snapshot.data();
-  if (value.owner_id !== uid) {
-    throw new HttpsError("permission-denied", "Only the owner can change media access");
-  }
-  if (typeof value.object_key !== "string" || typeof value.encrypted_metadata !== "string") {
-    throw new HttpsError("failed-precondition", "Only encrypted media supports this access update");
-  }
-  await reference.update({ wrapped_keys: access.wrappedKeys, allowed_users: access.allowedUsers });
+  const grant = planMediaGrantRef(uid, mediaId);
+  const forPlan = request.data?.forPlan === true;
+  await db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(reference);
+    const tracked = await transaction.get(grant);
+    const plan = forPlan ? (await transaction.get(db.collection("safetyPlans").doc(uid))).data() : null;
+    if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
+    const value = snapshot.data();
+    if (value.owner_id !== uid) {
+      throw new HttpsError("permission-denied", "Only the owner can change media access");
+    }
+    if (typeof value.object_key !== "string" || typeof value.encrypted_metadata !== "string") {
+      throw new HttpsError("failed-precondition", "Only encrypted media supports this access update");
+    }
+    let wrappedKeys = access.wrappedKeys;
+    let deviceWrappedKeys = access.deviceWrappedKeys ?? retainedDeviceKeys(value.device_wrapped_keys, access.allowedUsers);
+    if (forPlan) {
+      const recipients = planMediaReaders(plan, mediaId);
+      const added = access.allowedUsers.filter(id => id !== uid);
+      if (added.some(id => !recipients.has(id))) {
+        throw new HttpsError("permission-denied", "The document is not shared with that plan reader.");
+      }
+      const trackedReaders = new Set(tracked.get("readers") || []);
+      for (const id of added) {
+        if (!value.allowed_users?.includes(id)) trackedReaders.add(id);
+      }
+      transaction.set(grant, {readers: [...trackedReaders]});
+      wrappedKeys = {...value.wrapped_keys, ...Object.fromEntries(added.map(id => [id, access.wrappedKeys[id]]))};
+      deviceWrappedKeys = {...value.device_wrapped_keys, ...deviceWrappedKeys};
+    } else if (tracked.exists) {
+      const readers = (tracked.get("readers") || []).filter(id => access.allowedUsers.includes(id));
+      if (readers.length) transaction.update(grant, {readers});
+      else transaction.delete(grant);
+    }
+    if (Object.keys(wrappedKeys).length > 25 || Object.keys(deviceWrappedKeys).length > 250) {
+      throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
+    }
+    transaction.update(reference, {
+      wrapped_keys: wrappedKeys,
+      allowed_users: Object.keys(wrappedKeys),
+      device_wrapped_keys: deviceWrappedKeys,
+    });
+  });
   return publicRecord(await reference.get());
 });
+
+function planMediaGrantRef(ownerUid, mediaId) {
+  return db.collection("safetyPlanMediaGrants").doc(ownerUid).collection("files").doc(mediaId);
+}
+
+async function requireActivePlanGrant(ownerUid, mediaId, readerUid) {
+  if (ownerUid === readerUid) return;
+  const grant = await planMediaGrantRef(ownerUid, mediaId).get();
+  if (!grant.get("readers")?.includes(readerUid)) return;
+  const plan = await db.collection("safetyPlans").doc(ownerUid).get();
+  if (!planMediaReaders(plan.data(), mediaId).has(readerUid)) {
+    throw new HttpsError("permission-denied", "Plan attachment access was removed.");
+  }
+}
+
+function retainedDeviceKeys(keys, allowedUsers) {
+  return Object.fromEntries(Object.entries(keys || {}).filter(([key]) =>
+    allowedUsers.some(id => key.startsWith(id + "--"))));
+}
+
+function planMediaReaders(plan, mediaId) {
+  const attached = ["primary_documents", "backup_documents"].some(key => {
+    try {
+      const checklist = JSON.parse(plan?.fields?.[key]?.value || "");
+      return checklist?.oliveSafetyChecklist === 1 && Array.isArray(checklist.items) &&
+        checklist.items.some(item => Array.isArray(item?.attachmentIds) && item.attachmentIds.includes(mediaId) &&
+          !(Array.isArray(item.excludedAttachmentIds) && item.excludedAttachmentIds.includes(mediaId)));
+    } catch (_) {
+      return false;
+    }
+  });
+  return new Set(attached ? [
+    ...(plan.safeContactUids || []),
+    ...(plan.consultationRequested ? [plan.staffUid, plan.adminUid] : []),
+  ].filter(Boolean) : []);
+}
+
+// Removes only grants created by plan sharing, preserving independently shared access.
+async function reconcilePlanMediaGrants(ownerUid) {
+  const planRef = db.collection("safetyPlans").doc(ownerUid);
+  const grants = await planMediaGrantRef(ownerUid, "_").parent.get();
+  for (const grant of grants.docs) {
+    await db.runTransaction(async transaction => {
+      const reference = mediaRef(grant.id);
+      const [plan, currentGrant, media] = await Promise.all([
+        transaction.get(planRef), transaction.get(grant.ref), transaction.get(reference),
+      ]);
+      if (!currentGrant.exists) return;
+      const readers = currentGrant.get("readers") || [];
+      const permitted = planMediaReaders(plan.data(), grant.id);
+      const revoked = readers.filter(id => !permitted.has(id));
+      if (media.exists && media.get("owner_id") === ownerUid && revoked.length) {
+        const wrappedKeys = Object.fromEntries(Object.entries(media.get("wrapped_keys") || {})
+            .filter(([id]) => !revoked.includes(id)));
+        const allowedUsers = Object.keys(wrappedKeys);
+        transaction.update(reference, {
+          wrapped_keys: wrappedKeys, allowed_users: allowedUsers,
+          device_wrapped_keys: retainedDeviceKeys(media.get("device_wrapped_keys"), allowedUsers),
+        });
+      }
+      const kept = readers.filter(id => permitted.has(id));
+      if (!media.exists || !kept.length) transaction.delete(grant.ref);
+      else if (revoked.length) transaction.update(grant.ref, {readers: kept});
+    });
+  }
+}
+
+Object.defineProperty(exports, "reconcilePlanMediaGrants", {value: reconcilePlanMediaGrants});
 
 // Adds key copies for new phones or browsers without changing who may access the document.
 exports.mediaUpdateDeviceKeys = onCall(options, async (request) => {

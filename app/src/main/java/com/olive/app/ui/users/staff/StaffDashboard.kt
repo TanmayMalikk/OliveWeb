@@ -167,7 +167,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
                     Button(
                         onClick = {
                             completionTarget = null
-                            session.messages.closeSupportChat(target.conversationId) {
+                            session.messages.closeSupportChat(target.conversationId, planCompleted = true) {
                                 selected = null
                                 controller.close()
                             }
