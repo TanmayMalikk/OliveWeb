@@ -58,7 +58,7 @@ export default function Home() {
           </button>
         ))}
       </div>
-      <section className="privacy-note">
+      {s.profile?.role === "USER" && <section className="privacy-note">
         <ShieldCheck size={22} />
         <div>
           <h3>A quick way back.</h3>
@@ -68,7 +68,7 @@ export default function Home() {
             history.
           </p>
         </div>
-      </section>
+      </section>}
     </>
   );
 }

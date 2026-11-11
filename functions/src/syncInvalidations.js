@@ -1,6 +1,7 @@
 // Signed-in accounts: publishes payload-free priority sync revisions and wake-up notifications.
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
-const {db, realtime, messaging, FieldValue} = require("./firebaseAdminClient");
+const {db, messaging, FieldValue} = require("./firebaseAdminClient");
+const {reconcilePlanMediaGrants} = require("./mediaTickets");
 
 const DOMAINS = new Set(["account", "safety", "media", "conversation"]);
 const MAX_REVISION = Number.MAX_SAFE_INTEGER - 1;
@@ -92,11 +93,10 @@ async function writeMarker(uid, domain, urgent) {
 }
 
 async function deviceTokens(uid) {
-  const snapshot = await realtime().ref(`users/${uid}/fcmTokens`).get();
-  const values = snapshot.val();
-  if (!values || typeof values !== "object") return [];
-  return Object.entries(values).filter(([, token]) => typeof token === "string" && token.length > 0)
-      .map(([deviceId, token]) => ({deviceId, token}));
+  const snapshot = await db.collection("notificationTokens").doc(uid).collection("devices").get();
+  return snapshot.docs
+      .map((device) => ({ref: device.ref, token: device.get("token")}))
+      .filter(({token}) => typeof token === "string" && token.length > 0);
 }
 
 async function notify(uid, revision, urgent) {
@@ -106,17 +106,18 @@ async function notify(uid, revision, urgent) {
     const result = await messaging.sendEachForMulticast({
       tokens: batch.map(({token}) => token),
       data: {type: "sync_invalidation", revision: String(revision), urgent: urgent ? "1" : "0"},
-      android: {priority: "high"},
+      android: {priority: "normal"},
     });
-    const removals = {};
-    result.responses.forEach((response, index) => {
+    await Promise.all(result.responses.map((response, index) => {
       const code = response.error?.code;
-      if (code === "messaging/registration-token-not-registered" ||
-          code === "messaging/invalid-registration-token") {
-        removals[`users/${uid}/fcmTokens/${batch[index].deviceId}`] = null;
-      }
-    });
-    if (Object.keys(removals).length > 0) await realtime().ref().update(removals);
+      if (code !== "messaging/registration-token-not-registered" &&
+          code !== "messaging/invalid-registration-token") return;
+      const {ref, token} = batch[index];
+      return db.runTransaction(async (transaction) => {
+        const current = await transaction.get(ref);
+        if (current.get("token") === token) transaction.delete(ref);
+      });
+    }));
   }
 }
 
@@ -133,7 +134,13 @@ exports.syncSafetyPlanInvalidation = onDocumentWritten("safetyPlans/{ownerUid}",
   const before = event.data?.before.exists ? event.data.before.data() : {};
   const after = event.data?.after.exists ? event.data.after.data() : {};
   const audience = [...safetyAudience(before, after), ...await adminUids()];
-  await invalidate(audience, "safety", safetyAccessChanged(before, after) ? audience : []);
+  const accessChanged = safetyAccessChanged(before, after);
+  await Promise.all([
+    invalidate(audience, "safety", accessChanged ? audience : []),
+    (accessChanged || ["primary_documents", "backup_documents"].some(key =>
+      before.fields?.[key]?.value !== after.fields?.[key]?.value)) ?
+      reconcilePlanMediaGrants(event.params.ownerUid) : Promise.resolve(),
+  ]);
 });
 
 exports.syncMediaInvalidation = onDocumentWritten("files/{fileId}", async (event) => {

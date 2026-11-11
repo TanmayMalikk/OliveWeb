@@ -36,6 +36,10 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     private var lease: Any? = null
     private var planListener: ListenerRegistration? = null
     private var generation = 0
+    private var foregroundSync: Job? = null
+    private var foregroundVersion = 0L
+    private var accessListener: ListenerRegistration? = null
+    private var accessActor: String? = null
     var plan by mutableStateOf<SafetyPlan?>(null)
         private set
     var error by mutableStateOf<Int?>(null)
@@ -53,6 +57,19 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         runtime.scope.launch {
             SyncCompletionEvents.events.collect { uid ->
                 if (uid == runtime.coverAccountId) loadCachedAccessLists(uid)
+            }
+        }
+    }
+
+    fun observeAccess() {
+        val actor = runtime.coverAccountId ?: return
+        if (runtime.localMode || accessActor == actor) return
+        accessListener?.remove()
+        accessActor = actor
+        accessListener = repository.observeAccess(actor) {
+            if (runtime.coverAccountId == actor && authorized()) {
+                if (runtime.state.accountRole == AccountRole.SAFE_CONTACT) refreshSharedPlans()
+                else runtime.scope.launch { refreshConsultations() }
             }
         }
     }
@@ -82,6 +99,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     fun close(screenLease: Any? = null) {
         if (screenLease != null && lease !== screenLease) return
         planListener?.remove()
+        foregroundSync?.cancel()
         planListener = null
         lease =
             null
@@ -91,7 +109,12 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         error = null
         saving =
             0
-        if (screenLease == null) consultations = emptyList()
+        if (screenLease == null) {
+            consultations = emptyList()
+            accessListener?.remove()
+            accessListener = null
+            accessActor = null
+        }
     }
 
     // Checks access, loads or creates the selected plan, queues cloud sync, and ignores stale results.
@@ -122,18 +145,26 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 ownerUid
             )
             if (current(actor, ownerUid, token)) plan = value
-            refresh()
             if (!runtime.localMode && current(actor, ownerUid, token)) {
+                runtime.scope.launch {
+                    try {
+                        if (current(actor, ownerUid, token)) {
+                            runtime.messaging.registerMessagingIdentity(AccountIdentity(actor, runtime.state.coverUsername))
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Plan fields stay available even if the device cannot register for documents yet.
+                    }
+                }
                 planListener = repository.observe(
                     ownerUid,
                     onUpdate = { remote ->
                         runtime.scope.launch {
+                            if (!current(actor, ownerUid, token)) return@launch
                             // Keep unsent local edits while refreshing every section changed on another device.
                             val updated = withContext(Dispatchers.IO) {
-                                store.update(actor, ownerUid) { local ->
-                                    val combined = local.copy(fields = remote.fields + local.fields)
-                                    mergeSafetyPlan(combined, combined, remote)
-                                }
+                                writes.withLock { store.mergeRemote(actor, remote) }
                             }
                             if (current(actor, ownerUid, token)) {
                                 plan = updated
@@ -146,10 +177,20 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                         }
                     },
                     onError = { failure ->
-                        if (current(actor, ownerUid, token)) error = R.string.safety_sync_error
+                        runtime.scope.launch {
+                            if (!current(actor, ownerUid, token)) return@launch
+                            if (actor != ownerUid && failure is com.google.firebase.firestore.FirebaseFirestoreException &&
+                                failure.code == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED
+                            ) {
+                                plan = null
+                                error = R.string.safety_access_revoked
+                                withContext(Dispatchers.IO) { store.remove(actor, ownerUid) }
+                            } else refresh()
+                        }
                     },
                 )
             }
+            refresh()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) { // Keep locally available plan data on screen and report that cloud storage could not be loaded.
@@ -171,11 +212,39 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     // Resolves a sync conflict by keeping either the local text or the newer server text.
     fun resolve(key: String, keepMine: Boolean) {
         val old = plan ?: return
-        if (runtime.state.accountRole == AccountRole.SAFE_CONTACT) return
+        if (runtime.state.accountRole != AccountRole.USER) return
         val field = old.fields[key] ?: return
+        val proposal = old.pendingConflicts[key]
+        if (field.conflictRevision == null && proposal != null) {
+            val actor = runtime.coverAccountId ?: return
+            val token = generation
+            saving++
+            runtime.scope.launch {
+                try {
+                    val updated = sync.withLock {
+                        withContext(Dispatchers.IO) {
+                            val remote = repository.sync(old, mapOf(
+                                "key" to key, "revision" to field.revision,
+                                "mutationId" to proposal.mutationId, "useIncoming" to !keepMine,
+                            ))
+                            store.mergeRemote(actor, remote)
+                        }
+                    }
+                    if (current(actor, actor, token)) plan = updated
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (current(actor, actor, token)) error = R.string.safety_sync_error
+                } finally {
+                    if (current(actor, actor, token)) saving = (saving - 1).coerceAtLeast(0)
+                }
+            }
+            return
+        }
         val revision = field.conflictRevision ?: return
         val edited = if (keepMine) field.copy(
             revision = revision,
+            baseValue = field.conflictValue,
             conflictRevision = null,
             conflictValue = null
         ).edit(field.value)
@@ -222,6 +291,10 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 if (current(actor, actor, token) && updated != null) {
                     plan = updated
                     error = null
+                    if (!stop && updated.consultationConversationId.isNotBlank()) {
+                        if (updated.staffUid.isNotBlank()) shareConsultationDocuments(actor, updated)
+                        openConsultation(updated.consultationConversationId)
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -234,10 +307,51 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
+    fun openConsultation(conversationId: String) {
+        val actor = runtime.coverAccountId ?: return
+        if (conversationId.isBlank()) return
+        val token = generation
+        runtime.scope.launch {
+            try {
+                val conversation = MessagingRepository().listConversations(actor).firstOrNull { it.id == conversationId }
+                    ?: return@launch
+                if (!current(actor, actor, token)) return@launch
+                runtime.navigation.navigate(SafePage.Messages)
+                runtime.conversationActions.openConversation(conversation)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current(actor, actor, token)) error = R.string.safety_sync_error
+            }
+        }
+    }
+
+    private fun shareConsultationDocuments(actor: String, updated: SafetyPlan) {
+        val source = runtime.safetyDocumentRepository ?: return
+        val ids = updated.fields.filterKeys { it.endsWith("_documents") }.values.flatMap { field ->
+            readSafetyChecklist(field.value).flatMap { item -> item.attachmentIds - item.excludedAttachmentIds.toSet() }
+        }.distinct()
+        if (ids.isEmpty()) return
+        runtime.scope.launch(Dispatchers.IO) {
+            try {
+                val staff = repository.mediaRecipients()[updated.staffUid] ?: return@launch
+                for (id in ids) {
+                    if (runtime.coverAccountId != actor) return@launch
+                    val document = source.getFor(actor, id)
+                    source.grantAccess(document, actor, updated.staffUid, staff, forPlan = true)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // The plan screen retries grants when the staff device registers or the owner returns.
+            }
+        }
+    }
+
     // Verifies the selected friends, syncs pending edits, and shares the plan with up to ten contacts.
     fun shareWithContacts(friends: List<Friend>) {
         if (!authorized() || runtime.state.accountRole != AccountRole.USER || runtime.localMode || friends.size > 10) return
-        val draft = plan ?: return
+        if (plan == null) return
         val actor = runtime.coverAccountId ?: return
         val token = generation
         saving++
@@ -245,12 +359,15 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         runtime.scope.launch {
             // Use the fallback when share with contacts is unavailable.
             try {
-                repository.sync(draft)
-                val updated = repository.shareContacts(friends)
+                val updated = sync.withLock {
+                    withContext(Dispatchers.IO) {
+                        syncSafetyPlan(store, repository, actor, actor)
+                        store.mergeRemote(actor, repository.shareContacts(friends))
+                    }
+                }
                 if (current(actor, actor, token)) {
                     plan = updated
                     error = null
-                    withContext(Dispatchers.IO) { store.write(actor, actor, updated) }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -276,9 +393,10 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             try {
                 repository.setSupportContact(uid)
                 if (current(actor, actor, token)) {
-                    val updated = old.copy(supportSafeContactUid = uid)
+                    val updated = withContext(Dispatchers.IO) {
+                        store.update(actor, actor) { it.copy(supportSafeContactUid = uid) }
+                    }
                     plan = updated
-                    withContext(Dispatchers.IO) { store.write(actor, actor, updated) }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -314,6 +432,27 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
+    // Loads the staff/admin encryption identities that can read attachments on the user's own plan.
+    suspend fun mediaRecipients(): Map<String, String> {
+        val actor = runtime.coverAccountId ?: return emptyMap()
+        if (!authorized() || runtime.state.accountRole != AccountRole.USER || activeOwner != actor || runtime.localMode) {
+            return emptyMap()
+        }
+        return repository.mediaRecipients()
+    }
+
+    fun observeRecipientDevices(usernames: Collection<String>, onChange: () -> Unit) =
+        repository.observeRecipientDevices(usernames, onChange)
+
+    // Uploads publish their ID after the encrypted file is available in the owner's document list.
+    fun attachPublishedDocuments(documents: List<SafetyDocument>) {
+        val draft = plan ?: return
+        val fields = draft.fields.filterKeys { it.endsWith("_documents") }.mapValues { (key, field) ->
+            safetyChecklistWithPublishedDocuments(key, field.value, documents)
+        }
+        fields.forEach { (key, value) -> edit(key, value) }
+    }
+
     // Writes one plan change in order, then asks the durable worker to sync it when online.
     private fun persist(change: (SafetyPlan) -> SafetyPlan) {
         if (!authorized()) return
@@ -334,11 +473,12 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                         )
                     }
                 }
-                if (!runtime.localMode) SafetyPlanSyncWorker.enqueue(
-                    runtime.application,
-                    actor,
-                    owner
-                )
+                if (!runtime.localMode) {
+                    SafetyPlanSyncWorker.enqueue(runtime.application, actor, owner)
+                    if (current(actor, owner, token)) {
+                        syncForeground(actor, owner, token)
+                    }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) { // Keep the local draft and show a storage error when saving fails.
@@ -349,10 +489,48 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
+    private fun syncForeground(actor: String, owner: String, token: Int) {
+        foregroundVersion++
+        if (foregroundSync?.isActive == true) return
+        foregroundSync = runtime.scope.launch {
+            try {
+                do {
+                    val version = foregroundVersion
+                    if (!current(actor, owner, token) || !hasValidatedInternetConnection(runtime.application)) break
+                    sync.withLock {
+                        withContext(Dispatchers.IO) { syncSafetyPlan(store, repository, actor, owner) }
+                    }
+                    val saved = withContext(Dispatchers.IO) { store.read(actor, owner) }
+                    if (current(actor, owner, token) && saving == 0) plan = saved
+                } while (version != foregroundVersion)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current(actor, owner, token)) error = R.string.safety_sync_error
+            } finally {
+                foregroundSync = null
+            }
+        }
+    }
+
     // Saves the current draft again after a local storage failure.
     fun retrySave() {
         val draft = plan ?: return
         persist { saved -> saved.copy(fields = draft.fields, shareAction = draft.shareAction) }
+    }
+
+    suspend fun flushConsultation(conversationId: String) {
+        val actor = runtime.coverAccountId ?: return
+        val draft = plan?.takeIf { it.consultationConversationId == conversationId } ?: return
+        sync.withLock {
+            withContext(Dispatchers.IO) {
+                writes.withLock {
+                    check(runtime.coverAccountId == actor)
+                    syncSafetyPlan(store, repository, actor, draft.ownerUid)
+                    check(store.read(actor, draft.ownerUid)?.pending != true)
+                }
+            }
+        }
     }
 
     // Syncs queued changes, reloads the saved plan, and removes a shared copy when access is revoked.
@@ -411,7 +589,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val actor = runtime.coverAccountId ?: return
         // Turn an unexpected refresh consultations failure into a readable message.
         try {
-            loadCachedAccessLists(actor)
+            if (consultations.isEmpty()) loadCachedAccessLists(actor)
             if (!hasValidatedInternetConnection(runtime.application)) return
             val result = repository.consultations()
             withContext(Dispatchers.IO) {
@@ -437,124 +615,14 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (!authorized() || runtime.state.accountRole != AccountRole.STAFF || runtime.localMode) return
         val actor = runtime.coverAccountId
         runtime.scope.launch {
-            // Turn an unexpected change availability failure into a readable message.
             try {
                 repository.available(value)
-                if (authorized() && actor == runtime.coverAccountId) available =
-                    value
+                if (authorized() && actor == runtime.coverAccountId) available = value
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) { // Keep the current availability value when the staff setting cannot be updated.
-                if (authorized() && actor == runtime.coverAccountId) error =
-                    R.string.safety_sync_error
+            } catch (_: Exception) {
+                if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
             }
         }
     }
-}
-
-// Signed-in users: checks device-lock and PIN entry.
-
-internal class DeviceLockRequest internal constructor(
-    val challenge: DeviceLockChallenge,
-    val settingsChange: Boolean = false
-) {
-    internal val result = CompletableDeferred<Cipher?>()
-    // Session device access: Finishes the active task.
-    fun complete(cipher: Cipher?) {
-        result.complete(cipher)
-    }
-}
-
-// A prompt result is useful only to its original account, screen and cancellation epoch.
-internal class SessionDeviceAccess(private val runtime: SessionRuntime) {
-    private val keys = DeviceLockKey(if (runtime.localMode) "demo" else "firebase")
-
-    // Authenticates the account for session device access.
-    fun authenticate(enroll: Boolean, trigger: String? = null): Unit = with(runtime) {
-        with(state) {
-            if (busy || privacyBlackout) return
-            if (accountRole != AccountRole.USER) return
-            val identity = pendingIdentity
-            val value = pendingProfile
-            val device = enrollment
-            val expectedScreen =
-                if (enroll) SessionScreen.DevicePin else if (trigger != null) SessionScreen.Safe else SessionScreen.Pin
-            if (screen != expectedScreen) return
-            if (enroll && (identity == null || value == null || device != null || value.role != AccountRole.USER)) return
-            if (!enroll && device?.entryMethod != SafeEntryMethod.DEVICE_LOCK) return
-            if (!enroll && device?.role != AccountRole.USER) return
-            if (!enroll && trigger == null && activeTriggerId == null) return
-            if (trigger != null && !InputPolicy.validTrigger(trigger)) {
-                message = application.getString(R.string.entry_invalid_trigger)
-                return
-            }
-            val uid = if (enroll) identity!!.uid else device!!.uid
-            // Counts changes to value.
-            val version = pinChallengeVersion
-            operations.runOperation(
-                application.getString(R.string.entry_auth_failed),
-                timeoutMillis = 120_000
-            ) { token ->
-                val challenge = withContext(Dispatchers.IO) {
-                    keys.prepare(uid, if (enroll) null else store.deviceLockGrant(uid))
-                }
-                if (!current(token, expectedScreen, uid, enroll)) {
-                    challenge.close()
-                    return@runOperation
-                }
-                val request = DeviceLockRequest(challenge, settingsChange = trigger != null)
-                deviceLockRequest = request
-                // Use the fallback when authenticate is unavailable.
-                try {
-                    val cipher = request.result.await()
-                    if (!current(token, expectedScreen, uid, enroll)) return@runOperation
-                    if (cipher == null) {
-                        message =
-                            application.getString(R.string.entry_auth_cancelled)
-                        return@runOperation
-                    }
-                    // The callback alone grants no access: Android Keystore must complete the protected operation.
-                    val grant = withContext(Dispatchers.IO) { challenge.finish(cipher) }
-                    if (!current(token, expectedScreen, uid, enroll)) return@runOperation
-                    // Save device-lock enrolment only when this prompt came from setup.
-                    if (enroll) {
-                        val saved = withContext(Dispatchers.IO) {
-                            store.enrollDeviceLock(identity!!, value!!, checkNotNull(grant))
-                                .also { challenge.markEnrolled() }
-                        }
-                        if (current(token, expectedScreen, uid, true)) accountSession.finishEnrollment(
-                            saved,
-                            value!!,
-                            token
-                        )
-                    } else if (trigger != null) {
-                        settings.saveVerifiedTrigger(device!!, trigger, token)
-                    } else {
-                        withContext(Dispatchers.IO) {
-                            triggerJob?.join()
-                            activeTriggerId?.let { store.recordTriggerAttempt(uid, it, true) }
-                        }
-                        if (current(
-                                token,
-                                expectedScreen,
-                                uid,
-                                false
-                            ) && version == pinChallengeVersion
-                        )
-                            access.unlockVerifiedDevice(device!!, token, expectedScreen, version)
-                    }
-                } finally {
-                    if (deviceLockRequest === request) deviceLockRequest = null
-                    challenge.close()
-                }
-            }
-        }
-    }
-
-    // Reads the current private-entry settings before changing them.
-    private fun current(token: Long, expected: SessionScreen, uid: String, enroll: Boolean) =
-        with(runtime) {
-            epoch == token && state.screen == expected && !state.privacyBlackout && state.accountRole == AccountRole.USER &&
-                    (if (enroll) pendingIdentity?.uid == uid else enrollment?.uid == uid)
-        }
 }

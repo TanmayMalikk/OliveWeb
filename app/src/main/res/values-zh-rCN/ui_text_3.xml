@@ -65,15 +65,11 @@
     <string name="ui_new_headlines_are_available">新的头条新闻可用。</string>
     <string name="ui_a_new_update_is_available">有新的更新可用。</string>
     <string name="ui_an_account_update_is_available">帐户更新可用。</string>
-    <string name="ui_fresh_menu_updates_are_available">提供新鲜的菜单更新。</string>
-    <string name="ui_see_what_s_new_from_olive">了解 Olive 的最新动态。</string>
-    <string name="ui_new_kitchen_picks_are_ready_to_browse">新的厨房精选可供浏览。</string>
     <string name="ui_your_latest_digest_is_ready">您的最新摘要已准备就绪。</string>
     <string name="ui_there_are_new_stories_to_browse">有新的故事可供浏览。</string>
 
     <string name="ui_open_the_app_to_see_what_s_new">打开应用程序查看新内容。</string>
     <string name="ui_new_activity_is_waiting">新活动正在等待。</string>
-    <string name="ui_order_status_and_delivery_notifications_for_olive">Olive 的订单状态和交货通知</string>
     <string name="ui_daily_digest_briefings">每日摘要简报</string>
     <string name="ui_daily_headlines_and_news_digest_notifications">每日头条新闻和新闻摘要通知</string>
 
@@ -86,9 +82,13 @@
     <string name="ui_speaker_off">关闭扬声器</string>
     <string name="ui_incoming_call">来电</string>
     <string name="ui_voice_call">语音通话</string>
+    <string name="ui_minimize_call">最小化通话</string>
+    <string name="ui_return_to_call">返回通话</string>
+    <string name="ui_call_running_in_background">通话正在后台继续</string>
     <string name="ui_start_voice_call">开始语音通话</string>
     <string name="ui_calling">正在呼叫…</string>
     <string name="ui_call_in_progress">通话中</string>
+    <string name="ui_join_call">加入通话</string>
     <string name="ui_missed_call">未接来电</string>
     <string name="ui_call_declined">通话已拒绝</string>
     <string name="ui_call_ended">通话已结束</string>
@@ -114,4 +114,8 @@
     <string name="password_excludes_username">密码不能包含用户名。</string>
 <string name="ocr_no_text">未从文档中识别出文字。</string>
     <string name="ocr_error_detail">OCR 错误：%1$s</string>
+    <string name="notification_active_voice_calls">进行中的语音通话</string>
+    <string name="notification_safe_app_updates">安全应用动态</string>
+    <string name="notification_safe_app_activity">打开 Olive Branch 查看更新。</string>
+    <string name="notification_new_app_update">应用有新版本</string>
 </resources>

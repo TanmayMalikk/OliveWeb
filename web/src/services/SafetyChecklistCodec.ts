@@ -2,7 +2,16 @@ export type SafetyChecklistItem = {
   id: string;
   text: string;
   checked: boolean;
+  attachmentIds?: string[];
+  excludedAttachmentIds?: string[];
 };
+
+function documentIds(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return [...new Set(value.filter((id): id is string =>
+    typeof id === "string" && id.length > 0 && id.length <= 128,
+  ))].slice(0, 80);
+}
 
 // Web safety plans: decodes the checklist format shared with the Android app.
 export function readSafetyChecklist(value: string): SafetyChecklistItem[] {
@@ -23,14 +32,22 @@ export function readSafetyChecklist(value: string): SafetyChecklistItem[] {
         typeof row.checked !== "boolean"
       )
         throw new Error("Invalid checklist row");
-      return { id: row.id, text: row.text, checked: row.checked };
+      const attachmentIds = documentIds(row.attachmentIds);
+      const excludedAttachmentIds = documentIds(row.excludedAttachmentIds);
+      return {
+        id: row.id,
+        text: row.text,
+        checked: row.checked,
+        ...(attachmentIds?.length ? { attachmentIds } : {}),
+        ...(excludedAttachmentIds?.length ? { excludedAttachmentIds } : {}),
+      };
     });
     if (new Set(items.map((item) => item.id)).size !== items.length)
       throw new Error("Duplicate checklist row");
     return items;
   } catch {
     return value.trim()
-      ? [{ id: crypto.randomUUID(), text: value, checked: false }]
+      ? [{ id: "legacy-note", text: value, checked: false }]
       : [];
   }
 }

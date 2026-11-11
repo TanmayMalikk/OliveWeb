@@ -1,10 +1,12 @@
 // Staff: shows assigned users and support chats to staff.
 import { useEffect, useState } from "react";
-import { LogOut } from "lucide-react";
 import { Button, Empty, Logo } from "../../components/SharedComponents";
 import { useSession } from "../../session/SessionProvider";
+import { accounts } from "../../services/AccountService";
+import { register } from "../../services/MessagingService";
 import {
   loadPlan,
+  observeSafetyAccess,
   setStaffAvailability,
   staffConsultations,
   type SafetyPlan,
@@ -15,28 +17,41 @@ import OrganizationSupportInbox from "../shared/OrganizationSupportInbox";
 export default function StaffPortal() {
   const session = useSession();
   const [consultations, setConsultations] = useState<
-    { ownerUid: string; ownerName: string; updatedAt: number }[]
+    { ownerUid: string; ownerName: string; updatedAt: number; ticketNumber: number }[]
   >([]);
   const [available, setAvailable] = useState(true);
   const [plan, setPlan] = useState<SafetyPlan | null>(null);
 
   // Reload staff tickets when the signed-in session changes.
+  const identity = accounts.identity;
+  const uid = identity?.uid;
   useEffect(() => {
-    void session.perform(async () => {
-      const value = await staffConsultations();
-      setConsultations(value.plans);
-      setAvailable(value.available);
+    if (!uid) return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    let request = 0;
+    const refresh = () => {
+      const token = ++request;
+      void staffConsultations().then((value) => {
+        if (!active || token !== request) return;
+        setConsultations(value.plans);
+        setAvailable(value.available);
+      }).catch(() => undefined);
+    };
+    refresh();
+    if (identity) void register(identity).catch(() => undefined);
+    void observeSafetyAccess(uid, refresh, () => undefined).then((cleanup) => {
+      if (active) stop = cleanup;
+      else cleanup();
     });
-  }, []);
+    return () => { active = false; stop?.(); };
+  }, [uid]);
 
   return (
     <div className="page-width private-shell portal">
       <header className="site-header">
         <Logo />
         <span className="eyebrow">STAFF PORTAL</span>
-        <Button variant="exit" onClick={session.quickExit}>
-          Quick Exit <LogOut size={17} />
-        </Button>
       </header>
       <main id="main">
         <div className="safe-page-title">
@@ -88,12 +103,13 @@ export default function StaffPortal() {
                   )
                 }
               >
-                Open {item.ownerName || "shared plan"}
+                {item.ticketNumber >= 0 ? `Consult Ticket #${item.ticketNumber}` : "Consult Ticket"}
               </button>
             ))}
           </div>
         )}
-        {plan && <SafetyPlanEditor plan={plan} onChange={setPlan} />}
+        {plan && <SafetyPlanEditor plan={plan} onChange={setPlan}
+          onCompleted={() => setConsultations((current) => current.filter((item) => item.ownerUid !== plan.ownerUid))} />}
         <OrganizationSupportInbox />
         <Button
           variant="quiet"

@@ -44,6 +44,7 @@ export type BrowserDocument = {
   ciphertextSha256: string;
   key?: CryptoKey;
   evidence: boolean;
+  tags?: string[];
 };
 
 // Turns stored Base64 text back into bytes before a file is decrypted.
@@ -171,6 +172,7 @@ async function uploadCiphertext(
       report((index + 1) / count);
     }
     await httpsCallable(functions, "mediaCompleteUpload")({ jobId, parts });
+    return mediaId;
   } catch (error) {
     if (mediaId)
       await httpsCallable(
@@ -228,23 +230,94 @@ export async function uploadBrowserDocument(
         ),
       ]),
     );
-    const device = await messageDevice(identity.uid);
-    const wrappedKey = await wrapForPublicKey(rawKey, publicKey, "SHA-1");
-    const deviceWrappedKey = await wrapForPublicKey(rawKey, device.publicKey, "SHA-256");
-    await uploadCiphertext(
+    const keys = await wrapForDocumentRecipient(rawKey, identity);
+    return await uploadCiphertext(
       crypto.randomUUID(),
       ciphertext,
       encryptedMetadata,
-      { [identity.uid]: wrappedKey },
-      { [`${identity.uid}--${device.deviceId}`]: deviceWrappedKey },
+      { [identity.uid]: keys.accountKey },
+      keys.deviceKeys,
       identity.uid,
       report,
     );
+  } finally {
     rawKey.fill(0);
-  } catch (error) {
-    rawKey.fill(0);
-    throw error;
   }
+}
+
+async function wrapForDocumentRecipient(raw: Uint8Array, { uid, username }: { uid: string; username: string }) {
+  const { db } = await firebase();
+  const directory = doc(db, "messageDirectory", username.toLowerCase());
+  const [account, devices] = await Promise.all([getDoc(directory), getDocs(collection(directory, "devices"))]);
+  const publicKey = account.get("publicKey");
+  if (account.get("uid") !== uid || typeof publicKey !== "string" || !publicKey) {
+    throw new Error("The recipient's encryption identity is unavailable.");
+  }
+  const approvedDevices = devices.docs.map((device) => device.data()).filter((device) =>
+    device.uid === uid && typeof device.publicKey === "string" && typeof device.deviceId === "string",
+  );
+  const deviceKeys = Object.fromEntries(await Promise.all(approvedDevices.map(async (device) => [
+    `${uid}--${device.deviceId}`,
+    await wrapForPublicKey(raw, device.publicKey, device.mgf1Digest === "SHA-256" ? "SHA-256" : "SHA-1"),
+  ])));
+  const accountDevice = approvedDevices.find((device) => device.publicKey === publicKey);
+  const accountKey = await wrapForPublicKey(raw, publicKey, accountDevice?.mgf1Digest === "SHA-256" ? "SHA-256" : "SHA-1");
+  return { accountKey, deviceKeys };
+}
+
+// Wrap an attached document for the selected plan readers using their published device keys.
+export async function shareBrowserPlanDocument(
+  mediaId: string,
+  identity: Identity,
+  recipients: { uid: string; username: string }[],
+) {
+  if (!recipients.length) return;
+  const { db, functions } = await firebase();
+  const row = await getDoc(doc(db, "files", mediaId));
+  const value = row.data() as StoredMedia | undefined;
+  if (!value || value.owner_id !== identity.uid) throw new Error("Only the document owner can share it.");
+  const ownerKey = (value.wrapped_keys as Record<string, string>)?.[identity.uid];
+  if (!ownerKey) throw new Error("Upload an encrypted copy before attaching this document.");
+  const wrappedKeys: Record<string, string> = { [identity.uid]: ownerKey };
+  const deviceWrappedKeys: Record<string, string> = {};
+  const existingDevices = (value.device_wrapped_keys as Record<string, string>) ?? {};
+  const device = await messageDevice(identity.uid);
+  const wrapped = existingDevices[`${identity.uid}--${device.deviceId}`];
+  if (!wrapped) throw new Error("Open the plan on an approved device to share this document.");
+  const raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
+  try {
+    const results = await Promise.allSettled(recipients.map(async (recipient) => ({
+      recipient, keys: await wrapForDocumentRecipient(raw, recipient),
+    })));
+    for (const result of results) {
+      if (result.status !== "fulfilled") continue;
+      const { recipient, keys } = result.value;
+      if ((value.allowed_users as string[])?.includes(recipient.uid) &&
+          Object.keys(keys.deviceKeys).every((key) => existingDevices[key])) continue;
+      wrappedKeys[recipient.uid] = keys.accountKey;
+      Object.assign(deviceWrappedKeys, keys.deviceKeys);
+    }
+    if (Object.keys(wrappedKeys).length > 1) {
+      const { httpsCallable } = await import("firebase/functions");
+      await httpsCallable(functions, "mediaUpdateAccess")({ mediaId, wrappedKeys, deviceWrappedKeys, forPlan: true });
+    }
+    if (results.some((result) => result.status === "rejected")) {
+      throw new Error("A plan recipient must sign in on their device before they can open the attachment.");
+    }
+  } finally {
+    raw.fill(0);
+  }
+}
+
+export async function observeDocumentRecipientDevices(
+  recipients: { username: string }[],
+  onChange: () => void,
+) {
+  const { db } = await firebase();
+  const listeners = recipients.map(({ username }) =>
+    onSnapshot(collection(db, "messageDirectory", username, "devices"), () => onChange(), () => undefined),
+  );
+  return () => listeners.forEach((stop) => stop());
 }
 
 // Returns a lowercase SHA-256 checksum for the encrypted file.
@@ -268,6 +341,7 @@ async function decryptMetadata(value: string, key: CryptoKey) {
   return JSON.parse(new TextDecoder().decode(plain)) as {
     name?: unknown;
     mimeType?: unknown;
+    tags?: unknown;
   };
 }
 
@@ -291,20 +365,29 @@ export async function observeBrowserDocuments(
   onUpdate: (documents: BrowserDocument[]) => void,
   onError: (error: Error) => void,
 ) {
+  await register(identity);
   const { db } = await firebase();
   const documentsQuery = query(
     collection(db, "files"),
     where("allowed_users", "array-contains", identity.uid),
   );
-  return onSnapshot(
+  let revision = 0;
+  const unsubscribe = onSnapshot(
     documentsQuery,
     (snapshot) => {
+      const current = ++revision;
       void resolveBrowserDocuments(identity, snapshot.docs)
-        .then(onUpdate)
-        .catch((error) => onError(error instanceof Error ? error : new Error(String(error))));
+        .then((documents) => { if (current === revision) onUpdate(documents); })
+        .catch((error) => {
+          if (current === revision) onError(error instanceof Error ? error : new Error(String(error)));
+        });
     },
     onError,
   );
+  return () => {
+    revision++;
+    unsubscribe();
+  };
 }
 
 async function resolveBrowserDocuments(
@@ -325,19 +408,25 @@ async function resolveBrowserDocuments(
       let key: CryptoKey | undefined;
       let name = "Encrypted document";
       let mimeType = "application/octet-stream";
+      let tags: string[] = [];
       // New uploads keep their private details in one encrypted metadata value.
       if (typeof value.encrypted_metadata === "string") {
         // Keep the document in the list when old metadata cannot be decrypted on this browser.
         try {
           if (!wrapped) throw new Error("This browser has no wrapped document key.");
           const raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
-          key = await importKey(raw);
-          raw.fill(0);
+          try {
+            key = await importKey(raw);
+          } finally {
+            raw.fill(0);
+          }
           const metadata = await decryptMetadata(value.encrypted_metadata, key);
           if (typeof metadata.name === "string" && metadata.name.trim())
             name = metadata.name;
           if (typeof metadata.mimeType === "string" && metadata.mimeType.trim())
             mimeType = metadata.mimeType;
+          if (Array.isArray(metadata.tags))
+            tags = metadata.tags.filter((tag): tag is string => typeof tag === "string");
         } catch {
           key = undefined;
         }
@@ -360,6 +449,7 @@ async function resolveBrowserDocuments(
             : "",
         key,
         evidence: value.evidence === true,
+        tags,
       };
     }),
   ).then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt));

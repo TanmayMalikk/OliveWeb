@@ -86,7 +86,7 @@ export function Modal({
 }: {
   title: string;
   children: ReactNode;
-  onClose: () => void;
+  onClose?: () => void;
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -108,18 +108,18 @@ export function Modal({
       aria-labelledby={titleId}
       onCancel={(e) => {
         e.preventDefault();
-        onClose();
+        onClose?.();
       }}
     >
       <div className="modal-top">
         <h2 id={titleId}>{title}</h2>
-        <button
+        {onClose && <button
           className="icon-button"
           onClick={onClose}
           aria-label="Close dialog"
         >
           <X />
-        </button>
+        </button>}
       </div>
       {children}
     </dialog>

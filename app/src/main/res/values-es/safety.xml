@@ -38,7 +38,6 @@
     <string name="safety_staff_intro">Consulta y edita los planes compartidos contigo.</string>
     <string name="safety_retry_save">Reintentar guardado</string>
     <string name="safety_back">Atrás</string>
-    <string name="safety_open_plan">Abrir plan de %1$s</string>
     <string name="safety_source">Orientación: Agencia de Salud Pública de Canadá. Adapta estas indicaciones con alguien de confianza.</string>
     <string name="safety_upload_document">Subir documento</string>
     <string name="safety_upload_for">Subir un documento para %1$s.</string>

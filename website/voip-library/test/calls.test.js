@@ -129,7 +129,7 @@ test('FirebaseCallStore handles a transient null on the first transaction callba
     assert.equal((await store.getCall('call-1')).status, 'ended');
 });
 
-test('FirebaseCallStore expires unanswered calls after twenty seconds and records declines', async () => {
+test('FirebaseCallStore expires unanswered calls and keeps the room open after one decline', async () => {
     const values = {};
     let now = 1_000;
     const store = new FirebaseCallStore(fakeDatabase(values), {
@@ -161,8 +161,39 @@ test('FirebaseCallStore expires unanswered calls after twenty seconds and record
         participantIds: ['bob']
     });
     const declined = await secondStore.respondToInvitation('call-2', 'bob', false);
-    assert.equal(declined.status, 'declined');
-    assert.equal(declined.endReason, 'declined');
+    assert.equal(declined.status, 'active');
+    assert.equal(getParticipantStatus(declined, 'bob'), 'declined');
+    assert.equal(declined.endReason, undefined);
+});
+
+test('FirebaseCallStore keeps two members connected and ends when only one remains', async () => {
+    const values = {
+        'calls/call-1': {
+            callId: 'call-1',
+            callerId: 'alice',
+            status: 'active',
+            participants: {
+                bob: { status: 'accepted' },
+                carol: { status: 'accepted' }
+            }
+        }
+    };
+    const store = new FirebaseCallStore(fakeDatabase(values));
+
+    const updated = await store.leaveCall('call-1', 'bob');
+
+    assert.equal(updated.status, 'active');
+    assert.equal(getParticipantStatus(updated, 'bob'), 'declined');
+    assert.equal(getParticipantStatus(updated, 'carol'), 'accepted');
+    const rejoined = await store.rejoinCall('call-1', 'bob');
+    assert.equal(rejoined.status, 'active');
+    assert.equal(getParticipantStatus(rejoined, 'bob'), 'accepted');
+    await store.leaveCall('call-1', 'bob');
+    const callerLeft = await store.leaveCall('call-1', 'alice');
+    assert.equal(callerLeft.status, 'ended');
+    assert.equal(getParticipantStatus(callerLeft, 'alice'), 'declined');
+    assert.equal(callerLeft.endReason, 'not_enough_participants');
+    assert.equal(await store.rejoinCall('call-1', 'bob'), null);
 });
 
 test('FirebaseCallStore expires legacy pending calls that predate expiresAt', async () => {

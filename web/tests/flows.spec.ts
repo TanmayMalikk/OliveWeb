@@ -73,6 +73,30 @@ async function newsFixture(page: Page) {
   );
 }
 
+test("incident pin loads and keeps the selected location when address lookup is unavailable", async ({ page }) => {
+  await page.route("**/api/map-tiles/**", (route) => route.fulfill({ status: 404 }));
+  await page.route("**/api/locations?**", (route) => route.fulfill({ status: 503, json: {} }));
+  const link = await onboard(page);
+  await page.getByRole("button", { name: "Continue to my cover" }).click();
+  await unlock(page, link);
+  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("button", { name: "New entry", exact: true }).click();
+  await page.getByRole("tab", { name: "Incident", exact: true }).click();
+  await page.getByRole("button", { name: "Choose incident location on map" }).click();
+
+  const map = page.getByRole("application", { name: /Incident location map/ });
+  await map.click({ position: { x: 100, y: 100 } });
+  const pin = map.getByAltText("Incident pin");
+  await expect(pin).toBeVisible();
+  await expect.poll(() => pin.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+  const location = page.getByLabel("Location of incident");
+  await expect(location).toHaveValue(/^Dropped pin/);
+  const first = await location.inputValue();
+  await map.click({ position: { x: 170, y: 130 } });
+  await expect(location).not.toHaveValue(first);
+  await expect(location).toHaveValue(/^Dropped pin/);
+});
+
 // Inputs: numeric username, mismatched password, then corrected credentials. Expected: errors stay inline and valid setup advances.
 test("account creation enforces current credential rules before onboarding", async ({
   page,
@@ -122,7 +146,9 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await page.getByRole("button", { name: "Continue to my cover" }).click();
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Fitness Tracker" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Fitness Tracker" }),
+  ).toBeVisible();
   await unlock(page, link);
   await page.getByRole("button", { name: "Notes", exact: true }).click();
   await page.getByRole("button", { name: "New entry", exact: true }).click();
@@ -319,8 +345,8 @@ test("news reader sanitizes publisher HTML and bookmarks stay available", async 
     /javascript:/,
   );
 });
-// Inputs: the values in this case. Expected: PWA manifests use cover-specific identities and the download page offers the debug APK.
-test("PWA manifests use cover-specific identities and the download page offers the debug APK", async ({
+// Inputs: the values in this case. Expected: PWA manifests use cover-specific identities and the download page offers the signed APK.
+test("PWA manifests use cover-specific identities and the download page offers the signed APK", async ({
   page,
   request,
 }) => {
@@ -338,14 +364,14 @@ test("PWA manifests use cover-specific identities and the download page offers t
     page.getByRole("button", { name: "Begin onboarding" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Download the Android debug app." }),
+    page.getByRole("heading", { name: "Download the signed Android app." }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /Download debug APK/i }),
+    page.getByRole("link", { name: /Download signed APK/i }),
   ).toHaveAttribute("href", /\/download\/android$/);
-  const download = await request.get("/download/android", { maxRedirects: 0 });
-  expect(download.status()).toBe(302);
-  expect(download.headers().location).toContain("olive-branch.apk");
+  await expect(
+    page.getByAltText("QR code for the latest signed Android app"),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Your space, on the web." }),
   ).toBeVisible();

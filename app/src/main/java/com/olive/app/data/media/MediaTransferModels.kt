@@ -96,6 +96,7 @@ data class MediaUploadJob(
     val completedParts:Map<Int,String> = emptyMap(),
     val error:String?=null,
     val createdAt:Long=System.currentTimeMillis(),
+    val attachToSafetyPlan:Boolean=false,
 ) {
     /** Serializes the entire resumable state for storage inside the Keystore-backed vault. */
     fun toJson()=JSONObject().apply {
@@ -107,6 +108,7 @@ data class MediaUploadJob(
         put("kind",source.kind.name);put("ocrReview",source.ocrReview.name);put("status",status.name)
         mode?.let { put("mode",it.name) };put("mediaId",mediaId);put("objectKey",objectKey)
         put("uploadId",uploadId);put("partSize",partSize);put("createdAt",createdAt)
+        put("attachToSafetyPlan",attachToSafetyPlan)
         put("completedParts",JSONObject(completedParts.mapKeys { it.key.toString() }))
         error?.let { put("error",it) }
     }
@@ -133,7 +135,8 @@ data class MediaUploadJob(
             return MediaUploadJob(value.getString("id"),value.getString("ownerUid"),source,
                 MediaTransferStatus.valueOf(value.getString("status")),value.optString("mode").takeIf(String::isNotBlank)?.let(MediaUploadMode::valueOf),
                 value.optString("mediaId"),value.optString("objectKey"),value.optString("uploadId"),
-                value.optLong("partSize"),parts,value.optString("error").takeIf(String::isNotBlank),value.getLong("createdAt"))
+                value.optLong("partSize"),parts,value.optString("error").takeIf(String::isNotBlank),
+                value.getLong("createdAt"),value.optBoolean("attachToSafetyPlan"))
         }
     }
 }

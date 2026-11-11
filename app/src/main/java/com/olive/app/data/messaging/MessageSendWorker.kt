@@ -231,6 +231,7 @@ internal fun ChatConversation.toCacheJson() = JSONObject().apply {
     put("adminUid", adminUid)
     put("supportOrigin", supportOrigin)
     put("supportTag", supportTag)
+    put("ticketSequence", ticketSequence)
     put("closedAt", closedAt)
 }
 
@@ -256,6 +257,7 @@ internal fun conversationFromCacheJson(value: JSONObject): ChatConversation {
         adminUid = value.optString("adminUid"),
         supportOrigin = value.optString("supportOrigin"),
         supportTag = value.optString("supportTag"),
+        ticketSequence = value.optLong("ticketSequence", -1L),
         closedAt = value.optLong("closedAt"),
     )
 }
@@ -372,11 +374,15 @@ internal class SupportRepository(
     suspend fun requestHelp(): StaffSupportTicket = updateRequest("request")
 
     // Returns true when the user still has a staff request that can be cancelled.
-    suspend fun cancelRequest(): StaffSupportTicket = updateRequest("stop")
+    suspend fun cancelRequest(conversationId: String): StaffSupportTicket =
+        updateRequest("stop", conversationId)
 
     // Updates one support ticket without replacing its existing chat history.
-    private suspend fun updateRequest(action: String): StaffSupportTicket {
-        val ticket = call("staffSupportRequest", mapOf("action" to action)).getJSONObject("ticket")
+    private suspend fun updateRequest(action: String, conversationId: String = ""): StaffSupportTicket {
+        val ticket = call(
+            "staffSupportRequest",
+            mapOf("action" to action, "conversationId" to conversationId),
+        ).getJSONObject("ticket")
         return StaffSupportTicket(
             requested = ticket.optBoolean("requested"),
             staffUid = ticket.optString("staffUid"),
@@ -389,9 +395,32 @@ internal class SupportRepository(
         call("safetySupportAdmin", mapOf("conversationId" to conversationId))
     }
 
+    // Adds one accepted contact while the server keeps the existing conversation ID and history.
+    suspend fun addParticipant(conversationId: String, participantUid: String) {
+        call(
+            "conversationAddParticipant",
+            mapOf("conversationId" to conversationId, "participantUid" to participantUid),
+        )
+    }
+
+    // Opens a separate staff ticket containing everyone from the selected personal chat.
+    suspend fun requestStaffForConversation(conversationId: String): String =
+        call("conversationRequestStaff", mapOf("conversationId" to conversationId))
+            .optString("conversationId")
+            .takeIf(String::isNotBlank)
+            ?: error("The support chat was not created.")
+
+    // Removes one member after the server confirms the caller owns the group.
+    suspend fun removeParticipant(conversationId: String, participantUid: String) {
+        call(
+            "conversationRemoveParticipant",
+            mapOf("conversationId" to conversationId, "participantUid" to participantUid),
+        )
+    }
+
     // Closes the support ticket and archives it for every participant.
-    suspend fun close(conversationId: String) {
-        call("staffSupportClose", mapOf("conversationId" to conversationId))
+    suspend fun close(conversationId: String, planCompleted: Boolean = false) {
+        call("staffSupportClose", mapOf("conversationId" to conversationId, "planCompleted" to planCompleted))
     }
 }
 

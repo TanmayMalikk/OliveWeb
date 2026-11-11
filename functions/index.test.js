@@ -16,15 +16,69 @@ test("deployment keeps the existing callable endpoint names", () => {
   const names = ["adminListAccounts", "adminCreateAccount", "adminDeleteAccount", "createPublicAccount",
     "completeOrganizationProfile", "resolveOrganizationLogin", "restoreOrganizationLoginAlias",
     "safetyPlanSync", "safetyPlanConsultations", "safetyPlanAvailability", "safetyPlanConsult",
-    "safetyPlanShareContacts", "safetyPlansSharedWithMe", "mediaCreateUpload",
+    "safetyPlanShareContacts", "safetyPlanMediaRecipients", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
     "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
-    "safetySupportContact", "safetySupportAdmin", "staffSupportClose", "nutritionFoodSearch",
+    "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant",
+    "conversationRemoveParticipant", "conversationRequestStaff", "conversationPrepareKeys", "supportTicketsPrepare", "staffSupportClose", "nutritionFoodSearch",
     "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",
     "syncConversationDeviceKeyInvalidation", "syncAccountInvalidation"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+test("ticket assignments notify staff and newly added administrators through the shared FCM payload", () => {
+  const {fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
+  const ticket = {type: "SUPPORT", ownerUid: "user", participantIds: ["user", "staff"], lastMessageId: ""};
+  const assigned = fcmTargetsForConversationUpdate(undefined, ticket, "support-user-ticket");
+  assert.deepEqual(assigned.recipients, ["staff"]);
+  assert.equal(assigned.data.type, "safe_update");
+  const escalated = fcmTargetsForConversationUpdate(ticket, {
+    ...ticket, participantIds: ["user", "staff", "admin"],
+  }, "support-user-ticket");
+  assert.deepEqual(escalated.recipients, ["admin"]);
+  assert.equal(escalated.data.type, "safe_update");
+  assert.deepEqual(fcmTargetsForConversationUpdate(ticket, ticket, "support-user-ticket").recipients, []);
+});
+
+// Inputs: a three-person group, its owner, and one other member. Expected: only the owner can
+// remove that member, while two-person groups and unrelated accounts are rejected.
+test("group member removal keeps an owner and at least two people", () => {
+  const group = {type:"GROUP", ownerUid:"owner", participantIds:["owner", "friend", "safe"]};
+  assert.deepEqual(supportGroups.validateGroupRemoval(group, "owner", "safe"), ["owner", "friend"]);
+  assert.throws(() => supportGroups.validateGroupRemoval(group, "friend", "safe"));
+  assert.throws(() => supportGroups.validateGroupRemoval(group, "owner", "missing"));
+  assert.throws(() => supportGroups.validateGroupRemoval(
+    {...group, participantIds:["owner", "friend"]}, "owner", "friend",
+  ));
+});
+
+// Inputs: current and older support tickets with staff/admin participants. Expected: an
+// organization account in the chat may close it even when an old assignment field is stale.
+test("support ticket closing follows trusted role and chat membership", () => {
+  const conversation = {
+    type: "SUPPORT",
+    participantIds: ["user", "staff", "admin"],
+    staffUid: "old-staff-field",
+    adminUid: "",
+  };
+  assert.equal(
+    supportGroups.canCloseSupportConversation(conversation, {uid: "staff", role: "STAFF"}),
+    true,
+  );
+  assert.equal(
+    supportGroups.canCloseSupportConversation(conversation, {uid: "admin", role: "ADMIN"}),
+    true,
+  );
+  assert.equal(
+    supportGroups.canCloseSupportConversation(conversation, {uid: "user", role: "USER"}),
+    false,
+  );
+  assert.equal(
+    supportGroups.canCloseSupportConversation(conversation, {uid: "other-admin", role: "ADMIN"}),
+    false,
+  );
 });
 
 // Inputs: one device key for the caller and one forged key for another UID. Expected: only caller-owned device IDs pass.
@@ -245,4 +299,37 @@ test("profile completion rejects malformed and temporary organization profiles",
   assert.equal(_test.profileComplete("USER",{fullName:"A",dob:"2000-1-1",language:"English",address:{city:"Edmonton"}}),false);
   assert.equal(_test.profileComplete("STAFF",{fullName:"A",dob:"2000-01-01",email:"staff@staff.olive.invalid"}),false);
   assert.equal(_test.profileComplete("STAFF",{fullName:"A",dob:"2000-01-01",email:"staff@example.ca"}),true);
+});
+
+const {
+  TOPIC_APP_UPDATES,
+  buildUpdateNotification,
+  parseManifestConfig,
+} = require("./scripts/publish-android-release");
+
+// Inputs: valid release details. Expected: FCM app update payload targets high priority and the dedicated topic.
+test("fcm app update notifications target the app_updates topic with high priority", () => {
+  const payload = buildUpdateNotification({ versionCode: 10001, versionName: "1.0.0" });
+  assert.equal(payload.topic, TOPIC_APP_UPDATES);
+  assert.equal(payload.data.type, "app_update");
+  assert.equal(payload.data.versionCode, "10001");
+  assert.equal(payload.data.versionName, "1.0.0");
+  assert.equal(payload.android.priority, "high");
+});
+
+// Inputs: missing and valid release configuration. Expected: validation strictly enforces project and version fields.
+test("release manifest parser enforces matching projects and valid version codes", () => {
+  assert.throws(() => parseManifestConfig({}), /OLIVE_RELEASE_PROJECT_ID/);
+  const config = parseManifestConfig({
+    OLIVE_RELEASE_PROJECT_ID: "proj-1",
+    OLIVE_RELEASE_CONFIRM_PROJECT: "proj-1",
+    OLIVE_RELEASE_APK: "test.apk",
+    OLIVE_VERSION_CODE: "10002",
+    OLIVE_VERSION_NAME: "v1.0.1",
+    OLIVE_MINIMUM_VERSION_CODE: "1",
+    OLIVE_RELEASE_NOTES: "Feature 1\nFeature 2",
+  });
+  assert.equal(config.versionCode, 10002);
+  assert.equal(config.versionName, "v1.0.1");
+  assert.deepEqual(config.notes, ["Feature 1", "Feature 2"]);
 });

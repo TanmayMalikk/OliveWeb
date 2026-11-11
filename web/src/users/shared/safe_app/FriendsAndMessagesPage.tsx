@@ -51,6 +51,17 @@ export default function Messages() {
   const messageEnd = useRef<HTMLDivElement>(null);
   const identity = accounts.identity;
   useEffect(() => {
+    const requested = session.requestedConversation;
+    if (!requested || requested.uid !== identity?.uid) return;
+    const ticket = conversations.find((item) => item.id === requested.id);
+    if (!ticket) return;
+    setConversation(ticket);
+    session.setRequestedConversation(null);
+  }, [conversations, identity?.uid, session.requestedConversation, session.setRequestedConversation]);
+  useEffect(() => {
+    setConversation((active) => conversations.find((item) => item.id === active?.id) ?? active);
+  }, [conversations]);
+  useEffect(() => {
     messageEnd.current?.scrollIntoView({ block: "end" });
   }, [rows, conversation?.id]);
   useEffect(() => {
@@ -64,6 +75,7 @@ export default function Messages() {
     const stops: (() => void)[] = [];
     void messaging
       .register(identity)
+      .then(() => messaging.prepareSupportTickets())
       .then(() =>
         messaging.subscribeSocial(
           identity.uid,
@@ -102,7 +114,7 @@ export default function Messages() {
     setRows([]);
     setDraft("");
     setRoomKey(null);
-    if (!conversation) return;
+    if (!conversation || conversation.participantIds.length < 2) return;
     let active = true;
     let stop: (() => void) | undefined;
     void messaging
@@ -138,7 +150,7 @@ export default function Messages() {
       active = false;
       stop?.();
     };
-  }, [conversation?.id]);
+  }, [conversation?.id, conversation?.participantIds.join(",")]);
   if (!cloudMode)
     return (
       <Empty
@@ -417,7 +429,7 @@ export default function Messages() {
               />
               <Button
                 type="submit"
-                disabled={session.busy || !draft.trim() || !roomKey || Boolean(conversation.closedAt)}
+                disabled={session.busy || !draft.trim() || !roomKey || Boolean(conversation.closedAt) || conversation.participantIds.length < 2}
               >
                 <Send size={18} />
                 <span className="sr-only">Send message</span>

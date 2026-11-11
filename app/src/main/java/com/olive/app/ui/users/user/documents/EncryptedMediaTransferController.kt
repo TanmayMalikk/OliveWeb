@@ -42,41 +42,41 @@ import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
 import java.util.UUID
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
 import org.json.JSONArray
+import org.json.JSONObject
 
+internal interface MediaTransferOperations {
+    // Watches pending uploads for this account and reports progress to the screen.
+    fun observeUploads(ownerUid: String)
+    // Marks an uploaded encrypted file as published after the server accepts it.
+    fun acknowledgePublished(mediaIds: Set<String>)
+    // Adds document metadata to the user's encrypted document list.
+    fun queueDocument(
+        uri: Uri, owner: AccountIdentity, ocrReview: OcrReview,
+        tags: Set<String> = emptySet(),
+        onQueued: (String) -> Unit, onFailure: (String) -> Unit,
+    )
+    // Encrypts the selected file and queues its upload.
+    fun queueFile(
+        file: File, name: String, mimeType: String, owner: AccountIdentity, kind: MediaKind,
+        ocrReview: OcrReview, ocr: DocumentOcrMetadata?,
+        tags: Set<String> = emptySet(),
+        onQueued: (String) -> Unit, onFailure: (String) -> Unit,
+    )
+    // Downloads, checks, and decrypts one allowed media file.
+    suspend fun downloadFile(document: SafetyDocument, viewerUid: String): File
+    suspend fun makeAvailableOffline(document: SafetyDocument, viewerUid: String)
+    suspend fun removeOfflineCopy(document: SafetyDocument, viewerUid: String)
+    fun onDocumentSnapshot(viewerUid: String, documents: List<SafetyDocument>, serverConfirmed: Boolean)
+    // Clears upload progress and errors when the document screen closes.
+    fun clearState()
+}
 
-/**
- * Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
- *
- * Ownership and dependency graph:
- * - `SessionViewModel` owns one controller for the signed-in session;
- * - `SafetyDocumentsController` delegates document upload/download actions here;
- * - [MediaPreprocessor] supplies the replaceable on-device compression stage;
- * - [MediaTransferStore] persists restartable jobs;
- * - [MediaUploadWorker] owns background upload execution;
- * - [MediaTicketDataSource] supplies authorized R2 download capabilities;
- * - [MediaCipher] and [KeyManager] enforce client-side encryption and per-user key wrapping.
- *
- * Upload workflow:
- * `OCR decision -> preprocess/compress -> AES-GCM encrypt -> checksum/wrap key -> persist job ->
- * WorkManager -> Firebase ticket -> direct R2 PUT -> Firebase finalization`.
- *
- * Download workflow:
- * `Firebase authorization ticket -> direct R2 GET -> ciphertext size/hash verification -> unwrap key
- * -> AES-GCM decrypt into .part -> atomic rename`.
- *
- * This is deliberately a controller rather than another AndroidX ViewModel: WorkManager/store provide
- * durable state, while `SessionViewModel` remains the single lifecycle owner for session features.
- */
+// Session-scoped coordinator for media preparation, observable state, and encrypted downloads.
 internal class MediaTransferController(
     context:Context,
     private val scope:CoroutineScope,
@@ -97,21 +97,15 @@ internal class MediaTransferController(
         private set
     var uploads by mutableStateOf<List<MediaUploadPresentation>>(emptyList())
         private set
-    var offlineCopies by mutableStateOf<Map<String,OfflineMediaAvailability>>(emptyMap())
+    var offlineCopies by mutableStateOf<Map<String, OfflineMediaAvailability>>(emptyMap())
         private set
     var recentCachingEnabled by mutableStateOf(false)
         private set
-    private var cachePreferenceOwnerUid:String?=null
+    private var cachePreferenceOwnerUid: String? = null
 
-    /**
-     * Restores and observes every durable upload belonging to the visible account.
-     *
-     * WorkManager owns execution, while this controller owns only the device-local presentation.
-     * Re-entering the screen after process death reconstructs pending cards from the encrypted
-     * [MediaTransferStore] and reconnects to the already scheduled unique work chains.
-     */
-    override fun observeUploads(ownerUid:String) {
-        if(observedOwnerUid!=ownerUid) {
+    // Restores and observes every durable upload belonging to the visible account.
+    override fun observeUploads(ownerUid: String) {
+        if (observedOwnerUid != ownerUid) {
             observationJobs.values.forEach(Job::cancel)
             observationJobs.clear()
             workProgress.clear()
@@ -121,28 +115,29 @@ internal class MediaTransferController(
             offlineCopies = emptyMap()
         }
         loadRecentCachingPreference(ownerUid)
-        scope.launch { refreshUploads(ownerUid)
-            .filterNot { it.status in setOf(MediaTransferStatus.COMPLETE,MediaTransferStatus.FAILED,MediaTransferStatus.CANCELLED) }
-            .forEach { observe(it.jobId) } }
+        scope.launch {
+            refreshUploads(ownerUid)
+                .filterNot { it.status in setOf(MediaTransferStatus.COMPLETE, MediaTransferStatus.FAILED, MediaTransferStatus.CANCELLED) }
+                .forEach { observe(it.jobId) }
+        }
     }
 
-    /** Retries a durable job without repeating OCR, compression, or encryption. */
-    fun retryUpload(jobId:String) {
+    // Retries a durable job without repeating OCR, compression, or encryption.
+    fun retryUpload(jobId: String) {
         retry(jobId)
         observedOwnerUid?.let { owner -> scope.launch { refreshUploads(owner) } }
     }
 
-    /**
-     * Removes completed local bookkeeping only after Firestore publishes the matching media record.
-     * This prevents a blank gap: the pending card remains until the finalized document can replace it.
-     */
-    override fun acknowledgePublished(mediaIds:Set<String>) {
-        val owner=observedOwnerUid ?: return
-        publishedMediaIds=mediaIds
+    // Removes completed local bookkeeping only after Firestore publishes the matching media record.
+    override fun acknowledgePublished(mediaIds: Set<String>) {
+        val owner = observedOwnerUid ?: return
+        publishedMediaIds = mediaIds
         scope.launch {
-            val completed=withContext(Dispatchers.IO) { store.all().filter {
-                it.ownerUid==owner && it.status==MediaTransferStatus.COMPLETE && it.mediaId in mediaIds
-            } }
+            val completed = withContext(Dispatchers.IO) {
+                store.all().filter {
+                    it.ownerUid == owner && it.status == MediaTransferStatus.COMPLETE && it.mediaId in mediaIds
+                }
+            }
             withContext(Dispatchers.IO) { completed.forEach { store.remove(it.id) } }
             completed.forEach {
                 observationJobs.remove(it.id)?.cancel()
@@ -152,11 +147,7 @@ internal class MediaTransferController(
         }
     }
 
-    /**
-     * Entry point for picker-selected safety documents. The caller supplies the OCR recommendation.
-     * [OcrReview.RETAKE_RECOMMENDED] pauses before any plaintext processing; declining is represented
-     * by calling again with [OcrReview.RETAKE_DECLINED].
-     */
+    // Entry point for picker-selected safety documents after OCR review.
     override fun queueDocument(
         uri:Uri,owner:AccountIdentity,ocrReview:OcrReview,
         tags:Set<String>,
@@ -473,7 +464,8 @@ internal class MediaTransferController(
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
                 EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
                 KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped)
-            return MediaUploadJob(jobId,owner.uid,prepared)
+            return MediaUploadJob(jobId,owner.uid,prepared,
+                attachToSafetyPlan = tags.any { it.startsWith("safety-plan:") })
         } catch (failure: Throwable) {
             target.delete()
             throw failure

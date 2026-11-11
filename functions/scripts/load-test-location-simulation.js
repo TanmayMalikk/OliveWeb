@@ -1,4 +1,4 @@
-// Builds repeatable Alberta route loops and calculates where a test user should be at any time.
+// Builds repeatable city route loops and calculates where a test user should be at any time.
 const EARTH_RADIUS_METRES = 6_371_000;
 const METRES_PER_SECOND_AT_60_KMPH = 60_000 / 3_600;
 

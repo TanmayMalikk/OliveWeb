@@ -233,12 +233,18 @@ internal fun SafetyDocumentUploadFlow(
     visible: Boolean,
     onDismiss: () -> Unit,
     tags: Set<String> = emptySet(),
+    onSelectExisting: ((SafetyDocument) -> Unit)? = null,
+    onUploadStarted: (() -> Unit)? = null,
 ) {
     val controller = session.documents
     val unableUpload = stringResource(R.string.documents_upload_failed)
     var pickerTags by remember { mutableStateOf(tags) }
+    var showOliveStorage by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(visible, tags) {
-        if (visible) pickerTags = tags
+        if (visible) {
+            pickerTags = tags
+            showOliveStorage = false
+        }
     }
     fun finishSelection(uri: android.net.Uri?) {
         session.endExternalFilePicker()
@@ -259,6 +265,7 @@ internal fun SafetyDocumentUploadFlow(
         ::finishSelection,
     )
     fun launchProtectedPicker(action: () -> Unit) {
+        onUploadStarted?.invoke()
         onDismiss()
         session.beginExternalFilePicker()
         runCatching(action).onFailure {
@@ -272,17 +279,60 @@ internal fun SafetyDocumentUploadFlow(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                stringResource(R.string.documents_choose_source),
+                stringResource(
+                    if (showOliveStorage) R.string.olive_storage
+                    else R.string.documents_choose_source
+                ),
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.semantics { heading() })
             Text(
-                stringResource(R.string.documents_choose_source_help),
+                stringResource(
+                    if (showOliveStorage) R.string.olive_storage_help
+                    else R.string.documents_choose_source_help
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Muted
             )
+            if (showOliveStorage) {
+                val ownerUid = session.coverAccountId
+                val available = controller.state.files.filter { it.ownerUid == ownerUid }
+                if (available.isEmpty()) {
+                    Text(
+                        stringResource(R.string.attachments_empty_help),
+                        color = Muted,
+                        modifier = Modifier.padding(vertical = 16.dp),
+                    )
+                } else {
+                    LazyColumn(
+                        Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(available, key = SafetyDocument::id) { document ->
+                            OutlinedButton(
+                                onClick = {
+                                    onSelectExisting?.invoke(document)
+                                    onDismiss()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                                    .testTag("olive_storage_${document.id}"),
+                            ) {
+                                Icon(Icons.Outlined.Attachment, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(document.name, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = { showOliveStorage = false },
+                    modifier = Modifier.align(Alignment.End),
+                ) { Text(stringResource(R.string.back)) }
+                return@Column
+            }
             Button(
                 onClick = {
-                    session.pendingCameraUploadTags = tags
+                    onUploadStarted?.invoke()
+                    session.pendingCameraUploadTags = pickerTags
                     onDismiss()
                     session.navigation.openSafePage(SafePage.Camera)
                 },
@@ -324,6 +374,14 @@ internal fun SafetyDocumentUploadFlow(
                 Text(
                     stringResource(R.string.documents_choose_document)
                 )
+            }
+            if (onSelectExisting != null) OutlinedButton(
+                onClick = { showOliveStorage = true },
+                modifier = Modifier.fillMaxWidth().testTag("documents_choose_olive_storage"),
+            ) {
+                Icon(Icons.Outlined.FolderSpecial, null)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.olive_storage))
             }
             TextButton(
                 onClick = onDismiss,

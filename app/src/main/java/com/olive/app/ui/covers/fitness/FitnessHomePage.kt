@@ -39,10 +39,8 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.ui.shared.PaleOlive
-import com.olive.app.ui.shared.Paper
+import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
-import com.olive.app.ui.shared.oliveScrollbar
 import kotlin.math.roundToInt
 
 // Shows a quick summary of steps, calories, macros, and goals.

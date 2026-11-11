@@ -92,6 +92,8 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
             check(newRoom.localParticipant.setMicrophoneEnabled(true)) {
                 "LiveKit could not publish microphone audio"
             }
+            // Calls begin privately through the phone earpiece. The user can turn the speaker on.
+            applySpeakerRoute(enabled = false)
             room = newRoom
             onParticipantCountChanged(newRoom.remoteParticipants.size)
             roomEventJob = eventScope.launch {
@@ -130,12 +132,28 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
 
     override suspend fun setSpeakerEnabled(enabled: Boolean) = mutex.withLock {
         check(room != null) { "No LiveKit room is connected" }
+        applySpeakerRoute(enabled)
+    }
+
+    /** Moves call audio between the private earpiece and the loudspeaker. */
+    private fun applySpeakerRoute(enabled: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val type = if (enabled) AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
-            else AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+            val type = if (enabled) {
+                AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
+            } else {
+                AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+            }
             val device = audioManager.availableCommunicationDevices.firstOrNull { it.type == type }
-                ?: error(if (enabled) "Speaker is unavailable" else "Phone earpiece is unavailable")
-            check(audioManager.setCommunicationDevice(device)) { "Could not change the call audio route" }
+            if (device != null) {
+                check(audioManager.setCommunicationDevice(device)) {
+                    "Could not change the call audio route"
+                }
+            } else if (!enabled) {
+                // Devices without an earpiece let Android choose a private headset route if present.
+                audioManager.clearCommunicationDevice()
+            } else {
+                error("Speaker is unavailable")
+            }
         } else {
             @Suppress("DEPRECATION")
             audioManager.isSpeakerphoneOn = enabled
@@ -280,6 +298,13 @@ class VoipSessionController(
         joinAudio(call)
     }
 
+    suspend fun rejoinCall(callId: String): VoipCall = mutex.withLock {
+        check(mutableState.value == VoipSessionState.Idle) {
+            "A VoIP session is already in progress"
+        }
+        joinAudio(voipManager.rejoinCall(callId))
+    }
+
     suspend fun setMicrophoneMuted(muted: Boolean) = mutex.withLock {
         val active = mutableState.value as? VoipSessionState.Active
             ?: error("No active VoIP session")
@@ -328,6 +353,12 @@ class VoipSessionController(
             )
             throw error
         }
+        // Tell the call service that this member left while keeping the group room open.
+        try {
+            voipManager.leaveCall(call.callId)
+        } catch (error: Exception) {
+            if (error !is VoipApiException || error.statusCode !in setOf(403, 409)) throw error
+        }
     }
 
     suspend fun endCall() = mutex.withLock {
@@ -353,7 +384,13 @@ class VoipSessionController(
         try {
             voipManager.endCall(call.callId)
         } catch (error: Exception) {
-            if (error !is VoipApiException || error.statusCode != 409) throw error
+            if (error is VoipApiException &&
+                error.statusCode == 409 &&
+                error.errorCode == "group_member_must_leave") {
+                voipManager.leaveCall(call.callId)
+            } else if (error !is VoipApiException || error.statusCode != 409) {
+                throw error
+            }
         }
     }
 

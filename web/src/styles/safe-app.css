@@ -210,6 +210,28 @@
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
+.safety-step-documents {
+  grid-column: 2 / -1;
+  display: grid;
+  justify-items: start;
+  gap: 0.45rem;
+  min-width: 0;
+}
+.safety-step-documents .field {
+  width: 100%;
+  min-width: 0;
+}
+.safety-step-document {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+}
+.safety-step-documents .button:focus-within {
+  outline: 2px solid var(--olive);
+  outline-offset: 2px;
+}
 .safety-checklist-row .completed {
   color: var(--muted);
   text-decoration: line-through;
@@ -530,145 +552,4 @@
   object-fit: contain;
   border-radius: 1rem;
   border: 1px solid var(--line);
-}
-.documents-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
-.documents-heading > div { display: grid; gap: 0.6rem; }
-.documents-heading h2, .documents-heading p, .browser-document h3, .browser-document p { margin: 0; }
-.document-grid { display: grid; gap: 0.8rem; }
-.browser-document {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-}
-.browser-document p { color: var(--muted); font-size: 0.78rem; margin-top: 0.35rem; }
-.safe-document-viewer { display: grid; place-items: center; min-height: min(72vh, 48rem); }
-.safe-document-viewer img, .safe-document-viewer video, .safe-document-viewer iframe {
-  display: block;
-  width: 100%;
-  max-height: min(72vh, 48rem);
-  border: 0;
-  border-radius: 0.8rem;
-  object-fit: contain;
-  background: #151713;
-}
-.safe-document-viewer iframe { height: min(72vh, 48rem); background: white; }
-.safe-document-viewer audio { width: min(100%, 40rem); }
-@media (max-width: 42rem) {
-  .documents-heading { align-items: flex-start; flex-direction: column; }
-  .browser-document { grid-template-columns: auto minmax(0, 1fr); }
-  .browser-document .button { grid-column: 1 / -1; width: 100%; }
-}
-.entry-type-tabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-
-.entry-type-tabs button {
-  min-height: 2.75rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.entry-type-tabs button.active {
-  background: var(--olive);
-  color: white;
-}
-
-.attachment-picker {
-  display: grid;
-  gap: 0.65rem;
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  padding: 1rem;
-}
-
-.attachment-picker label,
-.document-evidence-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.incident-location-picker {
-  position: relative;
-  display: grid;
-  gap: 0.65rem;
-}
-
-.incident-location-input {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: stretch;
-}
-
-.incident-location-input input {
-  min-width: 0;
-  border-radius: 0.85rem 0 0 0.85rem;
-}
-
-.incident-location-input button {
-  display: grid;
-  width: 3.25rem;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-left: 0;
-  border-radius: 0 0.85rem 0.85rem 0;
-  background: var(--paper);
-  color: var(--olive);
-  cursor: pointer;
-}
-
-.incident-location-input button:hover,
-.incident-location-input button:focus-visible {
-  background: var(--soft);
-}
-
-.incident-address-results {
-  z-index: 500;
-  display: grid;
-  gap: 0;
-  margin: -0.5rem 0 0;
-  padding: 0;
-  overflow: hidden;
-  list-style: none;
-  border: 1px solid var(--line);
-  border-radius: 0.8rem;
-  background: var(--paper);
-}
-
-.incident-address-results button {
-  width: 100%;
-  padding: 0.75rem 0.9rem;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.incident-address-results li:last-child button { border-bottom: 0; }
-.incident-address-results button:hover,
-.incident-address-results button:focus-visible { background: var(--soft); }
-
-.incident-map-wrap {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.incident-map-wrap > .text-link { justify-self: start; }
-
-.incident-map {
-  width: 100%;
-  height: clamp(16rem, 42vh, 25rem);
-  border: 1px solid var(--line);
-  border-radius: 1rem;
-  overflow: hidden;
-  touch-action: none;
 }

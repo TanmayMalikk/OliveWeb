@@ -33,12 +33,11 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
     fun quickExit() {
         with(runtime) {
             with(state) {
-                enrollment?.let { accountRole = it.role }
-                if (accountRole == AccountRole.USER && screen in setOf(
-                        SessionScreen.Safe,
-                        SessionScreen.Pin
-                    )
-                ) accessibilityExitVersion++
+                val enrolledRole = enrollment?.role
+                accountRole = enrolledRole ?: AccountRole.USER
+                if (accountRole == AccountRole.USER && screen != SessionScreen.Cover) {
+                    accessibilityExitVersion++
+                }
                 safety.close()
                 epoch++
                 pinAuthorizedUid = null
@@ -54,22 +53,8 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 busy = false
                 coverReset++
                 viewedSharedEntry = null
-                profile?.coverType?.let { coverType = it }
-                // Safe contacts return to account entry because they do not use a cover app.
-                if (accountRole == AccountRole.SAFE_CONTACT) {
-                    page = SafePage.Home
-                    activityCategory =
-                        null
-                    screenHistory.clear()
-                    safePageHistory.clear()
-                    message = null
-                    messaging.stopMessaging()
-                    activeTriggerId = null
-                    triggerJob =
-                        null
-                    screen = SessionScreen.Safe
-                    return
-                }
+                if (enrolledRole == null) coverType = CoverType.FITNESS
+                else profile?.coverType?.let { coverType = it }
                 screen = when (accountRole) {
                     AccountRole.USER -> SessionScreen.Cover
                     AccountRole.SAFE_CONTACT -> SessionScreen.Safe
@@ -79,7 +64,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                 activityCategory = null
                 screenHistory.clear()
                 safePageHistory.clear()
-                profile = null
+                if (accountRole == AccountRole.USER) profile = null
                 attempts = emptyList()
                 message = null
                 pendingSync = false
@@ -89,11 +74,12 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     emptyList()
                 privateEntries = emptyList()
                 messaging.stopMessaging()
-                if (accountRole == AccountRole.USER && !localMode) messaging.syncLocalNotificationHandler()
+                if (!localMode) messaging.syncLocalNotificationHandler()
                 activeTriggerId = null
                 triggerJob = null
                 pendingIdentity = null
                 pendingProfile = null
+                credentialFieldError = null
             }
         }
     }
@@ -234,6 +220,10 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         private set
     var error by mutableStateOf<Int?>(null)
         private set
+    var addParticipantError by mutableStateOf<String?>(null)
+        private set
+    var requestStaffError by mutableStateOf<String?>(null)
+        private set
 
     // Requests help for staff support controller.
     fun requestHelp() = updateRequest(cancel = false)
@@ -249,6 +239,13 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         }
         if (runtime.state.accountRole != AccountRole.USER) return
         val actor = runtime.coverAccountId ?: return
+        val ticketToCancel = conversationId
+        if (!cancel) {
+            // Clear the last ticket before searching so this screen cannot reopen an older chat.
+            requested = false
+            staffUid = ""
+            conversationId = ""
+        }
         saving++
         error = null
         runtime.scope.launch {
@@ -256,7 +253,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
             try {
                 val ticket = withTimeout(35.seconds) {
                     withContext(Dispatchers.IO) {
-                        if (cancel) repository.cancelRequest() else repository.requestHelp()
+                        if (cancel) repository.cancelRequest(ticketToCancel) else repository.requestHelp()
                     }
                 }
                 if (runtime.coverAccountId == actor) {
@@ -293,23 +290,121 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         }
     }
 
+    // Adds an accepted personal contact to the open chat after the server checks both accounts.
+    fun addParticipant(conversationId: String, participantUid: String) {
+        if (runtime.localMode || conversationId.isBlank() || participantUid.isBlank() || saving > 0) return
+        val actor = runtime.coverAccountId ?: return
+        saving++
+        addParticipantError = null
+        runtime.scope.launch {
+            try {
+                withContext(Dispatchers.IO) { repository.addParticipant(conversationId, participantUid) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (exception: Exception) { // Keep the members unchanged and explain the server's actual reason.
+                if (runtime.coverAccountId == actor) {
+                    addParticipantError = exception.message?.takeIf(String::isNotBlank)
+                        ?: "This person could not be added."
+                }
+            } finally {
+                if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
+    // Removes a member from a group after the server verifies group ownership and the two-person minimum.
+    fun removeParticipant(conversationId: String, participantUid: String) {
+        if (runtime.localMode || conversationId.isBlank() || participantUid.isBlank() || saving > 0) return
+        val actor = runtime.coverAccountId ?: return
+        saving++
+        addParticipantError = null
+        runtime.scope.launch {
+            try {
+                withContext(Dispatchers.IO) { repository.removeParticipant(conversationId, participantUid) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (exception: Exception) { // Keep the member visible when the server rejects the removal.
+                if (runtime.coverAccountId == actor) {
+                    addParticipantError = exception.message?.takeIf(String::isNotBlank)
+                        ?: "This person could not be removed."
+                }
+            } finally {
+                if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
+    // Removes an old add-person failure when Chat Info is closed or retried.
+    fun clearAddParticipantError() {
+        addParticipantError = null
+    }
+
+    // Creates a new support chat from an existing user and safe-contact conversation.
+    fun requestStaffForConversation(conversationId: String, onCreated: (String) -> Unit) {
+        if (runtime.localMode || conversationId.isBlank() || saving > 0 ||
+            runtime.state.accountRole !in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT)
+        ) return
+        val actor = runtime.coverAccountId ?: return
+        saving++
+        requestStaffError = null
+        runtime.scope.launch {
+            try {
+                val createdId = withContext(Dispatchers.IO) {
+                    repository.requestStaffForConversation(conversationId)
+                }
+                if (runtime.coverAccountId == actor) onCreated(createdId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (exception: Exception) { // Keep the personal chat open when staff assignment fails.
+                if (runtime.coverAccountId == actor) {
+                    requestStaffError = exception.message?.takeIf(String::isNotBlank)
+                        ?: runtime.application.getString(R.string.support_request_error)
+                }
+            } finally {
+                if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
+    // Removes old Chat Info errors before another chat is opened.
+    fun clearChatInfoErrors() {
+        addParticipantError = null
+        requestStaffError = null
+    }
+
     // Staff support controller: Closes the active feature.
-    fun close(conversationId: String) {
-        if (runtime.localMode || runtime.state.accountRole != AccountRole.STAFF || conversationId.isBlank() || saving > 0) return
+    fun close(conversationId: String, planCompleted: Boolean = false, onClosed: () -> Unit = {}) {
+        if (runtime.localMode ||
+            runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) ||
+            conversationId.isBlank() || saving > 0
+        ) return
         val actor = runtime.coverAccountId ?: return
         saving++
         error = null
         runtime.scope.launch {
-            // Use the fallback when close is unavailable.
+            // Closing a ticket is safe to retry because the server treats an already-closed ticket as success.
             try {
-                withContext(Dispatchers.IO) { repository.close(conversationId) }
+                if (planCompleted) runtime.safety.flushConsultation(conversationId)
+                withContext(Dispatchers.IO) { repository.close(conversationId, planCompleted) }
+                if (runtime.coverAccountId == actor) onClosed()
                 if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
                     runtime.conversationActions.closeConversation()
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) { // Leave the chat active when the server cannot archive it for every participant.
-                if (runtime.coverAccountId == actor) error = R.string.support_close_error
+            } catch (_: Exception) { // Retry once in case the server closed the ticket but its first reply was lost.
+                try {
+                    if (planCompleted) runtime.safety.flushConsultation(conversationId)
+                    withContext(Dispatchers.IO) { repository.close(conversationId, planCompleted) }
+                    if (runtime.coverAccountId == actor) onClosed()
+                    if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
+                        runtime.conversationActions.closeConversation()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) { // Show an error only after both close attempts fail.
+                    if (runtime.coverAccountId == actor) error = R.string.support_close_error
+                }
             } finally {
                 if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
             }

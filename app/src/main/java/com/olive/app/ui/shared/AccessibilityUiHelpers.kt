@@ -192,10 +192,6 @@ internal fun Modifier.keepVisibleWhileTyping(): Modifier = composed {
     this.bringIntoViewRequester(requester).onFocusChanged { focused = it.isFocused }
 }
 
-// UI color: the first alpha controls the faint track and the second controls the darker moving thumb.
-private val ScrollTrack = Color(0x2445613C)
-private val ScrollThumb = Color(0xB345613C)
-
 // UI sizing: every scrollbar is 4dp wide, sits 3dp from the edge, and keeps at least a 28dp thumb.
 // Shared Olive scrollbar for forms and other regular vertically scrolling content.
 internal fun Modifier.oliveScrollbar(state: ScrollState): Modifier = drawWithContent {
@@ -304,40 +300,5 @@ private fun DrawScope.drawLazyScrollbar(
         Offset(x, edge + (trackHeight - thumbHeight) * progress),
         Size(width, thumbHeight),
         CornerRadius(width)
-    )
-}
-
-// UI colors: change these named vars to recolor every screen that uses the shared theme instead of editing individual composables.
-internal val OliveGreen = Color(0xFF45613C)
-internal val Ink = Color(0xFF253322)
-internal val Cream = Color(0xFFFAF9F5)
-internal val Muted = Color(0xFF677A3B)
-internal val Paper = Color.White
-internal val PaleOlive = Color(0xFFE7EDDD)
-internal val WarmWhite = Color(0xFFF0F0E8)
-internal val LightSage = Color(0xFFE1E8D7)
-internal val SageGreen = Color(0xFFD2DDC6)
-internal val SoftGray = Color(0xFFD6D9CD)
-internal val DarkOlive = Color(0xFF314B28)
-internal val MossGreen = Color(0xFF6C7A3D)
-internal val OliveBrown = Color(0xFF7A5326)
-
-// Every cover and the private app use this one shared color system.
-// Text sizing: Material's default typography is intentionally used for normal copy; explicit sp values are documented beside special display text.
-// Language sizing note: use MaterialTheme typography for ordinary translated copy; keep explicit sp values only for brand, keypad, or editorial display text.
-// If the whole app needs larger default text later, define typography here instead of changing every screen separately.
-@Composable
-internal fun OliveTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = OliveGreen, onPrimary = Paper,
-            primaryContainer = PaleOlive, onPrimaryContainer = Ink,
-            secondary = OliveGreen, onSecondary = Paper,
-            secondaryContainer = PaleOlive, onSecondaryContainer = Ink,
-            background = Cream, onBackground = Ink,
-            surface = Cream, onSurface = Ink,
-            surfaceVariant = WarmWhite, onSurfaceVariant = Muted,
-            outline = SoftGray,
-        ), content = content
     )
 }

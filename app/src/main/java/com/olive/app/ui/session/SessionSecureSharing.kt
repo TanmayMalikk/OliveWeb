@@ -30,6 +30,7 @@ import kotlinx.coroutines.sync.Mutex
 import com.olive.app.data.sync.PrioritySyncCoordinator
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.tasks.await
 
 
 /** Coordinates encrypted conversations and private-entry sharing without exposing keys to UI code. */
@@ -40,12 +41,21 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             val device = enrollment ?: error("No active account")
             val repository = messagingRepository ?: error("Messaging unavailable")
             val secure = secureChatRepository ?: error("Secure messaging unavailable")
+            repository.registerUser(AccountIdentity(device.uid, state.coverUsername))
+            val prepared = if (conversation.type == "SUPPORT") {
+                val result = com.google.firebase.functions.FirebaseFunctions.getInstance("northamerica-northeast1")
+                    .getHttpsCallable("conversationPrepareKeys").call(mapOf("conversationId" to conversation.id)).await().data as Map<*, *>
+                val names = (result["participantUsernames"] as Map<*, *>).entries.associate {
+                    it.key.toString() to it.value.toString()
+                }
+                conversation.copy(participantUsernames = names)
+            } else conversation
             // Use the fallback when room key is unavailable.
             try {
-                val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
-                    val username = conversation.participantUsernames[uid]
+                val peers = prepared.participantIds.filter { it != device.uid }.map { uid ->
+                    val username = prepared.participantUsernames[uid]
                         ?: error("Conversation participant unavailable")
-                    repository.searchUsers(username, device.uid).firstOrNull()
+                    repository.searchUsers(username, device.uid).firstOrNull { it.uid == uid }
                         ?: error("Every participant needs to open the updated app before secure messages can be sent.")
                 }
                 require(peers.all { it.publicKey.isNotBlank() }) {
@@ -57,7 +67,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         peers.forEach { put(it.uid, KeyManager.decodePublicKey(it.publicKey)) }
                     }
                 }
-                return secure.ensureRoomKey(conversation, device.uid, keys)
+                return secure.ensureRoomKey(prepared, device.uid, keys)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (keySharingFailure: Exception) {
@@ -243,7 +253,12 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                     requestPermission,
                     application.getString(R.string.location_permission_required),
                     application.getString(R.string.location_start_failed),
-                    onError = { message = it })
+                    onError = { message = it },
+                    onStarted = { expiresAt ->
+                        // Posts a normal encrypted timeline item after location sharing has actually started.
+                        conversationActions.sendMessage("SHARED_LOCATION:$expiresAt")
+                    },
+                )
             }
         }
     }
@@ -495,6 +510,7 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var outgoingFriendRequests by mutableStateOf(emptyList<FriendRequest>())
     var conversations by mutableStateOf(emptyList<ChatConversation>())
     var archivedConversationIds by mutableStateOf(emptySet<String>())
+    var restoredClosedConversationIds by mutableStateOf(emptySet<String>())
     var privateContactNotes by mutableStateOf(emptyMap<String, PrivateContactNote>())
     // Counts changes to read message.
     var readMessageVersion by mutableIntStateOf(0)

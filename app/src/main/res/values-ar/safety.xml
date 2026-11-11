@@ -38,7 +38,6 @@
     <string name="safety_staff_intro">اعرض الخطط المشتركة معك وعدّلها.</string>
     <string name="safety_retry_save">إعادة محاولة الحفظ</string>
     <string name="safety_back">رجوع</string>
-    <string name="safety_open_plan">فتح خطة %1$s</string>
     <string name="safety_source">إرشادات التخطيط: وكالة الصحة العامة الكندية. عدّل هذه الإرشادات مع شخص تثق به.</string>
     <string name="safety_upload_document">رفع الوثيقة</string>
     <string name="safety_upload_for">رفع مستند لـ %1$s.</string>

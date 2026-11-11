@@ -2,7 +2,7 @@ import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebas
 
 import {
   doc, setDoc, getDoc, collection, getDocs, query, where,
-  serverTimestamp, writeBatch, updateDoc, deleteDoc
+  serverTimestamp, writeBatch, updateDoc, deleteDoc, onSnapshot
 } from 'firebase/firestore';
 import { ref, set, get, remove } from 'firebase/database';
 
@@ -59,6 +59,38 @@ test('sync invalidation markers are owner-readable and server-write-only', async
   await assertFails(setDoc(doc(alice,'syncInvalidations/sync-alice'),marker));
   await assertFails(updateDoc(doc(alice,'syncInvalidations/sync-alice'),{revision:6}));
   await assertFails(deleteDoc(doc(alice,'syncInvalidations/sync-alice')));
+});
+
+test('a new account can reconcile before a marker or safety plan exists', async () => {
+  const uid = 'sync-bootstrap-user';
+  const owner = env.authenticatedContext(uid, {role:'USER'}).firestore();
+  const other = env.authenticatedContext('sync-bootstrap-other', {role:'USER'}).firestore();
+  for (const path of ['syncInvalidations', 'safetyPlans']) {
+    const empty = await assertSucceeds(getDoc(doc(owner, path, uid)));
+    if (empty.exists()) throw new Error('Bootstrap fixture unexpectedly exists');
+    await assertFails(getDoc(doc(other, path, uid)));
+  }
+});
+
+test('an open sync marker listener receives a later server write', {timeout: 15000}, async (t) => {
+  const uid = 'sync-listener-user';
+  const client = env.authenticatedContext(uid).firestore();
+  await new Promise((resolve, reject) => {
+    let published = false;
+    const stop = onSnapshot(doc(client, 'syncInvalidations', uid), snapshot => {
+      if (snapshot.metadata.fromCache) return;
+      if (snapshot.get('revision') === 1) {
+        resolve();
+      } else if (!published) {
+        published = true;
+        env.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'syncInvalidations', uid), {
+          ownerUid: uid, allowedUsers: [uid], revision: 1, urgentRevision: 0, safetyRevision: 1,
+          mediaRevision: 0, conversationRevision: 0, accountRevision: 0, updatedAt: serverTimestamp(),
+        })).catch(reject);
+      }
+    }, reject);
+    t.after(stop);
+  });
 });
 
 test('malformed server sync markers are unreadable even by their path owner', async () => {
@@ -382,19 +414,28 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   const participantPublicKeys={'social-a':'alice-key','social-b':'bob-key'};
   await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),
     {roomKeys,participantPublicKeys,updatedAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),
-    {roomKeys:{'social-a':'replacement','social-b':'replacement'},updatedAt:serverTimestamp()}));
+  // An empty conversation may repair stale wrapped keys because no message history can be lost.
+  await assertSucceeds(updateDoc(doc(bob,'conversations/'+friendshipId),
+    {roomKeys:{'social-a':'replacement','social-b':'replacement'},
+      participantPublicKeys,updatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(alice,'messageDirectory/social_alice'),
     {publicKey:'alice-key-rotated',updatedAt:serverTimestamp()}));
   await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),{
     roomKeys:{'social-a':'wrapped-a-rotated','social-b':'wrapped-b-rotated'},
     participantPublicKeys:{'social-a':'alice-key-rotated','social-b':'bob-key'},updatedAt:serverTimestamp()}));
-  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),{
+  // A second participant can also repair this still-empty conversation with the current public keys.
+  await assertSucceeds(updateDoc(doc(bob,'conversations/'+friendshipId),{
     roomKeys:{'social-a':'unauthorized-replacement','social-b':'unauthorized-replacement'},
     participantPublicKeys:{'social-a':'alice-key-rotated','social-b':'bob-key'},updatedAt:serverTimestamp()}));
   const encryptedRef=doc(alice,'conversations/'+friendshipId+'/messages/message-2');
   await assertSucceeds(setDoc(encryptedRef,{senderUid:'social-a',senderUsername:'social_alice',
     ciphertext:'encrypted-payload',deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now()}));
+  await assertSucceeds(updateDoc(doc(alice,'conversations/'+friendshipId),{
+    lastMessage:'Secure message',lastMessageId:'message-2',lastSenderUid:'social-a',updatedAt:serverTimestamp()}));
+  // Once encrypted history exists, nobody may replace the room key and make that history unreadable.
+  await assertFails(updateDoc(doc(bob,'conversations/'+friendshipId),{
+    roomKeys:{'social-a':'late-replacement','social-b':'late-replacement'},
+    participantPublicKeys:{'social-a':'alice-key-rotated','social-b':'bob-key'},updatedAt:serverTimestamp()}));
   await assertSucceeds(getDoc(doc(bob,'conversations/'+friendshipId+'/messages/message-2')));
   await assertFails(setDoc(doc(bob,'conversations/'+friendshipId+'/messages/safe-contact-plaintext'),
     {senderUid:'social-b',senderUsername:'social_bob',body:'Unencrypted reply',deleted:false,
@@ -413,16 +454,19 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
       sentAt:serverTimestamp(),clientSentAt:Date.now()}));
 });
 
-test('support conversations allow one user, safe contact, staff member, and admin', async () => {
+for (const requestSource of ['SUPPORT_BUTTON', 'GROUP_CHAT']) {
+test(`support conversations from ${requestSource} keep encrypted access when more than four people participate`, async () => {
   const owner=env.authenticatedContext('support-owner',{email:'support_owner@users.olive.invalid'}).firestore();
   const staff=env.authenticatedContext('support-staff',{email:'staff@example.ca',role:'STAFF'}).firestore();
   const contact=env.authenticatedContext('support-contact',{email:'support_contact@safe.olive.invalid'}).firestore();
+  const guest=env.authenticatedContext('support-guest',{email:'support_guest@users.olive.invalid'}).firestore();
   const admin=env.authenticatedContext('support-admin',{email:'admin@example.ca',role:'ADMIN'}).firestore();
   const stranger=env.authenticatedContext('support-stranger',{email:'support_stranger@users.olive.invalid'}).firestore();
   const directory=[
     [owner,'support_owner','support-owner','owner-key'],
     [staff,'support_staff','support-staff','staff-key'],
     [contact,'support_contact','support-contact','contact-key'],
+    [guest,'support_guest','support-guest','guest-key'],
     [admin,'support_admin','support-admin','admin-key'],
   ];
   for (const [client,username,uid,publicKey] of directory) {
@@ -433,11 +477,13 @@ test('support conversations allow one user, safe contact, staff member, and admi
     senderUid:'support-staff',senderUsername:'support_staff',recipientUid:'support-owner',
     recipientUsername:'support_owner',friendshipId:'support-staff--support-owner',createdAt:serverTimestamp(),
   }));
-  const conversationId='support-support-owner-ticket-1';
+  const conversationId=`support-support-owner-ticket-${requestSource}`;
   const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',adminUid:'support-admin',
     supportOrigin:'SUPPORT',supportTag:'NEEDS_ADMIN',
-    friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-admin'],
-    participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact','support-admin':'support_admin'},
+    requestSource,sourceConversationId:conversationId,
+    friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-guest','support-admin'],
+    participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact',
+      'support-guest':'support_guest','support-admin':'support_admin'},
     createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:''};
   await env.withSecurityRulesDisabled(async context => {
     await setDoc(doc(context.firestore(),`conversations/${conversationId}`),conversation);
@@ -445,12 +491,15 @@ test('support conversations allow one user, safe contact, staff member, and admi
   await assertSucceeds(getDoc(doc(owner,`conversations/${conversationId}`)));
   await assertSucceeds(getDoc(doc(staff,`conversations/${conversationId}`)));
   await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}`)));
+  await assertSucceeds(getDoc(doc(guest,`conversations/${conversationId}`)));
   await assertSucceeds(getDoc(doc(admin,`conversations/${conversationId}`)));
   await assertFails(getDoc(doc(stranger,`conversations/${conversationId}`)));
   await assertFails(updateDoc(doc(owner,`conversations/${conversationId}`),
     {participantIds:['support-owner','support-staff'],updatedAt:serverTimestamp()}));
-  const keys={roomKeys:{'support-owner':'owner-wrap','support-staff':'staff-wrap','support-contact':'contact-wrap','support-admin':'admin-wrap'},
-    participantPublicKeys:{'support-owner':'owner-key','support-staff':'staff-key','support-contact':'contact-key','support-admin':'admin-key'},
+  const keys={roomKeys:{'support-owner':'owner-wrap','support-staff':'staff-wrap','support-contact':'contact-wrap',
+    'support-guest':'guest-wrap','support-admin':'admin-wrap'},
+    participantPublicKeys:{'support-owner':'owner-key','support-staff':'staff-key','support-contact':'contact-key',
+      'support-guest':'guest-key','support-admin':'admin-key'},
     updatedAt:serverTimestamp()};
   await assertSucceeds(updateDoc(doc(owner,`conversations/${conversationId}`),keys));
   await assertFails(updateDoc(doc(staff,`conversations/${conversationId}`),{
@@ -472,6 +521,46 @@ test('support conversations allow one user, safe contact, staff member, and admi
     await assertSucceeds(batch.commit());
   }
   await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}/messages/staff-message`)));
+});
+}
+
+test('personal group members can initialize keys and exchange encrypted messages while outsiders remain blocked', async () => {
+  const ids=['group-owner','group-friend','group-contact'];
+  const clients=ids.map(uid=>env.authenticatedContext(uid,{email:`${uid.replaceAll('-','_')}@users.olive.invalid`}).firestore());
+  const outsider=env.authenticatedContext('group-outsider').firestore();
+  const conversationId='personal-group-regression';
+  const participantUsernames=Object.fromEntries(ids.map(uid=>[uid,uid.replaceAll('-','_')]));
+  const participantPublicKeys=Object.fromEntries(ids.map(uid=>[uid,`${uid}-key`]));
+  for (const [index,uid] of ids.entries()) {
+    const username=participantUsernames[uid];
+    await assertSucceeds(setDoc(doc(clients[index],`messageDirectory/${username}`),
+      {uid,username,publicKey:participantPublicKeys[uid],updatedAt:serverTimestamp()}));
+  }
+  await env.withSecurityRulesDisabled(async context=>{
+    await setDoc(doc(context.firestore(),`conversations/${conversationId}`),{
+      type:'GROUP',ownerUid:ids[0],friendshipId:conversationId,participantIds:ids,participantUsernames,
+      createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:'',
+    });
+  });
+  await assertSucceeds(updateDoc(doc(clients[0],`conversations/${conversationId}`),{
+    roomKeys:Object.fromEntries(ids.map(uid=>[uid,`${uid}-wrapped-key`])),participantPublicKeys,
+    updatedAt:serverTimestamp(),
+  }));
+  for (const [index,uid] of ids.entries()) {
+    const messageId=`message-${index}`;
+    const batch=writeBatch(clients[index]);
+    batch.set(doc(clients[index],`conversations/${conversationId}/messages/${messageId}`),{
+      senderUid:uid,senderUsername:participantUsernames[uid],ciphertext:'encrypted-group-message',
+      deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now(),
+    });
+    batch.update(doc(clients[index],`conversations/${conversationId}`),{
+      lastMessage:'Secure message',lastMessageId:messageId,lastSenderUid:uid,updatedAt:serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+    for (const client of clients) await assertSucceeds(getDoc(doc(client,`conversations/${conversationId}/messages/${messageId}`)));
+  }
+  await assertFails(getDoc(doc(outsider,`conversations/${conversationId}`)));
+  await assertFails(getDoc(doc(outsider,`conversations/${conversationId}/messages/message-0`)));
 });
 
 test('encrypted live coordinates are overwritten by their owner and readable only by authorized contacts', async () => {
@@ -512,7 +601,7 @@ test('organization locations are written by users and readable only by admins', 
     updatedAt:Date.now(),active:true};
   await assertSucceeds(set(ref(user,path),point));
   await assertSucceeds(get(ref(admin,'adminLiveLocations')));
-  await assertFails(get(ref(staff,'adminLiveLocations')));
+  await assertSucceeds(get(ref(staff,'adminLiveLocations')));
   await assertFails(get(ref(safeContact,'adminLiveLocations')));
   await assertFails(set(ref(admin,path),point));
   await assertFails(set(ref(user,path),{...point,latitude:91}));

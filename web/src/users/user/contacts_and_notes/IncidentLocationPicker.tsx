@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { MapPin } from "lucide-react";
 import "leaflet/dist/leaflet.css";
+import markerUrl from "leaflet/dist/images/marker-icon.png?url";
+import retinaMarkerUrl from "leaflet/dist/images/marker-icon-2x.png?url";
+import shadowUrl from "leaflet/dist/images/marker-shadow.png?url";
 
 type LocationResult = {
   label: string;
@@ -18,6 +21,22 @@ type IncidentLocationPickerProps = {
 };
 
 const DEFAULT_CENTER: [number, number] = [53.5461, -113.4938];
+const INCIDENT_PIN = L.icon({
+  iconUrl: markerUrl,
+  iconRetinaUrl: retinaMarkerUrl,
+  shadowUrl,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowSize: [41, 41],
+});
+
+function droppedPin(point: L.LatLng): LocationResult {
+  return {
+    label: "Dropped pin (" + point.lat.toFixed(5) + ", " + point.lng.toFixed(5) + ")",
+    latitude: point.lat,
+    longitude: point.lng,
+  };
+}
 
 // The map keeps the saved incident pin separate from the user's current red location dot.
 function IncidentMap({ latitude, longitude, onChange }: Omit<IncidentLocationPickerProps, "label">) {
@@ -26,6 +45,17 @@ function IncidentMap({ latitude, longitude, onChange }: Omit<IncidentLocationPic
   const selectedMarker = useRef<L.Marker | null>(null);
   const currentMarker = useRef<L.CircleMarker | null>(null);
   const latestChange = useRef(onChange);
+
+  function placePin(instance: L.Map, point: L.LatLng) {
+    if (selectedMarker.current) {
+      selectedMarker.current.setLatLng(point);
+      return;
+    }
+    const pin = L.marker(point, { icon: INCIDENT_PIN, draggable: true, alt: "Incident pin" })
+      .addTo(instance);
+    pin.on("dragend", () => latestChange.current(droppedPin(pin.getLatLng())));
+    selectedMarker.current = pin;
+  }
 
   useEffect(() => {
     latestChange.current = onChange;
@@ -48,27 +78,10 @@ function IncidentMap({ latitude, longitude, onChange }: Omit<IncidentLocationPic
       maxZoom: 19,
     }).addTo(instance);
 
-    const moveSelection = (point: L.LatLng) => {
-      if (!selectedMarker.current) {
-        selectedMarker.current = L.marker(point, { draggable: true }).addTo(instance);
-        selectedMarker.current.on("dragend", () => {
-          const moved = selectedMarker.current!.getLatLng();
-          latestChange.current({
-            label: `Dropped pin (${moved.lat.toFixed(5)}, ${moved.lng.toFixed(5)})`,
-            latitude: moved.lat,
-            longitude: moved.lng,
-          });
-        });
-      } else {
-        selectedMarker.current.setLatLng(point);
-      }
-      latestChange.current({
-        label: `Dropped pin (${point.lat.toFixed(5)}, ${point.lng.toFixed(5)})`,
-        latitude: point.lat,
-        longitude: point.lng,
-      });
-    };
-    instance.on("click", (event: L.LeafletMouseEvent) => moveSelection(event.latlng));
+    instance.on("click", (event: L.LeafletMouseEvent) => {
+      placePin(instance, event.latlng);
+      latestChange.current(droppedPin(event.latlng));
+    });
     map.current = instance;
     return () => {
       instance.remove();
@@ -80,21 +93,14 @@ function IncidentMap({ latitude, longitude, onChange }: Omit<IncidentLocationPic
 
   // This moves the draggable pin when the user chooses an address suggestion.
   useEffect(() => {
-    if (!map.current || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-    const point = L.latLng(latitude!, longitude!);
-    if (!selectedMarker.current) {
-      selectedMarker.current = L.marker(point, { draggable: true }).addTo(map.current);
-      selectedMarker.current.on("dragend", () => {
-        const moved = selectedMarker.current!.getLatLng();
-        latestChange.current({
-          label: `Dropped pin (${moved.lat.toFixed(5)}, ${moved.lng.toFixed(5)})`,
-          latitude: moved.lat,
-          longitude: moved.lng,
-        });
-      });
-    } else {
-      selectedMarker.current.setLatLng(point);
+    if (!map.current) return;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      selectedMarker.current?.remove();
+      selectedMarker.current = null;
+      return;
     }
+    const point = L.latLng(latitude!, longitude!);
+    placePin(map.current, point);
     map.current.setView(point, 15);
   }, [latitude, longitude]);
 
@@ -145,6 +151,9 @@ export function IncidentLocationPicker({
   const [results, setResults] = useState<LocationResult[]>([]);
   const [message, setMessage] = useState("");
   const [mapOpen, setMapOpen] = useState(false);
+  const reverseLookup = useRef<AbortController | null>(null);
+
+  useEffect(() => () => reverseLookup.current?.abort(), []);
 
   useEffect(() => setQuery(label), [label]);
   useEffect(() => {
@@ -175,17 +184,27 @@ export function IncidentLocationPicker({
 
   // A map selection is reverse-geocoded when possible, but coordinates remain usable if lookup fails.
   function chooseMapPoint(result: LocationResult) {
+    reverseLookup.current?.abort();
+    const controller = new AbortController();
+    reverseLookup.current = controller;
+    chooseLocation(result);
+    void fetch("/api/locations?latitude=" + result.latitude + "&longitude=" + result.longitude, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const body = await response.json();
+        const label = body.locations?.[0]?.label;
+        if (!controller.signal.aborted && response.ok && typeof label === "string" && label) {
+          chooseLocation({ ...result, label });
+        }
+      })
+      .catch(() => undefined);
+  }
+
+  function chooseLocation(result: LocationResult) {
     onChange(result);
     setQuery(result.label);
     setResults([]);
-    void fetch(`/api/locations?latitude=${result.latitude}&longitude=${result.longitude}`)
-      .then(async (response) => {
-        const body = await response.json();
-        if (!response.ok || !body.locations?.[0]) return;
-        onChange(body.locations[0]);
-        setQuery(body.locations[0].label);
-      })
-      .catch(() => undefined);
   }
 
   return (
@@ -197,8 +216,8 @@ export function IncidentLocationPicker({
             id="incident-location-input"
             value={query}
             onChange={(event) => {
-              setQuery(event.target.value);
-              onChange({ label: event.target.value, latitude: NaN, longitude: NaN });
+              reverseLookup.current?.abort();
+              chooseLocation({ label: event.target.value, latitude: NaN, longitude: NaN });
             }}
             autoComplete="off"
             required
@@ -217,7 +236,10 @@ export function IncidentLocationPicker({
         <ul className="incident-address-results" aria-label="Address suggestions">
           {results.map((result) => (
             <li key={`${result.latitude}:${result.longitude}`}>
-              <button type="button" onClick={() => chooseMapPoint(result)}>
+              <button type="button" onClick={() => {
+                  reverseLookup.current?.abort();
+                  chooseLocation(result);
+                }}>
                 {result.label}
               </button>
             </li>

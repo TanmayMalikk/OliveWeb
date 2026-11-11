@@ -19,19 +19,27 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.LocationSearching
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,6 +76,7 @@ internal fun InteractiveLocationMap(
     route: LocationRoute? = null,
     navigationActive: Boolean = false,
     detailsOnlyForSelectedPoint: Boolean = false,
+    userSearchEnabled: Boolean = false,
     selectedLocation: Pair<Double, Double>? = null,
     onSelectedLocationChange: ((Double, Double) -> Unit)? = null,
 ) {
@@ -77,9 +86,16 @@ internal fun InteractiveLocationMap(
     var loadState by remember { mutableStateOf(MapLoadState.Loading) }
     var attempt by remember { mutableIntStateOf(0) }
     var following by remember { mutableStateOf(false) }
+    var selectedFollowUid by remember { mutableStateOf<String?>(null) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     var routeWasShown by remember { mutableStateOf(false) }
-    val followTargetUid = if (navigationActive) ownPointUid
+    val followTargetUid = selectedFollowUid ?: if (navigationActive) ownPointUid
     else points.firstOrNull { it.live || it.lastKnown }?.uid ?: ownPointUid
+    val matchingUsers = remember(points, searchQuery) {
+        points.filter { it.name.contains(searchQuery.trim(), ignoreCase = true) }
+            .sortedBy { it.name.lowercase() }
+    }
 
     LaunchedEffect(attempt) {
         delay(15.seconds)
@@ -162,7 +178,9 @@ internal fun InteractiveLocationMap(
     // Tells the map which person to follow after navigation or loading changes.
     LaunchedEffect(following, followTargetUid, loadState, attempt) {
         if (loadState == MapLoadState.Ready) webView[0]?.evaluateJavascript(
-            "window.oliveSetFollow($following,${JSONObject.quote(followTargetUid.orEmpty())});",
+            "window.oliveSetFollow(" +
+                "$following,${JSONObject.quote(followTargetUid.orEmpty())}," +
+                "${userSearchEnabled && selectedFollowUid != null});",
             null
         )
     }
@@ -170,6 +188,14 @@ internal fun InteractiveLocationMap(
     LaunchedEffect(navigationActive) {
         following = navigationActive
         if (!navigationActive) routeWasShown = false
+    }
+
+    // Stops following when the selected user is no longer available in the organization feed.
+    LaunchedEffect(points, selectedFollowUid) {
+        if (selectedFollowUid != null && points.none { it.uid == selectedFollowUid }) {
+            selectedFollowUid = null
+            following = false
+        }
     }
 
     // Redraws a changed route and fits it once when navigation begins.
@@ -274,10 +300,15 @@ internal fun InteractiveLocationMap(
                 },
                 update = { view ->
                     resizeMap(view)
-                    if (loadState == MapLoadState.Ready) updatePoints(
-                        view,
-                        false
-                    )
+                    if (loadState == MapLoadState.Ready) {
+                        updatePoints(view, false)
+                        if (userSearchEnabled && selectedFollowUid != null) {
+                            view.evaluateJavascript(
+                                "window.oliveSetFollow(true,${JSONObject.quote(selectedFollowUid)},false);",
+                                null,
+                            )
+                        }
+                    }
                     if (loadState == MapLoadState.Ready) updateRoute(view, false)
                     if (loadState == MapLoadState.Ready) updateSelection(view)
                 },
@@ -331,22 +362,88 @@ internal fun InteractiveLocationMap(
                 ) {
                     Icon(Icons.Outlined.Remove, stringResource(R.string.location_zoom_out))
                 }
-                SmallFloatingActionButton(
-                    onClick = { webView[0]?.evaluateJavascript("window.oliveRecenter();", null) },
-                    modifier = Modifier.testTag("recenter_map")
-                ) {
-                    Icon(Icons.Outlined.MyLocation, stringResource(R.string.recenter_map))
-                }
-                SmallFloatingActionButton(
-                    onClick = { if (followTargetUid != null) following = !following },
-                    modifier = Modifier.testTag("follow_user_location")
-                ) {
-                    Icon(
-                        if (following) Icons.Outlined.CenterFocusStrong else Icons.Outlined.LocationSearching,
-                        stringResource(if (following) R.string.location_stop_following else R.string.location_follow_user)
-                    )
+                if (userSearchEnabled) {
+                    SmallFloatingActionButton(
+                        onClick = { searchOpen = true },
+                        modifier = Modifier.testTag("search_user_location")
+                    ) {
+                        Icon(Icons.Outlined.Search, stringResource(R.string.location_search_user))
+                    }
+                } else {
+                    SmallFloatingActionButton(
+                        onClick = { webView[0]?.evaluateJavascript("window.oliveRecenter();", null) },
+                        modifier = Modifier.testTag("recenter_map")
+                    ) {
+                        Icon(Icons.Outlined.MyLocation, stringResource(R.string.recenter_map))
+                    }
+                    SmallFloatingActionButton(
+                        onClick = { if (followTargetUid != null) following = !following },
+                        modifier = Modifier.testTag("follow_user_location")
+                    ) {
+                        Icon(
+                            if (following) Icons.Outlined.CenterFocusStrong else Icons.Outlined.LocationSearching,
+                            stringResource(if (following) R.string.location_stop_following else R.string.location_follow_user)
+                        )
+                    }
                 }
             }
+        }
+
+        if (searchOpen && userSearchEnabled) {
+            AlertDialog(
+                onDismissRequest = { searchOpen = false },
+                title = { Text(stringResource(R.string.location_search_user)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it.take(80) },
+                            label = { Text(stringResource(R.string.search)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("location_user_search_query"),
+                        )
+                        if (matchingUsers.isEmpty()) {
+                            Text(stringResource(R.string.location_search_no_users))
+                        } else {
+                            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                                items(matchingUsers, key = { it.uid }) { point ->
+                                    TextButton(
+                                        onClick = {
+                                            selectedFollowUid = point.uid
+                                            following = true
+                                            searchOpen = false
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                            .testTag("location_user_${point.uid}"),
+                                    ) {
+                                        Text(point.name, modifier = Modifier.fillMaxWidth())
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { searchOpen = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                },
+                dismissButton = {
+                    if (selectedFollowUid != null) {
+                        TextButton(onClick = {
+                            selectedFollowUid = null
+                            following = false
+                            searchOpen = false
+                            webView[0]?.evaluateJavascript(
+                                "window.oliveSetFollow(false,'');",
+                                null,
+                            )
+                        }) {
+                            Text(stringResource(R.string.location_stop_following))
+                        }
+                    }
+                },
+            )
         }
     }
 }

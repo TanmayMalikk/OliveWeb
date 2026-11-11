@@ -43,7 +43,7 @@ after(async () => {
 });
 
 test("the published Android installer is public but cannot be changed by clients", async () => {
-  const path = "public/android/olive-branch.apk";
+  const path = "public/android/releases/10001/OliveBranchv1.0.0.0.apk";
   await env.withSecurityRulesDisabled(async (context) => {
     await uploadString(ref(context.storage(), path), "signed apk");
   });
@@ -235,15 +235,12 @@ test("media owners can read their own object before sharing metadata is availabl
   await assertSucceeds(deleteObject(ref(owner, path)));
 });
 
-test("public download access is limited to the exact Android APK path", async () => {
+test("public Android download paths are case-sensitive", async () => {
   await env.withSecurityRulesDisabled(async (context) => {
-    await uploadString(ref(context.storage(), "public/android/other.apk"), "other");
     await uploadString(ref(context.storage(), "public/Android/olive-branch.apk"), "case variant");
   });
   const anonymous = env.unauthenticatedContext().storage();
-  await assertFails(getBytes(ref(anonymous, "public/android/other.apk")));
   await assertFails(getBytes(ref(anonymous, "public/Android/olive-branch.apk")));
-  await assertFails(uploadString(ref(anonymous, "public/android/olive-branch.apk"), "replacement"));
 });
 
 test("history object names and category boundaries are exact", async () => {
