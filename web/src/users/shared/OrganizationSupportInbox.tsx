@@ -10,7 +10,7 @@ import {
   requestAdministratorHelp,
 } from "../../services/OrganizationSupportService";
 import { useSession } from "../../session/SessionProvider";
-import { useChatTimeline } from "./useChatTimeline";
+import { useChatDeviceKey, useChatTimeline } from "./useChatTimeline";
 
 type TicketCategory = "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
 const categories: { id: TicketCategory; label: string }[] = [
@@ -39,9 +39,7 @@ export default function OrganizationSupportInbox() {
   const [category, setCategory] = useState<TicketCategory>("SUPPORT");
   const [showArchived, setShowArchived] = useState(false);
   const timeline = useChatTimeline(selected?.id, identity?.uid, messages);
-  useEffect(() => {
-    setSelected((current) => conversations.find((ticket) => ticket.id === current?.id) ?? current);
-  }, [conversations]);
+  const deviceKeyAvailable = useChatDeviceKey(selected?.id, identity?.uid);
 
   // Keeps the inbox current while the organization user is signed in.
   useEffect(() => {
@@ -54,9 +52,12 @@ export default function OrganizationSupportInbox() {
         if (!active) return undefined;
         return messaging.subscribeConversations(
           identity.uid,
-          (value) =>
-            active &&
-            setConversations(value.filter((item) => item.type === "SUPPORT")),
+          (value) => {
+            if (!active) return;
+            const tickets = value.filter((item) => item.type === "SUPPORT");
+            setConversations(tickets);
+            setSelected((current) => tickets.find((ticket) => ticket.id === current?.id) ?? null);
+          },
           (error) => active && setFeedback(error.message),
         );
       })
@@ -101,7 +102,7 @@ export default function OrganizationSupportInbox() {
       active = false;
       stop?.();
     };
-  }, [selected?.id, selected?.participantIds.join(","), identity?.uid]);
+  }, [selected?.id, selected?.participantIds.join(","), identity?.uid, deviceKeyAvailable]);
 
   const visible = useMemo(
     () =>

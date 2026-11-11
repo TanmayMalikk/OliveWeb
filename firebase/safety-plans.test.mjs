@@ -2,7 +2,7 @@ import {before, after, test} from "node:test";
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 import {initializeTestEnvironment, assertFails} from "@firebase/rules-unit-testing";
-import {collection, doc, getDoc, getDocFromServer, getDocsFromServer, onSnapshot, setDoc, updateDoc, serverTimestamp} from "firebase/firestore";
+import {collection, doc, getDoc, getDocFromServer, getDocsFromServer, onSnapshot, query, setDoc, updateDoc, serverTimestamp, where} from "firebase/firestore";
 import {readFile} from "node:fs/promises";
 const require = createRequire(new URL("../functions/package.json", import.meta.url));
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId:"demo-olive-rules",storageBucket:"demo-olive-rules.appspot.com"});
@@ -199,6 +199,59 @@ test("chat membership changes record one server-authored event and revoke histor
   assert.equal(remaining.docs.find(event => event.get("action") === "REMOVED").get("participantName"), "contact");
   assert.deepEqual((await reference.get()).get("participantIds"), [owner, friend]);
 });
+
+for (const type of ["GROUP", "SUPPORT"]) {
+  test(`removed ${type} members lose the conversation and regain history when re-added`, async () => {
+    const owner = "plan-owner", removed = "plan-contact", retained = "plan-other";
+    const id = type === "SUPPORT" ? "support-plan-owner-rejoin-test" : "group-original-friend-rejoin";
+    const chat = db.collection("conversations").doc(id);
+    const others = type === "SUPPORT" ? [owner, "plan-staff"] : [owner, retained];
+    await db.collection("friendLists").doc(owner).collection("friends").doc("rejoin-contact")
+      .set({friendUid: removed, friendUsername: "contact"});
+    if (type === "GROUP") {
+      // The original DM participants still share a friendship after the chat becomes a group.
+      await db.collection("friendships").doc(id).set({participantIds: [owner, removed]});
+    }
+    await chat.set({
+      type, ownerUid: owner, staffUid: type === "SUPPORT" ? "plan-staff" : "",
+      participantIds: others, participantUsernames: Object.fromEntries(others.map(uid => [uid, uid])),
+    });
+    const args = {conversationId: id, participantUid: removed};
+    await call(conversationAddParticipant, owner, args);
+    await chat.update({
+      roomKeys: {[owner]: "owner-envelope", [removed]: "removed-envelope"},
+      participantPublicKeys: {[owner]: "owner-public", [removed]: "removed-public"},
+    });
+    await chat.collection("messages").doc("history").set({ciphertext: "existing-ciphertext"});
+    const deviceId = `${removed}--phone`;
+    await chat.collection("deviceKeys").doc(deviceId).set({uid: removed, wrappedKey: "removed-device-envelope"});
+    await chat.collection("deviceKeys").doc(`${owner}--phone`).set({uid: owner, wrappedKey: "owner-device-envelope"});
+    const client = env.authenticatedContext(removed).firestore();
+    const list = query(collection(client, "conversations"), where("participantIds", "array-contains", removed));
+    const chatDoc = doc(client, "conversations", id);
+    const messageDoc = doc(client, "conversations", id, "messages", "history");
+    const deviceDoc = doc(client, "conversations", id, "deviceKeys", deviceId);
+    const visible = async () => (await getDocsFromServer(list)).docs.some(row => row.id === id);
+    assert.equal(await visible(), true);
+    assert.equal((await getDocFromServer(messageDoc)).exists(), true);
+
+    await call(conversationRemoveParticipant, owner, args);
+    assert.equal(await visible(), false);
+    await assertFails(getDocFromServer(chatDoc));
+    await assertFails(getDocFromServer(messageDoc));
+    await assertFails(getDocFromServer(deviceDoc));
+    const remaining = await chat.get();
+    assert.deepEqual(remaining.get("roomKeys"), {[owner]: "owner-envelope"});
+    assert.deepEqual(remaining.get("participantPublicKeys"), {[owner]: "owner-public"});
+    assert.equal((await chat.collection("deviceKeys").doc(deviceId).get()).exists, false);
+    assert.equal((await chat.collection("deviceKeys").doc(`${owner}--phone`).get()).exists, true);
+
+    await call(conversationAddParticipant, owner, args);
+    assert.equal(await visible(), true);
+    assert.equal((await getDocFromServer(chatDoc)).exists(), true);
+    assert.equal((await getDocFromServer(messageDoc)).get("ciphertext"), "existing-ciphertext");
+  });
+}
 
 test("ticket owners can remove friends they added, while staff, admins, and original members stay", async () => {
   const owner = "plan-owner", friend = "plan-contact", original = "plan-other";

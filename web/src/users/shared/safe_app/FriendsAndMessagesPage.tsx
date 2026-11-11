@@ -23,7 +23,7 @@ import {
 import type { Entry } from "../../../domain/DomainModels";
 import { SafeMediaViewer } from "./SafeMediaViewer";
 import { sharedMessage } from "./SharedMessageContent";
-import { useChatTimeline, useMembershipHistory } from "../useChatTimeline";
+import { useChatDeviceKey, useChatTimeline, useMembershipHistory } from "../useChatTimeline";
 import type {
   Friend,
   Request,
@@ -51,6 +51,7 @@ export default function Messages() {
   const [viewerEntry, setViewerEntry] = useState<Entry | null>(null);
   const messageEnd = useRef<HTMLDivElement>(null);
   const identity = accounts.identity;
+  const deviceKeyAvailable = useChatDeviceKey(conversation?.id, identity?.uid);
   const timeline = useChatTimeline(conversation?.id, identity?.uid, rows);
   const [managingTicket, setManagingTicket] = useState<string>();
   const [removingTicketFriend, setRemovingTicketFriend] = useState(false);
@@ -72,9 +73,6 @@ export default function Messages() {
     setConversation(ticket);
     session.setRequestedConversation(null);
   }, [conversations, identity?.uid, session.requestedConversation, session.setRequestedConversation]);
-  useEffect(() => {
-    setConversation((active) => conversations.find((item) => item.id === active?.id) ?? active);
-  }, [conversations]);
   useEffect(() => {
     messageEnd.current?.scrollIntoView({ block: "end" });
   }, [timeline, conversation?.id]);
@@ -113,7 +111,11 @@ export default function Messages() {
       });
     void messaging.subscribeConversations(
       identity.uid,
-      (value) => { if (active) setConversations(value); },
+      (value) => {
+        if (!active) return;
+        setConversations(value);
+        setConversation((current) => value.find((item) => item.id === current?.id) ?? null);
+      },
       (error) => { if (active) setFeedback(error.message); },
     ).then((cleanup) => {
       if (!active) cleanup(); else stops.push(cleanup);
@@ -128,11 +130,14 @@ export default function Messages() {
     setRows([]);
     setDraft("");
     setRoomKey(null);
-    if (!conversation || conversation.participantIds.length < 2) return;
+    setViewerDocument(null);
+    setViewerUrl("");
+    setViewerEntry(null);
+    if (!conversation || !identity || conversation.participantIds.length < 2) return;
     let active = true;
     let stop: (() => void) | undefined;
     void messaging
-      .roomKey(conversation.id, identity!, conversation)
+      .roomKey(conversation.id, identity, conversation)
       .then((key) => {
         if (!active) return undefined;
         setRoomKey(key);
@@ -164,7 +169,7 @@ export default function Messages() {
       active = false;
       stop?.();
     };
-  }, [conversation?.id, conversation?.participantIds.join(",")]);
+  }, [conversation?.id, conversation?.participantIds.join(","), identity?.uid, deviceKeyAvailable]);
   if (!cloudMode)
     return (
       <Empty

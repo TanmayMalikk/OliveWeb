@@ -334,16 +334,16 @@ exports.conversationRemoveParticipant = onCall({invoker: "public"}, async (reque
       participantUsernames: updatedNames,
       updatedAt: FieldValue.serverTimestamp(),
     };
-    if (isTicket) {
-      for (const field of ["roomKeys", "participantPublicKeys"]) {
-        if (conversation[field]?.[participantUid]) {
-          const retainedKeys = {...conversation[field]};
-          delete retainedKeys[participantUid];
-          update[field] = retainedKeys;
-        }
+    const deviceKeys = await transaction.get(reference.collection("deviceKeys").where("uid", "==", participantUid));
+    for (const field of ["roomKeys", "participantPublicKeys"]) {
+      if (Object.hasOwn(conversation[field] || {}, participantUid)) {
+        const retainedKeys = {...conversation[field]};
+        delete retainedKeys[participantUid];
+        update[field] = retainedKeys;
       }
     }
     transaction.update(reference, update);
+    for (const key of deviceKeys.docs) transaction.delete(key.ref);
     recordMembershipEvent(transaction, reference, "REMOVED", caller.uid, participantUid, conversation.participantUsernames || {});
   });
   return {conversationId, participantUid};

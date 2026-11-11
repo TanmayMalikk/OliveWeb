@@ -120,6 +120,9 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             } ?: error("Online room key timed out")
                         } catch (onlineFailure: Exception) {
                             if (onlineFailure is CancellationException) throw onlineFailure
+                            if (onlineFailure is FirebaseFirestoreException &&
+                                onlineFailure.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+                            ) throw onlineFailure
                             val cached = withContext(Dispatchers.IO) {
                                 chatCache.open(
                                     uid,
@@ -194,6 +197,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 activeRoomKey = null
                 chatMessages = emptyList()
                 remoteChatMessages = emptyList()
+                messagingBusy = false
                 message = null
             }
         }
@@ -376,6 +380,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         try {
                             val wrapped = secure.wrappedRoomKey(conversation.id, ownerUid)
                                 ?: throw ChatCacheException("Wrapped room key unavailable")
+                            if (epoch != token || state.activeConversation?.id != conversation.id) return@launch
                             val confirmedKey = com.olive.app.security.KeyManager.unwrapKey(wrapped)
                             withContext(Dispatchers.IO) {
                                 chatCache.saveAccess(
@@ -385,6 +390,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                                     wrapped,
                                     com.olive.app.security.KeyManager.deviceId(),
                                     System.currentTimeMillis(),
+                                    requireIndexed = true,
                                 )
                                 chatCache.saveMessages(
                                     ownerUid,

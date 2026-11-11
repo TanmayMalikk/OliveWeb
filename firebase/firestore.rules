@@ -606,6 +606,7 @@ service cloud.firestore {
       // Firestore rejects unfiltered and other-user queries because it cannot prove this predicate.
       allow get: if conversationParticipant(resource.data)
         || (signedIn()
+          && !exists(/databases/$(database)/documents/conversations/$(conversationId))
           && exists(/databases/$(database)/documents/friendships/$(conversationId))
           && request.auth.uid in get(/databases/$(database)/documents/friendships/$(conversationId)).data.participantIds);
       allow list: if signedIn()

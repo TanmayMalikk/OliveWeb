@@ -244,10 +244,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                     }
                     val conversations = snapshot?.documents.orEmpty().mapNotNull(::conversationFrom)
                         .sortedByDescending { it.updatedAt }
-                    if (snapshot?.metadata?.isFromCache != true || conversations.isNotEmpty()) {
-                        onUpdate(conversations)
-                    }
                     if (snapshot != null && !snapshot.metadata.isFromCache) {
+                        onUpdate(conversations)
                         onServerUpdate?.invoke(conversations)
                     }
                 }
