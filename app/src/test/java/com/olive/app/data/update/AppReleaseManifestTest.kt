@@ -42,6 +42,11 @@ class AppReleaseManifestTest {
         }
     }
 
+    @Test
+    fun `update topic matches expected fcm release channel`() {
+        assertEquals("app_updates", AppUpdateScheduler.TOPIC_APP_UPDATES)
+    }
+
     private fun validJson() = """
         {
           "packageName":"com.olive.app",

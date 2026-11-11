@@ -286,3 +286,36 @@ test("profile completion rejects malformed and temporary organization profiles",
   assert.equal(_test.profileComplete("STAFF",{fullName:"A",dob:"2000-01-01",email:"staff@staff.olive.invalid"}),false);
   assert.equal(_test.profileComplete("STAFF",{fullName:"A",dob:"2000-01-01",email:"staff@example.ca"}),true);
 });
+
+const {
+  TOPIC_APP_UPDATES,
+  buildUpdateNotification,
+  parseManifestConfig,
+} = require("./scripts/publish-android-release");
+
+// Inputs: valid release details. Expected: FCM app update payload targets high priority and the dedicated topic.
+test("fcm app update notifications target the app_updates topic with high priority", () => {
+  const payload = buildUpdateNotification({ versionCode: 10001, versionName: "1.0.0" });
+  assert.equal(payload.topic, TOPIC_APP_UPDATES);
+  assert.equal(payload.data.type, "app_update");
+  assert.equal(payload.data.versionCode, "10001");
+  assert.equal(payload.data.versionName, "1.0.0");
+  assert.equal(payload.android.priority, "high");
+});
+
+// Inputs: missing and valid release configuration. Expected: validation strictly enforces project and version fields.
+test("release manifest parser enforces matching projects and valid version codes", () => {
+  assert.throws(() => parseManifestConfig({}), /OLIVE_RELEASE_PROJECT_ID/);
+  const config = parseManifestConfig({
+    OLIVE_RELEASE_PROJECT_ID: "proj-1",
+    OLIVE_RELEASE_CONFIRM_PROJECT: "proj-1",
+    OLIVE_RELEASE_APK: "test.apk",
+    OLIVE_VERSION_CODE: "10002",
+    OLIVE_VERSION_NAME: "v1.0.1",
+    OLIVE_MINIMUM_VERSION_CODE: "1",
+    OLIVE_RELEASE_NOTES: "Feature 1\nFeature 2",
+  });
+  assert.equal(config.versionCode, 10002);
+  assert.equal(config.versionName, "v1.0.1");
+  assert.deepEqual(config.notes, ["Feature 1", "Feature 2"]);
+});
