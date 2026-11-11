@@ -10,6 +10,7 @@ import {
   requestAdministratorHelp,
 } from "../../services/OrganizationSupportService";
 import { useSession } from "../../session/SessionProvider";
+import { useChatDeviceKey, useChatTimeline } from "./useChatTimeline";
 
 type TicketCategory = "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
 const categories: { id: TicketCategory; label: string }[] = [
@@ -37,6 +38,8 @@ export default function OrganizationSupportInbox() {
   const [feedback, setFeedback] = useState("");
   const [category, setCategory] = useState<TicketCategory>("SUPPORT");
   const [showArchived, setShowArchived] = useState(false);
+  const timeline = useChatTimeline(selected?.id, identity?.uid, messages);
+  const deviceKeyAvailable = useChatDeviceKey(selected?.id, identity?.uid);
 
   // Keeps the inbox current while the organization user is signed in.
   useEffect(() => {
@@ -44,13 +47,17 @@ export default function OrganizationSupportInbox() {
     let active = true;
     let stop: (() => void) | undefined;
     void messaging.register(identity)
+      .then(() => messaging.prepareSupportTickets())
       .then(() => {
         if (!active) return undefined;
         return messaging.subscribeConversations(
           identity.uid,
-          (value) =>
-            active &&
-            setConversations(value.filter((item) => item.type === "SUPPORT")),
+          (value) => {
+            if (!active) return;
+            const tickets = value.filter((item) => item.type === "SUPPORT");
+            setConversations(tickets);
+            setSelected((current) => tickets.find((ticket) => ticket.id === current?.id) ?? null);
+          },
           (error) => active && setFeedback(error.message),
         );
       })
@@ -95,7 +102,7 @@ export default function OrganizationSupportInbox() {
       active = false;
       stop?.();
     };
-  }, [selected?.id, identity?.uid]);
+  }, [selected?.id, selected?.participantIds.join(","), identity?.uid, deviceKeyAvailable]);
 
   const visible = useMemo(
     () =>
@@ -249,18 +256,22 @@ export default function OrganizationSupportInbox() {
               aria-label="Support messages"
               aria-live="polite"
             >
-              {messages.length === 0 ? (
+              {timeline.length === 0 ? (
                 <p className="help-note">No messages yet.</p>
               ) : (
-                messages.map((message) => (
+                timeline.map((item) => item.kind === "membership" ? (
+                  <p key={`membership-${item.event.id}`} className="chat-membership-event">
+                    {messaging.membershipEventText(selected, item.event, identity.role)}
+                  </p>
+                ) : (
                   <article
-                    key={message.id}
-                    className={`chat-bubble ${message.senderUid === identity.uid ? "own" : ""}`}
+                    key={item.message.id}
+                    className={`chat-bubble ${item.message.senderUid === identity.uid ? "own" : ""}`}
                   >
-                    <small>{message.senderUsername}</small>
-                    <p>{message.deleted ? "Message unsent" : message.body}</p>
+                    <small>{messaging.chatSenderName(selected, item.message, identity.role)}</small>
+                    <p>{item.message.deleted ? "Message unsent" : item.message.body}</p>
                     <time>
-                      {new Date(message.clientSentAt).toLocaleString()}
+                      {new Date(item.message.clientSentAt).toLocaleString()}
                     </time>
                   </article>
                 ))

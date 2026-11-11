@@ -1,7 +1,6 @@
-// Safe-app users: provides staff requests, support directories, browser location, and camera capture.
+// Safe-app users: provides staff requests, support directories, and browser location.
 import { useEffect, useState } from "react";
 import {
-  Camera,
   ExternalLink,
   FileLock2,
   LocateFixed,
@@ -43,10 +42,12 @@ export function StaffHelpPage() {
     requested: boolean;
     staffName?: string;
     conversationId?: string;
+    ticketNumber?: number;
   } | null>(null);
   return (
     <section className="panel safe-feature-page">
-      <h2>Request help from staff</h2>
+      <h2>{ticket?.requested && ticket.ticketNumber !== undefined
+        ? `Support Ticket #${ticket.ticketNumber}` : "Request help from staff"}</h2>
       <p>
         This opens a private support ticket. It does not share your safety plan.
       </p>
@@ -57,8 +58,13 @@ export function StaffHelpPage() {
               ? "Olive Staff is assigned."
               : "Looking for an available staff member…"}
           </strong>
-          <Button variant="outline" onClick={() => session.setPage("Messages")}>
-            Open support chats
+          <Button variant="outline" onClick={() => {
+            if (ticket.conversationId && accounts.identity) {
+              session.setRequestedConversation({ id: ticket.conversationId, uid: accounts.identity.uid });
+            }
+            session.setPage("Messages");
+          }}>
+            {ticket.ticketNumber !== undefined ? `Support Ticket #${ticket.ticketNumber}` : "Open support ticket"}
           </Button>
           <Button
             variant="quiet"
@@ -66,7 +72,7 @@ export function StaffHelpPage() {
               void session.perform(async () => {
                 const result = await callable<{ ticket: typeof ticket }>(
                   "staffSupportRequest",
-                  { action: "stop" },
+                  { action: "stop", conversationId: ticket.conversationId },
                 );
                 setTicket(result.ticket);
               })
@@ -215,84 +221,6 @@ export function LocationPage() {
         <Empty title="Waiting for location.">
           Allow location access to show your position.
         </Empty>
-      )}
-    </section>
-  );
-}
-
-// Lets the user take a photo or choose a file without leaving the safe app.
-export function CameraPage() {
-  const session = useSession();
-  const [preview, setPreview] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [progress, setProgress] = useState<number | null>(null);
-  useEffect(
-    () => () => {
-      if (preview) URL.revokeObjectURL(preview);
-    },
-    [preview],
-  );
-  return (
-    <section className="panel safe-feature-page">
-      <h2>Take a photo or document image</h2>
-      <p>
-        Capture with your device or choose an existing file. Saved files are
-        encrypted and shared with the same account vault as the phone app.
-      </p>
-      <label className="button">
-        <Camera size={17} /> Open camera
-        <input
-          className="sr-only"
-          type="file"
-          accept="image/*,video/*"
-          capture="environment"
-          onChange={(event) => {
-            const selected = event.target.files?.[0];
-            if (selected) {
-              setFile(selected);
-              setPreview(URL.createObjectURL(selected));
-            }
-          }}
-        />
-      </label>
-      {preview &&
-        (file?.type.startsWith("video/") ? (
-          <video
-            className="camera-preview"
-            src={preview}
-            controls
-            aria-label="Captured video preview"
-          />
-        ) : (
-          <img
-            className="camera-preview"
-            src={preview}
-            alt="Captured preview"
-          />
-        ))}
-      {file && (
-        <p>
-          {file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB
-        </p>
-      )}
-      {file && (
-        <Button
-          disabled={session.busy}
-          onClick={() =>
-            void session.perform(async () => {
-              if (!accounts.identity)
-                throw new Error("Sign in again before saving this file.");
-              await uploadBrowserDocument(file, accounts.identity, setProgress);
-              setFile(null);
-              setPreview("");
-              setProgress(null);
-            })
-          }
-        >
-          {progress === null
-            ? "Save encrypted file"
-            : `Uploading ${Math.round(progress * 100)}%`}
-        </Button>
       )}
     </section>
   );

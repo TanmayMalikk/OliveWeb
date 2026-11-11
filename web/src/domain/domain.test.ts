@@ -5,7 +5,6 @@ import {
   validUsername,
   validPassword,
   validPin,
-  coverPath,
   purgeEntry,
   TRASH_RETENTION_MS,
   type Entry,
@@ -55,9 +54,8 @@ describe("mobile-compatible contracts", () => {
     expect(validPassword(`A1!${"x".repeat(100_000)}`)).toBe(false);
     expect(validPin("9".repeat(100_000))).toBe(false);
   });
-  // Inputs: the values in this case. Expected: routes each cover and irreversibly redacts expired trash copies.
-  it("routes each cover and irreversibly redacts expired trash copies", () => {
-    expect(coverPath("NEWS")).toBe("/daily-digest");
+  // Inputs: the values in this case. Expected: irreversibly redacts expired trash copies.
+  it("irreversibly redacts expired trash copies", () => {
     const entry: Entry = {
       id: "id",
       timestamp: 1,

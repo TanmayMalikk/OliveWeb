@@ -3,7 +3,6 @@ import {
   Component,
   lazy,
   Suspense,
-  useEffect,
   useRef,
   useState,
   type ErrorInfo,
@@ -12,16 +11,15 @@ import {
 import { createRoot } from "react-dom/client";
 import { LogOut, Delete, ArrowLeft, Leaf } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
+import { accounts } from "./services/AccountService";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
 import { Button, Field, Form } from "./components/SharedComponents";
 import Game from "./public/covers/OliveGamesCover";
-import { coverSite, siteMode, type SiteMode } from "./sites/SiteRouting";
+import { siteMode, type SiteMode } from "./sites/SiteRouting";
 import "./styles.css";
 const Download = lazy(() => import("./public/AppDownloadInstructions"));
 const EntryLink = lazy(() => import("./users/shared/auth/PrivateEntryLink"));
 const SafeApp = lazy(() => import("./users/shared/safe_app/SafeAppLayout"));
-const News = lazy(() => import("./public/covers/DailyDigestCover"));
-const Fitness = lazy(() => import("./public/covers/FitnessCover"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
 const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
 // User cover apps: asks for the private PIN before opening the Safe App.
@@ -34,9 +32,9 @@ function PinGate() {
         <span>
           <Leaf size={20} /> A little space.
         </span>
-        <Button variant="exit" onClick={s.quickExit}>
+        {(s.profile?.role ?? accounts.identity?.role) === "USER" && <Button variant="exit" onClick={s.quickExit}>
           Quick Exit <LogOut size={17} />
-        </Button>
+        </Button>}
       </div>
       <div className="pin-card">
         <span className="eyebrow">YOUR PERSONAL ENTRY</span>
@@ -140,17 +138,11 @@ function PinGate() {
     </main>
   );
 }
-// User cover apps: displays the cover chosen for this account.
+// Little Grove is the browser cover for every account.
 function Cover() {
   const s = useSession();
   const [accountOpen, setAccountOpen] = useState(false);
   const lastOliveTap = useRef(0);
-  const coverLabel =
-    s.cover === "NEWS"
-        ? "Daily Digest"
-        : s.cover === "FITNESS"
-          ? "Fitness"
-          : "Game";
   const tapOlive = () => {
     const now = Date.now();
     if (now - lastOliveTap.current > 1500) {
@@ -163,12 +155,12 @@ function Cover() {
   return (
     <main
       id="main"
-      className={`cover-container ${s.cover.toLowerCase()}-cover`}
+      className="cover-container game-cover"
     >
       <nav
         className="cover-account-tabs"
         role="tablist"
-        aria-label={`${coverLabel} app pages`}
+        aria-label="Little Grove pages"
       >
         <button
           type="button"
@@ -177,7 +169,7 @@ function Cover() {
           aria-controls="cover-display-panel"
           onClick={() => setAccountOpen(false)}
         >
-          {coverLabel}
+          Game
         </button>
         <button
           type="button"
@@ -195,13 +187,7 @@ function Cover() {
         role="tabpanel"
         hidden={accountOpen}
       >
-        {s.cover === "NEWS" ? (
-          <News />
-        ) : s.cover === "FITNESS" ? (
-          <Fitness />
-        ) : (
-          <Game />
-        )}
+        <Game />
       </div>
       <section
         id="cover-account-panel"
@@ -228,36 +214,6 @@ function Cover() {
 // Sends each domain and signed-in role to its matching web screen.
 function Routes({ mode }: { mode: SiteMode }) {
   const s = useSession();
-  // Read the current session whenever the route changes.
-  useEffect(() => {
-    const cover = coverSite(s.cover).slug;
-    let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "manifest";
-      document.head.append(link);
-    }
-    link.href = `/${cover}/manifest.webmanifest`;
-    const icon = cover;
-    const apple = document.querySelector<HTMLLinkElement>(
-      'link[rel="apple-touch-icon"]',
-    );
-    if (apple) apple.href = `/icons/${icon}-192.png`;
-    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (favicon) favicon.href = `/icons/${icon}.svg`;
-    const appleName = document.querySelector<HTMLMetaElement>(
-      'meta[name="apple-mobile-web-app-title"]',
-    );
-    if (appleName)
-      appleName.content =
-        icon === "olive"
-          ? "Olive"
-          : icon === "daily-digest"
-            ? "Daily Digest"
-            : icon === "fitness"
-              ? "Fitness Tracker"
-              : "Little Grove";
-  }, [s.cover]);
   let content: ReactNode;
   if (mode === "download") content = <Download />;
   else if (mode === "admin") {
@@ -308,7 +264,7 @@ class ErrorBoundary extends Component<
         <p>
           This page could not open. Your stored account has not been deleted.
         </p>
-        <a href="/">Return to Fitness Tracker</a>
+        <a href="/">Return to Little Grove</a>
       </main>
     ) : (
       this.props.children

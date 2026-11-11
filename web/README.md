@@ -1,7 +1,6 @@
 # Olive Branch web portal
 
-React + TypeScript alongside the Android project. Android publishes an owner-only
-14-day fitness summary so the signed-in web cover can display real activity.
+React + TypeScript alongside the Android project. Little Grove is the public web cover.
 
 ## Run locally
 
@@ -32,7 +31,7 @@ Firebase rule checks remain in `../firebase` (`npm test` there starts demo emula
 
 | Address                    | Behavior                                       |
 | -------------------------- | ---------------------------------------------- |
-| `yourolivebranch.ca/`      | Cover apps and private user entry.             |
+| `yourolivebranch.ca/`      | Little Grove and private user entry.           |
 | `yourolivebranch.ca/get`   | Download and installation instructions.        |
 | `yourolivebranch.ca/admin` | Staff and administrator sign-in and workspace. |
 | `voip.yourolivebranch.ca`  | Separate Firebase-authenticated VoIP API.      |
@@ -53,17 +52,14 @@ before every production build and rejects common private credential formats from
 the public web source.
 
 Hostinger Business/Unlimited or Cloud hosting is required for this Node.js setup.
-A static-only plan can display the built React pages, but the News cover API and
-dynamic manifests will not work. Create one additional Node app rooted at
+A static-only plan can display the built React pages, but the same-origin APIs and
+dynamic manifest require the Node server. Create one additional Node app rooted at
 `website/voip-library` for `voip.yourolivebranch.ca`. Enable automatic GitHub
 deployment only after the production branch and environment variables are confirmed.
 
-The four user covers are states of the first SPA, rather than pages or subdomains.
-The chosen cover is saved in the browser enrollment/profile. Two people can open
-the same `https://yourolivebranch.ca/` address and see different covers. The Game
-cover exposes no login or download links. Five quick taps on its Fitness Tracker
-brand starts private entry. News and Fitness retain their configured
-trigger input. Quick Exit returns to the saved cover at `/`.
+The browser enrollment stores `webCover: "GAME"`. The shared account profile keeps
+the Android cover in `coverType`. Open Little Grove’s Account tab and tap the olive
+twice to start private entry. Quick Exit returns to Little Grove at `/`.
 
 Local routes such as `/daily-digest`, `/fitness`, `/game`, and
 `/account/sign-in` are accepted as migration/development inputs, then immediately
@@ -73,8 +69,8 @@ replaced with `/` as soon as the app reads them.
 
 ### Shared code, one website address
 
-`site.config.json` keeps the main origin, `/get`, `/admin`, VoIP origin, cover
-paths, Quick Exit, personal links, and PWA manifests together. No
+`site.config.json` keeps the main origin, `/get`, `/admin`, VoIP origin, and
+Little Grove’s install identity together. No
 `VITE_SITE_MODE` variable is used. Configure `yourolivebranch.ca` as the Firebase
 authorized web domain and Storage/R2 CORS origin. All browser pages share the
 same origin, Firebase session, and browser storage.
@@ -132,11 +128,11 @@ download page keeps iPhone and iPad web app installation instructions.
 
 The website responds to viewport space, container size, orientation, keyboard, and
 touch interaction; it does not guess device models from the user agent. It uses
-fluid type, responsive grids, touch-sized targets, and bottom navigation on narrow
+fluid type, responsive grids, touch-sized targets, and collapsible navigation on narrow
 private-workspace layouts. Reduced-motion settings are respected.
 
-Each cover has a stable manifest ID/start URL, name, and icon. iPhone/iPad users
-open their chosen cover in Safari, use Share → Add to Home Screen, and enable
+Little Grove has a stable manifest ID/start URL, name, and icon. iPhone/iPad users
+open the site in Safari, use Share → Add to Home Screen, and enable
 Open as Web App if offered. Keep the original personal link separately; the
 installed start page remains a cover. Icons can be regenerated with
 `node scripts/icons.mjs`.
@@ -174,17 +170,8 @@ page. This intentionally does not provide a fully offline application shell.
   Speech/video calling is not implemented in either version by this work.
 - The profile language preference syncs; this web UI currently uses English.
   Native translation coverage has not been ported one-for-one.
-- Publisher restrictions remain in place. The web reader sanitizes available
-  article HTML and links to the original when Google News resolution, paywalls,
-  or publisher restrictions prevent reading. It does not promise that every
-  article will open in-page or bypass a subscription.
-- The Fitness cover logs calories/macros in a browser and displays the Android app's
-  owner-only 14-day steps, distance, calories, and Wear OS heart-rate summary. A
-  browser does not claim to count background steps.
-- Browser camera preview and current-location lookup are available while their page
-  is open. Android remains the source for OCR, background location sharing,
-  navigation, and encrypted media upload/viewing because their keys and background
-  services are device-held.
+- The browser supports current-location lookup and document upload and viewing.
+  Android handles camera capture, OCR, and background location sharing.
 
 Do not describe this as a deployed production site or complete native parity until
 the remaining platform/translation differences and real Firebase integration have

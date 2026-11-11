@@ -546,10 +546,3 @@
   .safety-remove-step { grid-column: 2; justify-self: start; }
 }
 .safe-map p { display: flex; align-items: center; gap: 0.4rem; }
-.camera-preview {
-  width: min(100%, 44rem);
-  max-height: 65vh;
-  object-fit: contain;
-  border-radius: 1rem;
-  border: 1px solid var(--line);
-}

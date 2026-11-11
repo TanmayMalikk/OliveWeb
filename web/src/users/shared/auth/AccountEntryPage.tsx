@@ -1,7 +1,7 @@
 // All safe-app roles: handles web account sign-in and registration.
 import { useState } from "react";
 import { siteHref } from "../../../sites/SiteRouting";
-import { ArrowLeft, ArrowRight, Check, Leaf } from "lucide-react";
+import { ArrowLeft, ArrowRight, Leaf } from "lucide-react";
 import {
   Branch,
   Button,
@@ -12,7 +12,6 @@ import {
   StepProgress,
 } from "../../../components/SharedComponents";
 import {
-  covers,
   emptyProfile,
   validUsername,
   validPassword,
@@ -22,7 +21,6 @@ import {
 } from "../../../domain/DomainModels";
 import { useSession } from "../../../session/SessionProvider";
 import { accounts, triggerHash } from "../../../services/AccountService";
-import { CoverPreview } from "../../../public/GameLandingPage";
 // Shows the sign-in or registration form for the selected account role.
 export function AuthPage({
   organizationOnly = false,
@@ -212,18 +210,14 @@ export function Setup() {
   const existing = session.onboardingProfile;
   const personal = identity.role === "USER";
   const [step, setStep] = useState(
-    personal
-      ? existing && existing.fullName && existing.dob && existing.address.city
-        ? 2
-        : 0
-      : 1,
+    personal && existing?.fullName && existing.dob && existing.address.city ? 2 : 1,
   );
   const [profile, setProfile] = useState<Profile>(
     existing ?? emptyProfile(identity.username, identity.role),
   );
   const [trigger, setTrigger] = useState("");
   const steps = personal
-    ? ["Your cover", "About you", "Private entry"]
+    ? ["About you", "Private entry"]
     : ["Your profile", "Ready"];
   // Moves the setup form to the selected step and places focus on its heading.
   function update(key: keyof Profile, value: string) {
@@ -242,56 +236,21 @@ export function Setup() {
         </button>
       </header>
       <main id="main">
-        <StepProgress step={personal ? step : 0} steps={steps} />
+        <StepProgress step={step - 1} steps={steps} />
         <div className="setup-heading">
           <span className="eyebrow">
-            {step === 0
-              ? "YOUR EVERYDAY, YOUR WAY"
-              : step === 1
-                ? "A LITTLE ABOUT YOU"
-                : "ONE MORE THING"}
+            {step === 1 ? "ABOUT YOU" : "PRIVATE ENTRY"}
           </span>
           <h1>
-            {step === 0
-              ? "Choose your familiar."
-              : step === 1
-                ? "Make yourself at home."
-                : "Your personal doorway."}
+            {step === 1 ? "Set up your profile" : "Set up private entry"}
           </h1>
           <p>
-            {step === 0
-              ? "This is where you’ll land when you sign in. Your private space stays underneath."
-              : step === 1
-                ? "You can update these details in your profile at any time."
-                : "Your personal link opens the entry screen. Your PIN unlocks this browser. The trigger preference is shared with your Android app."}
+            {step === 1
+              ? "You can update these details in your profile at any time."
+              : "Use your personal link or the olive in Little Grove’s Account tab to reach your browser PIN."}
           </p>
         </div>
-        {step === 0 ? (
-          <>
-            <div className="setup-covers">
-              {covers.map((c) => (
-                <button
-                  key={c.id}
-                  className={`setup-cover ${profile.coverType === c.id ? "selected" : ""}`}
-                  aria-pressed={profile.coverType === c.id}
-                  onClick={() => setProfile({ ...profile, coverType: c.id })}
-                >
-                  <CoverPreview cover={c.id} />
-                  <span>
-                    {c.name}
-                    {profile.coverType === c.id && <Check size={18} />}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="setup-controls">
-              <span>You can change your cover later.</span>
-              <Button onClick={() => setStep(1)}>
-                <Forward>Continue</Forward>
-              </Button>
-            </div>
-          </>
-        ) : step === 1 ? (
+        {step === 1 ? (
           <Form
             className="setup-form"
             onSubmit={async () => {
@@ -398,13 +357,7 @@ export function Setup() {
               </p>
             )}
             <div className="setup-controls">
-              {personal ? (
-                <Button variant="quiet" onClick={() => setStep(0)}>
-                  <ArrowLeft size={17} /> Back
-                </Button>
-              ) : (
-                <span />
-              )}
+              <span />
               <Button type="submit" disabled={session.busy}>
                 <Forward>{personal ? "Continue" : "Finish setup"}</Forward>
               </Button>

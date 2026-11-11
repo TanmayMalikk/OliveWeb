@@ -392,9 +392,9 @@ export default function Notes() {
               <Button type="submit" disabled={s.busy}>
                 Save entry
               </Button>
-              <Button variant="quiet" onClick={s.quickExit}>
+              {s.profile?.role === "USER" && <Button variant="quiet" onClick={s.quickExit}>
                 Quick Exit
-              </Button>
+              </Button>}
             </div>
           </Form>
         </Modal>
