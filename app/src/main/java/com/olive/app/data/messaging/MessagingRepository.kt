@@ -255,6 +255,13 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return listener.asSubscription()
     }
 
+    // Loads a server-confirmed conversation index for background membership and key reconciliation.
+    suspend fun listConversations(currentUid: String): List<ChatConversation> =
+        firestore.collection("conversations").whereArrayContains("participantIds", currentUid)
+            .get(com.google.firebase.firestore.Source.SERVER).await().documents
+            .mapNotNull(::conversationFrom)
+            .sortedByDescending(ChatConversation::updatedAt)
+
     // Loads incoming and outgoing friend requests for this account.
     private fun requestFrom(row: DocumentSnapshot): FriendRequest? {
         val senderUid = row.getString("senderUid") ?: return null

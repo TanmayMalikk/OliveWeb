@@ -14,13 +14,8 @@ import androidx.work.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.messaging.FirebaseMessagingService
-import com.google.firebase.messaging.RemoteMessage
-import com.olive.app.BuildConfig
 import com.olive.app.R
 import com.olive.app.data.AccountRole
-import com.olive.app.data.update.AppUpdateScheduler
-import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.notification.OliveNotificationManager
 import java.io.IOException
 import java.util.UUID
@@ -240,46 +235,6 @@ class VoipPushTokenRegistrationWorker(context: Context, parameters: WorkerParame
             Result.retry()
         } catch (error: IllegalArgumentException) {
             Result.failure()
-        }
-    }
-}
-
-// Receives incoming VoIP call invitations and discreet safe-update alerts from Firebase Cloud Messaging.
-class VoipFirebaseMessagingService : FirebaseMessagingService() {
-    override fun onRegistered(installationId: String) {
-        super.onRegistered(installationId)
-        runCatching { VoipPushTokenRegistration.onTokenRefreshed(this, installationId) }
-        runCatching { LocalNotificationEventHandler.onFcmTokenRefreshed(this, installationId) }
-    }
-
-    override fun onMessageReceived(message: RemoteMessage) {
-        val data = message.data
-        if (data["type"] == "call_invitation") {
-            if (!VoipPushTokenRegistration.isEnabled(this)) return
-            val currentUid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-            val recipientId = data["recipientId"] ?: return
-            val callId = data["callId"] ?: return
-            val callerId = data["callerId"] ?: return
-            if (recipientId != currentUid || callId.isBlank() || callerId.isBlank()) return
-            runCatching {
-                OliveNotificationManager.showIncomingCall(this, callId, callerId, data["callName"].orEmpty())
-            }
-            return
-        }
-        if (data["type"] == "app_update") {
-            val remoteVersion = data["versionCode"]?.toLongOrNull() ?: Long.MAX_VALUE
-            if (remoteVersion > BuildConfig.VERSION_CODE) {
-                runCatching { AppUpdateScheduler.triggerNow(this) }
-            }
-            return
-        }
-        runCatching {
-            LocalNotificationEventHandler.onFcmMessageReceived(
-                this,
-                data,
-                message.notification?.title,
-                message.notification?.body,
-            )
         }
     }
 }

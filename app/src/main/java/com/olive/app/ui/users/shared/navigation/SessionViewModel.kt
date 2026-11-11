@@ -95,6 +95,11 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         runtime.accountSession.load()
     }
 
+    // Uses the same durable reconciliation path after Android returns the app to the foreground.
+    fun reconcilePriorityData() {
+        runtime.coverAccountId?.let(runtime.prioritySync::request)
+    }
+
     // Opens Android's file picker for a document attachment.
     fun beginExternalFilePicker() {
         externalFilePickerOpen = true

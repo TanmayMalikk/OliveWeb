@@ -37,7 +37,7 @@
         <provider android:name="ai.onnxruntime.TelemetryInitializer" tools:node="remove"
             android:authorities="ThisShouldNotBeHere" />
         <service
-            android:name=".data.messaging.VoipFirebaseMessagingService"
+            android:name=".data.messaging.OliveFirebaseMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

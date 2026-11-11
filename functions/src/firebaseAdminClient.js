@@ -12,7 +12,7 @@ setGlobalOptions({region: "northamerica-northeast1", maxInstances: 10});
 module.exports = {
   auth: getAuth(),
   db: getFirestore(),
-  messaging: getMessaging(),
   bucket: getStorage().bucket(),
+  messaging: getMessaging(),
   FieldValue,
 };
