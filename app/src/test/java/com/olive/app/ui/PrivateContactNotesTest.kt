@@ -40,9 +40,9 @@ class PrivateContactNotesTest {
             supportTag = SUPPORT_TAG_SUPPORT,
         )
 
-        assertEquals("Olive Staff", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.USER, "Olive Staff"))
-        assertEquals("Olive Staff", conversation.senderDisplayName("admin", "real_admin_name", AccountRole.SAFE_CONTACT, "Olive Staff"))
-        assertEquals("real_staff_name", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Olive Staff", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.USER, "Olive Staff", "Olive Admin"))
+        assertEquals("Olive Admin", conversation.senderDisplayName("admin", "real_admin_name", AccountRole.SAFE_CONTACT, "Olive Staff", "Olive Admin"))
+        assertEquals("real_staff_name", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.ADMIN, "Olive Staff", "Olive Admin"))
         val anonymousName = conversation.anonymousStaffDisplayName(
             "Olive Staff", "Consultation", "Support", "Escalation"
         )
