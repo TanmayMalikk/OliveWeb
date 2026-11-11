@@ -36,3 +36,25 @@ data class OutgoingAttachment(
         private const val UPLOAD_JOB_ID = "uploadJobId"
     }
 }
+
+/** A pending upload keeps its sequence position and asks WorkManager to retry later. */
+internal class AttachmentDependencyPending : IllegalStateException("Encrypted media upload is still pending")
+
+/** Routes one sequenced outbox head without allowing attachments to bypass the text-message queue. */
+internal class OutgoingDeliveryDispatcher(
+    private val deliverText: suspend (OutgoingMessage) -> Unit,
+    private val resolveUpload: suspend (String) -> String?,
+    private val deliverAttachment: suspend (OutgoingMessage, String) -> Unit,
+) {
+    suspend fun deliver(message: OutgoingMessage) {
+        val attachment = message.attachment
+        if (attachment == null) {
+            deliverText(message)
+            return
+        }
+        val mediaId = attachment.mediaId
+            ?: resolveUpload(checkNotNull(attachment.uploadJobId))
+            ?: throw AttachmentDependencyPending()
+        deliverAttachment(message, mediaId)
+    }
+}
