@@ -150,40 +150,27 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 val conversation = activeConversation ?: return
                 val device = enrollment ?: return
                 val documents = safetyDocumentRepository ?: return
-                val chat = secureChatRepository ?: return
                 if (messagingBusy || document.ownerUid != device.uid) return
                 val token = epoch
                 messagingBusy = true
                 message = null
                 scope.launch {
-                    val newlyGrantedRecipients = mutableListOf<String>()
                     // Turn an unexpected share failure into a readable message.
                     try {
-                        conversation.participantIds.filter { it != device.uid }.forEach { recipient ->
-                            if (recipient !in document.allowedUsers) newlyGrantedRecipients += recipient
-                            val username = conversation.participantUsernames[recipient]
+                        val recipients = conversation.participantIds.filter { it != device.uid }
+                            .associateWith { recipient -> conversation.participantUsernames[recipient]
                                 ?: error("Recipient username is unavailable")
-                            documents.grantAccess(document, device.uid, recipient, username)
-                        }
-                        chat.send(
+                            }
+                        val outgoing = prepareOutgoingMessage(
                             conversation.id, AccountIdentity(device.uid, coverUsername),
                             "SHARED_MEDIA:${document.id}:${document.name}", roomKey(conversation)
                         )
+                        documents.shareInChat(document, outgoing, recipients)
                         if (epoch == token) message =
                             runtime.application.getString(R.string.documents_shared_in_chat)
                     } catch (error: CancellationException) {
-                        newlyGrantedRecipients.forEach { recipient ->
-                            runCatching {
-                                documents.revokeAccess(document.id, device.uid, recipient)
-                            }
-                        }
                         throw error
-                    } catch (_: Exception) { // Revoke any access granted before a later recipient or chat update failed.
-                        newlyGrantedRecipients.forEach { recipient ->
-                            runCatching {
-                                documents.revokeAccess(document.id, device.uid, recipient)
-                            }
-                        }
+                    } catch (_: Exception) {
                         if (epoch == token) message =
                             runtime.application.getString(R.string.documents_share_failed)
                     } finally {
