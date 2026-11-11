@@ -17,6 +17,13 @@ import {
   type SafetyPlan as Plan,
 } from "../../../services/SafetyPlanService";
 import { useSession } from "../../../session/SessionProvider";
+import {
+  observeBrowserDocuments,
+  openBrowserDocument,
+  uploadBrowserDocument,
+  type BrowserDocument,
+} from "../../../services/MediaService";
+import { SafeMediaViewer } from "./SafeMediaViewer";
 
 // Changes a safety-plan field key into a readable section label.
 const label = (value: string) =>
@@ -32,6 +39,38 @@ export default function SafetyPlan() {
   const [feedback, setFeedback] = useState("");
   const [activeKind, setActiveKind] = useState<"primary" | "backup">("primary");
   const editable = identity?.role === "USER";
+  const [documents, setDocuments] = useState<BrowserDocument[]>([]);
+  const [viewer, setViewer] = useState<{ document: BrowserDocument; url: string } | null>(null);
+  const [documentError, setDocumentError] = useState("");
+
+  useEffect(() => {
+    if (!identity || !cloudMode) return;
+    let active = true;
+    let stop: (() => void) | undefined;
+    setDocuments([]);
+    setDocumentError("");
+    const failed = () => {
+      if (active) setDocumentError("Unable to load your encrypted documents.");
+    };
+    void observeBrowserDocuments(identity, (files) => {
+      if (active) {
+        setDocuments(files);
+        setDocumentError("");
+      }
+    }, failed).then((unsubscribe) => {
+      if (active) stop = unsubscribe;
+      else unsubscribe();
+    }).catch(failed);
+    return () => {
+      active = false;
+      stop?.();
+    };
+  }, [identity?.uid]);
+
+  useEffect(() => {
+    if (!viewer) return;
+    return () => URL.revokeObjectURL(viewer.url);
+  }, [viewer]);
   // Copy new plan data into the editor without replacing unsaved typing.
   useEffect(() => {
     if (!cloudMode || !identity) return;
@@ -112,6 +151,7 @@ export default function SafetyPlan() {
     message: string,
   ) => {
     const value = writeSafetyChecklist(items);
+    if (value.length > 4000) throw new Error("This section is full. Remove a step or document before adding more.");
     setDrafts((current) => ({ ...current, [key]: value }));
     const next = await saveField(plan, key, value);
     setPlan(next);
@@ -119,8 +159,26 @@ export default function SafetyPlan() {
       ...current,
       [key]: next.fields[key]?.value ?? value,
     }));
+    if (next.fields[key]?.value !== value) {
+      throw new Error("This section changed on another device. Review the latest version and try again.");
+    }
     setFeedback(message);
   };
+
+  const changeAttachment = (
+    key: string, items: SafetyChecklistItem[], itemId: string,
+    documentId: string, attach: boolean,
+  ) => updateSection(key, items.map((item) => {
+    if (item.id !== itemId) return item;
+    const attachmentIds = (item.attachmentIds ?? []).filter((id) => id !== documentId);
+    const excludedAttachmentIds = (item.excludedAttachmentIds ?? []).filter((id) => id !== documentId);
+    return {
+      ...item,
+      attachmentIds: attach ? [...attachmentIds, documentId].slice(-80) : attachmentIds,
+      excludedAttachmentIds: attach ? excludedAttachmentIds : [...excludedAttachmentIds, documentId].slice(-80),
+    };
+  }), attach ? "Document attached." : "Document removed from this step.");
+
   return (
     <div className="safety-plan-web">
       <section className="panel safety-plan-summary">
@@ -187,6 +245,11 @@ export default function SafetyPlan() {
                   <div className="safety-checklist-items">
                     {items.map((item, index) => {
                       const linkedContact = item.id.startsWith("trusted-contact:");
+                      const attachmentTag = ("safety-plan:" + key + ":" + item.id).slice(0, 80);
+                      const attachedIds = [...new Set([
+                        ...(item.attachmentIds ?? []),
+                        ...documents.filter((file) => file.tags?.includes(attachmentTag)).map((file) => file.id),
+                      ])].filter((id) => !item.excludedAttachmentIds?.includes(id));
                       return (
                         <div className="safety-checklist-row" key={item.id}>
                           <input
@@ -212,6 +275,7 @@ export default function SafetyPlan() {
                           ) : (
                             <input
                               type="text"
+                              disabled={section === "documents" && session.busy}
                               value={item.text}
                               maxLength={1000}
                               aria-label={`${label(section)} step ${index + 1}`}
@@ -254,6 +318,64 @@ export default function SafetyPlan() {
                               Remove
                             </button>
                           )}
+                          {section === "documents" && (
+                            <div className="safety-step-documents">
+                              {attachedIds.map((id) => {
+                                const document = documents.find((file) => file.id === id);
+                                return (
+                                  <div className="safety-step-document" key={id}>
+                                    {document?.approved ? (
+                                      <button type="button" className="text-link" disabled={session.busy}
+                                        onClick={() => void session.perform(async () => {
+                                          const url = await openBrowserDocument(document);
+                                          setViewer({ document, url });
+                                        })}>
+                                        {document.name}
+                                      </button>
+                                    ) : <span>{document?.name ?? "Document unavailable"}</span>}
+                                    {editable && (
+                                      <button type="button" className="safety-remove-step" disabled={session.busy}
+                                        aria-label={"Remove attachment " + (document?.name ?? "from step " + (index + 1))}
+                                        onClick={() => void session.perform(() => changeAttachment(key, items, item.id, id, false))}>
+                                        Remove
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {editable && identity && (
+                                <>
+                                  <label className="field">
+                                    <span>Attach a saved document</span>
+                                    <select aria-label={"Attach a saved document to step " + (index + 1)}
+                                      value="" disabled={session.busy}
+                                      onChange={(event) => {
+                                        const id = event.currentTarget.value;
+                                        if (id) void session.perform(() => changeAttachment(key, items, item.id, id, true));
+                                      }}>
+                                      <option value="">Choose a document</option>
+                                      {documents.filter((file) => file.ownerUid === identity.uid && !attachedIds.includes(file.id))
+                                        .map((file) => <option key={file.id} value={file.id}>{file.name}</option>)}
+                                    </select>
+                                  </label>
+                                  <label className="button outline">
+                                    Upload and attach
+                                    <input type="file" className="sr-only" disabled={session.busy}
+                                      aria-label={"Upload a document for step " + (index + 1)}
+                                      onChange={(event) => {
+                                        const file = event.currentTarget.files?.[0];
+                                        event.currentTarget.value = "";
+                                        if (!file) return;
+                                        void session.perform(async () => {
+                                          const id = await uploadBrowserDocument(file, identity);
+                                          await changeAttachment(key, items, item.id, id, true);
+                                        });
+                                      }} />
+                                  </label>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -284,7 +406,9 @@ export default function SafetyPlan() {
           </div>
         </section>
       ))}
+      {documentError && <p className="error" role="status">{documentError}</p>}
       {feedback && <p role="status">{feedback}</p>}
+      {viewer && <SafeMediaViewer {...viewer} onClose={() => setViewer(null)} />}
     </div>
   );
 }
