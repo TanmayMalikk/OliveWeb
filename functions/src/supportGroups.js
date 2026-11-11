@@ -21,7 +21,9 @@ function supportConversationId(ownerUid, origin = SUPPORT) {
 // Loads display usernames for every participant stored in a support conversation.
 async function participantNames(participantIds) {
   const profiles = await Promise.all(participantIds.map(readProfile));
-  return Object.fromEntries(participantIds.map((uid, index) => [uid, profiles[index]?.username || uid]));
+  return Object.fromEntries(participantIds.map((uid, index) => [
+    uid, (profiles[index]?.username || uid).trim().toLowerCase(),
+  ]));
 }
 
 // Finds active staff accounts that are ready to receive another support chat.
@@ -55,7 +57,7 @@ function validateGroupRemoval(conversation, callerUid, participantUid) {
 
 // Creates or updates the encrypted support chat for a support request or consultation.
 async function saveSupportConversation(plan, safeContactUid = "", reopen = false, writeContext = null) {
-  if (!plan?.ownerUid || !plan?.staffUid) return;
+  if (!plan?.ownerUid) return;
   const origin = plan.supportOrigin === PLAN_CONSULT ? PLAN_CONSULT : SUPPORT;
   const conversationId = plan.conversationId || supportConversationId(plan.ownerUid, origin);
   const participantIds = [...new Set([
@@ -65,7 +67,7 @@ async function saveSupportConversation(plan, safeContactUid = "", reopen = false
     safeContactUid,
     plan.adminUid,
   ].filter(Boolean))];
-  if (participantIds.length < 2) {
+  if (plan.staffUid && participantIds.length < 2) {
     throw new HttpsError("failed-precondition", "A support chat needs at least two people.");
   }
   const participantUsernames = await participantNames(participantIds);
@@ -78,7 +80,7 @@ async function saveSupportConversation(plan, safeContactUid = "", reopen = false
   const previousParticipants = current.data()?.participantIds || [];
   const participantRemoved = previousParticipants.some(uid => !participantIds.includes(uid));
   const value = {
-    type: "SUPPORT", ownerUid: plan.ownerUid, staffUid: plan.staffUid, adminUid: plan.adminUid || "",
+    type: "SUPPORT", ownerUid: plan.ownerUid, staffUid: plan.staffUid || "", adminUid: plan.adminUid || "",
     supportOrigin: origin, supportTag: plan.adminUid ? NEEDS_ADMIN : origin,
     friendshipId: conversationId, participantIds, participantUsernames,
     updatedAt: FieldValue.serverTimestamp(), lastMessage: current.data()?.lastMessage || "",

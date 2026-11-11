@@ -18,6 +18,9 @@ import com.olive.app.security.*
 
 // Owns conversation selection, messages and read markers.
 internal class SessionConversations(private val runtime: SessionRuntime) {
+    private var keyListeners = emptyList<com.google.firebase.firestore.ListenerRegistration>()
+    private val observedKeys = mutableMapOf<String, String>()
+    private var keyVersion = 0
     // Opens a conversation after loading its participants and encryption access.
     fun openConversation(conversation: ChatConversation, preserveMessages: Boolean = false) {
         with(runtime) {
@@ -30,6 +33,54 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 messageOutboxObservation?.cancel()
                 messageOutboxObservation = null
                 val sameConversation = activeConversation?.id == conversation.id
+                if (!sameConversation) {
+                    val observationEpoch = epoch
+                    keyListeners.forEach { it.remove() }
+                    observedKeys.clear()
+                    keyVersion = 0
+                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    val sources = listOf(
+                        firestore.collection("conversations").document(conversation.id).collection("deviceKeys")
+                            .document("$uid--${KeyManager.deviceId()}"),
+                    ) + conversation.participantUsernames.values.distinct().map {
+                        firestore.collection("messageDirectory").document(it.trim().lowercase())
+                    }
+                    val directories = conversation.participantUsernames.values.distinct().map {
+                        firestore.collection("messageDirectory").document(it.trim().lowercase()).collection("devices")
+                    }
+                    keyListeners = sources.map { reference ->
+                        reference.addSnapshotListener { snapshot, failure ->
+                            if (failure != null || snapshot == null || epoch != observationEpoch ||
+                                enrollment?.uid != uid || activeConversation?.id != conversation.id) return@addSnapshotListener
+                            val fingerprint = snapshot.getString("wrappedKey") ?: snapshot.getString("publicKey") ?: return@addSnapshotListener
+                            if (observedKeys.put(reference.path, fingerprint) != fingerprint) {
+                                keyVersion++
+                                if (activeRoomKey == null && !messagingBusy) openConversation(checkNotNull(activeConversation))
+                            }
+                        }
+                    } + directories.map { directory ->
+                        directory.addSnapshotListener { snapshot, failure ->
+                            if (failure != null || snapshot == null || epoch != observationEpoch ||
+                                enrollment?.uid != uid || activeConversation?.id != conversation.id) return@addSnapshotListener
+                            val fingerprint = snapshot.documents.joinToString("|") {
+                                "${it.id}:${it.getString("publicKey")}:${it.getString("mgf1Digest")}"
+                            }
+                            if (observedKeys.put(directory.path, fingerprint) == fingerprint) return@addSnapshotListener
+                            val availableKey = activeRoomKey ?: return@addSnapshotListener
+                            scope.launch {
+                                try {
+                                    if (epoch == observationEpoch && enrollment?.uid == uid) {
+                                        secureChatRepository?.shareWithRegisteredDevices(conversation, availableKey)
+                                    }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    // The next directory update or conversation open retries device approval.
+                                }
+                            }
+                        }
+                    }
+                }
                 if (!preserveMessages || !sameConversation) {
                     chatMessages = emptyList()
                     remoteChatMessages = emptyList()
@@ -43,6 +94,12 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     accountRole == AccountRole.USER && !chatQuickExitHintShown
                 if (chatQuickExitHintVisible) chatQuickExitHintShown = true
                 val token = epoch
+                val initialKeyVersion = keyVersion
+                if (conversation.type == "SUPPORT" && conversation.staffUid.isBlank()) {
+                    activeRoomKey = null
+                    messagingBusy = false
+                    return
+                }
                 messagingBusy = true
                 scope.launch {
                     try {
@@ -96,7 +153,8 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             messagingBusy = false
                             val updated = activeConversation
                             if (messageSubscription == null && updated?.id == conversation.id &&
-                                updated.updatedAt != conversation.updatedAt) {
+                                (updated.updatedAt != conversation.updatedAt ||
+                                  (activeRoomKey == null && keyVersion != initialKeyVersion))) {
                                 openConversation(updated)
                             }
                         }
@@ -106,8 +164,15 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
+    fun stopKeyObservation() {
+        keyListeners.forEach { it.remove() }
+        keyListeners = emptyList()
+        observedKeys.clear()
+    }
+
     // Session conversations: Stops conversation. It closes the active subscription or resource.
     fun closeConversation() {
+        stopKeyObservation()
         with(runtime) {
             with(state) {
                 messageSubscription?.close()

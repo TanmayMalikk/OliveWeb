@@ -4,6 +4,46 @@ const assert = require("node:assert/strict");
 const {mergeFields, staffEligible, chooseStaff} = require("./src/safetyPlanPolicy");
 process.env.FIREBASE_CONFIG = JSON.stringify({projectId:"olive-test",storageBucket:"olive-test.appspot.com"});
 const {canEdit} = require("./src/safetyPlanAccess");
+
+test("different checklist rows and different properties merge without an owner conflict", () => {
+  const items = [
+    {id:"a",text:"First",checked:false},
+    {id:"b",text:"Second",checked:false},
+  ];
+  const encode = items => JSON.stringify({oliveSafetyChecklist:1,items});
+  const baseValue = encode(items);
+  const remote = encode(items.map(item => item.id==="a" ? {...item,checked:true} : item));
+  const local = encode(items.map(item => item.id==="b" ? {...item,text:"Updated second"} : item));
+  const result = mergeFields({primary_documents:{value:remote,revision:2,mutationId:"remote"}}, {}, [{
+    key:"primary_documents",baseValue,value:local,revision:1,mutationId:"local",
+  }]);
+  assert.deepEqual(result.conflicts,[]);
+  const merged=JSON.parse(result.fields.primary_documents.value).items;
+  assert.equal(merged[0].checked,true);
+  assert.equal(merged[1].text,"Updated second");
+  const sameRow=mergeFields({primary_documents:{value:remote,revision:2,mutationId:"remote"}},{},[{
+    key:"primary_documents",baseValue,value:encode(items.map(item=>item.id==="a"?{...item,text:"Renamed"}:item)),
+    revision:1,mutationId:"same-row",
+  }]);
+  assert.deepEqual(sameRow.conflicts,[]);
+  assert.deepEqual(JSON.parse(sameRow.fields.primary_documents.value).items[0],
+      {id:"a",text:"Renamed",checked:true});
+});
+
+test("a true checklist conflict retains independent edits in both owner choices", () => {
+  const items=[{id:"a",text:"Original",checked:false},{id:"b",text:"Second",checked:false}];
+  const encode=items=>JSON.stringify({oliveSafetyChecklist:1,items});
+  const current=encode([{...items[0],text:"Owner change"},{...items[1],checked:true}]);
+  const incoming=encode([{...items[0],text:"Staff change"},items[1]]);
+  const result=mergeFields({primary_documents:{value:current,revision:2,mutationId:"owner"}},{},[{
+    key:"primary_documents",baseValue:encode(items),value:incoming,revision:1,mutationId:"staff",
+  }]);
+  assert.deepEqual(result.conflicts,["primary_documents"]);
+  assert.equal(JSON.parse(result.fields.primary_documents.value).items[0].text,"Owner change");
+  const proposed=JSON.parse(result.conflictValues.primary_documents).items;
+  assert.equal(proposed[0].text,"Staff change");
+  assert.equal(proposed[1].checked,true);
+});
 // Inputs: the values in this case. Expected: offline concurrent edits retain the server version until explicitly resolved.
 test("offline concurrent edits retain the server version until explicitly resolved", () => {
   const fields = {primary_destination: {value:"Staff location", revision:2, mutationId:"staff"}};

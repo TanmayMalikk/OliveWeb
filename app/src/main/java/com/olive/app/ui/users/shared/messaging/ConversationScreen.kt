@@ -432,7 +432,8 @@ internal fun ChatPane(
                     )
                     FilledIconButton(
                         onClick = { session.messages.sendMessage(draft) { draft = "" } },
-                        enabled = draft.isNotBlank() && !session.messages.busy,
+                        enabled = draft.isNotBlank() && !session.messages.busy &&
+                            (active.type != "SUPPORT" || active.staffUid.isNotBlank()),
                         modifier = Modifier.size(50.dp).testTag("send_message")
                     ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
                 }

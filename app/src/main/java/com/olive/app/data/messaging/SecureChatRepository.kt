@@ -120,18 +120,19 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     }
 
     // Secure messaging: gives each registered phone or browser its own wrapped copy of the room key.
-    private suspend fun shareWithRegisteredDevices(
+    suspend fun shareWithRegisteredDevices(
         conversation: ChatConversation,
         roomKey: SecretKey
     ) {
         val conversationRef = firestore.collection("conversations").document(conversation.id)
-        val batch = firestore.batch()
+        var batch = firestore.batch()
         var writes = 0
         conversation.participantIds.forEach { uid ->
             val username = conversation.participantUsernames[uid] ?: return@forEach
-            val devices = firestore.collection("messageDirectory").document(username)
+            val devices = firestore.collection("messageDirectory").document(username.trim().lowercase())
                 .collection("devices").get().await()
             devices.documents.forEach { device ->
+                if (device.getString("uid") != uid) return@forEach
                 val deviceId = device.getString("deviceId") ?: return@forEach
                 val encoded = device.getString("publicKey") ?: return@forEach
                 val publicKey = runCatching { KeyManager.decodePublicKey(encoded) }.getOrNull()
@@ -149,6 +150,11 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                     )
                 )
                 writes++
+                if (writes == 10) {
+                    batch.commit().await()
+                    batch = firestore.batch()
+                    writes = 0
+                }
             }
         }
         if (writes > 0) batch.commit().await()
@@ -482,7 +488,11 @@ data class ChatConversation(
 
     // Keeps the header neutral until Firestore returns the real ticket number.
     fun ticketDisplayName(): String =
-        if (ticketSequence >= 0L) "Ticket #$ticketSequence" else "Support ticket"
+        (when {
+            supportTag == SUPPORT_TAG_NEEDS_ADMIN -> "Admin Ticket"
+            supportOrigin == SUPPORT_TAG_PLAN_CONSULT || supportTag == SUPPORT_TAG_PLAN_CONSULT -> "Consult Ticket"
+            else -> "Support Ticket"
+        }) + if (ticketSequence >= 0L) " #$ticketSequence" else ""
 
     // Gives each personal participant a stable anonymous label inside organization support views.
     fun participantTicketNumber(uid: String): String =
@@ -494,9 +504,7 @@ data class ChatConversation(
         viewerRole: AccountRole,
         anonymousStaffName: String = "Your Olive Branch",
     ) = if (type == "SUPPORT") {
-        if (viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-            ticketDisplayName()
-        } else anonymousStaffName
+        ticketDisplayName()
     } else {
         participantIds.mapNotNull { uid ->
             participantUsernames[uid]?.takeIf { uid != currentUid }
@@ -510,12 +518,7 @@ data class ChatConversation(
         supportName: String,
         escalationName: String,
     ): String {
-        val ticketName = when {
-            supportTag == SUPPORT_TAG_NEEDS_ADMIN -> escalationName
-            supportOrigin == SUPPORT_TAG_PLAN_CONSULT || supportTag == SUPPORT_TAG_PLAN_CONSULT -> consultationName
-            else -> supportName
-        }
-        return "$staffName • $ticketName"
+        return ticketDisplayName()
     }
 
     // Personal accounts see a role label instead of an organization member's account name.

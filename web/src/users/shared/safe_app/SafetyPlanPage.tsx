@@ -54,6 +54,7 @@ export default function SafetyPlan() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const baseRevisions = useRef<Record<string, number>>({});
+  const baseValues = useRef<Record<string, string>>({});
   const lastAttempt = useRef<{ key: string; value: string } | null>(null);
   const [localConflict, setLocalConflict] = useState<{ key: string; mine: string } | null>(null);
   const [keepMine, setKeepMine] = useState(false);
@@ -171,6 +172,7 @@ export default function SafetyPlan() {
     setViewer(null);
     setLocalConflict(null);
     baseRevisions.current = {};
+    baseValues.current = {};
     if (!ownerUid) return;
     void loadPlan(ownerUid)
       .then(async (value) => {
@@ -234,11 +236,14 @@ export default function SafetyPlan() {
     const value = writeSafetyChecklist(items);
     if (value.length > 4000) throw new Error("This section is full. Remove a step or document before adding more.");
     setDrafts((current) => ({ ...current, [key]: value }));
-    const { plan: next, conflicts } = await saveField(plan, key, value, baseRevisions.current[key]);
+    const { plan: next, conflicts, conflictValues } = await saveField(
+      plan, key, value, baseRevisions.current[key], baseValues.current[key],
+    );
     delete baseRevisions.current[key];
+    delete baseValues.current[key];
     setPlan(next);
     if (conflicts.includes(key) && next.fields[key]?.value !== value) {
-      setLocalConflict({ key, mine: value });
+      setLocalConflict({ key, mine: conflictValues?.[key] ?? value });
       return;
     }
     setDrafts((current) => ({
@@ -258,7 +263,7 @@ export default function SafetyPlan() {
     const timer = window.setTimeout(() => {
       lastAttempt.current = { key, value: drafts[key] };
       void session.perform(() => updateSection(key, readSafetyChecklist(drafts[key]), `${label(key)} saved.`));
-    }, 300);
+    }, 75);
     return () => window.clearTimeout(timer);
   }, [drafts, plan, editable, session.busy, conflictKey]);
 
@@ -315,7 +320,7 @@ export default function SafetyPlan() {
           {plan.staffUid && <small>A support staff member is working with you.</small>}
           {editable && !plan.consultationRequested && Boolean(plan.plansCompletedAt) &&
             <p role="status">Your safety plan and backup plan are complete.</p>}
-          {editable && plan.staffUid && plan.consultationConversationId && identity && (
+          {editable && plan.consultationRequested && plan.consultationConversationId && identity && (
             <Button variant="quiet" onClick={() => {
               session.setRequestedConversation({ id: plan.consultationConversationId!, uid: identity.uid });
               session.setPage("Messages");
@@ -332,7 +337,7 @@ export default function SafetyPlan() {
                   plan.consultationRequested ? "stop" : "request",
                 );
                 setPlan(next);
-                if (identity && next.staffUid && next.consultationConversationId) {
+                if (identity && next.consultationRequested && next.consultationConversationId) {
                   if (attachedIds.length) {
                     void planMediaRecipients().then((recipients) => Promise.allSettled(
                       attachedIds.map((id) => shareBrowserPlanDocument(id, identity, recipients)),
@@ -418,6 +423,7 @@ export default function SafetyPlan() {
                               onChange={(event) => {
                                 lastAttempt.current = null;
                                 baseRevisions.current[key] ??= plan.fields[key]?.revision ?? 0;
+                                baseValues.current[key] ??= plan.fields[key]?.value ?? "";
                                 const changed = items.map((candidate) =>
                                   candidate.id === item.id
                                     ? { ...candidate, text: event.target.value }
@@ -433,6 +439,7 @@ export default function SafetyPlan() {
                                 const changed = readSafetyChecklist(drafts[key] ?? "");
                                 if (writeSafetyChecklist(changed) === plan.fields[key]?.value) {
                                   delete baseRevisions.current[key];
+                                  delete baseValues.current[key];
                                   return;
                                 }
                                 void session.perform(() =>

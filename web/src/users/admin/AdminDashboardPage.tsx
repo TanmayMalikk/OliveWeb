@@ -1,6 +1,6 @@
 // Admins: shows account totals and controls to admins.
 import { useEffect, useState } from "react";
-import { LogOut, Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import {
   Button,
   Field,
@@ -52,9 +52,6 @@ export default function AdminPortal() {
       <header className="site-header">
         <Logo />
         <span className="eyebrow">ADMINISTRATOR PORTAL</span>
-        <Button variant="exit" onClick={session.quickExit}>
-          Quick Exit <LogOut size={17} />
-        </Button>
       </header>
       <main id="main">
         <div className="safe-page-title">

@@ -36,6 +36,7 @@ export type SafetyPlan = {
   safeContactNames: Record<string, string>;
   updatedAt?: number;
   consultationConversationId?: string;
+  ticketNumber?: number;
   plansCompletedAt?: number;
   pendingConflicts?: Record<string, { value: string; mutationId: string }>;
 };
@@ -141,6 +142,7 @@ export async function observePlan(
         safeContactNames: (data.safeContactNames ?? {}) as Record<string, string>,
         updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
         consultationConversationId: data.consultationConversationId,
+        ticketNumber: Number.isSafeInteger(data.ticketNumber) ? data.ticketNumber : undefined,
         plansCompletedAt: data.plansCompletedAt,
         pendingConflicts: data.pendingConflicts,
       });
@@ -161,10 +163,10 @@ export async function observeSafetyAccess(uid: string, onUpdate: () => void, onE
   }, onError);
 }
 // Saves one safety-plan field without overwriting a newer edit.
-export async function saveField(plan: SafetyPlan, key: string, value: string, revision?: number) {
+export async function saveField(plan: SafetyPlan, key: string, value: string, revision?: number, baseValue?: string) {
   const current = plan.fields[key] ?? { value: "", revision: 0 };
   return (
-    await call<{ plan: SafetyPlan; conflicts: string[] }>("safetyPlanSync", {
+    await call<{ plan: SafetyPlan; conflicts: string[]; conflictValues?: Record<string, string> }>("safetyPlanSync", {
       ownerUid: plan.ownerUid,
       defaults: {},
       changes: [
@@ -173,6 +175,7 @@ export async function saveField(plan: SafetyPlan, key: string, value: string, re
           value,
           revision: revision ?? current.revision,
           mutationId: crypto.randomUUID(),
+          baseValue: baseValue ?? current.value,
         },
       ],
     })
@@ -220,7 +223,7 @@ export async function sharedPlans() {
 export async function staffConsultations() {
   return call<{
     available: boolean;
-    plans: { ownerUid: string; ownerName: string; updatedAt: number }[];
+    plans: { ownerUid: string; ownerName: string; updatedAt: number; ticketNumber: number }[];
   }>("safetyPlanConsultations");
 }
 // Lets the support queue know whether this staff member can take a ticket.

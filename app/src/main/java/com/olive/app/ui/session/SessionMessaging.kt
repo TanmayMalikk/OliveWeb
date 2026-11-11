@@ -77,9 +77,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 val identity = AccountIdentity(device.uid, coverUsername)
                 // Organization accounts stay in the portal, so keep their notification listener
                 // active while the message list listener drives unread badges on the dashboard.
-                if (accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-                    LocalNotificationEventHandler.pauseForegroundListeners()
-                }
+                LocalNotificationEventHandler.start(application)
                 val token = epoch
                 messagingBusy = true
                 if (showFeedback) message = null
@@ -87,6 +85,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                     // Use the fallback when start messaging is unavailable.
                     try {
                         registerMessagingIdentity(identity)
+                        repository.prepareSupportTickets()
                         if (epoch != token || !messagingScreenActive()) return@launch
                         socialSubscription = repository.observeSocial(device.uid, { social ->
                             // Apply messages only to the same chat session that started the listener.
@@ -271,6 +270,7 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
 
     // Removes friend and conversation listeners when messaging is no longer needed.
     fun stopMessaging(clearRows: Boolean = true) {
+        runtime.conversationActions.stopKeyObservation()
         with(runtime) {
             with(state) {
                 socialSubscription?.close()

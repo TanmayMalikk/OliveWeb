@@ -24,6 +24,14 @@ function fcmTargetsForConversationUpdate(before, after, conversationId) {
   }
   const messageId = typeof after?.lastMessageId === "string" ? after.lastMessageId.trim() : "";
   const previousId = typeof before?.lastMessageId === "string" ? before.lastMessageId.trim() : "";
+  if (after?.type === "SUPPORT" && Array.isArray(after.participantIds) && (!messageId || messageId === previousId)) {
+    const previous = new Set(before?.participantIds || []);
+    const added = after.participantIds.filter(uid => uid !== after.ownerUid && !previous.has(uid));
+    if (added.length) return {
+      recipients: [...new Set(added)],
+      data: {type: "safe_update", conversationId, eventId: "ticket-assigned"},
+    };
+  }
   if (!messageId || messageId === previousId || !Array.isArray(after?.participantIds)) {
     return {recipients: [], data: null};
   }
@@ -108,7 +116,7 @@ exports.staffSupportRequest = onCall({invoker: "public"}, async request => {
     transaction.set(reference, created);
     return created;
   });
-  if (ticket.staffUid) await saveSupportConversation(ticket, "", false);
+  if (ticket.requested) await saveSupportConversation(ticket, "", false);
   return {ticket};
 });
 

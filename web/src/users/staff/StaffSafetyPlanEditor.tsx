@@ -16,7 +16,7 @@ interface SafetyPlanEditorProps {
 export default function SafetyPlanEditor({ plan, onChange, onCompleted }: SafetyPlanEditorProps) {
   const session = useSession();
   const identity = accounts.identity;
-  const [drafts, setDrafts] = useState<Record<string, { key: string; itemId: string; text: string; revision: number }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { key: string; itemId: string; text: string; revision: number; baseValue: string }>>({});
   const lastAttempt = useRef<{ draftKey: string; text: string } | null>(null);
   const [documents, setDocuments] = useState<BrowserDocument[]>([]);
   const [viewer, setViewer] = useState<{ document: BrowserDocument; url: string } | null>(null);
@@ -48,13 +48,13 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
   useEffect(() => {
     if (viewer && !documents.some((file) => file.id === viewer.document.id && file.approved)) setViewer(null);
   }, [viewer, documents]);
-  const saveStep = async (key: string, itemId: string, change: { text?: string; checked?: boolean }, revision?: number) => {
+  const saveStep = async (key: string, itemId: string, change: { text?: string; checked?: boolean }, revision?: number, baseValue?: string) => {
     const items = readSafetyChecklist(plan.fields[key]?.value ?? "");
     const item = items.find((row) => row.id === itemId);
     if (!item) throw new Error("This step was removed. Review the updated plan.");
     const result = await saveField(plan, key, writeSafetyChecklist(
       items.map((current) => current.id === itemId ? { ...current, ...change } : current),
-    ), revision);
+    ), revision, baseValue);
     onChange(result.plan);
     setFeedback(result.conflicts.length ? "The plan owner will resolve the conflicting edit." : "");
     setDrafts((current) => {
@@ -72,13 +72,13 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
     const [draftKey, draft] = next;
     const timer = window.setTimeout(() => {
       lastAttempt.current = { draftKey, text: draft.text };
-      void session.perform(() => saveStep(draft.key, draft.itemId, { text: draft.text }, draft.revision));
-    }, 300);
+      void session.perform(() => saveStep(draft.key, draft.itemId, { text: draft.text }, draft.revision, draft.baseValue));
+    }, 75);
     return () => window.clearTimeout(timer);
   }, [drafts, plan, session.busy]);
   return (
     <section className="panel safety-plan-group">
-      <h2>{plan.ownerName || "Shared"} plan</h2>
+      <h2>{plan.ticketNumber !== undefined && plan.ticketNumber >= 0 ? `Consult Ticket #${plan.ticketNumber}` : "Consult Ticket"}</h2>
       <div className="form-grid">
         {(["primary", "backup"] as const).flatMap((kind) =>
           safetySections.map((section) => {
@@ -106,12 +106,13 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
                           const text = event.currentTarget.value;
                           setDrafts((current) => ({ ...current, [draftKey]: {
                             key, itemId: item.id, text, revision: draft?.revision ?? field.revision,
+                            baseValue: draft?.baseValue ?? field.value,
                           } }));
                         }}
                         onBlur={() => {
                           if (session.busy) return;
                           if (draft && draft.text !== item.text) {
-                            void session.perform(() => saveStep(key, item.id, { text: draft.text }, draft.revision));
+                            void session.perform(() => saveStep(key, item.id, { text: draft.text }, draft.revision, draft.baseValue));
                           }
                           else if (draft) setDrafts((current) => {
                             const next = { ...current };

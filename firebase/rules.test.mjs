@@ -454,7 +454,8 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
       sentAt:serverTimestamp(),clientSentAt:Date.now()}));
 });
 
-test('support conversations keep encrypted access when more than four people participate', async () => {
+for (const requestSource of ['SUPPORT_BUTTON', 'GROUP_CHAT']) {
+test(`support conversations from ${requestSource} keep encrypted access when more than four people participate`, async () => {
   const owner=env.authenticatedContext('support-owner',{email:'support_owner@users.olive.invalid'}).firestore();
   const staff=env.authenticatedContext('support-staff',{email:'staff@example.ca',role:'STAFF'}).firestore();
   const contact=env.authenticatedContext('support-contact',{email:'support_contact@safe.olive.invalid'}).firestore();
@@ -476,9 +477,10 @@ test('support conversations keep encrypted access when more than four people par
     senderUid:'support-staff',senderUsername:'support_staff',recipientUid:'support-owner',
     recipientUsername:'support_owner',friendshipId:'support-staff--support-owner',createdAt:serverTimestamp(),
   }));
-  const conversationId='support-support-owner-ticket-1';
+  const conversationId=`support-support-owner-ticket-${requestSource}`;
   const conversation={type:'SUPPORT',ownerUid:'support-owner',staffUid:'support-staff',adminUid:'support-admin',
     supportOrigin:'SUPPORT',supportTag:'NEEDS_ADMIN',
+    requestSource,sourceConversationId:conversationId,
     friendshipId:conversationId,participantIds:['support-owner','support-staff','support-contact','support-guest','support-admin'],
     participantUsernames:{'support-owner':'support_owner','support-staff':'support_staff','support-contact':'support_contact',
       'support-guest':'support_guest','support-admin':'support_admin'},
@@ -519,6 +521,46 @@ test('support conversations keep encrypted access when more than four people par
     await assertSucceeds(batch.commit());
   }
   await assertSucceeds(getDoc(doc(contact,`conversations/${conversationId}/messages/staff-message`)));
+});
+}
+
+test('personal group members can initialize keys and exchange encrypted messages while outsiders remain blocked', async () => {
+  const ids=['group-owner','group-friend','group-contact'];
+  const clients=ids.map(uid=>env.authenticatedContext(uid,{email:`${uid.replaceAll('-','_')}@users.olive.invalid`}).firestore());
+  const outsider=env.authenticatedContext('group-outsider').firestore();
+  const conversationId='personal-group-regression';
+  const participantUsernames=Object.fromEntries(ids.map(uid=>[uid,uid.replaceAll('-','_')]));
+  const participantPublicKeys=Object.fromEntries(ids.map(uid=>[uid,`${uid}-key`]));
+  for (const [index,uid] of ids.entries()) {
+    const username=participantUsernames[uid];
+    await assertSucceeds(setDoc(doc(clients[index],`messageDirectory/${username}`),
+      {uid,username,publicKey:participantPublicKeys[uid],updatedAt:serverTimestamp()}));
+  }
+  await env.withSecurityRulesDisabled(async context=>{
+    await setDoc(doc(context.firestore(),`conversations/${conversationId}`),{
+      type:'GROUP',ownerUid:ids[0],friendshipId:conversationId,participantIds:ids,participantUsernames,
+      createdAt:serverTimestamp(),updatedAt:serverTimestamp(),lastMessage:'',lastMessageId:'',lastSenderUid:'',
+    });
+  });
+  await assertSucceeds(updateDoc(doc(clients[0],`conversations/${conversationId}`),{
+    roomKeys:Object.fromEntries(ids.map(uid=>[uid,`${uid}-wrapped-key`])),participantPublicKeys,
+    updatedAt:serverTimestamp(),
+  }));
+  for (const [index,uid] of ids.entries()) {
+    const messageId=`message-${index}`;
+    const batch=writeBatch(clients[index]);
+    batch.set(doc(clients[index],`conversations/${conversationId}/messages/${messageId}`),{
+      senderUid:uid,senderUsername:participantUsernames[uid],ciphertext:'encrypted-group-message',
+      deleted:false,sentAt:serverTimestamp(),clientSentAt:Date.now(),
+    });
+    batch.update(doc(clients[index],`conversations/${conversationId}`),{
+      lastMessage:'Secure message',lastMessageId:messageId,lastSenderUid:uid,updatedAt:serverTimestamp(),
+    });
+    await assertSucceeds(batch.commit());
+    for (const client of clients) await assertSucceeds(getDoc(doc(client,`conversations/${conversationId}/messages/${messageId}`)));
+  }
+  await assertFails(getDoc(doc(outsider,`conversations/${conversationId}`)));
+  await assertFails(getDoc(doc(outsider,`conversations/${conversationId}/messages/message-0`)));
 });
 
 test('encrypted live coordinates are overwritten by their owner and readable only by authorized contacts', async () => {

@@ -54,7 +54,7 @@ exports.safetyPlanConsult = onCall({invoker: "public"}, async (request) => {
       adminName: assignmentNeeded ? plan.adminName || "" : "",
       ...(consultationRequested && !wasRequested ? {plansCompletedAt: 0} : {}),
       consultationRequested, consultationConversationId, ticketNumber, updatedAt: Date.now()};
-    if (selected) await saveSupportConversation(
+    if (consultationRequested) await saveSupportConversation(
         {...updated, conversationId: consultationConversationId, supportOrigin: PLAN_CONSULT},
         updated.supportSafeContactUid || "", false, {transaction, snapshot: conversation});
     else if (action === "stop" && conversation?.exists && !conversation.get("closedAt")) {

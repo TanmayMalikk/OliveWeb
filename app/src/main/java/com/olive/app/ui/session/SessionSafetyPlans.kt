@@ -37,6 +37,9 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     private var planListener: ListenerRegistration? = null
     private var generation = 0
     private var foregroundSync: Job? = null
+    private var foregroundVersion = 0L
+    private var accessListener: ListenerRegistration? = null
+    private var accessActor: String? = null
     var plan by mutableStateOf<SafetyPlan?>(null)
         private set
     var error by mutableStateOf<Int?>(null)
@@ -54,6 +57,19 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         runtime.scope.launch {
             SyncCompletionEvents.events.collect { uid ->
                 if (uid == runtime.coverAccountId) loadCachedAccessLists(uid)
+            }
+        }
+    }
+
+    fun observeAccess() {
+        val actor = runtime.coverAccountId ?: return
+        if (runtime.localMode || accessActor == actor) return
+        accessListener?.remove()
+        accessActor = actor
+        accessListener = repository.observeAccess(actor) {
+            if (runtime.coverAccountId == actor && authorized()) {
+                if (runtime.state.accountRole == AccountRole.SAFE_CONTACT) refreshSharedPlans()
+                else runtime.scope.launch { refreshConsultations() }
             }
         }
     }
@@ -93,7 +109,12 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         error = null
         saving =
             0
-        if (screenLease == null) consultations = emptyList()
+        if (screenLease == null) {
+            consultations = emptyList()
+            accessListener?.remove()
+            accessListener = null
+            accessActor = null
+        }
     }
 
     // Checks access, loads or creates the selected plan, queues cloud sync, and ignores stale results.
@@ -223,6 +244,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val revision = field.conflictRevision ?: return
         val edited = if (keepMine) field.copy(
             revision = revision,
+            baseValue = field.conflictValue,
             conflictRevision = null,
             conflictValue = null
         ).edit(field.value)
@@ -269,8 +291,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 if (current(actor, actor, token) && updated != null) {
                     plan = updated
                     error = null
-                    if (!stop && updated.staffUid.isNotBlank()) {
-                        shareConsultationDocuments(actor, updated)
+                    if (!stop && updated.consultationConversationId.isNotBlank()) {
+                        if (updated.staffUid.isNotBlank()) shareConsultationDocuments(actor, updated)
                         openConsultation(updated.consultationConversationId)
                     }
                 }
@@ -454,11 +476,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 if (!runtime.localMode) {
                     SafetyPlanSyncWorker.enqueue(runtime.application, actor, owner)
                     if (current(actor, owner, token)) {
-                        foregroundSync?.cancel()
-                        foregroundSync = runtime.scope.launch {
-                            delay(250)
-                            if (current(actor, owner, token)) refresh()
-                        }
+                        syncForeground(actor, owner, token)
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -467,6 +485,30 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 if (current(actor, owner, token)) error = R.string.safety_storage_error
             } finally {
                 if (current(actor, owner, token)) saving = (saving - 1).coerceAtLeast(0)
+            }
+        }
+    }
+
+    private fun syncForeground(actor: String, owner: String, token: Int) {
+        foregroundVersion++
+        if (foregroundSync?.isActive == true) return
+        foregroundSync = runtime.scope.launch {
+            try {
+                do {
+                    val version = foregroundVersion
+                    if (!current(actor, owner, token) || !hasValidatedInternetConnection(runtime.application)) break
+                    sync.withLock {
+                        withContext(Dispatchers.IO) { syncSafetyPlan(store, repository, actor, owner) }
+                    }
+                    val saved = withContext(Dispatchers.IO) { store.read(actor, owner) }
+                    if (current(actor, owner, token) && saving == 0) plan = saved
+                } while (version != foregroundVersion)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (current(actor, owner, token)) error = R.string.safety_sync_error
+            } finally {
+                foregroundSync = null
             }
         }
     }
