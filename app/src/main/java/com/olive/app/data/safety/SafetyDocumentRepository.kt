@@ -182,7 +182,10 @@ class SafetyDocumentRepository(
         val current = getFor(ownerUid, document.id)
         if (current.objectKey.isNotBlank()) {
             val access = encryptedAccess(current, ownerUid, recipients)
-            media.updateAccess(current.id, access.accountKeys, access.deviceKeys)
+            media.updateAccess(
+                current.id, access.accountKeys, access.deviceKeys,
+                grantIndependentRecipients = recipients.keys.toList(),
+            )
             return
         }
         val updated = (listOf(ownerUid) + recipients.keys).distinct()
@@ -227,7 +230,10 @@ class SafetyDocumentRepository(
             }
             val wrapped = current.wrappedKeys + (recipientUid to recipient.accountKey)
             val devices = retainAuthorizedDeviceKeys(current.deviceWrappedKeys, wrapped.keys) + recipient.deviceKeys
-            media.updateAccess(current.id, wrapped, devices)
+            media.updateAccess(
+                current.id, wrapped, devices,
+                grantIndependentRecipients = listOf(recipientUid),
+            )
             return
         }
         check(!forPlan) { "Upload an encrypted copy before attaching this legacy document." }
@@ -251,7 +257,10 @@ class SafetyDocumentRepository(
             val wrapped = document.wrappedKeys - recipientUid
             require(ownerUid in wrapped) { "The owner encryption key cannot be removed" }
             val devices = retainAuthorizedDeviceKeys(document.deviceWrappedKeys, wrapped.keys)
-            media.updateAccess(document.id, wrapped, devices)
+            media.updateAccess(
+                document.id, wrapped, devices,
+                revokeIndependentRecipients = listOf(recipientUid),
+            )
             return
         }
         val updated = document.allowedUsers.toSet() - recipientUid
