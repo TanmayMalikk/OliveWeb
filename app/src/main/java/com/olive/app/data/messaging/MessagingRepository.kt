@@ -400,8 +400,9 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
                 require(
                     existing.ownerUid == message.ownerUid &&
                             existing.conversationId == message.conversationId &&
-                            existing.ciphertext == message.ciphertext
-                ) { "A queued message id cannot identify different ciphertext" }
+                            existing.ciphertext == message.ciphertext &&
+                            existing.attachment == message.attachment
+                ) { "A queued message id cannot identify different encrypted content" }
                 persisted = existing
                 return@update
             }

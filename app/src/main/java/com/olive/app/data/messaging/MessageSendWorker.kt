@@ -141,6 +141,7 @@ data class OutgoingMessage(
     val status: MessageDeliveryStatus = MessageDeliveryStatus.QUEUED,
     val attemptCount: Int = 0,
     val failureCode: String? = null,
+    val attachment: OutgoingAttachment? = null,
 ) {
     init {
         require(id.isNotBlank() && ownerUid.isNotBlank() && conversationId.isNotBlank())
@@ -159,6 +160,7 @@ data class OutgoingMessage(
         put("status", status.name)
         put("attemptCount", attemptCount)
         failureCode?.let { put("failureCode", it) }
+        attachment?.let { put("attachment", it.toJson()) }
     }
 
     companion object {
@@ -173,6 +175,7 @@ data class OutgoingMessage(
             status = MessageDeliveryStatus.valueOf(value.getString("status")),
             attemptCount = value.optInt("attemptCount", 0),
             failureCode = value.optString("failureCode").takeIf(String::isNotBlank),
+            attachment = value.optJSONObject("attachment")?.let(OutgoingAttachment::fromJson),
         )
     }
 }
