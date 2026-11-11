@@ -118,6 +118,13 @@
   gap: 1rem;
   overscroll-behavior: contain;
 }
+.chat-membership-event {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
 .chat-bubble {
   background: var(--soft);
   align-self: flex-start;

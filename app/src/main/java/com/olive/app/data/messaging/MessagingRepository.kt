@@ -254,6 +254,32 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return listener.asSubscription()
     }
 
+    // Reads server-authored history independently of the encrypted message stream.
+    internal fun observeMembershipEvents(
+        id: String, actorUid: String? = null, onUpdate: (List<ChatMembershipEvent>) -> Unit,
+    ): ChatSubscription {
+        val events = firestore.collection("conversations").document(id).collection("membershipEvents")
+        val query = if (actorUid == null) events.orderBy("createdAt").limitToLast(250)
+        else events.whereEqualTo("actorUid", actorUid)
+        return query.addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+            if (error != null) {
+                onUpdate(emptyList())
+                return@addSnapshotListener
+            }
+            if (snapshot?.metadata?.isFromCache != false) return@addSnapshotListener
+            onUpdate(snapshot.documents.mapNotNull { row ->
+                val action = ChatMembershipAction.entries.firstOrNull { it.name == row.getString("action") }
+                    ?: return@mapNotNull null
+                ChatMembershipEvent(
+                    row.id, action, row.getString("actorUid") ?: return@mapNotNull null,
+                    row.getString("actorName").orEmpty(), row.getString("participantUid") ?: return@mapNotNull null,
+                    row.getString("participantName").orEmpty(),
+                    row.getTimestamp("createdAt")?.toDate()?.time ?: return@mapNotNull null,
+                )
+            })
+        }.asSubscription()
+    }
+
     // Reads a newly created ticket before it reaches the conversation index.
     suspend fun getConversation(id: String): ChatConversation? =
         conversationFrom(firestore.collection("conversations").document(id)

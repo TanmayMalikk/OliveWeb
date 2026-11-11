@@ -506,6 +506,18 @@ data class SocialSnapshot(
 
 enum class FriendRelationship { AddFriend, RequestSent, IncomingRequest, Friends }
 
+internal enum class ChatMembershipAction { ADDED, REMOVED, ADMIN_HELP_REQUESTED }
+
+internal data class ChatMembershipEvent(
+    val id: String,
+    val action: ChatMembershipAction,
+    val actorUid: String,
+    val actorName: String,
+    val participantUid: String,
+    val participantName: String,
+    val createdAt: Long,
+)
+
 data class ChatConversation(
     val id: String,
     val friendshipId: String,
@@ -563,20 +575,25 @@ data class ChatConversation(
         return ticketDisplayName()
     }
 
-    // Personal accounts see a role label instead of an organization member's account name.
+    // Admins have a fixed support-chat name for every viewer.
+    fun isChatAdmin(uid: String): Boolean = type == "SUPPORT" && adminUid.isNotBlank() && uid == adminUid
+
+    // Personal accounts see role labels in support chats.
     fun senderDisplayName(
         senderUid: String,
         senderUsername: String,
         viewerRole: AccountRole,
         anonymousStaffName: String,
+        anonymousAdminName: String,
     ) = when {
+        isChatAdmin(senderUid) -> anonymousAdminName
         type == "SUPPORT" &&
             viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
-            senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() } -> anonymousStaffName
+            staffUid.isNotBlank() && senderUid == staffUid -> anonymousStaffName
         type == "SUPPORT" &&
             viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
             senderUid !in setOf(staffUid, adminUid).filter { it.isNotBlank() } ->
-            "Ticket ${participantTicketNumber(senderUid)}"
+            if (senderUid == ownerUid) "Ticket ${ticketNumber()}" else "Friend"
         else -> senderUsername
     }
 

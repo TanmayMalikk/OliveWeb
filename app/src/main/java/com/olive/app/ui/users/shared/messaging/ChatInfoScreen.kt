@@ -86,6 +86,16 @@ internal fun ChatInfoDialog(
         conversation.type == "SUPPORT" -> session.accountRole == AccountRole.USER && conversation.ownerUid == currentUid
         else -> personalViewer
     }
+    val ownsOpenTicket = conversation.type == "SUPPORT" && conversation.closedAt == 0L &&
+        personalViewer && conversation.ownerUid == currentUid
+    var ticketFriends by remember(conversation.id, currentUid, ownsOpenTicket) { mutableStateOf(emptySet<String>()) }
+    DisposableEffect(conversation.id, currentUid, ownsOpenTicket) {
+        val subscription = if (ownsOpenTicket) session.messages.observeMembershipEvents(conversation.id, currentUid) { events ->
+            ticketFriends = events.sortedBy { it.createdAt }.associateBy { it.participantUid }.values
+                .filter { it.action == com.olive.app.data.ChatMembershipAction.ADDED }.map { it.participantUid }.toSet()
+        } else null
+        onDispose { subscription?.close() }
+    }
     val candidates = if (canAddPeople) {
         session.messages.friends.filterNot { it.uid in conversation.participantIds }
     } else emptyList()
@@ -225,8 +235,13 @@ internal fun ChatInfoDialog(
                             session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
                             uid !in setOf(conversation.staffUid, conversation.adminUid).filter(String::isNotBlank)
                         val name = when {
+                            conversation.isChatAdmin(uid) -> stringResource(R.string.support_admin_chat_name)
                             organizationMember -> stringResource(R.string.chat_organization_member)
-                            anonymousPersonalMember -> "Ticket ${conversation.participantTicketNumber(uid)}"
+                            anonymousPersonalMember -> if (uid == conversation.ownerUid) {
+                                "Ticket ${conversation.ticketNumber()}"
+                            } else {
+                                "Friend"
+                            }
                             else -> conversation.participantUsernames[uid].orEmpty().ifBlank { stringResource(R.string.account) }
                         }
                         Card(
@@ -254,10 +269,11 @@ internal fun ChatInfoDialog(
                                     )
                                 }
                             },
-                            trailingContent = if (
-                                conversation.type == "GROUP" && conversation.ownerUid == currentUid &&
-                                uid != currentUid && conversation.participantIds.size > 2
-                            ) ({
+                            trailingContent = if (uid != currentUid && when {
+                                ownsOpenTicket -> uid in ticketFriends && uid != conversation.staffUid && uid != conversation.adminUid
+                                else -> conversation.type == "GROUP" && conversation.closedAt == 0L &&
+                                    conversation.ownerUid == currentUid && conversation.participantIds.size > 2
+                            }) ({
                                 IconButton(
                                     onClick = {
                                         session.messages.removeConversationParticipant(conversation.id, uid)

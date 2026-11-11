@@ -632,6 +632,12 @@ service cloud.firestore {
         );
       allow delete: if false;
 
+      match /membershipEvents/{eventId} {
+        allow read: if conversationParticipant(
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data);
+        allow write: if false;
+      }
+
       match /messages/{messageId} {
         function parentConversation() {
           return get(/databases/$(database)/documents/conversations/$(conversationId)).data;

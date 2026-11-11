@@ -201,6 +201,10 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun openConversation(conversation: ChatConversation) =
         runtime.conversationActions.openConversation(conversation)
 
+    internal fun observeMembershipEvents(
+        id: String, actorUid: String? = null, onUpdate: (List<com.olive.app.data.ChatMembershipEvent>) -> Unit,
+    ) = runtime.messagingRepository?.observeMembershipEvents(id, actorUid, onUpdate)
+
     suspend fun findRequestedConversation(id: String): ChatConversation? {
         if (id.isBlank()) return null
         val uid = runtime.coverAccountId ?: return null
