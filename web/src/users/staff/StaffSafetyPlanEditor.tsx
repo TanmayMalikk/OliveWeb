@@ -77,25 +77,38 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
     }, 75);
     return () => window.clearTimeout(timer);
   }, [drafts, plan, session.busy]);
+  const sections = [...safetySections, ...olderSafetySections.filter((section) =>
+    readSafetyChecklist(plan.fields[kind + "_" + section]?.value ?? "").length > 0,
+  )];
   return (
-    <section className="panel safety-plan-group">
-      <h2>{plan.ticketNumber !== undefined && plan.ticketNumber >= 0 ? `Consult Ticket #${plan.ticketNumber}` : "Consult Ticket"}</h2>
-      <div className="safety-plan-tabs" aria-label="Safety plans" role="group">
-        {(["primary", "backup"] as const).map((planKind) => (
-          <button key={planKind} type="button" aria-pressed={planKind === kind} onClick={() => setKind(planKind)}>
-            {planKind === "primary" ? "Primary plan" : "Backup plan"}
-          </button>
-        ))}
-      </div>
-      <div className="safety-checklist-stack">
-        {[...safetySections, ...olderSafetySections.filter((section) =>
-          readSafetyChecklist(plan.fields[`${kind}_${section}`]?.value ?? "").length > 0,
-        )].map((section) => {
+    <section className="panel safety-plan-group consultation-editor">
+      <h2>{plan.ticketNumber !== undefined && plan.ticketNumber >= 0 ? "Consult Ticket #" + plan.ticketNumber : "Consult Ticket"}</h2>
+      <div className="safety-workspace">
+        <div className="safety-workspace-nav">
+          <div className="safety-plan-tabs" aria-label="Safety plans" role="group">
+            {(["primary", "backup"] as const).map((planKind) => (
+              <button key={planKind} type="button" aria-pressed={planKind === kind} onClick={() => setKind(planKind)}>
+                {planKind === "primary" ? "Primary plan" : "Backup plan"}
+              </button>
+            ))}
+          </div>
+          <nav className="safety-section-links" aria-label="Jump to a checklist">
+            {sections.map((section) => (
+              <button key={section} type="button" onClick={() => {
+                const checklist = document.getElementById("consultation-" + kind + "-" + section);
+                checklist?.focus({ preventScroll: true });
+                checklist?.scrollIntoView({ block: "start" });
+              }}>{safetySectionLabels[section]}</button>
+            ))}
+          </nav>
+        </div>
+        <div className="safety-checklist-stack">
+          {sections.map((section) => {
             const key = `${kind}_${section}`;
             const field = plan.fields[key];
             const items = readSafetyChecklist(field?.value ?? "");
             return (
-              <fieldset className="safety-checklist" key={key}>
+              <fieldset className="safety-checklist" key={key} id={"consultation-" + kind + "-" + section} tabIndex={-1}>
                 <legend>{safetySectionLabels[section]}</legend>
                 {items.map((item) => {
                   const draftKey = `${key}:${item.id}`;
@@ -148,7 +161,8 @@ export default function SafetyPlanEditor({ plan, onChange, onCompleted }: Safety
                 })}>Add step</Button>
               </fieldset>
             );
-        })}
+          })}
+        </div>
       </div>
       {feedback && <p role="status">{feedback}</p>}
       {identity?.role === "STAFF" && plan.staffUid === identity.uid && plan.consultationConversationId && (

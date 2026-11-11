@@ -1,6 +1,7 @@
 // Signed-in accounts: publishes payload-free priority sync revisions and wake-up notifications.
 const {onDocumentWritten} = require("firebase-functions/v2/firestore");
 const {db, messaging, FieldValue} = require("./firebaseAdminClient");
+const {reconcilePlanMediaGrants} = require("./mediaTickets");
 
 const DOMAINS = new Set(["account", "safety", "media", "conversation"]);
 const MAX_REVISION = Number.MAX_SAFE_INTEGER - 1;
@@ -133,7 +134,13 @@ exports.syncSafetyPlanInvalidation = onDocumentWritten("safetyPlans/{ownerUid}",
   const before = event.data?.before.exists ? event.data.before.data() : {};
   const after = event.data?.after.exists ? event.data.after.data() : {};
   const audience = [...safetyAudience(before, after), ...await adminUids()];
-  await invalidate(audience, "safety", safetyAccessChanged(before, after) ? audience : []);
+  const accessChanged = safetyAccessChanged(before, after);
+  await Promise.all([
+    invalidate(audience, "safety", accessChanged ? audience : []),
+    (accessChanged || ["primary_documents", "backup_documents"].some(key =>
+      before.fields?.[key]?.value !== after.fields?.[key]?.value)) ?
+      reconcilePlanMediaGrants(event.params.ownerUid) : Promise.resolve(),
+  ]);
 });
 
 exports.syncMediaInvalidation = onDocumentWritten("files/{fileId}", async (event) => {

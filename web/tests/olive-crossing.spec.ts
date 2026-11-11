@@ -76,14 +76,16 @@ test("Olive Crossing shows the complete world width without side panning on PC",
 // Inputs: the values in this case. Expected: Olive Crossing has touch controls and fits a phone.
 test("Olive Crossing has touch controls and fits a phone", async ({
   browser,
+  baseURL,
 }) => {
   const context = await browser.newContext({
+    baseURL,
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
   });
   const page = await context.newPage();
-  await page.goto("http://127.0.0.1:5173/game");
+  await page.goto("/game");
   await page.getByRole("button", { name: "Olive Crossing", exact: true }).tap();
   await page.getByRole("button", { name: "Start Olive Crossing" }).tap();
   await page.getByRole("button", { name: "Move up" }).tap();

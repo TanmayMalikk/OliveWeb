@@ -7,7 +7,7 @@ test("download and organization pages open from the main website", async ({
 }) => {
   await page.goto("/get");
   await expect(
-    page.getByRole("heading", { name: "Make a little room on your screen." }),
+    page.getByRole("heading", { name: "Get Olive Branch" }),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/get$/);
 

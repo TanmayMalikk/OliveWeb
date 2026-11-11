@@ -362,6 +362,7 @@ exports.mediaDownloadTicket = onCall(options, async (request) => {
   if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
     throw new HttpsError("permission-denied", "Media access was denied");
   }
+  await requireActivePlanGrant(value.owner_id, mediaId, uid);
   const url = await getSignedUrl(
     client(),
     new GetObjectCommand({ Bucket: bucketName.value(), Key: value.object_key }),
@@ -382,6 +383,7 @@ exports.mediaAccountAccessKey = onCall(options, async (request) => {
   if (!Array.isArray(value.allowed_users) || !value.allowed_users.includes(uid)) {
     throw new HttpsError("permission-denied", "Media access was denied");
   }
+  await requireActivePlanGrant(value.owner_id, mediaId, uid);
   if (!recovery.exists) {
     throw new HttpsError("failed-precondition", "This older document has not been upgraded for account access");
   }
@@ -412,18 +414,245 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   const mediaId = string(request.data?.mediaId, "mediaId", 64);
   const access = accessRequest(request.data, uid);
   const reference = mediaRef(mediaId);
-  const snapshot = await reference.get();
-  if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
-  const value = snapshot.data();
-  if (value.owner_id !== uid) {
-    throw new HttpsError("permission-denied", "Only the owner can change media access");
+  const grant = planMediaGrantRef(uid, mediaId);
+  const forPlan = request.data?.forPlan === true;
+  const grantIndependentRecipients = recipientList(
+    request.data?.grantIndependentRecipients, access.allowedUsers, uid, "grantIndependentRecipients",
+  );
+  const revokeIndependentRecipients = recipientList(
+    request.data?.revokeIndependentRecipients, null, uid, "revokeIndependentRecipients",
+  );
+  if (forPlan && (grantIndependentRecipients.length || revokeIndependentRecipients.length)) {
+    throw new HttpsError("invalid-argument", "Plan access cannot change independent grants.");
   }
-  if (typeof value.object_key !== "string" || typeof value.encrypted_metadata !== "string") {
-    throw new HttpsError("failed-precondition", "Only encrypted media supports this access update");
-  }
-  await reference.update({ wrapped_keys: access.wrappedKeys, allowed_users: access.allowedUsers });
+  await db.runTransaction(async transaction => {
+    const snapshot = await transaction.get(reference);
+    const tracked = await transaction.get(grant);
+    const planSnapshot = forPlan || revokeIndependentRecipients.length ?
+      await transaction.get(db.collection("safetyPlans").doc(uid)) : null;
+    const plan = planSnapshot?.data() || null;
+    if (!snapshot.exists) throw new HttpsError("not-found", "Media was not found");
+    const value = snapshot.data();
+    if (value.owner_id !== uid) {
+      throw new HttpsError("permission-denied", "Only the owner can change media access");
+    }
+    if (typeof value.object_key !== "string" || typeof value.encrypted_metadata !== "string") {
+      throw new HttpsError("failed-precondition", "Only encrypted media supports this access update");
+    }
+    let wrappedKeys = {...access.wrappedKeys};
+    let deviceWrappedKeys = access.deviceWrappedKeys ?? retainedDeviceKeys(value.device_wrapped_keys, access.allowedUsers);
+    if (forPlan) {
+      const recipients = planMediaReaders(plan, mediaId);
+      const added = access.allowedUsers.filter(id => id !== uid);
+      if (added.some(id => !recipients.has(id))) {
+        throw new HttpsError("permission-denied", "The document is not shared with that plan reader.");
+      }
+      const trackedReaders = new Set([...(tracked.get("readers") || []), ...added]);
+      transaction.set(grant, {
+        readers: [...trackedReaders], independentReaders: tracked.get("independentReaders") || [],
+      });
+      wrappedKeys = {...value.wrapped_keys, ...Object.fromEntries(added.map(id => [id, access.wrappedKeys[id]]))};
+      deviceWrappedKeys = {...value.device_wrapped_keys, ...deviceWrappedKeys};
+    } else if (grantIndependentRecipients.length || revokeIndependentRecipients.length || tracked.exists) {
+      const independentReaders = new Set(tracked.get("independentReaders") || []);
+      const previouslyAllowed = new Set(value.allowed_users || []);
+      for (const id of access.allowedUsers) {
+        if (!previouslyAllowed.has(id) && id !== uid) independentReaders.add(id);
+      }
+      for (const id of previouslyAllowed) {
+        if (!access.allowedUsers.includes(id)) independentReaders.delete(id);
+      }
+      grantIndependentRecipients.forEach(id => independentReaders.add(id));
+      revokeIndependentRecipients.forEach(id => independentReaders.delete(id));
+
+      // Removing a direct share must keep the existing wrapper when an active plan still grants access.
+      const stillPlanAuthorized = new Set(planMediaReaders(plan, mediaId));
+      for (const id of revokeIndependentRecipients) {
+        if (!stillPlanAuthorized.has(id) || access.allowedUsers.includes(id)) continue;
+        const existingAccountKey = value.wrapped_keys?.[id];
+        if (existingAccountKey) wrappedKeys[id] = existingAccountKey;
+        for (const [deviceId, key] of Object.entries(value.device_wrapped_keys || {})) {
+          if (deviceId.startsWith(`${id}--`)) deviceWrappedKeys[deviceId] = key;
+        }
+      }
+
+      const planReaders = tracked.get("readers") || [];
+      if (planReaders.length || independentReaders.size) {
+        transaction.set(grant, {readers: planReaders, independentReaders: [...independentReaders]});
+      } else if (tracked.exists) {
+        transaction.delete(grant);
+      }
+    }
+    if (Object.keys(wrappedKeys).length > 25 || Object.keys(deviceWrappedKeys).length > 250) {
+      throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
+    }
+    transaction.update(reference, {
+      wrapped_keys: wrappedKeys,
+      allowed_users: Object.keys(wrappedKeys),
+      device_wrapped_keys: deviceWrappedKeys,
+    });
+  });
   return publicRecord(await reference.get());
 });
+
+// Publish the message and grant its recipients access in the same transaction.
+exports.mediaShareInChat = onCall(options, async (request) => {
+  const uid = caller(request);
+  const data = request.data;
+  const mediaId = string(data?.mediaId, "mediaId", 64);
+  const conversationId = string(data?.conversationId, "conversationId", 300);
+  const messageId = string(data?.messageId, "messageId", 128);
+  const ciphertext = string(data?.ciphertext, "ciphertext", 12000);
+  const clientSentAt = data?.clientSentAt;
+  const recipients = recipientList(data?.recipientUids, null, uid, "recipientUids");
+  if (!recipients.length || !Number.isSafeInteger(clientSentAt) || clientSentAt < 0 ||
+      [mediaId, conversationId, messageId].some(id => !/^[A-Za-z0-9_-]+$/.test(id))) {
+    throw new HttpsError("invalid-argument", "Invalid chat share.");
+  }
+  const file = mediaRef(mediaId);
+  const grants = planMediaGrantRef(uid, mediaId);
+  const chat = db.collection("conversations").doc(conversationId);
+  const message = chat.collection("messages").doc(messageId);
+  await db.runTransaction(async transaction => {
+    const [media, conversation, savedMessage, tracked] = await Promise.all([
+      transaction.get(file), transaction.get(chat), transaction.get(message), transaction.get(grants),
+    ]);
+    const value = media.data();
+    const participants = conversation.get("participantIds");
+    const senderUsername = conversation.get("participantUsernames")?.[uid];
+    if (!value || value.owner_id !== uid || !Array.isArray(participants) ||
+        !participants.includes(uid) || typeof senderUsername !== "string" || !senderUsername) {
+      throw new HttpsError("permission-denied", "Only the file owner can share it in a chat they belong to.");
+    }
+    if (savedMessage.exists) {
+      if (savedMessage.get("senderUid") !== uid || savedMessage.get("ciphertext") !== ciphertext ||
+          savedMessage.get("clientSentAt") !== clientSentAt) {
+        throw new HttpsError("already-exists", "This message ID is already in use.");
+      }
+      return;
+    }
+    if (conversation.get("closedAt") || recipients.length !== participants.length - 1 ||
+        recipients.some(id => !participants.includes(id))) {
+      throw new HttpsError("failed-precondition", "Chat membership changed. Open the chat and try again.");
+    }
+    if (value.object_key) {
+      const access = accessRequest(data, uid);
+      if (access.allowedUsers.length !== recipients.length + 1 ||
+          recipients.some(id => !Object.hasOwn(access.wrappedKeys, id))) {
+        throw new HttpsError("invalid-argument", "A wrapped file key is required for every recipient.");
+      }
+      const wrappedKeys = {...value.wrapped_keys, ...Object.fromEntries(
+        recipients.map(id => [id, access.wrappedKeys[id]]),
+      )};
+      const deviceWrappedKeys = {...value.device_wrapped_keys, ...retainedDeviceKeys(access.deviceWrappedKeys, recipients)};
+      const allowedUsers = Object.keys(wrappedKeys);
+      if (allowedUsers.length > 25 || Object.keys(deviceWrappedKeys).length > 250) {
+        throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
+      }
+      transaction.update(file, {wrapped_keys: wrappedKeys, device_wrapped_keys: deviceWrappedKeys, allowed_users: allowedUsers});
+      transaction.set(grants, {
+        independentReaders: [...new Set([...(tracked.get("independentReaders") || []), ...recipients])],
+      }, {merge: true});
+    } else {
+      if (value.storage_path !== `users/${uid}/media/${mediaId}`) {
+        throw new HttpsError("failed-precondition", "This file cannot be shared in chat.");
+      }
+      const allowedUsers = [...new Set([...(value.allowed_users || []), uid, ...recipients])];
+      if (allowedUsers.length > 25) {
+        throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
+      }
+      transaction.update(file, {allowed_users: allowedUsers});
+    }
+    transaction.create(message, {
+      senderUid: uid, senderUsername, ciphertext, clientSentAt, deleted: false, sentAt: FieldValue.serverTimestamp(),
+    });
+    transaction.update(chat, {
+      lastMessage: "Secure message", lastMessageId: messageId, lastSenderUid: uid, updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return {shared: true};
+});
+
+function planMediaGrantRef(ownerUid, mediaId) {
+  return db.collection("safetyPlanMediaGrants").doc(ownerUid).collection("files").doc(mediaId);
+}
+
+async function requireActivePlanGrant(ownerUid, mediaId, readerUid) {
+  if (ownerUid === readerUid) return;
+  const grant = await planMediaGrantRef(ownerUid, mediaId).get();
+  if (!grant.get("readers")?.includes(readerUid)) return;
+  const plan = await db.collection("safetyPlans").doc(ownerUid).get();
+  if (!planMediaReaders(plan.data(), mediaId).has(readerUid) &&
+      !grant.get("independentReaders")?.includes(readerUid)) {
+    throw new HttpsError("permission-denied", "Plan attachment access was removed.");
+  }
+}
+
+function recipientList(value, allowedUsers, ownerUid, field) {
+  if (value == null) return [];
+  if (!Array.isArray(value) || value.length > 25 || value.some(uid =>
+    typeof uid !== "string" || !uid || uid.length > 128 || uid === ownerUid ||
+    (allowedUsers && !allowedUsers.includes(uid)))) {
+    throw new HttpsError("invalid-argument", `Invalid ${field}`);
+  }
+  return [...new Set(value)];
+}
+
+function retainedDeviceKeys(keys, allowedUsers) {
+  return Object.fromEntries(Object.entries(keys || {}).filter(([key]) =>
+    allowedUsers.some(id => key.startsWith(id + "--"))));
+}
+
+function planMediaReaders(plan, mediaId) {
+  const attached = ["primary_documents", "backup_documents"].some(key => {
+    try {
+      const checklist = JSON.parse(plan?.fields?.[key]?.value || "");
+      return checklist?.oliveSafetyChecklist === 1 && Array.isArray(checklist.items) &&
+        checklist.items.some(item => Array.isArray(item?.attachmentIds) && item.attachmentIds.includes(mediaId) &&
+          !(Array.isArray(item.excludedAttachmentIds) && item.excludedAttachmentIds.includes(mediaId)));
+    } catch (_) {
+      return false;
+    }
+  });
+  return new Set(attached ? [
+    ...(plan.safeContactUids || []),
+    ...(plan.consultationRequested ? [plan.staffUid, plan.adminUid] : []),
+  ].filter(Boolean) : []);
+}
+
+// Removes only grants created by plan sharing, preserving independently shared access.
+async function reconcilePlanMediaGrants(ownerUid) {
+  const planRef = db.collection("safetyPlans").doc(ownerUid);
+  const grants = await planMediaGrantRef(ownerUid, "_").parent.get();
+  for (const grant of grants.docs) {
+    await db.runTransaction(async transaction => {
+      const reference = mediaRef(grant.id);
+      const [plan, currentGrant, media] = await Promise.all([
+        transaction.get(planRef), transaction.get(grant.ref), transaction.get(reference),
+      ]);
+      if (!currentGrant.exists) return;
+      const readers = currentGrant.get("readers") || [];
+      const independentReaders = currentGrant.get("independentReaders") || [];
+      const permitted = planMediaReaders(plan.data(), grant.id);
+      const revoked = readers.filter(id => !permitted.has(id));
+      const removeAccess = revoked.filter(id => !independentReaders.includes(id));
+      if (media.exists && media.get("owner_id") === ownerUid && removeAccess.length) {
+        const wrappedKeys = Object.fromEntries(Object.entries(media.get("wrapped_keys") || {})
+            .filter(([id]) => !removeAccess.includes(id)));
+        const allowedUsers = Object.keys(wrappedKeys);
+        transaction.update(reference, {
+          wrapped_keys: wrappedKeys, allowed_users: allowedUsers,
+          device_wrapped_keys: retainedDeviceKeys(media.get("device_wrapped_keys"), allowedUsers),
+        });
+      }
+      const kept = readers.filter(id => permitted.has(id));
+      if (!media.exists || (!kept.length && !independentReaders.length)) transaction.delete(grant.ref);
+      else if (revoked.length) transaction.update(grant.ref, {readers: kept});
+    });
+  }
+}
+
+Object.defineProperty(exports, "reconcilePlanMediaGrants", {value: reconcilePlanMediaGrants});
 
 // Adds key copies for new phones or browsers without changing who may access the document.
 exports.mediaUpdateDeviceKeys = onCall(options, async (request) => {
@@ -486,7 +715,7 @@ exports.mediaDelete = onCall(options, async (request) => {
 // Keep validation helpers available to Node tests without exporting another deployed endpoint.
 Object.defineProperty(exports, "_test", {
   value: {
-    accessRequest, validateDeviceWrappedKeys, validateAccessDeviceWrappedKeys,
+    accessRequest, validateDeviceWrappedKeys, validateAccessDeviceWrappedKeys, recipientList,
     accountAccessKey, evidenceRequest,
   },
   enumerable: false,

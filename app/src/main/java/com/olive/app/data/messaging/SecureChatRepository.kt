@@ -4,6 +4,13 @@ package com.olive.app.data
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.MetadataChanges
+import com.google.firebase.firestore.Source
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.tasks.await
@@ -19,6 +26,25 @@ import org.json.JSONObject
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
 class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
+    // Reads established keys directly after confirming current membership on the server.
+    internal suspend fun readyRoomKey(conversation: ChatConversation, uid: String): KeyManager.UnwrappedKeyEnvelope? {
+        val snapshot = firestore.collection("conversations").document(conversation.id).get(Source.SERVER).await()
+        val participants = (snapshot.get("participantIds") as? List<*>)?.toSet() ?: return null
+        if (uid !in participants || participants != conversation.participantIds.toSet()) return null
+        val roomKeys = snapshot.roomKeys().orEmpty()
+        if (roomKeys.keys != participants || snapshot.participantPublicKeys()?.keys != participants) return null
+        val accountEnvelope = roomKeys[uid] ?: return null
+        val accountKey = withContext(Dispatchers.Default) {
+            runCatching { KeyManager.unwrapFirstWithEnvelope(listOf(accountEnvelope)) }.getOrNull()
+        }
+        if (accountKey != null) return accountKey
+        val deviceEnvelope = snapshot.reference.collection("deviceKeys")
+            .document("$uid--${KeyManager.deviceId()}").get(Source.SERVER).await().getString("wrappedKey") ?: return null
+        return withContext(Dispatchers.Default) {
+            runCatching { KeyManager.unwrapFirstWithEnvelope(listOf(deviceEnvelope)) }.getOrNull()
+        }
+    }
+
     // Opens the copy of an existing room key that was encrypted for this account.
     suspend fun existingRoomKey(conversationId: String, currentUid: String): SecretKey? {
         return roomKeyAccess(conversationId, currentUid)?.secretKey
@@ -26,18 +52,20 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
 
     // Returns a verified envelope for protected offline retention.
     suspend fun wrappedRoomKey(conversationId: String, currentUid: String): String? {
-        return roomKeyAccess(conversationId, currentUid)?.wrappedKeyBase64
+        return roomKeyAccess(conversationId, currentUid, Source.SERVER)?.wrappedKeyBase64
     }
 
     // Tries the device envelope first, then the same account's recovery envelope.
     private suspend fun roomKeyAccess(
         conversationId: String,
         currentUid: String,
+        source: Source = Source.DEFAULT,
     ): KeyManager.UnwrappedKeyEnvelope? {
-        val snapshot = firestore.collection("conversations").document(conversationId).get().await()
+        val snapshot = firestore.collection("conversations").document(conversationId).get(source).await()
+        if (currentUid !in (snapshot.get("participantIds") as? List<*>).orEmpty()) return null
         val deviceId = KeyManager.deviceId()
         val deviceKey = snapshot.reference.collection("deviceKeys")
-            .document("$currentUid--$deviceId").get().await().getString("wrappedKey")
+            .document("$currentUid--$deviceId").get(source).await().getString("wrappedKey")
         val candidates = listOfNotNull(deviceKey, snapshot.roomKeys().orEmpty()[currentUid])
         return runCatching { KeyManager.unwrapFirstWithEnvelope(candidates) }.getOrNull()
     }
@@ -120,18 +148,19 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     }
 
     // Secure messaging: gives each registered phone or browser its own wrapped copy of the room key.
-    private suspend fun shareWithRegisteredDevices(
+    suspend fun shareWithRegisteredDevices(
         conversation: ChatConversation,
         roomKey: SecretKey
     ) {
         val conversationRef = firestore.collection("conversations").document(conversation.id)
-        val batch = firestore.batch()
+        var batch = firestore.batch()
         var writes = 0
         conversation.participantIds.forEach { uid ->
             val username = conversation.participantUsernames[uid] ?: return@forEach
-            val devices = firestore.collection("messageDirectory").document(username)
+            val devices = firestore.collection("messageDirectory").document(username.trim().lowercase())
                 .collection("devices").get().await()
             devices.documents.forEach { device ->
+                if (device.getString("uid") != uid) return@forEach
                 val deviceId = device.getString("deviceId") ?: return@forEach
                 val encoded = device.getString("publicKey") ?: return@forEach
                 val publicKey = runCatching { KeyManager.decodePublicKey(encoded) }.getOrNull()
@@ -149,6 +178,11 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                     )
                 )
                 writes++
+                if (writes == 10) {
+                    batch.commit().await()
+                    batch = firestore.batch()
+                    writes = 0
+                }
             }
         }
         if (writes > 0) batch.commit().await()
@@ -197,9 +231,14 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         onError: (String) -> Unit,
         onServerCiphertext: ((List<EncryptedChatMessage>) -> Unit)? = null,
     ): ChatSubscription {
+        val deliveryScope = CoroutineScope(Dispatchers.Main.immediate)
+        var delivery: Job? = null
+        var lastEncrypted: List<EncryptedChatMessage>? = null
+        var lastDecoded = emptyList<ChatMessage>()
         val listener = firestore.collection("conversations").document(conversationId)
             .collection("messages").orderBy("sentAt").limitToLast(250)
             .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+                delivery?.cancel()
                 if (error != null) {
                     onError(error.localizedMessage.orEmpty())
                     return@addSnapshotListener
@@ -216,14 +255,25 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
                         deleted = row.getBoolean("deleted") ?: false,
                     )
                 }
-                val decrypted = runCatching { decryptMessages(encrypted, roomKey) }.getOrElse {
-                    onError("Encrypted message authentication failed.")
-                    return@addSnapshotListener
+                delivery = deliveryScope.launch {
+                    if (lastEncrypted != encrypted) {
+                        val decoded = withContext(Dispatchers.Default) {
+                            runCatching { decryptMessages(encrypted, roomKey) }
+                        }.getOrElse {
+                            onError("Encrypted message authentication failed.")
+                            return@launch
+                        }
+                        lastEncrypted = encrypted
+                        lastDecoded = decoded
+                    }
+                    if (snapshot?.metadata?.isFromCache != true || encrypted.isNotEmpty()) onUpdate(lastDecoded)
+                    if (snapshot != null && !snapshot.metadata.isFromCache) onServerCiphertext?.invoke(encrypted)
                 }
-                if (snapshot?.metadata?.isFromCache != true || encrypted.isNotEmpty()) onUpdate(decrypted)
-                if (snapshot != null && !snapshot.metadata.isFromCache) onServerCiphertext?.invoke(encrypted)
             }
-        return ChatSubscription { listener.remove() }
+        return ChatSubscription {
+            listener.remove()
+            deliveryScope.cancel()
+        }
     }
 
     // Authenticates ciphertext before any message is exposed to the UI.
@@ -332,15 +382,18 @@ class ChatCacheStore internal constructor(
         wrappedRoomKey: String,
         deviceId: String,
         validatedAt: Long,
+        requireIndexed: Boolean = false,
     ) {
         require(ownerUid in conversation.participantIds)
         require(wrappedRoomKey.isNotBlank() && deviceId.isNotBlank())
         vault.update { root ->
             val account = root.child(ACCOUNTS).child(ownerUid)
-            val entry = conversations(account).optJSONObject(conversation.id) ?: JSONObject().also {
-                conversations(account).put(conversation.id, it)
+            val entries = conversations(account)
+            val entry = entries.optJSONObject(conversation.id) ?: run {
+                if (requireIndexed) return@update
+                JSONObject().also { entries.put(conversation.id, it) }
             }
-            entry.put(CONVERSATION, conversation.toCacheJson())
+            if (!requireIndexed) entry.put(CONVERSATION, conversation.toCacheJson())
             entry.put(WRAPPED_ROOM_KEY, wrappedRoomKey)
             entry.put(DEVICE_ID, deviceId)
             entry.put(VALIDATED_AT, validatedAt)
@@ -458,6 +511,18 @@ data class SocialSnapshot(
 
 enum class FriendRelationship { AddFriend, RequestSent, IncomingRequest, Friends }
 
+internal enum class ChatMembershipAction { ADDED, REMOVED, ADMIN_HELP_REQUESTED }
+
+internal data class ChatMembershipEvent(
+    val id: String,
+    val action: ChatMembershipAction,
+    val actorUid: String,
+    val actorName: String,
+    val participantUid: String,
+    val participantName: String,
+    val createdAt: Long,
+)
+
 data class ChatConversation(
     val id: String,
     val friendshipId: String,
@@ -482,7 +547,11 @@ data class ChatConversation(
 
     // Keeps the header neutral until Firestore returns the real ticket number.
     fun ticketDisplayName(): String =
-        if (ticketSequence >= 0L) "Ticket #$ticketSequence" else "Support ticket"
+        (when {
+            supportTag == SUPPORT_TAG_NEEDS_ADMIN -> "Admin Ticket"
+            supportOrigin == SUPPORT_TAG_PLAN_CONSULT || supportTag == SUPPORT_TAG_PLAN_CONSULT -> "Consult Ticket"
+            else -> "Support Ticket"
+        }) + if (ticketSequence >= 0L) " #$ticketSequence" else ""
 
     // Gives each personal participant a stable anonymous label inside organization support views.
     fun participantTicketNumber(uid: String): String =
@@ -494,9 +563,7 @@ data class ChatConversation(
         viewerRole: AccountRole,
         anonymousStaffName: String = "Your Olive Branch",
     ) = if (type == "SUPPORT") {
-        if (viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
-            ticketDisplayName()
-        } else anonymousStaffName
+        ticketDisplayName()
     } else {
         participantIds.mapNotNull { uid ->
             participantUsernames[uid]?.takeIf { uid != currentUid }
@@ -510,28 +577,28 @@ data class ChatConversation(
         supportName: String,
         escalationName: String,
     ): String {
-        val ticketName = when {
-            supportTag == SUPPORT_TAG_NEEDS_ADMIN -> escalationName
-            supportOrigin == SUPPORT_TAG_PLAN_CONSULT || supportTag == SUPPORT_TAG_PLAN_CONSULT -> consultationName
-            else -> supportName
-        }
-        return "$staffName • $ticketName"
+        return ticketDisplayName()
     }
 
-    // Personal accounts see a role label instead of an organization member's account name.
+    // Admins have a fixed support-chat name for every viewer.
+    fun isChatAdmin(uid: String): Boolean = type == "SUPPORT" && adminUid.isNotBlank() && uid == adminUid
+
+    // Personal accounts see role labels in support chats.
     fun senderDisplayName(
         senderUid: String,
         senderUsername: String,
         viewerRole: AccountRole,
         anonymousStaffName: String,
+        anonymousAdminName: String,
     ) = when {
+        isChatAdmin(senderUid) -> anonymousAdminName
         type == "SUPPORT" &&
             viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
-            senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() } -> anonymousStaffName
+            staffUid.isNotBlank() && senderUid == staffUid -> anonymousStaffName
         type == "SUPPORT" &&
             viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
             senderUid !in setOf(staffUid, adminUid).filter { it.isNotBlank() } ->
-            "Ticket ${participantTicketNumber(senderUid)}"
+            if (senderUid == ownerUid) "Ticket ${ticketNumber()}" else "Friend"
         else -> senderUsername
     }
 

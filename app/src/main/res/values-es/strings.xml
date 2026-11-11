@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">App</string>
+    <string name="app_name">Olive Branch</string>
     <string name="local">locales</string>
     <string name="global">Mundial</string>
     <string name="local_edition">Edición local</string>
@@ -272,7 +272,7 @@
     <string name="no_private_notes_found">No se encontraron notas.</string><string name="untitled_note">Nota sin título</string><string name="no_incident_reports_found">No se encontraron informes de incidentes.</string>
 <string name="secure_shared_entry">Elemento compartido seguro</string><string name="close_shared_entry">Cerrar elemento compartido</string>
     <string name="attach_secure_entry">Adjuntar una nota o informe seguro</string><string name="encrypted_document">Documento cifrado</string><string name="shared_private_note">Nota privada compartida</string><string name="shared_incident_report">Informe de incidente compartido</string>
-    <string name="private_entry_shared">Elemento privado compartido de forma segura.</string><string name="unable_to_share_private_entry">No se pudo compartir este elemento privado.</string><string name="unable_to_open_shared_entry">No se pudo abrir este elemento compartido.</string><string name="unable_to_open_secure_conversation">Este dispositivo no tiene la clave de cifrado de esta conversación. Abre la conversación en un dispositivo ya autorizado para esta cuenta y vuelve a intentarlo.</string>
+    <string name="private_entry_shared">Elemento privado compartido de forma segura.</string><string name="unable_to_share_private_entry">No se pudo compartir este elemento privado.</string><string name="unable_to_open_shared_entry">No se pudo abrir este elemento compartido.</string><string name="unable_to_open_secure_conversation">No se pudo preparar esta conversación cifrada. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="secure_message">Mensaje seguro</string><string name="encrypted_message_unavailable">Mensaje cifrado no disponible</string>
 <string name="news_near_location">Noticias cerca de %1$s</string>
 <string name="accounts">Cuentas</string>
@@ -422,7 +422,14 @@
     <string name="ui_group_voice_call">Llamada de voz grupal</string>
     <string name="ui_group_call_status">%1$d conectados • %2$s</string>
     <string name="organization_live_map_staff_description">Ver todas las ubicaciones.</string>
-    <string name="safety_mark_consultation_complete">Marcar consulta como completada</string>
+    <string name="safety_mark_consultation_complete">Marcar como completado</string>
+    <string name="safety_plans_completed">Tu plan de seguridad y tu plan alternativo están completos.</string>
+    <string name="safety_staff_assigned">Un miembro del equipo de apoyo está trabajando contigo.</string>
+    <string name="safety_open_consultation">Abrir el caso de consulta</string>
+    <string name="safety_conflicts_title">Conflictos</string>
+    <string name="safety_your_change">Tu cambio</string>
+    <string name="safety_incoming_change">Cambio recibido</string>
+    <string name="safety_empty_value">Sección vacía</string>
     <string name="safety_complete_consultation_title">¿Completar esta consulta?</string>
     <string name="safety_complete_consultation_description">Esto archiva el chat de consulta para todos y elimina este plan de seguridad de tu bandeja de personal.</string>
     <string name="safety_mark_complete">Marcar como completada</string>

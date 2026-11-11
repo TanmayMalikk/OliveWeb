@@ -4,11 +4,10 @@ package com.olive.app.data
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.tasks.await
 import com.olive.app.security.KeyManager
 import java.security.PublicKey
@@ -25,11 +24,10 @@ import org.json.JSONObject
 
 
 class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
-    init {
-        firestore.firestoreSettings = FirebaseFirestoreSettings.Builder()
-            .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build()).build()
+    suspend fun prepareSupportTickets() {
+        FirebaseFunctions.getInstance("northamerica-northeast1")
+            .getHttpsCallable("supportTicketsPrepare").call().await()
     }
-
     // Publishes this account's messaging key and device details to Firebase.
     suspend fun registerUser(
         identity: AccountIdentity,
@@ -222,8 +220,9 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 if (key is String && value is String) key to value else null
             }?.toMap().orEmpty()
         val ref = firestore.collection("conversations").document(friend.friendshipId)
-        if (!ref.get().await().exists())
-            ref.set(directConversationData(friend.friendshipId, ids, names)).await()
+        val existing = ref.get().await()
+        if (existing.exists()) return checkNotNull(conversationFrom(existing))
+        ref.set(directConversationData(friend.friendshipId, ids, names)).await()
         return ChatConversation(friend.friendshipId, friend.friendshipId, ids, names)
     }
 
@@ -245,15 +244,44 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                     }
                     val conversations = snapshot?.documents.orEmpty().mapNotNull(::conversationFrom)
                         .sortedByDescending { it.updatedAt }
-                    if (snapshot?.metadata?.isFromCache != true || conversations.isNotEmpty()) {
-                        onUpdate(conversations)
-                    }
                     if (snapshot != null && !snapshot.metadata.isFromCache) {
+                        onUpdate(conversations)
                         onServerUpdate?.invoke(conversations)
                     }
                 }
         return listener.asSubscription()
     }
+
+    // Reads server-authored history independently of the encrypted message stream.
+    internal fun observeMembershipEvents(
+        id: String, actorUid: String? = null, onUpdate: (List<ChatMembershipEvent>) -> Unit,
+    ): ChatSubscription {
+        val events = firestore.collection("conversations").document(id).collection("membershipEvents")
+        val query = if (actorUid == null) events.orderBy("createdAt").limitToLast(250)
+        else events.whereEqualTo("actorUid", actorUid)
+        return query.addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+            if (error != null) {
+                onUpdate(emptyList())
+                return@addSnapshotListener
+            }
+            if (snapshot?.metadata?.isFromCache != false) return@addSnapshotListener
+            onUpdate(snapshot.documents.mapNotNull { row ->
+                val action = ChatMembershipAction.entries.firstOrNull { it.name == row.getString("action") }
+                    ?: return@mapNotNull null
+                ChatMembershipEvent(
+                    row.id, action, row.getString("actorUid") ?: return@mapNotNull null,
+                    row.getString("actorName").orEmpty(), row.getString("participantUid") ?: return@mapNotNull null,
+                    row.getString("participantName").orEmpty(),
+                    row.getTimestamp("createdAt")?.toDate()?.time ?: return@mapNotNull null,
+                )
+            })
+        }.asSubscription()
+    }
+
+    // Reads a newly created ticket before it reaches the conversation index.
+    suspend fun getConversation(id: String): ChatConversation? =
+        conversationFrom(firestore.collection("conversations").document(id)
+            .get(com.google.firebase.firestore.Source.SERVER).await())
 
     // Loads a server-confirmed conversation index for background membership and key reconciliation.
     suspend fun listConversations(currentUid: String): List<ChatConversation> =
@@ -291,7 +319,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             (row.get("participantUsernames") as? Map<*, *>)?.entries?.mapNotNull { (key, value) ->
                 if (key is String && value is String) key to value else null
             }?.toMap().orEmpty()
-        val friendshipId = row.getString("friendshipId") ?: return null
+        val friendshipId = row.getString("friendshipId") ?: row.id.takeIf { row.getString("type") == "SUPPORT" }
+            ?: return null
         return ChatConversation(
             row.id,
             friendshipId,

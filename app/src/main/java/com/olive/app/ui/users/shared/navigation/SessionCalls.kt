@@ -127,7 +127,7 @@ internal class SessionCalls(
                 }
             }.distinctUntilChanged().collect { callId ->
                 if (callId == null) VoipCallForegroundService.stop(application)
-                else VoipCallForegroundService.start(application, callId)
+                else VoipCallForegroundService.start(application, callId, configuredRole == AccountRole.USER)
             }
         }
     }

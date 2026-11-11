@@ -201,6 +201,25 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun openConversation(conversation: ChatConversation) =
         runtime.conversationActions.openConversation(conversation)
 
+    internal fun observeMembershipEvents(
+        id: String, actorUid: String? = null, onUpdate: (List<com.olive.app.data.ChatMembershipEvent>) -> Unit,
+    ) = runtime.messagingRepository?.observeMembershipEvents(id, actorUid, onUpdate)
+
+    suspend fun findRequestedConversation(id: String): ChatConversation? {
+        if (id.isBlank()) return null
+        val uid = runtime.coverAccountId ?: return null
+        return try {
+            runtime.messagingRepository?.getConversation(id)?.takeIf {
+                runtime.coverAccountId == uid && uid in it.participantIds && it.closedAt == 0L
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // The live conversation list can still deliver the ticket after a transient read failure.
+            null
+        }
+    }
+
     // Closes the current conversation and returns to the chat list.
     fun closeConversation() = runtime.conversationActions.closeConversation()
     // Archives or restores the selected conversation for this account.
@@ -245,8 +264,8 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun requestStaffForConversation(conversationId: String, onCreated: (String) -> Unit) =
         runtime.staffSupport.requestStaffForConversation(conversationId, onCreated)
     // Closes the support ticket and archives it for every participant.
-    fun closeSupportChat(conversationId: String, onClosed: () -> Unit = {}) =
-        runtime.staffSupport.close(conversationId, onClosed)
+    fun closeSupportChat(conversationId: String, planCompleted: Boolean = false, onClosed: () -> Unit = {}) =
+        runtime.staffSupport.close(conversationId, planCompleted, onClosed)
 }
 
 // Signed-in accounts and admins: connects profile, cover settings, and account management screens.

@@ -19,13 +19,34 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanShareContacts", "safetyPlanMediaRecipients", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
-    "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
+    "mediaUpdateAccess", "mediaShareInChat", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
     "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant",
-    "conversationRemoveParticipant", "conversationRequestStaff", "staffSupportClose", "nutritionFoodSearch",
+    "conversationRemoveParticipant", "conversationRequestStaff", "conversationPrepareKeys", "supportTicketsPrepare", "staffSupportClose", "nutritionFoodSearch",
     "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",
     "syncConversationDeviceKeyInvalidation", "syncAccountInvalidation"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+test("ticket assignments notify staff and newly added administrators through the shared FCM payload", () => {
+  const {ticketAssignmentForUpdate, fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
+  const id = "support-user-ticket";
+  const ticket = {type: "SUPPORT", ownerUid: "user", staffUid: "staff", participantIds: ["user", "staff"], lastMessageId: ""};
+  for (const origin of ["SUPPORT", "PLAN_CONSULT"]) {
+    assert.deepEqual(ticketAssignmentForUpdate(undefined, {...ticket, supportOrigin: origin}, id), {
+      recipients: ["staff"], data: {type: "safe_update", conversationId: id, eventId: "ticket-assigned"},
+    });
+  }
+  const waiting = {...ticket, staffUid: "", participantIds: ["user"]};
+  assert.equal(ticketAssignmentForUpdate(undefined, waiting, id), null);
+  assert.deepEqual(ticketAssignmentForUpdate(waiting, ticket, id).recipients, ["staff"]);
+  const escalated = {...ticket, adminUid: "admin", participantIds: ["user", "staff", "admin"],
+    lastMessageId: "first-message", lastSenderUid: "user"};
+  assert.deepEqual(ticketAssignmentForUpdate(ticket, escalated, id).recipients, ["admin"]);
+  assert.deepEqual(fcmTargetsForConversationUpdate(ticket, escalated, id).recipients, ["staff", "admin"]);
+  assert.equal(ticketAssignmentForUpdate(ticket, {...ticket, participantIds: ["user", "staff", "contact"]}, id), null);
+  assert.equal(ticketAssignmentForUpdate(ticket, ticket, id), null);
+  assert.equal(ticketAssignmentForUpdate(undefined, {...ticket, closedAt: new Date()}, id), null);
 });
 
 // Inputs: a three-person group, its owner, and one other member. Expected: only the owner can
@@ -291,7 +312,29 @@ const {
   TOPIC_APP_UPDATES,
   buildUpdateNotification,
   parseManifestConfig,
+  pruneOldReleases,
 } = require("./scripts/publish-android-release");
+
+test("release cleanup keeps the active APK and the immediately preceding build", async () => {
+  const apk = (version, label = `v1.0.0.${version}`) => `public/android/releases/${version}/OliveBranch${label}.apk`;
+  const active = apk(101);
+  const legacy = "public/android/releases/97/olive-branch-v1.0.0.97.apk";
+  const names = [apk(98), apk(100), active, apk(99), apk(102), legacy, "public/android/releases/97/readme.txt", apk(101, "v0.0.0.1")];
+  const removed = [];
+  const bucket = {getFiles: async ({prefix}) => {
+    assert.equal(prefix, "public/android/releases/");
+    return [names.map(name => ({name, metadata: {generation: "123"}, delete: async options => {
+      assert.equal(options.ifGenerationMatch, "123");
+      removed.push(name);
+    }}))];
+  }};
+  const manifest = {versionCode: 101, apkUrl: `https://example.com/o/${encodeURIComponent(active)}?alt=media`};
+  assert.equal(await pruneOldReleases(bucket, manifest), 4);
+  assert.deepEqual(new Set(removed), new Set([apk(98), apk(99), legacy, apk(101, "v0.0.0.1")]));
+  removed.length = 0;
+  await assert.rejects(pruneOldReleases(bucket, {...manifest, versionCode: 103}), /does not point/);
+  assert.deepEqual(removed, []);
+});
 
 // Inputs: valid release details. Expected: FCM app update payload targets high priority and the dedicated topic.
 test("fcm app update notifications target the app_updates topic with high priority", () => {

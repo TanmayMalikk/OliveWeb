@@ -90,11 +90,15 @@ interface SafetyDocumentDataSource {
     fun cachedFor(uid: String, id: String): SafetyDocument? = null
     // Wraps the document key for new recipients before sharing it.
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
+    suspend fun shareInChat(document: SafetyDocument, outgoing: OutgoingMessage, recipients: Map<String, String>) {
+        error("Chat attachment sharing is unavailable")
+    }
     suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
         recipientUid: String,
         recipientUsername: String,
+        forPlan: Boolean = false,
     ) { error("Encrypted media sharing is unavailable") }
     suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) {
         error("Encrypted media revocation is unavailable")
@@ -181,7 +185,10 @@ class SafetyDocumentRepository(
         val current = getFor(ownerUid, document.id)
         if (current.objectKey.isNotBlank()) {
             val access = encryptedAccess(current, ownerUid, recipients)
-            media.updateAccess(current.id, access.accountKeys, access.deviceKeys)
+            media.updateAccess(
+                current.id, access.accountKeys, access.deviceKeys,
+                grantIndependentRecipients = recipients.keys.toList(),
+            )
             return
         }
         val updated = (listOf(ownerUid) + recipients.keys).distinct()
@@ -202,23 +209,52 @@ class SafetyDocumentRepository(
         }
     }
 
+    override suspend fun shareInChat(
+        document: SafetyDocument,
+        outgoing: OutgoingMessage,
+        recipients: Map<String, String>,
+    ) {
+        require(document.ownerUid == outgoing.ownerUid)
+        val current = getFor(outgoing.ownerUid, document.id)
+        val access = if (current.objectKey.isNotBlank()) {
+            encryptedAccess(current, outgoing.ownerUid, recipients)
+        } else {
+            EncryptedAccess(emptyMap(), emptyMap())
+        }
+        media.shareInChat(current.id, outgoing, recipients.keys.toList(), access.accountKeys, access.deviceKeys)
+    }
+
     // Wraps the document key for another approved account without exposing the raw key.
     override suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
         recipientUid: String,
         recipientUsername: String,
+        forPlan: Boolean,
     ) {
         require(document.ownerUid == ownerUid && recipientUid != ownerUid)
         val current = getFor(ownerUid, document.id)
         if (current.objectKey.isNotBlank()) {
             val documentKey = unwrapDocumentKey(current, ownerUid)
             val recipient = recipientAccess(documentKey, recipientUid, recipientUsername)
+            if (forPlan) {
+                if (recipientUid in current.allowedUsers &&
+                    current.deviceWrappedKeys.keys.containsAll(recipient.deviceKeys.keys)) return
+                media.updatePlanAccess(current.id, mapOf(
+                    ownerUid to checkNotNull(current.wrappedKeys[ownerUid]),
+                    recipientUid to recipient.accountKey,
+                ), recipient.deviceKeys)
+                return
+            }
             val wrapped = current.wrappedKeys + (recipientUid to recipient.accountKey)
             val devices = retainAuthorizedDeviceKeys(current.deviceWrappedKeys, wrapped.keys) + recipient.deviceKeys
-            media.updateAccess(current.id, wrapped, devices)
+            media.updateAccess(
+                current.id, wrapped, devices,
+                grantIndependentRecipients = listOf(recipientUid),
+            )
             return
         }
+        check(!forPlan) { "Upload an encrypted copy before attaching this legacy document." }
         val updated = current.allowedUsers.toSet() + recipientUid
         updateStorageAccess(current, current.allowedUsers.toSet(), updated)
         // Turn an unexpected grant access failure into a readable message.
@@ -239,7 +275,10 @@ class SafetyDocumentRepository(
             val wrapped = document.wrappedKeys - recipientUid
             require(ownerUid in wrapped) { "The owner encryption key cannot be removed" }
             val devices = retainAuthorizedDeviceKeys(document.deviceWrappedKeys, wrapped.keys)
-            media.updateAccess(document.id, wrapped, devices)
+            media.updateAccess(
+                document.id, wrapped, devices,
+                revokeIndependentRecipients = listOf(recipientUid),
+            )
             return
         }
         val updated = document.allowedUsers.toSet() - recipientUid
@@ -509,12 +548,16 @@ class IndexedSafetyDocumentRepository(
     override suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>) =
         remote.share(document, ownerUid, recipients)
 
+    override suspend fun shareInChat(document: SafetyDocument, outgoing: OutgoingMessage, recipients: Map<String, String>) =
+        remote.shareInChat(document, outgoing, recipients)
+
     override suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
         recipientUid: String,
         recipientUsername: String,
-    ) = remote.grantAccess(document, ownerUid, recipientUid, recipientUsername)
+        forPlan: Boolean,
+    ) = remote.grantAccess(document, ownerUid, recipientUid, recipientUsername, forPlan)
 
     override suspend fun revokeAccess(documentId: String, ownerUid: String, recipientUid: String) =
         remote.revokeAccess(documentId, ownerUid, recipientUid)

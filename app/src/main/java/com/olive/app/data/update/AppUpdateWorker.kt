@@ -5,6 +5,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.Manifest
+import android.os.Build
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import androidx.work.*
 import com.google.firebase.messaging.FirebaseMessaging
@@ -14,6 +18,22 @@ import com.olive.app.notification.OliveNotificationManager
 import java.util.concurrent.TimeUnit
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.tasks.await
+
+// Topic membership belongs to the installation and applies to every signed-in role.
+class AppUpdateRegistrationWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
+    override suspend fun doWork(): Result = try {
+        val messaging = FirebaseMessaging.getInstance()
+        messaging.register().await()
+        messaging.subscribeToTopic(AppUpdateScheduler.TOPIC_APP_UPDATES).await()
+        Result.success()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        Result.retry()
+    }
+}
 
 // Checks for a release update in the background and prepares it without interrupting the current screen.
 internal class AppUpdateWorker(context: Context, parameters: WorkerParameters) :
@@ -91,8 +111,35 @@ internal object AppUpdateScheduler {
             PeriodicWorkRequestBuilder<AppUpdateWorker>(24, TimeUnit.HOURS).setConstraints(constraints).build(),
         )
         if (BuildConfig.FIREBASE_CONFIGURED) {
-            runCatching { FirebaseMessaging.getInstance().subscribeToTopic(TOPIC_APP_UPDATES) }
+            registerForUpdates(context)
         }
+    }
+
+    fun registerForUpdates(context: Context) {
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            "olive-update-registration", ExistingWorkPolicy.KEEP,
+            OneTimeWorkRequestBuilder<AppUpdateRegistrationWorker>()
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build(),
+        )
+    }
+
+    fun announceRelease(context: Context, versionName: String) {
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED) return
+        OliveNotificationManager.createNotificationChannels(context)
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        val pending = PendingIntent.getActivity(context, 7401, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val notification = NotificationCompat.Builder(context, OliveNotificationManager.CHANNEL_APP_UPDATES)
+            .setSmallIcon(R.drawable.ic_notification_olive_branch)
+            .setContentTitle(context.getString(R.string.ui_a_new_update_is_available))
+            .setContentText(versionName.take(80))
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        context.getSystemService(NotificationManager::class.java).notify(7401, notification)
     }
 
     // Immediately enqueues an update check and download when an FCM release alert is received.

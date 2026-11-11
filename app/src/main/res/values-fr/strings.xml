@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">App</string>
+    <string name="app_name">Olive Branch</string>
     <string name="local">Local</string>
     <string name="global">Monde</string>
     <string name="local_edition">Édition locale</string>
@@ -272,7 +272,7 @@
     <string name="no_private_notes_found">Aucune note trouvée.</string><string name="untitled_note">Note sans titre</string><string name="no_incident_reports_found">Aucun rapport d’incident trouvé.</string>
 <string name="secure_shared_entry">Élément partagé sécurisé</string><string name="close_shared_entry">Fermer l’élément partagé</string>
     <string name="attach_secure_entry">Joindre une note ou un rapport sécurisé</string><string name="encrypted_document">Document chiffré</string><string name="shared_private_note">Note privée partagée</string><string name="shared_incident_report">Rapport d’incident partagé</string>
-    <string name="private_entry_shared">Élément privé partagé de façon sécurisée.</string><string name="unable_to_share_private_entry">Impossible de partager cet élément privé.</string><string name="unable_to_open_shared_entry">Impossible d’ouvrir cet élément partagé.</string><string name="unable_to_open_secure_conversation">Cet appareil ne possède pas la clé de chiffrement de cette conversation. Ouvrez la conversation sur un appareil déjà autorisé pour ce compte, puis réessayez.</string>
+    <string name="private_entry_shared">Élément privé partagé de façon sécurisée.</string><string name="unable_to_share_private_entry">Impossible de partager cet élément privé.</string><string name="unable_to_open_shared_entry">Impossible d’ouvrir cet élément partagé.</string><string name="unable_to_open_secure_conversation">Impossible de préparer cette conversation chiffrée. Vérifiez votre connexion et réessayez.</string>
     <string name="secure_message">Message sécurisé</string><string name="encrypted_message_unavailable">Message chiffré indisponible</string>
 <string name="news_near_location">Actualités près de %1$s</string>
 <string name="accounts">Comptes</string>
@@ -422,7 +422,14 @@
     <string name="ui_group_voice_call">Appel vocal de groupe</string>
     <string name="ui_group_call_status">%1$d connectés • %2$s</string>
     <string name="organization_live_map_staff_description">Voir toutes les positions.</string>
-    <string name="safety_mark_consultation_complete">Marquer la consultation comme terminée</string>
+    <string name="safety_mark_consultation_complete">Marquer comme terminé</string>
+    <string name="safety_plans_completed">Votre plan de sécurité et votre plan de secours sont terminés.</string>
+    <string name="safety_staff_assigned">Un membre de l’équipe de soutien vous accompagne.</string>
+    <string name="safety_open_consultation">Ouvrir le ticket de consultation</string>
+    <string name="safety_conflicts_title">Conflits</string>
+    <string name="safety_your_change">Votre modification</string>
+    <string name="safety_incoming_change">Modification reçue</string>
+    <string name="safety_empty_value">Section vide</string>
     <string name="safety_complete_consultation_title">Terminer cette consultation ?</string>
     <string name="safety_complete_consultation_description">Cela archive la discussion pour tout le monde et retire ce plan de sécurité de votre boîte de réception.</string>
     <string name="safety_mark_complete">Marquer comme terminée</string>

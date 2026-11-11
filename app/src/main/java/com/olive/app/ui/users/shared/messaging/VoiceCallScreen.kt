@@ -53,9 +53,9 @@ internal fun IncomingCallDialog(
     invitation: VoipInvitation,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
-    onQuickExit: () -> Unit,
+    onQuickExit: (() -> Unit)?,
 ) = FullScreenCallDialog(onBack = onDecline) {
-    QuickExitCallButton(onQuickExit, Modifier.align(Alignment.End))
+    onQuickExit?.let { QuickExitCallButton(it, Modifier.align(Alignment.End)) }
     Spacer(Modifier.height(20.dp))
     CallIdentity(
         name = invitation.name.ifBlank { stringResource(R.string.ui_voice_call) },
@@ -92,7 +92,7 @@ internal fun ActiveCallDialog(
     onSpeaker: (Boolean) -> Unit,
     onFinish: () -> Unit,
     onMinimize: () -> Unit,
-    onQuickExit: () -> Unit,
+    onQuickExit: (() -> Unit)?,
 ) = FullScreenCallDialog(onBack = onMinimize) {
     Row(
         Modifier.fillMaxWidth(),
@@ -117,7 +117,7 @@ internal fun ActiveCallDialog(
             )
         }
         Spacer(Modifier.width(10.dp))
-        QuickExitCallButton(onQuickExit)
+        onQuickExit?.let { QuickExitCallButton(it) }
     }
     Spacer(Modifier.height(20.dp))
     val active = state as? VoipSessionState.Active

@@ -119,5 +119,6 @@
     <string name="notification_active_voice_calls">Active Voice Calls</string>
     <string name="notification_safe_app_updates">Safe App Updates</string>
     <string name="notification_safe_app_activity">Open Olive Branch to view your updates.</string>
+    <string name="notification_ticket_assigned">A new ticket has been assigned to you.</string>
     <string name="notification_new_app_update">New App Update</string>
 </resources>

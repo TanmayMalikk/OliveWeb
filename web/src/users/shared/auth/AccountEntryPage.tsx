@@ -1,7 +1,7 @@
 // All safe-app roles: handles web account sign-in and registration.
 import { useState } from "react";
 import { siteHref } from "../../../sites/SiteRouting";
-import { ArrowLeft, ArrowRight, Leaf } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Leaf, UserRound } from "lucide-react";
 import {
   Branch,
   Button,
@@ -30,6 +30,174 @@ export function AuthPage({
   const session = useSession();
   const create = !organizationOnly && session.path === "/account/create";
   const [role, setRole] = useState<Role>(organizationOnly ? "STAFF" : "USER");
+  const form = (
+    <>
+      <Form
+        onSubmit={async (data) => {
+          const username = String(data.get("username"));
+          const password = String(data.get("password"));
+          await session.perform(async () => {
+            if (create && !validUsername(username))
+              throw new Error(
+                "Use 8–24 lowercase letters, numbers, or underscores.",
+              );
+            if (create && !validPassword(password))
+              throw new Error(
+                "Use 8–24 characters with a letter, number, and special character.",
+              );
+            if (create && password !== data.get("confirmation"))
+              throw new Error("Passwords do not match.");
+            await session.authenticate(username, password, role, create);
+          });
+        }}
+      >
+        <label className="field">
+          <span>Account type</span>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value as Role)}
+          >
+            {organizationOnly ? (
+              <>
+                <option value="STAFF">Organization staff</option>
+                <option value="ADMIN">Organization administrator</option>
+              </>
+            ) : (
+              <>
+                <option value="USER">Personal account</option>
+                <option value="SAFE_CONTACT">Safe contact</option>
+              </>
+            )}
+          </select>
+        </label>
+        <Field
+          label={
+            role === "STAFF" || role === "ADMIN"
+              ? "Username or organization email"
+              : "Username"
+          }
+          name="username"
+          autoComplete="username"
+          required
+          minLength={create ? 8 : 4}
+          maxLength={254}
+          hint={
+            create ? "8–24 letters, numbers, or underscores." : undefined
+          }
+        />
+        <Field
+          label="Password"
+          name="password"
+          type="password"
+          autoComplete={create ? "new-password" : "current-password"}
+          required
+          minLength={create ? 8 : 1}
+          maxLength={create ? 24 : 128}
+          hint={
+            create
+              ? "8–24 characters, including a letter, number, and special character."
+              : undefined
+          }
+        />
+        {create && (
+          <Field
+            label="Confirm password"
+            name="confirmation"
+            type="password"
+            autoComplete="new-password"
+            required
+            maxLength={24}
+          />
+        )}
+        {session.message && (
+          <p className="form-error" role="alert">
+            {session.message}
+          </p>
+        )}
+        <Button type="submit" disabled={session.busy}>
+          <Forward>
+            {session.busy
+              ? "Please wait…"
+              : create
+                ? "Create account"
+                : "Sign in"}
+          </Forward>
+        </Button>
+      </Form>
+      {!organizationOnly && (
+        <p className="auth-switch">
+          {create ? "Already have an account?" : "Need an account?"}{" "}
+          <button
+            className="text-link"
+            onClick={() => {
+              session.clearMessage();
+              session.go(create ? "/account/sign-in" : "/account/create");
+            }}
+          >
+            {create ? "Sign in" : "Create an account"}{" "}
+            <ArrowRight size={15} />
+          </button>
+        </p>
+      )}
+      {!organizationOnly && (
+        <div className="account-utility-links">
+          {create && <a className="text-link" href={siteHref("/get")}>
+            Download & installation <ArrowRight size={15} aria-hidden="true" />
+          </a>}
+          {!create && (
+            <button
+              className="text-link"
+              onClick={() => {
+                session.clearMessage();
+                session.go("/account/link");
+              }}
+            >
+              Replace a lost personal link <ArrowRight size={15} />
+            </button>
+          )}
+        </div>
+      )}
+      {!session.cloudMode && (
+        <div className="storage-note">
+          <Leaf size={18} aria-hidden="true" />
+          <span>Local preview. Accounts are stored in this browser.</span>
+        </div>
+      )}
+    </>
+  );
+
+  if (!create) {
+    const Icon = organizationOnly ? Building2 : UserRound;
+    return (
+      <div className="access-page">
+        <header className="access-header">
+          <Logo small />
+          {!organizationOnly && (
+            <a className="text-link" href={siteHref("/get")}>Get the app <ArrowRight size={16} aria-hidden="true" /></a>
+          )}
+        </header>
+        <main className="access-sign-in" id="main">
+          <section className="access-context" aria-labelledby="sign-in-context">
+            <span className="access-mark"><Icon size={25} aria-hidden="true" /></span>
+            <p className="access-context-title" id="sign-in-context">{organizationOnly ? "Organization portal" : "Personal and safe contact accounts"}</p>
+            <p>{organizationOnly
+              ? "Access the staff or administrator workspace with your organization account."
+              : "Choose the account type you registered with to continue."}</p>
+            {!organizationOnly && (
+              <button className="text-link" type="button" onClick={() => session.go("/")}>
+                <ArrowLeft size={16} aria-hidden="true" /> Back to Little Grove
+              </button>
+            )}
+          </section>
+          <section className="access-card" aria-labelledby="sign-in-heading">
+            <h1 id="sign-in-heading">{organizationOnly ? "Organization sign-in" : "Sign in to Olive Branch"}</h1>
+            {form}
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="account-layout">
       <aside className="account-aside">
@@ -56,148 +224,10 @@ export function AuthPage({
           </button>
         )}
         <div className="account-form">
-          <span className="eyebrow">
-            {create ? "A SIMPLE START" : "MAKE YOURSELF AT HOME"}
-          </span>
-          <h2>{create ? "Create your account." : "Welcome back."}</h2>
-          <p>
-            {create
-              ? "Your details first. Your everyday app next."
-              : "Sign in and we’ll take you to your linked app."}
-          </p>
-          <Form
-            onSubmit={async (data) => {
-              const username = String(data.get("username"));
-              const password = String(data.get("password"));
-              await session.perform(async () => {
-                if (create && !validUsername(username))
-                  throw new Error(
-                    "Use 8–24 lowercase letters, numbers, or underscores.",
-                  );
-                if (create && !validPassword(password))
-                  throw new Error(
-                    "Use 8–24 characters with a letter, number, and special character.",
-                  );
-                if (create && password !== data.get("confirmation"))
-                  throw new Error("Passwords do not match.");
-                await session.authenticate(username, password, role, create);
-              });
-            }}
-          >
-            <label className="field">
-              <span>Account type</span>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-              >
-                {organizationOnly ? (
-                  <>
-                    <option value="STAFF">Organization staff</option>
-                    <option value="ADMIN">Organization administrator</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="USER">Personal account</option>
-                    <option value="SAFE_CONTACT">Safe contact</option>
-                  </>
-                )}
-              </select>
-            </label>
-            <Field
-              label={
-                role === "STAFF" || role === "ADMIN"
-                  ? "Username or organization email"
-                  : "Username"
-              }
-              name="username"
-              autoComplete="username"
-              required
-              minLength={create ? 8 : 4}
-              maxLength={254}
-              hint={
-                create ? "8–24 letters, numbers, or underscores." : undefined
-              }
-            />
-            <Field
-              label="Password"
-              name="password"
-              type="password"
-              autoComplete={create ? "new-password" : "current-password"}
-              required
-              minLength={create ? 8 : 1}
-              maxLength={create ? 24 : 128}
-              hint={
-                create
-                  ? "8–24 characters, including a letter, number, and special character."
-                  : undefined
-              }
-            />
-            {create && (
-              <Field
-                label="Confirm password"
-                name="confirmation"
-                type="password"
-                autoComplete="new-password"
-                required
-                maxLength={24}
-              />
-            )}
-            {session.message && (
-              <p className="form-error" role="alert">
-                {session.message}
-              </p>
-            )}
-            <Button type="submit" disabled={session.busy}>
-              <Forward>
-                {session.busy
-                  ? "Please wait…"
-                  : create
-                    ? "Create account"
-                    : "Sign in"}
-              </Forward>
-            </Button>
-          </Form>
-          {!organizationOnly && (
-            <p className="auth-switch">
-              {create ? "Already have an account?" : "New around here?"}{" "}
-              <button
-                className="text-link"
-                onClick={() => {
-                  session.clearMessage();
-                  session.go(create ? "/account/sign-in" : "/account/create");
-                }}
-              >
-                {create ? "Sign in" : "Create an account"}{" "}
-                <ArrowRight size={15} />
-              </button>
-            </p>
-          )}
-          {!organizationOnly && (
-            <div className="account-utility-links">
-              <a className="text-link" href={siteHref("/get")}>
-                Download & installation <ArrowRight size={15} />
-              </a>
-              {!create && (
-                <button
-                  className="text-link"
-                  onClick={() => {
-                    session.clearMessage();
-                    session.go("/account/link");
-                  }}
-                >
-                  Replace a lost personal link <ArrowRight size={15} />
-                </button>
-              )}
-            </div>
-          )}
-          <div className="storage-note">
-            <Leaf size={18} />
-            <span>
-              {session.cloudMode
-                ? "Connected to your shared Firebase account."
-                : "Local preview: accounts are encrypted in this browser. They do not sync with the Android app."}
-            </span>
-          </div>
+          <span className="eyebrow">A SIMPLE START</span>
+          <h2>Create your account.</h2>
+          <p>Your details first. Your everyday app next.</p>
+          {form}
         </div>
       </main>
     </div>
@@ -290,25 +320,6 @@ export function Setup() {
                 max={new Date().toISOString().slice(0, 10)}
                 required
               />
-              <label className="field">
-                <span>Language</span>
-                <select
-                  value={profile.language}
-                  onChange={(e) => update("language", e.target.value)}
-                >
-                  {[
-                    "English",
-                    "French",
-                    "Spanish",
-                    "Arabic",
-                    "Chinese",
-                    "Tagalog",
-                    "Cree",
-                  ].map((l) => (
-                    <option key={l}>{l}</option>
-                  ))}
-                </select>
-              </label>
               <Field
                 label="City"
                 value={profile.address.city}

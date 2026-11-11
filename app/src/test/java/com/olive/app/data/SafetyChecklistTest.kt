@@ -163,4 +163,41 @@ class SafetyChecklistTest {
         assertNull(readSafetyPlanContact(SafetyChecklistItem("trusted-contact:id", "not json")))
         assertNull(readSafetyPlanContact(SafetyChecklistItem("trusted-contact:id", "{\"name\":\"Missing details\"}")))
     }
+
+    @Test
+    fun incomingChecklistDiffShowsOnlySemanticChanges() {
+        val local = listOf(
+            SafetyChecklistItem("license", "Driver's license", checked = false),
+            SafetyChecklistItem("medication", "Medication list"),
+            SafetyChecklistItem("rename", "Old name"),
+            SafetyChecklistItem("attachments", "Passport", excludedAttachmentIds = listOf("old-document")),
+            SafetyChecklistItem("unchanged", "Emergency cash"),
+        )
+        val remote = listOf(
+            SafetyChecklistItem("unchanged", "Emergency cash"),
+            SafetyChecklistItem("license", "Driver's license", checked = true),
+            SafetyChecklistItem("rename", "Passport"),
+            SafetyChecklistItem("attachments", "Passport", excludedAttachmentIds = listOf("new-document")),
+            SafetyChecklistItem("new", "Phone charger"),
+        )
+
+        assertEquals(
+            listOf(
+                SafetyChecklistChange.CompletionChanged("license", "Driver's license", false, true),
+                SafetyChecklistChange.Removed("medication", "Medication list"),
+                SafetyChecklistChange.TextChanged("rename", "Old name", "Passport"),
+                SafetyChecklistChange.AttachmentsChanged("attachments", "Passport"),
+                SafetyChecklistChange.Added("new", "Phone charger", false),
+            ),
+            safetyChecklistIncomingChanges(local, remote),
+        )
+    }
+
+    @Test
+    fun incomingChecklistDiffIgnoresReorderingAndIdenticalItems() {
+        val first = SafetyChecklistItem("first", "Driver's license", checked = true)
+        val second = SafetyChecklistItem("second", "Emergency cash")
+
+        assertTrue(safetyChecklistIncomingChanges(listOf(first, second), listOf(second, first)).isEmpty())
+    }
 }
