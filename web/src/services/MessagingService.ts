@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -10,6 +11,7 @@ import {
   where,
   orderBy,
   limitToLast,
+  limit,
   writeBatch,
   serverTimestamp,
   runTransaction,
@@ -58,6 +60,7 @@ export interface Conversation {
   supportOrigin: "" | "PLAN_CONSULT" | "SUPPORT";
   supportTag: "" | "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
   closedAt: number;
+  ticketNumber?: number;
 }
 // Makes one chat ID from two account IDs. Sorting them means both users get the same ID.
 export const pairId = (a: string, b: string) => [a, b].sort().join("--");
@@ -108,21 +111,21 @@ export async function messageDevice(uid: string) {
   return { deviceId, publicKey };
 }
 // Reads another device's public key so this browser can encrypt a room key for it.
-async function importPublicKey(value: string) {
+async function importPublicKey(value: string, hash = "SHA-256") {
   return crypto.subtle.importKey(
     "spki",
     base64ToBytes(value),
-    { name: "RSA-OAEP", hash: "SHA-256" },
+    { name: "RSA-OAEP", hash },
     false,
     ["encrypt"],
   );
 }
 // Locks a chat room key with one device's public key so only that device can open it.
-async function wrapRoomKey(raw: Uint8Array, publicKey: string) {
+async function wrapRoomKey(raw: Uint8Array, publicKey: string, hash = "SHA-256") {
   return bytesToBase64(
     await crypto.subtle.encrypt(
       { name: "RSA-OAEP" },
-      await importPublicKey(publicKey),
+      await importPublicKey(publicKey, hash),
       raw.buffer.slice(
         raw.byteOffset,
         raw.byteOffset + raw.byteLength,
@@ -170,6 +173,12 @@ export async function register(identity: Identity) {
     mgf1Digest: "SHA-256",
     updatedAt: serverTimestamp(),
   }, { merge: true });
+}
+
+export async function prepareSupportTickets() {
+  const { functions } = await firebase();
+  const { httpsCallable } = await import("firebase/functions");
+  await httpsCallable(functions, "supportTicketsPrepare")();
 }
 // Finds user for the web data service.
 export async function searchUser(
@@ -350,6 +359,7 @@ export async function subscribeConversations(
         supportOrigin: data.supportOrigin ?? "",
         supportTag: data.supportTag ?? "",
         closedAt: data.closedAt?.toMillis?.() ?? 0,
+        ticketNumber: Number.isSafeInteger(data.ticketNumber) && data.ticketNumber >= 0 ? data.ticketNumber : undefined,
       } as Conversation;
     }).sort((a, b) => b.updatedAt - a.updatedAt)),
     onError,
@@ -357,23 +367,26 @@ export async function subscribeConversations(
 }
 // Chooses the chat title. Users see an anonymous Olive Staff label, while staff see the user's name.
 export function conversationName(conversation: Conversation, current: Identity) {
-  // Hide staff and admin usernames from users in support chats.
-  if (conversation.type === "SUPPORT" && current.role !== "STAFF" && current.role !== "ADMIN") {
-    const label = conversation.supportTag === "NEEDS_ADMIN"
-      ? "Escalation"
-      : conversation.supportOrigin === "PLAN_CONSULT"
-        ? "Plan Consult"
-        : "Support";
-    return `Olive Staff • ${label}`;
+  if (conversation.type === "SUPPORT") {
+    const label = conversation.supportTag === "NEEDS_ADMIN" ? "Admin Ticket"
+      : conversation.supportOrigin === "PLAN_CONSULT" || conversation.supportTag === "PLAN_CONSULT"
+        ? "Consult Ticket" : "Support Ticket";
+    return conversation.ticketNumber === undefined ? label : `${label} #${conversation.ticketNumber}`;
   }
-  if (conversation.type === "SUPPORT")
-    return conversation.participantUsernames[conversation.ownerUid] || "User";
   return Object.entries(conversation.participantUsernames)
     .find(([uid]) => uid !== current.uid)?.[1] ?? "Conversation";
 }
 // Gets the secure key for a chat. It reuses this browser's key or creates one key for every approved participant.
 export async function roomKey(id: string, current: Identity, conversationData: Conversation) {
-  const { db } = await firebase();
+  await register(current);
+  const { db, functions } = await firebase();
+  if (conversationData.type === "SUPPORT") {
+    const { httpsCallable } = await import("firebase/functions");
+    const result = await httpsCallable<{ conversationId: string }, { participantUsernames: Record<string, string> }>(
+      functions, "conversationPrepareKeys",
+    )({ conversationId: id });
+    conversationData = { ...conversationData, participantUsernames: result.data.participantUsernames };
+  }
   const device = await messageDevice(current.uid);
   const deviceKeyReference = doc(
     db,
@@ -383,13 +396,22 @@ export async function roomKey(id: string, current: Identity, conversationData: C
     `${current.uid}--${device.deviceId}`,
   );
   const savedDeviceKey = await getDoc(deviceKeyReference);
-  if (savedDeviceKey.exists())
-    return unwrapRoomKey(current.uid, String(savedDeviceKey.data().wrappedKey));
+  if (savedDeviceKey.exists()) {
+    const raw = await unwrapRoomKeyBytes(current.uid, String(savedDeviceKey.data().wrappedKey)).catch(() => null);
+    if (raw) {
+      try {
+        await shareRoomKeyWithDevices(id, conversationData, raw);
+        return await crypto.subtle.importKey("raw", raw.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
+      } finally {
+        raw.fill(0);
+      }
+    }
+  }
   const directory = await Promise.all(conversationData.participantIds.map(async (uid) => {
     const username = conversationData.participantUsernames[uid];
     if (!username) return [uid, ""] as const;
     const row = await getDoc(doc(db, "messageDirectory", username.toLowerCase()));
-    return [uid, String(row.data()?.publicKey ?? "")] as const;
+    return [uid, row.get("uid") === uid ? String(row.data()?.publicKey ?? "") : ""] as const;
   }));
   const publicKeys: Record<string, string> = Object.fromEntries(directory);
   if (Object.values(publicKeys).some((key) => !key))
@@ -407,7 +429,9 @@ export async function roomKey(id: string, current: Identity, conversationData: C
   );
   const ownDeviceWrapped = await wrapRoomKey(raw, device.publicKey);
   const conversation = doc(db, "conversations", id);
-  const selected = await runTransaction(db, async (transaction) => {
+  const messages = await getDocs(query(collection(conversation, "messages"), limit(1)));
+  try {
+    const selected = await runTransaction(db, async (transaction) => {
     const snapshot = await transaction.get(conversation);
     if (!snapshot.exists())
       throw new Error("This conversation is no longer available.");
@@ -419,8 +443,8 @@ export async function roomKey(id: string, current: Identity, conversationData: C
     if (savedKeys && roomKeys) {
       if (savedKeys[current.uid] === device.publicKey && roomKeys[current.uid])
         return roomKeys[current.uid];
-      throw new Error(
-        "Open this chat once on Android to securely approve this browser.",
+      if (!messages.empty || snapshot.get("lastMessageId")) throw new Error(
+        "Open this chat on an existing authorized device to approve this browser.",
       );
     }
     transaction.update(conversation, {
@@ -429,16 +453,52 @@ export async function roomKey(id: string, current: Identity, conversationData: C
       updatedAt: serverTimestamp(),
     });
     return ownDeviceWrapped;
-  });
-  await setDoc(deviceKeyReference, {
+    });
+    await setDoc(deviceKeyReference, {
     uid: current.uid,
     deviceId: device.deviceId,
     publicKey: device.publicKey,
     wrappedKey: selected,
     updatedAt: serverTimestamp(),
-  });
-  raw.fill(0);
-  return unwrapRoomKey(current.uid, selected);
+    });
+    const selectedRaw = await unwrapRoomKeyBytes(current.uid, selected);
+    try {
+      await shareRoomKeyWithDevices(id, conversationData, selectedRaw);
+      return await crypto.subtle.importKey("raw", selectedRaw.slice().buffer, "AES-GCM", false, ["encrypt", "decrypt"]);
+    } finally {
+      selectedRaw.fill(0);
+    }
+  } finally {
+    raw.fill(0);
+  }
+}
+
+// Publish an envelope for every registered device so either platform can open a new support ticket.
+async function shareRoomKeyWithDevices(id: string, conversation: Conversation, raw: Uint8Array) {
+  const { db } = await firebase();
+  for (const uid of conversation.participantIds) {
+    const username = conversation.participantUsernames[uid]?.trim().toLowerCase();
+    if (!username) continue;
+    const devices = await getDocs(collection(db, "messageDirectory", username, "devices"));
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const device of devices.docs) {
+      const value = device.data();
+      if (value.uid !== uid || typeof value.publicKey !== "string" || typeof value.deviceId !== "string") continue;
+      batch.set(doc(db, "conversations", id, "deviceKeys", `${uid}--${value.deviceId}`), {
+        uid, deviceId: value.deviceId, publicKey: value.publicKey,
+        wrappedKey: await wrapRoomKey(raw, value.publicKey, value.mgf1Digest === "SHA-256" ? "SHA-256" : "SHA-1"),
+        updatedAt: serverTimestamp(),
+      });
+      count++;
+      if (count === 10) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+    if (count) await batch.commit();
+  }
 }
 // Encrypts a message on this browser, then saves only the locked text in Firebase.
 export async function sendMessage(

@@ -38,7 +38,6 @@
     <string name="safety_staff_intro">Consultez et modifiez les plans partagés avec vous.</string>
     <string name="safety_retry_save">Réessayer l’enregistrement</string>
     <string name="safety_back">Retour</string>
-    <string name="safety_open_plan">Ouvrir le plan de %1$s</string>
     <string name="safety_source">Conseils : Agence de la santé publique du Canada. Adaptez ces pistes avec une personne de confiance.</string>
     <string name="safety_upload_document">Téléverser le document</string>
     <string name="safety_upload_for">Téléverser un document pour %1$s.</string>

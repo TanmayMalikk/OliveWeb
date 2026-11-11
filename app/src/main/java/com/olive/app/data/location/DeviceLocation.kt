@@ -492,9 +492,9 @@ private fun coordinateDistanceMeters(first: RouteCoordinate, second: RouteCoordi
 
 private const val EARTH_RADIUS_METERS = 6_371_000.0
 
-// Admins: reads the live locations that every signed-in user publishes for the organization map.
+// Staff and admins: reads the user locations published for the protected organization map.
 
-/** Listens to the admin-only location feed in Firebase Realtime Database. */
+/** Listens to the organization location feed after Firebase verifies the account role. */
 internal class AdminLocationRepository(
     private val databaseProvider: () -> FirebaseDatabase = LocationDatabase::instance,
 ) {

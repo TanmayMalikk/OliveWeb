@@ -5,6 +5,39 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafetyPlanMergeTest {
+    @Test
+    fun concurrentChecklistRowsMergeWithoutAConflictPopup() {
+        val key = "primary_documents"
+        val rows = listOf(SafetyChecklistItem("a", "First"), SafetyChecklistItem("b", "Second"))
+        val initial = SafetyPlan("owner", "owner", mapOf(key to SafetyField(writeSafetyChecklist(rows), 1)))
+        val draft = initial.copy(fields = mapOf(key to initial.fields.getValue(key).edit(
+            writeSafetyChecklist(listOf(rows[0], rows[1].copy(text = "User edit"))),
+        )))
+        val remote = initial.copy(fields = mapOf(key to SafetyField(
+            writeSafetyChecklist(listOf(rows[0].copy(checked = true), rows[1])), 2, "staff",
+        )))
+        val merged = mergeSafetyPlan(draft, draft, remote)
+        assertFalse(merged.hasConflicts)
+        val saved = readSafetyChecklist(merged.fields.getValue(key).value)
+        assertTrue(saved[0].checked)
+        assertEquals("User edit", saved[1].text)
+        assertEquals(2L, merged.fields.getValue(key).revision)
+        assertEquals(remote.fields.getValue(key).value, merged.fields.getValue(key).baseValue)
+    }
+
+    @Test
+    fun conflictingChecklistTextPreservesOtherIncomingRowsInBothChoices() {
+        val rows = listOf(SafetyChecklistItem("a", "Original"), SafetyChecklistItem("b", "Second"))
+        val base = writeSafetyChecklist(rows)
+        val mine = writeSafetyChecklist(listOf(rows[0].copy(text = "Mine"), rows[1]))
+        val remote = writeSafetyChecklist(listOf(rows[0].copy(text = "Incoming"), rows[1].copy(checked = true)))
+        val merged = checkNotNull(mergeSafetyChecklist(base, mine, remote))
+        assertTrue(merged.conflicted)
+        assertEquals("Mine", readSafetyChecklist(merged.localValue)[0].text)
+        assertEquals("Incoming", readSafetyChecklist(merged.remoteValue)[0].text)
+        assertTrue(readSafetyChecklist(merged.localValue)[1].checked)
+        assertTrue(readSafetyChecklist(merged.remoteValue)[1].checked)
+    }
     private val old =
         SafetyPlan("owner", "owner", mapOf("primary_destination" to SafetyField("Old", 1)))
 
@@ -65,6 +98,41 @@ class SafetyPlanMergeTest {
         assertEquals("My draft", merged.value)
         assertEquals("Staff draft", merged.conflictValue)
         assertEquals(2L, merged.conflictRevision)
+    }
+
+    @Test
+    fun staleStaffEditStaysQueuedUntilItReachesTheOwner() {
+        val key = "primary_destination"
+        val staff = old.copy(fields = mapOf(key to SafetyField("Staff draft", 1, "staff-draft")))
+        val remote = old.copy(fields = mapOf(key to SafetyField("Owner edit", 2, "owner-edit")))
+        val queued = mergeSafetyPlan(staff, staff, remote, ownerEditing = false)
+        assertTrue(queued.pending)
+        assertNull(queued.fields.getValue(key).conflictRevision)
+
+        val pending = remote.copy(pendingConflicts = mapOf(key to SafetyConflict("Staff draft", "staff-draft")))
+        val acknowledged = mergeSafetyPlan(queued, queued, pending, ownerEditing = false)
+        assertFalse(acknowledged.pending)
+        assertEquals("Owner edit", acknowledged.fields.getValue(key).value)
+        assertEquals("Staff draft", acknowledged.pendingConflicts.getValue(key).value)
+
+        val resolved = remote.copy(resolvedConflicts = mapOf(key to listOf("staff-draft")))
+        assertFalse(mergeSafetyPlan(queued, queued, resolved, ownerEditing = false).pending)
+        assertEquals(resolved, SafetyPlan.fromJson(resolved.toJson()))
+    }
+
+    @Test
+    fun finishedUploadAddsOnlyTheMatchingPlanAttachment() {
+        val field = "backup_documents"
+        val checklist = writeSafetyChecklist(listOf(
+            SafetyChecklistItem("passport", "Passport", excludedAttachmentIds = listOf("removed")),
+        ))
+        val matching = SafetyDocument("uploaded", "owner", "", "Passport", "application/pdf", listOf("owner"),
+            tags = listOf(safetyChecklistAttachmentTag(field, "passport")))
+        val unrelated = matching.copy(id = "unrelated", tags = listOf("Other"))
+        val updated = safetyChecklistWithPublishedDocuments(field, checklist, listOf(matching, unrelated, matching.copy(id = "removed")))
+        assertEquals(listOf("uploaded"), readSafetyChecklist(updated).single().attachmentIds)
+        assertEquals(updated, safetyChecklistWithPublishedDocuments(field, updated, listOf(matching)))
+        assertEquals(checklist, safetyChecklistWithPublishedDocuments("primary_documents", checklist, listOf(matching)))
     }
 
     // Inputs: the values shown below. Expected: acknowledged edits clear the queue but newer typing survives.

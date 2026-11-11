@@ -47,13 +47,17 @@ const accounts = [
   },
 ];
 
-async function writeAccountDirectory(user, account) {
+async function writeAccountDirectory(user, account, profile) {
   const authEmail = signInEmail(account.username, account.role, account.email);
   await writeFirestoreDocument("accountDirectory", account.username, {
     uid: user.uid,
     username: account.username,
     role: account.role,
     protected: account.protected,
+    fullName: profile.fullName,
+    contactEmail: profile.email,
+    phone: profile.phone,
+    profileComplete: true,
     ...(account.role === "STAFF" || account.role === "ADMIN" ? {
       loginAlias: authEmail,
     } : {}),
@@ -116,7 +120,7 @@ async function provision(account) {
     phone: "",
   }, account.email || authEmail);
   await writeProfile(user.uid, profile);
-  await writeAccountDirectory(user, account);
+  await writeAccountDirectory(user, account, profile);
   await writeOrganizationLogin(user, account, authEmail);
   await writeStaffSettings(user, account);
   console.log(`Ready: ${account.username} (${account.role})`);

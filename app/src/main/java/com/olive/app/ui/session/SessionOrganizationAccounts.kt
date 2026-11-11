@@ -1,23 +1,14 @@
 // Signed-in users: loads staff and admin account details.
 package com.olive.app.ui.session
 
-import com.olive.app.ui.shared.*
-import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import com.olive.app.data.*
 import com.olive.app.security.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.milliseconds
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
-import com.olive.app.data.AccountRole
-import com.olive.app.data.SettingsEvent
-import com.olive.app.ui.users.shared.navigation.SafePage
-import com.olive.app.ui.users.shared.navigation.SessionScreen
-import kotlinx.coroutines.NonCancellable
-
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.*
 
 // Owns staff and administrator account workflows.
 internal class OrganizationAccounts(private val runtime: SessionRuntime) {
@@ -27,35 +18,26 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
             with(state) {
                 val identity = pendingIdentity ?: return
                 val repository = adminRepository ?: return
-                if (fullName.isBlank() || !InputPolicy.validDob(dob) || !android.util.Patterns.EMAIL_ADDRESS.matcher(
-                        email.trim()
-                    ).matches()
+                if (fullName.isBlank() || !InputPolicy.validDob(dob) ||
+                    !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
                 ) {
-                    message =
-                        runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required)
+                    message = runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required)
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_finish_the_organization_profile_check_the_email_and_try)) { token ->
-                    val updated = repository.completeOrganizationProfile(
-                        fullName.trim(),
-                        dob.trim(),
-                        email.trim(),
-                        phone.trim()
-                    )
-                    val saved =
-                        withContext(Dispatchers.IO) { store.enrollWithoutPin(identity, updated) }
+                    val updated = repository.completeOrganizationProfile(fullName.trim(), dob.trim(), email.trim(), phone.trim())
+                    val saved = withContext(Dispatchers.IO) { store.enrollWithoutPin(identity, updated) }
                     if (epoch == token) {
                         enrollment = saved
                         archivedConversationIds = withContext(Dispatchers.IO) { store.archivedConversationIds(saved.uid) }
+                        restoredClosedConversationIds = withContext(Dispatchers.IO) { store.restoredClosedConversationIds(saved.uid) }
                         privateContactNotes = withContext(Dispatchers.IO) { store.privateContactNotes(saved.uid) }
                         profile = updated
-                        pendingProfile =
-                            updated
+                        pendingProfile = updated
                         accountRole = updated.role
                         coverUsername = updated.username
                         coverDob = updated.dob
-                        coverFullName =
-                            updated.fullName
+                        coverFullName = updated.fullName
                         language = updated.language
                         screenHistory.clear()
                         screen = SessionScreen.Portal
@@ -72,52 +54,69 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
             with(state) {
                 val device = enrollment ?: return
                 val repository = adminRepository ?: return
-                if (screen != SessionScreen.Portal || accountRole !in setOf(
-                        AccountRole.STAFF,
-                        AccountRole.ADMIN
-                    ) || busy
-                ) return
-                if (fullName.isBlank() || !InputPolicy.validDob(dob) || !android.util.Patterns.EMAIL_ADDRESS.matcher(
-                        email.trim()
-                    ).matches()
+                if (screen != SessionScreen.Portal || accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || busy) return
+                if (fullName.isBlank() || !InputPolicy.validDob(dob) ||
+                    !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()
                 ) {
-                    message =
-                        runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required)
+                    message = runtime.application.getString(R.string.ui_full_name_a_valid_date_of_birth_and_a_real_email_are_required)
                     return
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_update_your_olive_tree_profile)) { token ->
-                    val updated = repository.completeOrganizationProfile(
-                        fullName.trim(),
-                        dob.trim(),
-                        email.trim(),
-                        phone.trim()
-                    )
+                    val updated = repository.completeOrganizationProfile(fullName.trim(), dob.trim(), email.trim(), phone.trim())
                     withContext(Dispatchers.IO) { store.cacheProfile(device.uid, updated) }
-                    // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         profile = updated
                         pendingProfile = updated
-                        coverDob =
-                            updated.dob
+                        coverDob = updated.dob
                         coverFullName = updated.fullName
-                        message =
-                            runtime.application.getString(R.string.ui_profile_updated)
+                        message = runtime.application.getString(R.string.ui_profile_updated)
                     }
                 }
             }
         }
     }
 
-    // Session organization accounts: Refreshes admin accounts. It runs the work through shared error handling and uses a readable message if it fails.
-    fun refreshAdminAccounts() {
+    // Refreshes only the small dashboard totals after an administrator signs in.
+    fun refreshAdminSummary() {
         with(runtime) {
             with(state) {
                 val repository = adminRepository ?: return
                 if (accountRole != AccountRole.ADMIN || busy) return
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
-                    val (counts, rows) = repository.accounts()
+                    val counts = repository.summary()
+                    if (epoch == token && screen == SessionScreen.Portal) adminCounts = counts
+                }
+            }
+        }
+    }
+
+    // Loads the complete directory only when the administrator opens Accounts.
+    fun refreshAdminAccounts() {
+        with(runtime) {
+            with(state) {
+                val repository = adminRepository ?: return
+                if (accountRole != AccountRole.ADMIN || busy) return
+                adminAccounts = emptyList()
+                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
+                    val rows = repository.accounts()
                     if (epoch == token && screen == SessionScreen.Portal) {
-                        adminCounts = counts
+                        adminAccounts = rows
+                    }
+                }
+            }
+        }
+    }
+
+    // Loads staff rows and their workload totals only when Staff management is open.
+    fun refreshAdminStaff() {
+        with(runtime) {
+            with(state) {
+                val repository = adminRepository ?: return
+                if (accountRole != AccountRole.ADMIN || busy) return
+                adminAccounts = emptyList()
+                operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
+                    val rows = repository.staffAccounts()
+                    if (epoch == token && screen == SessionScreen.Portal) {
                         adminAccounts = rows
                     }
                 }
@@ -131,7 +130,7 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
             with(state) {
                 scope.launch {
                     while (busy) delay(50.milliseconds)
-                    if (screen == SessionScreen.Portal && accountRole == AccountRole.ADMIN) refreshAdminAccounts()
+                    if (screen == SessionScreen.Portal && accountRole == AccountRole.ADMIN) refreshAdminSummary()
                 }
             }
         }
@@ -160,7 +159,8 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 }
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_create_the_account_the_username_or_email_may_already_be)) { token ->
                     repository.create(value)
-                    val (counts, rows) = repository.accounts()
+                    val rows = repository.accounts()
+                    val counts = repository.summary()
                     // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         adminCounts = counts
@@ -184,7 +184,8 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
                 if (accountRole != AccountRole.ADMIN || busy || value.protected) return
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_delete_this_account)) { token ->
                     repository.delete(value.uid)
-                    val (counts, rows) = repository.accounts()
+                    val rows = repository.accounts()
+                    val counts = repository.summary()
                     // Apply the result only while the same organization portal is open.
                     if (epoch == token && screen == SessionScreen.Portal) {
                         adminCounts = counts

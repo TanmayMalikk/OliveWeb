@@ -12,6 +12,7 @@ import {
 import { createRoot } from "react-dom/client";
 import { LogOut, Delete, ArrowLeft, Leaf } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
+import { accounts } from "./services/AccountService";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
 import { Button, Field, Form } from "./components/SharedComponents";
 import Game from "./public/covers/OliveGamesCover";
@@ -34,9 +35,9 @@ function PinGate() {
         <span>
           <Leaf size={20} /> A little space.
         </span>
-        <Button variant="exit" onClick={s.quickExit}>
+        {(s.profile?.role ?? accounts.identity?.role) === "USER" && <Button variant="exit" onClick={s.quickExit}>
           Quick Exit <LogOut size={17} />
-        </Button>
+        </Button>}
       </div>
       <div className="pin-card">
         <span className="eyebrow">YOUR PERSONAL ENTRY</span>

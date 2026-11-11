@@ -4,73 +4,55 @@ package com.olive.app.ui.users.user.dashboard
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.Toast
-import com.olive.app.ui.shared.*
-
-
-import com.olive.app.ui.users.shared.navigation.*
-
-import com.olive.app.ui.users.safecontact.SharedEntryViewer
-import com.olive.app.ui.users.shared.camera.CameraScreen
-import com.olive.app.ui.users.shared.messaging.MessagesScreen
-import com.olive.app.ui.users.shared.safetyplan.*
-import com.olive.app.ui.users.user.account.*
-import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
-import com.olive.app.ui.users.user.location.LocationMapScreen
-import com.olive.app.ui.users.user.notes.PrivateNotes
-
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.*
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.HealthAndSafety
-import androidx.compose.material.icons.outlined.PhotoCamera
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.olive.app.data.*
-import com.olive.app.R
 import androidx.core.content.ContextCompat
-import com.olive.app.ui.users.user.documents.EmergencyReportLocation
+import com.olive.app.R
+import com.olive.app.data.*
+import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
+import com.olive.app.ui.users.safecontact.SharedEntryViewer
+import com.olive.app.ui.users.shared.camera.CameraScreen
+import com.olive.app.ui.users.shared.messaging.MessagesScreen
+import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.shared.safetyplan.*
+import com.olive.app.ui.users.user.account.*
+import com.olive.app.ui.users.user.documents.EmergencyReportLocation
+import com.olive.app.ui.users.user.documents.SafetyDocumentsScreen
+import com.olive.app.ui.users.user.location.LocationMapScreen
+import com.olive.app.ui.users.user.notes.PrivateNotes
 import kotlinx.coroutines.launch
 
 // Route account-owner pages to focused screen files; Safe Contacts use their separate workspace.
@@ -550,7 +532,8 @@ private fun SafeFeatureGrid(session: SessionViewModel) {
         }
     }
 }
-// Draws one accessible Safe App feature button.
+
+// Draws one accessible Safe App feature button on the user dashboard.
 @Composable
 private fun SafeFeatureTile(
     label: String,
@@ -564,7 +547,7 @@ private fun SafeFeatureTile(
         enabled = enabled,
         modifier = modifier.heightIn(min = 112.dp),
         shape = RoundedCornerShape(24.dp),
-        color = if (enabled) Color(0xFFF4F6EF) else Color(0xFFE9EDE5),
+        color = if (enabled) CardTintEnabled else CardTintDisabled,
         contentColor = if (enabled) OliveGreen else Muted,
         border = BorderStroke(
             1.dp,
@@ -579,7 +562,7 @@ private fun SafeFeatureTile(
         ) {
             Surface(
                 shape = CircleShape,
-                color = if (enabled) Color(0xFFDDE7D6) else Color(0xFFDDE2D9),
+                color = if (enabled) IconBadgeEnabled else IconBadgeDisabled,
                 contentColor = if (enabled) OliveGreen else Muted
             ) {
                 Box(Modifier.size(46.dp), contentAlignment = Alignment.Center) { icon() }
@@ -596,3 +579,4 @@ private fun SafeFeatureTile(
         }
     }
 }
+

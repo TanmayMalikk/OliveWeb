@@ -247,7 +247,7 @@ export default function Settings() {
           <RefreshCw size={16} /> Refresh account
         </Button>
         <p className="help-note">
-          Quick Exit does not clear browser history or prevent screen recording.
+          {s.profile?.role === "USER" ? "Quick Exit does not clear browser history or prevent screen recording." : "Keep access to your account secure."}
           Keep access to your device and browser secure.
         </p>
       </section>

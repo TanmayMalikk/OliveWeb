@@ -4,11 +4,10 @@ package com.olive.app.data
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.tasks.await
 import com.olive.app.security.KeyManager
 import java.security.PublicKey
@@ -25,11 +24,10 @@ import org.json.JSONObject
 
 
 class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
-    init {
-        firestore.firestoreSettings = FirebaseFirestoreSettings.Builder()
-            .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build()).build()
+    suspend fun prepareSupportTickets() {
+        FirebaseFunctions.getInstance("northamerica-northeast1")
+            .getHttpsCallable("supportTicketsPrepare").call().await()
     }
-
     // Publishes this account's messaging key and device details to Firebase.
     suspend fun registerUser(
         identity: AccountIdentity,
@@ -311,6 +309,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             row.getString("supportTag").orEmpty().ifBlank {
                 if (row.getString("type") == "SUPPORT") SUPPORT_TAG_SUPPORT else ""
             },
+            row.getLong("ticketNumber") ?: -1L,
             row.getTimestamp("closedAt")?.toDate()?.time ?: 0L,
         )
     }

@@ -41,8 +41,10 @@ class VoipManagerTest {
         assertEquals("call-1", call.callId)
         assertEquals("Support", call.name)
         assertEquals(listOf("user-2", "user-3"), call.participants.drop(1).map { it.userId })
-        assertEquals("Bearer user-token", requests.single().header("Authorization"))
-        val requestBody = JSONObject(Buffer().also { requests.single().body?.writeTo(it) }.readUtf8())
+        val createRequest = requests.single { it.url.encodedPath == "/api/calls" }
+        assertEquals("Bearer user-token", createRequest.header("Authorization"))
+        assertEquals(listOf("/api/calls"), requests.map { it.url.encodedPath })
+        val requestBody = JSONObject(Buffer().also { createRequest.body?.writeTo(it) }.readUtf8())
         assertEquals("Support", requestBody.getString("name"))
         assertEquals("caller-1", requestBody.getString("callerId"))
         assertEquals("Alice", requestBody.getString("callerName"))
@@ -84,7 +86,7 @@ class VoipManagerTest {
         val manager = VoipManager(
             apiBaseUrl = "https://voip.test",
             httpClient = client,
-            bearerTokenProvider = { "firebase-id-token" }
+            bearerTokenProvider = { "firebase-id-token" },
         )
 
         val details = manager.getLiveKitConnectionDetails("call-1")
@@ -179,7 +181,8 @@ class VoipManagerTest {
         val manager = VoipManager(
             apiBaseUrl = "https://voip.test",
             httpClient = client,
-            bearerTokenProvider = { "firebase-id-token" }
+            bearerTokenProvider = { "firebase-id-token" },
+            refreshedBearerTokenProvider = { "refreshed-firebase-id-token" },
         )
 
         val error = assertThrows(VoipApiException::class.java) {
@@ -189,6 +192,37 @@ class VoipManagerTest {
         assertEquals(401, error.statusCode)
         assertEquals("unauthorized", error.errorCode)
         assertEquals("Sign in required", error.message)
+    }
+
+    // Uses a fresh Firebase token after the server rejects the cached token, then completes the call request.
+    @Test
+    fun unauthorizedCachedTokenIsRefreshedOnce() = runBlocking {
+        val requests = mutableListOf<Request>()
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                requests += chain.request()
+                if (requests.size == 1) {
+                    chain.request().jsonResponse(
+                        code = 401,
+                        body = """{"error":{"code":"unauthorized","message":"A valid Firebase bearer token is required"}}""",
+                    )
+                } else {
+                    chain.request().jsonResponse(body = INVITATIONRESPONSE)
+                }
+            }
+            .build()
+        val manager = VoipManager(
+            apiBaseUrl = "https://voip.test",
+            httpClient = client,
+            bearerTokenProvider = { "expired-token" },
+            refreshedBearerTokenProvider = { "fresh-token" },
+        )
+
+        val invitations = manager.getIncomingCalls("user-2")
+
+        assertEquals(1, invitations.size)
+        assertEquals("Bearer expired-token", requests.first().header("Authorization"))
+        assertEquals("Bearer fresh-token", requests.last().header("Authorization"))
     }
 
     // Checks the server error without json uses status fallback step with the test's sample data.
@@ -299,6 +333,18 @@ class VoipManagerTest {
         }
         VoipManager(apiBaseUrl = "http://10.0.2.2:3000")
         assertEquals(emptyList<Request>(), requests)
+    }
+
+    // A build without the optional VoIP URL opens normally and rejects only call requests.
+    @Test
+    fun missingVoipConfigurationDoesNotCrashDuringManagerCreation() {
+        val manager = VoipManager(apiBaseUrl = "")
+
+        val error = assertThrows(IllegalStateException::class.java) {
+            runBlocking { manager.listCalls() }
+        }
+
+        assertTrue(error.message.orEmpty().contains("no VoIP service configured"))
     }
 
     // Checks the polling clears ringing state when invitations disappear step with the test's sample data.

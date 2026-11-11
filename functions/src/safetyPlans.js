@@ -1,8 +1,12 @@
 // Users and support staff: saves safety-plan edits and shares approved plans.
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {db} = require("./firebaseAdminClient");
+const {auth, db} = require("./firebaseAdminClient");
+const {readProfile} = require("./accountStorage");
+const {roleFromUser, text} = require("./accountPolicy");
 const {mergeFields} = require("./safetyPlanPolicy");
+const {mergeChecklist} = require("./safetyChecklistMerge");
 const {safetyCaller, planReference, canEdit, canRead} = require("./safetyPlanAccess");
+const {repairPlanTicket} = require("./supportTicketRepair");
 exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   const ownerUid = request.data?.ownerUid;
@@ -14,13 +18,51 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
     const old = snapshot.data();
     if (!canRead(caller, old, ownerUid)) throw new HttpsError("permission-denied", "Plan is no longer shared with this account.");
     if (changes.length && !canEdit(caller, old, ownerUid)) throw new HttpsError("permission-denied", "This shared plan is read only.");
-    const {fields, conflicts} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes);
+    const {fields, conflicts, conflictValues} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes);
+    const pendingConflicts = {...old?.pendingConflicts};
+    const resolvedConflicts = {...old?.resolvedConflicts};
+    if (caller.role === "STAFF" || caller.role === "ADMIN") {
+      for (const change of changes) {
+        if (conflicts.includes(change.key) && fields[change.key]?.value !== change.value &&
+            !resolvedConflicts[change.key]?.includes(change.mutationId)) {
+          pendingConflicts[change.key] = {
+            value: conflictValues[change.key] || change.value, mutationId: change.mutationId,
+            baseValue: fields[change.key].value,
+          };
+        }
+      }
+    }
+    for (const [key, proposal] of Object.entries(pendingConflicts)) {
+      const current = fields[key]?.value;
+      if (proposal.baseValue != null && current != null && proposal.baseValue !== current) {
+        const merged = mergeChecklist(proposal.baseValue, proposal.value, current);
+        if (merged) pendingConflicts[key] = {...proposal, value: merged.localValue, baseValue: current};
+      }
+    }
+    const resolution = request.data?.resolution;
+    if (resolution) {
+      if (caller.uid !== ownerUid || caller.role !== "USER") {
+        throw new HttpsError("permission-denied", "Only the plan owner can resolve a conflict.");
+      }
+      const proposal = Object.hasOwn(pendingConflicts, resolution.key) && pendingConflicts[resolution.key];
+      if (!proposal || proposal.mutationId !== resolution.mutationId ||
+          fields[resolution.key]?.revision !== resolution.revision || typeof resolution.useIncoming !== "boolean") {
+        throw new HttpsError("aborted", "The conflict changed. Review the latest versions.");
+      }
+      if (resolution.useIncoming) fields[resolution.key] = {
+        value: proposal.value, mutationId: proposal.mutationId, revision: resolution.revision + 1,
+      };
+      resolvedConflicts[resolution.key] = [...(resolvedConflicts[resolution.key] || []), proposal.mutationId].slice(-8);
+      delete pendingConflicts[resolution.key];
+    }
     const changed = !old || Object.keys(fields).length !== Object.keys(old.fields || {}).length ||
-      Object.entries(fields).some(([key, field]) => field !== old.fields?.[key]);
+      Object.entries(fields).some(([key, field]) => field !== old.fields?.[key]) ||
+      JSON.stringify(pendingConflicts) !== JSON.stringify(old.pendingConflicts || {});
     const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", adminUid: "", adminName: "", consultationRequested: false,
-      safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}), fields, updatedAt: Date.now()} : old;
+      safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}),
+    fields, pendingConflicts, resolvedConflicts, updatedAt: Date.now()} : old;
     if (changed) transaction.set(reference, plan);
-    return {plan, conflicts};
+    return {plan, conflicts, conflictValues};
   });
 });
 exports.safetyPlanShareContacts = onCall({invoker: "public"}, async (request) => {
@@ -41,6 +83,10 @@ exports.safetyPlanShareContacts = onCall({invoker: "public"}, async (request) =>
   if (friendships.some((snapshot, index) => !snapshot.exists || snapshot.data()?.friendUid !== clean[index].uid)) {
     throw new HttpsError("permission-denied", "Only accepted friends can receive a plan.");
   }
+  const accounts = await Promise.all(clean.map(({uid}) => auth.getUser(uid)));
+  if (accounts.some(account => account.disabled || roleFromUser(account) !== "SAFE_CONTACT")) {
+    throw new HttpsError("permission-denied", "Only active safe contacts can receive a plan.");
+  }
   const reference = planReference(caller.uid);
   return db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(reference);
@@ -52,6 +98,21 @@ exports.safetyPlanShareContacts = onCall({invoker: "public"}, async (request) =>
     return {plan: updated};
   });
 });
+
+// Gives a plan owner the public organization identities needed to wrap attachment keys on-device.
+exports.safetyPlanMediaRecipients = onCall({invoker: "public"}, async (request) => {
+  const caller = await safetyCaller(request);
+  if (caller.role !== "USER") throw new HttpsError("permission-denied", "Owner only.");
+  const plan = (await planReference(caller.uid).get()).data();
+  if (!plan) throw new HttpsError("failed-precondition", "Open the plan before sharing files.");
+  const recipients = new Set([...(plan.safeContactUids || []), plan.staffUid, plan.adminUid].filter(Boolean));
+  const rows = await Promise.all([...recipients].map(async (uid) => {
+    const profile = await readProfile(uid);
+    const username = text(profile?.username, 24).toLowerCase();
+    return /^[a-z0-9_]{4,24}$/.test(username) ? {uid, username} : null;
+  }));
+  return {recipients: rows.filter(Boolean)};
+});
 exports.safetyPlansSharedWithMe = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   if (caller.role !== "SAFE_CONTACT") throw new HttpsError("permission-denied", "Safe contacts only.");
@@ -62,12 +123,54 @@ exports.safetyPlansSharedWithMe = onCall({invoker: "public"}, async (request) =>
 exports.safetyPlanConsultations = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);
   if (!["STAFF", "ADMIN"].includes(caller.role)) throw new HttpsError("permission-denied", "Organization access only.");
-  const snapshot = caller.role === "ADMIN" ? await db.collection("safetyPlans").get() :
+  const snapshot = caller.role === "ADMIN" ?
+    await db.collection("safetyPlans").where("consultationRequested", "==", true).get() :
     await db.collection("safetyPlans").where("staffUid", "==", caller.uid).get();
   const settings = caller.role === "STAFF" ? await db.collection("safetyStaff").doc(caller.uid).get() : null;
+  const requestedRows = snapshot.docs.filter(document => document.data().consultationRequested === true);
+  for (const document of requestedRows) {
+    if (!document.get("consultationConversationId") || !Number.isSafeInteger(document.get("ticketNumber"))) {
+      await repairPlanTicket(document.id);
+    }
+  }
+  const requestedPlans = requestedRows.length ? await db.getAll(...requestedRows.map(row => row.ref)) : [];
+  const conversationIds = [...new Set(requestedPlans.map(document =>
+    text(document.data().consultationConversationId, 300)).filter(Boolean))];
+  const conversationSnapshots = conversationIds.length ?
+    await db.getAll(...conversationIds.map(id => db.collection("conversations").doc(id))) : [];
+  const conversations = new Map(conversationSnapshots.map(document => [document.id, document.data()]));
+  const completedPlans = requestedPlans.filter(document => {
+    const conversationId = text(document.data().consultationConversationId, 300);
+    const conversation = conversations.get(conversationId);
+    return conversation?.ticketStatus === "COMPLETED" || Boolean(conversation?.closedAt);
+  });
+  // Repairs older records so completed consultations are not scanned again on later refreshes.
+  if (completedPlans.length) {
+    for (let start = 0; start < completedPlans.length; start += 400) {
+      const batch = db.batch();
+      completedPlans.slice(start, start + 400).forEach(document => batch.set(document.ref, {
+        consultationRequested: false,
+        staffUid: "",
+        staffName: "",
+        adminUid: "",
+        adminName: "",
+        updatedAt: Date.now(),
+      }, {merge: true}));
+      await batch.commit();
+    }
+  }
+  const completedOwnerUids = new Set(completedPlans.map(document => document.id));
   return {available: caller.role === "STAFF" ? settings.data()?.available !== false : true,
-    plans: snapshot.docs.filter((document) => document.data().consultationRequested === true)
-        .map((document) => ({ownerUid: document.id, ownerName: document.data().ownerName || "", updatedAt: document.data().updatedAt}))};
+    plans: requestedPlans.filter(document => !completedOwnerUids.has(document.id))
+        .map((document) => ({
+          ownerUid: document.id,
+          ownerName: document.data().ownerName || "",
+          conversationId: document.data().consultationConversationId || "",
+          ticketNumber: Number.isSafeInteger(document.data().ticketNumber) ? document.data().ticketNumber : -1,
+          staffUid: document.data().staffUid || "",
+          staffName: document.data().staffName || "",
+          updatedAt: document.data().updatedAt,
+        }))};
 });
 exports.safetyPlanAvailability = onCall({invoker: "public"}, async (request) => {
   const caller = await safetyCaller(request);

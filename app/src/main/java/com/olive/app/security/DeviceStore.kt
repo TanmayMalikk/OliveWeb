@@ -279,6 +279,28 @@ class DeviceStore(
         }
     }
 
+    // Returns completed chats this account chose to show in its regular chat list on this phone.
+    fun restoredClosedConversationIds(uid: String): Set<String> {
+        val rows = vault.read().optJSONObject("restoredClosedConversations")?.optJSONArray(uid)
+            ?: return emptySet()
+        return (0 until rows.length()).mapNotNull { rows.optString(it).takeIf(String::isNotBlank) }
+            .toSet()
+    }
+
+    // Changes only where a completed chat is displayed; it never reopens its completed ticket.
+    fun setClosedConversationRestored(uid: String, conversationId: String, restored: Boolean) {
+        require(conversationId.isNotBlank() && conversationId.length <= 160)
+        vault.update { root ->
+            val all = root.child("restoredClosedConversations")
+            val current = all.optJSONArray(uid) ?: JSONArray()
+            val values = (0 until current.length()).mapNotNull {
+                current.optString(it).takeIf(String::isNotBlank)
+            }.toMutableSet()
+            if (restored) values += conversationId else values -= conversationId
+            all.put(uid, JSONArray(values.sorted()))
+        }
+    }
+
     // Loads the private contact notes needed by app security.
     fun privateContactNotes(uid: String): Map<String, PrivateContactNote> {
         val rows = vault.read().optJSONObject("privateContactNotes")?.optJSONObject(uid)
@@ -358,8 +380,10 @@ class DeviceStore(
         histories.mergeHistory(uid, records)
 
     // Removes this account's saved enrollment and private phone data.
-    fun forgetDevice() {
-        vault.update { it.remove("activeUid") }
+    fun forgetDevice(expectedUid: String? = null) {
+        vault.update {
+            if (expectedUid == null || it.optString("activeUid") == expectedUid) it.remove("activeUid")
+        }
     }
 }
 

@@ -1,12 +1,15 @@
-// Signed-in accounts: routes call invitations and content-free sync wake-ups from one FCM service.
+// Signed-in accounts: routes call invitations, update alerts, and sync wake-ups from one FCM service.
 package com.olive.app.data.messaging
 
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.olive.app.BuildConfig
 import com.olive.app.data.sync.PriorityReconciliationWorker
 import com.olive.app.data.sync.syncInvalidationFrom
+import com.olive.app.data.update.AppUpdateScheduler
+import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.notification.OliveNotificationManager
 
 class OliveFirebaseMessagingService : FirebaseMessagingService() {
@@ -16,6 +19,8 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
             .onFailure { error ->
                 Log.e(VoipPushTokenRegistration.TAG, "Could not persist the Firebase messaging registration", error)
             }
+        runCatching { LocalNotificationEventHandler.onFcmTokenRefreshed(this, installationId) }
+        AppUpdateScheduler.registerForUpdates(this)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -32,8 +37,26 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
             }
             return
         }
-        if (data["type"] != CALL_INVITATION) return
-        showCall(data)
+        if (data["type"] == CALL_INVITATION) {
+            if (VoipPushTokenRegistration.isEnabled(this)) showCall(data)
+            return
+        }
+        if (data["type"] == APP_UPDATE) {
+            val remoteVersion = data["versionCode"]?.toLongOrNull() ?: Long.MAX_VALUE
+            if (remoteVersion > BuildConfig.VERSION_CODE) {
+                AppUpdateScheduler.announceRelease(this, data["versionName"].orEmpty())
+                runCatching { AppUpdateScheduler.triggerNow(this) }
+            }
+            return
+        }
+        runCatching {
+            LocalNotificationEventHandler.onFcmMessageReceived(
+                this,
+                data,
+                message.notification?.title,
+                message.notification?.body,
+            )
+        }
     }
 
     private fun showCall(data: Map<String, String>) {
@@ -54,6 +77,9 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
         }
     }
 
-    private companion object { const val CALL_INVITATION = "call_invitation" }
+    private companion object {
+        const val CALL_INVITATION = "call_invitation"
+        const val APP_UPDATE = "app_update"
+    }
 }
 

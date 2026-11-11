@@ -184,6 +184,20 @@
 .download-page > main > .text-link {
   margin-top: 0.25rem;
 }
+.download-qr {
+  display: block;
+  width: min(12rem, 55vw);
+  margin: 1.2rem auto;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: white;
+}
+.download-qr img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
 .download-heading {
   max-width: 54rem;
   margin-block: clamp(1.25rem, 3vh, 2.25rem);

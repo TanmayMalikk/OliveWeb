@@ -1,44 +1,43 @@
-// Safe-app users: lists safety resources on the user dashboard.
+// Safe-app users: lists safety resources and tile helpers on the user dashboard.
 package com.olive.app.ui.users.user.dashboard
-
-import com.olive.app.ui.shared.*
-
-
-import com.olive.app.ui.users.shared.navigation.*
-
-import com.olive.app.ui.users.user.account.SafeBack
 
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import com.olive.app.data.*
-import com.olive.app.data.hotlineDialNumber
-import com.olive.app.data.HotlineResource
-import com.olive.app.data.HotlineResourceKind
 import com.olive.app.R
+import com.olive.app.data.*
+import com.olive.app.ui.shared.*
+import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.user.account.SafeBack
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -407,3 +406,4 @@ private fun hotlineRegionName(code: String) = stringResource(
         else -> R.string.support_canada
     }
 )
+
