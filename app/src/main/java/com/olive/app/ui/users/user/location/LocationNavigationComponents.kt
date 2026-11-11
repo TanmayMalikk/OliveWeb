@@ -44,8 +44,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.LocationRoute
-import com.olive.app.data.MapLocationPoint
+import com.olive.app.data.location.LocationRoute
+import com.olive.app.data.location.MapLocationPoint
 import kotlin.math.ceil
 
 // Keeps the map awake and shows the next direction while a safe contact is navigating.

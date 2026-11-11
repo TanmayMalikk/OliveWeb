@@ -4,7 +4,6 @@ package com.olive.app.ui.session
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import androidx.core.content.edit
-import com.olive.app.data.*
 import com.olive.app.security.*
 import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -16,11 +15,14 @@ import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.functions.FirebaseFunctionsException
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.AccountPolicy
-import com.olive.app.data.AccountRole
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountPolicy
+import com.olive.app.data.account.AccountRole
 import com.olive.app.security.InputPolicy
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.MessagingRepository
 import com.olive.app.ui.shared.ResourceText
 import com.olive.app.ui.shared.localizedTitle
 import com.olive.app.ui.users.shared.navigation.CredentialFieldError
@@ -298,9 +300,6 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
         }
     }
 
-    // Returns this device's messaging ID for encrypted-chat access.
-    private fun deviceUid() = runtime.enrollment?.uid ?: error("No active account")
-
     // Registers messaging identity for session messaging.
     suspend fun registerMessagingIdentity(identity: AccountIdentity) {
         with(runtime) {
@@ -319,12 +318,10 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
     // Reconnects device notifications to the conversations visible to the current account.
     fun syncLocalNotificationHandler() {
         with(runtime) {
-            with(state) {
-                val device = enrollment ?: return
-                if (localMode) return
-                if (accounts.authenticatedUid() == device.uid)
-                    LocalNotificationEventHandler.start(application)
-            }
+            val device = enrollment ?: return
+            if (localMode) return
+            if (accounts.authenticatedUid() == device.uid)
+                LocalNotificationEventHandler.start(application)
         }
     }
 }
@@ -446,7 +443,7 @@ internal class SessionAccountSignIn(private val runtime: SessionRuntime) {
     }
 
     // Reject organization accounts that were never provisioned and accounts opened under the wrong role.
-    private suspend fun validateAccountRole(profile: UserProfile?, create: Boolean): Boolean {
+    private fun validateAccountRole(profile: UserProfile?, create: Boolean): Boolean {
         val chosenRole = runtime.state.accountRole
         if (profile == null && !create && chosenRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
             runtime.accounts.signOut()

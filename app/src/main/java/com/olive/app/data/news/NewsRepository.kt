@@ -1,5 +1,5 @@
 // News cover users: loads articles for the Daily Digest cover.
-package com.olive.app.data
+package com.olive.app.data.news
 
 import android.text.Html
 import android.util.Xml
@@ -11,6 +11,7 @@ import org.xmlpull.v1.XmlPullParser
 import java.net.URLEncoder
 import java.net.URL
 import java.nio.charset.StandardCharsets
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -155,6 +156,6 @@ class GoogleNewsRepository {
 fun NewsArticle.localPublishedDate(language: String): String = runCatching {
     val locale = Locale.forLanguageTag(AppLocaleManager.getLanguageTag(language))
     ZonedDateTime.parse(published, DateTimeFormatter.RFC_1123_DATE_TIME)
-        .withZoneSameInstant(java.time.ZoneId.systemDefault())
+        .withZoneSameInstant(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
 }.getOrDefault(published)

@@ -1,11 +1,13 @@
 package com.olive.app.data.media
 
+import android.annotation.SuppressLint
 import android.content.Context
-import com.olive.app.data.SafetyDocument
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.JsonVault
 import com.olive.app.security.KeyManager
 import com.olive.app.security.child
+import kotlinx.coroutines.Dispatchers
 import java.io.File
 import java.security.MessageDigest
 import org.json.JSONObject
@@ -16,6 +18,7 @@ import kotlinx.coroutines.ensureActive
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 
 enum class OfflineMediaAvailability {
@@ -241,6 +244,7 @@ class OfflineMediaCache internal constructor(
         accounts.keys().asSequence().toList().forEach(::enforceAutomaticLimit)
     }
 
+    @SuppressLint("UsableSpace")
     private fun retain(
         uid: String,
         document: SafetyDocument,
@@ -254,6 +258,9 @@ class OfflineMediaCache internal constructor(
             throw MediaAccessException(MediaAccessError.CORRUPT_CIPHERTEXT)
         }
         val directory = accountDirectory(uid).apply { mkdirs() }
+        //TODO: determine if the warning here is valid or not.
+        // The current method usable space is not recommended for this.
+        // However the recommended functions are not defined inside the class.
         if (directory.usableSpace < document.ciphertextSize + MIN_FREE_SPACE_BYTES) {
             throw MediaAccessException(MediaAccessError.INSUFFICIENT_STORAGE)
         }
@@ -351,7 +358,7 @@ class OfflineMediaCache internal constructor(
         var total = automatic.fold(0L) { sum, item ->
             if (Long.MAX_VALUE - sum < item.size) Long.MAX_VALUE else sum + item.size
         }
-        automatic.sortedWith(compareBy<AutomaticItem>({ it.lastAccessedAt }, { it.id }, { it.candidate }))
+        automatic.sortedWith(compareBy({ it.lastAccessedAt }, { it.id }, { it.candidate }))
             .forEach { item ->
                 if (total <= automaticCacheLimitBytes) return@forEach
                 item.file.delete()
@@ -478,7 +485,7 @@ class MediaTransferStore(context:Context) {
         vault.update { root ->
             val collection=jobs(root)
             val current=collection.optJSONObject(id)?.let(MediaUploadJob::fromJson) ?: error("Media transfer was not found")
-            result=change(current);collection.put(id,checkNotNull(result).toJson())
+            result=change(current);collection.put(id, result.toJson())
         }
         return checkNotNull(result)
     }
@@ -510,7 +517,9 @@ internal suspend fun copyAndVerifyEncryptedDownload(
         // Media: Keeps copy and verify encrypted download active while true.
         while(true) {
             currentCoroutineContext().ensureActive()
-            val count=input.read(buffer)
+            val count= withContext(Dispatchers.IO) {
+                input.read(buffer)
+            }
             if(count<0) break
             if(count==0) continue
             received+=count
@@ -518,7 +527,9 @@ internal suspend fun copyAndVerifyEncryptedDownload(
                 "Encrypted download size does not match (expected $expectedSize bytes, received more than $expectedSize bytes)"
             }
             digest.update(buffer,0,count)
-            output.write(buffer,0,count)
+            withContext(Dispatchers.IO) {
+                output.write(buffer, 0, count)
+            }
         }
     } finally {
         buffer.fill(0)

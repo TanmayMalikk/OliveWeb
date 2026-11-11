@@ -1,11 +1,13 @@
 // Safe-app users and support staff: handles background safety plan sync work.
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import android.content.Context
 import androidx.work.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.BuildConfig
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.network.hasValidatedInternetConnection
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
@@ -48,20 +50,18 @@ class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :
             throw cancelled
         } catch (error: FirebaseFunctionsException) {
             // Returns the correct WorkManager result for a completed, retryable, or failed sync.
-            when {
-                error.code == FirebaseFunctionsException.Code.PERMISSION_DENIED && actor != owner -> {
+            when (error.code) {
+                FirebaseFunctionsException.Code.PERMISSION_DENIED if actor != owner -> {
                     SafetyPlanStore(applicationContext, false).remove(
                         actor,
                         owner
                     )
                     Result.success()
                 }
-
-                error.code in setOf(
+                in setOf(
                     FirebaseFunctionsException.Code.INVALID_ARGUMENT,
                     FirebaseFunctionsException.Code.NOT_FOUND
                 ) -> Result.failure()
-
                 else -> Result.retry()
             }
         } catch (_: Exception) { // Network and server failures are temporary; WorkManager retries the encrypted sync later.
@@ -240,7 +240,7 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
     private val vault = EncryptedVault(context, if (localMode) "safety-demo" else "safety-firebase")
     // Reads one account's safety plan from encrypted local storage.
     fun read(actorUid: String, ownerUid: String) =
-        vault.read().optJSONObject(actorUid)?.optJSONObject(ownerUid)?.let(SafetyPlan::fromJson)
+        vault.read().optJSONObject(actorUid)?.optJSONObject(ownerUid)?.let(SafetyPlan.Companion::fromJson)
 
     // Creates a blank safety plan only when this account does not have one yet.
     fun ensure(
@@ -251,7 +251,7 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
     ): SafetyPlan {
         vault.update { root ->
             val actor = root.child(actorUid)
-            val existing = actor.optJSONObject(ownerUid)?.let(SafetyPlan::fromJson)
+            val existing = actor.optJSONObject(ownerUid)?.let(SafetyPlan.Companion::fromJson)
             val fields = safetyFieldsWithDefaults(existing?.fields.orEmpty(), defaults)
             actor.put(
                 ownerUid,
@@ -283,7 +283,7 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
         var merged = remote
         vault.update { root ->
             val actor = root.child(actorUid)
-            val local = actor.optJSONObject(remote.ownerUid)?.let(SafetyPlan::fromJson)
+            val local = actor.optJSONObject(remote.ownerUid)?.let(SafetyPlan.Companion::fromJson)
             if (local != null) {
                 val combined = local.copy(fields = remote.fields + local.fields)
                 merged = mergeSafetyPlan(combined, combined, remote)
@@ -303,7 +303,7 @@ internal class SafetyPlanStore(context: Context, localMode: Boolean) {
     fun all(actorUid: String): List<SafetyPlan> {
         val actor = vault.read().optJSONObject(actorUid) ?: return emptyList()
         return actor.keys().asSequence()
-            .mapNotNull { actor.optJSONObject(it)?.let(SafetyPlan::fromJson) }.toList()
+            .mapNotNull { actor.optJSONObject(it)?.let(SafetyPlan.Companion::fromJson) }.toList()
     }
 
     // Removes one locally cached safety plan for this signed-in actor.

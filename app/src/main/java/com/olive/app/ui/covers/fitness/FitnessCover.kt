@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
@@ -86,6 +85,7 @@ import android.content.Context
 import androidx.core.content.edit
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import kotlin.time.Duration.Companion.milliseconds
 
 
 private enum class FitnessPage { HOME, ACTIVITY, VITALS, NUTRITION, FOOD_SEARCH, GOALS, ACCOUNT }
@@ -114,7 +114,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     // Load fitness history and watch data when the cover becomes active.
     LaunchedEffect(store) {
         while (true) {
-            delay(2_000L)
+            delay(2_000L.milliseconds)
             snapshot = store.snapshot()
         }
     }

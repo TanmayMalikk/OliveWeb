@@ -18,7 +18,18 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.safety.SAFETY_SECTIONS
+import com.olive.app.data.safety.SafetyChecklistItem
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.readSafetyChecklist
+import com.olive.app.data.safety.readSafetyPlanContact
+import com.olive.app.data.safety.safetyChecklistAttachments
+import com.olive.app.data.safety.safetyChecklistPreview
+import com.olive.app.data.safety.safetyPlanContactItem
+import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
@@ -414,7 +425,7 @@ private fun SafetyPlanContactPicker(
 // https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html
 internal fun safetyDefaults(context: Context): Map<String, String> = buildMap {
     listOf("primary", "backup").forEach { plan ->
-        com.olive.app.data.SAFETY_SECTIONS.forEach { section ->
+        SAFETY_SECTIONS.forEach { section ->
             val prompts = when (section) {
                 "documents" -> safetyDocumentSuggestions(context)
                 "grab" -> context.resources.getStringArray(R.array.safety_grab_checklist).toList()

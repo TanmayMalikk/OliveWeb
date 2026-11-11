@@ -6,23 +6,28 @@ import androidx.compose.runtime.*
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
-import com.olive.app.data.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.seconds
-import com.olive.app.data.AccountRole
-import com.olive.app.security.DeviceLockChallenge
-import com.olive.app.security.DeviceLockKey
-import com.olive.app.security.SafeEntryMethod
-import com.olive.app.security.InputPolicy
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.network.hasValidatedInternetConnection
+import com.olive.app.data.safety.SAFETY_FIELD_KEYS
+import com.olive.app.data.safety.SafetyAccessIndexStore
+import com.olive.app.data.safety.SafetyConsultation
+import com.olive.app.data.safety.SafetyField
+import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.SafetyPlanRepository
+import com.olive.app.data.safety.SafetyPlanStore
+import com.olive.app.data.safety.SafetyPlanSyncWorker
+import com.olive.app.data.safety.SharedSafetyPlan
+import com.olive.app.data.safety.edit
+import com.olive.app.data.safety.syncSafetyPlan
 import com.olive.app.ui.users.shared.navigation.SessionScreen
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.olive.app.data.sync.SyncCompletionEvents
-import kotlinx.coroutines.flow.collect
-import javax.crypto.Cipher
 
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.

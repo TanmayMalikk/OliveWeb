@@ -399,14 +399,21 @@
     <string name="safety_remove_attachment">Supprimer la pièce jointe %1$s</string>
     <string name="chat_info">Infos sur la discussion</string>
     <string name="chat_members">Personnes dans cette discussion</string>
-    <string name="chat_header_member_count">%1$d membres</string>
-    <string name="chat_member_count">%1$d personnes</string>
+    <plurals name="chat_header_member_count">
+        <item quantity="one">%1$d membre</item>
+        <item quantity="many">%1$d membres</item>
+        <item quantity="other">%1$d membres</item>
+    </plurals>
+    <plurals name="chat_member_count">
+        <item quantity="one">%1$d personne</item>
+        <item quantity="many">%1$d personnes</item>
+        <item quantity="other">%1$d personnes</item>
+    </plurals>
     <string name="chat_shared_items">Éléments partagés</string>
     <string name="chat_no_shared_items">Aucun fichier ni élément de sécurité n’a encore été partagé.</string>
     <string name="chat_add_people">Ajouter des personnes</string>
     <string name="chat_add_person">Ajouter %1$s</string>
     <string name="chat_remove_person">Retirer %1$s de ce groupe</string>
-    <string name="chat_add_participant_error">Cette personne n’a pas pu être ajoutée. Elle doit être un contact accepté avec la messagerie sécurisée configurée.</string>
     <string name="chat_request_staff_title">Soutien du personnel</string>
     <string name="chat_request_staff_description">Créer une discussion de soutien séparée avec toutes les personnes déjà présentes.</string>
     <string name="chat_request_staff_button">Demander du personnel</string>
@@ -439,7 +446,11 @@
     <string name="admin_support_chat_tasks">Discussions d’aide</string>
     <string name="admin_completed">terminés</string>
     <string name="admin_closed">fermées</string>
-    <string name="admin_staff_workload_accessibility">%1$s, %2$d plans de sécurité, %3$d terminés, %4$d discussions d’aide, %5$d fermées</string>
+    <plurals name="admin_staff_workload_accessibility">
+        <item quantity="one">%1$s, %2$d plan de sécurité, %3$d terminés, %4$d discussions d’aide, %5$d fermées</item>
+        <item quantity="many">%1$s, %2$d plans de sécurité, %3$d terminés, %4$d discussions d’aide, %5$d fermées</item>
+        <item quantity="other">%1$s, %2$d plans de sécurité, %3$d terminés, %4$d discussions d’aide, %5$d fermées</item>
+    </plurals>
     <string name="safety_assigned_to_staff">Attribués au personnel</string>
     <string name="safety_assigned_to_you">Vous sont attribués</string>
     <string name="safety_waiting_for_staff">En attente du personnel</string>

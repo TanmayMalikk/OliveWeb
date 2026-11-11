@@ -9,7 +9,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.data.*
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.UserProfile
 import com.olive.app.security.*
 import org.junit.Assert.*
 import org.junit.Test

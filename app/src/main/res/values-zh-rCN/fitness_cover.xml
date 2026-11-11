@@ -41,8 +41,6 @@
     <string name="fatsecret_attribution">由 FatSecret Platform API 提供支持</string>
     <string name="open_food_facts_attribution">包装食品数据来自 Open Food Facts</string>
     <string name="fitness_cover_choice">健身应用 · 健身记录</string>
-    <string name="fitness_reminder">您的健身摘要已准备好。</string>
-    <string name="fitness_updates">健身记录更新</string>
     <string name="fitness_history_title">14 天记录</string>
     <string name="fitness_history_description">此手机和已连接手表的每日总计。</string>
     <string name="fitness_history_daily_total">每日总计</string>

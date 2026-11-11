@@ -1,6 +1,10 @@
 // Tests profile defaults, invalid stored values, addresses, and contact compatibility for users.
 package com.olive.app.data
 
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.UserProfile
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test

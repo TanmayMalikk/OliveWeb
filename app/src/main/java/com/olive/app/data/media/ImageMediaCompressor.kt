@@ -4,10 +4,11 @@ package com.olive.app.data.media
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.media.ExifInterface
+import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import kotlin.math.max
 import kotlin.math.roundToInt
+import androidx.core.graphics.scale
 
 /** Codec-only image compressor with no Firebase, WorkManager, R2, UI, or encryption dependency. */
 internal class ImageMediaCompressor {
@@ -49,7 +50,7 @@ internal class ImageMediaCompressor {
             bitmap=replace(bitmap,applyOrientation(bitmap,source))
             val target=ImageCompressionPolicy.targetSize(bitmap.width,bitmap.height)
             if(target.first!=bitmap.width || target.second!=bitmap.height) {
-                bitmap=replace(bitmap,Bitmap.createScaledBitmap(bitmap,target.first,target.second,true))
+                bitmap= replace(bitmap, bitmap.scale(target.first, target.second))
             }
             val preserveAlpha=actualMime=="image/png" || (bitmap.hasAlpha() && actualMime!="image/jpeg")
             val outputMime=if(preserveAlpha) "image/png" else "image/jpeg"
@@ -134,10 +135,7 @@ internal object ImageCompressionPolicy {
     fun isAnimatedWebp(file:File):Boolean {
         if(detectMimeType(file)!="image/webp") return false
         val header=readHeader(file,64)
-        if(header.size>=21 && ascii(header,12,4)=="VP8X" && (header[20].toInt() and 0x02)!=0) {
-            return true
-        }
-        return (12..(header.size-4).coerceAtLeast(11)).any { ascii(header,it,4)=="ANIM" }
+        return header.size>=21 && ascii(header,12,4)=="VP8X" && (header[20].toInt() and 0x02)!=0 || (12..(header.size-4).coerceAtLeast(11)).any { ascii(header,it,4)=="ANIM" }
     }
 
     fun isEligible(mimeType:String,kind:MediaKind)=
@@ -180,6 +178,8 @@ internal object ImageCompressionPolicy {
         }
         return buffer.copyOf(count)
     }
-
+    //Linter believes length is always 4 here. I don't know why, but I don't see a need to mess
+    //with it.
+    @Suppress("SameParameterValue")
     private fun ascii(bytes:ByteArray,start:Int,length:Int)=String(bytes,start,length,Charsets.US_ASCII)
 }

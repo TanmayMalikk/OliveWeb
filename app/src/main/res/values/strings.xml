@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">App</string>
     <string name="local">Local</string>
     <string name="global">Global</string>
@@ -56,14 +56,18 @@
     <string name="close">Close</string>
     <string name="chat_info">Chat info</string>
     <string name="chat_members">People in this chat</string>
-    <string name="chat_header_member_count">%1$d members</string>
-    <string name="chat_member_count">%1$d people</string>
+    <plurals name="chat_header_member_count">
+        <item quantity="one">%1$d member</item>
+        <item quantity="other">%1$d members</item>
+    </plurals>
+    <plurals name="chat_member_count">
+        <item quantity="one">%1$d person</item>
+        <item quantity="other">%1$d people</item></plurals>
     <string name="chat_shared_items">Shared items</string>
     <string name="chat_no_shared_items">No files or safety items have been shared yet.</string>
     <string name="chat_add_people">Add people</string>
     <string name="chat_add_person">Add %1$s</string>
     <string name="chat_remove_person">Remove %1$s from this group</string>
-    <string name="chat_add_participant_error">This person could not be added. They must be an accepted contact with secure messaging set up.</string>
     <string name="chat_request_staff_title">Staff support</string>
     <string name="chat_request_staff_description">Create a separate support chat with everyone already in this conversation.</string>
     <string name="chat_request_staff_button">Request staff</string>
@@ -425,7 +429,10 @@
     <string name="admin_support_chat_tasks">Support chats</string>
     <string name="admin_completed">complete</string>
     <string name="admin_closed">closed</string>
-    <string name="admin_staff_workload_accessibility">%1$s, %2$d safety plans, %3$d complete, %4$d support chats, %5$d closed</string>
+    <plurals name="admin_staff_workload_accessibility" tools:ignore="PluralsCandidate">
+        <item quantity="one">%1$s, %2$d safety plan, %3$d complete, %4$d support chats, %5$d closed</item>
+        <item quantity="other">%1$s, %2$d safety plans, %3$d complete, %4$d support chats, %5$d closed</item>
+    </plurals>
     <string name="safety_assigned_to_staff">Assigned to staff</string>
     <string name="safety_assigned_to_you">Assigned to you</string>
     <string name="safety_waiting_for_staff">Waiting for staff</string>

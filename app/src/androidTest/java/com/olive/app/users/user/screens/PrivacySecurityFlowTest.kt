@@ -3,6 +3,7 @@ package com.olive.app
 
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
+import com.olive.app.data.account.AccountRole
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.child
 import org.junit.Assert.*
@@ -20,13 +21,13 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
         // Checks the assert locked step with the test's sample data.
         fun assertLocked() {
             assertNotEquals(com.olive.app.ui.users.shared.navigation.SessionScreen.Safe, session.screen)
-            assertEquals(com.olive.app.data.AccountRole.USER, session.accountRole)
+            assertEquals(AccountRole.USER, session.accountRole)
             assertNull(session.profile)
         }
 
         // These calls represent accessibility callbacks from old onboarding nodes.
         fun staleActions() {
-            com.olive.app.data.AccountRole.entries.forEach(session.account::selectRole)
+            AccountRole.entries.forEach(session.account::selectRole)
             session.account.openAccountSetup()
             session.account.chooseNew()
             session.account.chooseReturning()

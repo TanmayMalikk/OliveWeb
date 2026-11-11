@@ -18,11 +18,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.olive.app.BuildConfig
-import com.olive.app.data.ChatCacheStore
-import com.olive.app.data.DocumentIndexStore
-import com.olive.app.data.MessageOutboxStore
-import com.olive.app.data.SafetyAccessIndexStore
-import com.olive.app.data.SafetyPlanStore
+import com.olive.app.data.messaging.ChatCacheStore
+import com.olive.app.data.safety.DocumentIndexStore
+import com.olive.app.data.messaging.MessageOutboxStore
+import com.olive.app.data.safety.SafetyAccessIndexStore
+import com.olive.app.data.safety.SafetyPlanStore
 import com.olive.app.data.media.OfflineMediaCache
 import com.olive.app.security.DeviceStore
 import com.olive.app.security.EncryptedVault
@@ -122,7 +122,7 @@ class PriorityReconciliationWorker(
             revision: Long? = null,
             expedited: Boolean = false,
         ) {
-            if (!BuildConfig.FIREBASE_CONFIGURED || uid.isBlank()) return
+            if (uid.isBlank()) return
             if (revision != null) {
                 var accepted = false
                 scheduledRevisions.compute(uid) { _, previous ->

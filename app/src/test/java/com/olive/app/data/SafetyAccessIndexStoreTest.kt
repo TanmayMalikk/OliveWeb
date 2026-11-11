@@ -1,5 +1,8 @@
 package com.olive.app.data
 
+import com.olive.app.data.safety.SafetyAccessIndexStore
+import com.olive.app.data.safety.SafetyConsultation
+import com.olive.app.data.safety.SharedSafetyPlan
 import com.olive.app.security.JsonVault
 import org.json.JSONObject
 import org.junit.Assert.assertEquals

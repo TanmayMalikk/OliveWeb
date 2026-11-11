@@ -2,14 +2,15 @@
 package com.olive.app
 
 import androidx.test.core.app.ApplicationProvider
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.AccountRole
-import com.olive.app.data.CoverStateStore
-import com.olive.app.data.CoverType
-import com.olive.app.data.NewsArticle
-import com.olive.app.data.NewsFeedCacheStore
-import com.olive.app.data.NewsScope
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.cover.CoverStateStore
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.news.NewsFeedCacheStore
+import com.olive.app.data.news.NewsScope
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.messaging.PrivateContactNote
 import com.olive.app.security.DeviceStore
 import com.olive.app.security.EncryptedVault
 import org.junit.Assert.assertEquals
@@ -70,7 +71,7 @@ class ResponsivePersistenceTest {
             store.privateContactNotes("viewer-a")["person-1"]?.body
         )
         assertEquals(emptySet<String>(), store.archivedConversationIds("viewer-b"))
-        assertEquals(emptyMap<String, com.olive.app.data.PrivateContactNote>(), store.privateContactNotes("viewer-b"))
+        assertEquals(emptyMap<String, PrivateContactNote>(), store.privateContactNotes("viewer-b"))
 
         store.setConversationArchived("viewer-a", "chat-1", false)
         assertEquals(emptySet<String>(), store.archivedConversationIds("viewer-a"))

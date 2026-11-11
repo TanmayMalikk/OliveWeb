@@ -1,6 +1,18 @@
 // Tests malformed, old, deleted, and changed account-history records for every account role.
 package com.olive.app.data
 
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.FieldChange
+import com.olive.app.data.account.PRIVATE_ENTRY_TRASH_RETENTION_MS
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryEdit
+import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.account.profileChanges
+import com.olive.app.data.account.trashDaysRemaining
+import com.olive.app.data.account.trashExpired
+import com.olive.app.data.account.trashSecondsRemaining
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
