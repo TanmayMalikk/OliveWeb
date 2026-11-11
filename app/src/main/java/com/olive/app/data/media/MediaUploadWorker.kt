@@ -15,6 +15,7 @@ import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.SafetyPlanSyncWorker
+import com.olive.app.data.OutgoingMessage
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -295,6 +296,13 @@ interface MediaTicketDataSource {
         wrappedKeys: Map<String, String>,
         deviceWrappedKeys: Map<String, String>,
     ): CloudMediaRecord = error("Plan attachment sharing is unavailable")
+    suspend fun shareInChat(
+        mediaId: String,
+        outgoing: OutgoingMessage,
+        recipientUids: List<String>,
+        wrappedKeys: Map<String, String>,
+        deviceWrappedKeys: Map<String, String>,
+    ) { error("Chat attachment sharing is unavailable") }
     /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
     suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
     /** Changes the owner's evidence label without changing or decrypting file contents. */
@@ -402,6 +410,25 @@ class MediaRepository(
         "deviceWrappedKeys" to deviceWrappedKeys,
         "forPlan" to true,
     )).record()
+
+    override suspend fun shareInChat(
+        mediaId: String,
+        outgoing: OutgoingMessage,
+        recipientUids: List<String>,
+        wrappedKeys: Map<String, String>,
+        deviceWrappedKeys: Map<String, String>,
+    ) {
+        call("mediaShareInChat", mapOf(
+            "mediaId" to mediaId,
+            "conversationId" to outgoing.conversationId,
+            "messageId" to outgoing.id,
+            "ciphertext" to outgoing.ciphertext,
+            "clientSentAt" to outgoing.clientSentAt,
+            "recipientUids" to recipientUids,
+            "wrappedKeys" to wrappedKeys,
+            "deviceWrappedKeys" to deviceWrappedKeys,
+        ))
+    }
 
     // Adds the wrapped file keys needed by newly authorized devices.
     override suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord {
