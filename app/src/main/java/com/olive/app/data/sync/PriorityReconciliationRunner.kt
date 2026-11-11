@@ -28,16 +28,19 @@ internal class PriorityReconciliationRunner(
         var checkpoint = checkpoints.read(uid)
         for (domain in ORDER) {
             if (activeUid() != uid) return ReconciliationOutcome.STALE_ACCOUNT
-            if (checkpoint.initialized && target.value(domain) <= checkpoint.revisions.value(domain)) continue
+            val applied = checkpoint.revisions.value(domain)
+            val requested = target.value(domain)
+            if ((checkpoint.initialized || applied > 0) && requested <= applied) continue
             checkNotNull(reconcilers[domain]) { "Missing $domain reconciler" }.reconcile(uid)
-            checkpoint = checkpoint.copy(
-                initialized = true,
-                revisions = checkpoint.revisions.withApplied(domain, target.value(domain)),
-            )
+            if (activeUid() != uid) return ReconciliationOutcome.STALE_ACCOUNT
+            checkpoint = checkpoint.copy(revisions = checkpoint.revisions.withApplied(domain, requested))
             checkpoints.write(uid, checkpoint)
         }
         if (activeUid() != uid) return ReconciliationOutcome.STALE_ACCOUNT
-        checkpoints.write(uid, checkpoint.copy(revisions = checkpoint.revisions.copy(revision = target.revision)))
+        checkpoints.write(uid, checkpoint.copy(
+            initialized = true,
+            revisions = checkpoint.revisions.copy(revision = maxOf(checkpoint.revisions.revision, target.revision)),
+        ))
         return ReconciliationOutcome.COMPLETE
     }
 

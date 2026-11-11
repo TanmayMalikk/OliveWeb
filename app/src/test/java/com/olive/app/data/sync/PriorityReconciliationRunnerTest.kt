@@ -17,6 +17,15 @@ class PriorityReconciliationRunnerTest {
     }
 
     @Test
+    fun `a missing server marker still refreshes every domain once`() = runBlocking {
+        val fixture = Fixture()
+        repeat(2) { fixture.runner.reconcile(OWNER, SyncRevisions()) }
+
+        assertEquals(SyncDomain.entries, fixture.calls)
+        assertEquals(SyncCheckpoint(initialized = true), fixture.store.read(OWNER))
+    }
+
+    @Test
     fun `only advanced domains reconcile on later runs`() = runBlocking {
         val fixture = Fixture(SyncCheckpoint(true, SyncRevisions(4, 2, 2, 2, 2)))
         fixture.runner.reconcile(OWNER, SyncRevisions(6, 2, 5, 2, 3))
@@ -34,7 +43,10 @@ class PriorityReconciliationRunnerTest {
 
         assertTrue(failure is TemporarySyncFailure)
         assertEquals(listOf(SyncDomain.ACCOUNT, SyncDomain.SAFETY, SyncDomain.MEDIA), fixture.calls)
-        assertEquals(SyncRevisions(0, 1, 1, 0, 0), fixture.store.read(OWNER).revisions)
+        assertEquals(SyncCheckpoint(revisions = SyncRevisions(0, 1, 1, 0, 0)), fixture.store.read(OWNER))
+        val retry = Fixture(fixture.store.read(OWNER))
+        retry.runner.reconcile(OWNER, SyncRevisions(4, 1, 1, 1, 1))
+        assertEquals(listOf(SyncDomain.MEDIA, SyncDomain.CONVERSATION), retry.calls)
     }
 
     @Test
@@ -67,7 +79,7 @@ class PriorityReconciliationRunnerTest {
             runner.reconcile(OWNER, SyncRevisions(4, 1, 1, 1, 1)),
         )
         assertEquals(listOf(SyncDomain.ACCOUNT, SyncDomain.SAFETY), calls)
-        assertEquals(SyncRevisions(0, 1, 1, 0, 0), store.read(OWNER).revisions)
+        assertEquals(SyncCheckpoint(revisions = SyncRevisions(account = 1)), store.read(OWNER))
     }
 
     @Test
