@@ -1,6 +1,6 @@
 // Staff and admins: reads assigned support chats and sends encrypted replies.
 import { useEffect, useMemo, useState } from "react";
-import { Archive, MessageCircle, Send, ShieldAlert } from "lucide-react";
+import { Archive, ArrowLeft, MessageCircle, Send, ShieldAlert } from "lucide-react";
 import { Button, Empty, Form } from "../../components/SharedComponents";
 import { accounts, cloudMode } from "../../services/AccountService";
 import * as messaging from "../../services/MessagingService";
@@ -11,6 +11,8 @@ import {
 } from "../../services/OrganizationSupportService";
 import { useSession } from "../../session/SessionProvider";
 import { useChatDeviceKey, useChatTimeline } from "./useChatTimeline";
+
+const noMessages: Message[] = [];
 
 type TicketCategory = "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
 const categories: { id: TicketCategory; label: string }[] = [
@@ -32,9 +34,12 @@ export default function OrganizationSupportInbox() {
   const identity = accounts.identity;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
-  const [draft, setDraft] = useState("");
+  const [history, setHistory] = useState<{ ticketId: string; messages: Message[] } | null>(null);
+  const messages = history && history.ticketId === selected?.id ? history.messages : noMessages;
+  const [room, setRoom] = useState<{ ticketId: string; key: CryptoKey } | null>(null);
+  const roomKey = room && room.ticketId === selected?.id ? room.key : null;
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draft = selected ? drafts[selected.id] ?? "" : "";
   const [feedback, setFeedback] = useState("");
   const [category, setCategory] = useState<TicketCategory>("SUPPORT");
   const [showArchived, setShowArchived] = useState(false);
@@ -56,6 +61,9 @@ export default function OrganizationSupportInbox() {
             if (!active) return;
             const tickets = value.filter((item) => item.type === "SUPPORT");
             setConversations(tickets);
+            setDrafts((current) => Object.fromEntries(tickets.flatMap(({ id, closedAt }) =>
+              !closedAt && current[id] ? [[id, current[id]]] : [],
+            )));
             setSelected((current) => tickets.find((ticket) => ticket.id === current?.id) ?? null);
           },
           (error) => active && setFeedback(error.message),
@@ -75,8 +83,8 @@ export default function OrganizationSupportInbox() {
 
   // Opens a selected ticket using its device-approved encryption key.
   useEffect(() => {
-    setMessages([]);
-    setRoomKey(null);
+    setHistory(null);
+    setRoom(null);
     if (!selected || !identity) return;
     let active = true;
     let stop: (() => void) | undefined;
@@ -84,11 +92,11 @@ export default function OrganizationSupportInbox() {
       .roomKey(selected.id, identity, selected)
       .then((key) => {
         if (!active) return undefined;
-        setRoomKey(key);
+        setRoom({ ticketId: selected.id, key });
         return messaging.subscribeMessages(
           selected.id,
           key,
-          (value) => active && setMessages(value),
+          (value) => active && setHistory({ ticketId: selected.id, messages: value }),
           (error) => active && setFeedback(error.message),
         );
       })
@@ -113,6 +121,11 @@ export default function OrganizationSupportInbox() {
         .filter((item) => showArchived || categoryOf(item) === category),
     [conversations, category, showArchived],
   );
+  const openTicket = (ticket: Conversation | null) => {
+    setSelected(ticket);
+    setFeedback("");
+  };
+
   if (!identity) return null;
   if (!cloudMode)
     return (
@@ -124,17 +137,20 @@ export default function OrganizationSupportInbox() {
   return (
     <section
       className="organization-inbox"
+      data-detail-open={Boolean(selected)}
       aria-label="Organization support inbox"
     >
       <aside className="organization-ticket-list">
         <div className="organization-inbox-heading">
           <div>
-            <span className="eyebrow">SECURE SUPPORT</span>
             <h2>Ticket inbox</h2>
           </div>
           <Button
             variant="outline"
-            onClick={() => setShowArchived((value) => !value)}
+            onClick={() => {
+              openTicket(null);
+              setShowArchived((value) => !value);
+            }}
           >
             <Archive size={16} /> {showArchived ? "Active tickets" : "Archived"}
           </Button>
@@ -142,15 +158,18 @@ export default function OrganizationSupportInbox() {
         {!showArchived && (
           <div
             className="organization-ticket-tabs"
-            role="tablist"
+            role="group"
             aria-label="Ticket categories"
           >
             {categories.map((item) => (
               <button
                 key={item.id}
-                role="tab"
-                aria-selected={category === item.id}
-                onClick={() => setCategory(item.id)}
+                type="button"
+                aria-pressed={category === item.id}
+                onClick={() => {
+                  if (category !== item.id) openTicket(null);
+                  setCategory(item.id);
+                }}
               >
                 {item.label}
               </button>
@@ -172,7 +191,9 @@ export default function OrganizationSupportInbox() {
             <button
               key={item.id}
               className={`organization-ticket ${selected?.id === item.id ? "selected" : ""}`}
-              onClick={() => setSelected(item)}
+              type="button"
+              aria-pressed={selected?.id === item.id}
+              onClick={() => openTicket(item)}
             >
               <span className="organization-ticket-icon">
                 <MessageCircle size={18} />
@@ -207,6 +228,9 @@ export default function OrganizationSupportInbox() {
           </Empty>
         ) : (
           <>
+            <button className="text-link workspace-list-back" type="button" onClick={() => openTicket(null)}>
+              <ArrowLeft size={17} aria-hidden="true" /> Back to tickets
+            </button>
             <header className="organization-chat-heading">
               <div>
                 <span className="eyebrow">
@@ -242,7 +266,7 @@ export default function OrganizationSupportInbox() {
                     onClick={() =>
                       void session.perform(async () => {
                         await closeSupportTicket(selected.id);
-                        setSelected(null);
+                        openTicket(null);
                       })
                     }
                   >
@@ -292,7 +316,7 @@ export default function OrganizationSupportInbox() {
                       draft,
                       roomKey,
                     );
-                    setDraft("");
+                    setDrafts((current) => ({ ...current, [selected.id]: "" }));
                   })
                 }
               >
@@ -303,7 +327,7 @@ export default function OrganizationSupportInbox() {
                   id="organization-message"
                   value={draft}
                   maxLength={2000}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) => setDrafts({ ...drafts, [selected.id]: event.target.value })}
                   placeholder="Write a secure reply…"
                   required
                 />

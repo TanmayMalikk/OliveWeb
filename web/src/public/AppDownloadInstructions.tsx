@@ -1,179 +1,78 @@
 // Public visitors: download the signed Android release or install the iOS web app.
 import {
-  ArrowLeft,
-  ArrowUpRight,
-  Download,
-  Smartphone,
-  Share,
-  PlusSquare,
-  Check,
+  ArrowLeft, ArrowUpRight, Download, Globe, PlusSquare, ScanLine, Share, Smartphone,
 } from "lucide-react";
-import {
-  Logo,
-  Button,
-  Forward,
-  External,
-} from "../components/SharedComponents";
-import { useSession } from "../session/SessionProvider";
+import { Logo, External } from "../components/SharedComponents";
 import { siteHref } from "../sites/SiteRouting";
 import config from "../../site.config.json";
 
-const ANDROID_DOWNLOAD_URL = new URL("/download/android", location.origin).href;
-const ANDROID_DOWNLOAD_PAGE_URL = new URL("/get", location.origin).href;
+const androidDownload = "/download/android";
 
 export default function DownloadPage() {
-  const { go } = useSession();
-
   return (
-    <div className="page-width download-page">
-      <header className="site-header">
-        <Logo />
-        <nav>
-          <a
-            href={siteHref("/account")}
-            onClick={(e) => {
-              e.preventDefault();
-              go("/account");
-            }}
-          >
-            Your account <ArrowUpRight size={16} />
-          </a>
-        </nav>
+    <div className="access-page install-page">
+      <header className="access-header">
+        <Logo small />
+        <a className="text-link" href={siteHref("/account/sign-in")}>
+          Sign in <ArrowUpRight size={16} aria-hidden="true" />
+        </a>
       </header>
-      <main id="main">
-        <button className="text-link" onClick={() => go("/")}>
-          <ArrowLeft size={16} /> Back to Little Grove
-        </button>
-        <div className="download-heading">
-          <span className="eyebrow">A FAMILIAR PLACE, WHEREVER YOU GO</span>
-          <h1>
-            Make a little
-            <br />
-            <em>room on your screen.</em>
-          </h1>
-          <p>Choose your device. Settle in. Your account goes with you.</p>
+      <main className="install-main" id="main">
+        <a className="text-link" href={siteHref("/")}>
+          <ArrowLeft size={16} aria-hidden="true" /> Back to Little Grove
+        </a>
+        <div className="install-heading">
+          <h1>Get Olive Branch</h1>
+          <p>Install on Android, add Little Grove to your iPhone or iPad, or use Olive Branch in your browser.</p>
         </div>
-        <div className="download-grid">
-          <section className="install-card">
-            <div className="install-icon">
-              <Download size={30} />
+        <div className="install-platforms">
+          <section className="access-card install-platform install-android" aria-labelledby="android-install">
+            <span className="access-mark"><Download size={24} aria-hidden="true" /></span>
+            <h2 id="android-install">Android</h2>
+            <p>Download the latest signed release and open the APK on your Android device to install it.</p>
+            <a className="button" href={androidDownload}>
+              <Download size={17} aria-hidden="true" /> Download signed APK
+            </a>
+            <p className="install-note">Android may ask you to allow your browser to install apps from outside the Play Store.</p>
+            <div className="install-qr-panel">
+              <a className="install-qr" href={androidDownload} aria-label="Download signed Android APK">
+                <img src="/android-download-qr.svg?v=direct-apk-v2" width={128} height={128}
+                  alt="QR code for the latest signed Android app" />
+              </a>
+              <div>
+                <h3><ScanLine size={17} aria-hidden="true" /> On another device?</h3>
+                <p>Scan the code with your Android phone to download the APK there.</p>
+              </div>
             </div>
-            <span className="eyebrow">FOR ANDROID</span>
-            <h2>Download the signed Android app.</h2>
-            <p>
-              Scan the QR code or download the current release on your Android
-              device, then open the file to install it. Android may ask you to
-              allow installation from your browser.
-            </p>
-            <a
-              className="download-qr"
-              href={ANDROID_DOWNLOAD_URL}
-              aria-label="Download signed Android APK"
-            >
-              <img
-                src="/android-download-qr.svg?v=direct-apk-v2"
-                alt="QR code for the latest signed Android app"
-              />
-            </a>
-            <a className="button" href={ANDROID_DOWNLOAD_URL}>
-              <Download size={17} /> Download signed APK
-            </a>
-            <p className="help-note">
-              Android may show a warning because this APK is installed outside
-              the Play Store.
-            </p>
           </section>
-          <section className="install-card">
-            <div className="install-icon">
-              <Smartphone size={30} />
-            </div>
-            <span className="eyebrow">FOR IPHONE & IPAD</span>
-            <h2>A place on your Home Screen.</h2>
-            <p>
-              Install the web app from Safari. It opens from your Home Screen
-              like an app, and no App Store download is needed.
-            </p>
-            <ol className="install-steps">
-              <li>
-                <span>1</span>
-                <div>
-                  <h3>Open your chosen cover in Safari</h3>
-                  <p>
-                    Finish account setup first, then open your cover link in
-                    Safari. These installation steps are for Safari on iOS.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <span>
-                  <Share size={18} />
-                </span>
-                <div>
-                  <h3>Open the Share menu</h3>
-                  <p>
-                    Tap Safari’s Share button. Its position varies with your
-                    Safari layout.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <span>
-                  <PlusSquare size={18} />
-                </span>
-                <div>
-                  <h3>Choose “Add to Home Screen”</h3>
-                  <p>
-                    Scroll through the actions if needed. Turn on “Open as Web
-                    App” if that option appears, then tap Add.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <span>
-                  <Check size={18} />
-                </span>
-                <div>
-                  <h3>Open it from your Home Screen</h3>
-                  <p>
-                    Keep your personal entry link separately. Installing the web
-                    app does not unlock your private space.
-                  </p>
-                </div>
-              </li>
+          <section className="access-card install-platform" aria-labelledby="ios-install">
+            <span className="access-mark"><Smartphone size={24} aria-hidden="true" /></span>
+            <h2 id="ios-install">iPhone and iPad</h2>
+            <p>Add Little Grove to your Home Screen from Safari.</p>
+            <ol className="install-guide">
+              <li><Globe size={18} aria-hidden="true" /><h3>Open <a href={siteHref("/")}>Little Grove</a> in Safari</h3></li>
+              <li><Share size={18} aria-hidden="true" /><h3>Tap Share in Safari</h3></li>
+              <li><PlusSquare size={18} aria-hidden="true" /><div><h3>Choose Add to Home Screen</h3><p>Turn on “Open as Web App” if offered, then tap Add.</p></div></li>
             </ol>
+            <p className="install-note">Keep your personal entry link separately so you can return to Safe Space.</p>
             <External href="https://support.apple.com/guide/iphone/turn-a-website-into-an-app-iphea86e5236/ios">
               Apple’s installation guide
             </External>
           </section>
         </div>
-        <section className="download-web panel">
-          <div className="install-icon">
-            <Smartphone size={30} />
-          </div>
+        <section className="access-card install-browser" aria-labelledby="browser-install">
+          <span className="access-mark"><Globe size={24} aria-hidden="true" /></span>
           <div>
-            <span className="eyebrow">OPEN IN A BROWSER</span>
-            <h2>Your space, on the web.</h2>
-            <p>
-              Sign in with the same account to open the web version of Olive
-              Branch.
-            </p>
+            <h2 id="browser-install">Use Olive Branch in your browser</h2>
+            <p>Sign in with your existing account or create one to get started.</p>
           </div>
-          <a className="button" href={`${config.publicOrigin}/account/sign-in`}>
-            Open the web app <ArrowUpRight size={17} />
-          </a>
+          <div className="install-browser-actions">
+            <a className="button" href={new URL("/account/sign-in", config.publicOrigin).href}>
+              Open the web app <ArrowUpRight size={17} aria-hidden="true" />
+            </a>
+            <a className="text-link" href={siteHref("/account/create")}>Create an account</a>
+          </div>
         </section>
-        <div className="download-account panel">
-          <div>
-            <span className="eyebrow">NEW HERE?</span>
-            <h2>Start with your account.</h2>
-            <p>
-              Create an account and choose your everyday app before installing.
-            </p>
-          </div>
-          <Button onClick={() => go("/account/create")}>
-            <Forward>Begin onboarding</Forward>
-          </Button>
-        </div>
       </main>
     </div>
   );

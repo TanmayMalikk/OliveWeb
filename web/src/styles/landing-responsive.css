@@ -100,10 +100,6 @@
   .account-form {
     margin-block: 2rem;
   }
-  .download-account {
-    align-items: flex-start;
-    flex-direction: column;
-  }
   .step-progress {
     margin-bottom: 2.5rem;
   }

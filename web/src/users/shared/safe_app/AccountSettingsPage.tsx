@@ -27,49 +27,7 @@ export default function Settings() {
   return (
     <div className="settings-grid">
       <section className="panel">
-        <h2>Preferences</h2>
-        <p>Website cover: Little Grove.</p>
-        <Form
-          onSubmit={async (data) => {
-            await s.perform(() =>
-              s.saveProfile(
-                {
-                  ...p,
-                  language: String(data.get("language")),
-                },
-                "Updated profile language",
-              ),
-            );
-          }}
-        >
-          <label className="field">
-            <span id="profile-language-label">Profile language</span>
-            <select name="language" defaultValue={p.language} aria-labelledby="profile-language-label"
-              aria-describedby="profile-language-help">
-              {[
-                "English",
-                "French",
-                "Spanish",
-                "Arabic",
-                "Chinese",
-                "Tagalog",
-                "Cree",
-              ].map((l) => (
-                <option key={l}>{l}</option>
-              ))}
-            </select>
-            <small id="profile-language-help">
-              Your language preference syncs with mobile. The web interface
-              currently uses English.
-            </small>
-          </label>
-          <Button type="submit" disabled={s.busy}>
-            Save preferences
-          </Button>
-        </Form>
-      </section>
-      <section className="panel">
-        <h2>Your personal link.</h2>
+        <h2>Personal entry link</h2>
         <p>
           Your link opens an entry gate. A password or enrolled-browser PIN is
           still required.
@@ -96,7 +54,7 @@ export default function Settings() {
         </Button>
       </section>
       <section className="panel">
-        <h2>Account password.</h2>
+        <h2>Account password</h2>
         <Form
           onSubmit={async (data) => {
             await s.perform(async () => {
@@ -142,7 +100,7 @@ export default function Settings() {
       {p.role === "USER" && (
         <>
           <section className="panel">
-            <h2>Browser PIN.</h2>
+            <h2>Browser PIN</h2>
             <Form
               onSubmit={async (data) => {
                 await s.perform(async () => {
@@ -190,10 +148,9 @@ export default function Settings() {
             </Form>
           </section>
           <section className="panel">
-            <h2>Cover trigger.</h2>
+            <h2>Android cover trigger</h2>
             <p>
-              Your web entry uses your personal link. This trigger preference
-              also syncs with your Android cover.
+              Change the phrase that opens the private entry prompt on Android. The web uses your personal link.
             </p>
             <Form
               onSubmit={async (data) => {
@@ -225,11 +182,11 @@ export default function Settings() {
         </>
       )}
       <section className="panel">
-        <h2>Your account connection.</h2>
+        <h2>Account sync</h2>
         <p>
           {s.cloudMode
-            ? "Profiles, notes, contacts, and activity use the same Firebase paths as Android."
-            : "This account is encrypted in this browser. It cannot read the Android app’s local vault."}
+            ? "Your profile, notes, contacts, and activity sync with Android."
+            : "This account’s data is stored in this browser. It is separate from your Android account."}
         </p>
         <Button
           variant="outline"
@@ -240,7 +197,6 @@ export default function Settings() {
         </Button>
         <p className="help-note">
           {s.profile?.role === "USER" ? "Quick Exit does not clear browser history or prevent screen recording." : "Keep access to your account secure."}
-          Keep access to your device and browser secure.
         </p>
       </section>
       {confirmRotation && (
