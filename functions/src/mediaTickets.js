@@ -495,6 +495,84 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   return publicRecord(await reference.get());
 });
 
+// Publish the message and grant its recipients access in the same transaction.
+exports.mediaShareInChat = onCall(options, async (request) => {
+  const uid = caller(request);
+  const data = request.data;
+  const mediaId = string(data?.mediaId, "mediaId", 64);
+  const conversationId = string(data?.conversationId, "conversationId", 300);
+  const messageId = string(data?.messageId, "messageId", 128);
+  const ciphertext = string(data?.ciphertext, "ciphertext", 12000);
+  const clientSentAt = data?.clientSentAt;
+  const recipients = recipientList(data?.recipientUids, null, uid, "recipientUids");
+  if (!recipients.length || !Number.isSafeInteger(clientSentAt) || clientSentAt < 0 ||
+      [mediaId, conversationId, messageId].some(id => !/^[A-Za-z0-9_-]+$/.test(id))) {
+    throw new HttpsError("invalid-argument", "Invalid chat share.");
+  }
+  const file = mediaRef(mediaId);
+  const grants = planMediaGrantRef(uid, mediaId);
+  const chat = db.collection("conversations").doc(conversationId);
+  const message = chat.collection("messages").doc(messageId);
+  await db.runTransaction(async transaction => {
+    const [media, conversation, savedMessage, tracked] = await Promise.all([
+      transaction.get(file), transaction.get(chat), transaction.get(message), transaction.get(grants),
+    ]);
+    const value = media.data();
+    const participants = conversation.get("participantIds");
+    const senderUsername = conversation.get("participantUsernames")?.[uid];
+    if (!value || value.owner_id !== uid || !Array.isArray(participants) ||
+        !participants.includes(uid) || typeof senderUsername !== "string" || !senderUsername) {
+      throw new HttpsError("permission-denied", "Only the file owner can share it in a chat they belong to.");
+    }
+    if (savedMessage.exists) {
+      if (savedMessage.get("senderUid") !== uid || savedMessage.get("ciphertext") !== ciphertext ||
+          savedMessage.get("clientSentAt") !== clientSentAt) {
+        throw new HttpsError("already-exists", "This message ID is already in use.");
+      }
+      return;
+    }
+    if (conversation.get("closedAt") || recipients.length !== participants.length - 1 ||
+        recipients.some(id => !participants.includes(id))) {
+      throw new HttpsError("failed-precondition", "Chat membership changed. Open the chat and try again.");
+    }
+    if (value.object_key) {
+      const access = accessRequest(data, uid);
+      if (access.allowedUsers.length !== recipients.length + 1 ||
+          recipients.some(id => !Object.hasOwn(access.wrappedKeys, id))) {
+        throw new HttpsError("invalid-argument", "A wrapped file key is required for every recipient.");
+      }
+      const wrappedKeys = {...value.wrapped_keys, ...Object.fromEntries(
+        recipients.map(id => [id, access.wrappedKeys[id]]),
+      )};
+      const deviceWrappedKeys = {...value.device_wrapped_keys, ...retainedDeviceKeys(access.deviceWrappedKeys, recipients)};
+      const allowedUsers = Object.keys(wrappedKeys);
+      if (allowedUsers.length > 25 || Object.keys(deviceWrappedKeys).length > 250) {
+        throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
+      }
+      transaction.update(file, {wrapped_keys: wrappedKeys, device_wrapped_keys: deviceWrappedKeys, allowed_users: allowedUsers});
+      transaction.set(grants, {
+        independentReaders: [...new Set([...(tracked.get("independentReaders") || []), ...recipients])],
+      }, {merge: true});
+    } else {
+      if (value.storage_path !== `users/${uid}/media/${mediaId}`) {
+        throw new HttpsError("failed-precondition", "This file cannot be shared in chat.");
+      }
+      const allowedUsers = [...new Set([...(value.allowed_users || []), uid, ...recipients])];
+      if (allowedUsers.length > 25) {
+        throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
+      }
+      transaction.update(file, {allowed_users: allowedUsers});
+    }
+    transaction.create(message, {
+      senderUid: uid, senderUsername, ciphertext, clientSentAt, deleted: false, sentAt: FieldValue.serverTimestamp(),
+    });
+    transaction.update(chat, {
+      lastMessage: "Secure message", lastMessageId: messageId, lastSenderUid: uid, updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return {shared: true};
+});
+
 function planMediaGrantRef(ownerUid, mediaId) {
   return db.collection("safetyPlanMediaGrants").doc(ownerUid).collection("files").doc(mediaId);
 }

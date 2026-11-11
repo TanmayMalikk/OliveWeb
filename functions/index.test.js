@@ -19,7 +19,7 @@ test("deployment keeps the existing callable endpoint names", () => {
     "safetyPlanShareContacts", "safetyPlanMediaRecipients", "safetyPlansSharedWithMe", "mediaCreateUpload",
     "mediaUploadPartTicket", "mediaCompleteUpload", "mediaAbortUpload",
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
-    "mediaUpdateAccess", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
+    "mediaUpdateAccess", "mediaShareInChat", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
     "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant",
     "conversationRemoveParticipant", "conversationRequestStaff", "conversationPrepareKeys", "supportTicketsPrepare", "staffSupportClose", "nutritionFoodSearch",
     "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",

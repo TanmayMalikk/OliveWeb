@@ -14,7 +14,7 @@ const {safetyPlanConsult} = require("./src/safetyConsultations");
 const {safetySupportAdmin, staffSupportClose, conversationAddParticipant, conversationRemoveParticipant} = require("./src/supportGroups");
 const {conversationPrepareKeys, supportTicketsPrepare, repairPlanTicket, repairConversation} = require("./src/supportTicketRepair");
 const {staffSupportRequest} = require("./src/supportTickets");
-const {mediaUpdateAccess, mediaAccountAccessKey, reconcilePlanMediaGrants} = require("./src/mediaTickets");
+const {mediaUpdateAccess, mediaShareInChat, mediaAccountAccessKey, reconcilePlanMediaGrants} = require("./src/mediaTickets");
 const {fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
 const users = new Map([
   ["plan-owner",{uid:"plan-owner",email:"owner@users.olive.invalid",displayName:"Owner"}],
@@ -129,6 +129,43 @@ test("open user, safe contact and staff listeners receive edits and a completed 
   assert.equal(completed.staffUid, "");
   assert.ok(completed.plansCompletedAt > 0);
   assert.equal((await call(safetyPlanConsultations, staff)).plans.some(row => row.ownerUid === owner), false);
+});
+
+test("a failed repeat group share preserves earlier grants and publishes no partial share", async () => {
+  const owner = "repeat-share-owner", alice = "repeat-share-alice", bob = "repeat-share-bob", carol = "repeat-share-carol";
+  const mediaId = "repeat-share-file", conversationId = "repeat-share-group";
+  const file = db.collection("files").doc(mediaId);
+  const chat = db.collection("conversations").doc(conversationId);
+  const grants = db.collection("safetyPlanMediaGrants").doc(owner).collection("files").doc(mediaId);
+  const people = [owner, alice, bob, carol];
+  await chat.set({type: "GROUP", participantIds: people.slice(0, 2),
+    participantUsernames: Object.fromEntries(people.map(uid => [uid, uid]))});
+  await file.set({
+    owner_id: owner, object_key: `users/${owner}/media/${mediaId}`, encrypted_metadata: "metadata",
+    allowed_users: [owner], wrapped_keys: {[owner]: "owner-key"}, device_wrapped_keys: {},
+  });
+  const first = {mediaId, conversationId, messageId: "first-share", ciphertext: "first-ciphertext", clientSentAt: 1,
+    recipientUids: [alice], wrappedKeys: {[owner]: "owner-key", [alice]: "alice-key"},
+    deviceWrappedKeys: {[`${alice}--phone`]: "alice-device-key"}};
+  await call(mediaShareInChat, owner, first);
+  await chat.update({participantIds: people});
+  const repeat = {...first, messageId: "repeat-share", ciphertext: "repeat-ciphertext", clientSentAt: 2,
+    recipientUids: [alice, bob, carol], wrappedKeys: {[owner]: "owner-key", [alice]: "new-alice-key", [bob]: "bob-key"}};
+  const beforeFile = (await file.get()).data();
+  const beforeGrants = (await grants.get()).data();
+
+  // Carol's key setup failed after Alice and Bob were prepared.
+  await assert.rejects(call(mediaShareInChat, owner, repeat), {code: "invalid-argument"});
+  assert.deepEqual((await file.get()).data(), beforeFile);
+  assert.deepEqual((await grants.get()).data(), beforeGrants);
+  assert.equal((await chat.collection("messages").doc(repeat.messageId).get()).exists, false);
+  assert.equal((await chat.get()).get("lastMessageId"), first.messageId);
+
+  const complete = {...repeat, wrappedKeys: {...repeat.wrappedKeys, [carol]: "carol-key"}};
+  await Promise.all([call(mediaShareInChat, owner, complete), call(mediaShareInChat, owner, complete)]);
+  assert.deepEqual(new Set((await file.get()).get("allowed_users")), new Set(people));
+  assert.deepEqual(new Set((await grants.get()).get("independentReaders")), new Set([alice, bob, carol]));
+  assert.equal((await chat.collection("messages").get()).size, 2);
 });
 
 test("removing a plan attachment preserves an overlapping independent chat share", async () => {
