@@ -1,4 +1,9 @@
 // Schedules priority reconciliation and persists or reports its progress.
+@file:Suppress("SimplifyBooleanWithConstants")
+//!BUILDCONFIG.FIREBASE_CONFIGURED || uid.isBlank()
+//the linter thinks that line is better as just uid.isBlank()
+//dropping buildconfig means we don't have any check to drop the function if BUILDCONFIG.FIREBASE_CONFIGURED is false.
+
 package com.olive.app.data.sync
 
 import android.content.Context
@@ -122,7 +127,7 @@ class PriorityReconciliationWorker(
             revision: Long? = null,
             expedited: Boolean = false,
         ) {
-            if (uid.isBlank()) return
+            if (!BuildConfig.FIREBASE_CONFIGURED || uid.isBlank()) return
             if (revision != null) {
                 var accepted = false
                 scheduledRevisions.compute(uid) { _, previous ->

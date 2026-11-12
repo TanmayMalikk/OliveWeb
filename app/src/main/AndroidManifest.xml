@@ -8,12 +8,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Olive branch tracks user location at all time as part of our core safety features.
     While users can choose not to use it, it is part of our Requirements per our contract.
+    This gives user's safety functionality
      Warning suppressed.-->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"
         tools:ignore="BackgroundLocationPolicy" />
-    <!-- TODO: submit a declaration fom in Play Console describing use case of each FGS service used with written explanation and Demo video.
-    This warning is being suppressed, since that's the only way to handle it, the warning is meant to serve
-    as a stop gap to slow the developer and make them think about their actions. -->
+    <!-- This warning is being suppressed, since that's the only way to handle it, the warning is meant to serve
+    as a stop gap to slow the developer and make them think about their actions.
+    Our use case for FOREGROUND_SERVICE is to be able to do location/calling-->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
         tools:ignore="ForegroundServicesPolicy" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
