@@ -347,13 +347,14 @@ internal fun ChatPane(
                                             color = if (mine) Color.White.copy(alpha = .7f) else Muted
                                         )
                                         if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
-                                            val retryable = chat.deliveryStatus in setOf(
-                                                MessageDeliveryStatus.FAILED_RETRYABLE,
-                                                MessageDeliveryStatus.FAILED_PERMANENT,
-                                            )
+                                            val retryable = canManuallyRetryMessage(chat.deliveryStatus)
+                                            val discardable = canDiscardFailedMessage(chat.deliveryStatus)
                                             TextButton(
-                                                onClick = { session.messages.retryMessage(chat) },
-                                                enabled = retryable,
+                                                onClick = {
+                                                    if (retryable) session.messages.retryMessage(chat)
+                                                    else if (discardable) session.messages.discardFailedMessage(chat)
+                                                },
+                                                enabled = retryable || discardable,
                                                 contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
                                                 modifier = Modifier.testTag("message_status_${chat.id}")
                                                     .semantics { liveRegion = LiveRegionMode.Polite },
@@ -365,11 +366,20 @@ internal fun ChatPane(
                                                             MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued
                                                             MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
                                                             MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_retrying
-                                                            MessageDeliveryStatus.FAILED_PERMANENT -> R.string.message_delivery_failed_retry
+                                                            MessageDeliveryStatus.FAILED_PERMANENT ->
+                                                                if (chat.deliveryFailureCode in setOf(
+                                                                        "ATTACHMENT_ACCESS_REVOKED",
+                                                                        "ATTACHMENT_KEY_UNAVAILABLE",
+                                                                    )
+                                                                )
+                                                                    R.string.message_delivery_attachment_access_revoked
+                                                                else R.string.message_delivery_failed_permanent
                                                             MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
                                                         }
                                                     ),
-                                                    color = Color.White.copy(alpha = if (retryable) 1f else .75f),
+                                                    color = Color.White.copy(
+                                                        alpha = if (retryable || discardable) 1f else .75f
+                                                    ),
                                                     style = MaterialTheme.typography.labelSmall,
                                                 )
                                             }
