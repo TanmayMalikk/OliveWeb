@@ -3,6 +3,7 @@ package com.olive.app.data.media
 
 import android.content.Context
 import android.util.Log
+import android.util.Base64
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -16,6 +17,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.SafetyPlanSyncWorker
 import com.olive.app.data.OutgoingMessage
+import com.olive.app.security.KeyManager
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -37,6 +39,8 @@ import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
 import kotlinx.coroutines.tasks.await
+import javax.crypto.SecretKey
+import javax.crypto.spec.SecretKeySpec
 
 
 /**
@@ -91,7 +95,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             val parts=upload(file,job)
 
             // Finalization tells R2 to assemble multipart chunks, verifies the remote byte count,
-            // and atomically publishes the zero-knowledge Firestore record.
+            // and atomically publishes the encrypted Firestore record.
             store.update(job.id) { it.copy(status=MediaTransferStatus.FINALIZING,error=null) }
             val record=repository.completeUpload(job.id,parts)
             if (job.attachToSafetyPlan) {
@@ -283,6 +287,8 @@ interface MediaTicketDataSource {
     suspend fun abortUpload(jobId:String)
     /** Returns a short-lived GET capability after the callable checks `allowed_users`. */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
+    suspend fun recoverDocumentKey(mediaId: String): SecretKey = error("Document recovery is unavailable")
+    suspend fun storeDocumentKey(mediaId: String, key: SecretKey) = Unit
     /** Atomically replaces recipients plus their account/device-wrapped AES keys. */
     suspend fun updateAccess(
         mediaId:String,
@@ -333,17 +339,43 @@ class MediaRepository(
 ):MediaTicketDataSource {
     // Requests short-lived upload URLs for one encrypted file.
     override suspend fun createUpload(job:MediaUploadJob):MediaUploadSession {
-        // Only ciphertext facts and already-encrypted metadata cross the Firebase boundary.
         val source=job.source
+        val wrapped = source.wrappedKeys.getValue(job.ownerUid)
+        val key = KeyManager.unwrapKey(wrapped, source.encryptionVersion)
         val result=call("mediaCreateUpload",mapOf(
             "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
             "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
             "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
             "deviceWrappedKeys" to source.deviceWrappedKeys,
             "encryptionVersion" to source.encryptionVersion,
+            "recoveryKeyToSeal" to encodeRecoveryKey(key),
         ))
         return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
             MediaUploadMode.valueOf(result.string("mode")),result.optionalString("uploadId"),result.long("partSize"))
+    }
+
+    override suspend fun recoverDocumentKey(mediaId: String): SecretKey {
+        val result = call("mediaAccountAccessKey", mapOf("mediaId" to mediaId))
+        val raw = Base64.decode(result.string("accountAccessKey"), Base64.DEFAULT)
+        return try {
+            require(raw.size == 32) { "Invalid document recovery key" }
+            SecretKeySpec(raw, "AES")
+        } finally {
+            raw.fill(0)
+        }
+    }
+
+    override suspend fun storeDocumentKey(mediaId: String, key: SecretKey) {
+        call("mediaStoreAccountAccessKey", mapOf("mediaId" to mediaId, "recoveryKeyToSeal" to encodeRecoveryKey(key)))
+    }
+
+    private fun encodeRecoveryKey(key: SecretKey): String {
+        val raw = key.encoded
+        return try {
+            Base64.encodeToString(raw, Base64.NO_WRAP)
+        } finally {
+            raw.fill(0)
+        }
     }
 
     // Requests a protected upload ticket for an encrypted media file.
@@ -451,10 +483,9 @@ class MediaRepository(
         // sure the callable receives both the signed-in account and the required App Check proof.
         val user=auth.currentUser ?: error("Sign in again before uploading files")
         user.getIdToken(false).await()
-        // Ask Firebase for a fresh proof before protected media work. This is important after a
-        // debug device is approved because the SDK may still hold the rejection from its first try.
+        // Let the SDK reuse a valid proof across the calls that make up one transfer or list refresh.
         try {
-            appCheck.getAppCheckToken(true).await()
+            appCheck.getAppCheckToken(false).await()
         } catch(error:Exception) {
             // Media functions enforce App Check. Keep that protection, but replace Firebase's vague
             // retry-limit message with the exact action needed for an unregistered debug device.

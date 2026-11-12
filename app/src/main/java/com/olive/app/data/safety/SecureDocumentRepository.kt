@@ -511,6 +511,7 @@ private fun SafetyDocument.toIndexJson(viewerUid: String): JSONObject {
         .put("ciphertextSize", ciphertextSize)
         .put("ciphertextSha256", ciphertextSha256.lowercase())
         .put("encryptionVersion", encryptionVersion)
+        .put("accountRecoveryReady", accountRecoveryReady)
         .put("evidence", evidence)
         .put("tags", JSONArray(tags.distinct().take(20)))
         .apply {
@@ -552,6 +553,7 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
         ocrConfidence = optDouble("ocrConfidence").takeIf { has("ocrConfidence") }?.toFloat(),
         ocrSuccessful = optBoolean("ocrSuccessful").takeIf { has("ocrSuccessful") },
         objectKey = optString("objectKey"),
+        accountRecoveryReady = optBoolean("accountRecoveryReady"),
         encryptedMetadata = optString("encryptedMetadata"),
         wrappedKeys = accountKey?.let { mapOf(viewerUid to it) }.orEmpty(),
         ciphertextSize = size,
