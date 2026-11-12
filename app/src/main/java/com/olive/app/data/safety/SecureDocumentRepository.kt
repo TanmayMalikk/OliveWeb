@@ -1,5 +1,5 @@
 // Safe-app users and support staff: opens encrypted documents for approved viewers.
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,9 +12,11 @@ import java.security.PublicKey
 import javax.crypto.SecretKey
 import java.util.UUID
 import android.content.Context
+import com.olive.app.data.account.PrivateEntry
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.JsonVault
 import org.json.JSONArray
+import kotlin.collections.iterator
 
 
 class SecureDocumentRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
@@ -24,8 +26,6 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
      *
      * @param entry The full note or incident report that the recipient will read.
      * @param ownerUid The UID of the creator.
-     * @param title The plaintext title.
-     * @param body The plaintext body.
      * @param recipientPublicKeys Map of UID -> RSA PublicKey for everyone who needs access (including the owner).
      */
     suspend fun saveMultiRecipientEntry(
@@ -87,42 +87,6 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
     }
 
     /**
-     * Grants access to an existing encrypted entry for a new recipient.
-     * Extracts the AES key using the owner's private key, wraps it for the recipient, and updates Firestore.
-     */
-    suspend fun grantAccessToEntry(
-        entryId: String,
-        ownerUid: String,
-        recipientUid: String,
-        recipientPublicKey: PublicKey
-    ) {
-        val documentRef = firestore.collection("privateEntries").document(entryId)
-        val snapshot = documentRef.get().await()
-
-        if (!snapshot.exists()) throw Exception("Document not found.")
-
-        @Suppress("UNCHECKED_CAST")
-        val wrappedKeys = snapshot.get("wrappedKeys") as? Map<String, String>
-            ?: throw Exception("Encryption keys missing.")
-
-        val ownerWrappedKey = wrappedKeys[ownerUid]
-            ?: throw Exception("You do not have the cryptographic key to share this document.")
-
-        // 1. Unwrap the AES key using the owner's hardware Private Key
-        val documentKey = KeyManager.unwrapKey(ownerWrappedKey)
-
-        // 2. Wrap the AES key using the new recipient's Public Key
-        val newRecipientWrappedKey = KeyManager.wrapKey(documentKey, recipientPublicKey)
-
-        // 3. Append the new key and update security rule arrays
-        documentRef.update(
-            "wrappedKeys.${recipientUid}", newRecipientWrappedKey,
-            "allowedUsers", FieldValue.arrayUnion(recipientUid),
-            "updatedAt", FieldValue.serverTimestamp()
-        ).await()
-    }
-
-    /**
      * Retrieves and decrypts a shared Private Entry.
      */
     suspend fun loadAndDecryptEntry(entryId: String, currentUid: String): PrivateEntry {
@@ -155,34 +119,6 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         )
     }
 
-    /**
-     * Completely deletes an encrypted entry from the cloud.
-     */
-    suspend fun deleteEntry(entryId: String) {
-        firestore.collection("privateEntries").document(entryId).delete().await()
-    }
-
-    /**
-     * Retrieves all Private Entries that this user has access to.
-     */
-    suspend fun fetchMyEntries(currentUid: String): List<PrivateEntry> {
-        val snapshot = firestore.collection("privateEntries")
-            .whereArrayContains("allowedUsers", currentUid)
-            .get()
-            .await()
-
-        val entries = mutableListOf<PrivateEntry>()
-        for (doc in snapshot.documents) {
-            // Use the fallback when fetch my entries is unavailable.
-            try {
-                // We reuse loadAndDecryptEntry but pass the already fetched snapshot ID
-                val decryptedEntry = loadAndDecryptEntry(doc.id, currentUid)
-                entries.add(decryptedEntry)
-            } catch (_: Exception) { // Skip one unreadable entry so the rest of the private list can still load.
-            }
-        }
-        return entries
-    }
 }
 
 // Safe-app users and support staff: defines safety-plan fields and conflict data.
@@ -257,7 +193,7 @@ internal data class SafetyPlan(
         .put("staffUid", staffUid).put("staffName", staffName)
         .put("adminUid", adminUid).put("adminName", adminName)
         .put("consultationRequested", consultationRequested).put("shareAction", shareAction)
-        .put("safeContactUids", org.json.JSONArray(safeContactUids))
+        .put("safeContactUids", JSONArray(safeContactUids))
         .put("safeContactNames", JSONObject(safeContactNames))
         .put("supportSafeContactUid", supportSafeContactUid)
         .put("consultationConversationId", consultationConversationId)
@@ -511,6 +447,8 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
     )
 }
 
+@Suppress("SameParameterValue")
+// Linter Believes 'name' is always doumentindexStore.accounts which is dynamic.
 private fun JSONObject.child(name: String): JSONObject =
     optJSONObject(name) ?: JSONObject().also { put(name, it) }
 

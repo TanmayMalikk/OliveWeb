@@ -399,14 +399,21 @@
     <string name="safety_remove_attachment">Quitar archivo adjunto %1$s</string>
     <string name="chat_info">Información del chat</string>
     <string name="chat_members">Personas en este chat</string>
-    <string name="chat_header_member_count">%1$d miembros</string>
-    <string name="chat_member_count">%1$d personas</string>
+    <plurals name="chat_header_member_count">
+        <item quantity="one">%1$d miembro</item>
+        <item quantity="many">%1$d miembros</item>
+        <item quantity="other">%1$d miembros</item>
+    </plurals>
+    <plurals name="chat_member_count">
+        <item quantity="one">%1$d persona</item>
+        <item quantity="many">%1$d personas</item>
+        <item quantity="other">%1$d personas</item>
+    </plurals>
     <string name="chat_shared_items">Elementos compartidos</string>
     <string name="chat_no_shared_items">Todavía no se compartieron archivos ni elementos de seguridad.</string>
     <string name="chat_add_people">Agregar personas</string>
     <string name="chat_add_person">Agregar a %1$s</string>
     <string name="chat_remove_person">Quitar a %1$s de este grupo</string>
-    <string name="chat_add_participant_error">No se pudo agregar a esta persona. Debe ser un contacto aceptado con mensajería segura configurada.</string>
     <string name="chat_request_staff_title">Apoyo del personal</string>
     <string name="chat_request_staff_description">Crea un chat de apoyo separado con todas las personas de esta conversación.</string>
     <string name="chat_request_staff_button">Solicitar personal</string>
@@ -439,7 +446,11 @@
     <string name="admin_support_chat_tasks">Chats de apoyo</string>
     <string name="admin_completed">completos</string>
     <string name="admin_closed">cerrados</string>
-    <string name="admin_staff_workload_accessibility">%1$s, %2$d planes de seguridad, %3$d completos, %4$d chats de apoyo, %5$d cerrados</string>
+    <plurals name="admin_staff_workload_accessibility">
+        <item quantity="one">%1$s, %2$d plan de seguridad, %3$d completos, %4$d chats de apoyo, %5$d cerrados</item>
+        <item quantity="many">%1$s, %2$d planes de seguridad, %3$d completos, %4$d chats de apoyo, %5$d cerrados</item>
+        <item quantity="other">%1$s, %2$d planes de seguridad, %3$d completos, %4$d chats de apoyo, %5$d cerrados</item>
+    </plurals>
     <string name="safety_assigned_to_staff">Asignados al personal</string>
     <string name="safety_assigned_to_you">Asignados a ti</string>
     <string name="safety_waiting_for_staff">Esperando personal</string>

@@ -3,10 +3,10 @@ package com.olive.app.ui.users.user.documents
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.olive.app.data.DeliveryAddress
-import com.olive.app.data.PrivateEntry
-import com.olive.app.data.PrivateEntryKind
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.UserProfile
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith

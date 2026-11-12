@@ -2,7 +2,7 @@ package com.olive.app.ui.users.user.documents
 
 import android.content.Context
 import com.olive.app.R
-import com.olive.app.data.AccountIdentity
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.media.CloudMediaRecord
 import com.olive.app.data.media.MediaCompletedPart
 import com.olive.app.data.media.MediaDownloadTicket

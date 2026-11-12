@@ -5,15 +5,25 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import android.util.Log
 import androidx.core.content.edit
-import com.olive.app.data.*
 import com.olive.app.security.EncryptionUtils
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.ChatCacheException
+import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.messaging.ChatMessage
+import com.olive.app.data.messaging.DirectoryUser
+import com.olive.app.data.messaging.MessageDeliveryStatus
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.prepareOutgoingMessage
+import com.olive.app.security.KeyManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException
-import com.olive.app.security.*
+import kotlin.time.Duration.Companion.milliseconds
 
 
 // Owns conversation selection, messages and read markers.
@@ -48,7 +58,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     try {
                         val secure = checkNotNull(secureChatRepository)
                         val key = try {
-                            withTimeoutOrNull(8_000) {
+                            withTimeoutOrNull(8_000.milliseconds) {
                                 val onlineKey = secureSharing.roomKey(conversation)
                                 val wrapped = secure.wrappedRoomKey(conversation.id, uid)
                                     ?: error("Wrapped room key unavailable")
@@ -57,7 +67,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                                         uid,
                                         conversation,
                                         wrapped,
-                                        com.olive.app.security.KeyManager.deviceId(),
+                                        KeyManager.deviceId(),
                                         System.currentTimeMillis(),
                                     )
                                 }
@@ -69,11 +79,11 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                                 chatCache.open(
                                     uid,
                                     conversation.id,
-                                    com.olive.app.security.KeyManager.deviceId(),
+                                    KeyManager.deviceId(),
                                     System.currentTimeMillis(),
                                 )
                             }
-                            val offlineKey = com.olive.app.security.KeyManager.unwrapKey(cached.wrappedRoomKey)
+                            val offlineKey = KeyManager.unwrapKey(cached.wrappedRoomKey)
                             val cachedMessages = withContext(Dispatchers.Default) {
                                 secure.decryptMessages(cached.messages, offlineKey)
                             }
@@ -300,14 +310,14 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         try {
                             val wrapped = secure.wrappedRoomKey(conversation.id, ownerUid)
                                 ?: throw ChatCacheException("Wrapped room key unavailable")
-                            val confirmedKey = com.olive.app.security.KeyManager.unwrapKey(wrapped)
+                            val confirmedKey = KeyManager.unwrapKey(wrapped)
                             withContext(Dispatchers.IO) {
                                 chatCache.saveAccess(
                                     ownerUid,
                                     state.activeConversation?.takeIf { it.id == conversation.id }
                                         ?: conversation,
                                     wrapped,
-                                    com.olive.app.security.KeyManager.deviceId(),
+                                    KeyManager.deviceId(),
                                     System.currentTimeMillis(),
                                 )
                                 chatCache.saveMessages(

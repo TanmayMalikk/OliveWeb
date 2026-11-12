@@ -22,8 +22,8 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.AccountRole
-import com.olive.app.data.PrivateEntryKind
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import com.olive.app.ui.users.user.location.ShareDurationDialog
@@ -48,6 +48,8 @@ internal fun AttachmentPicker(
     val sheetTitle = if (selectedCategory == null) stringResource(R.string.share_attachment) else stringResource(
         R.string.select_attachment_category,
         stringResource(
+            //TODO: This when branch is unreachable
+
             // Opens the selected photo, video, document, or camera source.
             when (selectedCategory) {
                 AttachmentCategory.Notes -> R.string.private_notes

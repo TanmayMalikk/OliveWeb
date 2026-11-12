@@ -6,7 +6,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import android.view.WindowManager
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.data.PrivateEntryKind
+import com.olive.app.data.account.PrivateEntryKind
 
 import org.junit.Assert.*
 import org.junit.Test

@@ -1,7 +1,6 @@
 // All signed-in roles: stores device activity state.
 package com.olive.app.security
 
-import com.olive.app.data.*
 import org.json.JSONArray
 import org.json.JSONObject
 import android.security.keystore.KeyGenParameterSpec
@@ -31,6 +30,12 @@ import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import com.olive.app.R
+import com.olive.app.data.account.HistoryRecord
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.SettingsEvent
+import com.olive.app.data.account.TriggerEvent
+import com.olive.app.data.account.trashExpired
 import com.olive.app.ui.session.DeviceLockRequest
 
 
@@ -429,7 +434,7 @@ internal class AndroidDeviceLock(
     private val onAbandoned: () -> Unit
 ) {
     private var request: DeviceLockRequest? = null
-    private var pendingCipher: javax.crypto.Cipher? = null
+    private var pendingCipher: Cipher? = null
     var awaitingCredential: Boolean = false
         private set
     private val prompt = BiometricPrompt(
@@ -494,7 +499,7 @@ internal class AndroidDeviceLock(
     )
 
     // Ends the authentication request once and sends its final result.
-    private fun finish(value: DeviceLockRequest, cipher: javax.crypto.Cipher?) {
+    private fun finish(value: DeviceLockRequest, cipher: Cipher?) {
         if (request !== value) return
         // Wait to show device authentication until the activity is visible.
         if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {

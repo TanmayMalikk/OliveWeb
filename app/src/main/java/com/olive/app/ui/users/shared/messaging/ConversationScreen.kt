@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.IntOffset
@@ -34,8 +35,8 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import com.olive.app.R
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.messaging.*
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
@@ -53,7 +54,7 @@ private sealed interface ConversationTimelineItem {
     val key: String
     val timestamp: Long
 
-    data class Message(val value: com.olive.app.data.ChatMessage) : ConversationTimelineItem {
+    data class Message(val value: ChatMessage) : ConversationTimelineItem {
         override val key = "message-${value.id}"
         override val timestamp = value.sentAt
     }
@@ -64,7 +65,6 @@ private sealed interface ConversationTimelineItem {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
 @Composable
 internal fun ChatPane(
@@ -76,8 +76,8 @@ internal fun ChatPane(
     val callState by session.calls.state.collectAsState()
     val callAllowed = canCallFromConversation(session.accountRole, active, currentUid)
     val canAttachMedia = session.accountRole !in setOf(
-        com.olive.app.data.AccountRole.STAFF,
-        com.olive.app.data.AccountRole.ADMIN,
+        AccountRole.STAFF,
+        AccountRole.ADMIN,
     )
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
@@ -192,14 +192,14 @@ internal fun ChatPane(
                         if (active.type == "SUPPORT") {
                             stringResource(R.string.support_conversation)
                         } else {
-                            stringResource(R.string.chat_header_member_count, active.participantIds.size)
+                            pluralStringResource(R.plurals.chat_header_member_count, active.participantIds.size, active.participantIds.size)
                         },
                         style = MaterialTheme.typography.labelSmall,
                         color = Muted,
                     )
                     if (active.type == "SUPPORT" && session.accountRole in setOf(
-                            com.olive.app.data.AccountRole.STAFF,
-                            com.olive.app.data.AccountRole.ADMIN,
+                            AccountRole.STAFF,
+                            AccountRole.ADMIN,
                         )
                     ) Text(
                         stringResource(
@@ -231,7 +231,7 @@ internal fun ChatPane(
                 ) { Text(uiText(R.string.ui_exit)) }
             }
             HorizontalDivider()
-            if (session.accountRole == com.olive.app.data.AccountRole.STAFF &&
+            if (session.accountRole == AccountRole.STAFF &&
                 active.type == "SUPPORT" && active.closedAt == 0L && active.adminUid.isBlank()) {
                 OutlinedButton(
                     onClick = { session.messages.requestAdminHelp(active.id) },
@@ -241,8 +241,8 @@ internal fun ChatPane(
                 ) { Text(stringResource(R.string.request_admin_help)) }
             }
             if (session.accountRole in setOf(
-                    com.olive.app.data.AccountRole.STAFF,
-                    com.olive.app.data.AccountRole.ADMIN,
+                    AccountRole.STAFF,
+                    AccountRole.ADMIN,
                 ) &&
                 active.type == "SUPPORT" && active.closedAt == 0L) {
                 OutlinedButton(
@@ -360,6 +360,7 @@ internal fun ChatPane(
                                             ) {
                                                 Text(
                                                     stringResource(
+                                                        //TODO: this when branch is unreachable.
                                                         when (chat.deliveryStatus) {
                                                             MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued
                                                             MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending

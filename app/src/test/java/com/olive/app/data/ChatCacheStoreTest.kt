@@ -1,5 +1,10 @@
 package com.olive.app.data
 
+import com.olive.app.data.messaging.ChatCacheException
+import com.olive.app.data.messaging.ChatCacheStore
+import com.olive.app.data.messaging.ChatCacheVault
+import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.messaging.EncryptedChatMessage
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

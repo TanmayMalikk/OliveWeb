@@ -1,5 +1,12 @@
 package com.olive.app.data
 
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.messaging.MessageDeliveryStatus
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.isPermanentMessageFailure
+import com.olive.app.data.messaging.prepareOutgoingMessage
+import com.olive.app.data.messaging.sanitizedMessageBody
 import com.olive.app.security.EncryptionUtils
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -88,16 +95,17 @@ class OutgoingMessageModelsTest {
         assertFalse(expected == MessageSendWorker.workName("another-owner", "conversation"))
     }
 
-    private fun outgoing(id: String, status: MessageDeliveryStatus, attempts: Int) = OutgoingMessage(
-        id = id,
-        ownerUid = "owner",
-        conversationId = "conversation",
-        senderUsername = "alice",
-        ciphertext = "ciphertext-$id",
-        clientSentAt = attempts.toLong(),
-        clientSequence = attempts.toLong() + 1,
-        status = status,
-        attemptCount = attempts,
-        failureCode = if (status.name.startsWith("FAILED")) "TEST_FAILURE" else null,
-    )
+    private fun outgoing(id: String, status: MessageDeliveryStatus, attempts: Int) =
+        OutgoingMessage(
+            id = id,
+            ownerUid = "owner",
+            conversationId = "conversation",
+            senderUsername = "alice",
+            ciphertext = "ciphertext-$id",
+            clientSentAt = attempts.toLong(),
+            clientSequence = attempts.toLong() + 1,
+            status = status,
+            attemptCount = attempts,
+            failureCode = if (status.name.startsWith("FAILED")) "TEST_FAILURE" else null,
+        )
 }

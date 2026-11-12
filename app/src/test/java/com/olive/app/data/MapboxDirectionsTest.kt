@@ -1,6 +1,12 @@
 // Tests route results shown to safe contacts navigating to a user.
 package com.olive.app.data
 
+import com.olive.app.data.location.LocationRoute
+import com.olive.app.data.location.MapboxDirectionsClient
+import com.olive.app.data.location.RouteCoordinate
+import com.olive.app.data.location.RouteDirection
+import com.olive.app.data.location.RouteProgress
+import com.olive.app.data.location.distanceFromRouteMeters
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -64,7 +70,8 @@ class MapboxDirectionsTest {
         assertNull(MapboxDirectionsClient.parseResponse("{}"))
         assertNull(MapboxDirectionsClient.parseResponse("""{"code":"NoRoute","routes":[]}"""))
         assertNull(MapboxDirectionsClient.parseResponse("""{"code":"Ok","routes":[]}"""))
-        assertNull(MapboxDirectionsClient.parseResponse(
+        assertNull(
+            MapboxDirectionsClient.parseResponse(
             """{"code":"Ok","routes":[{"geometry":{"coordinates":[[999,999],[0,0]]}}]}"""
         ))
     }

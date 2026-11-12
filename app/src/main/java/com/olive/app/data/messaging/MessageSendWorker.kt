@@ -1,5 +1,5 @@
 // All chat roles: delivers durable ciphertext messages when Firebase becomes reachable.
-package com.olive.app.data
+package com.olive.app.data.messaging
 
 import android.content.Context
 import androidx.work.BackoffPolicy
@@ -22,6 +22,7 @@ import org.json.JSONObject
 import org.json.JSONArray
 import kotlinx.coroutines.CancellationException
 import com.google.firebase.functions.FirebaseFunctions
+import com.olive.app.data.account.AccountIdentity
 import kotlinx.coroutines.tasks.await
 
 

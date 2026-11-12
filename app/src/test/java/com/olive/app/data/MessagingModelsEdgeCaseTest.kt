@@ -1,6 +1,11 @@
 // Tests direct-message names, anonymous staff names, and support-ticket labels for every role.
 package com.olive.app.data
 
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.messaging.SUPPORT_TAG_NEEDS_ADMIN
+import com.olive.app.data.messaging.SUPPORT_TAG_PLAN_CONSULT
+import com.olive.app.data.messaging.SUPPORT_TAG_SUPPORT
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

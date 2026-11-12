@@ -5,10 +5,29 @@ import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
 import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountRepository
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.AdminRepository
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.FirebaseAccountRepository
+import com.olive.app.data.account.LocalAccountRepository
+import com.olive.app.data.account.TriggerEvent
+import com.olive.app.data.cover.CoverStateStore
+import com.olive.app.data.location.AdminLocationRepository
+import com.olive.app.data.location.LocationSharingRepository
 import com.olive.app.data.media.MediaRepository
 import com.olive.app.data.media.MediaTicketDataSource
 import com.olive.app.data.media.OfflineMediaCache
+import com.olive.app.data.messaging.ChatCacheStore
+import com.olive.app.data.messaging.MessageOutboxStore
+import com.olive.app.data.messaging.MessagingRepository
+import com.olive.app.data.messaging.SecureChatRepository
+import com.olive.app.data.safety.DocumentIndexDataSource
+import com.olive.app.data.safety.DocumentIndexStore
+import com.olive.app.data.safety.IndexedSafetyDocumentRepository
+import com.olive.app.data.safety.SafetyDocumentDataSource
+import com.olive.app.data.safety.SafetyDocumentRepository
+import com.olive.app.data.safety.SecureDocumentRepository
 import com.olive.app.security.*
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionScreen
@@ -73,7 +92,10 @@ internal class SessionDataSources(
                 secureDocument = if (localMode) null else SecureDocumentRepository(),
                 media = media,
                 safetyDocuments = media?.let {
-                    IndexedSafetyDocumentRepository(SafetyDocumentRepository(media = it), documentIndex)
+                    IndexedSafetyDocumentRepository(
+                        SafetyDocumentRepository(media = it),
+                        documentIndex
+                    )
                 },
                 locations = if (localMode) null else LocationSharingRepository(application),
                 adminLocations = if (localMode) null else AdminLocationRepository(),
@@ -94,7 +116,8 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                         InputPolicy.legacyTriggerHash(value) != device.triggerHash)
                 ) return false
                 if (screen == SessionScreen.Cover && !busy) {
-                    val event = TriggerEvent(source = if (coverType == CoverType.NEWS) "Daily Digest search" else "Olive search")
+                    val event =
+                        TriggerEvent(source = if (coverType == CoverType.NEWS) "Daily Digest search" else "Olive search")
                     activeTriggerId = event.id
                     triggerJob = scope.launch(Dispatchers.IO) {
                         store.recordTrigger(device.uid, event)

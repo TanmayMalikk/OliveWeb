@@ -1,4 +1,9 @@
 // Schedules priority reconciliation and persists or reports its progress.
+@file:Suppress("SimplifyBooleanWithConstants")
+//!BUILDCONFIG.FIREBASE_CONFIGURED || uid.isBlank()
+//the linter thinks that line is better as just uid.isBlank()
+//dropping buildconfig means we don't have any check to drop the function if BUILDCONFIG.FIREBASE_CONFIGURED is false.
+
 package com.olive.app.data.sync
 
 import android.content.Context
@@ -18,11 +23,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.olive.app.BuildConfig
-import com.olive.app.data.ChatCacheStore
-import com.olive.app.data.DocumentIndexStore
-import com.olive.app.data.MessageOutboxStore
-import com.olive.app.data.SafetyAccessIndexStore
-import com.olive.app.data.SafetyPlanStore
+import com.olive.app.data.messaging.ChatCacheStore
+import com.olive.app.data.safety.DocumentIndexStore
+import com.olive.app.data.messaging.MessageOutboxStore
+import com.olive.app.data.safety.SafetyAccessIndexStore
+import com.olive.app.data.safety.SafetyPlanStore
 import com.olive.app.data.media.OfflineMediaCache
 import com.olive.app.security.DeviceStore
 import com.olive.app.security.EncryptedVault

@@ -1,6 +1,11 @@
 // Tests admin account API mapping without calling Firebase.
 package com.olive.app.data
 
+import com.olive.app.data.account.AccountCounts
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.AdminAccountDraft
+import com.olive.app.data.account.adminAccountPayload
+import com.olive.app.data.account.parseAdminAccounts
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -56,7 +61,15 @@ class AdminAccountMappingTest {
     @Test
     fun malformedAccountRowsAreSkipped() {
         val (_, accounts) = parseAdminAccounts(
-            mapOf("accounts" to listOf(null, "wrong", 7, emptyMap<String, Any>(), mapOf("uid" to "valid")))
+            mapOf(
+                "accounts" to listOf(
+                    null,
+                    "wrong",
+                    7,
+                    emptyMap<String, Any>(),
+                    mapOf("uid" to "valid")
+                )
+            )
         )
         assertEquals(1, accounts.size)
         assertEquals("valid", accounts.single().uid)
@@ -137,7 +150,8 @@ class AdminAccountMappingTest {
     // Input: the smallest valid draft. Expected: defaults are explicit rather than omitted or null.
     @Test
     fun minimalCreatePayloadIncludesStableDefaults() {
-        val payload = adminAccountPayload(AdminAccountDraft("user_name", "password1!", AccountRole.USER))
+        val payload =
+            adminAccountPayload(AdminAccountDraft("user_name", "password1!", AccountRole.USER))
         assertEquals("English", payload["language"])
         assertEquals("", payload["fullName"])
         assertEquals("", payload["region"])

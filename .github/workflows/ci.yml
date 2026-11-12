@@ -1,7 +1,8 @@
 name: CI
 
 on:
-  push:
+  # if every push did the tests it will eat up our github action minutes really quickly
+  #push:
   pull_request:
 
 permissions:

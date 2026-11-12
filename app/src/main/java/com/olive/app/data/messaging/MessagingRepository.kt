@@ -1,5 +1,5 @@
 // All chat roles: loads and saves direct messages and friend requests.
-package com.olive.app.data
+package com.olive.app.data.messaging
 
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -14,6 +14,8 @@ import com.olive.app.security.KeyManager
 import java.security.PublicKey
 import java.util.Base64
 import android.content.Context
+import com.google.firebase.firestore.Source
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.child
 import kotlinx.coroutines.flow.Flow
@@ -258,7 +260,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     // Loads a server-confirmed conversation index for background membership and key reconciliation.
     suspend fun listConversations(currentUid: String): List<ChatConversation> =
         firestore.collection("conversations").whereArrayContains("participantIds", currentUid)
-            .get(com.google.firebase.firestore.Source.SERVER).await().documents
+            .get(Source.SERVER).await().documents
             .mapNotNull(::conversationFrom)
             .sortedByDescending(ChatConversation::updatedAt)
 
@@ -441,7 +443,7 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
             collection.put(id, updated.toJson())
         }
         changes.tryEmit(checkNotNull(result).ownerUid)
-        return checkNotNull(result)
+        return result
     }
 
     /** The first unresolved message is a hard barrier for every later sequence. */

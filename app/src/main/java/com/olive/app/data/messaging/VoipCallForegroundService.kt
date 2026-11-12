@@ -15,11 +15,12 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.installations.FirebaseInstallations
 import com.google.firebase.messaging.FirebaseMessaging
 import com.olive.app.R
-import com.olive.app.data.AccountRole
+import com.olive.app.data.account.AccountRole
 import com.olive.app.notification.OliveNotificationManager
 import java.io.IOException
 import java.util.UUID
 import kotlinx.coroutines.tasks.await
+import androidx.core.content.edit
 
 // Keeps an active voice call alive when the user leaves Olive Branch or turns off the screen.
 class VoipCallForegroundService : Service() {
@@ -124,7 +125,7 @@ object VoipPushTokenRegistration {
     // Personal accounts can receive calls; organization accounts remove any token left by a previous user.
     suspend fun configureForRole(context: Context, role: AccountRole) {
         val enabled = role in setOf(AccountRole.USER, AccountRole.SAFE_CONTACT) && isVoipApiConfigured()
-        preferences(context).edit().putBoolean(ENABLED_KEY, enabled).apply()
+        preferences(context).edit { putBoolean(ENABLED_KEY, enabled)}
         if (enabled) {
             registerCurrentToken(context)
         } else {
@@ -163,7 +164,7 @@ object VoipPushTokenRegistration {
         VoipManager().unregisterPushToken(installationId)
         messaging.unregister().await()
         installations.delete().await()
-        preferences(context).edit().remove(TOKEN_KEY).apply()
+        preferences(context).edit {remove(TOKEN_KEY)}
         messaging.register().await()
         val token = installations.id.await()
         saveToken(context, token)
@@ -185,14 +186,14 @@ object VoipPushTokenRegistration {
 
     private fun saveToken(context: Context, token: String) {
         require(token.isNotBlank()) { "Firebase returned a blank push token" }
-        preferences(context).edit().putString(TOKEN_KEY, token).apply()
+        preferences(context).edit { putString(TOKEN_KEY, token)}
     }
 
     @Synchronized
     private fun deviceId(context: Context): String {
         val preferences = preferences(context)
         return preferences.getString(DEVICE_ID_KEY, null) ?: UUID.randomUUID().toString().also {
-            preferences.edit().putString(DEVICE_ID_KEY, it).apply()
+            preferences.edit { putString(DEVICE_ID_KEY, it)}
         }
     }
 

@@ -2,15 +2,21 @@
 package com.olive.app.ui.session
 
 import com.olive.app.ui.users.shared.navigation.*
-import com.olive.app.data.*
 import com.olive.app.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
 import androidx.compose.runtime.*
-import com.olive.app.data.AccountRole
-import com.olive.app.data.SupportRepository
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.messaging.DirectoryUser
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.messaging.FriendRelationship
+import com.olive.app.data.messaging.FriendRequest
+import com.olive.app.data.messaging.SupportRepository
+import com.olive.app.data.news.NewsArticle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
@@ -332,11 +338,6 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
                 if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
             }
         }
-    }
-
-    // Removes an old add-person failure when Chat Info is closed or retried.
-    fun clearAddParticipantError() {
-        addParticipantError = null
     }
 
     // Creates a new support chat from an existing user and safe-contact conversation.

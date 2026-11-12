@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <string name="app_name">App</string>
     <string name="local">محلي</string>
     <string name="global">عالمي</string>
@@ -399,14 +399,27 @@
     <string name="safety_remove_attachment">إزالة المرفق %1$s</string>
     <string name="chat_info">معلومات المحادثة</string>
     <string name="chat_members">الأشخاص في هذه المحادثة</string>
-    <string name="chat_header_member_count">%1$d أعضاء</string>
-    <string name="chat_member_count">%1$d أشخاص</string>
+    <plurals name="chat_header_member_count">
+        <item quantity="zero">%1$d عضو</item>
+        <item quantity="one">%1$d عضو</item>
+        <item quantity="two">%1$d عضوان</item>
+        <item quantity="few">%1$d أعضاء</item>
+        <item quantity="many">%1$d عضواً</item>
+        <item quantity="other">%1$d عضو</item>
+    </plurals>
+    <plurals name="chat_member_count">
+        <item quantity="zero">%1$d شخص</item>
+        <item quantity="one">%1$d شخص</item>
+        <item quantity="two">%1$d شخصان</item>
+        <item quantity="few">%1$d أشخاص</item>
+        <item quantity="many">%1$d شخصاً</item>
+        <item quantity="other">%1$d شخص</item>
+    </plurals>
     <string name="chat_shared_items">العناصر المشتركة</string>
     <string name="chat_no_shared_items">لم تتم مشاركة ملفات أو عناصر أمان بعد.</string>
     <string name="chat_add_people">إضافة أشخاص</string>
     <string name="chat_add_person">إضافة %1$s</string>
     <string name="chat_remove_person">إزالة %1$s من هذه المجموعة</string>
-    <string name="chat_add_participant_error">تعذرت إضافة هذا الشخص. يجب أن يكون جهة اتصال مقبولة وأن تكون المراسلة الآمنة معدة.</string>
     <string name="chat_request_staff_title">دعم الموظفين</string>
     <string name="chat_request_staff_description">أنشئ محادثة دعم منفصلة تضم جميع الأشخاص الموجودين في هذه المحادثة.</string>
     <string name="chat_request_staff_button">طلب موظف</string>
@@ -439,7 +452,14 @@
     <string name="admin_support_chat_tasks">محادثات الدعم</string>
     <string name="admin_completed">مكتملة</string>
     <string name="admin_closed">مغلقة</string>
-    <string name="admin_staff_workload_accessibility">%1$s، %2$d خطط سلامة، %3$d مكتملة، %4$d محادثات دعم، %5$d مغلقة</string>
+    <plurals name="admin_staff_workload_accessibility">
+        <item quantity="zero">%1$s، %2$d خطة سلامة، %3$d مكتملة، %4$d محادثات دعم، %5$d مغلقة</item>
+        <item quantity="one">%1$s، %2$d خطة سلامة، %3$d مكتملة، %4$d محادثات دعم، %5$d مغلقة</item>
+        <item quantity="two">%1$s، %2$d خطتا سلامة، %3$d مكتملة، %4$d محادثات دعم، %5$d مغلقة</item>
+        <item quantity="few">%1$s، %2$d خطط سلامة، %3$d مكتملة، %4$d محادثات دعم، %5$d مغلقة</item>
+        <item quantity="many">%1$s، %2$d خطة سلامة، %3$d مكتملة، %4$d محادثات دعم، %5$d مغلقة</item>
+        <item quantity="other">%1$s، %2$d خطة سلامة، %3$d مكتملة، %4$d محادثات دعم، %5$d مغلقة</item>
+    </plurals>
     <string name="safety_assigned_to_staff">معينة للموظفين</string>
     <string name="safety_assigned_to_you">معينة لك</string>
     <string name="safety_waiting_for_staff">بانتظار موظف</string>

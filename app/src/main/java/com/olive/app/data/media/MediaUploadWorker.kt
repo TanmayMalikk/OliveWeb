@@ -428,6 +428,9 @@ class MediaRepository(
 // Encrypted media: Reads a required text field from a downloaded media record and rejects missing data.
 private fun Map<*,*>.string(name:String)=get(name) as? String ?: error("Missing $name")
 // Encrypted media: Reads an optional text field and uses an empty value when older records omit it.
+// Suppressing warning SameParameterValue since linter believes optional string will always equal "uploadid"
+// "uploadid" is the default value given in its one function call.
+@Suppress("SameParameterValue")
 private fun Map<*,*>.optionalString(name:String)=get(name) as? String ?: ""
 // Encrypted media: Reads a required whole number from a downloaded media record.
 private fun Map<*,*>.long(name:String)=(get(name) as? Number)?.toLong() ?: error("Missing $name")
@@ -436,6 +439,9 @@ private fun Map<*,*>.stringMap(name:String):Map<String,String> = (get(name) as? 
     (entry.key as? String ?: error("Invalid $name key")) to (entry.value as? String ?: error("Invalid $name value"))
 }.orEmpty()
 // Encrypted media: Reads the list of account IDs allowed to open a downloaded file.
+// Suppressing SameParameterValue, linter believes name is always 'allowedUsers'
+// That is the default value for stringlist function call.
+@Suppress("SameParameterValue")
 private fun Map<*,*>.stringList(name:String)=(get(name) as? List<*>)?.filterIsInstance<String>() ?: error("Missing $name")
 // Encrypted media: Rebuilds a cloud media record by reading each validated field from the downloaded map.
 private fun Map<*,*>.record()=CloudMediaRecord(string("mediaId"),string("ownerUid"),string("objectKey"),

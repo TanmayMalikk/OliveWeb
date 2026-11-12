@@ -1,6 +1,11 @@
 // Tests safety-plan state, serialization, defaults, and merge boundaries.
 package com.olive.app.data
 
+import com.olive.app.data.safety.SafetyField
+import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.edit
+import com.olive.app.data.safety.mergeSafetyPlan
+import com.olive.app.data.safety.safetyFieldsWithDefaults
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -20,9 +25,17 @@ class SafetyPlanStateTest {
         assertFalse(clean.hasConflicts)
         assertFalse(clean.pending)
 
-        assertTrue(plan(fields = mapOf("primary_destination" to SafetyField("Draft", mutationId = "m1"))).hasEdits)
+        assertTrue(plan(fields = mapOf("primary_destination" to SafetyField(
+            "Draft",
+            mutationId = "m1"
+        )
+        )).hasEdits)
         assertTrue(plan(shareAction = "share").pending)
-        assertTrue(plan(fields = mapOf("primary_destination" to SafetyField("Mine", conflictRevision = 2))).hasConflicts)
+        assertTrue(plan(fields = mapOf("primary_destination" to SafetyField(
+            "Mine",
+            conflictRevision = 2
+        )
+        )).hasConflicts)
     }
 
     // Input: every participant and safe-contact field. Expected: encrypted JSON round-trips without dropping access data.

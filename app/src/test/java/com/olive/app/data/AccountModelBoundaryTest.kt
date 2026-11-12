@@ -1,6 +1,11 @@
 // Tests account profile serialization, enum compatibility, and malformed stored values.
 package com.olive.app.data
 
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.UserProfile
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -37,7 +42,16 @@ class AccountModelBoundaryTest {
             region = "Edmonton",
             triggerHash = "hash",
             contacts = listOf(SafeContact("c1", "Amina", "555-0100", true, "uid-2")),
-            address = DeliveryAddress("1 Olive St", "2", "Edmonton", "AB", "T5J 0N3", "Canada", 53.5, -113.5),
+            address = DeliveryAddress(
+                "1 Olive St",
+                "2",
+                "Edmonton",
+                "AB",
+                "T5J 0N3",
+                "Canada",
+                53.5,
+                -113.5
+            ),
             coverType = CoverType.NEWS,
             role = AccountRole.USER,
             email = "olive@example.ca",

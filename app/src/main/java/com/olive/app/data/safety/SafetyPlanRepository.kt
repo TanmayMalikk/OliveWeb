@@ -1,9 +1,11 @@
 // Safe-app users and support staff: loads and saves safety-plan edits.
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Source
 import com.google.firebase.functions.FirebaseFunctions
+import com.olive.app.data.messaging.Friend
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
@@ -41,7 +43,7 @@ internal class SafetyPlanRepository(
     // Reads a server-confirmed plan without modifying any fields.
     suspend fun get(ownerUid: String): SafetyPlan? {
         val snapshot = firestore.collection("safetyPlans").document(ownerUid)
-            .get(com.google.firebase.firestore.Source.SERVER).await()
+            .get(Source.SERVER).await()
         return snapshot.data?.let { SafetyPlan.fromJson(JSONObject(it)) }
     }
 

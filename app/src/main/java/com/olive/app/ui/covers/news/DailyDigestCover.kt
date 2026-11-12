@@ -30,11 +30,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
-import com.olive.app.data.CoverLocation
-import com.olive.app.data.GoogleNewsRepository
-import com.olive.app.data.NewsArticle
-import com.olive.app.data.NewsFeedCacheStore
-import com.olive.app.data.NewsScope
+import com.olive.app.data.location.CoverLocation
+import com.olive.app.data.news.GoogleNewsRepository
+import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.news.NewsFeedCacheStore
+import com.olive.app.data.news.NewsScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext

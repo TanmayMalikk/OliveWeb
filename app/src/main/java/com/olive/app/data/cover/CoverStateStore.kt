@@ -1,6 +1,7 @@
 // Persists account-isolated state for the cover applications.
-package com.olive.app.data
+package com.olive.app.data.cover
 
+import com.olive.app.data.news.NewsArticle
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.child
 import org.json.JSONArray
