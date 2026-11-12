@@ -295,7 +295,7 @@ test('authorized users can query encrypted media without exposing other file rec
   const encrypted={owner_id:'media-alice',object_key:`users/media-alice/media/${mediaId}`,
     encrypted_metadata:'encrypted-display-metadata',wrapped_keys:{'media-alice':'wrapped-owner-key','media-bob':'wrapped-recipient-key'},
     allowed_users:['media-alice','media-bob'],ciphertext_size:4096,
-    ciphertext_sha256:'a'.repeat(64),encryption_version:1,created_at:serverTimestamp()};
+    ciphertext_sha256:'a'.repeat(64),encryption_version:1,account_recovery_ready:true,created_at:serverTimestamp()};
 
   // Cloud Functions writes encrypted records with the Admin SDK, which bypasses client rules.
   await env.withSecurityRulesDisabled(async context => {
@@ -313,6 +313,9 @@ test('authorized users can query encrypted media without exposing other file rec
   await assertFails(getDocs(collection(alice,'files')));
   await assertFails(getDocs(query(collection(anonymous,'files'),where('allowed_users','array-contains','media-alice'))));
   // Direct reads retain full schema validation even for a UID present in allowed_users.
+  await assertSucceeds(getDoc(doc(alice,`files/${mediaId}`)));
+  await assertSucceeds(getDoc(doc(bob,`files/${mediaId}`)));
+  await assertFails(getDoc(doc(charlie,`files/${mediaId}`)));
   await assertFails(getDoc(doc(alice,'files/malformed-encrypted-media')));
 });
 
