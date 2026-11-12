@@ -31,7 +31,7 @@ dependencies {
     implementation("androidx.fragment:fragment-ktx:1.9.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.11.0")
     implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material3:material3")
+    implementation("androidx.wear.compose:compose-material3:1.7.1")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.health:health-services-client:1.1.0")
