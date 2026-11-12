@@ -25,9 +25,13 @@ data class OutgoingAttachment(
     }
 }
 
-internal class AttachmentDeliveryRejected(
+internal open class MessageDeliveryRejected(
     val failureCode: String,
 ) : IllegalStateException(failureCode)
+
+internal class AttachmentDeliveryRejected(
+    failureCode: String,
+) : MessageDeliveryRejected(failureCode)
 
 /** Routes one sequenced outbox head without allowing attachments to bypass the text-message queue. */
 internal class OutgoingDeliveryDispatcher(
