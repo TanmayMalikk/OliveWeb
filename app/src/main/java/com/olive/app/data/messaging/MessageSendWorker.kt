@@ -19,6 +19,7 @@ import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaRepository
 import java.security.MessageDigest
+import java.security.GeneralSecurityException
 import java.util.concurrent.TimeUnit
 import com.olive.app.security.EncryptionUtils
 import java.util.UUID
@@ -73,18 +74,22 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     }
 
     private suspend fun deliverAttachment(message: OutgoingMessage, mediaId: String) {
-        val conversation = conversations.getConversation(message.conversationId)
-            ?: throw AttachmentDeliveryRejected("CONVERSATION_NOT_FOUND")
-        if (message.ownerUid !in conversation.participantIds) {
-            throw AttachmentDeliveryRejected("PERMISSION_DENIED")
+        try {
+            val conversation = conversations.getConversation(message.conversationId)
+                ?: throw AttachmentDeliveryRejected("CONVERSATION_NOT_FOUND")
+            if (message.ownerUid !in conversation.participantIds) {
+                throw AttachmentDeliveryRejected("PERMISSION_DENIED")
+            }
+            val recipients = conversation.participantIds.filter { it != message.ownerUid }.associateWith { uid ->
+                conversation.participantUsernames[uid]
+                    ?: throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
+            }
+            if (recipients.isEmpty()) throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
+            val document = documents.getFor(message.ownerUid, mediaId)
+            documents.shareInChat(document, message, recipients)
+        } catch (failure: GeneralSecurityException) {
+            throw attachmentKeyUnavailable(failure)
         }
-        val recipients = conversation.participantIds.filter { it != message.ownerUid }.associateWith { uid ->
-            conversation.participantUsernames[uid]
-                ?: throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
-        }
-        if (recipients.isEmpty()) throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
-        val document = documents.getFor(message.ownerUid, mediaId)
-        documents.shareInChat(document, message, recipients)
     }
 
     companion object {

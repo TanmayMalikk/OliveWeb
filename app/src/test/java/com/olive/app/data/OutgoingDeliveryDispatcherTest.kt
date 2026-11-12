@@ -6,6 +6,9 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
+import java.security.InvalidKeyException
+import javax.crypto.BadPaddingException
+import javax.crypto.IllegalBlockSizeException
 
 class OutgoingDeliveryDispatcherTest {
     @Test
@@ -65,6 +68,23 @@ class OutgoingDeliveryDispatcherTest {
             MessageDeliveryFailure("IDEMPOTENCY_CONFLICT", permanent = true),
             messageDeliveryFailure(MessageDeliveryRejected("IDEMPOTENCY_CONFLICT")),
         )
+    }
+
+    @Test
+    fun `attachment key failures are permanent and retain their cause`() {
+        listOf(
+            IllegalBlockSizeException("incompatible wrapped key"),
+            BadPaddingException("wrong OAEP profile"),
+            InvalidKeyException("device key unavailable"),
+        ).forEach { cause ->
+            val rejection = attachmentKeyUnavailable(cause)
+
+            assertEquals(cause, rejection.cause)
+            assertEquals(
+                MessageDeliveryFailure("ATTACHMENT_KEY_UNAVAILABLE", permanent = true),
+                messageDeliveryFailure(rejection),
+            )
+        }
     }
 
     @Test
