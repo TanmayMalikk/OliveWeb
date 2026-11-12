@@ -1,6 +1,6 @@
 package com.olive.app.ui.users.shared.messaging
 
-import com.olive.app.data.AccountRole
+import com.olive.app.data.account.AccountRole
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

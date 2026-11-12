@@ -4,6 +4,9 @@ import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.messaging.MessageDeliveryStatus
 import com.olive.app.data.messaging.MessageSendWorker
 import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.OutgoingAttachment
+import com.olive.app.data.messaging.canDiscardFailedMessage
+import com.olive.app.data.messaging.canManuallyRetryMessage
 import com.olive.app.data.messaging.isPermanentMessageFailure
 import com.olive.app.data.messaging.prepareOutgoingMessage
 import com.olive.app.data.messaging.sanitizedMessageBody

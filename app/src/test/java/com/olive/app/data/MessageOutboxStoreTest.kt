@@ -4,6 +4,7 @@ import com.olive.app.data.messaging.MessageDeliveryStatus
 import com.olive.app.data.messaging.MessageOutboxStore
 import com.olive.app.data.messaging.MessageOutboxVault
 import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.OutgoingAttachment
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
