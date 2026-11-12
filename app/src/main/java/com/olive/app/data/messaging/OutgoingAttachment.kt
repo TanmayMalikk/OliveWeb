@@ -1,6 +1,7 @@
 // All chat roles: identifies encrypted media that must be published with an outbox message.
 package com.olive.app.data
 
+import java.security.GeneralSecurityException
 import org.json.JSONObject
 
 /** References ciphertext already published to the media service. */
@@ -27,11 +28,16 @@ data class OutgoingAttachment(
 
 internal open class MessageDeliveryRejected(
     val failureCode: String,
-) : IllegalStateException(failureCode)
+    cause: Throwable? = null,
+) : IllegalStateException(failureCode, cause)
 
 internal class AttachmentDeliveryRejected(
     failureCode: String,
-) : MessageDeliveryRejected(failureCode)
+    cause: Throwable? = null,
+) : MessageDeliveryRejected(failureCode, cause)
+
+internal fun attachmentKeyUnavailable(cause: GeneralSecurityException) =
+    AttachmentDeliveryRejected("ATTACHMENT_KEY_UNAVAILABLE", cause)
 
 /** Routes one sequenced outbox head without allowing attachments to bypass the text-message queue. */
 internal class OutgoingDeliveryDispatcher(

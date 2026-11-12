@@ -367,7 +367,11 @@ internal fun ChatPane(
                                                             MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
                                                             MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_retrying
                                                             MessageDeliveryStatus.FAILED_PERMANENT ->
-                                                                if (chat.deliveryFailureCode == "ATTACHMENT_ACCESS_REVOKED")
+                                                                if (chat.deliveryFailureCode in setOf(
+                                                                        "ATTACHMENT_ACCESS_REVOKED",
+                                                                        "ATTACHMENT_KEY_UNAVAILABLE",
+                                                                    )
+                                                                )
                                                                     R.string.message_delivery_attachment_access_revoked
                                                                 else R.string.message_delivery_failed_permanent
                                                             MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
