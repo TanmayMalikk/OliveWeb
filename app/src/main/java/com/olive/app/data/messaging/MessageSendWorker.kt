@@ -106,7 +106,24 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
         private fun ownerTag(ownerUid: String) = "olive_messages_owner_$ownerUid"
 
         fun enqueue(context: Context, message: OutgoingMessage) {
-            val request = OneTimeWorkRequestBuilder<MessageSendWorker>()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                workName(message.ownerUid, message.conversationId),
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                request(message),
+            )
+        }
+
+        /** Replaces only this conversation's backed-off drain after an explicit user retry. */
+        fun retryNow(context: Context, message: OutgoingMessage) {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                workName(message.ownerUid, message.conversationId),
+                ExistingWorkPolicy.REPLACE,
+                request(message),
+            )
+        }
+
+        private fun request(message: OutgoingMessage) =
+            OneTimeWorkRequestBuilder<MessageSendWorker>()
                 .setInputData(
                     workDataOf(
                         OWNER_UID to message.ownerUid,
@@ -119,12 +136,6 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag(ownerTag(message.ownerUid))
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                workName(message.ownerUid, message.conversationId),
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
-                request,
-            )
-        }
 
         fun enqueuePending(context: Context, ownerUid: String) {
             val store = MessageOutboxStore(context)
@@ -188,7 +199,7 @@ enum class MessageDeliveryStatus {
 }
 
 internal fun canManuallyRetryMessage(status: MessageDeliveryStatus) =
-    status == MessageDeliveryStatus.FAILED_RETRYABLE
+    status in setOf(MessageDeliveryStatus.QUEUED, MessageDeliveryStatus.FAILED_RETRYABLE)
 
 internal fun canDiscardFailedMessage(status: MessageDeliveryStatus) =
     status == MessageDeliveryStatus.FAILED_PERMANENT

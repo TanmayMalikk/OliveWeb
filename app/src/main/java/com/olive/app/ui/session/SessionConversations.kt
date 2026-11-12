@@ -199,7 +199,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     }
                 }
             } ?: return@launch
-            MessageSendWorker.enqueue(runtime.application, outgoing)
+            MessageSendWorker.retryNow(runtime.application, outgoing)
         }
     }
 
