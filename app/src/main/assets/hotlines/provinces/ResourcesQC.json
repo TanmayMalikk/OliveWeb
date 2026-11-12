@@ -27,15 +27,17 @@
     "Hotlines": {
       "Centre de Crise de Québec": {
         "Desc": "24/7 crisis intervention, telephone support, and residential crisis services.",
-        "Phone": "418-688-4357",
-        "url": "https://www.centredecrisedequebec.qc.ca/"
+        "Phone": "418-688-4240",
+        "hours": "24/7",
+        "url": "https://centredecrise.com/"
       }
     },
     "Shelters": {
       "Maison de la Famille de Québec": {
         "Desc": "24/7 emergency shelter and support line for victims of conjugal and domestic violence in Quebec City.",
-        "Phone": "418-688-2117",
-        "url": "https://www.maisonconjugale.qc.ca/"
+        "Phone": "418-529-0263",
+        "hours": "Monday – Thursday. 9:00 AM – 10:00 PM; Friday. 9:00 AM – 4:00 PM",
+        "url": "https://www.mf-quebec.org/"
       }
     }
   },
@@ -43,15 +45,17 @@
     "Hotlines": {
       "Maison Unies-Vers-Femmes Ligne d'urgence": {
         "Desc": "24/7 crisis line for women experiencing domestic violence in Outaouais.",
-        "Phone": "819-568-1188",
-        "url": "https://www.unies-vers-femmes.ca/"
+        "Phone": "819-568-4710",
+        "hours": "24/7",
+        "url": "https://maisonunies.ca/"
       }
     },
     "Shelters": {
       "Maison Unies-Vers-Femmes": {
         "Desc": "Safe 24/7 emergency shelter and crisis line for women and children experiencing spousal violence.",
-        "Phone": "819-568-1188",
-        "url": "https://www.unies-vers-femmes.ca/"
+        "Phone": "819-568-4710",
+        "hours": "24/7",
+        "url": "https://maisonunies.ca/"
       }
     }
   }
