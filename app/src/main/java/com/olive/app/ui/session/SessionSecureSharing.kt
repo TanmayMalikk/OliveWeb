@@ -150,16 +150,17 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 val conversation = activeConversation ?: return
                 val device = enrollment ?: return
                 safetyDocumentRepository ?: return
-                if (messagingBusy || document.ownerUid != device.uid) return
+                if (messagingBusy || !isDurableChatAttachment(document, device.uid)) return
                 val token = epoch
                 messagingBusy = true
                 message = null
                 scope.launch {
                     // Turn an unexpected share failure into a readable message.
                     try {
+                        val key = outgoingRoomKey(activeRoomKey) { roomKey(conversation) }
                         val outgoing = prepareOutgoingMessage(
                             conversation.id, AccountIdentity(device.uid, coverUsername),
-                            "SHARED_MEDIA:${document.id}:${document.name}", roomKey(conversation)
+                            "SHARED_MEDIA:${document.id}:${document.name}", key
                         ).copy(attachment = OutgoingAttachment(mediaId = document.id))
                         val queued = withContext(Dispatchers.IO) { messageOutbox.write(outgoing) }
                         MessageSendWorker.enqueue(application, queued)

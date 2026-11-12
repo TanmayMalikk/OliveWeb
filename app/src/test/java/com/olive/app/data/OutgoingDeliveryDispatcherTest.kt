@@ -5,12 +5,50 @@ import com.olive.app.data.media.MediaAccessException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.security.InvalidKeyException
 import javax.crypto.BadPaddingException
 import javax.crypto.IllegalBlockSizeException
+import javax.crypto.spec.SecretKeySpec
 
 class OutgoingDeliveryDispatcherTest {
+    @Test
+    fun `active room key queues offline attachment without loading remote key`() = runBlocking {
+        val active = key(1)
+        var remoteLoads = 0
+
+        val selected = outgoingRoomKey(active) {
+            remoteLoads += 1
+            key(2)
+        }
+
+        assertEquals(active, selected)
+        assertEquals(0, remoteLoads)
+    }
+
+    @Test
+    fun `missing active room key uses existing recovery path once`() = runBlocking {
+        val recovered = key(2)
+        var remoteLoads = 0
+
+        val selected = outgoingRoomKey(null) {
+            remoteLoads += 1
+            recovered
+        }
+
+        assertEquals(recovered, selected)
+        assertEquals(1, remoteLoads)
+    }
+
+    @Test
+    fun `only owner published ciphertext qualifies for durable chat sharing`() {
+        assertTrue(isDurableChatAttachment(document(objectKey = "r2/object"), "owner"))
+        assertFalse(isDurableChatAttachment(document(objectKey = ""), "owner"))
+        assertFalse(isDurableChatAttachment(document(objectKey = "r2/object"), "another-owner"))
+        assertFalse(isDurableChatAttachment(document(objectKey = "r2/object"), null))
+    }
+
     @Test
     fun `ordinary ciphertext keeps the existing delivery path`() = runBlocking {
         val delivered = mutableListOf<String>()
@@ -117,6 +155,18 @@ class OutgoingDeliveryDispatcherTest {
         ciphertext = "ciphertext-$id",
         clientSentAt = 1,
     )
+
+    private fun document(objectKey: String) = SafetyDocument(
+        id = "media-1",
+        ownerUid = "owner",
+        storagePath = "",
+        name = "document.pdf",
+        mimeType = "application/pdf",
+        allowedUsers = listOf("owner"),
+        objectKey = objectKey,
+    )
+
+    private fun key(value: Byte) = SecretKeySpec(ByteArray(32) { value }, "AES")
 
     private class TemporaryDeliveryFailure(message: String) : RuntimeException(message)
 
