@@ -266,8 +266,8 @@
     <string name="message_delivery_sending">Enviando…</string>
     <string name="message_delivery_retrying">Aún no se envió — reintentando automáticamente</string>
     <string name="message_delivery_failed_retry">No enviado — toca para reintentar</string>
-    <string name="message_delivery_failed_permanent">No enviado — este mensaje no se puede entregar</string>
-    <string name="message_delivery_attachment_access_revoked">No enviado — ya no tienes acceso a este archivo</string>
+    <string name="message_delivery_failed_permanent">No enviado — toca para eliminar</string>
+    <string name="message_delivery_attachment_access_revoked">No enviado — ya no tienes acceso a este archivo. Toca para eliminar</string>
     <string name="message_delivery_sent">Enviado</string>
 <string name="share_attachment">Compartir archivo adjunto</string><string name="select_attachment_category">Seleccionar %1$s</string>
     <string name="private_notes">Notas privadas</string><string name="incident_reports">Informes de incidentes</string><string name="saved_media">Contenido guardado</string>

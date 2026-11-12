@@ -266,8 +266,8 @@
     <string name="message_delivery_sending">جارٍ الإرسال…</string>
     <string name="message_delivery_retrying">لم تُرسل بعد — تتم إعادة المحاولة تلقائيًا</string>
     <string name="message_delivery_failed_retry">لم تُرسل — اضغط لإعادة المحاولة</string>
-    <string name="message_delivery_failed_permanent">لم تُرسل — لا يمكن تسليم هذه الرسالة</string>
-    <string name="message_delivery_attachment_access_revoked">لم تُرسل — لم يعد لديك حق الوصول إلى هذا الملف</string>
+    <string name="message_delivery_failed_permanent">لم تُرسل — اضغط للإزالة</string>
+    <string name="message_delivery_attachment_access_revoked">لم تُرسل — لم يعد لديك حق الوصول إلى هذا الملف. اضغط للإزالة</string>
     <string name="message_delivery_sent">تم الإرسال</string>
 <string name="share_attachment">مشاركة مرفق</string><string name="select_attachment_category">اختيار %1$s</string>
     <string name="private_notes">ملاحظات خاصة</string><string name="incident_reports">تقارير الحوادث</string><string name="saved_media">الوسائط المحفوظة</string>

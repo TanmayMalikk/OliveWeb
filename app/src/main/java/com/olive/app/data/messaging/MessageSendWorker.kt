@@ -162,6 +162,9 @@ enum class MessageDeliveryStatus {
 internal fun canManuallyRetryMessage(status: MessageDeliveryStatus) =
     status == MessageDeliveryStatus.FAILED_RETRYABLE
 
+internal fun canDiscardFailedMessage(status: MessageDeliveryStatus) =
+    status == MessageDeliveryStatus.FAILED_PERMANENT
+
 /**
  * Durable client-side record for one encrypted message.
  *

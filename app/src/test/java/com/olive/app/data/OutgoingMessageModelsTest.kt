@@ -109,6 +109,8 @@ class OutgoingMessageModelsTest {
         assertTrue(canManuallyRetryMessage(MessageDeliveryStatus.FAILED_RETRYABLE))
         assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.FAILED_PERMANENT))
         assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.QUEUED))
+        assertTrue(canDiscardFailedMessage(MessageDeliveryStatus.FAILED_PERMANENT))
+        assertFalse(canDiscardFailedMessage(MessageDeliveryStatus.FAILED_RETRYABLE))
     }
 
     @Test
