@@ -103,6 +103,10 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             }.onFailure { file.delete() }
             Result.success(workDataOf(MEDIA_ID to record.id))
         } catch(cancelled:CancellationException) { throw cancelled }
+        catch(error:MediaDeviceVerificationRetryableException) {
+            Log.w("OliveMediaUpload", "App Check temporarily unavailable for encrypted upload ${job.id}", error)
+            retry(job,error)
+        }
         catch(error:MediaDeviceVerificationException) {
             Log.e("OliveMediaUpload", "App Check rejected encrypted upload ${job.id}", error)
             permanent(job,error.message ?: "This app installation is not authorized for encrypted uploads")
@@ -302,6 +306,19 @@ interface MediaTicketDataSource {
 
 /** The installed app could not obtain the App Check proof required by encrypted-media functions. */
 class MediaDeviceVerificationException(message:String,cause:Exception):Exception(message,cause)
+class MediaDeviceVerificationRetryableException(message:String,cause:Exception):Exception(message,cause)
+
+internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
+    val visited = mutableSetOf<Throwable>()
+    var current: Throwable? = failure
+    while (current != null && visited.add(current)) {
+        if (current is IOException || current is SocketTimeoutException ||
+            current.message?.contains("too many attempts", ignoreCase = true) == true
+        ) return true
+        current = current.cause
+    }
+    return false
+}
 
 /**
  * Firebase Functions implementation of [MediaTicketDataSource].
@@ -429,6 +446,12 @@ class MediaRepository(
         try {
             appCheck.getAppCheckToken(false).await()
         } catch(error:Exception) {
+            if (isRetryableAppCheckFailure(error)) {
+                throw MediaDeviceVerificationRetryableException(
+                    "Device verification is temporarily unavailable. Retrying automatically.",
+                    error,
+                )
+            }
             // Media functions enforce App Check. Keep that protection, but replace Firebase's vague
             // retry-limit message with the exact action needed for an unregistered debug device.
             val message=if(BuildConfig.DEBUG)
