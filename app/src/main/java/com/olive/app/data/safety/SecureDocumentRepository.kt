@@ -140,12 +140,16 @@ internal val SAFETY_FIELD_KEYS =
 
 internal data class SafetyField(
     val value: String, val revision: Long = 0, val mutationId: String? = null,
-    val conflictValue: String? = null, val conflictRevision: Long? = null
+    val conflictValue: String? = null, val conflictRevision: Long? = null,
+    val writerId: String? = null, val writerUid: String? = null,
+    val clientSequence: Long = 0,
 ) {
     // Safety: Converts this record into JSON.
     fun toJson(): JSONObject =
         JSONObject().put("value", value).put("revision", revision).put("mutationId", mutationId)
             .put("conflictValue", conflictValue).put("conflictRevision", conflictRevision)
+            .put("writerId", writerId).put("writerUid", writerUid)
+            .put("clientSequence", clientSequence)
 
     companion object {
         // Rebuilds this safety-plan record from protected JSON data.
@@ -156,7 +160,10 @@ internal data class SafetyField(
             json.optString("conflictValue")
                 .takeIf { json.has("conflictValue") && !json.isNull("conflictValue") },
             json.optLong("conflictRevision")
-                .takeIf { json.has("conflictRevision") && !json.isNull("conflictRevision") })
+                .takeIf { json.has("conflictRevision") && !json.isNull("conflictRevision") },
+            json.optString("writerId").takeIf { it.isNotEmpty() },
+            json.optString("writerUid").takeIf { it.isNotEmpty() },
+            json.optLong("clientSequence"))
     }
 }
 
@@ -242,6 +249,14 @@ internal fun mergeSafetyPlan(
             sent.fields[key]?.mutationId != null && sent.fields[key]?.mutationId == cloud.mutationId ->
                 local.copy(revision = cloud.revision, conflictValue = null, conflictRevision = null)
 
+            local.writerUid != null && local.writerUid == cloud.writerUid &&
+                    local.writerId != null && local.writerId == cloud.writerId &&
+                    local.clientSequence > cloud.clientSequence -> local.copy(
+                revision = maxOf(local.revision, cloud.revision),
+                conflictValue = null,
+                conflictRevision = null,
+            )
+
             local.revision != cloud.revision -> local.copy(
                 conflictValue = cloud.value,
                 conflictRevision = cloud.revision
@@ -265,8 +280,23 @@ internal fun mergeSafetyPlan(
 }
 
 // Gives the safety plan the safety fields with defaults it needs.
-internal fun SafetyField.edit(value: String) =
-    copy(value = value, mutationId = UUID.randomUUID().toString())
+internal fun SafetyField.edit(
+    value: String,
+    activeWriterId: String = UUID.randomUUID().toString(),
+    activeWriterUid: String = "",
+): SafetyField {
+    val activeUid = activeWriterUid.takeIf(String::isNotBlank)
+    val nextWriterId = if (mutationId != null) writerId ?: activeWriterId else activeWriterId
+    val nextWriterUid = if (mutationId != null) writerUid ?: activeUid else activeUid
+    val nextSequence = if (writerId == nextWriterId && writerUid == nextWriterUid) clientSequence + 1 else 1
+    return copy(
+        value = value,
+        mutationId = UUID.randomUUID().toString(),
+        writerId = nextWriterId,
+        writerUid = nextWriterUid,
+        clientSequence = nextSequence,
+    )
+}
 
 // Upgrade only untouched local placeholders. User-cleared checklists, drafts and remote revisions remain intact.
 internal fun safetyFieldsWithDefaults(

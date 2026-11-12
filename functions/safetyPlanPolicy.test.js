@@ -18,6 +18,53 @@ test("retries are idempotent and unrelated sections merge", () => {
   assert.deepEqual(mergeFields(first.fields, {}, [change]), first);
   assert.equal(mergeFields(first.fields, {}, [{key:"backup_contacts", value:"Friend", revision:0, mutationId:"second"}]).fields.backup_contacts.value, "Friend");
 });
+
+test("rapid edits from one authenticated writer supersede stale revisions", () => {
+  let fields = {};
+  for (let sequence = 1; sequence <= 50; sequence++) {
+    const result = mergeFields(fields, {}, [{
+      key:"primary_destination",
+      value:`Staff draft ${sequence}`,
+      revision:0,
+      mutationId:`staff-${sequence}`,
+      writerId:"staff-device",
+      clientSequence:sequence,
+    }], "staff-uid");
+    assert.deepEqual(result.conflicts, []);
+    fields = result.fields;
+  }
+  assert.equal(fields.primary_destination.value, "Staff draft 50");
+  assert.equal(fields.primary_destination.revision, 50);
+  assert.equal(fields.primary_destination.writerUid, "staff-uid");
+  assert.equal(fields.primary_destination.writerId, "staff-device");
+  assert.equal(fields.primary_destination.clientSequence, 50);
+});
+
+test("an older delivery from the same writer cannot roll back its latest edit", () => {
+  const existing = {primary_destination: {
+    value:"Latest", revision:7, mutationId:"latest",
+    writerUid:"staff-uid", writerId:"staff-device", clientSequence:7,
+  }};
+  const result = mergeFields(existing, {}, [{
+    key:"primary_destination", value:"Older", revision:6, mutationId:"older",
+    writerId:"staff-device", clientSequence:6,
+  }], "staff-uid");
+  assert.deepEqual(result.conflicts, []);
+  assert.deepEqual(result.fields, existing);
+});
+
+test("different writers still conflict on the same stale field", () => {
+  const existing = {primary_destination: {
+    value:"Owner draft", revision:2, mutationId:"owner",
+    writerUid:"owner-uid", writerId:"owner-device", clientSequence:1,
+  }};
+  const result = mergeFields(existing, {}, [{
+    key:"primary_destination", value:"Staff draft", revision:1, mutationId:"staff",
+    writerId:"staff-device", clientSequence:2,
+  }], "staff-uid");
+  assert.deepEqual(result.conflicts, ["primary_destination"]);
+  assert.equal(result.fields.primary_destination.value, "Owner draft");
+});
 // Inputs: the values in this case. Expected: malformed and oversized edits cannot enter the store.
 test("malformed and oversized edits cannot enter the store", () => {
   for (const patch of [{key:"unknown",value:"x",revision:0,mutationId:"a"}, {key:"primary_destination",value:"x".repeat(4001),revision:0,mutationId:"a"}]) {
@@ -39,6 +86,11 @@ test("wrong safety plan variable types fail validation", () => {
     {...base, revision: "0"},
     {...base, revision: Number.MAX_SAFE_INTEGER + 1},
     {...base, mutationId: {id:"typed"}},
+    {...base, writerId:"writer-without-sequence"},
+    {...base, clientSequence:1},
+    {...base, writerId:"bad writer id", clientSequence:1},
+    {...base, writerId:"writer", clientSequence:0},
+    {...base, writerId:"writer", clientSequence:Number.MAX_SAFE_INTEGER + 1},
   ]) assert.throws(() => mergeFields({}, {}, [patch]));
 });
 

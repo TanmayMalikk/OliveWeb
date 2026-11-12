@@ -13,21 +13,41 @@ function validFields(defaults, changes) {
   for (const change of changes) {
     if (!change || !FIELD_KEYS.includes(change.key) || seen.has(change.key) || typeof change.value !== "string" || change.value.length > 4000 ||
         !Number.isSafeInteger(change.revision) || change.revision < 0 || typeof change.mutationId !== "string" ||
-        !/^[a-zA-Z0-9-]{1,64}$/.test(change.mutationId)) throw new HttpsError("invalid-argument", "Invalid plan change.");
+        !/^[a-zA-Z0-9-]{1,64}$/.test(change.mutationId) ||
+        ((change.writerId == null) !== (change.clientSequence == null)) ||
+        (change.writerId != null && (!/^[a-zA-Z0-9-]{1,64}$/.test(change.writerId) ||
+          !Number.isSafeInteger(change.clientSequence) || change.clientSequence < 1))) {
+      throw new HttpsError("invalid-argument", "Invalid plan change.");
+    }
     seen.add(change.key);
   }
 }
 // Field-level revisions merge independent edits and preserve both versions when the same section changes offline.
-function mergeFields(existing, defaults, changes) {
+function mergeFields(existing, defaults, changes, actorUid = "") {
   validFields(defaults, changes);
   const fields = {...existing};
   const conflicts = [];
   // Applies changes only when their revision still matches the stored section.
   for (const change of changes) {
     const old = fields[change.key];
+    const sameWriter = actorUid && change.writerId && old?.writerUid === actorUid &&
+      old?.writerId === change.writerId && Number.isSafeInteger(old?.clientSequence);
+    if (sameWriter && change.clientSequence <= old.clientSequence) continue;
+    if (sameWriter) {
+      fields[change.key] = {
+        value: change.value,
+        revision: old.revision + 1,
+        mutationId: change.mutationId,
+        writerUid: actorUid,
+        writerId: change.writerId,
+        clientSequence: change.clientSequence,
+      };
+      continue;
+    }
     if (old?.mutationId === change.mutationId) continue; // Retrying an acknowledged operation is idempotent.
     if ((old?.revision || 0) !== change.revision) { conflicts.push(change.key); continue; }
-    fields[change.key] = {value: change.value, revision: (old?.revision || 0) + 1, mutationId: change.mutationId};
+    fields[change.key] = {value: change.value, revision: (old?.revision || 0) + 1, mutationId: change.mutationId,
+      ...(change.writerId ? {writerUid: actorUid, writerId: change.writerId, clientSequence: change.clientSequence} : {})};
   }
   // Adds starter content to new plans and to untouched blank plans created by older app versions.
   for (const [key, value] of Object.entries(defaults)) {

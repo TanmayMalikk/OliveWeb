@@ -89,6 +89,33 @@ class SafetyPlanMergeTest {
         assertNull(merged.conflictRevision)
     }
 
+    @Test
+    fun earlierListenerEchoFromTheSameWriterDoesNotConflictWithNewerTyping() {
+        val current = old.copy(fields = mapOf("primary_destination" to SafetyField(
+            value = "Second edit",
+            revision = 1,
+            mutationId = "second",
+            writerId = "owner-device",
+            writerUid = "owner",
+            clientSequence = 2,
+        )))
+        val remote = old.copy(fields = mapOf("primary_destination" to SafetyField(
+            value = "First edit",
+            revision = 2,
+            mutationId = "first",
+            writerId = "owner-device",
+            writerUid = "owner",
+            clientSequence = 1,
+        )))
+
+        val merged = mergeSafetyPlan(current, current, remote).fields.getValue("primary_destination")
+
+        assertEquals("Second edit", merged.value)
+        assertEquals(2L, merged.revision)
+        assertEquals("second", merged.mutationId)
+        assertNull(merged.conflictRevision)
+    }
+
     // Inputs: the values shown below. Expected: late responses cannot roll back an already merged revision.
     @Test
     fun lateResponsesCannotRollBackAnAlreadyMergedRevision() {

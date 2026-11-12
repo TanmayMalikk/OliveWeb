@@ -16,7 +16,8 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
     const old = snapshot.data();
     if (!canRead(caller, old, ownerUid)) throw new HttpsError("permission-denied", "Plan is no longer shared with this account.");
     if (changes.length && !canEdit(caller, old, ownerUid)) throw new HttpsError("permission-denied", "This shared plan is read only.");
-    const {fields, conflicts} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes);
+    const {fields, conflicts} = mergeFields(
+        old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes, caller.uid);
     const changed = !old || Object.keys(fields).length !== Object.keys(old.fields || {}).length ||
       Object.entries(fields).some(([key, field]) => field !== old.fields?.[key]);
     const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", adminUid: "", adminName: "", consultationRequested: false,

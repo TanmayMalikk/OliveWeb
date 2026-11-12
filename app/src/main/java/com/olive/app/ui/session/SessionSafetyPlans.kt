@@ -28,10 +28,12 @@ import com.olive.app.ui.users.shared.navigation.SessionScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.olive.app.data.sync.SyncCompletionEvents
+import java.util.UUID
 
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
 internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
+    private val safetyWriterId = UUID.randomUUID().toString()
     private val store = SafetyPlanStore(runtime.application, runtime.localMode)
     private val accessIndex = SafetyAccessIndexStore(runtime.application)
     private val repository by lazy { SafetyPlanRepository() }
@@ -165,7 +167,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (!authorized() || runtime.state.accountRole == AccountRole.SAFE_CONTACT || key !in SAFETY_FIELD_KEYS || value.length > 4000) return
         val field = old.fields[key] ?: return
         if (field.value == value) return
-        val edited = field.edit(value)
+        val edited = field.edit(value, safetyWriterId, runtime.coverAccountId.orEmpty())
         plan = old.copy(fields = old.fields + (key to edited))
         persist { saved -> saved.copy(fields = saved.fields + (key to edited)) }
     }

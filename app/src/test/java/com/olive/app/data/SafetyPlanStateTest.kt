@@ -92,6 +92,18 @@ class SafetyPlanStateTest {
         assertNotEquals(first.mutationId, second.mutationId)
     }
 
+    @Test
+    fun rapidEditsRetainWriterIdentityAndIncreaseSequence() {
+        val first = SafetyField("Old").edit("First", "device-writer", "staff-uid")
+        val second = first.edit("Second", "ignored-while-pending", "staff-uid")
+        val restored = SafetyField.fromJson(second.toJson())
+
+        assertEquals("device-writer", restored.writerId)
+        assertEquals("staff-uid", restored.writerUid)
+        assertEquals(2L, restored.clientSequence)
+        assertEquals("Second", restored.value)
+    }
+
     // Input: a local field absent from the server response. Expected: a partial response cannot erase the draft.
     @Test
     fun partialRemoteResponseCannotEraseLocalFields() {

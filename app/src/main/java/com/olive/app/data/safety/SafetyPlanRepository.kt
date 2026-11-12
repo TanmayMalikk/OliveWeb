@@ -57,7 +57,10 @@ internal class SafetyPlanRepository(
                         "value" to field.value,
                         "revision" to field.revision,
                         "mutationId" to checkNotNull(field.mutationId)
-                    )
+                    ) + if (field.writerId != null && field.clientSequence > 0) mapOf(
+                        "writerId" to field.writerId,
+                        "clientSequence" to field.clientSequence,
+                    ) else emptyMap()
                 }
         val result = call(
             "safetyPlanSync",
