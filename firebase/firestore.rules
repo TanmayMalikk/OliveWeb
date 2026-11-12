@@ -301,7 +301,7 @@ service cloud.firestore {
       }
       function validEncryptedMedia(data, id) {
         return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','device_wrapped_keys','allowed_users',
-            'ciphertext_size','ciphertext_sha256','encryption_version','created_at','evidence'])
+            'ciphertext_size','ciphertext_sha256','encryption_version','created_at','evidence','account_recovery_ready'])
           && data.owner_id is string
           && data.object_key == 'users/' + data.owner_id + '/media/' + id
           && data.encrypted_metadata is string && data.encrypted_metadata.size() > 0
@@ -318,6 +318,7 @@ service cloud.firestore {
           && data.ciphertext_sha256 is string
           && data.ciphertext_sha256.matches('^[0-9a-f]{64}$')
           && data.encryption_version is int && data.encryption_version >= 1
+          && (!data.keys().hasAny(['account_recovery_ready']) || data.account_recovery_ready is bool)
           && data.created_at is timestamp
           && (!data.keys().hasAny(['evidence']) || data.evidence is bool);
       }
