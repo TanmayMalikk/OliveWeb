@@ -14,6 +14,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.messaging.OutgoingMessage
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -31,6 +32,7 @@ import okio.BufferedSink
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import com.olive.app.BuildConfig
+import com.olive.app.data.work.DurableWorkPolicy
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
@@ -102,6 +104,10 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             }.onFailure { file.delete() }
             Result.success(workDataOf(MEDIA_ID to record.id))
         } catch(cancelled:CancellationException) { throw cancelled }
+        catch(error:MediaDeviceVerificationRetryableException) {
+            Log.w("OliveMediaUpload", "App Check temporarily unavailable for encrypted upload ${job.id}", error)
+            retry(job,error)
+        }
         catch(error:MediaDeviceVerificationException) {
             Log.e("OliveMediaUpload", "App Check rejected encrypted upload ${job.id}", error)
             permanent(job,error.message ?: "This app installation is not authorized for encrypted uploads")
@@ -191,7 +197,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         fun enqueue(context:Context,jobId:String,replaceDelayedWork:Boolean=false) {
             val request=OneTimeWorkRequestBuilder<MediaUploadWorker>().setInputData(workDataOf(JOB_ID to jobId))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).build()
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    TimeUnit.SECONDS,
+                ).build()
             val policy=if(replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
             WorkManager.getInstance(context).enqueueUniqueWork(workName(jobId),policy,request)
         }
@@ -284,6 +294,13 @@ interface MediaTicketDataSource {
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
     ):CloudMediaRecord
+    suspend fun shareInChat(
+        mediaId:String,
+        outgoing:OutgoingMessage,
+        recipientUids:List<String>,
+        wrappedKeys:Map<String,String>,
+        deviceWrappedKeys:Map<String,String>,
+    ) { error("Chat attachment sharing is unavailable") }
     /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
     suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
     /** Changes the owner's evidence label without changing or decrypting file contents. */
@@ -294,6 +311,19 @@ interface MediaTicketDataSource {
 
 /** The installed app could not obtain the App Check proof required by encrypted-media functions. */
 class MediaDeviceVerificationException(message:String,cause:Exception):Exception(message,cause)
+class MediaDeviceVerificationRetryableException(message:String,cause:Exception):Exception(message,cause)
+
+internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
+    val visited = mutableSetOf<Throwable>()
+    var current: Throwable? = failure
+    while (current != null && visited.add(current)) {
+        if (current is IOException || current is SocketTimeoutException ||
+            current.message?.contains("too many attempts", ignoreCase = true) == true
+        ) return true
+        current = current.cause
+    }
+    return false
+}
 
 /**
  * Firebase Functions implementation of [MediaTicketDataSource].
@@ -377,6 +407,25 @@ class MediaRepository(
         )).record()
     }
 
+    override suspend fun shareInChat(
+        mediaId:String,
+        outgoing:OutgoingMessage,
+        recipientUids:List<String>,
+        wrappedKeys:Map<String,String>,
+        deviceWrappedKeys:Map<String,String>,
+    ) {
+        call("mediaShareInChat",mapOf(
+            "mediaId" to mediaId,
+            "conversationId" to outgoing.conversationId,
+            "messageId" to outgoing.id,
+            "ciphertext" to outgoing.ciphertext,
+            "clientSentAt" to outgoing.clientSentAt,
+            "recipientUids" to recipientUids,
+            "wrappedKeys" to wrappedKeys,
+            "deviceWrappedKeys" to deviceWrappedKeys,
+        ))
+    }
+
     // Adds the wrapped file keys needed by newly authorized devices.
     override suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord {
         require(deviceWrappedKeys.isNotEmpty() && deviceWrappedKeys.size<=50)
@@ -398,11 +447,16 @@ class MediaRepository(
         // sure the callable receives both the signed-in account and the required App Check proof.
         val user=auth.currentUser ?: error("Sign in again before uploading files")
         user.getIdToken(false).await()
-        // Ask Firebase for a fresh proof before protected media work. This is important after a
-        // debug device is approved because the SDK may still hold the rejection from its first try.
+        // Let the SDK reuse a valid proof across the calls that make up one transfer or list refresh.
         try {
-            appCheck.getAppCheckToken(true).await()
+            appCheck.getAppCheckToken(false).await()
         } catch(error:Exception) {
+            if (isRetryableAppCheckFailure(error)) {
+                throw MediaDeviceVerificationRetryableException(
+                    "Device verification is temporarily unavailable. Retrying automatically.",
+                    error,
+                )
+            }
             // Media functions enforce App Check. Keep that protection, but replace Firebase's vague
             // retry-limit message with the exact action needed for an unregistered debug device.
             val message=if(BuildConfig.DEBUG)

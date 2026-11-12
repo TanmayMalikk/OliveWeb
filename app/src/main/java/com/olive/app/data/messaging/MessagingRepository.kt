@@ -257,6 +257,11 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return listener.asSubscription()
     }
 
+    // Loads one server-confirmed conversation for durable attachment authorization.
+    suspend fun getConversation(id: String): ChatConversation? =
+        conversationFrom(firestore.collection("conversations").document(id)
+            .get(Source.SERVER).await())
+
     // Loads a server-confirmed conversation index for background membership and key reconciliation.
     suspend fun listConversations(currentUid: String): List<ChatConversation> =
         firestore.collection("conversations").whereArrayContains("participantIds", currentUid)
@@ -400,8 +405,9 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
                 require(
                     existing.ownerUid == message.ownerUid &&
                             existing.conversationId == message.conversationId &&
-                            existing.ciphertext == message.ciphertext
-                ) { "A queued message id cannot identify different ciphertext" }
+                            existing.ciphertext == message.ciphertext &&
+                            existing.attachment == message.attachment
+                ) { "A queued message id cannot identify different encrypted content" }
                 persisted = existing
                 return@update
             }

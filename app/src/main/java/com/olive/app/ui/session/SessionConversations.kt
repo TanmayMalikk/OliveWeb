@@ -16,6 +16,8 @@ import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.MessageDeliveryStatus
 import com.olive.app.data.messaging.MessageSendWorker
 import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.canDiscardFailedMessage
+import com.olive.app.data.messaging.canManuallyRetryMessage
 import com.olive.app.data.messaging.prepareOutgoingMessage
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.launch
@@ -182,11 +184,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
 
     // Retries only the failed encrypted queue head so later messages cannot overtake it.
     fun retryMessage(chat: ChatMessage) {
-        if (chat.deliveryStatus !in setOf(
-                MessageDeliveryStatus.FAILED_RETRYABLE,
-                MessageDeliveryStatus.FAILED_PERMANENT,
-            )
-        ) return
+        if (!canManuallyRetryMessage(chat.deliveryStatus)) return
         val uid = runtime.enrollment?.uid ?: return
         runtime.scope.launch {
             val outgoing = withContext(Dispatchers.IO) {
@@ -203,7 +201,24 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     }
                 }
             } ?: return@launch
-            MessageSendWorker.enqueue(runtime.application, outgoing)
+            MessageSendWorker.retryNow(runtime.application, outgoing)
+        }
+    }
+
+    // Discards only the permanently failed queue head, then resumes later ordered deliveries.
+    fun discardFailedMessage(chat: ChatMessage) {
+        if (!canDiscardFailedMessage(chat.deliveryStatus)) return
+        val uid = runtime.enrollment?.uid ?: return
+        runtime.scope.launch {
+            val removed = withContext(Dispatchers.IO) {
+                runtime.messageOutbox.get(chat.id)?.takeIf { candidate ->
+                    candidate.ownerUid == uid && canDiscardFailedMessage(candidate.status) &&
+                            runtime.messageOutbox.head(uid, candidate.conversationId)?.id == candidate.id
+                }?.also { runtime.messageOutbox.remove(uid, it.id) }
+            } ?: return@launch
+            runtime.messageOutbox.head(uid, removed.conversationId)?.let {
+                MessageSendWorker.enqueue(runtime.application, it)
+            }
         }
     }
 

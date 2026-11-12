@@ -33,7 +33,12 @@ import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRequest
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.OutgoingAttachment
 import com.olive.app.data.messaging.PrivateContactNote
+import com.olive.app.data.messaging.isDurableChatAttachment
+import com.olive.app.data.messaging.outgoingRoomKey
+import com.olive.app.data.messaging.prepareOutgoingMessage
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.security.*
 import kotlin.time.Duration.Companion.milliseconds
@@ -149,41 +154,26 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             with(state) {
                 val conversation = activeConversation ?: return
                 val device = enrollment ?: return
-                val documents = safetyDocumentRepository ?: return
-                val chat = secureChatRepository ?: return
-                if (messagingBusy || document.ownerUid != device.uid) return
+                safetyDocumentRepository ?: return
+                if (messagingBusy || !isDurableChatAttachment(document, device.uid)) return
                 val token = epoch
                 messagingBusy = true
                 message = null
                 scope.launch {
-                    val newlyGrantedRecipients = mutableListOf<String>()
                     // Turn an unexpected share failure into a readable message.
                     try {
-                        conversation.participantIds.filter { it != device.uid }.forEach { recipient ->
-                            if (recipient !in document.allowedUsers) newlyGrantedRecipients += recipient
-                            val username = conversation.participantUsernames[recipient]
-                                ?: error("Recipient username is unavailable")
-                            documents.grantAccess(document, device.uid, recipient, username)
-                        }
-                        chat.send(
+                        val key = outgoingRoomKey(activeRoomKey) { roomKey(conversation) }
+                        val outgoing = prepareOutgoingMessage(
                             conversation.id, AccountIdentity(device.uid, coverUsername),
-                            "SHARED_MEDIA:${document.id}:${document.name}", roomKey(conversation)
-                        )
+                            "SHARED_MEDIA:${document.id}:${document.name}", key
+                        ).copy(attachment = OutgoingAttachment(mediaId = document.id))
+                        val queued = withContext(Dispatchers.IO) { messageOutbox.write(outgoing) }
+                        MessageSendWorker.enqueue(application, queued)
                         if (epoch == token) message =
-                            runtime.application.getString(R.string.documents_shared_in_chat)
+                            runtime.application.getString(R.string.message_delivery_queued)
                     } catch (error: CancellationException) {
-                        newlyGrantedRecipients.forEach { recipient ->
-                            runCatching {
-                                documents.revokeAccess(document.id, device.uid, recipient)
-                            }
-                        }
                         throw error
-                    } catch (_: Exception) { // Revoke any access granted before a later recipient or chat update failed.
-                        newlyGrantedRecipients.forEach { recipient ->
-                            runCatching {
-                                documents.revokeAccess(document.id, device.uid, recipient)
-                            }
-                        }
+                    } catch (_: Exception) {
                         if (epoch == token) message =
                             runtime.application.getString(R.string.documents_share_failed)
                     } finally {

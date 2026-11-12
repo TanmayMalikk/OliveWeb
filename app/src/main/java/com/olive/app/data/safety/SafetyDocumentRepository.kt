@@ -6,6 +6,7 @@ import com.google.firebase.firestore.*
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
 import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaTicketDataSource
@@ -92,6 +93,9 @@ interface SafetyDocumentDataSource {
     fun cachedFor(uid: String, id: String): SafetyDocument? = null
     // Wraps the document key for new recipients before sharing it.
     suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>)
+    suspend fun shareInChat(document: SafetyDocument, outgoing: OutgoingMessage, recipients: Map<String, String>) {
+        error("Chat attachment sharing is unavailable")
+    }
     suspend fun grantAccess(
         document: SafetyDocument,
         ownerUid: String,
@@ -202,6 +206,21 @@ class SafetyDocumentRepository(
             }
             throw failure
         }
+    }
+
+    override suspend fun shareInChat(
+        document: SafetyDocument,
+        outgoing: OutgoingMessage,
+        recipients: Map<String, String>,
+    ) {
+        require(document.ownerUid == outgoing.ownerUid)
+        val current = getFor(outgoing.ownerUid, document.id)
+        val access = if (current.objectKey.isNotBlank()) {
+            encryptedAccess(current, outgoing.ownerUid, recipients)
+        } else {
+            EncryptedAccess(emptyMap(), emptyMap())
+        }
+        media.shareInChat(current.id, outgoing, recipients.keys.toList(), access.accountKeys, access.deviceKeys)
     }
 
     // Wraps the document key for another approved account without exposing the raw key.
@@ -510,6 +529,9 @@ class IndexedSafetyDocumentRepository(
 
     override suspend fun share(document: SafetyDocument, ownerUid: String, recipients: Map<String, String>) =
         remote.share(document, ownerUid, recipients)
+
+    override suspend fun shareInChat(document: SafetyDocument, outgoing: OutgoingMessage, recipients: Map<String, String>) =
+        remote.shareInChat(document, outgoing, recipients)
 
     override suspend fun grantAccess(
         document: SafetyDocument,
