@@ -347,10 +347,7 @@ internal fun ChatPane(
                                             color = if (mine) Color.White.copy(alpha = .7f) else Muted
                                         )
                                         if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
-                                            val retryable = chat.deliveryStatus in setOf(
-                                                MessageDeliveryStatus.FAILED_RETRYABLE,
-                                                MessageDeliveryStatus.FAILED_PERMANENT,
-                                            )
+                                            val retryable = canManuallyRetryMessage(chat.deliveryStatus)
                                             TextButton(
                                                 onClick = { session.messages.retryMessage(chat) },
                                                 enabled = retryable,
@@ -365,7 +362,10 @@ internal fun ChatPane(
                                                             MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued
                                                             MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
                                                             MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_retrying
-                                                            MessageDeliveryStatus.FAILED_PERMANENT -> R.string.message_delivery_failed_retry
+                                                            MessageDeliveryStatus.FAILED_PERMANENT ->
+                                                                if (chat.deliveryFailureCode == "ATTACHMENT_ACCESS_REVOKED")
+                                                                    R.string.message_delivery_attachment_access_revoked
+                                                                else R.string.message_delivery_failed_permanent
                                                             MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
                                                         }
                                                     ),

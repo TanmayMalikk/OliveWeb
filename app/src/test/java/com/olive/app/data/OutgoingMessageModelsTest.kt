@@ -105,6 +105,13 @@ class OutgoingMessageModelsTest {
     }
 
     @Test
+    fun `manual retry is limited to retryable delivery failures`() {
+        assertTrue(canManuallyRetryMessage(MessageDeliveryStatus.FAILED_RETRYABLE))
+        assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.FAILED_PERMANENT))
+        assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.QUEUED))
+    }
+
+    @Test
     fun `drain work names are stable per account conversation pair`() {
         val expected = MessageSendWorker.workName("owner", "conversation")
 
