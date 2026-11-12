@@ -4,29 +4,35 @@
       "Manitoba Domestic Violence Crisis Line": {
         "Desc": "Confidential 24/7 provincial crisis line providing immediate support and connection to safe emergency shelters.",
         "Phone": "1-877-977-0007",
+        "Text": "204-792-5302",
+        "hours": "24/7",
         "url": "https://www.gov.mb.ca/msw/fvpp/"
       },
       "Klinic Crisis Line": {
         "Desc": "Free, confidential 24/7 crisis counselling and suicide prevention service.",
         "Phone": "1-888-322-3019",
+        "hours": "24/7",
         "url": "https://klinic.mb.ca/"
       },
       "Winnipeg Sexual Assault Crisis Line": {
         "Desc": "24/7 specialized support line for survivors of sexual assault and domestic violence.",
         "Phone": "1-888-292-7565",
-        "url": "https://klinic.mb.ca/"
+        "hours": "24/7",
+        "url": "https://wcwrc.ca/"
       }
     },
     "Shelters": {
       "Ikwe-Widdjiitiwin": {
         "Desc": "24/7 Indigenous-led crisis line and safe emergency shelter for women and children fleeing family violence.",
         "Phone": "1-800-362-3344",
+        "hours": "24/7",
         "url": "https://ikwe.ca/"
       },
       "Willow Place": {
         "Desc": "24/7 emergency shelter, crisis support, and outreach for victims of family violence in Winnipeg.",
         "Phone": "204-615-0311",
-        "url": "https://willowplacemb.ca/"
+        "hours": "24/7",
+        "url": "https://willowplaceshelter.ca/"
       }
     }
   },
@@ -34,14 +40,18 @@
     "Hotlines": {
       "Westman Region Crisis Line": {
         "Desc": "24/7 crisis line and safety planning for women and families in Westman region.",
-        "Phone": "1-800-437-0160",
+        "Phone": "1-877-977-0007",
+        "Text": "204-400-4007",
+        "hours": "24/7",
         "url": "https://www.ywcabrandon.ca/"
       }
     },
     "Shelters": {
       "YMCA Brandon Westman Women's Shelter": {
         "Desc": "24/7 emergency shelter, crisis line, and safety planning for women and children.",
-        "Phone": "1-800-437-0160",
+        "Phone": "1-877-977-0007",
+        "Text": "204-400-4007",
+        "hours": "24/7",
         "url": "https://www.ywcabrandon.ca/"
       }
     }

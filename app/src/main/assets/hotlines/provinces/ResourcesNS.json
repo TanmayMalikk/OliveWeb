@@ -4,11 +4,13 @@
       "Transition House Association of Nova Scotia Helpline": {
         "Desc": "24/7 provincial crisis line connecting victims of domestic violence to local safe shelters and safety planning.",
         "Phone": "1-855-225-0220",
+        "hours": "24/7",
         "url": "https://thans.ca/"
       },
       "Mental Health Crisis Line Nova Scotia": {
         "Desc": "24/7 crisis support and mental health intervention across Nova Scotia.",
         "Phone": "1-888-429-8167",
+        "hours": "24/7",
         "url": "https://mha.nshealth.ca/"
       }
     },
@@ -16,11 +18,13 @@
       "Bryony House": {
         "Desc": "24/7 emergency shelter, crisis intervention, and outreach for women and children escaping family violence.",
         "Phone": "902-422-7650",
+        "hours": "24/7",
         "url": "https://www.bryonyhouse.ca/"
       },
       "Alice House": {
         "Desc": "Safe second-stage housing and recovery programs for women and children leaving intimate partner abuse.",
         "Phone": "902-466-8459",
+        "hours": "Monday to Friday, 9:00 AM – 4:00 PM",
         "url": "https://alicehouse.ca/"
       }
     }
@@ -29,15 +33,19 @@
     "Hotlines": {
       "Cape Breton Transition House Helpline": {
         "Desc": "24/7 crisis line for women experiencing domestic violence in Cape Breton.",
-        "Phone": "1-800-563-3933",
-        "url": "https://www.cbtransitionhouse.com/"
+        "Phone": "1-800-563-2945",
+        "Text": "902-919-5952",
+        "hours": "24/7",
+        "url": "https://www.cbtha.com/"
       }
     },
     "Shelters": {
       "Cape Breton Transition House": {
         "Desc": "24/7 emergency shelter and crisis line for women and children experiencing domestic abuse.",
-        "Phone": "1-800-563-3933",
-        "url": "https://www.cbtransitionhouse.com/"
+        "Phone": "902-539-2945",
+        "Text": "902-919-5952",
+        "hours": "24/7",
+        "url": "https://www.cbtha.com/"
       }
     }
   }

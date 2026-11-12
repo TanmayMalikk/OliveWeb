@@ -3,31 +3,30 @@
     "Hotlines": {
       "South East New Brunswick Crisis Line": {
         "Desc": "Confidential 24/7 crisis intervention line serving individuals across New Brunswick.",
-        "Phone": "1-800-313-0000",
-        "url": "https://www.chimohelpline.ca/"
+        "Phone": "1-800-784-2433",
+        "hours": "24/7",
+        "url": "https://chimoservices.com/"
       }
     },
     "Shelters": {
       "Crossroads for Women / Carrefour pour femmes": {
         "Desc": "24/7 crisis line and emergency shelter for women and children escaping domestic abuse in Moncton region.",
-        "Phone": "1-800-832-8500",
+        "Phone": "1-844-853-0811",
+        "Text": "506-853-0811",
+        "hours": "24/7",
         "url": "https://crossroadsforwomen.ca/"
       }
     }
   },
   "Saint John": {
     "Hotlines": {
-      "Saint John Domestic Violence Community Outreach": {
-        "Desc": "Safety planning, support, and shelter connection for victims of intimate partner violence.",
-        "Phone": "506-632-5616",
-        "url": "https://www.nbdomesticviolence.ca/"
-      }
     },
     "Shelters": {
       "Coverdale Centre for Women": {
         "Desc": "Emergency shelter and crisis support for women experiencing homelessness, trauma, or abuse.",
         "Phone": "506-634-1649",
-        "url": "https://www.coverdalecentre.org/"
+        "hours": "8:00am - 4:00pm, Mon - Sun",
+        "url": "https://www.coverdalecentreforwomen.com/"
       }
     }
   },
@@ -35,15 +34,17 @@
     "Hotlines": {
       "Chimo Helpline": {
         "Desc": "Provincial 24/7 crisis line providing emotional support and family violence intervention.",
-        "Phone": "1-800-667-5005",
-        "url": "https://www.chimohelpline.ca/"
+        "Phone": "1-800-784-2433",
+        "hours": "24/7",
+        "url": "https://chimoservices.com/"
       }
     },
     "Shelters": {
       "Gignoo Transition House": {
         "Desc": "24/7 emergency shelter for First Nations women and children fleeing domestic abuse.",
         "Phone": "1-800-565-6878",
-        "url": "https://www.gignoo.ca/"
+        "hours": "24/7",
+        "url": "https://www.gignoohouse.ca/"
       }
     }
   }

@@ -4,24 +4,22 @@
       "SOS Violence Conjugale": {
         "Desc": "Confidential 24/7 Quebec-wide helpline providing immediate safety planning, support, and shelter referrals.",
         "Phone": "1-800-363-9010",
+        "hours": "24/7",
         "url": "https://sosviolenceconjugale.ca/"
       },
       "Centre pour femmes de Montréal": {
         "Desc": "Support, counselling, and emergency resources for women in difficulty or experiencing abuse.",
         "Phone": "514-866-9941",
-        "url": "https://www.womenscentremontreal.org/"
+        "hours": "Monday to Friday, 9:00 a.m. to 5:00 p.m.",
+        "url": "https://www.ydesfemmesmtl.org/"
       }
     },
     "Shelters": {
       "Maison Sainte-Marguerite": {
         "Desc": "Safe emergency shelter and transition house for women fleeing conjugal violence.",
         "Phone": "514-932-2250",
-        "url": "https://www.maisonsaintemarguerite.org/"
-      },
-      "Maison Chantal Myriam": {
-        "Desc": "24/7 emergency shelter for women and children experiencing domestic abuse.",
-        "Phone": "514-875-4001",
-        "url": "https://www.maisonchantalmyriam.org/"
+        "hours": "24/7",
+        "url": "https://maisonmarguerite.com/"
       }
     }
   },
