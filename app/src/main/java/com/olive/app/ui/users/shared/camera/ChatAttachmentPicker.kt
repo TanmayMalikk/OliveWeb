@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.PrivateEntryKind
-import com.olive.app.data.isDurableChatAttachment
+import com.olive.app.data.messaging.isDurableChatAttachment
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import com.olive.app.ui.users.user.location.ShareDurationDialog

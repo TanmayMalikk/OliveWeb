@@ -1,6 +1,7 @@
 // All chat roles: identifies encrypted media that must be published with an outbox message.
-package com.olive.app.data
+package com.olive.app.data.messaging
 
+import com.olive.app.data.safety.SafetyDocument
 import java.security.GeneralSecurityException
 import javax.crypto.SecretKey
 import org.json.JSONObject

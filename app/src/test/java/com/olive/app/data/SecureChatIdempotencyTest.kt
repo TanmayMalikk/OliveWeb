@@ -1,5 +1,7 @@
 package com.olive.app.data
 
+import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.existingMessageMatches
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

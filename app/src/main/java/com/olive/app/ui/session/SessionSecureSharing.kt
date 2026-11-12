@@ -33,7 +33,12 @@ import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRequest
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.OutgoingAttachment
 import com.olive.app.data.messaging.PrivateContactNote
+import com.olive.app.data.messaging.isDurableChatAttachment
+import com.olive.app.data.messaging.outgoingRoomKey
+import com.olive.app.data.messaging.prepareOutgoingMessage
 import com.olive.app.data.news.NewsArticle
 import com.olive.app.security.*
 import kotlin.time.Duration.Companion.milliseconds
