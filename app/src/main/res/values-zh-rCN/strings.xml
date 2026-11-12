@@ -266,8 +266,8 @@
     <string name="message_delivery_sending">正在发送…</string>
     <string name="message_delivery_retrying">尚未发送 — 正在自动重试</string>
     <string name="message_delivery_failed_retry">未发送 — 点按重试</string>
-    <string name="message_delivery_failed_permanent">未发送 — 无法发送此消息</string>
-    <string name="message_delivery_attachment_access_revoked">未发送 — 你已无权访问此文件</string>
+    <string name="message_delivery_failed_permanent">未发送 — 点按即可移除</string>
+    <string name="message_delivery_attachment_access_revoked">未发送 — 你已无权访问此文件。点按即可移除</string>
     <string name="message_delivery_sent">已发送</string>
 <string name="share_attachment">分享附件</string><string name="select_attachment_category">选择%1$s</string>
     <string name="private_notes">私人笔记</string><string name="incident_reports">事件报告</string><string name="saved_media">已保存的媒体</string>

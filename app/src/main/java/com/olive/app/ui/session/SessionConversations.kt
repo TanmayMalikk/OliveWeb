@@ -203,6 +203,23 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
+    // Discards only the permanently failed queue head, then resumes later ordered deliveries.
+    fun discardFailedMessage(chat: ChatMessage) {
+        if (!canDiscardFailedMessage(chat.deliveryStatus)) return
+        val uid = runtime.enrollment?.uid ?: return
+        runtime.scope.launch {
+            val removed = withContext(Dispatchers.IO) {
+                runtime.messageOutbox.get(chat.id)?.takeIf { candidate ->
+                    candidate.ownerUid == uid && canDiscardFailedMessage(candidate.status) &&
+                            runtime.messageOutbox.head(uid, candidate.conversationId)?.id == candidate.id
+                }?.also { runtime.messageOutbox.remove(uid, it.id) }
+            } ?: return@launch
+            runtime.messageOutbox.head(uid, removed.conversationId)?.let {
+                MessageSendWorker.enqueue(runtime.application, it)
+            }
+        }
+    }
+
     // Removes message from the signed-in session.
     fun unsendMessage(chat: ChatMessage) {
         with(runtime) {

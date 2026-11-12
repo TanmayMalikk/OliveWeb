@@ -348,9 +348,13 @@ internal fun ChatPane(
                                         )
                                         if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
                                             val retryable = canManuallyRetryMessage(chat.deliveryStatus)
+                                            val discardable = canDiscardFailedMessage(chat.deliveryStatus)
                                             TextButton(
-                                                onClick = { session.messages.retryMessage(chat) },
-                                                enabled = retryable,
+                                                onClick = {
+                                                    if (retryable) session.messages.retryMessage(chat)
+                                                    else if (discardable) session.messages.discardFailedMessage(chat)
+                                                },
+                                                enabled = retryable || discardable,
                                                 contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
                                                 modifier = Modifier.testTag("message_status_${chat.id}")
                                                     .semantics { liveRegion = LiveRegionMode.Polite },
@@ -369,7 +373,9 @@ internal fun ChatPane(
                                                             MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
                                                         }
                                                     ),
-                                                    color = Color.White.copy(alpha = if (retryable) 1f else .75f),
+                                                    color = Color.White.copy(
+                                                        alpha = if (retryable || discardable) 1f else .75f
+                                                    ),
                                                     style = MaterialTheme.typography.labelSmall,
                                                 )
                                             }
