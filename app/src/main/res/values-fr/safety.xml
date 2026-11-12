@@ -10,7 +10,9 @@
     <string name="safety_waiting">En attente du prochain membre du personnel disponible.</string>
     <string name="safety_share_queued">Demande enregistrée.</string>
     <string name="safety_saving">Enregistrement sur cet appareil…</string>
-    <string name="safety_saved">Enregistré.</string>
+    <string name="safety_saved">Enregistré et synchronisé.</string>
+    <string name="safety_saved_waiting">Enregistré sur cet appareil. En attente de synchronisation.</string>
+    <string name="safety_syncing">Synchronisation des modifications…</string>
     <string name="safety_sync_error">Impossible de mettre à jour les détails de la consultation. Veuillez réessayer.</string>
     <string name="safety_storage_error">Impossible d’enregistrer sur cet appareil. Gardez cette page ouverte et réessayez.</string>
     <string name="safety_access_revoked">Ce plan ne vous est plus partagé. La copie en cache a été supprimée.</string>

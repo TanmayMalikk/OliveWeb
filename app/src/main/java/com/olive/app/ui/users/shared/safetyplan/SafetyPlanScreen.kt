@@ -71,6 +71,7 @@ internal fun SafetyPlanScreen(
     fun leaveEditor() {
         focus.clearFocus(force = true)
         keyboard?.hide()
+        controller.flushEdits()
     }
 
     val lease = remember(ownerUid) { Any() }
@@ -223,8 +224,12 @@ internal fun SafetyPlanScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Muted
                             )
-                            val status =
-                                if (controller.saving > 0) R.string.safety_saving else R.string.safety_saved
+                            val status = when {
+                                controller.saving > 0 -> R.string.safety_saving
+                                controller.syncing -> R.string.safety_syncing
+                                plan?.pending == true -> R.string.safety_saved_waiting
+                                else -> R.string.safety_saved
+                            }
                             if (plan != null && controller.error != R.string.safety_storage_error) Text(
                                 stringResource(status),
                                 style = MaterialTheme.typography.bodySmall,
@@ -260,6 +265,7 @@ internal fun SafetyPlanScreen(
                                             keepMine
                                         )
                                     },
+                                    onSyncNow = controller::flushEdits,
                                     contacts = if (!organizationEditor && !safeContact && section == "contacts") session.profile?.contacts.orEmpty() else emptyList(),
                                     contactsEditable = !organizationEditor && !safeContact && section == "contacts",
                                     onContactsChange = if (!organizationEditor && !safeContact && section == "contacts") session::saveContacts else null,
@@ -318,7 +324,9 @@ internal fun SafetyPlanScreen(
                                             key,
                                             keepMine
                                         )
-                                    }, editable = !safeContact
+                                    },
+                                    onSyncNow = controller::flushEdits,
+                                    editable = !safeContact
                                 )
                             }
                         }

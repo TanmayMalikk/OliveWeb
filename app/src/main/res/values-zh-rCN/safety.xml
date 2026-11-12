@@ -10,7 +10,9 @@
     <string name="safety_waiting">正在等待下一位有空的工作人员。</string>
     <string name="safety_share_queued">请求已保存。</string>
     <string name="safety_saving">正在保存到此设备…</string>
-    <string name="safety_saved">已保存。</string>
+    <string name="safety_saved">已保存并同步。</string>
+    <string name="safety_saved_waiting">已保存到此设备，正在等待同步。</string>
+    <string name="safety_syncing">正在同步更改…</string>
     <string name="safety_sync_error">无法更新咨询信息。请重试。</string>
     <string name="safety_storage_error">无法保存到此设备。请保持此页面打开并重试保存。</string>
     <string name="safety_access_revoked">此计划已不再与你共享。缓存副本已删除。</string>

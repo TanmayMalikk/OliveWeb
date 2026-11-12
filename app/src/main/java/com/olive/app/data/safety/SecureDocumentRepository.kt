@@ -279,6 +279,15 @@ internal fun mergeSafetyPlan(
     )
 }
 
+// Keeps an optimistic on-screen draft above intermediate listener echoes until its latest mutation is acknowledged.
+internal fun mergeVisibleSafetyPlan(
+    visible: SafetyPlan?,
+    stored: SafetyPlan,
+    @Suppress("UNUSED_PARAMETER") actorUid: String,
+): SafetyPlan = visible?.let {
+    mergeSafetyPlan(it, it, stored)
+} ?: stored
+
 // Gives the safety plan the safety fields with defaults it needs.
 internal fun SafetyField.edit(
     value: String,

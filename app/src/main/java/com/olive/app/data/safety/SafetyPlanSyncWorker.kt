@@ -19,6 +19,20 @@ import java.util.UUID
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.child
 
+private const val SAFETY_SYNC_TRAILING_DELAY_MS = 250L
+private const val SAFETY_SYNC_MAXIMUM_DELAY_MS = 1_000L
+
+// Coalesces live typing while guaranteeing that continuous edits still reach the cloud once per second.
+internal fun safetyPlanSyncDelayMillis(
+    firstEditAt: Long,
+    lastEditAt: Long,
+    now: Long,
+    immediate: Boolean = false,
+): Long = if (immediate) 0 else minOf(
+    (lastEditAt + SAFETY_SYNC_TRAILING_DELAY_MS - now).coerceAtLeast(0),
+    (firstEditAt + SAFETY_SYNC_MAXIMUM_DELAY_MS - now).coerceAtLeast(0),
+)
+
 
 // Each upload reads the durable encrypted queue. Replacing a worker is safe because mutations are idempotent.
 class SafetyPlanSyncWorker(context: Context, parameters: WorkerParameters) :

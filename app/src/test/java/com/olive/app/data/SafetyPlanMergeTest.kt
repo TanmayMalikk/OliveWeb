@@ -5,6 +5,8 @@ import com.olive.app.data.safety.SafetyChecklistItem
 import com.olive.app.data.safety.SafetyField
 import com.olive.app.data.safety.SafetyPlan
 import com.olive.app.data.safety.mergeSafetyPlan
+import com.olive.app.data.safety.mergeVisibleSafetyPlan
+import com.olive.app.data.safety.safetyPlanSyncDelayMillis
 import com.olive.app.data.safety.safetyFieldsWithDefaults
 import com.olive.app.data.safety.writeSafetyChecklist
 import org.junit.Assert.*
@@ -114,6 +116,40 @@ class SafetyPlanMergeTest {
         assertEquals(2L, merged.revision)
         assertEquals("second", merged.mutationId)
         assertNull(merged.conflictRevision)
+    }
+
+    @Test
+    fun visibleDraftStaysAuthoritativeWhileAnIntermediateCloudEchoArrives() {
+        val visible = old.copy(fields = mapOf("primary_destination" to SafetyField(
+            value = "",
+            revision = 1,
+            mutationId = "latest",
+            writerId = "staff-device",
+            writerUid = "staff",
+            clientSequence = 10,
+        )))
+        val intermediate = old.copy(fields = mapOf("primary_destination" to SafetyField(
+            value = "Original te",
+            revision = 9,
+            mutationId = "older",
+            writerId = "staff-device",
+            writerUid = "staff",
+            clientSequence = 9,
+        )))
+
+        val merged = mergeVisibleSafetyPlan(visible, intermediate, "staff")
+
+        assertEquals("", merged.fields.getValue("primary_destination").value)
+        assertEquals("latest", merged.fields.getValue("primary_destination").mutationId)
+        assertFalse(merged.hasConflicts)
+    }
+
+    @Test
+    fun liveEditDebounceUsesTrailingDelayWithOneSecondMaximum() {
+        assertEquals(250L, safetyPlanSyncDelayMillis(firstEditAt = 0, lastEditAt = 100, now = 100))
+        assertEquals(100L, safetyPlanSyncDelayMillis(firstEditAt = 0, lastEditAt = 900, now = 900))
+        assertEquals(0L, safetyPlanSyncDelayMillis(firstEditAt = 0, lastEditAt = 900, now = 1_000))
+        assertEquals(0L, safetyPlanSyncDelayMillis(firstEditAt = 0, lastEditAt = 100, now = 100, immediate = true))
     }
 
     // Inputs: the values shown below. Expected: late responses cannot roll back an already merged revision.
