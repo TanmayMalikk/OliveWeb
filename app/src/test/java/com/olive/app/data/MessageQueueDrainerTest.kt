@@ -155,6 +155,27 @@ class MessageQueueDrainerTest {
     }
 
     @Test
+    fun `failure reporter receives the classified permanent outcome`() = runBlocking {
+        val store = storeWithMessages(1)
+        val reports = mutableListOf<String>()
+        val outcome = MessageQueueDrainer(
+            store = store,
+            activeOwnerUid = { OWNER },
+            deliver = { throw PermanentDeliveryFailure() },
+            classifyFailure = { MessageDeliveryFailure("IDEMPOTENCY_CONFLICT", permanent = true) },
+            reportFailure = { message, failure, cause, permanent ->
+                reports += "${message.id}:${failure.code}:${cause::class.java.simpleName}:$permanent"
+            },
+        ).drain(OWNER, CONVERSATION)
+
+        assertEquals(MessageDrainOutcome.BLOCKED, outcome)
+        assertEquals(
+            listOf("message-0:IDEMPOTENCY_CONFLICT:PermanentDeliveryFailure:true"),
+            reports,
+        )
+    }
+
+    @Test
     fun `conversation drains are independent while each preserves its own sequence`() = runBlocking {
         val store = MessageOutboxStore(DrainTestVault())
         repeat(4) { index ->

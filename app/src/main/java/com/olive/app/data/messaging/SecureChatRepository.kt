@@ -175,9 +175,15 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         firestore.runTransaction { transaction ->
             val saved = transaction.get(message)
             if (saved.exists()) {
-                check(saved.getString("senderUid") == outgoing.ownerUid)
-                check(saved.getString("ciphertext") == outgoing.ciphertext)
-                check(saved.getLong("clientSentAt") == outgoing.clientSentAt)
+                if (!existingMessageMatches(
+                        senderUid = saved.getString("senderUid"),
+                        ciphertext = saved.getString("ciphertext"),
+                        clientSentAt = saved.getLong("clientSentAt"),
+                        outgoing = outgoing,
+                    )
+                ) {
+                    throw MessageDeliveryRejected("IDEMPOTENCY_CONFLICT")
+                }
                 return@runTransaction
             }
             transaction.set(message, mapOf(
@@ -276,6 +282,15 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     private fun DocumentSnapshot.participantPublicKeys() =
         get("participantPublicKeys") as? Map<String, String>
 }
+
+internal fun existingMessageMatches(
+    senderUid: String?,
+    ciphertext: String?,
+    clientSentAt: Long?,
+    outgoing: OutgoingMessage,
+) = senderUid == outgoing.ownerUid &&
+        ciphertext == outgoing.ciphertext &&
+        clientSentAt == outgoing.clientSentAt
 
 // All chat roles: retains only encrypted chat material for offline cold starts.
 

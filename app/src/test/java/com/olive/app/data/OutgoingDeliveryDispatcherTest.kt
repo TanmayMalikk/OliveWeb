@@ -4,6 +4,7 @@ import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class OutgoingDeliveryDispatcherTest {
@@ -58,6 +59,31 @@ class OutgoingDeliveryDispatcherTest {
         )
     }
 
+    @Test
+    fun `deterministic message conflict is permanent`() {
+        assertEquals(
+            MessageDeliveryFailure("IDEMPOTENCY_CONFLICT", permanent = true),
+            messageDeliveryFailure(MessageDeliveryRejected("IDEMPOTENCY_CONFLICT")),
+        )
+    }
+
+    @Test
+    fun `delivery diagnostic excludes encrypted payload`() {
+        val message = message("message-1")
+        val line = messageDeliveryLogLine(
+            messageId = message.id,
+            failure = MessageDeliveryFailure("UNAVAILABLE", permanent = false),
+            cause = TemporaryDeliveryFailure("ciphertext-message-1"),
+            permanent = false,
+        )
+
+        assertEquals(
+            "messageId=message-1 code=UNAVAILABLE permanent=false exception=TemporaryDeliveryFailure",
+            line,
+        )
+        assertFalse(line.contains(message.ciphertext))
+    }
+
     private fun dispatcher(
         text: suspend (OutgoingMessage) -> Unit = {},
         attachment: suspend (OutgoingMessage, String) -> Unit = { _, _ -> },
@@ -71,5 +97,7 @@ class OutgoingDeliveryDispatcherTest {
         ciphertext = "ciphertext-$id",
         clientSentAt = 1,
     )
+
+    private class TemporaryDeliveryFailure(message: String) : RuntimeException(message)
 
 }

@@ -2,6 +2,7 @@
 package com.olive.app.data.messaging
 
 import android.content.Context
+import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -50,12 +51,25 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
             activeOwnerUid = { FirebaseAuth.getInstance().currentUser?.uid },
             deliver = delivery::deliver,
             classifyFailure = ::messageDeliveryFailure,
+            reportFailure = ::reportMessageDeliveryFailure,
         ).drain(ownerUid, conversationId)
         return when (outcome) {
             MessageDrainOutcome.COMPLETE -> Result.success()
             MessageDrainOutcome.RETRY -> Result.retry()
             MessageDrainOutcome.BLOCKED -> Result.failure()
         }
+    }
+
+    private fun reportMessageDeliveryFailure(
+        message: OutgoingMessage,
+        failure: MessageDeliveryFailure,
+        cause: Throwable,
+        permanent: Boolean,
+    ) {
+        Log.w(
+            DELIVERY_LOG_TAG,
+            messageDeliveryLogLine(message.id, failure, cause, permanent),
+        )
     }
 
     private suspend fun deliverAttachment(message: OutgoingMessage, mediaId: String) {
@@ -76,6 +90,7 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     companion object {
         private const val OWNER_UID = "ownerUid"
         private const val CONVERSATION_ID = "conversationId"
+        private const val DELIVERY_LOG_TAG = "OliveMessageDelivery"
 
         fun workName(ownerUid: String, conversationId: String): String {
             val digest = MessageDigest.getInstance("SHA-256")
@@ -120,7 +135,7 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
 }
 
 internal fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure = when (failure) {
-    is AttachmentDeliveryRejected -> MessageDeliveryFailure(failure.failureCode, permanent = true)
+    is MessageDeliveryRejected -> MessageDeliveryFailure(failure.failureCode, permanent = true)
     is MediaAccessException -> MessageDeliveryFailure(
         code = "ATTACHMENT_${failure.reason.name}",
         permanent = failure.reason !in setOf(
@@ -135,6 +150,14 @@ internal fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure 
         MessageDeliveryFailure(failure.code.name, isPermanentMessageFailure(failure.code.name))
     else -> MessageDeliveryFailure("TEMPORARY_FAILURE", permanent = false)
 }
+
+internal fun messageDeliveryLogLine(
+    messageId: String,
+    failure: MessageDeliveryFailure,
+    cause: Throwable,
+    permanent: Boolean,
+) = "messageId=$messageId code=${failure.code} permanent=$permanent " +
+        "exception=${cause::class.java.simpleName}"
 
 internal fun isPermanentMessageFailure(code: FirebaseFirestoreException.Code) =
     isPermanentMessageFailure(code.name)
@@ -347,6 +370,8 @@ internal class MessageQueueDrainer(
     private val activeOwnerUid: () -> String?,
     private val deliver: suspend (OutgoingMessage) -> Unit,
     private val classifyFailure: (Throwable) -> MessageDeliveryFailure,
+    private val reportFailure: (OutgoingMessage, MessageDeliveryFailure, Throwable, Boolean) -> Unit =
+        { _, _, _, _ -> },
     private val maxAutomaticAttempts: Int = 6,
 ) {
     init {
@@ -387,6 +412,7 @@ internal class MessageQueueDrainer(
                 val deliveryFailure = classifyFailure(failure)
                 val permanent = deliveryFailure.permanent ||
                         sending.attemptCount >= maxAutomaticAttempts
+                reportFailure(sending, deliveryFailure, failure, permanent)
                 store.update(sending.id) {
                     it.copy(
                         status = if (permanent) {
