@@ -2,6 +2,7 @@
 package com.olive.app.data
 
 import java.security.GeneralSecurityException
+import javax.crypto.SecretKey
 import org.json.JSONObject
 
 /** References ciphertext already published to the media service. */
@@ -25,6 +26,16 @@ data class OutgoingAttachment(
         private const val MEDIA_ID = "mediaId"
     }
 }
+
+/** Only immutable ciphertext already published to the media service can enter the chat outbox. */
+internal fun isDurableChatAttachment(document: SafetyDocument, ownerUid: String?) =
+    ownerUid != null && document.ownerUid == ownerUid && document.objectKey.isNotBlank()
+
+/** Uses the locally opened conversation key without touching Firebase while the device is offline. */
+internal suspend fun outgoingRoomKey(
+    activeRoomKey: SecretKey?,
+    loadRoomKey: suspend () -> SecretKey,
+): SecretKey = activeRoomKey ?: loadRoomKey()
 
 internal open class MessageDeliveryRejected(
     val failureCode: String,
