@@ -15,9 +15,11 @@ const accountId = defineSecret("R2_ACCOUNT_ID");
 const accessKeyId = defineSecret("R2_ACCESS_KEY_ID");
 const secretAccessKey = defineSecret("R2_SECRET_ACCESS_KEY");
 const bucketName = defineSecret("R2_BUCKET_NAME");
+const recoveryMasterKey = defineSecret("MEDIA_RECOVERY_MASTER_KEY");
 const secrets = [accountId, accessKeyId, secretAccessKey, bucketName];
 // App Check plus Firebase Auth protects every exported media callable.
 const options = { secrets, enforceAppCheck: true, invoker: "public" };
+const recoveryOptions = { ...options, secrets: [...secrets, recoveryMasterKey] };
 
 // Small ciphertext uploads in one PUT; larger ciphertext uses resumable 8 MiB parts.
 const maxBytes = 250 * 1024 * 1024;
@@ -33,11 +35,17 @@ function caller(request) {
 }
 
 // Builds an S3-compatible client scoped to the configured Cloudflare R2 account.
-function client() {
+function client(r2 = {
+  accountId: accountId.value(),
+  accessKeyId: accessKeyId.value(),
+  secretAccessKey: secretAccessKey.value(),
+}) {
   return new S3Client({
     region: "auto",
-    endpoint: `https://${accountId.value()}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId: accessKeyId.value(), secretAccessKey: secretAccessKey.value() },
+    endpoint: `https://${r2.accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId: r2.accessKeyId, secretAccessKey: r2.secretAccessKey },
+    // A presigner has no file bytes. The default CRC32 would sign the checksum of an empty body.
+    requestChecksumCalculation: "WHEN_REQUIRED",
   });
 }
 
@@ -59,7 +67,51 @@ function accountAccessKey(value, required = false) {
   return value;
 }
 
-// Validates the zero-knowledge upload manifest and per-recipient wrapped keys.
+// Bind each encrypted key copy to the file and owner so records cannot be swapped.
+function sealRecoveryKey(raw, mediaId, ownerUid, masterKey = recoveryMasterKey.value()) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", Buffer.from(accountAccessKey(masterKey, true), "base64"), iv);
+  cipher.setAAD(Buffer.from(JSON.stringify([mediaId, ownerUid])));
+  const plaintext = Buffer.from(accountAccessKey(raw, true), "base64");
+  try {
+    const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+    return Buffer.concat([iv, cipher.getAuthTag(), encrypted]).toString("base64");
+  } finally {
+    plaintext.fill(0);
+  }
+}
+
+function openRecoveryKey(sealed, mediaId, ownerUid, masterKey = recoveryMasterKey.value()) {
+  const bytes = Buffer.from(sealed, "base64");
+  if (bytes.length !== 60) throw new Error("Invalid encrypted recovery key");
+  const decipher = crypto.createDecipheriv("aes-256-gcm", Buffer.from(accountAccessKey(masterKey, true), "base64"), bytes.subarray(0, 12));
+  decipher.setAAD(Buffer.from(JSON.stringify([mediaId, ownerUid])));
+  decipher.setAuthTag(bytes.subarray(12, 28));
+  const raw = Buffer.concat([decipher.update(bytes.subarray(28)), decipher.final()]);
+  try {
+    return raw.toString("base64");
+  } finally {
+    raw.fill(0);
+  }
+}
+
+// The file metadata authenticates a proposed key before it becomes an account recovery copy.
+function verifyRecoveryKey(key, encryptedMetadata) {
+  const metadata = Buffer.from(encryptedMetadata, "base64");
+  const raw = Buffer.from(key, "base64");
+  try {
+    const decipher = crypto.createDecipheriv("aes-256-gcm", raw, metadata.subarray(0, 12));
+    decipher.setAuthTag(metadata.subarray(-16));
+    decipher.update(metadata.subarray(12, -16)).fill(0);
+    decipher.final().fill(0);
+  } catch {
+    throw new HttpsError("invalid-argument", "The key does not match this document");
+  } finally {
+    raw.fill(0);
+  }
+}
+
+// Validates the encrypted upload manifest and per-recipient wrapped keys.
 function uploadRequest(data, uid) {
   const jobId = string(data?.jobId, "jobId", 64);
   if (!idPattern.test(jobId)) throw new HttpsError("invalid-argument", "Invalid jobId");
@@ -94,7 +146,8 @@ function uploadRequest(data, uid) {
   const deviceWrappedKeys = data?.deviceWrappedKeys == null
     ? {}
     : validateDeviceWrappedKeys(data.deviceWrappedKeys, uid);
-  const recoveryKey = accountAccessKey(data?.accountAccessKey);
+  const recoveryKey = accountAccessKey(data?.recoveryKeyToSeal ?? data?.accountAccessKey);
+  if (recoveryKey) verifyRecoveryKey(recoveryKey, encryptedMetadata);
   return {
     jobId, size, checksum, encryptedMetadata, allowedUsers, wrappedKeys,
     encryptionVersion, deviceWrappedKeys, accountAccessKey: recoveryKey,
@@ -213,7 +266,7 @@ function publicRecord(snapshot) {
 }
 
 // Creates or recovers an idempotent upload session keyed by the client job id.
-exports.mediaCreateUpload = onCall(options, async (request) => {
+exports.mediaCreateUpload = onCall(recoveryOptions, async (request) => {
   const uid = caller(request);
   const value = uploadRequest(request.data, uid);
   const reference = pendingRef(value.jobId);
@@ -223,8 +276,9 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
     if (found.ownerUid !== uid || found.ciphertextSha256 !== value.checksum || found.ciphertextSize !== value.size) {
       throw new HttpsError("already-exists", "jobId is already in use");
     }
-    if (!found.accountAccessKey && value.accountAccessKey) {
-      await reference.update({ accountAccessKey: value.accountAccessKey });
+    if (!found.sealedRecoveryKey && value.accountAccessKey && found.status === "pending") {
+      verifyRecoveryKey(value.accountAccessKey, found.encryptedMetadata);
+      await reference.update({ sealedRecoveryKey: sealRecoveryKey(value.accountAccessKey, found.mediaId, uid) });
     }
     return sessionResponse(found);
   }
@@ -246,7 +300,8 @@ exports.mediaCreateUpload = onCall(options, async (request) => {
     partSize: mode === "SINGLE" ? value.size : partSize,
     ciphertextSize: value.size, ciphertextSha256: value.checksum,
     encryptedMetadata: value.encryptedMetadata, wrappedKeys: value.wrappedKeys,
-    deviceWrappedKeys: value.deviceWrappedKeys, accountAccessKey: value.accountAccessKey,
+    deviceWrappedKeys: value.deviceWrappedKeys,
+    sealedRecoveryKey: value.accountAccessKey ? sealRecoveryKey(value.accountAccessKey, mediaId, uid) : "",
     allowedUsers: value.allowedUsers, encryptionVersion: value.encryptionVersion,
     status: "pending", createdAt: FieldValue.serverTimestamp(),
   };
@@ -281,7 +336,7 @@ exports.mediaUploadPartTicket = onCall(options, async (request) => {
 });
 
 // Finalizes R2 multipart state, verifies the remote byte count, and publishes Firestore metadata.
-exports.mediaCompleteUpload = onCall(options, async (request) => {
+exports.mediaCompleteUpload = onCall(recoveryOptions, async (request) => {
   const uid = caller(request);
   const jobId = string(request.data?.jobId, "jobId", 64);
   const value = await ownerPending(jobId, uid);
@@ -316,20 +371,23 @@ exports.mediaCompleteUpload = onCall(options, async (request) => {
   if (Number(head.ContentLength) !== value.ciphertextSize) {
     throw new HttpsError("failed-precondition", "Uploaded size does not match");
   }
+  const sealedRecoveryKey = value.sealedRecoveryKey ||
+    (value.accountAccessKey ? sealRecoveryKey(value.accountAccessKey, value.mediaId, uid) : "");
   const record = {
     owner_id: uid, object_key: value.objectKey, encrypted_metadata: value.encryptedMetadata,
     wrapped_keys: value.wrappedKeys, device_wrapped_keys: value.deviceWrappedKeys,
     allowed_users: value.allowedUsers, ciphertext_size: value.ciphertextSize,
     ciphertext_sha256: value.ciphertextSha256, encryption_version: value.encryptionVersion,
-    evidence: false, created_at: FieldValue.serverTimestamp(),
+    evidence: false, account_recovery_ready: Boolean(sealedRecoveryKey), created_at: FieldValue.serverTimestamp(),
   };
   const batch = db.batch();
   batch.create(mediaRef(value.mediaId), record).update(pendingRef(jobId), {
     status: "complete", completedAt: FieldValue.serverTimestamp(),
+    sealedRecoveryKey: FieldValue.delete(), accountAccessKey: FieldValue.delete(),
   });
-  if (value.accountAccessKey) {
+  if (sealedRecoveryKey) {
     batch.create(mediaAccessKeyRef(value.mediaId), {
-      owner_id: uid, key: value.accountAccessKey, created_at: FieldValue.serverTimestamp(),
+      owner_id: uid, sealed: sealedRecoveryKey, created_at: FieldValue.serverTimestamp(),
     });
   }
   await batch.commit();
@@ -372,7 +430,7 @@ exports.mediaDownloadTicket = onCall(options, async (request) => {
 });
 
 // Returns the account recovery copy only after checking the current file access list.
-exports.mediaAccountAccessKey = onCall(options, async (request) => {
+exports.mediaAccountAccessKey = onCall(recoveryOptions, async (request) => {
   const uid = caller(request);
   const mediaId = string(request.data?.mediaId, "mediaId", 64);
   const [media, recovery] = await Promise.all([
@@ -387,23 +445,35 @@ exports.mediaAccountAccessKey = onCall(options, async (request) => {
   if (!recovery.exists) {
     throw new HttpsError("failed-precondition", "This older document has not been upgraded for account access");
   }
-  return { accountAccessKey: accountAccessKey(recovery.data().key, true) };
+  const stored = recovery.data();
+  if (stored.owner_id !== value.owner_id) throw new HttpsError("failed-precondition", "Invalid document recovery record");
+  const key = stored.sealed
+    ? openRecoveryKey(stored.sealed, mediaId, value.owner_id)
+    : accountAccessKey(stored.key, true);
+  return { accountAccessKey: key };
 });
 
 // Lets an owner upgrade a legacy document after decrypting it on an authorized device.
-exports.mediaStoreAccountAccessKey = onCall(options, async (request) => {
+exports.mediaStoreAccountAccessKey = onCall(recoveryOptions, async (request) => {
   const uid = caller(request);
   const mediaId = string(request.data?.mediaId, "mediaId", 64);
-  const key = accountAccessKey(request.data?.accountAccessKey, true);
-  const media = await mediaRef(mediaId).get();
-  if (!media.exists) throw new HttpsError("not-found", "Media was not found");
-  if (media.data().owner_id !== uid) {
-    throw new HttpsError("permission-denied", "Only the owner can upgrade document access");
-  }
-  await mediaAccessKeyRef(mediaId).create({
-    owner_id: uid, key, created_at: FieldValue.serverTimestamp(),
-  }).catch((error) => {
-    if (error?.code !== 6 && error?.code !== "already-exists") throw error;
+  const key = accountAccessKey(request.data?.recoveryKeyToSeal, true);
+  const reference = mediaRef(mediaId);
+  const recovery = mediaAccessKeyRef(mediaId);
+  await db.runTransaction(async (transaction) => {
+    const [media, existing] = await Promise.all([transaction.get(reference), transaction.get(recovery)]);
+    if (!media.exists) throw new HttpsError("not-found", "Media was not found");
+    const value = media.data();
+    if (value.owner_id !== uid) throw new HttpsError("permission-denied", "Only the owner can upgrade document access");
+    if (!value.object_key) throw new HttpsError("failed-precondition", "Upload an encrypted copy first");
+    if (value.account_recovery_ready) return;
+    verifyRecoveryKey(key, value.encrypted_metadata);
+    if (!existing.data()?.sealed || existing.data().owner_id !== uid) {
+      transaction.set(recovery, {
+        owner_id: uid, sealed: sealRecoveryKey(key, mediaId, uid), created_at: FieldValue.serverTimestamp(),
+      });
+    }
+    transaction.update(reference, { account_recovery_ready: true });
   });
   return { stored: true };
 });
@@ -716,7 +786,7 @@ exports.mediaDelete = onCall(options, async (request) => {
 Object.defineProperty(exports, "_test", {
   value: {
     accessRequest, validateDeviceWrappedKeys, validateAccessDeviceWrappedKeys, recipientList,
-    accountAccessKey, evidenceRequest,
+    accountAccessKey, evidenceRequest, client, sealRecoveryKey, openRecoveryKey, verifyRecoveryKey,
   },
   enumerable: false,
 });

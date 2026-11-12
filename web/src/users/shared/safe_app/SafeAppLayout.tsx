@@ -33,13 +33,13 @@ import Contacts from "../../user/contacts_and_notes/UserContactsPage";
 import Notes from "../../user/contacts_and_notes/UserNotesPage";
 import {
   DocumentsPage,
-  HotlinesPage,
   LocationPage,
   StaffHelpPage,
 } from "./SupportAndLocationPages";
 
 const Messages = lazy(() => import("./FriendsAndMessagesPage"));
 const SafetyPlan = lazy(() => import("./SafetyPlanPage"));
+const HotlinesPage = lazy(() => import("./HotlinesPage"));
 type NavItem = { page: Page; label: string; icon: typeof House; userOnly?: boolean };
 const navigation: { label: string; items: NavItem[] }[] = [
   { label: "Workspace", items: [

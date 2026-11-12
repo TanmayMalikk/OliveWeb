@@ -1,11 +1,9 @@
 // Safe-app users: provides staff requests, support directories, and browser location.
 import { useEffect, useState } from "react";
 import {
-  ExternalLink,
   FileLock2,
   LocateFixed,
   MapPin,
-  Phone,
   RefreshCw,
   Upload,
 } from "lucide-react";
@@ -97,71 +95,6 @@ export function StaffHelpPage() {
           Request help from staff
         </Button>
       )}
-    </section>
-  );
-}
-
-const resources = [
-  {
-    name: "Emergency services",
-    description: "Immediate danger or urgent medical help",
-    phone: "911",
-    url: "tel:911",
-  },
-  {
-    name: "211 Canada",
-    description: "Local social, community, and crisis services",
-    phone: "211",
-    url: "tel:211",
-  },
-  {
-    name: "Government of Canada help directory",
-    description: "Province and territory violence-support services",
-    phone: "Online directory",
-    url: "https://www.canada.ca/en/women-gender-equality/gender-based-violence/get-help-now.html",
-  },
-  {
-    name: "ShelterSafe",
-    description: "Find nearby shelters across Canada",
-    phone: "Online directory",
-    url: "https://sheltersafe.ca/",
-  },
-];
-// Lists emergency and support hotlines for the user's region.
-export function HotlinesPage() {
-  return (
-    <section className="safe-feature-page">
-      <div className="panel">
-        <h2>Support hotlines and shelters</h2>
-        <p>
-          Calling links open your device dialer and do not place a call
-          automatically.
-        </p>
-      </div>
-      <div className="safe-resource-grid">
-        {resources.map((resource) => (
-          <article className="panel" key={resource.name}>
-            <h3>{resource.name}</h3>
-            <p>{resource.description}</p>
-            <strong>{resource.phone}</strong>
-            <a
-              className="button outline"
-              href={resource.url}
-              target={resource.url.startsWith("https") ? "_blank" : undefined}
-              rel="noreferrer"
-            >
-              {resource.url.startsWith("tel") ? (
-                <Phone size={17} />
-              ) : (
-                <ExternalLink size={17} />
-              )}
-              {resource.url.startsWith("tel")
-                ? "Open dialer"
-                : "Open directory"}
-            </a>
-          </article>
-        ))}
-      </div>
     </section>
   );
 }
@@ -262,7 +195,6 @@ export function DocumentsPage() {
     if (!identity) return;
     let active = true;
     let stop: (() => void) | undefined;
-    void refresh();
     void observeBrowserDocuments(
       identity,
       (value) => {
@@ -324,8 +256,9 @@ export function DocumentsPage() {
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (!file) return;
-                void session
-                  .perform(async () => {
+                event.target.value = "";
+                void session.perform(async () => {
+                  try {
                     if (!accounts.identity)
                       throw new Error("Sign in again before uploading files.");
                     setError("");
@@ -335,18 +268,17 @@ export function DocumentsPage() {
                       accounts.identity,
                       setUploadProgress,
                     );
-                    setUploadProgress(null);
-                    event.target.value = "";
                     await refresh();
-                  })
-                  .catch((failure) => {
+                  } catch (failure) {
                     setError(
                       failure instanceof Error
                         ? failure.message
                         : "Unable to upload this file.",
                     );
+                  } finally {
                     setUploadProgress(null);
-                  });
+                  }
+                });
               }}
             />
           </label>
@@ -405,7 +337,7 @@ export function DocumentsPage() {
                 disabled={!document.approved || session.busy}
                 onClick={() => open(document)}
               >
-                {document.approved ? "Open document" : "Upgrade required"}
+                {document.approved ? "Open document" : "Unavailable on this device"}
               </Button>
             </article>
           ))}

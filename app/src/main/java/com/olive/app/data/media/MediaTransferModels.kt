@@ -77,7 +77,7 @@ data class PreparedEncryptedMedia(
  * more than retransmitting a small object in the common case.
  *
  * @property id client-generated idempotency key shared by WorkManager and the Firebase upload session.
- * @property source prepared ciphertext and zero-knowledge metadata.
+ * @property source prepared ciphertext and encrypted metadata.
  * @property mediaId server-generated stable identifier for the final `files` document and R2 object.
  * @property objectKey opaque R2 key returned by Firebase; the client never constructs or changes it.
  * @property uploadId R2 multipart session identifier; blank for single PUT uploads.
@@ -155,7 +155,7 @@ data class MediaCompletedPart(val partNumber:Int,val etag:String)
 /** Short-lived capability for one authorized direct ciphertext GET from Cloudflare R2. */
 data class MediaDownloadTicket(val mediaId:String,val url:String,val headers:Map<String,String>,val expiresAt:Long)
 
-/** Zero-knowledge metadata returned after Firebase verifies and publishes an uploaded R2 object. */
+/** Encrypted metadata returned after Firebase verifies and publishes an uploaded R2 object. */
 data class CloudMediaRecord(
     val id:String,val ownerUid:String,val objectKey:String,val encryptedMetadata:String,
     val wrappedKeys:Map<String,String>,val allowedUsers:List<String>,val ciphertextSize:Long,
