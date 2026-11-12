@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
+import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
 import com.olive.app.data.messaging.FriendRelationship
@@ -465,7 +466,9 @@ internal fun SharedMediaMessage(
             }
         }
     }
-    if (document?.objectKey?.isNotBlank() == true) {
+    if (document?.objectKey?.isNotBlank() == true &&
+        canManageSharedMediaOfflineCopy(session.accountRole)
+    ) {
         val cached = offline in setOf(
             OfflineMediaAvailability.AVAILABLE,
             OfflineMediaAvailability.REVALIDATION_REQUIRED,
@@ -496,3 +499,6 @@ internal fun SharedMediaMessage(
     }
     }
 }
+
+internal fun canManageSharedMediaOfflineCopy(role: AccountRole) =
+    role == AccountRole.USER || role == AccountRole.SAFE_CONTACT
