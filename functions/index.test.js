@@ -1,6 +1,9 @@
 // Tests that cloud endpoints for accounts, support, media, and nutrition keep their public names.
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { createCipheriv, randomBytes } = require("node:crypto");
+const { PutObjectCommand, UploadPartCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 process.env.FIREBASE_CONFIG = JSON.stringify({
   projectId: "olive-test",
   storageBucket: "olive-test.appspot.com",
@@ -9,6 +12,47 @@ process.env.FIREBASE_CONFIG = JSON.stringify({
 const { _test } = require("./index");
 const mediaTest = require("./src/mediaTickets")._test;
 const supportGroups = require("./src/supportGroups");
+
+test("document recovery encrypts the key and binds it to one file and owner", () => {
+  const key = randomBytes(32).toString("base64");
+  const masterKey = randomBytes(32).toString("base64");
+  const sealed = mediaTest.sealRecoveryKey(key, "file-a", "owner-a", masterKey);
+  assert.notEqual(sealed, key);
+  assert.notEqual(sealed, mediaTest.sealRecoveryKey(key, "file-a", "owner-a", masterKey));
+  assert.equal(mediaTest.openRecoveryKey(sealed, "file-a", "owner-a", masterKey), key);
+  assert.throws(() => mediaTest.openRecoveryKey(sealed, "file-b", "owner-a", masterKey));
+  assert.throws(() => mediaTest.openRecoveryKey(sealed, "file-a", "owner-b", masterKey));
+});
+
+test("document recovery rejects a key that cannot open the existing Android/web metadata", () => {
+  const key = randomBytes(32);
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update('{"name":"test.pdf"}'), cipher.final()]);
+  const metadata = Buffer.concat([iv, encrypted, cipher.getAuthTag()]).toString("base64");
+  assert.doesNotThrow(() => mediaTest.verifyRecoveryKey(key.toString("base64"), metadata));
+  assert.throws(() => mediaTest.verifyRecoveryKey(randomBytes(32).toString("base64"), metadata),
+    { code: "invalid-argument" });
+});
+
+test("R2 upload tickets do not sign the checksum of an empty body", async () => {
+  const client = mediaTest.client({
+    accountId: "example",
+    accessKeyId: "test",
+    secretAccessKey: "test",
+  });
+  const object = { Bucket: "test-bucket", Key: "test-file" };
+  const commands = [
+    new PutObjectCommand({ ...object, ContentType: "application/octet-stream" }),
+    new UploadPartCommand({ ...object, UploadId: "test-upload", PartNumber: 1 }),
+  ];
+  for (const command of commands) {
+    const { searchParams } = new URL(await getSignedUrl(client, command));
+    assert.ok(searchParams.has("X-Amz-Signature"));
+    assert.equal(searchParams.has("x-amz-checksum-crc32"), false);
+    assert.equal(searchParams.has("x-amz-sdk-checksum-algorithm"), false);
+  }
+});
 
 // Inputs: the values in this case. Expected: deployment keeps the existing callable endpoint names.
 test("deployment keeps the existing callable endpoint names", () => {

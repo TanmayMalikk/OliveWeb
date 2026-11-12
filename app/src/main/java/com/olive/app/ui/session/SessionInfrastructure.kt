@@ -197,6 +197,9 @@ internal class SessionAccess(private val runtime: SessionRuntime) {
                 screen = SessionScreen.Safe
                 unlockAnimationVersion++
                 privacy.startIdleTimer()
+                scope.launch(Dispatchers.IO) {
+                    runCatching { dataSources.safetyDocuments?.upgradeOwnedRecoveryKeys(device.uid) }
+                }
             }
         }
     }

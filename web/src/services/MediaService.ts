@@ -24,6 +24,7 @@ type StoredMedia = {
   encrypted_metadata?: unknown;
   wrapped_keys?: unknown;
   device_wrapped_keys?: unknown;
+  account_recovery_ready?: unknown;
   allowed_users?: unknown;
   ciphertext_size?: unknown;
   ciphertext_sha256?: unknown;
@@ -100,6 +101,7 @@ async function uploadCiphertext(
   encryptedMetadata: string,
   wrappedKeys: Record<string, string>,
   deviceWrappedKeys: Record<string, string>,
+  accountAccessKey: string,
   uid: string,
   report: (fraction: number) => void,
 ) {
@@ -118,6 +120,7 @@ async function uploadCiphertext(
         encryptedMetadata,
         wrappedKeys,
         deviceWrappedKeys,
+        recoveryKeyToSeal: accountAccessKey,
         allowedUsers: [uid],
         encryptionVersion: 2,
       })
@@ -237,6 +240,7 @@ export async function uploadBrowserDocument(
       encryptedMetadata,
       { [identity.uid]: keys.accountKey },
       keys.deviceKeys,
+      toBase64(rawKey),
       identity.uid,
       report,
     );
@@ -265,6 +269,34 @@ async function wrapForDocumentRecipient(raw: Uint8Array, { uid, username }: { ui
   return { accountKey, deviceKeys };
 }
 
+async function unwrapBrowserDocumentKey(uid: string, deviceId: string, value: StoredMedia) {
+  const deviceKeys = value.device_wrapped_keys as Record<string, unknown> | undefined;
+  const accountKeys = value.wrapped_keys as Record<string, unknown> | undefined;
+  const candidates = new Set([deviceKeys?.[`${uid}--${deviceId}`], accountKeys?.[uid]]);
+  for (const wrapped of candidates) {
+    if (typeof wrapped !== "string" || !wrapped) continue;
+    const raw = await unwrapRoomKeyBytes(uid, wrapped).catch(() => null);
+    if (raw) return raw;
+  }
+  return null;
+}
+
+async function documentRecoveryCall(name: string, data: Record<string, string>) {
+  const { functions } = await firebase();
+  const { httpsCallable } = await import("firebase/functions");
+  return (await httpsCallable(functions, name)(data)).data as { accountAccessKey?: string };
+}
+
+async function resolveDocumentKey(mediaId: string, identity: Identity, deviceId: string, value: StoredMedia) {
+  const local = await unwrapBrowserDocumentKey(identity.uid, deviceId, value);
+  if (local) return local;
+  if (value.account_recovery_ready === true) {
+    const result = await documentRecoveryCall("mediaAccountAccessKey", { mediaId });
+    if (result.accountAccessKey) return fromBase64(result.accountAccessKey);
+  }
+  throw new Error("The account does not have a usable document key.");
+}
+
 // Wrap an attached document for the selected plan readers using their published device keys.
 export async function shareBrowserPlanDocument(
   mediaId: string,
@@ -282,9 +314,7 @@ export async function shareBrowserPlanDocument(
   const deviceWrappedKeys: Record<string, string> = {};
   const existingDevices = (value.device_wrapped_keys as Record<string, string>) ?? {};
   const device = await messageDevice(identity.uid);
-  const wrapped = existingDevices[`${identity.uid}--${device.deviceId}`];
-  if (!wrapped) throw new Error("Open the plan on an approved device to share this document.");
-  const raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
+  const raw = await resolveDocumentKey(mediaId, identity, device.deviceId, value);
   try {
     const results = await Promise.allSettled(recipients.map(async (recipient) => ({
       recipient, keys: await wrapForDocumentRecipient(raw, recipient),
@@ -365,7 +395,7 @@ export async function observeBrowserDocuments(
   onUpdate: (documents: BrowserDocument[]) => void,
   onError: (error: Error) => void,
 ) {
-  await register(identity);
+  void register(identity).catch(() => undefined);
   const { db } = await firebase();
   const documentsQuery = query(
     collection(db, "files"),
@@ -395,32 +425,30 @@ async function resolveBrowserDocuments(
   rows: Array<{ id: string; data: () => DocumentData }>,
 ): Promise<BrowserDocument[]> {
   const device = await messageDevice(identity.uid);
-  const deviceKey = `${identity.uid}--${device.deviceId}`;
   return Promise.all(
     rows.map(async (row) => {
       const value = row.data() as StoredMedia;
-      const deviceKeys = value.device_wrapped_keys as
-        Record<string, unknown> | undefined;
-      const wrapped =
-        typeof deviceKeys?.[deviceKey] === "string"
-          ? deviceKeys[deviceKey]
-          : "";
+      const encryptedMetadata = value.encrypted_metadata;
+      const encryptedStorage = typeof value.object_key === "string" && Boolean(value.object_key);
       let key: CryptoKey | undefined;
       let name = "Encrypted document";
       let mimeType = "application/octet-stream";
       let tags: string[] = [];
       // New uploads keep their private details in one encrypted metadata value.
-      if (typeof value.encrypted_metadata === "string") {
-        // Keep the document in the list when old metadata cannot be decrypted on this browser.
+      if (encryptedStorage && typeof encryptedMetadata === "string") {
         try {
-          if (!wrapped) throw new Error("This browser has no wrapped document key.");
-          const raw = await unwrapRoomKeyBytes(identity.uid, wrapped);
+          const raw = await resolveDocumentKey(row.id, identity, device.deviceId, value);
           try {
             key = await importKey(raw);
+            if (value.account_recovery_ready !== true && value.owner_id === identity.uid) {
+              void documentRecoveryCall("mediaStoreAccountAccessKey", {
+                mediaId: row.id, recoveryKeyToSeal: toBase64(raw),
+              }).catch(() => undefined);
+            }
           } finally {
             raw.fill(0);
           }
-          const metadata = await decryptMetadata(value.encrypted_metadata, key);
+          const metadata = await decryptMetadata(encryptedMetadata, key);
           if (typeof metadata.name === "string" && metadata.name.trim())
             name = metadata.name;
           if (typeof metadata.mimeType === "string" && metadata.mimeType.trim())
@@ -440,7 +468,11 @@ async function resolveBrowserDocuments(
         approved: Boolean(key),
         approvalMessage: key
           ? ""
-          : "This older document has not yet been upgraded for account-wide access.",
+          : encryptedStorage
+            ? value.account_recovery_ready === true
+              ? "Document access could not be verified. Check your connection and refresh."
+              : "The owner needs to open Documents once on a device that can already open this older file."
+            : "This older file uses Android-only storage. Open it on Android and upload a new copy to use it on the web.",
         ciphertextSize:
           typeof value.ciphertext_size === "number" ? value.ciphertext_size : 0,
         ciphertextSha256:
@@ -487,6 +519,8 @@ export async function openBrowserDocument(document: BrowserDocument) {
     throw new Error("The encrypted download ticket is invalid.");
   const response = await fetch(ticket.url, {
     headers: ticket.headers as HeadersInit | undefined,
+  }).catch(() => {
+    throw new Error("The browser could not reach encrypted storage. Check your connection and the website's storage access settings.");
   });
   if (!response.ok)
     throw new Error(`Cloud download failed (${response.status}).`);
@@ -511,5 +545,11 @@ export async function openBrowserDocument(document: BrowserDocument) {
     document.key,
     encrypted.slice(6 + ivLength),
   );
-  return URL.createObjectURL(new Blob([plain], { type: document.mimeType }));
+  const mimeType = document.mimeType.toLowerCase().split(";", 1)[0].trim();
+  // Frame only a PDF with a matching header. Text is displayed as text in the private viewer.
+  if (mimeType === "application/pdf" &&
+      new TextDecoder().decode(plain.slice(0, 5)) !== "%PDF-") {
+    throw new Error("The decrypted file is missing its PDF header.");
+  }
+  return URL.createObjectURL(new Blob([plain], { type: mimeType }));
 }

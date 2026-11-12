@@ -173,6 +173,15 @@
 }
 .safe-document-viewer iframe { height: min(72vh, 48rem); background: white; }
 .safe-document-viewer audio { width: min(100%, 40rem); }
+.safe-document-viewer pre {
+  width: 100%;
+  max-height: min(72vh, 48rem);
+  margin: 0;
+  padding: 1rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 @media (max-width: 42rem) {
   .documents-heading { align-items: flex-start; flex-direction: column; }
   .browser-document { grid-template-columns: auto minmax(0, 1fr); }
