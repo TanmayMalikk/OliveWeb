@@ -18,6 +18,7 @@ import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaRepository
+import com.olive.app.data.work.DurableWorkPolicy
 import java.security.MessageDigest
 import java.security.GeneralSecurityException
 import java.util.concurrent.TimeUnit
@@ -133,7 +134,11 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 )
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    TimeUnit.SECONDS,
+                )
                 .addTag(ownerTag(message.ownerUid))
                 .build()
 

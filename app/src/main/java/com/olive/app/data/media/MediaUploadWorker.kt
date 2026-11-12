@@ -32,6 +32,7 @@ import okio.BufferedSink
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import com.olive.app.BuildConfig
+import com.olive.app.data.work.DurableWorkPolicy
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
@@ -196,7 +197,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         fun enqueue(context:Context,jobId:String,replaceDelayedWork:Boolean=false) {
             val request=OneTimeWorkRequestBuilder<MediaUploadWorker>().setInputData(workDataOf(JOB_ID to jobId))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).build()
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    TimeUnit.SECONDS,
+                ).build()
             val policy=if(replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
             WorkManager.getInstance(context).enqueueUniqueWork(workName(jobId),policy,request)
         }
