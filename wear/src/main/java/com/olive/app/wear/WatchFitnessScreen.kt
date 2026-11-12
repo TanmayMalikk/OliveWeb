@@ -11,11 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,6 +27,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.ColorScheme
+import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.Text
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -54,15 +54,22 @@ internal enum class WatchPage(val label: String) {
 @Composable
 internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
     MaterialTheme(
-        colorScheme = lightColorScheme(
+        colorScheme = ColorScheme(
             primary = WatchAccent,
+            primaryDim = WatchAccent,
+            primaryContainer = WatchPaleOlive,
             onPrimary = WatchSurface,
+            onPrimaryContainer = WatchText,
             background = WatchBackground,
             onBackground = WatchText,
-            surface = WatchSurface,
+            surfaceContainerLow = WatchSurface,
+            surfaceContainer = WatchSurface,
+            surfaceContainerHigh = WatchLightSage,
             onSurface = WatchText,
-            surfaceVariant = WatchPaleOlive,
             onSurfaceVariant = WatchText,
+            error = WatchRed,
+            errorDim = WatchRed,
+            onError = WatchSurface,
         )
     ) {
         Column(
