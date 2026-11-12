@@ -105,10 +105,11 @@ class OutgoingMessageModelsTest {
     }
 
     @Test
-    fun `manual retry is limited to retryable delivery failures`() {
+    fun `manual retry accepts queued or retryable heads but not permanent failures`() {
         assertTrue(canManuallyRetryMessage(MessageDeliveryStatus.FAILED_RETRYABLE))
+        assertTrue(canManuallyRetryMessage(MessageDeliveryStatus.QUEUED))
         assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.FAILED_PERMANENT))
-        assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.QUEUED))
+        assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.SENDING))
         assertTrue(canDiscardFailedMessage(MessageDeliveryStatus.FAILED_PERMANENT))
         assertFalse(canDiscardFailedMessage(MessageDeliveryStatus.FAILED_RETRYABLE))
     }
