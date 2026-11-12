@@ -14,6 +14,8 @@ import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.media.MediaAccessError
+import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaRepository
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -119,6 +121,14 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
 
 internal fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure = when (failure) {
     is AttachmentDeliveryRejected -> MessageDeliveryFailure(failure.failureCode, permanent = true)
+    is MediaAccessException -> MessageDeliveryFailure(
+        code = "ATTACHMENT_${failure.reason.name}",
+        permanent = failure.reason !in setOf(
+            MediaAccessError.NETWORK_REQUIRED,
+            MediaAccessError.LEASE_EXPIRED,
+            MediaAccessError.DOWNLOAD_FAILED,
+        ),
+    )
     is FirebaseFirestoreException ->
         MessageDeliveryFailure(failure.code.name, isPermanentMessageFailure(failure.code))
     is FirebaseFunctionsException ->
@@ -148,6 +158,9 @@ enum class MessageDeliveryStatus {
     FAILED_PERMANENT,
     SENT,
 }
+
+internal fun canManuallyRetryMessage(status: MessageDeliveryStatus) =
+    status == MessageDeliveryStatus.FAILED_RETRYABLE
 
 /**
  * Durable client-side record for one encrypted message.

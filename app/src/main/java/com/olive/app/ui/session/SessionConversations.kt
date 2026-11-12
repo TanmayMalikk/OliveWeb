@@ -182,11 +182,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
 
     // Retries only the failed encrypted queue head so later messages cannot overtake it.
     fun retryMessage(chat: ChatMessage) {
-        if (chat.deliveryStatus !in setOf(
-                MessageDeliveryStatus.FAILED_RETRYABLE,
-                MessageDeliveryStatus.FAILED_PERMANENT,
-            )
-        ) return
+        if (!canManuallyRetryMessage(chat.deliveryStatus)) return
         val uid = runtime.enrollment?.uid ?: return
         runtime.scope.launch {
             val outgoing = withContext(Dispatchers.IO) {

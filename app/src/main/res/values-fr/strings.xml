@@ -266,6 +266,8 @@
     <string name="message_delivery_sending">Envoi…</string>
     <string name="message_delivery_retrying">Pas encore envoyé — nouvelle tentative automatique</string>
     <string name="message_delivery_failed_retry">Non envoyé — appuyez pour réessayer</string>
+    <string name="message_delivery_failed_permanent">Non envoyé — ce message ne peut pas être livré</string>
+    <string name="message_delivery_attachment_access_revoked">Non envoyé — vous n’avez plus accès à ce fichier</string>
     <string name="message_delivery_sent">Envoyé</string>
 <string name="share_attachment">Partager une pièce jointe</string><string name="select_attachment_category">Sélectionner %1$s</string>
     <string name="private_notes">Notes privées</string><string name="incident_reports">Rapports d’incident</string><string name="saved_media">Médias enregistrés</string>
