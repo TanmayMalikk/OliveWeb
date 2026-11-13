@@ -272,22 +272,10 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                 socialSubscription = null
                 conversationSubscription?.close()
                 conversationSubscription = null
-                conversationLoadFailed = false
                 messageSubscription?.close()
                 messageSubscription = null
-                activeConversation = null
                 activeRoomKey = null
-                chatMessages = emptyList()
-                messagingBusy = false
-                messagingNeedsReconnect = false
-                if (clearRows) {
-                    userSearchResults = emptyList()
-                    friends = emptyList()
-                    incomingFriendRequests =
-                        emptyList()
-                    outgoingFriendRequests = emptyList()
-                    conversations = emptyList()
-                }
+                clearMessaging(clearRows)
             }
         }
     }

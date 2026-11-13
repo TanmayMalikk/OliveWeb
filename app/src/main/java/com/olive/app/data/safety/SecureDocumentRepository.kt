@@ -1,6 +1,8 @@
 // Safe-app users and support staff: opens encrypted documents for approved viewers.
 package com.olive.app.data.safety
 
+import com.olive.app.data.sync.cloudStringMap
+
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -45,8 +47,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
             if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) null else throw error
         }
 
-        @Suppress("UNCHECKED_CAST")
-        val existingWrapped = existing?.get("wrappedKeys") as? Map<String, String> ?: emptyMap()
+        val existingWrapped = existing?.get("wrappedKeys").cloudStringMap().orEmpty()
         val documentKey: SecretKey = existingWrapped[ownerUid]?.let(KeyManager::unwrapKey)
             ?: EncryptionUtils.generateSymmetricKey()
 
@@ -94,8 +95,7 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
 
         if (!snapshot.exists()) throw Exception("Document not found.")
 
-        @Suppress("UNCHECKED_CAST")
-        val wrappedKeysMap = snapshot.get("wrappedKeys") as? Map<String, String>
+        val wrappedKeysMap = snapshot.get("wrappedKeys").cloudStringMap()
             ?: throw Exception("Encryption keys missing from document.")
 
         // 1. Find the current user's specific wrapped key

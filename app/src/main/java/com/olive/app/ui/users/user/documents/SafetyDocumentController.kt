@@ -23,6 +23,7 @@ import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.OcrReview
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -158,8 +159,10 @@ internal class SafetyDocumentsController(
                 runCatching { openDocument(document, viewerUid) }
                     .onSuccess { file ->
                         if (token == generation && state.ownerUid == viewerUid) onReady(file)
+                        else file.delete()
                     }
                     .onFailure { failure ->
+                        if (failure is CancellationException) throw failure
                         if (token == generation) {
                             val message = localizedFailure(failure)
                             state = state.copy(error = message,
@@ -195,11 +198,15 @@ internal class SafetyDocumentsController(
                         ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
                     val file = openDocument(document, viewerUid)
                     if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
-                }.onFailure { if (token == generation) {
-                    val message = localizedFailure(it)
-                    state = state.copy(error = message,
-                        attachmentErrors = state.attachmentErrors + (documentId to message))
-                } }
+                    else file.delete()
+                }.onFailure { failure ->
+                    if (failure is CancellationException) throw failure
+                    if (token == generation) {
+                        val message = localizedFailure(failure)
+                        state = state.copy(error = message,
+                            attachmentErrors = state.attachmentErrors + (documentId to message))
+                    }
+                }
             } finally {
                 finishOpening(documentId, token)
             }

@@ -1,6 +1,8 @@
 // All chat roles: loads and saves direct messages and friend requests.
 package com.olive.app.data.messaging
 
+import com.olive.app.data.sync.cloudStringMap
+
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -29,6 +31,14 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     suspend fun prepareSupportTickets() {
         FirebaseFunctions.getInstance("northamerica-northeast1")
             .getHttpsCallable("supportTicketsPrepare").call().await()
+    }
+
+    internal suspend fun prepareTicketParticipantNames(conversationId: String): Map<String, String> {
+        val result = FirebaseFunctions.getInstance("northamerica-northeast1")
+            .getHttpsCallable("conversationPrepareKeys")
+            .call(mapOf("conversationId" to conversationId)).await().data as? Map<*, *>
+        return result?.get("participantUsernames").cloudStringMap()
+            ?: error("Ticket participant identities are unavailable")
     }
     // Publishes this account's messaging key and device details to Firebase.
     suspend fun registerUser(
@@ -217,10 +227,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         val ids =
             (friendship.get("participantIds") as? List<*>)?.filterIsInstance<String>().orEmpty()
         check(ids.size == 2 && current.uid in ids && friend.uid in ids) { "Only friends can open this conversation." }
-        val names =
-            (friendship.get("participantUsernames") as? Map<*, *>)?.entries?.mapNotNull { (key, value) ->
-                if (key is String && value is String) key to value else null
-            }?.toMap().orEmpty()
+        val names = friendship.get("participantUsernames").cloudStringMap().orEmpty()
         val ref = firestore.collection("conversations").document(friend.friendshipId)
         val existing = ref.get().await()
         if (existing.exists()) return checkNotNull(conversationFrom(existing))
@@ -318,10 +325,7 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
     // Converts a Firestore chat record into the app conversation model.
     private fun conversationFrom(row: DocumentSnapshot): ChatConversation? {
         val ids = (row.get("participantIds") as? List<*>)?.filterIsInstance<String>() ?: return null
-        val names =
-            (row.get("participantUsernames") as? Map<*, *>)?.entries?.mapNotNull { (key, value) ->
-                if (key is String && value is String) key to value else null
-            }?.toMap().orEmpty()
+        val names = row.get("participantUsernames").cloudStringMap().orEmpty()
         val friendshipId = row.getString("friendshipId") ?: row.id.takeIf { row.getString("type") == "SUPPORT" }
             ?: return null
         return ChatConversation(

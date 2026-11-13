@@ -567,13 +567,12 @@ internal class MediaTransferController(
             }
         val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
         val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
-        val target=File(opened,document.id+(extension?.let { ".$it" } ?: ""))
-        val partial=File(target.path+".part")
+        val partial = File.createTempFile("preview-", ".part", opened)
+        val target = File(opened, partial.nameWithoutExtension + (extension?.let { ".$it" } ?: ".preview"))
         try {
             encrypted.inputStream().buffered().use { input -> partial.outputStream().buffered().use { output ->
                 MediaCipher.decrypt(input,output,key)
             } }
-            if(target.exists()) target.delete()
             check(partial.renameTo(target))
             return target
         } catch(failure:Exception) {

@@ -59,6 +59,13 @@ class PrivacySecurityFlowTest : OliveUiTestBase() {
                 } else assertEquals(com.olive.app.ui.users.shared.navigation.SessionScreen.Cover, session.screen)
             }
         }
+        // Test stale callbacks after the lockout expires, keeping the lockout itself covered below.
+        val vault = EncryptedVault(InstrumentationRegistry.getInstrumentation().targetContext, "demo")
+        vault.update { root ->
+            val enrollment = root.child("enrollments").getJSONObject(root.getString("activeUid"))
+            assertTrue(enrollment.has("lockedUntil"))
+            enrollment.put("lockedUntil", System.currentTimeMillis() - 1)
+        }
         compose.runOnIdle {
             session.account.interceptSearch("moon garden")
             session.account.submitPin("739182", obsoleteChallenge)

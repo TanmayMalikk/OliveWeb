@@ -6,11 +6,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Source
 import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.BuildConfig
 import kotlinx.coroutines.tasks.await
 
 internal class PrioritySyncCoordinator(
     context: Context,
-    private val repository: SyncInvalidationRepository = SyncInvalidationRepository(),
+    private val repository: SyncInvalidationRepository? =
+        if (BuildConfig.FIREBASE_CONFIGURED) SyncInvalidationRepository() else null,
 ) {
     private val application = context.applicationContext
     private var activeUid: String? = null
@@ -18,6 +20,7 @@ internal class PrioritySyncCoordinator(
     private var lastUrgentRevision = 0L
 
     fun start(uid: String) {
+        val repository = repository ?: return
         if (activeUid == uid && subscription != null) {
             PriorityReconciliationWorker.enqueue(application, uid)
             return

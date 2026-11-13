@@ -74,13 +74,14 @@ internal fun OliveRoot(
     closeApp: () -> Unit = {},
 ) {
     val uiText = rememberResourceText()
+    val navigation by session.navigationState.collectAsState()
     val callState by session.calls.state.collectAsState()
     val callAccountId = session.coverAccountId.orEmpty()
     var callMinimized by remember(callAccountId) { mutableStateOf(false) }
     val incomingCall = session.calls.invitations.firstOrNull()?.let {
         resolveIncomingCaller(it, session.messages.conversations, callAccountId)
     }
-    val callOverlayVisible = shouldShowCallOverlay(session.screen, session.accountRole) &&
+    val callOverlayVisible = shouldShowCallOverlay(navigation.screen, session.accountRole) &&
         (incomingCall != null || shouldShowActiveCall(callState))
     val context = LocalContext.current
     var pendingCallPermissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -131,10 +132,10 @@ internal fun OliveRoot(
     }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
-    val isCover = session.screen == SessionScreen.Cover
+    val isCover = navigation.screen == SessionScreen.Cover
     val view = LocalView.current
     val accessibilityRoot = (view.parent as? ComposeView) ?: view
-    val privacyHidden = session.privacyBlackout
+    val privacyHidden = navigation.privacyBlackout
     SideEffect {
         accessibilityRoot.importantForAccessibility =
             if (privacyHidden) View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
@@ -152,25 +153,25 @@ internal fun OliveRoot(
         }
     }
     val coverTitle = session.coverType.localizedTitle(uiText)
-    val inActiveChat = session.page == SafePage.Messages && session.messages.activeConversation != null
-    val safeUser = session.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER
-    val showSupport = safeUser && !inActiveChat && session.page != SafePage.Camera
-    val chatHasQuickExit = session.screen == SessionScreen.Safe && inActiveChat
+    val inActiveChat = navigation.page == SafePage.Messages && session.messages.activeConversation != null
+    val safeUser = navigation.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER
+    val showSupport = safeUser && !inActiveChat && navigation.page != SafePage.Camera
+    val chatHasQuickExit = navigation.screen == SessionScreen.Safe && inActiveChat
     val userQuickExit = session.accountRole == AccountRole.USER
     val showQuickExit = userQuickExit && !isCover && !chatHasQuickExit
     var supportExpanded by remember(
-        session.screen,
-        session.page,
+        navigation.screen,
+        navigation.page,
         session.coverAccountId
     ) { mutableStateOf(false) }
-    var observedUnlock by remember { mutableIntStateOf(session.unlockAnimationVersion) }
+    var observedUnlock by remember { mutableIntStateOf(navigation.unlockAnimationVersion) }
     var pinAnimationRunning by remember { mutableStateOf(false) }
     // Start the olive reveal only after a new successful private entry.
-    LaunchedEffect(session.unlockAnimationVersion, session.screen) {
-        val currentUnlock = session.unlockAnimationVersion
-        if (currentUnlock > observedUnlock && session.screen == SessionScreen.Safe) {
+    LaunchedEffect(navigation.unlockAnimationVersion, navigation.screen) {
+        val currentUnlock = navigation.unlockAnimationVersion
+        if (currentUnlock > observedUnlock && navigation.screen == SessionScreen.Safe) {
             pinAnimationRunning = true
-        } else if (session.screen != SessionScreen.Safe) {
+        } else if (navigation.screen != SessionScreen.Safe) {
             pinAnimationRunning = false
         }
         observedUnlock = currentUnlock
@@ -179,7 +180,7 @@ internal fun OliveRoot(
     Box(Modifier.fillMaxSize().then(if (isCover) Modifier else Modifier.imePadding())) {
         // User accounts keep their cover loaded underneath; the other roles never create a cover screen.
         Box(
-            if (isCover && !session.privacyBlackout) Modifier.fillMaxSize().testTag("cover_root")
+            if (isCover && !navigation.privacyBlackout) Modifier.fillMaxSize().testTag("cover_root")
                 .semantics { paneTitle = coverTitle } else Modifier.fillMaxSize()
                 .clearAndSetSemantics { }) {
             Box(Modifier.fillMaxSize()) {
@@ -189,7 +190,7 @@ internal fun OliveRoot(
                         CoverType.NEWS -> NewsCover(
                             session,
                             locationPermissionVersion,
-                            isCover && !session.privacyBlackout
+                            isCover && !navigation.privacyBlackout
                         )
 
                         CoverType.FITNESS -> FitnessCover(session, isCover)
@@ -202,8 +203,8 @@ internal fun OliveRoot(
                 }
             }
             // Return TalkBack focus to the cover after a privacy exit finishes.
-            if (isCover && !session.privacyBlackout && session.accessibilityExitVersion > 0) {
-                key(session.accessibilityExitVersion) {
+            if (isCover && !navigation.privacyBlackout && navigation.accessibilityExitVersion > 0) {
+                key(navigation.accessibilityExitVersion) {
                     AccessibleMessage(
                         uiText(R.string.a11y_returned_to_cover, coverTitle),
                         Modifier.align(Alignment.CenterStart).size(1.dp), showText = false
@@ -213,8 +214,8 @@ internal fun OliveRoot(
         }
         if (!isCover) {
             // Hide the keyboard whenever the private PIN screen opens.
-            LaunchedEffect(session.screen) {
-                if (session.screen == SessionScreen.Pin) {
+            LaunchedEffect(navigation.screen) {
+                if (navigation.screen == SessionScreen.Pin) {
                     keyboard?.hide()
                     focus.clearFocus(force = true)
                 }
@@ -235,12 +236,12 @@ internal fun OliveRoot(
                                 Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp)
                             )
                         },
-                        contentWindowInsets = if (session.screen == SessionScreen.Safe && session.page == SafePage.Camera)
+                        contentWindowInsets = if (navigation.screen == SessionScreen.Safe && navigation.page == SafePage.Camera)
                             WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
                     ) { padding ->
                         Box(Modifier.fillMaxSize().padding(padding)) {
                             AnimatedContent(
-                                targetState = session.screen, label = "session screen",
+                                targetState = navigation.screen, label = "session screen",
                                 transitionSpec = {
                                     // Security boundaries replace old controls immediately, without an outgoing PIN/private screen.
                                     if (initialState in setOf(
@@ -260,7 +261,7 @@ internal fun OliveRoot(
                                 }) { targetScreen ->
                                 val pane = when (targetScreen) {
                                     SessionScreen.Pin -> uiText(if (session.account.usesDeviceLock || !session.account.canUseAppPin) R.string.entry_device_lock else R.string.enter_pin)
-                                    SessionScreen.Safe -> when (session.page) {
+                                    SessionScreen.Safe -> when (navigation.page) {
                                         SafePage.Home -> uiText(R.string.home)
                                         SafePage.Notes -> uiText(
                                             R.string.ui_notes
@@ -305,13 +306,13 @@ internal fun OliveRoot(
                                     SessionScreen.Cover -> session.coverType.localizedTitle(uiText)
                                 }
                                 CompositionLocalProvider(
-                                    LocalAccessibilityMessagesVisible provides (targetScreen == session.screen && !supportExpanded),
+                                    LocalAccessibilityMessagesVisible provides (targetScreen == navigation.screen && !supportExpanded),
                                     LocalQuickExit provides if (userQuickExit) exit else null,
                                 ) {
                                     // Entry setup owns its pane title because choosing New PIN changes its local screen.
                                     Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
                                         paneTitle = pane
-                                    }).then(if (targetScreen != session.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
+                                    }).then(if (targetScreen != navigation.screen) Modifier.clearAndSetSemantics {} else Modifier)) {
                                         // Opens the cover, account entry, onboarding, or Safe App for the current session.
                                         when (targetScreen) {
                                             SessionScreen.Loading -> Box(
@@ -386,8 +387,8 @@ internal fun OliveRoot(
                     ) { supportExpanded = it }
                 }
             }
-            session.idleCountdownSeconds?.let { seconds ->
-                if (session.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER) AlertDialog(
+            navigation.idleCountdownSeconds?.let { seconds ->
+                if (navigation.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER) AlertDialog(
                     onDismissRequest = session::noteInteraction,
                     title = { Text(stringResource(R.string.locking_soon)) },
                     text = {
@@ -412,14 +413,14 @@ internal fun OliveRoot(
                 )
             }
         }
-        if (session.privacyBlackout) Box(
+        if (navigation.privacyBlackout) Box(
             Modifier.fillMaxSize().background(Color.Black)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {}
                 .testTag("privacy_blackout"))
-        if (shouldShowCallOverlay(session.screen, session.accountRole)) {
+        if (shouldShowCallOverlay(navigation.screen, session.accountRole)) {
             incomingCall?.takeIf { callState == VoipSessionState.Idle }?.let { invitation ->
                 IncomingCallDialog(
                     invitation = invitation,

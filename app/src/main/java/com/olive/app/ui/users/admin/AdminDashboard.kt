@@ -116,6 +116,7 @@ private fun AdminDashboard(
     onMessages: () -> Unit,
 ) {
     val uiText = rememberResourceText()
+    val dashboard by session.dashboardState.collectAsState()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 18.dp),
@@ -140,8 +141,8 @@ private fun AdminDashboard(
                 Icon(Icons.Outlined.Settings, uiText(R.string.account_settings))
             }
         }
-        AccountCountGrid(session.adminCounts)
-        TicketCountGrid(session.adminCounts)
+        AccountCountGrid(dashboard.adminCounts)
+        TicketCountGrid(dashboard.adminCounts)
         OutlinedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
