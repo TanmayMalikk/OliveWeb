@@ -1,5 +1,5 @@
 // Shared connectivity check for features that require a verified internet path.
-package com.olive.app.data
+package com.olive.app.data.network
 
 import android.content.Context
 import android.net.ConnectivityManager

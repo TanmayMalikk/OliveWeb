@@ -8,7 +8,8 @@ import android.content.pm.PackageManager
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.data.*
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.UserProfile
 import com.olive.app.security.InputPolicy
 import org.junit.Assert.*
 import org.junit.Test

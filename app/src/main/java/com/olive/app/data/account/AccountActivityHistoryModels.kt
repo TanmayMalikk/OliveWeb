@@ -1,5 +1,5 @@
 // All account roles: defines private account activity records.
-package com.olive.app.data
+package com.olive.app.data.account
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -14,9 +14,9 @@ import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.StorageReference
 import com.google.firebase.functions.FirebaseFunctions
 import android.util.Log
-import com.olive.app.data.account.AccountSyncRepository
 import com.olive.app.security.*
 import kotlinx.coroutines.tasks.await
+import kotlin.collections.get
 
 
 data class HistoryRecord(val category: String, val id: String, val json: String)

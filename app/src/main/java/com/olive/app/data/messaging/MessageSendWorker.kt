@@ -1,7 +1,8 @@
 // All chat roles: delivers durable ciphertext messages when Firebase becomes reachable.
-package com.olive.app.data
+package com.olive.app.data.messaging
 
 import android.content.Context
+import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -13,7 +14,14 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.media.MediaAccessError
+import com.olive.app.data.media.MediaAccessException
+import com.olive.app.data.media.MediaRepository
+import com.olive.app.data.safety.SafetyDocumentRepository
+import com.olive.app.data.work.DurableWorkPolicy
 import java.security.MessageDigest
+import java.security.GeneralSecurityException
 import java.util.concurrent.TimeUnit
 import com.olive.app.security.EncryptionUtils
 import java.util.UUID
@@ -22,6 +30,7 @@ import org.json.JSONObject
 import org.json.JSONArray
 import kotlinx.coroutines.CancellationException
 import com.google.firebase.functions.FirebaseFunctions
+import com.olive.app.data.account.AccountIdentity
 import kotlinx.coroutines.tasks.await
 
 
@@ -30,15 +39,22 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     CoroutineWorker(context, parameters) {
     private val store = MessageOutboxStore(context)
     private val repository = SecureChatRepository()
+    private val conversations = MessagingRepository()
+    private val documents = SafetyDocumentRepository(media = MediaRepository())
 
     override suspend fun doWork(): Result {
         val ownerUid = inputData.getString(OWNER_UID) ?: return Result.failure()
         val conversationId = inputData.getString(CONVERSATION_ID) ?: return Result.failure()
+        val delivery = OutgoingDeliveryDispatcher(
+            deliverText = repository::deliver,
+            deliverAttachment = ::deliverAttachment,
+        )
         val outcome = MessageQueueDrainer(
             store = store,
             activeOwnerUid = { FirebaseAuth.getInstance().currentUser?.uid },
-            deliver = repository::deliver,
+            deliver = delivery::deliver,
             classifyFailure = ::messageDeliveryFailure,
+            reportFailure = ::reportMessageDeliveryFailure,
         ).drain(ownerUid, conversationId)
         return when (outcome) {
             MessageDrainOutcome.COMPLETE -> Result.success()
@@ -47,9 +63,41 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
         }
     }
 
+    private fun reportMessageDeliveryFailure(
+        message: OutgoingMessage,
+        failure: MessageDeliveryFailure,
+        cause: Throwable,
+        permanent: Boolean,
+    ) {
+        Log.w(
+            DELIVERY_LOG_TAG,
+            messageDeliveryLogLine(message.id, failure, cause, permanent),
+        )
+    }
+
+    private suspend fun deliverAttachment(message: OutgoingMessage, mediaId: String) {
+        try {
+            val conversation = conversations.getConversation(message.conversationId)
+                ?: throw AttachmentDeliveryRejected("CONVERSATION_NOT_FOUND")
+            if (message.ownerUid !in conversation.participantIds) {
+                throw AttachmentDeliveryRejected("PERMISSION_DENIED")
+            }
+            val recipients = conversation.participantIds.filter { it != message.ownerUid }.associateWith { uid ->
+                conversation.participantUsernames[uid]
+                    ?: throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
+            }
+            if (recipients.isEmpty()) throw AttachmentDeliveryRejected("RECIPIENT_UNAVAILABLE")
+            val document = documents.getFor(message.ownerUid, mediaId)
+            documents.shareInChat(document, message, recipients)
+        } catch (failure: GeneralSecurityException) {
+            throw attachmentKeyUnavailable(failure)
+        }
+    }
+
     companion object {
         private const val OWNER_UID = "ownerUid"
         private const val CONVERSATION_ID = "conversationId"
+        private const val DELIVERY_LOG_TAG = "OliveMessageDelivery"
 
         fun workName(ownerUid: String, conversationId: String): String {
             val digest = MessageDigest.getInstance("SHA-256")
@@ -60,7 +108,24 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
         private fun ownerTag(ownerUid: String) = "olive_messages_owner_$ownerUid"
 
         fun enqueue(context: Context, message: OutgoingMessage) {
-            val request = OneTimeWorkRequestBuilder<MessageSendWorker>()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                workName(message.ownerUid, message.conversationId),
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                request(message),
+            )
+        }
+
+        /** Replaces only this conversation's backed-off drain after an explicit user retry. */
+        fun retryNow(context: Context, message: OutgoingMessage) {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                workName(message.ownerUid, message.conversationId),
+                ExistingWorkPolicy.REPLACE,
+                request(message),
+            )
+        }
+
+        private fun request(message: OutgoingMessage) =
+            OneTimeWorkRequestBuilder<MessageSendWorker>()
                 .setInputData(
                     workDataOf(
                         OWNER_UID to message.ownerUid,
@@ -70,15 +135,13 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 )
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    TimeUnit.SECONDS,
+                )
                 .addTag(ownerTag(message.ownerUid))
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork(
-                workName(message.ownerUid, message.conversationId),
-                ExistingWorkPolicy.APPEND_OR_REPLACE,
-                request,
-            )
-        }
 
         fun enqueuePending(context: Context, ownerUid: String) {
             val store = MessageOutboxStore(context)
@@ -93,12 +156,30 @@ class MessageSendWorker(context: Context, parameters: WorkerParameters) :
     }
 }
 
-private fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure =
-    if (failure is FirebaseFirestoreException) {
+internal fun messageDeliveryFailure(failure: Throwable): MessageDeliveryFailure = when (failure) {
+    is MessageDeliveryRejected -> MessageDeliveryFailure(failure.failureCode, permanent = true)
+    is MediaAccessException -> MessageDeliveryFailure(
+        code = "ATTACHMENT_${failure.reason.name}",
+        permanent = failure.reason !in setOf(
+            MediaAccessError.NETWORK_REQUIRED,
+            MediaAccessError.LEASE_EXPIRED,
+            MediaAccessError.DOWNLOAD_FAILED,
+        ),
+    )
+    is FirebaseFirestoreException ->
         MessageDeliveryFailure(failure.code.name, isPermanentMessageFailure(failure.code))
-    } else {
-        MessageDeliveryFailure("TEMPORARY_FAILURE", permanent = false)
-    }
+    is FirebaseFunctionsException ->
+        MessageDeliveryFailure(failure.code.name, isPermanentMessageFailure(failure.code.name))
+    else -> MessageDeliveryFailure("TEMPORARY_FAILURE", permanent = false)
+}
+
+internal fun messageDeliveryLogLine(
+    messageId: String,
+    failure: MessageDeliveryFailure,
+    cause: Throwable,
+    permanent: Boolean,
+) = "messageId=$messageId code=${failure.code} permanent=$permanent " +
+        "exception=${cause::class.java.simpleName}"
 
 internal fun isPermanentMessageFailure(code: FirebaseFirestoreException.Code) =
     isPermanentMessageFailure(code.name)
@@ -123,6 +204,12 @@ enum class MessageDeliveryStatus {
     SENT,
 }
 
+internal fun canManuallyRetryMessage(status: MessageDeliveryStatus) =
+    status in setOf(MessageDeliveryStatus.QUEUED, MessageDeliveryStatus.FAILED_RETRYABLE)
+
+internal fun canDiscardFailedMessage(status: MessageDeliveryStatus) =
+    status == MessageDeliveryStatus.FAILED_PERMANENT
+
 /**
  * Durable client-side record for one encrypted message.
  *
@@ -140,6 +227,7 @@ data class OutgoingMessage(
     val status: MessageDeliveryStatus = MessageDeliveryStatus.QUEUED,
     val attemptCount: Int = 0,
     val failureCode: String? = null,
+    val attachment: OutgoingAttachment? = null,
 ) {
     init {
         require(id.isNotBlank() && ownerUid.isNotBlank() && conversationId.isNotBlank())
@@ -158,6 +246,7 @@ data class OutgoingMessage(
         put("status", status.name)
         put("attemptCount", attemptCount)
         failureCode?.let { put("failureCode", it) }
+        attachment?.let { put("attachment", it.toJson()) }
     }
 
     companion object {
@@ -172,6 +261,7 @@ data class OutgoingMessage(
             status = MessageDeliveryStatus.valueOf(value.getString("status")),
             attemptCount = value.optInt("attemptCount", 0),
             failureCode = value.optString("failureCode").takeIf(String::isNotBlank),
+            attachment = value.optJSONObject("attachment")?.let(OutgoingAttachment::fromJson),
         )
     }
 }
@@ -302,6 +392,8 @@ internal class MessageQueueDrainer(
     private val activeOwnerUid: () -> String?,
     private val deliver: suspend (OutgoingMessage) -> Unit,
     private val classifyFailure: (Throwable) -> MessageDeliveryFailure,
+    private val reportFailure: (OutgoingMessage, MessageDeliveryFailure, Throwable, Boolean) -> Unit =
+        { _, _, _, _ -> },
     private val maxAutomaticAttempts: Int = 6,
 ) {
     init {
@@ -342,6 +434,7 @@ internal class MessageQueueDrainer(
                 val deliveryFailure = classifyFailure(failure)
                 val permanent = deliveryFailure.permanent ||
                         sending.attemptCount >= maxAutomaticAttempts
+                reportFailure(sending, deliveryFailure, failure, permanent)
                 store.update(sending.id) {
                     it.copy(
                         status = if (permanent) {

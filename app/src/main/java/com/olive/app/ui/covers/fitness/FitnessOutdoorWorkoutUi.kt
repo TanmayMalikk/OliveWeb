@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
@@ -30,9 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.olive.app.R
-import com.olive.app.data.LocationRoute
-import com.olive.app.data.MapLocationPoint
-import com.olive.app.data.RouteCoordinate
+import com.olive.app.data.location.LocationRoute
+import com.olive.app.data.location.MapLocationPoint
+import com.olive.app.data.location.RouteCoordinate
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
 import kotlinx.coroutines.delay
@@ -47,6 +46,7 @@ import kotlinx.coroutines.tasks.await
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.milliseconds
 
 // Shows workout type, live controls, route, and recent outdoor workouts.
 @Composable
@@ -81,7 +81,7 @@ internal fun FitnessOutdoorWorkoutCard(accountId: String, enabled: Boolean) {
             workout = store.snapshot()
             recentWorkouts = store.history()
             currentTime = System.currentTimeMillis()
-            delay(1_000L)
+            delay(1_000L.milliseconds)
         }
     }
     // Keep focus in the workout card when starting or finishing changes its controls.

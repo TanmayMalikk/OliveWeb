@@ -1,7 +1,7 @@
 package com.olive.app.ui.users.shared.navigation
 
-import com.olive.app.data.AccountRole
-import com.olive.app.data.ChatConversation
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.ChatConversation
 import com.olive.app.data.messaging.VoipCall
 import com.olive.app.data.messaging.VoipParticipant
 import com.olive.app.data.messaging.VoipParticipantStatus

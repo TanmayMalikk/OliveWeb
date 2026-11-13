@@ -1,6 +1,8 @@
 // Tests that private-entry history syncs for safe-app users.
 package com.olive.app.data
 
+import com.olive.app.data.account.HistoryRecord
+import com.olive.app.data.account.PrivateEntry
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test

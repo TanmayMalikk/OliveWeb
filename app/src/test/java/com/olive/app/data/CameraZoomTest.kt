@@ -1,5 +1,6 @@
 package com.olive.app.data
 
+import com.olive.app.data.safety.nextCameraZoom
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

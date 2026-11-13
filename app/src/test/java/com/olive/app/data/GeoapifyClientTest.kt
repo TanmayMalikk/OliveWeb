@@ -1,6 +1,7 @@
 // Tests address-result parsing without making real network requests.
 package com.olive.app.data
 
+import com.olive.app.data.location.GeoapifyClient
 import org.junit.Assert.*
 import org.junit.Test
 

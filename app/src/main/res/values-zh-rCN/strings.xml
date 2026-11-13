@@ -266,6 +266,8 @@
     <string name="message_delivery_sending">正在发送…</string>
     <string name="message_delivery_retrying">尚未发送 — 正在自动重试</string>
     <string name="message_delivery_failed_retry">未发送 — 点按重试</string>
+    <string name="message_delivery_failed_permanent">未发送 — 点按即可移除</string>
+    <string name="message_delivery_attachment_access_revoked">未发送 — 你已无权访问此文件。点按即可移除</string>
     <string name="message_delivery_sent">已发送</string>
 <string name="share_attachment">分享附件</string><string name="select_attachment_category">选择%1$s</string>
     <string name="private_notes">私人笔记</string><string name="incident_reports">事件报告</string><string name="saved_media">已保存的媒体</string>
@@ -399,14 +401,17 @@
     <string name="safety_remove_attachment">移除附件 %1$s</string>
     <string name="chat_info">聊天信息</string>
     <string name="chat_members">聊天中的人员</string>
-    <string name="chat_header_member_count">%1$d 位成员</string>
-    <string name="chat_member_count">%1$d 人</string>
+    <plurals name="chat_header_member_count">
+        <item quantity="other">%1$d 位成员</item>
+    </plurals>
+    <plurals name="chat_member_count">
+        <item quantity="other">%1$d 人</item>
+    </plurals>
     <string name="chat_shared_items">共享项目</string>
     <string name="chat_no_shared_items">尚未共享文件或安全项目。</string>
     <string name="chat_add_people">添加人员</string>
     <string name="chat_add_person">添加 %1$s</string>
     <string name="chat_remove_person">将 %1$s 移出此群聊</string>
-    <string name="chat_add_participant_error">无法添加此人。对方必须是已接受的联系人，并已设置安全消息。</string>
     <string name="chat_request_staff_title">工作人员支持</string>
     <string name="chat_request_staff_description">创建一个单独的支持聊天，并保留此聊天中的所有人员。</string>
     <string name="chat_request_staff_button">请求工作人员</string>
@@ -446,7 +451,9 @@
     <string name="admin_support_chat_tasks">支持聊天</string>
     <string name="admin_completed">已完成</string>
     <string name="admin_closed">已关闭</string>
-    <string name="admin_staff_workload_accessibility">%1$s，%2$d 个安全计划，%3$d 个已完成，%4$d 个支持聊天，%5$d 个已关闭</string>
+    <plurals name="admin_staff_workload_accessibility">
+        <item quantity="other">%1$s，%2$d 个安全计划，%3$d 个已完成，%4$d 个支持聊天，%5$d 个已关闭</item>
+    </plurals>
     <string name="safety_assigned_to_staff">已分配给员工</string>
     <string name="safety_assigned_to_you">已分配给你</string>
     <string name="safety_waiting_for_staff">等待员工</string>

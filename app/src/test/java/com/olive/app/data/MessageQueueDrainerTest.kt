@@ -1,5 +1,12 @@
 package com.olive.app.data
 
+import com.olive.app.data.messaging.MessageDeliveryFailure
+import com.olive.app.data.messaging.MessageDeliveryStatus
+import com.olive.app.data.messaging.MessageDrainOutcome
+import com.olive.app.data.messaging.MessageOutboxStore
+import com.olive.app.data.messaging.MessageOutboxVault
+import com.olive.app.data.messaging.MessageQueueDrainer
+import com.olive.app.data.messaging.OutgoingMessage
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -145,6 +152,27 @@ class MessageQueueDrainerTest {
         assertEquals(6, head.attemptCount)
         assertEquals(MessageDeliveryStatus.FAILED_PERMANENT, head.status)
         assertEquals(MessageDeliveryStatus.QUEUED, store.all(OWNER).last().status)
+    }
+
+    @Test
+    fun `failure reporter receives the classified permanent outcome`() = runBlocking {
+        val store = storeWithMessages(1)
+        val reports = mutableListOf<String>()
+        val outcome = MessageQueueDrainer(
+            store = store,
+            activeOwnerUid = { OWNER },
+            deliver = { throw PermanentDeliveryFailure() },
+            classifyFailure = { MessageDeliveryFailure("IDEMPOTENCY_CONFLICT", permanent = true) },
+            reportFailure = { message, failure, cause, permanent ->
+                reports += "${message.id}:${failure.code}:${cause::class.java.simpleName}:$permanent"
+            },
+        ).drain(OWNER, CONVERSATION)
+
+        assertEquals(MessageDrainOutcome.BLOCKED, outcome)
+        assertEquals(
+            listOf("message-0:IDEMPOTENCY_CONFLICT:PermanentDeliveryFailure:true"),
+            reports,
+        )
     }
 
     @Test

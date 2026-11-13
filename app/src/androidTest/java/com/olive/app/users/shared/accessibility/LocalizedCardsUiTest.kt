@@ -10,7 +10,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.data.NewsArticle
+import com.olive.app.data.news.NewsArticle
 import com.olive.app.ui.covers.news.NewsArticleCard
 import org.junit.Assert.assertEquals
 import org.junit.Test

@@ -3,13 +3,13 @@ package com.olive.app.data.update
 
 import android.app.Activity
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.TextView
 import androidx.core.content.FileProvider
 import com.olive.app.R
 import java.io.File
+import androidx.core.net.toUri
 
 // Hands a verified APK to Android's protected package installer.
 class AppUpdateInstallerActivity : Activity() {
@@ -38,7 +38,7 @@ class AppUpdateInstallerActivity : Activity() {
             startActivity(
                 Intent(
                     Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                    Uri.parse("package:$packageName"),
+                    "package:$packageName".toUri(),
                 )
             )
             return

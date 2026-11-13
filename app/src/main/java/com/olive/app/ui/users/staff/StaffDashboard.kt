@@ -35,7 +35,8 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.shared.safetyplan.SafetyPlanScreen
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
-import com.olive.app.data.SafetyConsultation
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.safety.SafetyConsultation
 
 private enum class StaffPage { Dashboard, Settings, SafetyPlans, Messages, Map }
 
@@ -153,7 +154,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
             ownerName = plan.ownerName,
             displayOwnerName = ticketLabel,
             onCompleteConsultation = if (
-                session.accountRole == com.olive.app.data.AccountRole.STAFF &&
+                session.accountRole == AccountRole.STAFF &&
                 plan.conversationId.isNotBlank()
             ) ({ completionTarget = plan }) else null,
             onBack = { selected = null },
@@ -193,10 +194,10 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
         TextButton(onClick = onBack) { Text(stringResource(R.string.safety_back)) }
         Heading(
             stringResource(R.string.safety_inbox),
-            stringResource(if (session.accountRole == com.olive.app.data.AccountRole.ADMIN) R.string.safety_admin_intro else R.string.safety_staff_intro),
+            stringResource(if (session.accountRole == AccountRole.ADMIN) R.string.safety_admin_intro else R.string.safety_staff_intro),
             stringResource(R.string.olive_tree),
         )
-        if (session.accountRole == com.olive.app.data.AccountRole.STAFF) {
+        if (session.accountRole == AccountRole.STAFF) {
             val availabilityLabel = stringResource(R.string.safety_available)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(availabilityLabel, Modifier.weight(1f))
@@ -214,16 +215,16 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
         val waiting = controller.consultations.filter { it.staffUid.isBlank() }
         ConsultationGroup(
             title = stringResource(
-                if (session.accountRole == com.olive.app.data.AccountRole.ADMIN)
+                if (session.accountRole == AccountRole.ADMIN)
                     R.string.safety_assigned_to_staff else R.string.safety_assigned_to_you
             ),
             consultations = assigned,
             expanded = assignedExpanded,
             onExpandedChange = { assignedExpanded = it },
-            showStaffName = session.accountRole == com.olive.app.data.AccountRole.ADMIN,
+            showStaffName = session.accountRole == AccountRole.ADMIN,
             onSelected = { selected = it },
         )
-        if (session.accountRole == com.olive.app.data.AccountRole.ADMIN) {
+        if (session.accountRole == AccountRole.ADMIN) {
             ConsultationGroup(
                 title = stringResource(R.string.safety_waiting_for_staff),
                 consultations = waiting,

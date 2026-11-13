@@ -69,8 +69,7 @@ fun VoipCall.canBeRejoinedBy(userId: String): Boolean =
 // Lets an invited chat member enter an active call from its chat log.
 // Pending members accept the invitation, while disconnected members rejoin an established room.
 fun VoipCall.canBeJoinedBy(userId: String): Boolean {
-    if (status != VoipCallStatus.ACTIVE) return false
-    return when (participants.firstOrNull { it.userId == userId }?.status) {
+    return status == VoipCallStatus.ACTIVE && when (participants.firstOrNull { it.userId == userId }?.status) {
         VoipParticipantStatus.PENDING, VoipParticipantStatus.ACCEPTED -> true
         VoipParticipantStatus.DECLINED -> connectedParticipantCount() >= 2
         null -> false
@@ -94,7 +93,6 @@ data class VoipInvitation(
 sealed interface VoipState {
     data object Idle : VoipState
     data class Ringing(val callId: String, val callName: String, val callerId: String = "") : VoipState
-    data class Connecting(val callId: String) : VoipState
     data class Active(val callId: String, val participantCount: Int) : VoipState
     data class Error(val message: String) : VoipState
 }
@@ -109,12 +107,8 @@ internal fun isVoipApiConfigured(apiBaseUrl: String = BuildConfig.VOIP_API_BASE_
     apiBaseUrl.isNotBlank()
 
 class VoipManager(
-    private val apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL,
-    // The call API is served through a proxy. Use HTTP/1.1 over TLS to avoid failed HTTP/2
-    // handshakes without replaying call-creation requests on a second connection.
-    private val httpClient: OkHttpClient = OkHttpClient.Builder()
-        .protocols(listOf(Protocol.HTTP_1_1))
-        .build(),
+    apiBaseUrl: String = BuildConfig.VOIP_API_BASE_URL,
+    private val httpClient: OkHttpClient = OkHttpClient(),
     private val bearerTokenProvider: suspend () -> String? = {
         FirebaseAuth.getInstance().currentUser?.getIdToken(false)?.await()?.token
     },
@@ -350,7 +344,7 @@ class VoipManager(
                     }
                 } catch (error: UnknownHostException) {
                     lastDnsError = error
-                    if (attempt + 1 < attempts) delay(750L * (attempt + 1))
+                    if (attempt + 1 < attempts) delay((750L * (attempt + 1)).milliseconds)
                 }
             }
             throw IOException(

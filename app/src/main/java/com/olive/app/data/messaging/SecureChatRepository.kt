@@ -1,5 +1,5 @@
 // All chat roles: stores encrypted chats between allowed participants.
-package com.olive.app.data
+package com.olive.app.data.messaging
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -18,10 +18,14 @@ import java.security.PublicKey
 import java.security.spec.MGF1ParameterSpec
 import javax.crypto.SecretKey
 import android.content.Context
+import com.google.firebase.firestore.DocumentSnapshot
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRole
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.child
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Base64
 
 
 /** Stores message bodies with a per-conversation AES key wrapped for each participant. */
@@ -77,7 +81,7 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
     ): SecretKey {
         require(participantPublicKeys.keys.containsAll(conversation.participantIds))
         val encodedPublicKeys = participantPublicKeys.mapValues { (_, key) ->
-            java.util.Base64.getEncoder().encodeToString(key.encoded)
+            Base64.getEncoder().encodeToString(key.encoded)
         }
         val ref = firestore.collection("conversations").document(conversation.id)
         val locallyAvailableKey = existingRoomKey(conversation.id, currentUid)
@@ -205,9 +209,15 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
         firestore.runTransaction { transaction ->
             val saved = transaction.get(message)
             if (saved.exists()) {
-                check(saved.getString("senderUid") == outgoing.ownerUid)
-                check(saved.getString("ciphertext") == outgoing.ciphertext)
-                check(saved.getLong("clientSentAt") == outgoing.clientSentAt)
+                if (!existingMessageMatches(
+                        senderUid = saved.getString("senderUid"),
+                        ciphertext = saved.getString("ciphertext"),
+                        clientSentAt = saved.getLong("clientSentAt"),
+                        outgoing = outgoing,
+                    )
+                ) {
+                    throw MessageDeliveryRejected("IDEMPOTENCY_CONFLICT")
+                }
                 return@runTransaction
             }
             transaction.set(message, mapOf(
@@ -314,14 +324,23 @@ class SecureChatRepository(private val firestore: FirebaseFirestore = FirebaseFi
 
     // Loads and unwraps the room key used to decrypt this conversation.
     @Suppress("UNCHECKED_CAST")
-    private fun com.google.firebase.firestore.DocumentSnapshot.roomKeys() =
+    private fun DocumentSnapshot.roomKeys() =
         get("roomKeys") as? Map<String, String>
 
     // Loads each participant's public key before sharing a room key.
     @Suppress("UNCHECKED_CAST")
-    private fun com.google.firebase.firestore.DocumentSnapshot.participantPublicKeys() =
+    private fun DocumentSnapshot.participantPublicKeys() =
         get("participantPublicKeys") as? Map<String, String>
 }
+
+internal fun existingMessageMatches(
+    senderUid: String?,
+    ciphertext: String?,
+    clientSentAt: Long?,
+    outgoing: OutgoingMessage,
+) = senderUid == outgoing.ownerUid &&
+        ciphertext == outgoing.ciphertext &&
+        clientSentAt == outgoing.clientSentAt
 
 // All chat roles: retains only encrypted chat material for offline cold starts.
 
@@ -428,7 +447,13 @@ class ChatCacheStore internal constructor(
                 throw ChatCacheException("Offline access requires online revalidation")
             }
             val messages = entry.optJSONArray(MESSAGES)?.let { array ->
-                List(array.length()) { index -> encryptedMessageFromCacheJson(array.getJSONObject(index)) }
+                List(array.length()) { index ->
+                    encryptedMessageFromCacheJson(
+                        array.getJSONObject(
+                            index
+                        )
+                    )
+                }
             }.orEmpty().takeLast(MAX_MESSAGES_PER_CONVERSATION)
             CachedChatAccess(conversation, entry.getString(WRAPPED_ROOM_KEY), messages)
         } catch (expected: ChatCacheException) {
@@ -580,25 +605,19 @@ data class ChatConversation(
         return ticketDisplayName()
     }
 
-    // Admins have a fixed support-chat name for every viewer.
-    fun isChatAdmin(uid: String): Boolean = type == "SUPPORT" && adminUid.isNotBlank() && uid == adminUid
-
-    // Personal accounts see role labels in support chats.
+    // Personal accounts see a role label instead of an organization member's account name.
+    // suppressing unused since linter believes viewerRole is never used, It is.
     fun senderDisplayName(
         senderUid: String,
         senderUsername: String,
         viewerRole: AccountRole,
         anonymousStaffName: String,
-        anonymousAdminName: String,
-    ) = when {
-        isChatAdmin(senderUid) -> anonymousAdminName
-        type == "SUPPORT" &&
-            viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
-            staffUid.isNotBlank() && senderUid == staffUid -> anonymousStaffName
-        type == "SUPPORT" &&
-            viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
-            senderUid !in setOf(staffUid, adminUid).filter { it.isNotBlank() } ->
-            if (senderUid == ownerUid) "Ticket ${ticketNumber()}" else "Friend"
+    ) = when (type) {
+        "SUPPORT" if viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+                senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() } -> anonymousStaffName
+        "SUPPORT" if viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+                senderUid !in setOf(staffUid, adminUid).filter { it.isNotBlank() } ->
+            "Ticket ${participantTicketNumber(senderUid)}"
         else -> senderUsername
     }
 

@@ -19,64 +19,8 @@
     <string name="ui_could_not_reconnect_check_your_password_and_try_again">无法重新连接。检查您的密码并重试。</string>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    <string name="ui_new_headlines_are_available">新的头条新闻可用。</string>
     <string name="ui_a_new_update_is_available">有新的更新可用。</string>
-    <string name="ui_an_account_update_is_available">帐户更新可用。</string>
-    <string name="ui_your_latest_digest_is_ready">您的最新摘要已准备就绪。</string>
-    <string name="ui_there_are_new_stories_to_browse">有新的故事可供浏览。</string>
 
-    <string name="ui_open_the_app_to_see_what_s_new">打开应用程序查看新内容。</string>
-    <string name="ui_new_activity_is_waiting">新活动正在等待。</string>
-    <string name="ui_daily_digest_briefings">每日摘要简报</string>
-    <string name="ui_daily_headlines_and_news_digest_notifications">每日头条新闻和新闻摘要通知</string>
-
-    <string name="ui_app_updates">应用程序更新</string>
-    <string name="ui_general_app_activity_notifications">一般应用程序活动通知</string>
-    <string name="ui_olive_branch_updates">橄榄枝更新</string>
-    <string name="ui_olive_tree_updates">橄榄树更新</string>
     <string name="ui_call_invitation_notifications">通话邀请</string>
     <string name="ui_speaker">扬声器</string>
     <string name="ui_speaker_off">关闭扬声器</string>

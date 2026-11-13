@@ -41,8 +41,6 @@
     <string name="fatsecret_attribution">Powered by FatSecret Platform API</string>
     <string name="open_food_facts_attribution">Packaged-food data from Open Food Facts</string>
     <string name="fitness_cover_choice">Fitness App · Fitness Tracker</string>
-    <string name="fitness_reminder">Your fitness summary is ready.</string>
-    <string name="fitness_updates">Fitness Tracker updates</string>
     <string name="fitness_history_title">14-day history</string>
     <string name="fitness_history_description">Daily totals from this phone and connected watch.</string>
     <string name="fitness_history_daily_total">Daily total</string>

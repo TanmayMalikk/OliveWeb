@@ -1,5 +1,5 @@
 // Safe contacts and organization accounts: caches authorized safety-plan list metadata encrypted on-device.
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import android.content.Context
 import com.olive.app.security.EncryptedVault

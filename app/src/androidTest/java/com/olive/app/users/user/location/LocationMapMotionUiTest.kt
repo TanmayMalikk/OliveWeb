@@ -11,8 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import com.olive.app.data.LocationTrailPoint
-import com.olive.app.data.MapLocationPoint
+import com.olive.app.data.location.LocationTrailPoint
+import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
 import com.olive.app.ui.shared.OliveTheme
 import org.junit.Assert.assertEquals

@@ -13,12 +13,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.safety.SAFETY_SECTIONS
+import com.olive.app.data.safety.SafetyChecklistItem
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.readSafetyChecklist
+import com.olive.app.data.safety.readSafetyPlanContact
+import com.olive.app.data.safety.safetyChecklistAttachments
+import com.olive.app.data.safety.safetyChecklistPreview
+import com.olive.app.data.safety.safetyPlanContactItem
+import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
@@ -27,6 +39,8 @@ import java.util.UUID
 @Composable
 internal fun SafetyChecklistSection(
     plan: SafetyPlan, fieldKey: String, onEdit: (String, String) -> Unit,
+    onResolve: (String, Boolean) -> Unit,
+    onSyncNow: () -> Unit = {},
     contacts: List<SafeContact> = emptyList(),
     contactsEditable: Boolean = false, onContactsChange: ((List<SafeContact>) -> Unit)? = null,
     editable: Boolean = true, attachmentsEditable: Boolean = editable,
@@ -91,9 +105,14 @@ internal fun SafetyChecklistSection(
                                 checked = checked
                             ) else it
                         })
+                        onSyncNow()
                     },
                     onText = { value -> update(items.map { if (it.id == item.id) it.copy(text = value) else it }) },
-                    onRemove = { update(items.filterNot { it.id == item.id }) },
+                    onRemove = {
+                        update(items.filterNot { it.id == item.id })
+                        onSyncNow()
+                    },
+                    onSyncNow = onSyncNow,
                     attachments = safetyChecklistAttachments(fieldKey, item, documents),
                     attachmentsEditable = attachmentsEditable,
                     onOpenAttachment = onOpenDocument,
@@ -105,6 +124,7 @@ internal fun SafetyChecklistSection(
                                     (it.excludedAttachmentIds + document.id).distinct().takeLast(80),
                             ) else it
                         })
+                        onSyncNow()
                     },
                     onUploadDocument = onUploadDocument?.let { upload -> { upload(item.id) } },
                 )
@@ -113,7 +133,10 @@ internal fun SafetyChecklistSection(
         if (section != "contacts" && editable) {
             val addDescription = stringResource(R.string.safety_add_to_section, title)
             TextButton(
-                onClick = { update(items + SafetyChecklistItem(UUID.randomUUID().toString(), "")) },
+                onClick = {
+                    update(items + SafetyChecklistItem(UUID.randomUUID().toString(), ""))
+                    onSyncNow()
+                },
                 modifier = Modifier.testTag("safety_add_$fieldKey")
                     .semantics { contentDescription = addDescription }) {
                 Icon(
@@ -133,6 +156,7 @@ internal fun SafetyChecklistSection(
 private fun ChecklistRow(
     item: SafetyChecklistItem, heading: String, sectionKey: String, index: Int, editable: Boolean,
     onChecked: (Boolean) -> Unit, onText: (String) -> Unit, onRemove: () -> Unit,
+    onSyncNow: () -> Unit,
     attachments: List<SafetyDocument>, onRemoveAttachment: (SafetyDocument) -> Unit,
     attachmentsEditable: Boolean,
     onOpenAttachment: ((SafetyDocument) -> Unit)?,
@@ -158,7 +182,9 @@ private fun ChecklistRow(
                 keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(vertical = 12.dp)
                     .testTag(if (index == 0) "safety_$sectionKey" else "safety_${sectionKey}_${item.id}")
-                    .semantics { contentDescription = heading }.keepVisibleWhileTyping(),
+                    .semantics { contentDescription = heading }
+                    .onFocusChanged { if (!it.isFocused) onSyncNow() }
+                    .keepVisibleWhileTyping(),
                 decorationBox = { input ->
                     Box {
                         if (item.text.isEmpty()) Text(
@@ -388,7 +414,7 @@ private fun SafetyPlanContactPicker(
 // https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html
 internal fun safetyDefaults(context: Context): Map<String, String> = buildMap {
     listOf("primary", "backup").forEach { plan ->
-        com.olive.app.data.SAFETY_SECTIONS.forEach { section ->
+        SAFETY_SECTIONS.forEach { section ->
             val prompts = when (section) {
                 "documents" -> safetyDocumentSuggestions(context)
                 "grab" -> context.resources.getStringArray(R.array.safety_grab_checklist).toList()

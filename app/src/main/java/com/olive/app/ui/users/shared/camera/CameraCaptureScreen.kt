@@ -36,8 +36,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.olive.app.R
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.DocumentOcrMetadata
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.safety.DocumentOcrMetadata
 import com.olive.app.data.media.MediaKind
 import com.olive.app.ocr.OcrResult
 import com.olive.app.ui.shared.*
@@ -183,6 +183,9 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                 AndroidView(
                     factory = {
                         preview.apply {
+                            //TODO: add accessibility functionality to this event.
+                            //currently there is no way for a user on talkback to navigate this event
+                            // and no way for them to zoom in or out.
                             setOnTouchListener { _, event ->
                                 pinchDetector.onTouchEvent(event)
                                 true

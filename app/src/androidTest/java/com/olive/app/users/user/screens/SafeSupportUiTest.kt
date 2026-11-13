@@ -24,7 +24,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.data.*
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.UserProfile
 import com.olive.app.security.InputPolicy
 import java.io.File
 import org.junit.Assert.*

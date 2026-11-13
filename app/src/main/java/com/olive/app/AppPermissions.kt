@@ -105,12 +105,10 @@ internal class AppPermissions(
         ) == PackageManager.PERMISSION_GRANTED
 
     // Checks background location on Android 10 and newer; older versions do not need a separate grant.
-    fun hasBackgroundLocation() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        ContextCompat.checkSelfPermission(
-            activity,
-            Manifest.permission.ACCESS_BACKGROUND_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-    } else true
+    fun hasBackgroundLocation() = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ContextCompat.checkSelfPermission(
+        activity,
+        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
 
     // Onboarding permissions: Opens the next permission prompt after onboarding. It checks saved prompt history and requests notifications, location, camera, or microphone in order.
     fun afterOnboarding() {

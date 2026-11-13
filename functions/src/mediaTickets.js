@@ -565,7 +565,7 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   return publicRecord(await reference.get());
 });
 
-// Publish the message and grant its recipients access in the same transaction.
+// Publishes the ciphertext message and grants its current conversation recipients access atomically.
 exports.mediaShareInChat = onCall(options, async (request) => {
   const uid = caller(request);
   const data = request.data;
@@ -574,13 +574,13 @@ exports.mediaShareInChat = onCall(options, async (request) => {
   const messageId = string(data?.messageId, "messageId", 128);
   const ciphertext = string(data?.ciphertext, "ciphertext", 12000);
   const clientSentAt = data?.clientSentAt;
-  const recipients = recipientList(data?.recipientUids, null, uid, "recipientUids");
+  const recipients = chatRecipientList(data?.recipientUids, uid);
   if (!recipients.length || !Number.isSafeInteger(clientSentAt) || clientSentAt < 0 ||
       [mediaId, conversationId, messageId].some(id => !/^[A-Za-z0-9_-]+$/.test(id))) {
     throw new HttpsError("invalid-argument", "Invalid chat share.");
   }
   const file = mediaRef(mediaId);
-  const grants = planMediaGrantRef(uid, mediaId);
+  const grants = chatMediaGrantRef(uid, mediaId);
   const chat = db.collection("conversations").doc(conversationId);
   const message = chat.collection("messages").doc(messageId);
   await db.runTransaction(async transaction => {
@@ -614,12 +614,19 @@ exports.mediaShareInChat = onCall(options, async (request) => {
       const wrappedKeys = {...value.wrapped_keys, ...Object.fromEntries(
         recipients.map(id => [id, access.wrappedKeys[id]]),
       )};
-      const deviceWrappedKeys = {...value.device_wrapped_keys, ...retainedDeviceKeys(access.deviceWrappedKeys, recipients)};
+      const deviceWrappedKeys = {
+        ...(value.device_wrapped_keys || {}),
+        ...chatDeviceKeys(access.deviceWrappedKeys, recipients),
+      };
       const allowedUsers = Object.keys(wrappedKeys);
       if (allowedUsers.length > 25 || Object.keys(deviceWrappedKeys).length > 250) {
         throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
       }
-      transaction.update(file, {wrapped_keys: wrappedKeys, device_wrapped_keys: deviceWrappedKeys, allowed_users: allowedUsers});
+      transaction.update(file, {
+        wrapped_keys: wrappedKeys,
+        device_wrapped_keys: deviceWrappedKeys,
+        allowed_users: allowedUsers,
+      });
       transaction.set(grants, {
         independentReaders: [...new Set([...(tracked.get("independentReaders") || []), ...recipients])],
       }, {merge: true});
@@ -634,95 +641,39 @@ exports.mediaShareInChat = onCall(options, async (request) => {
       transaction.update(file, {allowed_users: allowedUsers});
     }
     transaction.create(message, {
-      senderUid: uid, senderUsername, ciphertext, clientSentAt, deleted: false, sentAt: FieldValue.serverTimestamp(),
+      senderUid: uid,
+      senderUsername,
+      ciphertext,
+      clientSentAt,
+      deleted: false,
+      sentAt: FieldValue.serverTimestamp(),
     });
     transaction.update(chat, {
-      lastMessage: "Secure message", lastMessageId: messageId, lastSenderUid: uid, updatedAt: FieldValue.serverTimestamp(),
+      lastMessage: "Secure message",
+      lastMessageId: messageId,
+      lastSenderUid: uid,
+      updatedAt: FieldValue.serverTimestamp(),
     });
   });
   return {shared: true};
 });
 
-function planMediaGrantRef(ownerUid, mediaId) {
+function chatMediaGrantRef(ownerUid, mediaId) {
   return db.collection("safetyPlanMediaGrants").doc(ownerUid).collection("files").doc(mediaId);
 }
 
-async function requireActivePlanGrant(ownerUid, mediaId, readerUid) {
-  if (ownerUid === readerUid) return;
-  const grant = await planMediaGrantRef(ownerUid, mediaId).get();
-  if (!grant.get("readers")?.includes(readerUid)) return;
-  const plan = await db.collection("safetyPlans").doc(ownerUid).get();
-  if (!planMediaReaders(plan.data(), mediaId).has(readerUid) &&
-      !grant.get("independentReaders")?.includes(readerUid)) {
-    throw new HttpsError("permission-denied", "Plan attachment access was removed.");
-  }
-}
-
-function recipientList(value, allowedUsers, ownerUid, field) {
-  if (value == null) return [];
+function chatRecipientList(value, ownerUid) {
   if (!Array.isArray(value) || value.length > 25 || value.some(uid =>
-    typeof uid !== "string" || !uid || uid.length > 128 || uid === ownerUid ||
-    (allowedUsers && !allowedUsers.includes(uid)))) {
-    throw new HttpsError("invalid-argument", `Invalid ${field}`);
+    typeof uid !== "string" || !uid || uid.length > 128 || uid === ownerUid)) {
+    throw new HttpsError("invalid-argument", "Invalid recipientUids");
   }
   return [...new Set(value)];
 }
 
-function retainedDeviceKeys(keys, allowedUsers) {
+function chatDeviceKeys(keys, recipients) {
   return Object.fromEntries(Object.entries(keys || {}).filter(([key]) =>
-    allowedUsers.some(id => key.startsWith(id + "--"))));
+    recipients.some(id => key.startsWith(`${id}--`))));
 }
-
-function planMediaReaders(plan, mediaId) {
-  const attached = ["primary_documents", "backup_documents"].some(key => {
-    try {
-      const checklist = JSON.parse(plan?.fields?.[key]?.value || "");
-      return checklist?.oliveSafetyChecklist === 1 && Array.isArray(checklist.items) &&
-        checklist.items.some(item => Array.isArray(item?.attachmentIds) && item.attachmentIds.includes(mediaId) &&
-          !(Array.isArray(item.excludedAttachmentIds) && item.excludedAttachmentIds.includes(mediaId)));
-    } catch (_) {
-      return false;
-    }
-  });
-  return new Set(attached ? [
-    ...(plan.safeContactUids || []),
-    ...(plan.consultationRequested ? [plan.staffUid, plan.adminUid] : []),
-  ].filter(Boolean) : []);
-}
-
-// Removes only grants created by plan sharing, preserving independently shared access.
-async function reconcilePlanMediaGrants(ownerUid) {
-  const planRef = db.collection("safetyPlans").doc(ownerUid);
-  const grants = await planMediaGrantRef(ownerUid, "_").parent.get();
-  for (const grant of grants.docs) {
-    await db.runTransaction(async transaction => {
-      const reference = mediaRef(grant.id);
-      const [plan, currentGrant, media] = await Promise.all([
-        transaction.get(planRef), transaction.get(grant.ref), transaction.get(reference),
-      ]);
-      if (!currentGrant.exists) return;
-      const readers = currentGrant.get("readers") || [];
-      const independentReaders = currentGrant.get("independentReaders") || [];
-      const permitted = planMediaReaders(plan.data(), grant.id);
-      const revoked = readers.filter(id => !permitted.has(id));
-      const removeAccess = revoked.filter(id => !independentReaders.includes(id));
-      if (media.exists && media.get("owner_id") === ownerUid && removeAccess.length) {
-        const wrappedKeys = Object.fromEntries(Object.entries(media.get("wrapped_keys") || {})
-            .filter(([id]) => !removeAccess.includes(id)));
-        const allowedUsers = Object.keys(wrappedKeys);
-        transaction.update(reference, {
-          wrapped_keys: wrappedKeys, allowed_users: allowedUsers,
-          device_wrapped_keys: retainedDeviceKeys(media.get("device_wrapped_keys"), allowedUsers),
-        });
-      }
-      const kept = readers.filter(id => permitted.has(id));
-      if (!media.exists || (!kept.length && !independentReaders.length)) transaction.delete(grant.ref);
-      else if (revoked.length) transaction.update(grant.ref, {readers: kept});
-    });
-  }
-}
-
-Object.defineProperty(exports, "reconcilePlanMediaGrants", {value: reconcilePlanMediaGrants});
 
 // Adds key copies for new phones or browsers without changing who may access the document.
 exports.mediaUpdateDeviceKeys = onCall(options, async (request) => {

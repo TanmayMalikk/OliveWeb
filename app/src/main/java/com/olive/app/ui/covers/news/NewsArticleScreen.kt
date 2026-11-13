@@ -48,11 +48,11 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import coil3.compose.AsyncImage
-import com.olive.app.data.fallbackNewsTopic
-import com.olive.app.data.isSecureNewsUrl
-import com.olive.app.data.localPublishedDate
-import com.olive.app.data.NewsArticle
-import com.olive.app.data.NewsMetadataRepository
+import com.olive.app.data.news.fallbackNewsTopic
+import com.olive.app.data.news.isSecureNewsUrl
+import com.olive.app.data.news.localPublishedDate
+import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.news.NewsMetadataRepository
 import com.olive.app.R
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.LocalizedIcon as Icon

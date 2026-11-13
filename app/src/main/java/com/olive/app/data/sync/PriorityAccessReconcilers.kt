@@ -3,15 +3,15 @@ package com.olive.app.data.sync
 
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
-import com.olive.app.data.AccountRole
-import com.olive.app.data.ChatCacheStore
-import com.olive.app.data.DocumentIndexStore
-import com.olive.app.data.DocumentListSource
-import com.olive.app.data.MessagingRepository
-import com.olive.app.data.SafetyAccessIndexStore
-import com.olive.app.data.SafetyDocumentRepository
-import com.olive.app.data.SafetyPlanRepository
-import com.olive.app.data.SafetyPlanStore
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.ChatCacheStore
+import com.olive.app.data.safety.DocumentIndexStore
+import com.olive.app.data.safety.DocumentListSource
+import com.olive.app.data.messaging.MessagingRepository
+import com.olive.app.data.safety.SafetyAccessIndexStore
+import com.olive.app.data.safety.SafetyDocumentRepository
+import com.olive.app.data.safety.SafetyPlanRepository
+import com.olive.app.data.safety.SafetyPlanStore
 import com.olive.app.data.media.MediaRepository
 import com.olive.app.data.media.OfflineMediaCache
 import kotlinx.coroutines.tasks.await

@@ -5,7 +5,7 @@ import android.content.Context
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Source
-import com.olive.app.data.ChatSubscription
+import com.olive.app.data.messaging.ChatSubscription
 import kotlinx.coroutines.tasks.await
 
 internal class PrioritySyncCoordinator(

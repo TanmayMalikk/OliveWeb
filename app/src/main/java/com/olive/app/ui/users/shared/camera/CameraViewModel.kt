@@ -4,12 +4,12 @@ package com.olive.app.ui.users.shared.camera
 import android.app.Application
 import android.graphics.*
 import android.graphics.pdf.PdfDocument
-import android.media.ExifInterface
+import androidx.exifinterface.media.ExifInterface
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
-import com.olive.app.data.CameraManager
+import com.olive.app.data.safety.CameraManager
 import com.olive.app.ocr.OcrResult
 import com.olive.app.ocr.PaddleOcrManager
 import java.io.File

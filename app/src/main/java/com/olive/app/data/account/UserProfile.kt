@@ -1,5 +1,5 @@
 // Users and safe contacts: defines their profile details.
-package com.olive.app.data
+package com.olive.app.data.account
 
 import org.json.JSONArray
 import org.json.JSONObject
@@ -12,8 +12,6 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 import com.google.firebase.firestore.DocumentId
 import com.google.firebase.firestore.PropertyName
-import com.google.firebase.firestore.ServerTimestamp
-import java.util.Date
 
 
 // A trusted person can optionally be linked to one explicitly accepted chat friend.
@@ -285,7 +283,7 @@ class AdminRepository {
             )
         ).await().data.asMap()["profile"].asMap()
         FirebaseAuth.getInstance().currentUser?.reload()?.await()
-        return UserProfile.fromJson(org.json.JSONObject(result))
+        return UserProfile.fromJson(JSONObject(result))
     }
 }
 
@@ -497,37 +495,3 @@ data class Address(
     val country: String = ""
 )
 
-// Metadata stored for an uploaded document.
-data class FileMetadata(
-    @DocumentId
-    val fileId: String = "",
-
-    @PropertyName("owner_id")
-    val ownerId: String = "",
-
-    @PropertyName("storage_path")
-    val storagePath: String = "",
-
-    @PropertyName("file_name")
-    val fileName: String = "",
-
-    @PropertyName("file_type")
-    val fileType: String = "",
-
-    @PropertyName("allowed_users")
-    val allowedUsers: List<String> = emptyList(),
-
-    @ServerTimestamp
-    @PropertyName("created_at")
-    val createdAt: Date? = null
-)
-
-data class SecureCloudEntry(
-    val id: String,
-    val ownerUid: String,
-    val ciphertext: String, // The AES-encrypted JSON of title, body, and edits
-    val wrappedKeys: Map<String, String>, // Map of UID -> RSA-wrapped AES Key
-    val allowedUsers: List<String>, // Array of UIDs for Firestore security rules
-    val createdAt: Long,
-    val updatedAt: Long
-)

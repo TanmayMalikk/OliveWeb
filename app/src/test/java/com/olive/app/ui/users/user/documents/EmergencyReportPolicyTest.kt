@@ -1,11 +1,11 @@
 // Emergency PDF tests: checks which profile, incident, and evidence details enter the report.
 package com.olive.app.ui.users.user.documents
 
-import com.olive.app.data.DeliveryAddress
-import com.olive.app.data.PrivateEntry
-import com.olive.app.data.PrivateEntryKind
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.account.UserProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

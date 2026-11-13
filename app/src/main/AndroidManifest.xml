@@ -6,20 +6,38 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Olive branch tracks user location at all time as part of our core safety features.
+    While users can choose not to use it, it is part of our Requirements per our contract.
+    This gives user's safety functionality
+     Warning suppressed.-->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"
+        tools:ignore="BackgroundLocationPolicy" />
+    <!-- This warning is being suppressed, since that's the only way to handle it, the warning is meant to serve
+    as a stop gap to slow the developer and make them think about their actions.
+    Our use case for FOREGROUND_SERVICE is to be able to do location/calling-->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
+        tools:ignore="ForegroundServicesPolicy" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING" />
     <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Full screen intent is being used in our project to notify users of incoming phone calls,
+    The warning is to notify the developers that there are tight best practice considerations,
+    and to not abuse the powers it gives.
+    In our app the only full screen intent calls happen while the app is open to act as a mimicry of
+    the screen that pops up when you get a normal phone call.
+    Warning suppressed -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"
+        tools:ignore="FullScreenIntentPolicy" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <!-- Release APKs are distributed from Olive's website. Android still asks the user to
-         approve Olive as an installation source before an update can be installed. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+         approve Olive as an installation source before an update can be installed.
+          Warning suppressed.-->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:ignore="RequestInstallPackagesPolicy" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application android:name=".OliveApplication" android:allowBackup="false" android:label="@string/app_name"
         android:dataExtractionRules="@xml/data_extraction_rules"

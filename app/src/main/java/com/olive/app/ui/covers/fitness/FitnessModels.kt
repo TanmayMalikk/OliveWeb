@@ -182,7 +182,7 @@ internal object StepSourcePolicy {
 
     // Watches is active for fitness cover.
     fun watchIsActive(lastWatchActivityAt: Long, nowMillis: Long): Boolean =
-        lastWatchActivityAt > 0L && nowMillis >= lastWatchActivityAt &&
+        lastWatchActivityAt in 1..nowMillis &&
             nowMillis - lastWatchActivityAt <= WATCH_ACTIVE_WINDOW_MS
 
     // Adds only new phone steps so watch and phone totals are not counted twice.

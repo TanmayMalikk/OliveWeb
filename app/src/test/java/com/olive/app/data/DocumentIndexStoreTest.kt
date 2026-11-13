@@ -1,6 +1,13 @@
 package com.olive.app.data
 
 import android.content.Context
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.safety.DocumentIndexStore
+import com.olive.app.data.safety.DocumentListSnapshot
+import com.olive.app.data.safety.DocumentListSource
+import com.olive.app.data.safety.IndexedSafetyDocumentRepository
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.SafetyDocumentDataSource
 import com.olive.app.security.JsonVault
 import java.io.File
 import kotlinx.coroutines.runBlocking
@@ -43,7 +50,13 @@ class DocumentIndexStoreTest {
         remote.emit(DocumentListSnapshot(emptyList(), DocumentListSource.FIRESTORE_CACHE))
         assertEquals(setOf("kept", "revoked"), observed.last().documents.mapTo(mutableSetOf()) { it.id })
 
-        remote.emit(DocumentListSnapshot(listOf(document("kept", ALICE)), DocumentListSource.SERVER, 400))
+        remote.emit(
+            DocumentListSnapshot(
+                listOf(document("kept", ALICE)),
+                DocumentListSource.SERVER,
+                400
+            )
+        )
         assertEquals(listOf("kept"), index.read(ALICE).documents.map { it.id })
         assertEquals(400L, index.read(ALICE).lastSyncedAt)
     }
@@ -52,7 +65,10 @@ class DocumentIndexStoreTest {
     fun `authorization failure never falls back through getFor`() = runBlocking {
         val index = DocumentIndexStore(FakeJsonVault())
         index.replace(ALICE, listOf(document("cached", ALICE)), 100)
-        val repository = IndexedSafetyDocumentRepository(FakeRemote(getFailure = SecurityException("revoked")), index)
+        val repository = IndexedSafetyDocumentRepository(
+            FakeRemote(getFailure = SecurityException("revoked")),
+            index
+        )
 
         assertEquals("cached", repository.cachedFor(ALICE, "cached")?.id)
         val failure = runCatching { repository.getFor(ALICE, "cached") }.exceptionOrNull()
@@ -92,7 +108,8 @@ class DocumentIndexStoreTest {
     private class FakeRemote(private val getFailure: Exception? = null) : SafetyDocumentDataSource {
         private var observer: ((DocumentListSnapshot) -> Unit)? = null
         fun emit(value: DocumentListSnapshot) = checkNotNull(observer).invoke(value)
-        override suspend fun listFor(uid: String) = DocumentListSnapshot(emptyList(), DocumentListSource.SERVER, 1)
+        override suspend fun listFor(uid: String) =
+            DocumentListSnapshot(emptyList(), DocumentListSource.SERVER, 1)
         override fun observeFor(uid: String, onUpdate: (DocumentListSnapshot) -> Unit, onError: (String) -> Unit) =
             ChatSubscription { observer = null }.also { observer = onUpdate }
         override suspend fun getFor(uid: String, id: String): SafetyDocument {

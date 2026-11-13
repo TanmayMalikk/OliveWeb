@@ -93,7 +93,7 @@ internal class AppUpdateClient(private val context: Context) {
     }
 
     private fun android.content.pm.PackageInfo.longVersionCodeCompat(): Long =
-        if (android.os.Build.VERSION.SDK_INT >= 28) longVersionCode else versionCode.toLong()
+        longVersionCode
 
     companion object {
         private const val CONNECT_TIMEOUT_MS = 15_000

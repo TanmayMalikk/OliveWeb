@@ -340,17 +340,17 @@ fun JSONObject.child(name: String): JSONObject =
  */
 object MediaCipher {
     private val magic=byteArrayOf('O'.code.toByte(),'L'.code.toByte(),'V'.code.toByte(),'M'.code.toByte())
-    private const val version=1
-    private const val ivLength=12
-    private const val tagBits=128
-    private const val bufferSize=64*1024
-    const val headerBytes=6+ivLength
-    const val authenticationTagBytes=tagBits/Byte.SIZE_BITS
+    private const val VER=1
+    private const val IVLENGTH=12
+    private const val TAGBITS=128
+    private const val BUFFERSIZE=64*1024
+    const val HEADERBYTES=6+IVLENGTH
+    const val AUTHENTICATIONTAGBYTES=TAGBITS/Byte.SIZE_BITS
 
     /** Returns the exact container size without reading or allocating the plaintext. */
     fun encryptedSize(plainSize:Long):Long {
         require(plainSize>=0)
-        return headerBytes+plainSize+authenticationTagBytes
+        return HEADERBYTES+plainSize+AUTHENTICATIONTAGBYTES
     }
 
     /**
@@ -359,11 +359,11 @@ object MediaCipher {
      */
     fun encrypt(input:InputStream,output:OutputStream,key:SecretKey,onProgress:(Long)->Unit={}) {
         // GCM requires a unique unpredictable IV for every encryption under a key.
-        val iv=ByteArray(ivLength).apply { SecureRandom().nextBytes(this) }
+        val iv=ByteArray(IVLENGTH).apply { SecureRandom().nextBytes(this) }
         val cipher=Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE,key,GCMParameterSpec(tagBits,iv))
+        cipher.init(Cipher.ENCRYPT_MODE,key,GCMParameterSpec(TAGBITS,iv))
         val target=DataOutputStream(output)
-        target.write(magic);target.writeByte(version);target.writeByte(iv.size);target.write(iv)
+        target.write(magic);target.writeByte(VER);target.writeByte(iv.size);target.write(iv)
         transform(input,target,cipher,onProgress)
     }
 
@@ -376,18 +376,18 @@ object MediaCipher {
         val source=DataInputStream(input)
         val foundMagic=ByteArray(magic.size).also(source::readFully)
         require(foundMagic.contentEquals(magic)) { "Unsupported encrypted media" }
-        require(source.readUnsignedByte()==version) { "Unsupported encrypted media version" }
+        require(source.readUnsignedByte()==VER) { "Unsupported encrypted media version" }
         val foundIvLength=source.readUnsignedByte()
-        require(foundIvLength==ivLength) { "Unsupported encrypted media IV" }
+        require(foundIvLength==IVLENGTH) { "Unsupported encrypted media IV" }
         val iv=ByteArray(foundIvLength).also(source::readFully)
         val cipher=Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE,key,GCMParameterSpec(tagBits,iv))
+        cipher.init(Cipher.DECRYPT_MODE,key,GCMParameterSpec(TAGBITS,iv))
         transform(source,output,cipher,onProgress)
     }
 
     /** Shared bounded-memory transform used in both encryption and decryption directions. */
     private fun transform(input:InputStream,output:OutputStream,cipher:Cipher,onProgress:(Long)->Unit) {
-        val buffer=ByteArray(bufferSize)
+        val buffer=ByteArray(BUFFERSIZE)
         var processed=0L
         // Turn an unexpected transform failure into a readable message.
         try {

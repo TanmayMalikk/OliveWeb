@@ -4,6 +4,7 @@ import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.OfflineMediaAvailability
 import com.olive.app.data.media.OfflineMediaCache
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.security.JsonVault
 import java.io.File
 import java.security.MessageDigest
@@ -264,9 +265,19 @@ class OfflineMediaCacheTest {
 
     private fun document(id: String, owner: String, viewer: String, mime: String = "application/pdf"): SafetyDocument {
         val bytes = "encrypted-$id".toByteArray()
-        return SafetyDocument(id, owner, "", "$id.bin", mime, listOf(owner, viewer).distinct(),
-            objectKey = "objects/$id", wrappedKeys = mapOf(viewer to "wrapped"),
-            ciphertextSize = bytes.size.toLong(), ciphertextSha256 = sha256(bytes), encryptionVersion = 2)
+        return SafetyDocument(
+            id,
+            owner,
+            "",
+            "$id.bin",
+            mime,
+            listOf(owner, viewer).distinct(),
+            objectKey = "objects/$id",
+            wrappedKeys = mapOf(viewer to "wrapped"),
+            ciphertextSize = bytes.size.toLong(),
+            ciphertextSha256 = sha256(bytes),
+            encryptionVersion = 2
+        )
     }
 
     private fun ciphertext(document: SafetyDocument): File = temporary.newFile().apply {

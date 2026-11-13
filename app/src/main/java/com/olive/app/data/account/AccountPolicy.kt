@@ -1,5 +1,5 @@
 // All account roles: checks usernames, passwords, account roles, and account setup requirements.
-package com.olive.app.data
+package com.olive.app.data.account
 
 import com.olive.app.security.InputPolicy
 

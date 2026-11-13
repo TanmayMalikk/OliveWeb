@@ -3,7 +3,7 @@ package com.olive.app.data.account
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.olive.app.data.ChatSubscription
+import com.olive.app.data.messaging.ChatSubscription
 import kotlinx.coroutines.tasks.await
 
 // Only a revision counter is stored here; profile and history contents stay in their protected Storage files.

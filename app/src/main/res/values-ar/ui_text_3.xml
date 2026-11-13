@@ -19,64 +19,8 @@
     <string name="ui_could_not_reconnect_check_your_password_and_try_again">تعذر إعادة الاتصال. تحقق من كلمة المرور وحاول مرة أخرى.</string>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    <string name="ui_new_headlines_are_available">عناوين جديدة متاحة.</string>
     <string name="ui_a_new_update_is_available">تحديث جديد متاح.</string>
-    <string name="ui_an_account_update_is_available">تحديث الحساب متاح.</string>
-    <string name="ui_your_latest_digest_is_ready">أحدث ملخصك جاهز.</string>
-    <string name="ui_there_are_new_stories_to_browse">هناك قصص جديدة للتصفح.</string>
 
-    <string name="ui_open_the_app_to_see_what_s_new">افتح التطبيق لمعرفة الجديد.</string>
-    <string name="ui_new_activity_is_waiting">نشاط جديد في انتظارك.</string>
-    <string name="ui_daily_digest_briefings">ملخصات الملخص اليومي</string>
-    <string name="ui_daily_headlines_and_news_digest_notifications">العناوين اليومية وإخطارات ملخص الأخبار</string>
-
-    <string name="ui_app_updates">تحديثات التطبيق</string>
-    <string name="ui_general_app_activity_notifications">إشعارات نشاط التطبيق العامة</string>
-    <string name="ui_olive_branch_updates">تحديثات غصن الزيتون</string>
-    <string name="ui_olive_tree_updates">تحديثات شجرة الزيتون</string>
     <string name="ui_call_invitation_notifications">دعوات المكالمات</string>
     <string name="ui_speaker">مكبر الصوت</string>
     <string name="ui_speaker_off">إيقاف مكبر الصوت</string>

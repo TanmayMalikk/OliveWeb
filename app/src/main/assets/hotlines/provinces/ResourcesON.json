@@ -3,17 +3,20 @@
     "Hotlines": {
       "Assaulted Women's Helpline (AWHL)": {
         "Desc": "Confidential 24/7 provincial crisis line for women experiencing domestic, emotional, or physical abuse.",
-        "Phone": "1-866-863-7867",
+        "Phone": "1-866-863-0511",
+        "hours": "24/7",
         "url": "https://www.awhl.org/"
       },
       "Toronto Stop Violence Against Women Helpline": {
         "Desc": "24/7 crisis support, safety planning, and emergency shelter referrals in the GTA.",
-        "Phone": "416-863-7867",
+        "Phone": "416-863-0511",
+        "hours": "24/7",
         "url": "https://www.awhl.org/"
       },
       "Barbra Schlifer Commemorative Clinic": {
         "Desc": "Free legal, counselling, and language support for women experiencing violence.",
         "Phone": "416-323-9149",
+        "hours": "Mon 9am-5pm * Tue 9am-5pm * Wed 9am-5pm * Thu 9am-5pm * Fri 9am-5pm",
         "url": "https://schliferclinic.com/"
       }
     },
@@ -21,11 +24,13 @@
       "Ernestine's Women's Shelter": {
         "Desc": "Emergency shelter and 24/7 crisis line providing safe refuge, food, and legal support for women and children.",
         "Phone": "416-746-3701",
+        "hours": "Mon - Fri: 10 am - 5:30 pm",
         "url": "https://ernestines.ca/"
       },
       "Red Door Family Shelter": {
         "Desc": "Safe emergency shelter for families and women fleeing domestic abuse.",
-        "Phone": "416-510-3553",
+        "Phone": "416-915-5671",
+        "hours": "Mon-Fri 9 am-5 pm",
         "url": "https://www.reddoorshelter.ca/"
       }
     }
@@ -35,6 +40,7 @@
       "Ottawa Distress Centre Crisis Line": {
         "Desc": "24/7 confidential crisis line for mental health and domestic abuse support.",
         "Phone": "613-238-3311",
+        "hours": "24/7",
         "url": "https://www.dcottawa.on.ca/"
       }
     },
@@ -42,11 +48,13 @@
       "Maison d'Amitié": {
         "Desc": "24/7 French-language emergency shelter and crisis line for women and children experiencing domestic violence.",
         "Phone": "613-747-0020",
-        "url": "https://www.maisondamitie.com/"
+        "hours": "24/7",
+        "url": "https://maisondamitie.ca/"
       },
       "Interval House Ottawa": {
         "Desc": "Emergency shelter, crisis line, and advocacy for women and children fleeing abuse.",
-        "Phone": "613-224-8355",
+        "Phone": "613-234-5181",
+        "hours": "24/7",
         "url": "https://www.intervalhouseottawa.org/"
       }
     }
@@ -56,6 +64,7 @@
       "Interval House Hamilton Crisis Line": {
         "Desc": "24/7 crisis support and emergency assistance for women and children fleeing violence.",
         "Phone": "905-387-8881",
+        "hours": "24/7",
         "url": "https://intervalhousehamilton.org/"
       }
     },
@@ -63,6 +72,7 @@
       "Interval House Hamilton": {
         "Desc": "24/7 safe emergency shelter, advocacy, and community support.",
         "Phone": "905-387-8881",
+        "hours": "24/7",
         "url": "https://intervalhousehamilton.org/"
       }
     }

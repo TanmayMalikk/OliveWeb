@@ -1,5 +1,5 @@
 // Users and approved supporters: reads and writes live location data for approved viewers.
-package com.olive.app.data
+package com.olive.app.data.location
 
 import android.content.Context
 import androidx.core.content.edit
@@ -8,6 +8,11 @@ import com.google.firebase.database.*
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.olive.app.BuildConfig
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.account.UserProfile
 import com.olive.app.security.EncryptionUtils
 import com.olive.app.security.KeyManager
 import java.net.URLEncoder
@@ -17,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.net.URL
 
 data class LocationTrailPoint(val latitude: Double, val longitude: Double, val updatedAt: Long)
 
@@ -29,7 +35,7 @@ data class MapLocationPoint(
 internal object LocationDatabase {
     // Returns the instance used by location sharing.
     fun instance(): FirebaseDatabase {
-        val configured = com.olive.app.BuildConfig.REALTIME_DATABASE_URL
+        val configured = BuildConfig.REALTIME_DATABASE_URL
         if (configured.isNotBlank()) return FirebaseDatabase.getInstance(configured)
         val project =
             FirebaseApp.getInstance().options.projectId ?: error("Firebase project is unavailable")
@@ -471,7 +477,7 @@ internal object GeoapifyClient {
                 add("apiKey=${encode(BuildConfig.GEOAPIFY_API_KEY)}")
             }.joinToString("&")
             val connection =
-                (java.net.URL("https://api.geoapify.com/v1/geocode/autocomplete?$parameters")
+                (URL("https://api.geoapify.com/v1/geocode/autocomplete?$parameters")
                     .openConnection() as HttpsURLConnection).apply {
                     connectTimeout = 5_000
                     readTimeout = 5_000

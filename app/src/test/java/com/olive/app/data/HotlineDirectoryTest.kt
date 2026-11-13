@@ -1,6 +1,11 @@
 // Tests Canadian support numbers and city-based matches for users.
 package com.olive.app.data
 
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.safety.CanadianRegion
+import com.olive.app.data.safety.HotlineDirectory
+import com.olive.app.data.safety.HotlineResourceKind
+import com.olive.app.data.safety.hotlineDialNumber
 import java.io.File
 import org.junit.Assert.*
 import org.junit.Test

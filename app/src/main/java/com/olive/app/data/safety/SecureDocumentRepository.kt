@@ -1,5 +1,5 @@
 // Safe-app users and support staff: opens encrypted documents for approved viewers.
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -12,9 +12,11 @@ import java.security.PublicKey
 import javax.crypto.SecretKey
 import java.util.UUID
 import android.content.Context
+import com.olive.app.data.account.PrivateEntry
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.JsonVault
 import org.json.JSONArray
+import kotlin.collections.iterator
 
 
 class SecureDocumentRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
@@ -24,8 +26,6 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
      *
      * @param entry The full note or incident report that the recipient will read.
      * @param ownerUid The UID of the creator.
-     * @param title The plaintext title.
-     * @param body The plaintext body.
      * @param recipientPublicKeys Map of UID -> RSA PublicKey for everyone who needs access (including the owner).
      */
     suspend fun saveMultiRecipientEntry(
@@ -87,42 +87,6 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
     }
 
     /**
-     * Grants access to an existing encrypted entry for a new recipient.
-     * Extracts the AES key using the owner's private key, wraps it for the recipient, and updates Firestore.
-     */
-    suspend fun grantAccessToEntry(
-        entryId: String,
-        ownerUid: String,
-        recipientUid: String,
-        recipientPublicKey: PublicKey
-    ) {
-        val documentRef = firestore.collection("privateEntries").document(entryId)
-        val snapshot = documentRef.get().await()
-
-        if (!snapshot.exists()) throw Exception("Document not found.")
-
-        @Suppress("UNCHECKED_CAST")
-        val wrappedKeys = snapshot.get("wrappedKeys") as? Map<String, String>
-            ?: throw Exception("Encryption keys missing.")
-
-        val ownerWrappedKey = wrappedKeys[ownerUid]
-            ?: throw Exception("You do not have the cryptographic key to share this document.")
-
-        // 1. Unwrap the AES key using the owner's hardware Private Key
-        val documentKey = KeyManager.unwrapKey(ownerWrappedKey)
-
-        // 2. Wrap the AES key using the new recipient's Public Key
-        val newRecipientWrappedKey = KeyManager.wrapKey(documentKey, recipientPublicKey)
-
-        // 3. Append the new key and update security rule arrays
-        documentRef.update(
-            "wrappedKeys.${recipientUid}", newRecipientWrappedKey,
-            "allowedUsers", FieldValue.arrayUnion(recipientUid),
-            "updatedAt", FieldValue.serverTimestamp()
-        ).await()
-    }
-
-    /**
      * Retrieves and decrypts a shared Private Entry.
      */
     suspend fun loadAndDecryptEntry(entryId: String, currentUid: String): PrivateEntry {
@@ -155,34 +119,6 @@ class SecureDocumentRepository(private val firestore: FirebaseFirestore = Fireba
         )
     }
 
-    /**
-     * Completely deletes an encrypted entry from the cloud.
-     */
-    suspend fun deleteEntry(entryId: String) {
-        firestore.collection("privateEntries").document(entryId).delete().await()
-    }
-
-    /**
-     * Retrieves all Private Entries that this user has access to.
-     */
-    suspend fun fetchMyEntries(currentUid: String): List<PrivateEntry> {
-        val snapshot = firestore.collection("privateEntries")
-            .whereArrayContains("allowedUsers", currentUid)
-            .get()
-            .await()
-
-        val entries = mutableListOf<PrivateEntry>()
-        for (doc in snapshot.documents) {
-            // Use the fallback when fetch my entries is unavailable.
-            try {
-                // We reuse loadAndDecryptEntry but pass the already fetched snapshot ID
-                val decryptedEntry = loadAndDecryptEntry(doc.id, currentUid)
-                entries.add(decryptedEntry)
-            } catch (_: Exception) { // Skip one unreadable entry so the rest of the private list can still load.
-            }
-        }
-        return entries
-    }
 }
 
 // Safe-app users and support staff: defines safety-plan fields and conflict data.
@@ -205,13 +141,15 @@ internal val SAFETY_FIELD_KEYS =
 internal data class SafetyField(
     val value: String, val revision: Long = 0, val mutationId: String? = null,
     val conflictValue: String? = null, val conflictRevision: Long? = null,
-    val baseValue: String? = null,
+    val writerId: String? = null, val writerUid: String? = null,
+    val clientSequence: Long = 0,
 ) {
     // Safety: Converts this record into JSON.
     fun toJson(): JSONObject =
         JSONObject().put("value", value).put("revision", revision).put("mutationId", mutationId)
             .put("conflictValue", conflictValue).put("conflictRevision", conflictRevision)
-            .put("baseValue", baseValue)
+            .put("writerId", writerId).put("writerUid", writerUid)
+            .put("clientSequence", clientSequence)
 
     companion object {
         // Rebuilds this safety-plan record from protected JSON data.
@@ -223,7 +161,9 @@ internal data class SafetyField(
                 .takeIf { json.has("conflictValue") && !json.isNull("conflictValue") },
             json.optLong("conflictRevision")
                 .takeIf { json.has("conflictRevision") && !json.isNull("conflictRevision") },
-            json.optString("baseValue").takeIf { json.has("baseValue") && !json.isNull("baseValue") })
+            json.optString("writerId").takeIf { it.isNotEmpty() },
+            json.optString("writerUid").takeIf { it.isNotEmpty() },
+            json.optLong("clientSequence"))
     }
 }
 
@@ -266,7 +206,7 @@ internal data class SafetyPlan(
         .put("staffUid", staffUid).put("staffName", staffName)
         .put("adminUid", adminUid).put("adminName", adminName)
         .put("consultationRequested", consultationRequested).put("shareAction", shareAction)
-        .put("safeContactUids", org.json.JSONArray(safeContactUids))
+        .put("safeContactUids", JSONArray(safeContactUids))
         .put("safeContactNames", JSONObject(safeContactNames))
         .put("supportSafeContactUid", supportSafeContactUid)
         .put("consultationConversationId", consultationConversationId)
@@ -353,7 +293,15 @@ internal fun mergeSafetyPlan(
                 )
             }
 
-            ownerEditing && local.revision != cloud.revision -> local.copy(
+            local.writerUid != null && local.writerUid == cloud.writerUid &&
+                    local.writerId != null && local.writerId == cloud.writerId &&
+                    local.clientSequence > cloud.clientSequence -> local.copy(
+                revision = maxOf(local.revision, cloud.revision),
+                conflictValue = null,
+                conflictRevision = null,
+            )
+
+            local.revision != cloud.revision -> local.copy(
                 conflictValue = cloud.value,
                 conflictRevision = cloud.revision
             )
@@ -379,10 +327,33 @@ internal fun mergeSafetyPlan(
     )
 }
 
+// Keeps an optimistic on-screen draft above intermediate listener echoes until its latest mutation is acknowledged.
+internal fun mergeVisibleSafetyPlan(
+    visible: SafetyPlan?,
+    stored: SafetyPlan,
+    @Suppress("UNUSED_PARAMETER") actorUid: String,
+): SafetyPlan = visible?.let {
+    mergeSafetyPlan(it, it, stored)
+} ?: stored
+
 // Gives the safety plan the safety fields with defaults it needs.
-internal fun SafetyField.edit(value: String) =
-    copy(value = value, mutationId = UUID.randomUUID().toString(),
-        baseValue = if (mutationId == null) this.value else baseValue)
+internal fun SafetyField.edit(
+    value: String,
+    activeWriterId: String = UUID.randomUUID().toString(),
+    activeWriterUid: String = "",
+): SafetyField {
+    val activeUid = activeWriterUid.takeIf(String::isNotBlank)
+    val nextWriterId = if (mutationId != null) writerId ?: activeWriterId else activeWriterId
+    val nextWriterUid = if (mutationId != null) writerUid ?: activeUid else activeUid
+    val nextSequence = if (writerId == nextWriterId && writerUid == nextWriterUid) clientSequence + 1 else 1
+    return copy(
+        value = value,
+        mutationId = UUID.randomUUID().toString(),
+        writerId = nextWriterId,
+        writerUid = nextWriterUid,
+        clientSequence = nextSequence,
+    )
+}
 
 // Upgrade only untouched local placeholders. User-cleared checklists, drafts and remote revisions remain intact.
 internal fun safetyFieldsWithDefaults(
@@ -565,6 +536,8 @@ private fun JSONObject.toDocument(viewerUid: String, id: String): SafetyDocument
     )
 }
 
+@Suppress("SameParameterValue")
+// Linter Believes 'name' is always doumentindexStore.accounts which is dynamic.
 private fun JSONObject.child(name: String): JSONObject =
     optJSONObject(name) ?: JSONObject().also { put(name, it) }
 

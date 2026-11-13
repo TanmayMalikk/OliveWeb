@@ -39,14 +39,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.UserProfile
 import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.olive.app.data.account.PrivateEntryKind
 
 
 // Safe-contact accounts use a connection-focused dashboard and can open only records explicitly shared with them.
@@ -240,7 +240,6 @@ private fun SafeContactProfile(session: SessionViewModel, profile: UserProfile) 
 }
 
 // safe contact dashboard shows this shared entry viewer view so the user can view its details and use its actions.
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SharedEntryViewer(session: SessionViewModel) {
     val entry = session.viewedSharedEntry ?: return
@@ -296,7 +295,7 @@ internal fun SharedEntryViewer(session: SessionViewModel) {
                         .verticalScroll(rememberScrollState())
                         .padding(24.dp)
                 ) {
-                    if (entry.kind == com.olive.app.data.PrivateEntryKind.Incident) {
+                    if (entry.kind == PrivateEntryKind.Incident) {
                         SharedIncidentField(stringResource(R.string.title), entry.title)
                         SharedIncidentField(stringResource(R.string.incident_date), entry.incidentDate)
                         SharedIncidentField(stringResource(R.string.incident_time), entry.incidentTime)

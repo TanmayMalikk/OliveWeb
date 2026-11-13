@@ -1,6 +1,17 @@
 // Tests user checklist edits, saved checks, and old note conversion.
 package com.olive.app.data
 
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.safety.SafetyChecklistItem
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.SafetyPlanContact
+import com.olive.app.data.safety.readSafetyChecklist
+import com.olive.app.data.safety.readSafetyPlanContact
+import com.olive.app.data.safety.safetyChecklistAttachmentTag
+import com.olive.app.data.safety.safetyChecklistAttachments
+import com.olive.app.data.safety.safetyChecklistPreview
+import com.olive.app.data.safety.safetyPlanContactItem
+import com.olive.app.data.safety.writeSafetyChecklist
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -161,7 +172,14 @@ class SafetyChecklistTest {
     fun malformedTrustedContactRowsAreNeverShownAsValidContacts() {
         assertNull(readSafetyPlanContact(SafetyChecklistItem("ordinary", "{}")))
         assertNull(readSafetyPlanContact(SafetyChecklistItem("trusted-contact:id", "not json")))
-        assertNull(readSafetyPlanContact(SafetyChecklistItem("trusted-contact:id", "{\"name\":\"Missing details\"}")))
+        assertNull(
+            readSafetyPlanContact(
+                SafetyChecklistItem(
+                    "trusted-contact:id",
+                    "{\"name\":\"Missing details\"}"
+                )
+            )
+        )
     }
 
     @Test

@@ -41,8 +41,6 @@
     <string name="fatsecret_attribution">Propulsé par l’API FatSecret Platform</string>
     <string name="open_food_facts_attribution">Données des aliments emballés fournies par Open Food Facts</string>
     <string name="fitness_cover_choice">Application de forme · Suivi de la forme</string>
-    <string name="fitness_reminder">Votre résumé de forme est prêt.</string>
-    <string name="fitness_updates">Mises à jour du suivi de la forme</string>
     <string name="fitness_history_title">Historique sur 14 jours</string>
     <string name="fitness_history_description">Totaux quotidiens de ce téléphone et de la montre connectée.</string>
     <string name="fitness_history_daily_total">Total quotidien</string>

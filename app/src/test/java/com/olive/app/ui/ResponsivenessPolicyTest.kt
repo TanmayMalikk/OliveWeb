@@ -7,7 +7,7 @@ import com.olive.app.ui.users.shared.navigation.messagingIdentityMarker
 import com.olive.app.ui.users.shared.navigation.shouldRegisterMessagingIdentity
 import com.olive.app.ui.users.shared.navigation.shouldComposeCover
 
-import com.olive.app.data.AccountIdentity
+import com.olive.app.data.account.AccountIdentity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

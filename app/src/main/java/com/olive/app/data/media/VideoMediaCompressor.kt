@@ -1,6 +1,5 @@
 // Safe-app roles: validates and compresses eligible video locally before encryption.
 package com.olive.app.data.media
-
 import android.app.ActivityManager
 import android.content.Context
 import android.media.MediaExtractor
@@ -59,7 +58,9 @@ internal class VideoMediaCompressor(private val context:Context) {
         }
         val target=VideoCompressionPolicy.targetSize(input.width,input.height,input.rotationDegrees)
         val bitrate=VideoCompressionPolicy.targetBitrate(target.first,target.second,input.frameRate)
-        val output=File.createTempFile(OUTPUT_PREFIX,".mp4",outputFolder)
+        val output= withContext(Dispatchers.IO) {
+            File.createTempFile(OUTPUT_PREFIX, ".mp4", outputFolder)
+        }
         try {
             export(source,output,target,bitrate,input.frameRate)
             require(output.isFile && output.length()>0) { "Video compression produced an empty result" }
@@ -161,14 +162,14 @@ internal class VideoMediaCompressor(private val context:Context) {
                     .build()
                 lateinit var transformer:Transformer
                 val listener=object:Transformer.Listener {
-                    override fun onCompleted(composition:Composition,exportResult:ExportResult) {
+                    override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                         if(continuation.isActive) continuation.resumeWith(kotlin.Result.success(Unit))
                     }
 
                     override fun onError(
-                        composition:Composition,
-                        exportResult:ExportResult,
-                        exportException:ExportException,
+                        composition: Composition,
+                        exportResult: ExportResult,
+                        exportException: ExportException
                     ) {
                         if(continuation.isActive) continuation.resumeWithException(exportException)
                     }
@@ -201,12 +202,15 @@ internal class VideoMediaCompressor(private val context:Context) {
         VideoCompressionPolicy.extensionFor(mimeType),
     )
 
+    @Suppress("SameParameterValue")
     private fun MediaFormat.getIntegerOrNull(key:String)=
         if(containsKey(key)) runCatching { getInteger(key) }.getOrNull() else null
 
+    @Suppress("SameParameterValue")
     private fun MediaFormat.getLongOrNull(key:String)=
         if(containsKey(key)) runCatching { getLong(key) }.getOrNull() else null
 
+    @Suppress("SameParameterValue")
     private fun MediaFormat.getFloatOrNull(key:String):Float? {
         if(!containsKey(key)) return null
         return runCatching { getFloat(key) }.getOrElse {

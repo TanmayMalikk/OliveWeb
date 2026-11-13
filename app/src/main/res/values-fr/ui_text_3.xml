@@ -19,64 +19,8 @@
     <string name="ui_could_not_reconnect_check_your_password_and_try_again">Impossible de se reconnecter. Vérifiez votre mot de passe et réessayez.</string>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    <string name="ui_new_headlines_are_available">De nouveaux titres sont disponibles.</string>
     <string name="ui_a_new_update_is_available">Une nouvelle mise à jour est disponible.</string>
-    <string name="ui_an_account_update_is_available">Une mise à jour du compte est disponible.</string>
-    <string name="ui_your_latest_digest_is_ready">Votre dernier résumé est prêt.</string>
-    <string name="ui_there_are_new_stories_to_browse">Il y a de nouvelles histoires à parcourir.</string>
 
-    <string name="ui_open_the_app_to_see_what_s_new">Ouvrez l\'application pour voir les nouveautés.</string>
-    <string name="ui_new_activity_is_waiting">Une nouvelle activité vous attend.</string>
-    <string name="ui_daily_digest_briefings">Briefings quotidiens</string>
-    <string name="ui_daily_headlines_and_news_digest_notifications">Titres quotidiens et notifications de résumés d\'actualités</string>
-
-    <string name="ui_app_updates">Mises à jour de l\'application</string>
-    <string name="ui_general_app_activity_notifications">Notifications générales d\'activité des applications</string>
-    <string name="ui_olive_branch_updates">Mises à jour du rameau d\'olivier</string>
-    <string name="ui_olive_tree_updates">Mises à jour de l\'olivier</string>
     <string name="ui_call_invitation_notifications">Invitations d’appel</string>
     <string name="ui_speaker">Haut-parleur</string>
     <string name="ui_speaker_off">Désactiver le haut-parleur</string>

@@ -4,40 +4,26 @@ package com.olive.app.ui.users.user.documents
 import com.olive.app.ui.shared.*
 
 
-import com.olive.app.ui.users.shared.navigation.*
-
-
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.*
-import com.olive.app.data.media.MediaTransferState
-import com.olive.app.data.media.MediaTransferStatus
-import com.olive.app.data.media.MediaUploadPresentation
+import com.olive.app.data.account.SafeContact
 import com.olive.app.data.media.OfflineMediaAvailability
-import java.io.File
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.safety.SafetyDocument
 
 
 // User safety-document card used to view details and actions.

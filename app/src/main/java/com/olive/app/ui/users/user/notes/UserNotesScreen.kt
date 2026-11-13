@@ -5,7 +5,6 @@ import android.Manifest
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -31,18 +29,23 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.location.AddressSuggestion
+import com.olive.app.data.location.DeviceLocation
+import com.olive.app.data.location.GeoapifyClient
+import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
-import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 // Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor.
 // UI sizing/color: note editing uses 24dp sides, a 300dp minimum body field, yellow pinned icons, and an adaptive 160dp grid.
@@ -104,8 +107,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
         if (permissions.values.any { it }) scope.launch {
             DeviceLocation.currentCoordinates(context)?.let { fix ->
                 currentLocationPoint = MapLocationPoint(
-                    uid ?: "current", uiText(R.string.current_location), fix.latitude, fix.longitude,
-                    fix.timestamp, true, fix.accuracy,
+                    uid ?: "current",
+                    uiText(R.string.current_location),
+                    fix.latitude,
+                    fix.longitude,
+                    fix.timestamp,
+                    true,
+                    fix.accuracy,
                 )
             }
         }
@@ -116,7 +124,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     LaunchedEffect(incidentLocation, kind) {
         locationSuggestions = emptyList()
         if (kind != PrivateEntryKind.Incident || incidentLocation.trim().length < 3 || !GeoapifyClient.configured) return@LaunchedEffect
-        delay(300)
+        delay(300.milliseconds)
         locationSuggestions = runCatching {
             GeoapifyClient.autocomplete(incidentLocation, false)
         }.getOrDefault(emptyList())

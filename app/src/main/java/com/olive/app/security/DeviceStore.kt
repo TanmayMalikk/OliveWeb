@@ -1,7 +1,7 @@
 // All signed-in roles: stores device state.
 package com.olive.app.security
 
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountIdentity
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -12,8 +12,15 @@ import java.util.Base64
 import java.util.Locale
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
-import com.olive.app.data.AccountRole
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.FailedAttempt
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.account.FieldChange
+import com.olive.app.data.account.HistoryRecord
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.SettingsEvent
+import com.olive.app.data.account.TriggerEvent
+import com.olive.app.data.messaging.PrivateContactNote
 
 
 // This is the private locker on the phone: PIN verifier, cached profile, and failed-attempt history all stay encrypted.

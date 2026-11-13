@@ -18,9 +18,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.olive.app.OliveLauncher
 import com.olive.app.R
-import com.olive.app.data.DeviceCoordinates
-import com.olive.app.data.DeviceLocation
-import com.olive.app.data.DeviceLocationUpdates
+import com.olive.app.data.location.DeviceCoordinates
+import com.olive.app.data.location.DeviceLocation
+import com.olive.app.data.location.DeviceLocationUpdates
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale

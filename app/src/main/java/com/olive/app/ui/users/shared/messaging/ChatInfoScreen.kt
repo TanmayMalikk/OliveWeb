@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -22,19 +23,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
-import com.olive.app.data.AccountRole
-import com.olive.app.data.ChatMessage
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.messaging.VoipCall
-import com.olive.app.data.messaging.VoipCallStatus
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.ChatMessage
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.LocalQuickExit
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import java.io.File
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 private data class SharedChatItem(
     val key: String,
@@ -215,7 +211,7 @@ internal fun ChatInfoDialog(
                                 style = MaterialTheme.typography.titleLarge,
                             )
                             Text(
-                                stringResource(R.string.chat_member_count, conversation.participantIds.size),
+                                pluralStringResource(R.plurals.chat_member_count, conversation.participantIds.size, conversation.participantIds.size),
                                 color = Muted,
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -287,7 +283,7 @@ internal fun ChatInfoDialog(
                                     )
                                 }
                             }) else null,
-                            colors = androidx.compose.material3.ListItemDefaults.colors(
+                            colors = ListItemDefaults.colors(
                                 containerColor = Color.Transparent,
                             ),
                         ) }
@@ -349,7 +345,7 @@ internal fun ChatInfoDialog(
                                     }
                                 },
                                 enabled = session.staffSupport.saving == 0,
-                                colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = ChatDangerRed,
                                 ),
                                 border = BorderStroke(1.dp, ChatDangerRed.copy(alpha = .45f)),

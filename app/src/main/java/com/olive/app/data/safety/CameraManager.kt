@@ -1,5 +1,5 @@
 // Safe-app users and support staff: captures photos and documents for safe-app uploads.
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import android.Manifest
 import android.content.Context
@@ -128,7 +128,7 @@ class CameraManager(private val context: Context) {
         check(!includeAudio || audioGranted) {
             "Microphone permission is required to record video with sound"
         }
-        recording = (if (includeAudio && audioGranted) pending.withAudioEnabled() else pending)
+        recording = (if (includeAudio) pending.withAudioEnabled() else pending)
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 if (event is VideoRecordEvent.Start) onStarted()
                 else if (event is VideoRecordEvent.Finalize) {

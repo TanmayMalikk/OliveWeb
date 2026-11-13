@@ -27,18 +27,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
-import com.olive.app.data.DirectoryUser
 import com.olive.app.data.messaging.VoipInvitation
 import com.olive.app.data.messaging.VoipSessionState
 import com.olive.app.data.messaging.otherPartyName
 import com.olive.app.ui.shared.*
-import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 internal fun formatCallDuration(totalSeconds: Long): String {
     val hours = totalSeconds / 3600
@@ -134,7 +132,7 @@ internal fun ActiveCallDialog(
     LaunchedEffect(active?.call?.callId, remoteJoined) {
         if (!remoteJoined) return@LaunchedEffect
         while (true) {
-            delay(1_000)
+            delay(1_000.milliseconds)
             elapsedSeconds++
         }
     }

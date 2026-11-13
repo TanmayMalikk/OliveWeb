@@ -6,7 +6,20 @@ import android.location.Location
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.location.DeviceLocation
+import com.olive.app.data.location.GeoapifyClient
+import com.olive.app.data.location.LocationRoute
+import com.olive.app.data.location.LocationSharingDataSource
+import com.olive.app.data.location.LocationTrailPoint
+import com.olive.app.data.location.MapLocationPoint
+import com.olive.app.data.location.MapboxDirectionsClient
+import com.olive.app.data.location.SavedLocationUnavailableException
+import com.olive.app.data.location.distanceFromRouteMeters
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.messaging.Friend
 import com.olive.app.location.LiveLocationController
 import com.olive.app.location.LiveLocationState
 import kotlinx.coroutines.*
@@ -294,9 +307,7 @@ internal class LocationMapController(
         lastTarget: MapLocationPoint?,
     ): Boolean {
         val route = state.route ?: return true
-        if (lastTarget == null || distanceBetween(target, lastTarget) >= TARGET_REROUTE_METERS)
-            return true
-        return distanceFromRouteMeters(origin.latitude, origin.longitude, route) >= OFF_ROUTE_METERS
+        return lastTarget == null || distanceBetween(target, lastTarget) >= TARGET_REROUTE_METERS || distanceFromRouteMeters(origin.latitude, origin.longitude, route) >= OFF_ROUTE_METERS
     }
 
     // Calculates the straight-line distance between two map points.

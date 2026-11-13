@@ -14,8 +14,7 @@ const {safetyPlanConsult} = require("./src/safetyConsultations");
 const {safetySupportAdmin, staffSupportClose, conversationAddParticipant, conversationRemoveParticipant} = require("./src/supportGroups");
 const {conversationPrepareKeys, supportTicketsPrepare, repairPlanTicket, repairConversation} = require("./src/supportTicketRepair");
 const {staffSupportRequest} = require("./src/supportTickets");
-const {mediaUpdateAccess, mediaShareInChat, mediaAccountAccessKey, reconcilePlanMediaGrants} = require("./src/mediaTickets");
-const {fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
+const {mediaShareInChat} = require("./src/mediaTickets");
 const users = new Map([
   ["plan-owner",{uid:"plan-owner",email:"owner@users.olive.invalid",displayName:"Owner"}],
   ["plan-live-owner",{uid:"plan-live-owner",email:"live-owner@users.olive.invalid",displayName:"Live owner"}],
@@ -560,4 +559,53 @@ test("owners can share a read-only plan with an accepted safe contact and revoke
   await call(safetyPlanShareContacts,owner,{contacts:[]});
   await assert.rejects(call(safetyPlanSync,contact,{ownerUid:owner,changes:[]}));
   assert.equal((await call(safetyPlansSharedWithMe,contact)).plans.length,0);
+});
+
+test("encrypted chat media sharing is atomic, authorized and idempotent", async () => {
+  const owner="plan-owner", recipient="plan-contact", mediaId="media-chat-share";
+  const conversationId="conversation-chat-share", messageId="message-chat-share";
+  await db.collection("files").doc(mediaId).set({
+    owner_id:owner,
+    object_key:`users/${owner}/media/${mediaId}`,
+    encrypted_metadata:"encrypted-metadata",
+    wrapped_keys:{[owner]:"owner-wrapped-key"},
+    device_wrapped_keys:{[`${owner}--phone`]:"owner-device-key"},
+    allowed_users:[owner],
+  });
+  await db.collection("conversations").doc(conversationId).set({
+    participantIds:[owner,recipient],
+    participantUsernames:{[owner]:"owner",[recipient]:"safe-contact"},
+  });
+  const request={
+    mediaId,conversationId,messageId,ciphertext:"encrypted-message",clientSentAt:1234,
+    recipientUids:[recipient],
+    wrappedKeys:{[owner]:"owner-wrapped-key",[recipient]:"recipient-wrapped-key"},
+    deviceWrappedKeys:{[`${recipient}--phone`]:"recipient-device-key"},
+  };
+
+  await call(mediaShareInChat,owner,request);
+  await call(mediaShareInChat,owner,request);
+
+  const sharedFile=await db.collection("files").doc(mediaId).get();
+  assert.deepEqual(new Set(sharedFile.get("allowed_users")),new Set([owner,recipient]));
+  assert.equal(sharedFile.get("wrapped_keys")[recipient],"recipient-wrapped-key");
+  assert.equal(sharedFile.get("device_wrapped_keys")[`${recipient}--phone`],"recipient-device-key");
+  const message=await db.collection("conversations").doc(conversationId)
+      .collection("messages").doc(messageId).get();
+  assert.equal(message.get("ciphertext"),"encrypted-message");
+
+  const rejectedMessageId="message-rejected-share";
+  await assert.rejects(call(mediaShareInChat,"plan-other",{
+    ...request,messageId:rejectedMessageId,ciphertext:"other-encrypted-message",
+  }));
+  assert.equal((await db.collection("conversations").doc(conversationId)
+      .collection("messages").doc(rejectedMessageId).get()).exists,false);
+
+  const incompleteMessageId="message-incomplete-share";
+  await assert.rejects(call(mediaShareInChat,owner,{
+    ...request,messageId:incompleteMessageId,ciphertext:"incomplete-encrypted-message",
+    wrappedKeys:{[owner]:"owner-wrapped-key"},deviceWrappedKeys:{},
+  }));
+  assert.equal((await db.collection("conversations").doc(conversationId)
+      .collection("messages").doc(incompleteMessageId).get()).exists,false);
 });

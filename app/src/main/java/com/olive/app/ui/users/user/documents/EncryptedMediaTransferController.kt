@@ -10,10 +10,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.DocumentOcrMetadata
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.hasValidatedInternetConnection
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.safety.DocumentOcrMetadata
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.media.DocumentDownloadGate
 import com.olive.app.data.media.MAX_MEDIA_CIPHERTEXT_BYTES
 import com.olive.app.data.media.MediaKind
@@ -447,8 +447,10 @@ internal class MediaTransferController(
                 put("mimeType", processedMimeType.take(120))
                 put("kind", kind.name)
                 put("ocrReview", ocrReview.name)
-                put("tags", JSONArray(tags.map(String::trim).filter(String::isNotBlank)
-                    .map { it.take(80) }.distinct().take(20)))
+                put("tags", JSONArray(
+                    tags.asSequence().map(String::trim).filter(String::isNotBlank)
+                        .map { it.take(80) }.distinct().take(20).toList()
+                ))
                 ocr?.let {
                     put("ocrText",it.text.take(MAX_OCR_TEXT))
                     put("ocrConfidence",it.confidence.coerceIn(0f,1f).toDouble())
@@ -526,7 +528,9 @@ internal class MediaTransferController(
         val builder = Request.Builder().url(ticket.url).get()
         ticket.headers.forEach(builder::header)
         val encryptedFolder=File(applicationContext.cacheDir,"encrypted-media").apply { mkdirs() }
-        val encrypted=File.createTempFile("${document.id}.",".olive.part",encryptedFolder)
+        val encrypted= withContext(Dispatchers.IO) {
+            File.createTempFile("${document.id}.", ".olive.part", encryptedFolder)
+        }
         // Turn an unexpected download encrypted failure into a readable message.
         try {
             client.newCall(builder.build()).execute().use { response ->

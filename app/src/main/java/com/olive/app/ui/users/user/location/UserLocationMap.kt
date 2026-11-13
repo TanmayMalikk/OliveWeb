@@ -57,11 +57,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.R
-import com.olive.app.data.LocationRoute
-import com.olive.app.data.MapLocationPoint
+import com.olive.app.data.location.LocationRoute
+import com.olive.app.data.location.MapLocationPoint
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.collections.sortedBy
 import kotlin.math.roundToInt
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds

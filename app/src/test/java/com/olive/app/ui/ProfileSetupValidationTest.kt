@@ -3,7 +3,7 @@ package com.olive.app.ui
 
 import com.olive.app.ui.users.shared.onboarding.ProfileSetupValidation
 
-import com.olive.app.data.DeliveryAddress
+import com.olive.app.data.account.DeliveryAddress
 import org.junit.Assert.*
 import org.junit.Test
 

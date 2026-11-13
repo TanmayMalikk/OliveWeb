@@ -1,6 +1,7 @@
 // Signed-in accounts: routes call invitations, update alerts, and sync wake-ups from one FCM service.
 package com.olive.app.data.messaging
 
+import android.annotation.SuppressLint
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -12,6 +13,9 @@ import com.olive.app.data.update.AppUpdateScheduler
 import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.notification.OliveNotificationManager
 
+//This warning is suppressed since the Linter expects Firebase Messaging Service to use function onNewToken
+//specifically an override of it. However onNewToken is now deprecated so the linter is out of date looking for that.
+@SuppressLint("MissingFirebaseInstanceTokenRefresh")
 class OliveFirebaseMessagingService : FirebaseMessagingService() {
     override fun onRegistered(installationId: String) {
         super.onRegistered(installationId)

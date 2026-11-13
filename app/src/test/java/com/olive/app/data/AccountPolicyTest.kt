@@ -1,6 +1,11 @@
 // Tests role sign-in IDs and required setup steps for users and safe contacts.
 package com.olive.app.data
 
+import com.olive.app.data.account.AccountPolicy
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.AccountSetupStep
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.UserProfile
 import com.olive.app.security.InputPolicy
 import org.junit.Assert.*
 import org.junit.Test
@@ -144,13 +149,16 @@ class AccountPolicyTest {
     @Test
     fun invalidDatesLocationsAndPlaceholderOrganizationEmailsRequireSetup() {
         assertTrue(AccountPolicy.personalProfileNeedsSetup(profile(AccountRole.USER).copy(dob = "not-a-date")))
-        assertTrue(AccountPolicy.personalProfileNeedsSetup(
+        assertTrue(
+            AccountPolicy.personalProfileNeedsSetup(
             profile(AccountRole.USER).copy(address = DeliveryAddress(city = "x".repeat(161)))
         ))
-        assertTrue(AccountPolicy.organizationProfileNeedsSetup(
+        assertTrue(
+            AccountPolicy.organizationProfileNeedsSetup(
             profile(AccountRole.ADMIN, email = "ADMIN@ADMIN.OLIVE.INVALID")
         ))
-        assertTrue(AccountPolicy.organizationProfileNeedsSetup(
+        assertTrue(
+            AccountPolicy.organizationProfileNeedsSetup(
             profile(AccountRole.STAFF, email = "")
         ))
     }

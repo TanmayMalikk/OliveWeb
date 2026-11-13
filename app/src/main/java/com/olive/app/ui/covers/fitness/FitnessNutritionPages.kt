@@ -203,6 +203,7 @@ private fun NutritionAmountRow(label: String, value: Float, unit: String) {
     }
 }
 // Draws progress toward one calorie or macro goal.
+@Suppress("SameParameterValue") // unit is always 'g' for gram.
 @Composable
 private fun NutritionProgress(label: String, value: Float, goal: Float, unit: String) {
     val progress = (value / goal.coerceAtLeast(1f)).coerceIn(0f, 1f)

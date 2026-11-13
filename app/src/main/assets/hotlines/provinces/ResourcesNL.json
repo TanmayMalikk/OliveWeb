@@ -4,18 +4,22 @@
       "NL Domestic Violence Helpline": {
         "Desc": "Confidential 24/7 provincial helpline connecting individuals facing domestic violence to community resources.",
         "Phone": "1-888-709-7090",
+        "Text": "1-888-709-7090",
+        "hours": "24/7",
         "url": "https://www.gov.nl.ca/vpi/"
       },
       "NL Mental Health Crisis Line": {
         "Desc": "24/7 telephone crisis line providing support and referrals across Newfoundland and Labrador.",
-        "Phone": "1-888-737-4668",
-        "url": "https://www.healthnl.ca/"
+        "Phone": "811",
+        "hours": "24/7",
+        "url": "https://nl.bridgethegapp.ca/"
       }
     },
     "Shelters": {
       "Iris Kirby House": {
         "Desc": "24/7 emergency shelter, safety planning, and crisis support for women and children fleeing abuse.",
         "Phone": "1-877-753-1492",
+        "hours": "24/7",
         "url": "https://iriskirbyhouse.ca/"
       }
     }
@@ -24,14 +28,16 @@
     "Hotlines": {
       "Grace Sparkes House Crisis Line": {
         "Desc": "24/7 crisis line and support for individuals escaping domestic abuse.",
-        "Phone": "1-800-563-0080",
+        "Phone": "1-709-279-3562",
+        "hours": "24/7",
         "url": "https://gracesparkeshouse.com/"
       }
     },
     "Shelters": {
       "Grace Sparkes House": {
         "Desc": "24/7 emergency shelter and crisis line for women and children escaping family violence.",
-        "Phone": "1-800-563-0080",
+        "Phone": "1-709-279-3560",
+        "hours": "24/7",
         "url": "https://gracesparkeshouse.com/"
       }
     }

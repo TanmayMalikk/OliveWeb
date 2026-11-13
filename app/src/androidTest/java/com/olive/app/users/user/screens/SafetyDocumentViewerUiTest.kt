@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 import androidx.activity.compose.setContent
 import androidx.compose.ui.test.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.olive.app.data.SafetyDocument
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
 import org.junit.Rule

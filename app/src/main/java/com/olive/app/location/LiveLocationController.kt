@@ -5,8 +5,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import com.olive.app.data.MapLocationPoint
-import com.olive.app.data.LocationTrailPoint
+import com.olive.app.data.location.MapLocationPoint
+import com.olive.app.data.location.LocationTrailPoint
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.crypto.SecretKey

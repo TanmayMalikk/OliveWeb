@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -21,7 +22,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountCounts
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.AdminAccountSummary
+import com.olive.app.data.messaging.SUPPORT_TAG_NEEDS_ADMIN
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.safecontact.SharedEntryViewer
@@ -246,8 +250,9 @@ private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
 // A staff workload card summarizes plans and chats with completed counts kept beside their totals.
 @Composable
 private fun StaffWorkloadCard(account: AdminAccountSummary) {
-    val summary = stringResource(
-        R.string.admin_staff_workload_accessibility,
+    val summary = pluralStringResource(
+        R.plurals.admin_staff_workload_accessibility,
+        account.safetyPlans,
         account.username,
         account.safetyPlans,
         account.completedSafetyPlans,

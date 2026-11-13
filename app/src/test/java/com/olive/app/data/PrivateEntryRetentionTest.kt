@@ -1,6 +1,10 @@
 // Tests how long deleted private entries stay in a user's trash.
 package com.olive.app.data
 
+import com.olive.app.data.account.PRIVATE_ENTRY_TRASH_RETENTION_MS
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.trashExpired
+import com.olive.app.data.account.trashSecondsRemaining
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

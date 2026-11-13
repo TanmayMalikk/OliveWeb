@@ -21,7 +21,11 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.PRIVATE_ENTRY_TRASH_RETENTION_MS
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.trashDaysRemaining
+import com.olive.app.data.account.trashSecondsRemaining
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import java.time.Instant
@@ -82,13 +86,11 @@ internal fun Trash(
                 colors = CardDefaults.cardColors(containerColor = NotePaperCream)
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    entry.kind.let {
-                        Text(
-                            if (it == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
-                                R.string.note
-                            ), color = OliveGreen
-                        )
-                    }
+                    Text(
+                        if (entry.kind == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
+                            R.string.note
+                        ), color = OliveGreen
+                    )
                     if (entry.title.isNotBlank()) Text(
                         entry.title,
                         style = MaterialTheme.typography.titleMedium
@@ -257,16 +259,14 @@ internal fun PrivateNoteCard(
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                entry.kind.let {
-                    Text(
-                        if (it == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
-                            R.string.note
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = OliveGreen,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                Text(
+                    if (entry.kind == PrivateEntryKind.Incident) uiText(R.string.incident) else uiText(
+                        R.string.note
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = OliveGreen,
+                    modifier = Modifier.weight(1f)
+                )
                 IconButton(
                     onClick = pin,
                     modifier = Modifier.size(34.dp).testTag("private_pin")

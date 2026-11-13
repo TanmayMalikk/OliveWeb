@@ -10,7 +10,6 @@ import com.olive.app.ui.users.shared.navigation.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -25,24 +24,24 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.media.MediaTransferState
 import com.olive.app.data.media.MediaTransferStatus
 import com.olive.app.data.media.MediaUploadPresentation
 import com.olive.app.data.media.OfflineMediaAvailability
+import com.olive.app.data.safety.DocumentListSource
+import com.olive.app.data.safety.SafetyDocument
 import java.io.File
 
 private enum class DocumentFilter { All, Photos, Videos, Documents }
 
 // Lists encrypted documents and provides upload, filter, open, and share actions.
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SafetyDocumentsScreen(session: SessionViewModel) {
     val uid = session.coverAccountId ?: return

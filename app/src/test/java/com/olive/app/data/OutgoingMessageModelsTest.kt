@@ -1,5 +1,15 @@
 package com.olive.app.data
 
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.messaging.MessageDeliveryStatus
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.OutgoingAttachment
+import com.olive.app.data.messaging.canDiscardFailedMessage
+import com.olive.app.data.messaging.canManuallyRetryMessage
+import com.olive.app.data.messaging.isPermanentMessageFailure
+import com.olive.app.data.messaging.prepareOutgoingMessage
+import com.olive.app.data.messaging.sanitizedMessageBody
 import com.olive.app.security.EncryptionUtils
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -60,6 +70,24 @@ class OutgoingMessageModelsTest {
     }
 
     @Test
+    fun `attachment dependencies survive encrypted outbox serialization`() {
+        val published = outgoing("published", MessageDeliveryStatus.QUEUED, 0).copy(
+            attachment = OutgoingAttachment(mediaId = "media-123"),
+        )
+
+        assertEquals(published, OutgoingMessage.fromJson(published.toJson()))
+        assertEquals(null, OutgoingMessage.fromJson(
+            outgoing("legacy", MessageDeliveryStatus.QUEUED, 2).toJson().apply { remove("attachment") },
+        ).attachment)
+    }
+
+    @Test
+    fun `attachment dependency accepts only a valid published media id`() {
+        assertThrows(IllegalArgumentException::class.java) { OutgoingAttachment(mediaId = " ") }
+        assertThrows(IllegalArgumentException::class.java) { OutgoingAttachment(mediaId = "media/id") }
+    }
+
+    @Test
     fun `failure classification separates permanent and retryable firebase classes`() {
         val permanent = setOf(
             "INVALID_ARGUMENT",
@@ -80,6 +108,16 @@ class OutgoingMessageModelsTest {
     }
 
     @Test
+    fun `manual retry accepts queued or retryable heads but not permanent failures`() {
+        assertTrue(canManuallyRetryMessage(MessageDeliveryStatus.FAILED_RETRYABLE))
+        assertTrue(canManuallyRetryMessage(MessageDeliveryStatus.QUEUED))
+        assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.FAILED_PERMANENT))
+        assertFalse(canManuallyRetryMessage(MessageDeliveryStatus.SENDING))
+        assertTrue(canDiscardFailedMessage(MessageDeliveryStatus.FAILED_PERMANENT))
+        assertFalse(canDiscardFailedMessage(MessageDeliveryStatus.FAILED_RETRYABLE))
+    }
+
+    @Test
     fun `drain work names are stable per account conversation pair`() {
         val expected = MessageSendWorker.workName("owner", "conversation")
 
@@ -88,16 +126,17 @@ class OutgoingMessageModelsTest {
         assertFalse(expected == MessageSendWorker.workName("another-owner", "conversation"))
     }
 
-    private fun outgoing(id: String, status: MessageDeliveryStatus, attempts: Int) = OutgoingMessage(
-        id = id,
-        ownerUid = "owner",
-        conversationId = "conversation",
-        senderUsername = "alice",
-        ciphertext = "ciphertext-$id",
-        clientSentAt = attempts.toLong(),
-        clientSequence = attempts.toLong() + 1,
-        status = status,
-        attemptCount = attempts,
-        failureCode = if (status.name.startsWith("FAILED")) "TEST_FAILURE" else null,
-    )
+    private fun outgoing(id: String, status: MessageDeliveryStatus, attempts: Int) =
+        OutgoingMessage(
+            id = id,
+            ownerUid = "owner",
+            conversationId = "conversation",
+            senderUsername = "alice",
+            ciphertext = "ciphertext-$id",
+            clientSentAt = attempts.toLong(),
+            clientSequence = attempts.toLong() + 1,
+            status = status,
+            attemptCount = attempts,
+            failureCode = if (status.name.startsWith("FAILED")) "TEST_FAILURE" else null,
+        )
 }

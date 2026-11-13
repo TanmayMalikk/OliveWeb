@@ -15,9 +15,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
-import com.olive.app.data.SafetyPlanSyncWorker
-import com.olive.app.data.OutgoingMessage
-import com.olive.app.security.KeyManager
+import com.olive.app.data.messaging.OutgoingMessage
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -35,6 +33,7 @@ import okio.BufferedSink
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import com.olive.app.BuildConfig
+import com.olive.app.data.work.DurableWorkPolicy
 import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
@@ -111,6 +110,10 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             }.onFailure { file.delete() }
             Result.success(workDataOf(MEDIA_ID to record.id))
         } catch(cancelled:CancellationException) { throw cancelled }
+        catch(error:MediaDeviceVerificationRetryableException) {
+            Log.w("OliveMediaUpload", "App Check temporarily unavailable for encrypted upload ${job.id}", error)
+            retry(job,error)
+        }
         catch(error:MediaDeviceVerificationException) {
             Log.e("OliveMediaUpload", "App Check rejected encrypted upload ${job.id}", error)
             permanent(job,error.message ?: "This app installation is not authorized for encrypted uploads")
@@ -200,7 +203,11 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
         fun enqueue(context:Context,jobId:String,replaceDelayedWork:Boolean=false) {
             val request=OneTimeWorkRequestBuilder<MediaUploadWorker>().setInputData(workDataOf(JOB_ID to jobId))
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL,30,TimeUnit.SECONDS).build()
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    DurableWorkPolicy.INITIAL_BACKOFF_SECONDS,
+                    TimeUnit.SECONDS,
+                ).build()
             val policy=if(replaceDelayedWork) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
             WorkManager.getInstance(context).enqueueUniqueWork(workName(jobId),policy,request)
         }
@@ -297,17 +304,12 @@ interface MediaTicketDataSource {
         grantIndependentRecipients:List<String> = emptyList(),
         revokeIndependentRecipients:List<String> = emptyList(),
     ):CloudMediaRecord
-    suspend fun updatePlanAccess(
-        mediaId: String,
-        wrappedKeys: Map<String, String>,
-        deviceWrappedKeys: Map<String, String>,
-    ): CloudMediaRecord = error("Plan attachment sharing is unavailable")
     suspend fun shareInChat(
-        mediaId: String,
-        outgoing: OutgoingMessage,
-        recipientUids: List<String>,
-        wrappedKeys: Map<String, String>,
-        deviceWrappedKeys: Map<String, String>,
+        mediaId:String,
+        outgoing:OutgoingMessage,
+        recipientUids:List<String>,
+        wrappedKeys:Map<String,String>,
+        deviceWrappedKeys:Map<String,String>,
     ) { error("Chat attachment sharing is unavailable") }
     /** Adds AES-key copies encrypted for the signed-in account's other registered devices. */
     suspend fun updateDeviceKeys(mediaId:String,deviceWrappedKeys:Map<String,String>):CloudMediaRecord
@@ -319,6 +321,19 @@ interface MediaTicketDataSource {
 
 /** The installed app could not obtain the App Check proof required by encrypted-media functions. */
 class MediaDeviceVerificationException(message:String,cause:Exception):Exception(message,cause)
+class MediaDeviceVerificationRetryableException(message:String,cause:Exception):Exception(message,cause)
+
+internal fun isRetryableAppCheckFailure(failure: Throwable): Boolean {
+    val visited = mutableSetOf<Throwable>()
+    var current: Throwable? = failure
+    while (current != null && visited.add(current)) {
+        if (current is IOException || current is SocketTimeoutException ||
+            current.message?.contains("too many attempts", ignoreCase = true) == true
+        ) return true
+        current = current.cause
+    }
+    return false
+}
 
 /**
  * Firebase Functions implementation of [MediaTicketDataSource].
@@ -432,25 +447,14 @@ class MediaRepository(
         )).record()
     }
 
-    override suspend fun updatePlanAccess(
-        mediaId: String,
-        wrappedKeys: Map<String, String>,
-        deviceWrappedKeys: Map<String, String>,
-    ): CloudMediaRecord = call("mediaUpdateAccess", mapOf(
-        "mediaId" to mediaId,
-        "wrappedKeys" to wrappedKeys,
-        "deviceWrappedKeys" to deviceWrappedKeys,
-        "forPlan" to true,
-    )).record()
-
     override suspend fun shareInChat(
-        mediaId: String,
-        outgoing: OutgoingMessage,
-        recipientUids: List<String>,
-        wrappedKeys: Map<String, String>,
-        deviceWrappedKeys: Map<String, String>,
+        mediaId:String,
+        outgoing:OutgoingMessage,
+        recipientUids:List<String>,
+        wrappedKeys:Map<String,String>,
+        deviceWrappedKeys:Map<String,String>,
     ) {
-        call("mediaShareInChat", mapOf(
+        call("mediaShareInChat",mapOf(
             "mediaId" to mediaId,
             "conversationId" to outgoing.conversationId,
             "messageId" to outgoing.id,
@@ -487,6 +491,12 @@ class MediaRepository(
         try {
             appCheck.getAppCheckToken(false).await()
         } catch(error:Exception) {
+            if (isRetryableAppCheckFailure(error)) {
+                throw MediaDeviceVerificationRetryableException(
+                    "Device verification is temporarily unavailable. Retrying automatically.",
+                    error,
+                )
+            }
             // Media functions enforce App Check. Keep that protection, but replace Firebase's vague
             // retry-limit message with the exact action needed for an unregistered debug device.
             val message=if(BuildConfig.DEBUG)
@@ -512,6 +522,9 @@ class MediaRepository(
 // Encrypted media: Reads a required text field from a downloaded media record and rejects missing data.
 private fun Map<*,*>.string(name:String)=get(name) as? String ?: error("Missing $name")
 // Encrypted media: Reads an optional text field and uses an empty value when older records omit it.
+// Suppressing warning SameParameterValue since linter believes optional string will always equal "uploadid"
+// "uploadid" is the default value given in its one function call.
+@Suppress("SameParameterValue")
 private fun Map<*,*>.optionalString(name:String)=get(name) as? String ?: ""
 // Encrypted media: Reads a required whole number from a downloaded media record.
 private fun Map<*,*>.long(name:String)=(get(name) as? Number)?.toLong() ?: error("Missing $name")
@@ -520,6 +533,9 @@ private fun Map<*,*>.stringMap(name:String):Map<String,String> = (get(name) as? 
     (entry.key as? String ?: error("Invalid $name key")) to (entry.value as? String ?: error("Invalid $name value"))
 }.orEmpty()
 // Encrypted media: Reads the list of account IDs allowed to open a downloaded file.
+// Suppressing SameParameterValue, linter believes name is always 'allowedUsers'
+// That is the default value for stringlist function call.
+@Suppress("SameParameterValue")
 private fun Map<*,*>.stringList(name:String)=(get(name) as? List<*>)?.filterIsInstance<String>() ?: error("Missing $name")
 // Encrypted media: Rebuilds a cloud media record by reading each validated field from the downloaded map.
 private fun Map<*,*>.record()=CloudMediaRecord(string("mediaId"),string("ownerUid"),string("objectKey"),

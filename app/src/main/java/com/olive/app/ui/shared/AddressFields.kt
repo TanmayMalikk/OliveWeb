@@ -22,9 +22,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.DeliveryAddress
-import com.olive.app.data.AddressSuggestion
-import com.olive.app.data.GeoapifyClient
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.location.AddressSuggestion
+import com.olive.app.data.location.GeoapifyClient
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds

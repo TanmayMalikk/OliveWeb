@@ -23,9 +23,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
-import com.olive.app.data.DeliveryAddress
+import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.R
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.UserProfile
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.shared.AddressFields
 import com.olive.app.ui.shared.LocalizedIcon as Icon

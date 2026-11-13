@@ -2,43 +2,15 @@
 package com.olive.app.ui.users.shared.navigation
 
 import android.app.Application
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.*
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.*
-import com.olive.app.ui.session.SessionRuntime
-import com.olive.app.ui.shared.*
-import com.olive.app.ui.shared.LocalizedIcon as Icon
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import androidx.core.content.edit
+import kotlin.time.Duration.Companion.milliseconds
 
 
 // Calls are private-account features. Direct and personal group chats can call; support chats cannot.
@@ -170,7 +142,7 @@ internal class SessionCalls(
                     received.forEach { invitationFirstSeenAt.putIfAbsent(it.callId, now) }
                     val locallyExpired = received.filter { invitation ->
                         val deadline = invitation.expiresAt.takeIf { it > 0 }
-                            ?: invitationFirstSeenAt.getValue(invitation.callId) + LOCAL_RING_TIMEOUT_MS
+                            ?: (invitationFirstSeenAt.getValue(invitation.callId) + LOCAL_RING_TIMEOUT_MS)
                         deadline <= now
                     }.mapTo(mutableSetOf(), VoipInvitation::callId)
                     if (locallyExpired.isNotEmpty()) rememberSuppressed(locallyExpired)
@@ -193,7 +165,7 @@ internal class SessionCalls(
                 }
                 val callIsOpen = state.value is VoipSessionState.Connecting ||
                     state.value is VoipSessionState.Active || invitations.isNotEmpty()
-                delay(if (callIsOpen) ACTIVE_CALL_POLL_MS else IDLE_CALL_POLL_MS)
+                delay((if (callIsOpen) ACTIVE_CALL_POLL_MS else IDLE_CALL_POLL_MS).milliseconds)
             }
         }
     }
@@ -352,9 +324,9 @@ internal class SessionCalls(
 
     private fun rememberSuppressed(callIds: Set<String>) {
         suppressedInvitationIds += callIds
-        invitationPreferences.edit()
-            .putStringSet(DISMISSED_INVITATIONS_KEY, suppressedInvitationIds.toSet())
-            .apply()
+        invitationPreferences.edit {
+                putStringSet(DISMISSED_INVITATIONS_KEY, suppressedInvitationIds.toSet())
+            }
     }
 
     private suspend fun runCallAction(action: suspend () -> Unit) {

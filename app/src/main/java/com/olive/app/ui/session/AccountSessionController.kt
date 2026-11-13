@@ -5,7 +5,6 @@ import android.util.Log
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import com.olive.app.BuildConfig
-import com.olive.app.data.*
 import com.olive.app.data.account.AccountSyncRepository
 import com.olive.app.security.*
 import com.olive.app.location.LiveLocationController
@@ -15,7 +14,7 @@ import com.olive.app.data.messaging.VoipPushTokenRegistration
 import com.olive.app.data.sync.PriorityReconciliationWorker
 import com.olive.app.data.sync.SyncCheckpointStore
 import com.olive.app.data.sync.AccountRevocationEvents
-import com.olive.app.data.SafetyAccessIndexStore
+import com.olive.app.data.safety.SafetyAccessIndexStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -25,8 +24,14 @@ import kotlin.time.Duration.Companion.milliseconds
 import android.os.SystemClock
 import android.os.Build
 import android.view.accessibility.AccessibilityManager
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.SettingsEvent
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.messaging.MessageSendWorker
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
 
 
 // Restores enrollment, signs accounts in/out and runs onboarding; stale account-choice callbacks cannot restart setup.

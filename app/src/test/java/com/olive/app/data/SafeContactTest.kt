@@ -1,6 +1,8 @@
 // Tests safe-contact profile storage and older profile defaults.
 package com.olive.app.data
 
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.UserProfile
 import org.json.JSONObject
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals

@@ -11,8 +11,8 @@ import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import org.junit.Assert.*
 import org.junit.Test
-import com.olive.app.data.UserProfile
-import com.olive.app.data.DeliveryAddress
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.account.DeliveryAddress
 
 class SafeEntryUiTest : OliveUiTestBase() {
     // Checks the entry setup step with the test's sample data.

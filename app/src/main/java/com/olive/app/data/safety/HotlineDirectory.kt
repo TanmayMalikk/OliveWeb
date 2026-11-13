@@ -1,6 +1,12 @@
 // Safe-app users and support staff: lists support phone numbers for users.
-package com.olive.app.data
+// Suppressing warning SameParameterValue since Hotlinedirectory.checkeon is always a DATASET_DATE which is dynamic anyways
+// maybe I am too python-brained to understand why having a val that is always assigned the 'same' thing is a bad idea.
+// constants won't work since these aren't known at compile time.
+@file:Suppress("SameParameterValue")
 
+package com.olive.app.data.safety
+
+import com.olive.app.data.account.DeliveryAddress
 import java.net.URI
 import java.text.Normalizer
 import java.util.Locale

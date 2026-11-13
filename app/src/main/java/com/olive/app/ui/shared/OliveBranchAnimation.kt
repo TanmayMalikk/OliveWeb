@@ -23,15 +23,14 @@ import kotlin.math.atan2
 import kotlin.math.sin
 import android.content.res.Resources
 import androidx.annotation.StringRes
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalResources
-import androidx.core.os.LocaleListCompat
-import com.olive.app.data.AccountRole
-import com.olive.app.data.CoverType
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
 import com.olive.app.R
 import java.util.Locale
+import kotlin.math.pow
 
 
 /**
@@ -77,55 +76,6 @@ internal fun pinSafeBackgroundAlpha(progress: Float): Float = when {
 }
 
 /**
- * Pure Botanical Olive Branch & Falling Olive Animation.
- *
- * Self-contained animation overlay with NO screen or layout dependencies.
- *
- * Progression:
- * 1. Branch grows from top-left to top-right (0.00..0.38)
- * 2. Leaves unfurl along branch nodes (0.15..0.45)
- * 3. Olive swells at node with organic bounce (0.32..0.52)
- * 4. Olive detaches and falls with gravity (0.52..0.88)
- * 5. Branch dissolves smoothly (0.50..0.76)
- * 6. Falling olive dissolves smoothly (0.58..0.86)
- * 7. Optional subtle ground ripple settles at base (0.86..1.00)
- */
-@Composable
-internal fun OliveBranchAnimation(
-    modifier: Modifier = Modifier,
-    isAnimating: Boolean = true,
-    durationMs: Int = 2600,
-    onAnimationEnd: () -> Unit = {},
-    onOliveDropPosition: ((x: Float, y: Float, progress: Float) -> Unit)? = null
-) {
-    val progressAnimatable = remember { Animatable(0f) }
-
-    // Restart or clear the branch animation when its active state changes.
-    LaunchedEffect(isAnimating) {
-        // Run this part only when is animating.
-        if (isAnimating) {
-            progressAnimatable.snapTo(0f)
-            progressAnimatable.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(
-                    durationMillis = durationMs,
-                    easing = LinearEasing
-                )
-            )
-            onAnimationEnd()
-        } else {
-            progressAnimatable.snapTo(0f)
-        }
-    }
-
-    OliveBranchAnimationContent(
-        progress = progressAnimatable.value,
-        modifier = modifier,
-        onOliveDropPosition = onOliveDropPosition
-    )
-}
-
-/**
  * Stateless animation canvas driven by an external progress float (0f..1f).
  * Ideal for manual scrubbing, transition coordinators, or Gesture/Scroll drivers.
  */
@@ -148,7 +98,7 @@ internal fun OliveBranchAnimationContent(
     val oliveDrop = if (progress < 0.52f) 0f
     else {
         val dropLinear = ((progress - 0.52f) / 0.36f).coerceIn(0f, 1f)
-        Math.pow(dropLinear.toDouble(), 1.75).toFloat()
+        dropLinear.toDouble().pow(1.75).toFloat()
     }
 
     // 4. Branch Fade Away as new screen emerges (1f..0f between 50% and 76%)
@@ -434,11 +384,6 @@ internal fun rememberResourceText(): ResourceText {
 internal class ResourceFailure(@StringRes val textId: Int, vararg val arguments: Any?) :
     IllegalArgumentException()
 
-// Reads translated Android text outside a composable function.
-internal inline fun requireText(condition: Boolean, message: () -> ResourceFailure) {
-    if (!condition) throw message()
-}
-
 // Returns translated fallback text when an operation fails.
 internal fun ResourceText.failure(error: Throwable, @StringRes fallback: Int): String =
     if (error is ResourceFailure) this(error.textId, *error.arguments) else this(fallback)
@@ -526,18 +471,4 @@ internal object AppLocaleManager {
         }
     }
 
-    // Saves the selected language and asks Android to recreate UI resources in that locale.
-    fun applyLocale(language: String) {
-        val tag = getLanguageTag(language)
-        val locales = LocaleListCompat.forLanguageTags(tag)
-        AppCompatDelegate.setApplicationLocales(locales)
-    }
-
-    // Uses Android's current language when the app starts.
-    fun initSystemDefaultLocale() {
-        if (AppCompatDelegate.getApplicationLocales().isEmpty) {
-            val defaultTag = resolveSystemDefaultLanguageTag()
-            applyLocale(defaultTag)
-        }
-    }
 }

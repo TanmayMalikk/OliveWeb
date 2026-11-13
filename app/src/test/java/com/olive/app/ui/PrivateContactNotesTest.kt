@@ -1,11 +1,11 @@
 // Tests private notes linked to friends and assigned users.
 package com.olive.app.ui.users.shared.messaging
 
-import com.olive.app.data.AccountRole
-import com.olive.app.data.ChatConversation
-import com.olive.app.data.SUPPORT_TAG_NEEDS_ADMIN
-import com.olive.app.data.SUPPORT_TAG_PLAN_CONSULT
-import com.olive.app.data.SUPPORT_TAG_SUPPORT
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.messaging.SUPPORT_TAG_NEEDS_ADMIN
+import com.olive.app.data.messaging.SUPPORT_TAG_PLAN_CONSULT
+import com.olive.app.data.messaging.SUPPORT_TAG_SUPPORT
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

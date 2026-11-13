@@ -30,8 +30,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.fragment.app.FragmentActivity
-import com.olive.app.data.CoverType
-import com.olive.app.data.AccountRole
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.AccountRole
 import com.olive.app.notification.OliveNotificationManager
 import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.ui.covers.CoverLauncher

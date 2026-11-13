@@ -41,8 +41,6 @@
     <string name="fatsecret_attribution">Con tecnología de FatSecret Platform API</string>
     <string name="open_food_facts_attribution">Datos de alimentos envasados de Open Food Facts</string>
     <string name="fitness_cover_choice">Aplicación de actividad · Registro de actividad</string>
-    <string name="fitness_reminder">Tu resumen de actividad está listo.</string>
-    <string name="fitness_updates">Actualizaciones del registro de actividad</string>
     <string name="fitness_history_title">Historial de 14 días</string>
     <string name="fitness_history_description">Totales diarios de este teléfono y del reloj conectado.</string>
     <string name="fitness_history_daily_total">Total diario</string>
