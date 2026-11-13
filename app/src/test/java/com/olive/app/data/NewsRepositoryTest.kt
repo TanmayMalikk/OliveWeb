@@ -1,6 +1,7 @@
 // Tests news-feed locale queries for Daily Digest cover users.
 package com.olive.app.data
 
+import com.olive.app.data.news.GoogleNewsRepository
 import org.junit.Assert.*
 import org.junit.Test
 

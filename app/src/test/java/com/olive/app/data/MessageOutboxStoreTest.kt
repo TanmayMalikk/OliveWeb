@@ -1,10 +1,16 @@
 package com.olive.app.data
 
+import com.olive.app.data.messaging.MessageDeliveryStatus
+import com.olive.app.data.messaging.MessageOutboxStore
+import com.olive.app.data.messaging.MessageOutboxVault
+import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.OutgoingAttachment
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -76,6 +82,38 @@ class MessageOutboxStoreTest {
         assertEquals(1L, firstA.clientSequence)
         assertEquals(1L, firstB.clientSequence)
         assertEquals(2L, secondA.clientSequence)
+    }
+
+    @Test
+    fun `text and attachment records share one conversation sequence`() {
+        val store = MessageOutboxStore(InMemoryOutboxVault())
+        val text = store.write(message("text", "alice"))
+        val attachment = store.write(message("attachment", "alice").copy(
+            attachment = OutgoingAttachment(mediaId = "media-id"),
+        ))
+        val after = store.write(message("after", "alice"))
+
+        assertEquals(listOf(1L, 2L, 3L), listOf(
+            text.clientSequence,
+            attachment.clientSequence,
+            after.clientSequence,
+        ))
+        assertEquals("media-id", store.head("alice", "conversation")
+            ?.takeIf { it.id == "text" }
+            ?.let { store.all("alice")[1].attachment?.mediaId })
+    }
+
+    @Test
+    fun `an idempotency key cannot identify a different attachment`() {
+        val store = MessageOutboxStore(InMemoryOutboxVault())
+        val original = message("same-id", "alice").copy(
+            attachment = OutgoingAttachment(mediaId = "first-media"),
+        )
+        store.write(original)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            store.write(original.copy(attachment = OutgoingAttachment(mediaId = "other-media")))
+        }
     }
 
     @Test

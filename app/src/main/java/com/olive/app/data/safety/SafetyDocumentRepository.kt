@@ -1,10 +1,12 @@
 // Safe-app users and support staff: loads and saves a user’s safety documents.
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import android.content.Context
 import com.google.firebase.firestore.*
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaTicketDataSource
@@ -457,7 +459,7 @@ class SafetyDocumentRepository(
 
     /** Wraps the document key for both the directory identity and every registered recipient device. */
     private suspend fun recipientAccess(
-        documentKey: javax.crypto.SecretKey,
+        documentKey: SecretKey,
         uid: String,
         username: String,
     ): RecipientAccess {

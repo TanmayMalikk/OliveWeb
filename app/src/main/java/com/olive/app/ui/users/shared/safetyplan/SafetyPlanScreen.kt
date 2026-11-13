@@ -31,8 +31,17 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
 import com.olive.app.R
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.safety.SAFETY_CHECKLIST_SECTIONS
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.SharedSafetyPlan
+import com.olive.app.data.safety.readSafetyChecklist
+import com.olive.app.data.safety.safetyChecklistAttachmentTag
+import com.olive.app.data.safety.safetyChecklistConflictPreview
+import com.olive.app.data.safety.safetyChecklistPreview
+import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import com.olive.app.ui.users.user.documents.SafetyDocumentViewer
 import java.io.File
@@ -64,6 +73,7 @@ internal fun SafetyPlanScreen(
     fun leaveEditor() {
         focus.clearFocus(force = true)
         keyboard?.hide()
+        controller.flushEdits()
     }
 
     val lease = remember(ownerUid) { Any() }
@@ -243,8 +253,12 @@ internal fun SafetyPlanScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Muted
                             )
-                            val status =
-                                if (controller.saving > 0) R.string.safety_saving else R.string.safety_saved
+                            val status = when {
+                                controller.saving > 0 -> R.string.safety_saving
+                                controller.syncing -> R.string.safety_syncing
+                                plan?.pending == true -> R.string.safety_saved_waiting
+                                else -> R.string.safety_saved
+                            }
                             if (plan != null && controller.error != R.string.safety_storage_error) Text(
                                 stringResource(status),
                                 style = MaterialTheme.typography.bodySmall,
@@ -274,6 +288,13 @@ internal fun SafetyPlanScreen(
                                             value
                                         )
                                     },
+                                    onResolve = { key, keepMine ->
+                                        if (!safeContact && controller.plan?.ownerUid == ownerUid) controller.resolve(
+                                            key,
+                                            keepMine
+                                        )
+                                    },
+                                    onSyncNow = controller::flushEdits,
                                     contacts = if (!organizationEditor && !safeContact && section == "contacts") session.profile?.contacts.orEmpty() else emptyList(),
                                     contactsEditable = !organizationEditor && !safeContact && section == "contacts",
                                     onContactsChange = if (!organizationEditor && !safeContact && section == "contacts") session::saveContacts else null,
@@ -291,7 +312,10 @@ internal fun SafetyPlanScreen(
                                             pendingDocumentAttachment = SafetyAttachmentTarget(
                                                 fieldKey = fieldKey,
                                                 itemId = itemId,
-                                                uploadTag = safetyChecklistAttachmentTag(fieldKey, itemId),
+                                                uploadTag = safetyChecklistAttachmentTag(
+                                                    fieldKey,
+                                                    itemId
+                                                ),
                                             )
                                         }
                                     } else null,
@@ -323,6 +347,13 @@ internal fun SafetyPlanScreen(
                                             value
                                         )
                                     },
+                                    onResolve = { key, keepMine ->
+                                        if (controller.plan?.ownerUid == ownerUid) controller.resolve(
+                                            key,
+                                            keepMine
+                                        )
+                                    },
+                                    onSyncNow = controller::flushEdits,
                                     editable = !safeContact
                                 )
                             }

@@ -40,7 +40,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.olive.app.R
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.location.DeviceLocation
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.safecontact.SharedEntryViewer

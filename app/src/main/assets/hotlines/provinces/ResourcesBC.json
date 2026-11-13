@@ -4,28 +4,34 @@
       "VictimLinkBC": {
         "Desc": "Confidential 24/7 multilingual support and referral service for victims of family or sexual violence in BC.",
         "Phone": "1-800-563-0808",
+        "Text": "1-800-563-0808",
+        "hours": "24/7",
         "url": "https://www.victimlinkbc.ca/"
       },
       "Crisis Centre BC": {
         "Desc": "24/7 crisis intervention, emotional support, and suicide prevention line.",
         "Phone": "1-800-784-2433",
+        "hours": "24/7",
         "url": "https://crisiscentre.bc.ca/"
       },
       "Vancouver Rape Relief & Women's Shelter": {
         "Desc": "24/7 transition house and crisis line for women escaping violence and domestic abuse.",
         "Phone": "604-872-8212",
-        "url": "https://www.rapereliefshelter.org/"
+        "hours": "24/7",
+        "url": "https://rapereliefshelter.bc.ca/"
       }
     },
     "Shelters": {
       "Atira Women's Resource Society": {
         "Desc": "Emergency housing, crisis intervention, and supportive services for women and children in crisis.",
-        "Phone": "604-681-4480",
+        "Phone": "604-681-4437",
+        "hours": "Monday to Friday, 8:30 a.m. – 5:00 p.m.",
         "url": "https://atira.bc.ca/"
       },
       "Downtown Eastside Women's Centre": {
         "Desc": "Safe space, advocacy, housing support, and basic needs for women in Vancouver's DTES.",
         "Phone": "604-681-8480",
+        "hours": "Mon – Tue: 9am – 5pm; Wed: 11am – 5pm; Thur – Sun: 9am – 5pm",
         "url": "https://dewc.ca/"
       }
     }
@@ -35,6 +41,7 @@
       "Vancouver Island Crisis Line": {
         "Desc": "Confidential 24/7 crisis support line for Vancouver Island and surrounding areas.",
         "Phone": "1-888-494-3888",
+        "hours": "24/7",
         "url": "https://www.vicrisis.ca/"
       }
     },
@@ -42,6 +49,7 @@
       "Victoria Women's Transition House": {
         "Desc": "24/7 emergency shelter, safety planning, and counselling for women and children fleeing domestic abuse.",
         "Phone": "250-385-6611",
+        "hours": "24/7",
         "url": "https://www.transitionhouse.net/"
       }
     }
@@ -51,6 +59,7 @@
       "Kelowna Women's Shelter Hotline": {
         "Desc": "24/7 crisis line, food, clothing, and support services for women fleeing domestic violence.",
         "Phone": "250-763-1040",
+        "hours": "24/7",
         "url": "https://kelownawomensshelter.ca/"
       }
     },
@@ -58,6 +67,7 @@
       "Kelowna Women's Shelter": {
         "Desc": "24/7 emergency safe shelter, safety planning, and confidential support for women and children.",
         "Phone": "250-763-1040",
+        "hours": "24/7",
         "url": "https://kelownawomensshelter.ca/"
       }
     }

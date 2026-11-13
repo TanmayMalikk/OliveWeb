@@ -41,8 +41,6 @@
     <string name="fatsecret_attribution">مدعوم بواسطة FatSecret Platform API</string>
     <string name="open_food_facts_attribution">بيانات الأطعمة المعبأة من Open Food Facts</string>
     <string name="fitness_cover_choice">تطبيق اللياقة · متتبع اللياقة</string>
-    <string name="fitness_reminder">ملخص لياقتك جاهز.</string>
-    <string name="fitness_updates">تحديثات متتبع اللياقة</string>
     <string name="fitness_history_title">سجل 14 يوماً</string>
     <string name="fitness_history_description">الإجماليات اليومية من هذا الهاتف والساعة المتصلة.</string>
     <string name="fitness_history_daily_total">الإجمالي اليومي</string>

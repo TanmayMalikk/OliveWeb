@@ -1,5 +1,8 @@
+//suppressing SameParameterValue since 'value' in buildconfig is always MAPBOX_ACCESS_TOKEN which is dynamic
+// Const val will not work since value is not known at compile time.
+@file:Suppress("SameParameterValue")
 // Users and approved supporters: reads the device position for safe-app maps.
-package com.olive.app.data
+package com.olive.app.data.location
 
 import android.Manifest
 import android.content.Context
@@ -40,7 +43,9 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.account.DeliveryAddress
+import java.net.URL
 
 internal data class DeviceCoordinates(
     val latitude: Double,
@@ -367,7 +372,7 @@ internal object MapboxDirectionsClient {
             "access_token=${encode(BuildConfig.MAPBOX_ACCESS_TOKEN)}",
         ).joinToString("&")
         val connection =
-            (java.net.URL("https://api.mapbox.com/directions/v5/mapbox/driving-traffic/$coordinates?$parameters")
+            (URL("https://api.mapbox.com/directions/v5/mapbox/driving-traffic/$coordinates?$parameters")
                 .openConnection() as HttpsURLConnection).apply {
                 connectTimeout = 8_000
                 readTimeout = 10_000

@@ -31,8 +31,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
-import com.olive.app.data.AccountIdentity
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.R
 import com.olive.app.ui.covers.fitness.FitnessCover
 import com.olive.app.ui.covers.GameCover
@@ -53,8 +52,9 @@ import com.olive.app.ui.users.shared.messaging.IncomingCallDialog
 import androidx.core.content.ContextCompat
 import java.security.MessageDigest
 import java.util.Base64
-import com.olive.app.data.AccountRole
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.UserProfile
 import com.olive.app.security.SafeEntryMethod
 import com.olive.app.security.allowsAppPin
 import com.olive.app.ui.session.SessionRuntime
@@ -218,7 +218,7 @@ internal fun OliveRoot(
                             .accessibilityTraversal(AccessibilityTraversalOrder.ScreenContent)
                             .then(if (supportExpanded || showPinAnimation) Modifier.clearAndSetSemantics {} else Modifier),
                         bottomBar = {
-                            if (showQuickExit || showSupport) Spacer(
+                            if (showQuickExit) Spacer(
                                 Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp)
                             )
                         },

@@ -24,7 +24,6 @@ import com.olive.app.OliveActivity
 import com.olive.app.R
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-import kotlin.random.Random
 import kotlinx.coroutines.tasks.await
 
 // Syncs the device's FCM token to Firestore and checks conversation markers when requested.
@@ -180,9 +179,8 @@ object LocalNotificationEventHandler {
         val senderUid = data["senderUid"].orEmpty()
         if (senderUid.isNotBlank() && senderUid == currentUid) return false
         val messageId = data["messageId"].orEmpty()
-        if (messageId.isNotBlank() && messageId == previousMessageId) return false
-        return type in setOf("safe_update", "message", "notification") ||
-            messageId.isNotBlank() || data["conversationId"].orEmpty().isNotBlank() || hasNotificationPayload
+        return !(messageId.isNotBlank() && messageId == previousMessageId) && (type in setOf("safe_update", "message", "notification") ||
+                messageId.isNotBlank() || data["conversationId"].orEmpty().isNotBlank() || hasNotificationPayload)
     }
 
     // Handles an incoming FCM message by deduplicating its conversation marker and scheduling an alert.

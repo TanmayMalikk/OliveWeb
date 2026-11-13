@@ -11,8 +11,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.data.CoverType
-import com.olive.app.data.SafeContact
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.SafeContact
 import com.olive.app.ui.users.shared.navigation.SafePage
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import org.junit.Test

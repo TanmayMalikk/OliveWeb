@@ -1,6 +1,23 @@
 // Tests offline safety-plan edits and conflict merging for users.
 package com.olive.app.data
 
+import com.olive.app.data.safety.SafetyChecklistItem
+import com.olive.app.data.safety.SafetyConflict
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.SafetyField
+import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.edit
+import com.olive.app.data.safety.mergeSafetyChecklist
+import com.olive.app.data.safety.mergeSafetyPlan
+import com.olive.app.data.safety.mergeVisibleSafetyPlan
+import com.olive.app.data.safety.readSafetyChecklist
+import com.olive.app.data.safety.safetyChecklistAttachmentTag
+import com.olive.app.data.safety.safetyChecklistWithPublishedDocuments
+import com.olive.app.data.safety.safetyPlanSyncDelayMillis
+import com.olive.app.data.safety.safetyFieldsWithDefaults
+import com.olive.app.data.safety.safetyChecklistConflictPreview
+import com.olive.app.data.safety.SafetyChecklistConflictPreview
+import com.olive.app.data.safety.writeSafetyChecklist
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -169,6 +186,67 @@ class SafetyPlanMergeTest {
         assertEquals(2L, merged.revision)
         assertEquals("new", merged.mutationId)
         assertNull(merged.conflictRevision)
+    }
+
+    @Test
+    fun earlierListenerEchoFromTheSameWriterDoesNotConflictWithNewerTyping() {
+        val current = old.copy(fields = mapOf("primary_destination" to SafetyField(
+            value = "Second edit",
+            revision = 1,
+            mutationId = "second",
+            writerId = "owner-device",
+            writerUid = "owner",
+            clientSequence = 2,
+        )))
+        val remote = old.copy(fields = mapOf("primary_destination" to SafetyField(
+            value = "First edit",
+            revision = 2,
+            mutationId = "first",
+            writerId = "owner-device",
+            writerUid = "owner",
+            clientSequence = 1,
+        )))
+
+        val merged = mergeSafetyPlan(current, current, remote).fields.getValue("primary_destination")
+
+        assertEquals("Second edit", merged.value)
+        assertEquals(2L, merged.revision)
+        assertEquals("second", merged.mutationId)
+        assertNull(merged.conflictRevision)
+    }
+
+    @Test
+    fun visibleDraftStaysAuthoritativeWhileAnIntermediateCloudEchoArrives() {
+        val visible = old.copy(fields = mapOf("primary_destination" to SafetyField(
+            value = "",
+            revision = 1,
+            mutationId = "latest",
+            writerId = "staff-device",
+            writerUid = "staff",
+            clientSequence = 10,
+        )))
+        val intermediate = old.copy(fields = mapOf("primary_destination" to SafetyField(
+            value = "Original te",
+            revision = 9,
+            mutationId = "older",
+            writerId = "staff-device",
+            writerUid = "staff",
+            clientSequence = 9,
+        )))
+
+        val merged = mergeVisibleSafetyPlan(visible, intermediate, "staff")
+
+        assertEquals("", merged.fields.getValue("primary_destination").value)
+        assertEquals("latest", merged.fields.getValue("primary_destination").mutationId)
+        assertFalse(merged.hasConflicts)
+    }
+
+    @Test
+    fun liveEditDebounceUsesTrailingDelayWithOneSecondMaximum() {
+        assertEquals(250L, safetyPlanSyncDelayMillis(firstEditAt = 0, lastEditAt = 100, now = 100))
+        assertEquals(100L, safetyPlanSyncDelayMillis(firstEditAt = 0, lastEditAt = 900, now = 900))
+        assertEquals(0L, safetyPlanSyncDelayMillis(firstEditAt = 0, lastEditAt = 900, now = 1_000))
+        assertEquals(0L, safetyPlanSyncDelayMillis(firstEditAt = 0, lastEditAt = 100, now = 100, immediate = true))
     }
 
     // Inputs: the values shown below. Expected: late responses cannot roll back an already merged revision.

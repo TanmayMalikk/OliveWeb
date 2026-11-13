@@ -2,7 +2,6 @@
 package com.olive.app.location
 
 import android.Manifest
-import android.app.*
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
@@ -16,8 +15,8 @@ import com.google.android.gms.location.*
 import com.google.firebase.database.DatabaseReference
 import com.olive.app.R
 import com.olive.app.notification.OliveNotificationManager
-import com.olive.app.data.LocationDatabase
-import com.olive.app.data.MapLocationPoint
+import com.olive.app.data.location.LocationDatabase
+import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.security.EncryptionUtils
 import org.json.JSONObject
 import javax.crypto.SecretKey

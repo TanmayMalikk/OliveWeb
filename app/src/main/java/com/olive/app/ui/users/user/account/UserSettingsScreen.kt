@@ -34,9 +34,9 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.AccountRole
-import com.olive.app.data.CoverType
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.UserProfile
 import com.olive.app.ui.shared.AddressFields
 import com.olive.app.ui.shared.Cream
 import com.olive.app.ui.shared.Muted

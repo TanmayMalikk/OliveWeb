@@ -565,7 +565,7 @@ exports.mediaUpdateAccess = onCall(options, async (request) => {
   return publicRecord(await reference.get());
 });
 
-// Publish the message and grant its recipients access in the same transaction.
+// Publishes the ciphertext message and grants its current conversation recipients access atomically.
 exports.mediaShareInChat = onCall(options, async (request) => {
   const uid = caller(request);
   const data = request.data;
@@ -614,12 +614,19 @@ exports.mediaShareInChat = onCall(options, async (request) => {
       const wrappedKeys = {...value.wrapped_keys, ...Object.fromEntries(
         recipients.map(id => [id, access.wrappedKeys[id]]),
       )};
-      const deviceWrappedKeys = {...value.device_wrapped_keys, ...retainedDeviceKeys(access.deviceWrappedKeys, recipients)};
+      const deviceWrappedKeys = {
+        ...(value.device_wrapped_keys || {}),
+        ...retainedDeviceKeys(access.deviceWrappedKeys, recipients),
+      };
       const allowedUsers = Object.keys(wrappedKeys);
       if (allowedUsers.length > 25 || Object.keys(deviceWrappedKeys).length > 250) {
         throw new HttpsError("failed-precondition", "This document has reached its sharing limit.");
       }
-      transaction.update(file, {wrapped_keys: wrappedKeys, device_wrapped_keys: deviceWrappedKeys, allowed_users: allowedUsers});
+      transaction.update(file, {
+        wrapped_keys: wrappedKeys,
+        device_wrapped_keys: deviceWrappedKeys,
+        allowed_users: allowedUsers,
+      });
       transaction.set(grants, {
         independentReaders: [...new Set([...(tracked.get("independentReaders") || []), ...recipients])],
       }, {merge: true});
@@ -634,10 +641,18 @@ exports.mediaShareInChat = onCall(options, async (request) => {
       transaction.update(file, {allowed_users: allowedUsers});
     }
     transaction.create(message, {
-      senderUid: uid, senderUsername, ciphertext, clientSentAt, deleted: false, sentAt: FieldValue.serverTimestamp(),
+      senderUid: uid,
+      senderUsername,
+      ciphertext,
+      clientSentAt,
+      deleted: false,
+      sentAt: FieldValue.serverTimestamp(),
     });
     transaction.update(chat, {
-      lastMessage: "Secure message", lastMessageId: messageId, lastSenderUid: uid, updatedAt: FieldValue.serverTimestamp(),
+      lastMessage: "Secure message",
+      lastMessageId: messageId,
+      lastSenderUid: uid,
+      updatedAt: FieldValue.serverTimestamp(),
     });
   });
   return {shared: true};

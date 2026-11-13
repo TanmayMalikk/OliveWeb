@@ -2,12 +2,12 @@
 package com.olive.app.ui.session
 
 import com.olive.app.R
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.ChatConversation
-import com.olive.app.data.ChatMessage
-import com.olive.app.data.PrivateEntry
-import com.olive.app.data.PrivateEntryKind
-import com.olive.app.data.SafetyDocument
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.messaging.ChatMessage
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.ui.users.user.location.LocationMapConfiguration
 import com.olive.app.ui.users.user.location.LocationMapController
 import com.olive.app.security.KeyManager
@@ -20,7 +20,26 @@ import com.olive.app.ui.users.shared.navigation.*
 import android.app.Application
 import androidx.compose.runtime.*
 import com.olive.app.BuildConfig
-import com.olive.app.data.*
+import com.olive.app.data.account.AccountCounts
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.AdminAccountSummary
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.FailedAttempt
+import com.olive.app.data.account.SettingsEvent
+import com.olive.app.data.account.TriggerEvent
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.messaging.DirectoryUser
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.messaging.FriendRequest
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.OutgoingAttachment
+import com.olive.app.data.messaging.PrivateContactNote
+import com.olive.app.data.messaging.isDurableChatAttachment
+import com.olive.app.data.messaging.outgoingRoomKey
+import com.olive.app.data.messaging.prepareOutgoingMessage
+import com.olive.app.data.news.NewsArticle
 import com.olive.app.security.*
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
@@ -151,24 +170,23 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             with(state) {
                 val conversation = activeConversation ?: return
                 val device = enrollment ?: return
-                val documents = safetyDocumentRepository ?: return
-                if (messagingBusy || document.ownerUid != device.uid) return
+                safetyDocumentRepository ?: return
+                if (messagingBusy || !isDurableChatAttachment(document, device.uid)) return
                 val token = epoch
                 messagingBusy = true
                 message = null
                 scope.launch {
+                    // Turn an unexpected share failure into a readable message.
                     try {
-                        val recipients = conversation.participantIds.filter { it != device.uid }.associateWith { recipient ->
-                            conversation.participantUsernames[recipient]
-                                ?: error("Recipient username is unavailable")
-                        }
+                        val key = outgoingRoomKey(activeRoomKey) { roomKey(conversation) }
                         val outgoing = prepareOutgoingMessage(
                             conversation.id, AccountIdentity(device.uid, coverUsername),
-                            "SHARED_MEDIA:${document.id}:${document.name}", roomKey(conversation)
-                        )
-                        documents.shareInChat(document, outgoing, recipients)
+                            "SHARED_MEDIA:${document.id}:${document.name}", key
+                        ).copy(attachment = OutgoingAttachment(mediaId = document.id))
+                        val queued = withContext(Dispatchers.IO) { messageOutbox.write(outgoing) }
+                        MessageSendWorker.enqueue(application, queued)
                         if (epoch == token) message =
-                            runtime.application.getString(R.string.documents_shared_in_chat)
+                            runtime.application.getString(R.string.message_delivery_queued)
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: Exception) {
@@ -189,7 +207,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 val conversation = activeConversation ?: return
                 val device = enrollment ?: return
                 val chat = secureChatRepository ?: return
-                if (accountRole != com.olive.app.data.AccountRole.USER || messagingBusy ||
+                if (accountRole != AccountRole.USER || messagingBusy ||
                     conversation.type != "SUPPORT") return
                 val token = epoch
                 messagingBusy = true
@@ -227,7 +245,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                 val conversation = activeConversation ?: return
                 val device = enrollment ?: return
                 val profile = profile ?: return
-                if (profile.role != com.olive.app.data.AccountRole.USER || messagingBusy) return
+                if (profile.role != AccountRole.USER || messagingBusy) return
                 val peerUid = conversation.participantIds.firstOrNull { it != device.uid } ?: return
                 val friend = friends.firstOrNull { it.uid == peerUid } ?: return
                 val configuration = LocationMapConfiguration(
@@ -323,7 +341,6 @@ internal class SessionRuntime(
     val localMode = !BuildConfig.FIREBASE_CONFIGURED
     private val localStorage = SessionLocalStorage(application, localMode)
     val vault get() = localStorage.vault
-    val activityVault get() = localStorage.activityVault
 
     // Checks whether Android has a PIN, pattern, password, or biometric lock.
     fun phoneSecure() =

@@ -1,6 +1,11 @@
 // Tests Canadian support numbers and city-based matches for users.
 package com.olive.app.data
 
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.safety.CanadianRegion
+import com.olive.app.data.safety.HotlineDirectory
+import com.olive.app.data.safety.HotlineResourceKind
+import com.olive.app.data.safety.hotlineDialNumber
 import java.io.File
 import org.junit.Assert.*
 import org.junit.Test
@@ -28,9 +33,9 @@ class HotlineDirectoryTest {
             CanadianRegion.entries.map { it.code }.toSet(),
             catalog.resources.map { it.region }.toSet()
         )
-        assertEquals(98, catalog.resources.size)
-        assertEquals(55, catalog.resources.count { it.kind == HotlineResourceKind.Hotline })
-        assertEquals(43, catalog.resources.count { it.kind == HotlineResourceKind.Shelter })
+        assertEquals(94, catalog.resources.size)
+        assertEquals(52, catalog.resources.count { it.kind == HotlineResourceKind.Hotline })
+        assertEquals(42, catalog.resources.count { it.kind == HotlineResourceKind.Shelter })
         assertTrue(catalog.resources.all {
             it.source.startsWith("https://") && it.website.startsWith("https://") &&
                     it.phone.isNotBlank() && it.description.isNotBlank()

@@ -14,9 +14,10 @@ import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
 import android.os.ParcelFileDescriptor
 import androidx.core.graphics.createBitmap
-import com.olive.app.data.PrivateEntry
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.account.UserProfile
+import com.olive.app.data.account.PrivateEntryKind
 import java.io.File
 import java.io.FileOutputStream
 import java.time.Instant
@@ -40,7 +41,7 @@ internal data class EmergencyReportMedia(
 
 // Trashed records are left out because the user has already chosen to remove them from active notes.
 internal fun emergencyIncidents(entries: List<PrivateEntry>) = entries.filter {
-    it.kind == com.olive.app.data.PrivateEntryKind.Incident && it.deletedAt == null && it.purgedAt == null
+    it.kind == PrivateEntryKind.Incident && it.deletedAt == null && it.purgedAt == null
 }.sortedWith(
     compareBy<PrivateEntry> { it.incidentDate.ifBlank { "9999" } }
         .thenBy { it.incidentTime }

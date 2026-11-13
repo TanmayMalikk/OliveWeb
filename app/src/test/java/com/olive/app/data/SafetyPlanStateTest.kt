@@ -1,6 +1,11 @@
 // Tests safety-plan state, serialization, defaults, and merge boundaries.
 package com.olive.app.data
 
+import com.olive.app.data.safety.SafetyField
+import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.edit
+import com.olive.app.data.safety.mergeSafetyPlan
+import com.olive.app.data.safety.safetyFieldsWithDefaults
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -20,9 +25,17 @@ class SafetyPlanStateTest {
         assertFalse(clean.hasConflicts)
         assertFalse(clean.pending)
 
-        assertTrue(plan(fields = mapOf("primary_destination" to SafetyField("Draft", mutationId = "m1"))).hasEdits)
+        assertTrue(plan(fields = mapOf("primary_destination" to SafetyField(
+            "Draft",
+            mutationId = "m1"
+        )
+        )).hasEdits)
         assertTrue(plan(shareAction = "share").pending)
-        assertTrue(plan(fields = mapOf("primary_destination" to SafetyField("Mine", conflictRevision = 2))).hasConflicts)
+        assertTrue(plan(fields = mapOf("primary_destination" to SafetyField(
+            "Mine",
+            conflictRevision = 2
+        )
+        )).hasConflicts)
     }
 
     // Input: every participant and safe-contact field. Expected: encrypted JSON round-trips without dropping access data.
@@ -77,6 +90,18 @@ class SafetyPlanStateTest {
         assertEquals("New", first.value)
         assertNotNull(first.mutationId)
         assertNotEquals(first.mutationId, second.mutationId)
+    }
+
+    @Test
+    fun rapidEditsRetainWriterIdentityAndIncreaseSequence() {
+        val first = SafetyField("Old").edit("First", "device-writer", "staff-uid")
+        val second = first.edit("Second", "ignored-while-pending", "staff-uid")
+        val restored = SafetyField.fromJson(second.toJson())
+
+        assertEquals("device-writer", restored.writerId)
+        assertEquals("staff-uid", restored.writerUid)
+        assertEquals(2L, restored.clientSequence)
+        assertEquals("Second", restored.value)
     }
 
     // Input: a local field absent from the server response. Expected: a partial response cannot erase the draft.

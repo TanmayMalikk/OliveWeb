@@ -18,7 +18,7 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
     const old = snapshot.data();
     if (!canRead(caller, old, ownerUid)) throw new HttpsError("permission-denied", "Plan is no longer shared with this account.");
     if (changes.length && !canEdit(caller, old, ownerUid)) throw new HttpsError("permission-denied", "This shared plan is read only.");
-    const {fields, conflicts, conflictValues} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes);
+    const {fields, conflicts, conflictValues} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes, caller.uid);
     const pendingConflicts = {...old?.pendingConflicts};
     const resolvedConflicts = {...old?.resolvedConflicts};
     if (caller.role === "STAFF" || caller.role === "ADMIN") {
@@ -57,7 +57,8 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
     }
     const changed = !old || Object.keys(fields).length !== Object.keys(old.fields || {}).length ||
       Object.entries(fields).some(([key, field]) => field !== old.fields?.[key]) ||
-      JSON.stringify(pendingConflicts) !== JSON.stringify(old.pendingConflicts || {});
+      JSON.stringify(pendingConflicts) !== JSON.stringify(old.pendingConflicts || {}) ||
+      JSON.stringify(resolvedConflicts) !== JSON.stringify(old.resolvedConflicts || {});
     const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", adminUid: "", adminName: "", consultationRequested: false,
       safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}),
     fields, pendingConflicts, resolvedConflicts, updatedAt: Date.now()} : old;
