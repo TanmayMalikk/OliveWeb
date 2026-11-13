@@ -18,11 +18,47 @@ exports.safetyPlanSync = onCall({invoker: "public"}, async (request) => {
     const old = snapshot.data();
     if (!canRead(caller, old, ownerUid)) throw new HttpsError("permission-denied", "Plan is no longer shared with this account.");
     if (changes.length && !canEdit(caller, old, ownerUid)) throw new HttpsError("permission-denied", "This shared plan is read only.");
-    const {fields, conflicts} = mergeFields(
-        old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes, caller.uid);
+    const {fields, conflicts, conflictValues} = mergeFields(old?.fields || {}, caller.uid === ownerUid ? defaults : {}, changes, caller.uid);
+    const pendingConflicts = {...old?.pendingConflicts};
+    const resolvedConflicts = {...old?.resolvedConflicts};
+    if (caller.role === "STAFF" || caller.role === "ADMIN") {
+      for (const change of changes) {
+        if (conflicts.includes(change.key) && fields[change.key]?.value !== change.value &&
+            !resolvedConflicts[change.key]?.includes(change.mutationId)) {
+          pendingConflicts[change.key] = {
+            value: conflictValues[change.key] || change.value, mutationId: change.mutationId,
+            baseValue: fields[change.key].value,
+          };
+        }
+      }
+    }
+    for (const [key, proposal] of Object.entries(pendingConflicts)) {
+      const current = fields[key]?.value;
+      if (proposal.baseValue != null && current != null && proposal.baseValue !== current) {
+        const merged = mergeChecklist(proposal.baseValue, proposal.value, current);
+        if (merged) pendingConflicts[key] = {...proposal, value: merged.localValue, baseValue: current};
+      }
+    }
+    const resolution = request.data?.resolution;
+    if (resolution) {
+      if (caller.uid !== ownerUid || caller.role !== "USER") {
+        throw new HttpsError("permission-denied", "Only the plan owner can resolve a conflict.");
+      }
+      const proposal = Object.hasOwn(pendingConflicts, resolution.key) && pendingConflicts[resolution.key];
+      if (!proposal || proposal.mutationId !== resolution.mutationId ||
+          fields[resolution.key]?.revision !== resolution.revision || typeof resolution.useIncoming !== "boolean") {
+        throw new HttpsError("aborted", "The conflict changed. Review the latest versions.");
+      }
+      if (resolution.useIncoming) fields[resolution.key] = {
+        value: proposal.value, mutationId: proposal.mutationId, revision: resolution.revision + 1,
+      };
+      resolvedConflicts[resolution.key] = [...(resolvedConflicts[resolution.key] || []), proposal.mutationId].slice(-8);
+      delete pendingConflicts[resolution.key];
+    }
     const changed = !old || Object.keys(fields).length !== Object.keys(old.fields || {}).length ||
       Object.entries(fields).some(([key, field]) => field !== old.fields?.[key]) ||
-      JSON.stringify(pendingConflicts) !== JSON.stringify(old.pendingConflicts || {});
+      JSON.stringify(pendingConflicts) !== JSON.stringify(old.pendingConflicts || {}) ||
+      JSON.stringify(resolvedConflicts) !== JSON.stringify(old.resolvedConflicts || {});
     const plan = changed ? {...(old || {ownerUid, ownerName: caller.name, staffUid: "", staffName: "", adminUid: "", adminName: "", consultationRequested: false,
       safeContactUids: [], safeContactNames: {}, supportSafeContactUid: ""}),
     fields, pendingConflicts, resolvedConflicts, updatedAt: Date.now()} : old;

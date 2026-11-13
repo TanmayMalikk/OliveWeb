@@ -3,6 +3,7 @@ package com.olive.app.data.safety
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.Source
 import com.google.firebase.functions.FirebaseFunctions
 import com.olive.app.data.messaging.Friend
@@ -58,7 +59,8 @@ internal class SafetyPlanRepository(
                         "value" to field.value,
                         "revision" to field.revision,
                         "mutationId" to checkNotNull(field.mutationId)
-                    ) + if (field.writerId != null && field.clientSequence > 0) mapOf(
+                    ) + (field.baseValue?.let { mapOf("baseValue" to it) } ?: emptyMap()) +
+                        if (field.writerId != null && field.clientSequence > 0) mapOf(
                         "writerId" to field.writerId,
                         "clientSequence" to field.clientSequence,
                     ) else emptyMap()

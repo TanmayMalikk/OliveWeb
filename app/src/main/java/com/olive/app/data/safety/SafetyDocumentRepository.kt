@@ -29,7 +29,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
-import javax.crypto.SecretKey
 
 data class SafetyDocument(
     val id: String, val ownerUid: String, val storagePath: String, val name: String,
@@ -495,7 +494,7 @@ class SafetyDocumentRepository(
     }
 
     /** Uses this installation's key copy before the account envelope shared across installations. */
-    private fun unwrapDocumentKey(document: SafetyDocument, uid: String): SecretKey {
+    private suspend fun unwrapDocumentKey(document: SafetyDocument, uid: String): SecretKey {
         val candidates = documentKeyCandidates(document, uid, KeyManager.deviceId())
         val key = runCatching { KeyManager.unwrapFirst(candidates, document.encryptionVersion) }.getOrNull()
         return key ?: if (document.accountRecoveryReady) media.recoverDocumentKey(document.id)

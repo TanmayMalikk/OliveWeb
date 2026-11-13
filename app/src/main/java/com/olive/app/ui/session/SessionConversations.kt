@@ -22,6 +22,7 @@ import com.olive.app.data.messaging.prepareOutgoingMessage
 import com.olive.app.security.KeyManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException

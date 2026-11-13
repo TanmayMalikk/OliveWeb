@@ -35,6 +35,7 @@ describe("safety-plan edits and conflict resolution", () => {
       ownerUid: "owner", defaults: {}, changes: [{
         key: "primary_documents", value: "My edit", revision: 2,
         baseValue: "Original checklist", mutationId: expect.any(String),
+        writerId: expect.any(String), clientSequence: expect.any(Number),
       }],
     });
   });

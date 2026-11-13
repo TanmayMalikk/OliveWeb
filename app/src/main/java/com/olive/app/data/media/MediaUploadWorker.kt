@@ -16,6 +16,8 @@ import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.safety.SafetyPlanSyncWorker
+import com.olive.app.security.KeyManager
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -304,6 +306,11 @@ interface MediaTicketDataSource {
         grantIndependentRecipients:List<String> = emptyList(),
         revokeIndependentRecipients:List<String> = emptyList(),
     ):CloudMediaRecord
+    suspend fun updatePlanAccess(
+        mediaId: String,
+        wrappedKeys: Map<String, String>,
+        deviceWrappedKeys: Map<String, String>,
+    ): CloudMediaRecord = error("Plan attachment sharing is unavailable")
     suspend fun shareInChat(
         mediaId:String,
         outgoing:OutgoingMessage,
@@ -446,6 +453,17 @@ class MediaRepository(
             "revokeIndependentRecipients" to revokeIndependentRecipients,
         )).record()
     }
+
+    override suspend fun updatePlanAccess(
+        mediaId: String,
+        wrappedKeys: Map<String, String>,
+        deviceWrappedKeys: Map<String, String>,
+    ): CloudMediaRecord = call("mediaUpdateAccess", mapOf(
+        "mediaId" to mediaId,
+        "wrappedKeys" to wrappedKeys,
+        "deviceWrappedKeys" to deviceWrappedKeys,
+        "forPlan" to true,
+    )).record()
 
     override suspend fun shareInChat(
         mediaId:String,

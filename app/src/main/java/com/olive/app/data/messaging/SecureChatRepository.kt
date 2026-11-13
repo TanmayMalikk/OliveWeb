@@ -579,9 +579,6 @@ data class ChatConversation(
         }) + if (ticketSequence >= 0L) " #$ticketSequence" else ""
 
     // Gives each personal participant a stable anonymous label inside organization support views.
-    fun participantTicketNumber(uid: String): String =
-        if (uid == ownerUid) ticketNumber() else supportTicketNumber("$id-$uid")
-
     // Chooses the private display name shown for this conversation.
     fun displayName(
         currentUid: String,
@@ -607,17 +604,21 @@ data class ChatConversation(
 
     // Personal accounts see a role label instead of an organization member's account name.
     // suppressing unused since linter believes viewerRole is never used, It is.
+    fun isChatAdmin(uid: String): Boolean = type == "SUPPORT" && adminUid.isNotBlank() && uid == adminUid
+
     fun senderDisplayName(
         senderUid: String,
         senderUsername: String,
         viewerRole: AccountRole,
         anonymousStaffName: String,
-    ) = when (type) {
-        "SUPPORT" if viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
-                senderUid in setOf(staffUid, adminUid).filter { it.isNotBlank() } -> anonymousStaffName
-        "SUPPORT" if viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+        anonymousAdminName: String,
+    ) = when {
+        isChatAdmin(senderUid) -> anonymousAdminName
+        type == "SUPPORT" && viewerRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
+                staffUid.isNotBlank() && senderUid == staffUid -> anonymousStaffName
+        type == "SUPPORT" && viewerRole in setOf(AccountRole.STAFF, AccountRole.ADMIN) &&
                 senderUid !in setOf(staffUid, adminUid).filter { it.isNotBlank() } ->
-            "Ticket ${participantTicketNumber(senderUid)}"
+            if (senderUid == ownerUid) "Ticket ${ticketNumber()}" else "Friend"
         else -> senderUsername
     }
 
