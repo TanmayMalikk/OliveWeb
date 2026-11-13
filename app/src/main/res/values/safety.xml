@@ -19,6 +19,13 @@
     <string name="safety_account_required">Staff consultation requires a signed-in account. Your plans still work offline.</string>
     <string name="safety_conflict">This section changed on another device. Your edit is retained. Choose which version to keep.</string>
     <string name="safety_synced_version">Synced version: %1$s</string>
+    <string name="safety_incoming_changes">Incoming changes</string>
+    <string name="safety_incoming_added">Added: %1$s</string>
+    <string name="safety_incoming_removed">Removed: %1$s</string>
+    <string name="safety_incoming_text_changed">Changed: %1$s → %2$s</string>
+    <string name="safety_incoming_completed">Marked complete: %1$s</string>
+    <string name="safety_incoming_incomplete">Marked incomplete: %1$s</string>
+    <string name="safety_incoming_attachments_changed">Attachments updated: %1$s</string>
     <string name="safety_keep_mine">Keep my edit</string>
     <string name="safety_use_synced">Use synced version</string>
     <string name="safety_destination">Safe destination</string>
@@ -41,4 +48,14 @@
     <string name="safety_storage_videos">Videos</string>
     <string name="safety_storage_documents">Document images</string>
     <string name="safety_document_upload_hint">Uploaded files also appear in Documents.</string>
+    <string name="safety_conflict_step">Step</string>
+    <string name="safety_conflict_text">Text</string>
+    <string name="safety_conflict_completion">Completion</string>
+    <string name="safety_conflict_attachments">Attachments</string>
+    <string name="safety_conflict_excluded_attachments">Excluded attachments</string>
+    <string name="safety_conflict_present">Present</string>
+    <string name="safety_conflict_removed">Removed</string>
+    <string name="safety_conflict_complete">Complete</string>
+    <string name="safety_conflict_not_complete">Not complete</string>
+    <string name="safety_conflict_changed">Changed</string>
 </resources>

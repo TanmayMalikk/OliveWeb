@@ -466,7 +466,8 @@ internal class MediaTransferController(
             val prepared=PreparedEncryptedMedia(target.absolutePath,target.length(),sha256(target),
                 EncryptionUtils.encryptText(metadata,key),wrapped,listOf(owner.uid),
                 KeyManager.CURRENT_KEY_WRAP_VERSION,kind,ocrReview,deviceWrapped)
-            return MediaUploadJob(jobId,owner.uid,prepared)
+            return MediaUploadJob(jobId,owner.uid,prepared,
+                attachToSafetyPlan = tags.any { it.startsWith("safety-plan:") })
         } catch (failure: Throwable) {
             target.delete()
             throw failure
@@ -555,12 +556,15 @@ internal class MediaTransferController(
         }
     }
 
-    private fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File {
+    private suspend fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File {
         val deviceKey="$viewerUid--${KeyManager.deviceId()}"
         val wrapped=listOfNotNull(document.deviceWrappedKeys[deviceKey],document.wrappedKeys[viewerUid])
-        if(wrapped.isEmpty()) throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE)
         val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
-            .getOrElse { throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it) }
+            .getOrElse {
+                if (!document.accountRecoveryReady) throw MediaAccessException(MediaAccessError.KEY_UNAVAILABLE,it)
+                requireNetwork(MediaAccessError.NETWORK_REQUIRED)
+                repository.recoverDocumentKey(document.id)
+            }
         val opened=File(applicationContext.cacheDir,"opened-documents").apply { mkdirs() }
         val extension=document.name.substringAfterLast('.',"").takeIf { it.matches(Regex("[A-Za-z0-9]{1,8}")) }
         val target=File(opened,document.id+(extension?.let { ".$it" } ?: ""))

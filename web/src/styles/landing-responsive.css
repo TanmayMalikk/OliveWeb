@@ -15,12 +15,6 @@
   .cover-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .account-aside {
-    padding: 2.5rem;
-  }
-  .account-main {
-    padding: 2rem;
-  }
   .setup-covers {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -87,22 +81,6 @@
   .site-footer > span {
     margin-left: 0;
     width: 100%;
-  }
-  .account-layout {
-    grid-template-columns: 1fr;
-  }
-  .account-aside {
-    display: none;
-  }
-  .account-main {
-    padding: 1.5rem;
-  }
-  .account-form {
-    margin-block: 2rem;
-  }
-  .download-account {
-    align-items: flex-start;
-    flex-direction: column;
   }
   .step-progress {
     margin-bottom: 2.5rem;

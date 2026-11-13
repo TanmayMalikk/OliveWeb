@@ -1,24 +1,19 @@
 // All safe-app roles: loads and saves shared safety plans.
 import { firebase } from "./AccountService";
 import { doc, onSnapshot } from "firebase/firestore";
-import { writeSafetyChecklist } from "./SafetyChecklistCodec";
+import { olderSafetySections, safetySections, writeSafetyChecklist } from "./SafetyChecklistCodec";
+import type { Friend } from "./MessagingService";
 export {
+  olderSafetySections,
   readSafetyChecklist,
+  safetySectionLabels,
+  safetySections,
+  safetyChecklistConflictPreview,
   safetyChecklistText,
   writeSafetyChecklist,
 } from "./SafetyChecklistCodec";
 export type { SafetyChecklistItem } from "./SafetyChecklistCodec";
 
-export const safetySections = [
-  "destination",
-  "travel",
-  "contacts",
-  "essentials",
-  "dependants",
-  "aftercare",
-  "documents",
-  "grab",
-] as const;
 export type SafetyField = {
   value: string;
   revision: number;
@@ -36,6 +31,10 @@ export type SafetyPlan = {
   safeContactUids: string[];
   safeContactNames: Record<string, string>;
   updatedAt?: number;
+  consultationConversationId?: string;
+  ticketNumber?: number;
+  plansCompletedAt?: number;
+  pendingConflicts?: Record<string, { value: string; mutationId: string }>;
 };
 
 const starterItems: Record<string, string[]> = {
@@ -87,7 +86,7 @@ let safetyClientSequence = 0;
 function initialDefaults() {
   return Object.fromEntries(
     ["primary", "backup"].flatMap((kind) =>
-      safetySections.map((section) => {
+      [...safetySections, ...olderSafetySections].map((section) => {
         const items = (starterItems[section] ?? []).map((text) => ({
           id: crypto.randomUUID(),
           text,
@@ -125,8 +124,9 @@ export async function observePlan(
   const { db } = await firebase();
   return onSnapshot(
     doc(db, "safetyPlans", ownerUid),
+    { includeMetadataChanges: true },
     (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists() || snapshot.metadata.fromCache) return;
       const data = snapshot.data();
       onUpdate({
         ownerUid: String(data.ownerUid ?? ownerUid),
@@ -140,30 +140,71 @@ export async function observePlan(
           : [],
         safeContactNames: (data.safeContactNames ?? {}) as Record<string, string>,
         updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : 0,
+        consultationConversationId: data.consultationConversationId,
+        ticketNumber: Number.isSafeInteger(data.ticketNumber) ? data.ticketNumber : undefined,
+        plansCompletedAt: data.plansCompletedAt,
+        pendingConflicts: data.pendingConflicts,
       });
     },
     (error) => onError(error),
   );
 }
+
+export async function observeSafetyAccess(uid: string, onUpdate: () => void, onError: (error: Error) => void) {
+  const { db } = await firebase();
+  let revision: number | undefined;
+  return onSnapshot(doc(db, "syncInvalidations", uid), { includeMetadataChanges: true }, (snapshot) => {
+    if (snapshot.metadata.fromCache) return;
+    const next = snapshot.get("safetyRevision") ?? 0;
+    if (next === revision) return;
+    revision = next;
+    onUpdate();
+  }, onError);
+}
 // Saves one safety-plan field without overwriting a newer edit.
-export async function saveField(plan: SafetyPlan, key: string, value: string) {
+export async function saveField(plan: SafetyPlan, key: string, value: string, revision?: number, baseValue?: string) {
   const current = plan.fields[key] ?? { value: "", revision: 0 };
   return (
-    await call<{ plan: SafetyPlan; conflicts: string[] }>("safetyPlanSync", {
+    await call<{ plan: SafetyPlan; conflicts: string[]; conflictValues?: Record<string, string> }>("safetyPlanSync", {
       ownerUid: plan.ownerUid,
       defaults: {},
       changes: [
         {
           key,
           value,
-          revision: current.revision,
+          revision: revision ?? current.revision,
           mutationId: crypto.randomUUID(),
           writerId: safetyWriterId,
           clientSequence: ++safetyClientSequence,
         },
       ],
     })
-  ).plan;
+  );
+}
+
+export async function resolvePlanConflict(plan: SafetyPlan, key: string, useIncoming: boolean) {
+  const proposal = plan.pendingConflicts?.[key];
+  if (!proposal) throw new Error("This conflict has already been resolved.");
+  return (await call<{ plan: SafetyPlan }>("safetyPlanSync", {
+    ownerUid: plan.ownerUid,
+    resolution: { key, revision: plan.fields[key]?.revision, mutationId: proposal.mutationId, useIncoming },
+  })).plan;
+}
+
+export function completePlans(conversationId: string) {
+  return call("staffSupportClose", { conversationId, planCompleted: true });
+}
+
+export async function planMediaRecipients() {
+  return (await call<{ recipients: { uid: string; username: string }[] }>("safetyPlanMediaRecipients")).recipients;
+}
+
+export async function sharePlanWithContacts(friends: Friend[]) {
+  return (await call<{ plan: SafetyPlan }>("safetyPlanShareContacts", {
+    contacts: friends.map((friend) => ({
+      uid: friend.friendUid, friendshipId: friend.friendshipId, name: friend.friendUsername,
+    })),
+  })).plan;
 }
 // Starts or stops a plan consultation for the signed-in user.
 export async function consultation(action: "request" | "stop") {
@@ -182,7 +223,7 @@ export async function sharedPlans() {
 export async function staffConsultations() {
   return call<{
     available: boolean;
-    plans: { ownerUid: string; ownerName: string; updatedAt: number }[];
+    plans: { ownerUid: string; ownerName: string; updatedAt: number; ticketNumber: number }[];
   }>("safetyPlanConsultations");
 }
 // Lets the support queue know whether this staff member can take a ticket.

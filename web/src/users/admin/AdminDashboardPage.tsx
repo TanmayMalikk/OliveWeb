@@ -1,11 +1,10 @@
 // Admins: shows account totals and controls to admins.
 import { useEffect, useState } from "react";
-import { LogOut, Plus, RefreshCw } from "lucide-react";
+import { LayoutDashboard, MessageCircle, Plus, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import {
   Button,
   Field,
   Form,
-  Logo,
   Modal,
 } from "../../components/SharedComponents";
 import { useSession } from "../../session/SessionProvider";
@@ -21,7 +20,17 @@ import {
   loadPlan,
   type SafetyPlan,
 } from "../../services/SafetyPlanService";
-import SafetyPlanEditor from "../staff/StaffSafetyPlanEditor";
+import { ConsultationWorkspace } from "../staff/ConsultationWorkspace";
+import { OrganizationWorkspace, WorkspaceShortcuts, type WorkspacePage } from "../shared/OrganizationWorkspace";
+
+type AdminView = "home" | "plans" | "accounts" | "messages";
+const pages: WorkspacePage<AdminView>[] = [
+  { id: "home", label: "Overview", title: "Administrator overview", description: "Manage accounts, consultations, and escalated support tickets.", icon: LayoutDashboard },
+  { id: "accounts", label: "Accounts", description: "Find and manage organization and personal accounts.", icon: Users },
+  { id: "plans", label: "Consultations", title: "Safety-plan consultations", description: "Open assigned safety plans for review.", icon: ShieldCheck },
+  { id: "messages", label: "Escalation chats", description: "Review support tickets and respond to escalations.", icon: MessageCircle },
+];
+const roleLabels = { USER: "User", SAFE_CONTACT: "Safe contact", STAFF: "Staff", ADMIN: "Administrator" };
 
 export default function AdminPortal() {
   const session = useSession();
@@ -30,9 +39,10 @@ export default function AdminPortal() {
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<ManagedAccount | null>(null);
   const [plans, setPlans] = useState<
-    { ownerUid: string; ownerName: string; updatedAt: number }[]
+    { ownerUid: string; ownerName: string; updatedAt: number; ticketNumber: number }[]
   >([]);
   const [selectedPlan, setSelectedPlan] = useState<SafetyPlan | null>(null);
+  const [view, setView] = useState<AdminView>("home");
 
   // Web admin: Reloads the latest data.
   async function refresh() {
@@ -47,27 +57,19 @@ export default function AdminPortal() {
     });
   }, []);
 
+  const matchingAccounts = accounts.filter((account) =>
+    [account.username, account.fullName, account.role, roleLabels[account.role]]
+      .join(" ").toLowerCase().includes(search.trim().toLowerCase()),
+  );
+
+  const navigate = (next: AdminView) => {
+    if (next !== "plans") setSelectedPlan(null);
+    setView(next);
+  };
+
   return (
-    <div className="page-width private-shell portal">
-      <header className="site-header">
-        <Logo />
-        <span className="eyebrow">ADMINISTRATOR PORTAL</span>
-        <Button variant="exit" onClick={session.quickExit}>
-          Quick Exit <LogOut size={17} />
-        </Button>
-      </header>
-      <main id="main">
-        <div className="safe-page-title">
-          <div>
-            <span className="eyebrow">ADMINISTRATOR</span>
-            <h1>Manage organization accounts.</h1>
-          </div>
-        </div>
-        {session.message && (
-          <p role="alert" className="form-error">
-            {session.message}
-          </p>
-        )}
+    <OrganizationWorkspace role="Administrator" pages={pages} view={view} onNavigate={navigate}>
+      {view === "home" && <>
         <section className="panel organization-overview">
           <h2>Organization overview</h2>
           <div className="organization-counts">
@@ -91,9 +93,13 @@ export default function AdminPortal() {
             )}
           </div>
         </section>
-        <div className="page-toolbar">
+        <WorkspaceShortcuts pages={pages.slice(1)} onNavigate={navigate} />
+      </>}
+      {view === "accounts" && <>
+        <div className="panel organization-toolbar account-toolbar">
           <Field
             label="Search accounts"
+            type="search"
             value={search}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               setSearch(event.target.value)
@@ -112,8 +118,9 @@ export default function AdminPortal() {
             </Button>
           </div>
         </div>
-        <div className="table-scroll panel">
+        <div className="table-scroll panel organization-account-table" role="region" aria-label="Account results" tabIndex={0}>
           <table>
+            <caption className="sr-only">Managed accounts</caption>
             <thead>
               <tr>
                 <th>Username</th>
@@ -124,16 +131,10 @@ export default function AdminPortal() {
               </tr>
             </thead>
             <tbody>
-              {accounts
-                .filter((account) =>
-                  `${account.username} ${account.fullName} ${account.role}`
-                    .toLowerCase()
-                    .includes(search.toLowerCase()),
-                )
-                .map((account) => (
-                  <tr key={account.uid}>
-                    <td>@{account.username}</td>
-                    <td>{account.role}</td>
+              {matchingAccounts.map((account) => (
+                <tr key={account.uid}>
+                    <th scope="row">@{account.username}</th>
+                    <td><span className="tag">{roleLabels[account.role]}</span></td>
                     <td>{account.fullName || "—"}</td>
                     <td>
                       {account.profileComplete ? "Complete" : "Needs setup"}
@@ -147,62 +148,28 @@ export default function AdminPortal() {
                         Delete
                       </Button>
                     </td>
-                  </tr>
-                ))}
+                </tr>
+              ))}
+              {matchingAccounts.length === 0 && (
+                <tr><td colSpan={5}>{session.busy ? "Loading accounts…" : "No matching accounts."}</td></tr>
+              )}
             </tbody>
           </table>
         </div>
-        <section className="panel organization-plans">
-          <div className="organization-inbox-heading">
-            <div>
-              <span className="eyebrow">PLAN CONSULTS</span>
-              <h2>Safety plans needing review</h2>
-            </div>
-            <Button
-              variant="outline"
-              disabled={session.busy}
-              onClick={() =>
-                void session.perform(async () => {
-                  const value = await staffConsultations();
-                  setPlans(value.plans);
-                })
-              }
-            >
-              <RefreshCw size={16} /> Refresh
-            </Button>
-          </div>
-          {plans.length === 0 ? (
-            <p className="help-note">No active plan consultations.</p>
-          ) : (
-            <div className="organization-plan-list">
-              {plans.map((item) => (
-                <Button
-                  key={item.ownerUid}
-                  variant="outline"
-                  disabled={session.busy}
-                  onClick={() =>
-                    void session.perform(async () =>
-                      setSelectedPlan(await loadPlan(item.ownerUid)),
-                    )
-                  }
-                >
-                  Open {item.ownerName || "shared plan"}
-                </Button>
-              ))}
-            </div>
-          )}
-          {selectedPlan && (
-            <SafetyPlanEditor plan={selectedPlan} onChange={setSelectedPlan} />
-          )}
-        </section>
-        <OrganizationSupportInbox />
-        <Button
-          variant="quiet"
-          onClick={() => void session.perform(session.signOut)}
-        >
-          Sign out
-        </Button>
-      </main>
+      </>}
+      {view === "plans" && <>
+        <div className="panel organization-toolbar">
+          <h2>Consultation queue</h2>
+          <Button variant="outline" disabled={session.busy} onClick={() =>
+            void session.perform(async () => setPlans((await staffConsultations()).plans))
+          }>
+            <RefreshCw size={16} aria-hidden="true" /> Refresh
+          </Button>
+        </div>
+        <ConsultationWorkspace items={plans} plan={selectedPlan} busy={session.busy} onChange={setSelectedPlan}
+          onOpen={(ownerUid) => void session.perform(async () => setSelectedPlan(await loadPlan(ownerUid)))} />
+      </>}
+      {view === "messages" && <OrganizationSupportInbox />}
       {creating && (
         <Modal
           title="Create a managed account"
@@ -283,6 +250,6 @@ export default function AdminPortal() {
           </Button>
         </Modal>
       )}
-    </div>
+    </OrganizationWorkspace>
   );
 }

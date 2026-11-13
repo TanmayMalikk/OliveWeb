@@ -19,6 +19,13 @@
     <string name="safety_account_required">咨询需要登录账户。您的计划仍可离线使用。</string>
     <string name="safety_conflict">其他设备已更改此部分。你的编辑已保留。请选择要保留的版本。</string>
     <string name="safety_synced_version">已同步版本：%1$s</string>
+    <string name="safety_incoming_changes">收到的更改</string>
+    <string name="safety_incoming_added">已添加：%1$s</string>
+    <string name="safety_incoming_removed">已移除：%1$s</string>
+    <string name="safety_incoming_text_changed">已更改：%1$s → %2$s</string>
+    <string name="safety_incoming_completed">已标记为完成：%1$s</string>
+    <string name="safety_incoming_incomplete">已标记为未完成：%1$s</string>
+    <string name="safety_incoming_attachments_changed">附件已更新：%1$s</string>
     <string name="safety_keep_mine">保留我的编辑</string>
     <string name="safety_use_synced">使用已同步版本</string>
     <string name="safety_destination">安全去处</string>
@@ -40,4 +47,14 @@
     <string name="safety_storage_videos">视频</string>
     <string name="safety_storage_documents">文件图片</string>
     <string name="safety_document_upload_hint">上传的文件也会显示在“文件”中。</string>
+    <string name="safety_conflict_step">步骤</string>
+    <string name="safety_conflict_text">文字</string>
+    <string name="safety_conflict_completion">完成状态</string>
+    <string name="safety_conflict_attachments">附件</string>
+    <string name="safety_conflict_excluded_attachments">已排除的附件</string>
+    <string name="safety_conflict_present">存在</string>
+    <string name="safety_conflict_removed">已移除</string>
+    <string name="safety_conflict_complete">已完成</string>
+    <string name="safety_conflict_not_complete">未完成</string>
+    <string name="safety_conflict_changed">已更改</string>
 </resources>

@@ -80,7 +80,7 @@ internal class SessionNavigation(private val runtime: SessionRuntime) {
                     emptyList()
                 privateEntries = emptyList()
                 messaging.stopMessaging()
-                if (accountRole == AccountRole.USER && !localMode) messaging.syncLocalNotificationHandler()
+                if (!localMode) messaging.syncLocalNotificationHandler()
                 activeTriggerId = null
                 triggerJob = null
                 pendingIdentity = null
@@ -239,6 +239,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
 
     // Keep the current account's ticket on screen; responses from a previous account are ignored.
     private fun updateRequest(cancel: Boolean) {
+        if (saving > 0) return
         if (runtime.localMode) {
             error = R.string.safety_account_required
             return
@@ -267,6 +268,8 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
                     staffUid = ticket.staffUid
                     conversationId = ticket.conversationId
                 }
+            } catch (_: kotlinx.coroutines.TimeoutCancellationException) {
+                if (runtime.coverAccountId == actor) error = R.string.support_request_error
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) { // Keep the existing ticket state and show that the support request failed.
@@ -374,7 +377,7 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
     }
 
     // Staff support controller: Closes the active feature.
-    fun close(conversationId: String, onClosed: () -> Unit = {}) {
+    fun close(conversationId: String, planCompleted: Boolean = false, onClosed: () -> Unit = {}) {
         if (runtime.localMode ||
             runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) ||
             conversationId.isBlank() || saving > 0
@@ -383,27 +386,24 @@ internal class StaffSupportController(private val runtime: SessionRuntime) {
         saving++
         error = null
         runtime.scope.launch {
-            // Closing a ticket is safe to retry because the server treats an already-closed ticket as success.
             try {
-                withContext(Dispatchers.IO) { repository.close(conversationId) }
-                if (runtime.coverAccountId == actor) onClosed()
-                if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
-                    runtime.conversationActions.closeConversation()
+                if (planCompleted) runtime.safety.flushConsultation(conversationId)
+                withContext(Dispatchers.IO) { repository.close(conversationId, planCompleted) }
+                if (runtime.coverAccountId == actor) {
+                    val state = runtime.state
+                    state.conversations = state.conversations.map { chat ->
+                        if (chat.id == conversationId && chat.closedAt == 0L) chat.copy(closedAt = System.currentTimeMillis())
+                        else chat
+                    }
+                    state.restoredClosedConversationIds -= conversationId
+                    if (state.activeConversation?.id == conversationId) runtime.conversationActions.closeConversation()
+                    onClosed()
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) { // Retry once in case the server closed the ticket but its first reply was lost.
-                try {
-                    withContext(Dispatchers.IO) { repository.close(conversationId) }
-                    if (runtime.coverAccountId == actor) onClosed()
-                    if (runtime.coverAccountId == actor && runtime.state.activeConversation?.id == conversationId) {
-                        runtime.conversationActions.closeConversation()
-                    }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) { // Show an error only after both close attempts fail.
-                    if (runtime.coverAccountId == actor) error = R.string.support_close_error
-                }
+            } catch (failure: Exception) {
+                android.util.Log.w("OliveMessaging", "Ticket close failed", failure)
+                if (runtime.coverAccountId == actor) error = R.string.support_close_error
             } finally {
                 if (runtime.coverAccountId == actor) saving = (saving - 1).coerceAtLeast(0)
             }

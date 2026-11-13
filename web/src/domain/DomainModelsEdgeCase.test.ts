@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   covers,
   coverInfo,
-  coverPath,
   emptyHistory,
   emptyProfile,
   friendlyError,
@@ -21,10 +20,9 @@ import {
 
 describe("recent web domain boundaries", () => {
   // Input: every published cover. Expected: IDs, slugs, paths, and metadata remain unique and resolvable.
-  it("keeps every cover identity unique and routable", () => {
+  it("keeps every cover identity unique", () => {
     expect(new Set(covers.map((cover) => cover.id)).size).toBe(covers.length);
     expect(new Set(covers.map((cover) => cover.slug)).size).toBe(covers.length);
-    expect(new Set(covers.map((cover) => coverPath(cover.id))).size).toBe(covers.length);
     for (const cover of covers) expect(coverInfo(cover.id)).toEqual(cover);
   });
 

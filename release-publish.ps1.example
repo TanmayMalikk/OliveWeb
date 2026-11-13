@@ -1,0 +1,16 @@
+# Copy to release-publish.local.ps1 before editing. Git ignores that copy.
+# Run from the repository root. This file sets variables only.
+# Keep the service account JSON in private_credentials or point to an existing copy.
+$env:GOOGLE_APPLICATION_CREDENTIALS = Join-Path $PSScriptRoot 'private_credentials/firebase-release.json'
+
+# Production Firebase release storage.
+$env:OLIVE_RELEASE_PROJECT_ID = 'olive-21239'
+$env:OLIVE_RELEASE_CONFIRM_PROJECT = 'olive-21239'
+$env:OLIVE_RELEASE_BUCKET = 'olive-21239.firebasestorage.app'
+
+# Optional updates are the default. Set notes for each release if desired.
+$env:OLIVE_RELEASE_MANDATORY = 'false'
+$env:OLIVE_RELEASE_NOTES = ''
+
+# Set by the commands in LOCAL-ANDROID-RELEASE.txt:
+# OLIVE_VERSION_NAME, OLIVE_VERSION_CODE, OLIVE_MINIMUM_VERSION_CODE, OLIVE_RELEASE_APK.

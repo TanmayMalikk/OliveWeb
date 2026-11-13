@@ -59,12 +59,36 @@ never commit it or place it under the public web root. See
 2. Register it as the Firebase App Check web domain.
 3. Restrict the public Firebase API key to the Firebase APIs the browser uses.
 4. Deploy the reviewed Firestore, Realtime Database, and Storage rules.
-5. Allow `https://yourolivebranch.ca` in Cloudflare R2 CORS. Permit `PUT`,
-   `GET`, and `HEAD`, required signed headers, and expose `ETag`.
+5. In Cloudflare R2 → media bucket → Settings → CORS Policy, allow
+   `https://yourolivebranch.ca` as an origin, `PUT`, `GET`, and `HEAD` as
+   methods, and `Content-Type` as an allowed header. Expose `ETag` for
+   multipart uploads. Include any other hostname only if it serves the app.
+   The bucket can stay private because Firebase Functions issue signed URLs.
 6. Confirm `https://yourolivebranch.ca/api/health` and
    `https://voip.yourolivebranch.ca/health` both report healthy responses.
 7. Test `/get`, user sign-in, private entry, Quick Exit, `/admin`, document
    upload, support chat, and a two-device VoIP call.
+
+## Document recovery
+
+Set the Firebase Functions secret `MEDIA_RECOVERY_MASTER_KEY` to a securely
+generated Base64-encoded 32-byte key before deploying
+`mediaCreateUpload`, `mediaUploadPartTicket`, `mediaCompleteUpload`,
+`mediaAccountAccessKey`, and `mediaStoreAccountAccessKey`. Keep this key stable.
+Existing encrypted recovery records depend on it.
+
+Deploy the Functions before releasing the website and Android clients.
+Documents stay encrypted in R2. Firebase can recover a document key for
+an authenticated account with current document access. Existing R2 files
+upgrade when the owner unlocks the updated Android app or opens the web
+Documents page on a device that holds the original key. Files in the
+legacy Android storage format need a new upload.
+
+Upload a PDF on Android with the website closed, then sign in on the web and
+open it with Android closed. Repeat in reverse. With both clients open and
+online, check that a completed upload and a revocation appear in the other
+client without a refresh. A web upload larger than 16 MiB exercises multipart
+storage.
 
 Opening `/admin` selects the organization portal but never grants staff or
 administrator access. Firebase custom claims remain the authority. Android is

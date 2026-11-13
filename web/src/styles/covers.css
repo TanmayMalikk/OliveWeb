@@ -1,6 +1,4 @@
 /* Styles the covers part of the web app. */
-@import "./cover-news.css";
-@import "./cover-fitness.css";
 @import "./cover-game.css";
 @import "./cover-crossing.css";
 @import "./cover-memory.css";

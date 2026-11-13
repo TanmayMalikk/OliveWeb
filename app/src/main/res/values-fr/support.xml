@@ -10,6 +10,12 @@
     <string name="support_looking_for_staff">Recherche de membres du personnel…</string>
     <string name="support_staff_ready">Un membre du personnel a été affecté. Ouverture d’Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
+    <string name="support_admin_chat_name">Olive Admin</string>
+    <string name="ticket_added_friend">Un ami a été ajouté au ticket %1$s</string>
+    <string name="ticket_removed_friend">Un ami a été retiré du ticket %1$s</string>
+    <string name="chat_admin_help_requested">Aide d’un administrateur demandée</string>
+    <string name="chat_member_added">%1$s a ajouté %2$s</string>
+    <string name="chat_member_removed">%1$s a retiré %2$s</string>
     <string name="support_no_conversations">Aucune conversation de soutien pour le moment.</string>
     <string name="messaging_send_denied">Le serveur a refusé ce message. Rouvrez la conversation et réessayez.</string>
     <string name="support_ticket_consultation">Consultation</string>

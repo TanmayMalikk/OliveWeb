@@ -114,6 +114,8 @@ class MediaPreparationMemoryTest {
             mediaId:String,
             wrappedKeys:Map<String,String>,
             deviceWrappedKeys:Map<String,String>,
+            grantIndependentRecipients:List<String>,
+            revokeIndependentRecipients:List<String>,
         ):CloudMediaRecord=error("unused")
         override suspend fun updateDeviceKeys(
             mediaId:String,

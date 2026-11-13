@@ -1,0 +1,53 @@
+& {
+    $ErrorActionPreference = 'Stop'
+    $version = '0.2.0'
+    $versionCode = 2
+
+    Set-Location -LiteralPath 'C:/Users/Tanma/StudioProjects/F26_D1'
+    if ($version -notmatch '^\d+\.\d+\.\d+$' -or $versionCode -lt 1 -or $versionCode -gt 2100000000) {
+        throw 'Set a valid watch version and a positive Android version code.'
+    }
+    $env:JAVA_HOME = Join-Path $env:LOCALAPPDATA 'Programs/AndroidStudio-Rabbit2-Clean/android-studio/jbr'
+    if (-not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin/java.exe'))) {
+        $env:JAVA_HOME = Join-Path $env:ProgramFiles 'Android/Android Studio/jbr'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin/java.exe'))) {
+        throw 'Set JAVA_HOME to your Android Studio jbr folder or installed JDK.'
+    }
+
+    if (-not (Test-Path -LiteralPath 'keystore.properties' -PathType Leaf)) {
+        throw 'Configure the existing phone release key in keystore.properties first.'
+    }
+    $sdk = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { Join-Path $env:LOCALAPPDATA 'Android/Sdk' }
+    $signer = Get-ChildItem -LiteralPath (Join-Path $sdk 'build-tools') -Directory |
+        Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
+        Sort-Object { [version]$_.Name } -Descending |
+        ForEach-Object { Join-Path $_.FullName 'apksigner.bat' } |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } |
+        Select-Object -First 1
+    if (-not $signer) { throw 'Install Android SDK Build Tools before packaging.' }
+
+    $env:OLIVE_WEAR_VERSION_NAME = $version
+    $env:OLIVE_WEAR_VERSION_CODE = [string]$versionCode
+    .\gradlew.bat :wear:testDebugUnitTest :wear:lintRelease :wear:assembleRelease --console=plain
+    if ($LASTEXITCODE -ne 0) { throw 'Wear OS build or checks failed.' }
+
+    $releaseDir = 'wear/build/outputs/apk/release'
+    $metadata = Get-Content -LiteralPath (Join-Path $releaseDir 'output-metadata.json') -Raw | ConvertFrom-Json
+    $built = $metadata.elements | Select-Object -First 1
+    if ($metadata.applicationId -ne 'com.olive.app' -or $built.versionCode -ne $versionCode -or
+        $built.versionName -ne $version -or $built.outputFile -ne 'wear-release.apk') {
+        throw 'A signed watch APK with the requested version was not produced. Check keystore.properties.'
+    }
+    $apk = (Resolve-Path -LiteralPath (Join-Path $releaseDir $built.outputFile)).Path
+    & $signer verify --print-certs $apk
+    if ($LASTEXITCODE -ne 0) { throw 'Watch APK signature verification failed.' }
+
+    $output = (New-Item -ItemType Directory -Path distribution -Force).FullName
+    $name = "OliveFitness-Wear-$version.apk"
+    $destination = Join-Path $output $name
+    Copy-Item -LiteralPath $apk -Destination $destination -Force
+    $hash = & .\scripts\Get-ReleaseSha256.ps1 -Path $destination
+    Set-Content -LiteralPath ($destination + '.sha256') -Value "$hash  $name" -Encoding ascii
+    Write-Host "Signed watch APK: $destination"
+}

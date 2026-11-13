@@ -27,12 +27,13 @@ internal class SafetyPlanRepository(
         onUpdate: (SafetyPlan) -> Unit,
         onError: (Exception) -> Unit,
     ): ListenerRegistration = firestore.collection("safetyPlans").document(ownerUid)
-        .addSnapshotListener { snapshot, error ->
+        .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
             if (error != null) {
                 onError(error)
                 return@addSnapshotListener
             }
-            val data = snapshot?.data ?: return@addSnapshotListener
+            if (snapshot?.metadata?.isFromCache != false) return@addSnapshotListener
+            val data = snapshot.data ?: return@addSnapshotListener
             try {
                 onUpdate(SafetyPlan.fromJson(JSONObject(data)))
             } catch (failure: Exception) {
@@ -48,7 +49,7 @@ internal class SafetyPlanRepository(
     }
 
     // Sends changed safety-plan fields and returns the merged server version.
-    suspend fun sync(plan: SafetyPlan): SafetyPlan {
+    suspend fun sync(plan: SafetyPlan, resolution: Map<String, Any>? = null): SafetyPlan {
         val changes =
             plan.fields.filterValues { it.mutationId != null && it.conflictRevision == null }
                 .map { (key, field) ->
@@ -68,7 +69,7 @@ internal class SafetyPlanRepository(
                 "ownerUid" to plan.ownerUid,
                 "defaults" to plan.fields.mapValues { it.value.value },
                 "changes" to changes
-            )
+            ) + (resolution?.let { mapOf("resolution" to it) } ?: emptyMap())
         )
         return SafetyPlan.fromJson(result.getJSONObject("plan"))
     }
@@ -94,6 +95,25 @@ internal class SafetyPlanRepository(
             val row = rows.getJSONObject(index)
             row.getString("uid") to row.getString("username")
         }
+    }
+
+    fun observeRecipientDevices(usernames: Collection<String>, onChange: () -> Unit): List<ListenerRegistration> =
+        usernames.distinct().map { username ->
+            firestore.collection("messageDirectory").document(username).collection("devices")
+                .addSnapshotListener { snapshot, error -> if (snapshot != null && error == null) onChange() }
+        }
+
+    fun observeAccess(uid: String, onChange: () -> Unit): ListenerRegistration {
+        var revision = -1L
+        return firestore.collection("syncInvalidations").document(uid)
+            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, failure ->
+                if (failure != null || snapshot?.metadata?.isFromCache != false) return@addSnapshotListener
+                val next = snapshot.getLong("safetyRevision") ?: 0L
+                if (next != revision) {
+                    revision = next
+                    onChange()
+                }
+            }
     }
 
     // Saves which trusted contact should receive safety-plan support access.

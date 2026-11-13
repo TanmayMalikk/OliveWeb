@@ -58,11 +58,13 @@ class VoipCallForegroundService : Service() {
                 getString(R.string.ui_end_call),
                 callAction(ACTION_END_CALL, callId),
             )
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                getString(R.string.quick_exit),
-                callAction(ACTION_QUICK_EXIT, callId),
-            )
+            .apply {
+                if (intent.getBooleanExtra(EXTRA_QUICK_EXIT, false)) addAction(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    getString(R.string.quick_exit),
+                    callAction(ACTION_QUICK_EXIT, callId),
+                )
+            }
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .build()
@@ -85,13 +87,15 @@ class VoipCallForegroundService : Service() {
         internal const val ACTION_QUICK_EXIT = "com.olive.app.voip.QUICK_EXIT"
         internal const val CALL_ACTION_SCHEME = "olive-call-action"
         private const val EXTRA_CALL_ID = "call_id"
+        private const val EXTRA_QUICK_EXIT = "quick_exit"
         private const val NOTIFICATION_ID = 8_107
 
         // Starts the notification while the call room is connecting or connected.
-        fun start(context: Context, callId: String) {
+        fun start(context: Context, callId: String, quickExit: Boolean) {
             ContextCompat.startForegroundService(
                 context,
-                Intent(context, VoipCallForegroundService::class.java).putExtra(EXTRA_CALL_ID, callId),
+                Intent(context, VoipCallForegroundService::class.java)
+                    .putExtra(EXTRA_CALL_ID, callId).putExtra(EXTRA_QUICK_EXIT, quickExit),
             )
         }
 

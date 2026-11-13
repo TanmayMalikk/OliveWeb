@@ -40,27 +40,27 @@ class PrivateContactNotesTest {
             supportTag = SUPPORT_TAG_SUPPORT,
         )
 
-        assertEquals("Olive Staff", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.USER, "Olive Staff"))
-        assertEquals("Olive Staff", conversation.senderDisplayName("admin", "real_admin_name", AccountRole.SAFE_CONTACT, "Olive Staff"))
-        assertEquals("real_staff_name", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Olive Staff", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.USER, "Olive Staff", "Olive Admin"))
+        assertEquals("Olive Admin", conversation.senderDisplayName("admin", "real_admin_name", AccountRole.SAFE_CONTACT, "Olive Staff", "Olive Admin"))
+        assertEquals("real_staff_name", conversation.senderDisplayName("staff", "real_staff_name", AccountRole.ADMIN, "Olive Staff", "Olive Admin"))
         val anonymousName = conversation.anonymousStaffDisplayName(
             "Olive Staff", "Consultation", "Support", "Escalation"
         )
-        assertEquals("Olive Staff • Support", conversation.displayName("user", AccountRole.USER, anonymousName))
-        assertEquals("Olive Staff • Support", conversation.displayName("contact", AccountRole.SAFE_CONTACT, anonymousName))
-        assertEquals("Support ticket", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
-        assertEquals("Support ticket", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Support Ticket", conversation.displayName("user", AccountRole.USER, anonymousName))
+        assertEquals("Support Ticket", conversation.displayName("contact", AccountRole.SAFE_CONTACT, anonymousName))
+        assertEquals("Support Ticket", conversation.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("Support Ticket", conversation.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
         assertEquals(
-            "Ticket #42",
+            "Support Ticket #42",
             conversation.copy(ticketSequence = 42).displayName("staff", AccountRole.STAFF, "Olive Staff"),
         )
         assertEquals(
-            "Olive Staff • Consultation",
+            "Consult Ticket",
             conversation.copy(supportOrigin = SUPPORT_TAG_PLAN_CONSULT, supportTag = SUPPORT_TAG_PLAN_CONSULT)
                 .anonymousStaffDisplayName("Olive Staff", "Consultation", "Support", "Escalation"),
         )
         assertEquals(
-            "Olive Staff • Escalation",
+            "Admin Ticket",
             conversation.copy(supportTag = SUPPORT_TAG_NEEDS_ADMIN)
                 .anonymousStaffDisplayName("Olive Staff", "Consultation", "Support", "Escalation"),
         )

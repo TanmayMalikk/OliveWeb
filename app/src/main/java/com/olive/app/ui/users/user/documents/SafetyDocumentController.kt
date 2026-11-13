@@ -353,8 +353,8 @@ internal class SafetyDocumentsController(
         var granted = false
         var lastFailure: Throwable? = null
         documents.forEach { document ->
-            recipients.filterKeys { it !in document.allowedUsers }.forEach { (uid, username) ->
-                runCatching { source.grantAccess(document, ownerUid, uid, username) }
+            recipients.forEach { (uid, username) ->
+                runCatching { source.grantAccess(document, ownerUid, uid, username, forPlan = true) }
                     .onSuccess { granted = true }
                     .onFailure { lastFailure = it }
             }

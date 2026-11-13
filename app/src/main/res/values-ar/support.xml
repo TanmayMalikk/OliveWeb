@@ -10,6 +10,12 @@
     <string name="support_looking_for_staff">جارٍ البحث عن موظفين…</string>
     <string name="support_staff_ready">تم تعيين أحد الموظفين. جارٍ فتح Olive Staff…</string>
     <string name="support_chat_name">Olive Staff</string>
+    <string name="support_admin_chat_name">Olive Admin</string>
+    <string name="ticket_added_friend">تمت إضافة صديق إلى التذكرة %1$s</string>
+    <string name="ticket_removed_friend">تمت إزالة صديق من التذكرة %1$s</string>
+    <string name="chat_admin_help_requested">تم طلب مساعدة المسؤول</string>
+    <string name="chat_member_added">أضاف %1$s ‏%2$s</string>
+    <string name="chat_member_removed">أزال %1$s ‏%2$s</string>
     <string name="support_no_conversations">لا توجد محادثات دعم حتى الآن.</string>
     <string name="messaging_send_denied">رفض الخادم هذه الرسالة. أعد فتح المحادثة وحاول مرة أخرى.</string>
     <string name="support_ticket_consultation">استشارة</string>

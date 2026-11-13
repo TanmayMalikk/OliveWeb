@@ -88,7 +88,21 @@ export function createServerApp({ development = false } = {}) {
     if (!development)
       res.set(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com; frame-src https://*.firebaseapp.com https://www.google.com https://www.openstreetmap.org; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
+        [
+          "default-src 'self'",
+          "script-src 'self' https://www.google.com https://www.gstatic.com",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' https: data: blob:",
+          "media-src 'self' blob:",
+          "connect-src 'self' blob: https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app https://*.appspot.com https://*.r2.cloudflarestorage.com",
+          "frame-src blob: https://*.firebaseapp.com https://www.google.com https://www.openstreetmap.org",
+          "worker-src 'self'",
+          "object-src 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+          "frame-ancestors 'none'",
+          "upgrade-insecure-requests",
+        ].join("; "),
       );
     next();
   });
@@ -160,19 +174,15 @@ export function createServerApp({ development = false } = {}) {
     ],
     (req, res) => {
       res.setHeader("Cache-Control", "no-cache");
-      const hostSite = siteConfig.covers.find(
-        (site) => site.origin && new URL(site.origin).hostname === req.hostname,
-      );
-      const site = req.params.slug
-        ? siteConfig.covers.find((site) => site.slug === req.params.slug)
-        : hostSite;
-      if (req.params.slug && !site) return res.status(404).end();
+      const site = siteConfig.webCover;
+      if (req.params.slug && ![site.slug, "daily-digest", "fitness"].includes(req.params.slug))
+        return res.status(404).end();
       const start = "/";
-      const icon = site?.slug ?? "fitness";
+      const icon = site.slug;
       res.type("application/manifest+json").json({
         id: start,
-        name: site?.name ?? "Fitness Tracker",
-        short_name: site?.name ?? "Fitness Tracker",
+        name: site.name,
+        short_name: site.name,
         start_url: start,
         scope: "/",
         display: "standalone",

@@ -160,6 +160,10 @@ object LocalNotificationEventHandler {
             .collection("devices").document(devId)
             .set(mapOf("uid" to uid, "deviceId" to devId, "token" to token, "updatedAt" to FieldValue.serverTimestamp()))
             .await()
+        if (FirebaseAuth.getInstance().currentUser?.uid != uid) {
+            FirebaseFirestore.getInstance().collection("notificationTokens").document(uid)
+                .collection("devices").document(devId).delete().await()
+        }
     }
 
     // Evaluates whether an incoming FCM data payload should trigger a Safe App update notification.
@@ -184,8 +188,20 @@ object LocalNotificationEventHandler {
         context: Context, data: Map<String, String>, title: String? = null, body: String? = null,
     ) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
-        val preferences = context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
         val conversationId = data["conversationId"].orEmpty()
+        if (data["eventId"] == "ticket-assigned") {
+            if (data["recipientId"] == uid && conversationId.isNotBlank()) {
+                OliveNotificationManager.showSafeUpdate(
+                    context, R.string.notification_ticket_assigned, "ticket-assigned:$uid:$conversationId",
+                )
+            }
+            return
+        }
+        if (data["type"] == "safety_plans_completed" && data["recipientId"] == uid) {
+            OliveNotificationManager.showSafeUpdate(context, R.string.safety_plans_completed)
+            return
+        }
+        val preferences = context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
         val messageId = data["messageId"].orEmpty()
         val markerKey = if (conversationId.isNotBlank()) LocalSafeUpdateCheckWorker.messageKey(uid, conversationId) else null
         val previousMessageId = markerKey?.let { preferences.getString(it, null) }
@@ -344,7 +360,7 @@ object OliveNotificationManager {
         NotificationManagerCompat.from(context).notify(callId.hashCode(), notification)
     }
 
-    fun showSafeUpdate(context: Context) {
+    fun showSafeUpdate(context: Context, body: Int = R.string.notification_safe_app_activity, tag: String? = null) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
                 context, Manifest.permission.POST_NOTIFICATIONS
             ) != PackageManager.PERMISSION_GRANTED
@@ -359,13 +375,13 @@ object OliveNotificationManager {
         val notification = NotificationCompat.Builder(context, CHANNEL_SAFE_UPDATES)
             .setSmallIcon(R.drawable.ic_notification_olive_branch)
             .setContentTitle(context.getString(R.string.notification_safe_app_updates))
-            .setContentText(context.getString(R.string.notification_safe_app_activity))
+            .setContentText(context.getString(body))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
-        val notificationId = (System.currentTimeMillis() % 100000).toInt()
-        runCatching { NotificationManagerCompat.from(context).notify("safe-app-update", notificationId, notification) }
+        val notificationId = if (tag != null) 0 else (System.currentTimeMillis() % 100000).toInt()
+        runCatching { NotificationManagerCompat.from(context).notify(tag ?: "safe-app-update", notificationId, notification) }
     }
 
 }

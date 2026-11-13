@@ -1,18 +1,42 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val releaseProperties = Properties().apply {
+    val source = rootProject.file("keystore.properties")
+    if (source.isFile) source.inputStream().use { load(it) }
+}
+val releaseSigningReady = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    .all { !releaseProperties.getProperty(it).isNullOrBlank() }
+
 android {
     namespace = "com.olive.app.wear"
     compileSdk = 37
+
+    signingConfigs {
+        if (releaseSigningReady) create("oliveRelease") {
+            storeFile = rootProject.file(releaseProperties.getProperty("storeFile"))
+            storePassword = releaseProperties.getProperty("storePassword")
+            keyAlias = releaseProperties.getProperty("keyAlias")
+            keyPassword = releaseProperties.getProperty("keyPassword")
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("oliveRelease")
+        }
+    }
 
     defaultConfig {
         applicationId = "com.olive.app"
         minSdk = 30
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = providers.environmentVariable("OLIVE_WEAR_VERSION_CODE").orNull?.toIntOrNull() ?: 2
+        versionName = providers.environmentVariable("OLIVE_WEAR_VERSION_NAME").orNull ?: "0.2.0"
     }
 
     buildFeatures { compose = true }

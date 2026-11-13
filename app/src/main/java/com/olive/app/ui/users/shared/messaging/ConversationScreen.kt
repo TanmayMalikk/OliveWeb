@@ -63,6 +63,11 @@ private sealed interface ConversationTimelineItem {
         override val key = "call-${value.callId}"
         override val timestamp = value.endedAt.takeIf { it > 0 } ?: value.createdAt
     }
+
+    data class Membership(val value: ChatMembershipEvent) : ConversationTimelineItem {
+        override val key = "membership-${value.id}"
+        override val timestamp = value.createdAt
+    }
 }
 
 // UI sizing/color: chat bubbles cap at 340dp, sent bubbles use OliveGreen, and the header stays at least 76dp tall.
@@ -88,9 +93,15 @@ internal fun ChatPane(
     val keyboardVisible = imeBottom > 0
     val context = LocalContext.current
     val callHistory = session.calls.historyFor(active.id, session.accountRole)
-    val timeline = remember(session.messages.chatMessages, callHistory) {
+    var membershipEvents by remember(active.id, currentUid) { mutableStateOf(emptyList<ChatMembershipEvent>()) }
+    DisposableEffect(active.id, currentUid) {
+        val subscription = session.messages.observeMembershipEvents(active.id) { membershipEvents = it }
+        onDispose { subscription?.close() }
+    }
+    val timeline = remember(session.messages.chatMessages, callHistory, membershipEvents) {
         (session.messages.chatMessages.map(ConversationTimelineItem::Message) +
-            callHistory.map(ConversationTimelineItem::Call))
+            callHistory.map(ConversationTimelineItem::Call) +
+            membershipEvents.map(ConversationTimelineItem::Membership))
             .sortedWith(compareBy(ConversationTimelineItem::timestamp, ConversationTimelineItem::key))
     }
     var permissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -119,14 +130,14 @@ internal fun ChatPane(
     LaunchedEffect(currentUid, session.coverUsername, session.localMode) {
         session.documents.load(currentUid, session.coverUsername, session.localMode)
     }
-    LaunchedEffect(session.messages.chatMessages.size, session.messages.chatMessages.lastOrNull()?.body) {
-        if (session.messages.chatMessages.isNotEmpty()) listState.animateScrollToItem(session.messages.chatMessages.lastIndex)
+    LaunchedEffect(timeline.lastOrNull()?.key, session.messages.chatMessages.lastOrNull()?.body) {
+        if (timeline.isNotEmpty()) listState.animateScrollToItem(timeline.lastIndex)
     }
     // Keep the newest message visible when the chat grows.
     LaunchedEffect(keyboardVisible) {
-        if (keyboardVisible && session.messages.chatMessages.isNotEmpty()) {
+        if (keyboardVisible && timeline.isNotEmpty()) {
             delay(120.milliseconds)
-            listState.animateScrollToItem(session.messages.chatMessages.lastIndex)
+            listState.animateScrollToItem(timeline.lastIndex)
         }
     }
     openedMedia?.let { (document, file) ->
@@ -269,6 +280,41 @@ internal fun ChatPane(
                         )
                     }
                     items(timeline, key = ConversationTimelineItem::key) { timelineItem ->
+                        if (timelineItem is ConversationTimelineItem.Membership) {
+                            val event = timelineItem.value
+                            val added = event.action == ChatMembershipAction.ADDED
+                            val organizationViewer = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+                            val label = if (event.action == ChatMembershipAction.ADMIN_HELP_REQUESTED) {
+                                stringResource(R.string.chat_admin_help_requested)
+                            } else if (active.type == "SUPPORT" && organizationViewer) {
+                                stringResource(
+                                    if (added) R.string.ticket_added_friend else R.string.ticket_removed_friend,
+                                    active.ticketNumber(),
+                                )
+                            } else {
+                                val staffName = uiText(R.string.support_chat_name)
+                                val adminName = uiText(R.string.support_admin_chat_name)
+                                val accountName = uiText(R.string.account)
+                                val actor = active.senderDisplayName(
+                                    event.actorUid, event.actorName.ifBlank { accountName }, session.accountRole, staffName, adminName,
+                                )
+                                val participant = active.senderDisplayName(
+                                    event.participantUid, event.participantName.ifBlank { accountName }, session.accountRole, staffName, adminName,
+                                )
+                                stringResource(
+                                    if (added) R.string.chat_member_added else R.string.chat_member_removed,
+                                    actor, participant,
+                                )
+                            }
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Muted,
+                                )
+                            }
+                            return@items
+                        }
                         if (timelineItem is ConversationTimelineItem.Call) {
                             val call = timelineItem.value
                             CallHistoryRow(
@@ -325,11 +371,12 @@ internal fun ChatPane(
                                 ) {
                                     Column(Modifier.weight(1f)) {
                                         Text(
-                                            if (mine) session.coverUsername else active.senderDisplayName(
+                                            if (mine && !active.isChatAdmin(chat.senderUid)) session.coverUsername else active.senderDisplayName(
                                                 chat.senderUid,
                                                 chat.senderUsername,
                                                 session.accountRole,
                                                 uiText(R.string.support_chat_name),
+                                                uiText(R.string.support_admin_chat_name),
                                             ),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = if (mine) Color.White.copy(alpha = .78f) else Muted
@@ -410,7 +457,7 @@ internal fun ChatPane(
                     }
                 }
                 Status(session)
-                Surface(
+                if (active.closedAt == 0L) Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
                     border = BorderStroke(1.dp, ChatBorder),
@@ -443,7 +490,8 @@ internal fun ChatPane(
                     )
                     FilledIconButton(
                         onClick = { session.messages.sendMessage(draft) { draft = "" } },
-                        enabled = draft.isNotBlank() && !session.messages.busy,
+                        enabled = draft.isNotBlank() && !session.messages.busy &&
+                            (active.type != "SUPPORT" || active.participantIds.size >= 2),
                         modifier = Modifier.size(50.dp).testTag("send_message")
                     ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
                 }

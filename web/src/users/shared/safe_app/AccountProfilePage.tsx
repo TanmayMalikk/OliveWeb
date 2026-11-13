@@ -17,7 +17,6 @@ export default function Profile() {
             "affectedNames",
             "abuserName",
             "situation",
-            "language",
             "email",
             "phone",
           ] as const)
@@ -45,7 +44,7 @@ export default function Profile() {
         });
       }}
     >
-      <h2>The details that matter to you.</h2>
+      <h2>Personal details</h2>
       <div className="form-grid">
         <Field
           label="Full name"

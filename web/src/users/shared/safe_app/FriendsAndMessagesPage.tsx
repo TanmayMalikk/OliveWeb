@@ -23,6 +23,7 @@ import {
 import type { Entry } from "../../../domain/DomainModels";
 import { SafeMediaViewer } from "./SafeMediaViewer";
 import { sharedMessage } from "./SharedMessageContent";
+import { useChatDeviceKey, useChatTimeline, useMembershipHistory } from "../useChatTimeline";
 import type {
   Friend,
   Request,
@@ -50,9 +51,31 @@ export default function Messages() {
   const [viewerEntry, setViewerEntry] = useState<Entry | null>(null);
   const messageEnd = useRef<HTMLDivElement>(null);
   const identity = accounts.identity;
+  const deviceKeyAvailable = useChatDeviceKey(conversation?.id, identity?.uid);
+  const timeline = useChatTimeline(conversation?.id, identity?.uid, rows);
+  const [managingTicket, setManagingTicket] = useState<string>();
+  const [removingTicketFriend, setRemovingTicketFriend] = useState(false);
+  const ownsOpenTicket = conversation?.type === "SUPPORT" && !conversation.closedAt &&
+    (identity?.role === "USER" || identity?.role === "SAFE_CONTACT") && identity.uid === conversation.ownerUid;
+  const isManagingTicket = ownsOpenTicket && managingTicket === conversation?.id;
+  const ticketHistory = useMembershipHistory(isManagingTicket ? conversation?.id : undefined, identity?.uid, identity?.uid);
+  const latestChanges = new Map(
+    [...ticketHistory].sort((a, b) => a.createdAt - b.createdAt).map((event) => [event.participantUid, event]),
+  );
+  const removableFriends = [...latestChanges.values()].filter((event) =>
+    event.action === "ADDED" && conversation?.participantIds.includes(event.participantUid) &&
+    ![identity?.uid, conversation.staffUid, conversation.adminUid].includes(event.participantUid));
+  useEffect(() => {
+    const requested = session.requestedConversation;
+    if (!requested || requested.uid !== identity?.uid) return;
+    const ticket = conversations.find((item) => item.id === requested.id);
+    if (!ticket) return;
+    setConversation(ticket);
+    session.setRequestedConversation(null);
+  }, [conversations, identity?.uid, session.requestedConversation, session.setRequestedConversation]);
   useEffect(() => {
     messageEnd.current?.scrollIntoView({ block: "end" });
-  }, [rows, conversation?.id]);
+  }, [timeline, conversation?.id]);
   useEffect(() => {
     if (!viewerUrl) return;
     return () => URL.revokeObjectURL(viewerUrl);
@@ -64,6 +87,7 @@ export default function Messages() {
     const stops: (() => void)[] = [];
     void messaging
       .register(identity)
+      .then(() => messaging.prepareSupportTickets())
       .then(() =>
         messaging.subscribeSocial(
           identity.uid,
@@ -87,7 +111,11 @@ export default function Messages() {
       });
     void messaging.subscribeConversations(
       identity.uid,
-      (value) => { if (active) setConversations(value); },
+      (value) => {
+        if (!active) return;
+        setConversations(value);
+        setConversation((current) => value.find((item) => item.id === current?.id) ?? null);
+      },
       (error) => { if (active) setFeedback(error.message); },
     ).then((cleanup) => {
       if (!active) cleanup(); else stops.push(cleanup);
@@ -102,11 +130,14 @@ export default function Messages() {
     setRows([]);
     setDraft("");
     setRoomKey(null);
-    if (!conversation) return;
+    setViewerDocument(null);
+    setViewerUrl("");
+    setViewerEntry(null);
+    if (!conversation || !identity || conversation.participantIds.length < 2) return;
     let active = true;
     let stop: (() => void) | undefined;
     void messaging
-      .roomKey(conversation.id, identity!, conversation)
+      .roomKey(conversation.id, identity, conversation)
       .then((key) => {
         if (!active) return undefined;
         setRoomKey(key);
@@ -138,7 +169,7 @@ export default function Messages() {
       active = false;
       stop?.();
     };
-  }, [conversation?.id]);
+  }, [conversation?.id, conversation?.participantIds.join(","), identity?.uid, deviceKeyAvailable]);
   if (!cloudMode)
     return (
       <Empty
@@ -316,14 +347,47 @@ export default function Messages() {
                 <small>{conversation.type === "SUPPORT" ? "Support conversation" : "Direct message"}</small>
                 <h2>{messaging.conversationName(conversation, identity)}</h2>
               </div>
+              {ownsOpenTicket && (
+                <Button type="button" variant="outline"
+                  onClick={() => setManagingTicket(isManagingTicket ? undefined : conversation.id)}>
+                  {isManagingTicket ? "Hide added friends" : "Manage added friends"}
+                </Button>
+              )}
             </header>
+            {isManagingTicket && (
+              <div className="organization-ticket-actions" aria-label="Friends added to this ticket">
+                {removableFriends.length === 0 && <p className="help-note">No added friends to remove.</p>}
+                {removableFriends.map((event) => (
+                  <Button key={event.participantUid} type="button" variant="outline" disabled={removingTicketFriend}
+                    onClick={async () => {
+                      setRemovingTicketFriend(true);
+                      setFeedback("");
+                      try {
+                        await messaging.removeTicketFriend(conversation.id, event.participantUid);
+                      } catch (error) {
+                        setFeedback(error instanceof Error ? error.message : "Could not remove this friend.");
+                      } finally {
+                        setRemovingTicketFriend(false);
+                      }
+                    }}>
+                    Remove {event.participantName || "friend"}
+                  </Button>
+                ))}
+              </div>
+            )}
             <div
               className="chat-messages"
               aria-label="Conversation messages"
               role="log"
               aria-live="polite"
             >
-              {rows.map((message) => {
+              {timeline.map((item) => {
+                if (item.kind === "membership") return (
+                  <p key={`membership-${item.event.id}`} className="chat-membership-event">
+                    {messaging.membershipEventText(conversation, item.event, identity.role)}
+                  </p>
+                );
+                const { message } = item;
                 const shared = !message.deleted ? sharedMessage(message.body) : null;
                 const icon = shared?.kind === "media" ? <FileLock2 />
                   : shared?.kind === "incident" ? <ShieldCheck />
@@ -333,10 +397,7 @@ export default function Messages() {
                     key={message.id}
                     className={`chat-bubble ${message.senderUid === identity.uid ? "own" : ""}`}
                   >
-                    <small>{conversation.type === "SUPPORT" &&
-                      identity.role !== "STAFF" && identity.role !== "ADMIN" &&
-                      message.senderUid !== conversation.ownerUid
-                      ? "Olive Staff" : message.senderUsername}</small>
+                    <small>{messaging.chatSenderName(conversation, message, identity.role)}</small>
                     {shared ? (
                       <button
                         type="button"
@@ -417,7 +478,7 @@ export default function Messages() {
               />
               <Button
                 type="submit"
-                disabled={session.busy || !draft.trim() || !roomKey || Boolean(conversation.closedAt)}
+                disabled={session.busy || !draft.trim() || !roomKey || Boolean(conversation.closedAt) || conversation.participantIds.length < 2}
               >
                 <Send size={18} />
                 <span className="sr-only">Send message</span>

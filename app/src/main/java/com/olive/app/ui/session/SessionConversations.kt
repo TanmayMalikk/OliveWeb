@@ -30,6 +30,11 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // Owns conversation selection, messages and read markers.
 internal class SessionConversations(private val runtime: SessionRuntime) {
+    private var keyListeners = emptyList<com.google.firebase.firestore.ListenerRegistration>()
+    private val observedKeys = mutableMapOf<String, String>()
+    private var keyParticipants = emptyMap<String, String>()
+    private var keyVersion = 0
+    private var openingChat: Job? = null
     // Opens a conversation after loading its participants and encryption access.
     fun openConversation(conversation: ChatConversation, preserveMessages: Boolean = false) {
         with(runtime) {
@@ -38,10 +43,62 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             (screen == SessionScreen.Portal && accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)))) return
                 val uid = enrollment?.uid ?: return
                 if (uid !in conversation.participantIds) return
+                openingChat?.cancel()
                 messageSubscription?.close()
+                messageSubscription = null
                 messageOutboxObservation?.cancel()
                 messageOutboxObservation = null
                 val sameConversation = activeConversation?.id == conversation.id
+                if (!sameConversation || keyParticipants != conversation.participantUsernames) {
+                    val observationEpoch = epoch
+                    keyListeners.forEach { it.remove() }
+                    observedKeys.clear()
+                    keyParticipants = conversation.participantUsernames
+                    keyVersion = 0
+                    val firestore = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    val sources = listOf(
+                        firestore.collection("conversations").document(conversation.id).collection("deviceKeys")
+                            .document("$uid--${KeyManager.deviceId()}"),
+                    ) + conversation.participantUsernames.values.distinct().map {
+                        firestore.collection("messageDirectory").document(it.trim().lowercase())
+                    }
+                    val directories = conversation.participantUsernames.values.distinct().map {
+                        firestore.collection("messageDirectory").document(it.trim().lowercase()).collection("devices")
+                    }
+                    keyListeners = sources.map { reference ->
+                        reference.addSnapshotListener { snapshot, failure ->
+                            if (failure != null || snapshot == null || epoch != observationEpoch ||
+                                enrollment?.uid != uid || activeConversation?.id != conversation.id) return@addSnapshotListener
+                            val fingerprint = snapshot.getString("wrappedKey") ?: snapshot.getString("publicKey") ?: return@addSnapshotListener
+                            if (observedKeys.put(reference.path, fingerprint) != fingerprint) {
+                                keyVersion++
+                                if (activeRoomKey == null && !messagingBusy) openConversation(checkNotNull(activeConversation))
+                            }
+                        }
+                    } + directories.map { directory ->
+                        directory.addSnapshotListener { snapshot, failure ->
+                            if (failure != null || snapshot == null || epoch != observationEpoch ||
+                                enrollment?.uid != uid || activeConversation?.id != conversation.id) return@addSnapshotListener
+                            val fingerprint = snapshot.documents.joinToString("|") {
+                                "${it.id}:${it.getString("publicKey")}:${it.getString("mgf1Digest")}"
+                            }
+                            if (observedKeys.put(directory.path, fingerprint) == fingerprint) return@addSnapshotListener
+                            val availableKey = activeRoomKey ?: return@addSnapshotListener
+                            scope.launch {
+                                try {
+                                    if (epoch == observationEpoch && enrollment?.uid == uid &&
+                                        activeConversation?.participantIds == conversation.participantIds) {
+                                        secureChatRepository?.shareWithRegisteredDevices(conversation, availableKey)
+                                    }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    // The next directory update or conversation open retries device approval.
+                                }
+                            }
+                        }
+                    }
+                }
                 if (!preserveMessages || !sameConversation) {
                     chatMessages = emptyList()
                     remoteChatMessages = emptyList()
@@ -55,10 +112,17 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     accountRole == AccountRole.USER && !chatQuickExitHintShown
                 if (chatQuickExitHintVisible) chatQuickExitHintShown = true
                 val token = epoch
+                val initialKeyVersion = keyVersion
+                if (conversation.type == "SUPPORT" && conversation.participantIds.size < 2) {
+                    activeRoomKey = null
+                    messagingBusy = false
+                    return
+                }
                 messagingBusy = true
-                scope.launch {
+                openingChat = scope.launch {
                     try {
                         val secure = checkNotNull(secureChatRepository)
+                        var establishedKey = false
                         val key = try {
                             withTimeoutOrNull(8_000.milliseconds) {
                                 val onlineKey = secureSharing.roomKey(conversation)
@@ -77,6 +141,9 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                             } ?: error("Online room key timed out")
                         } catch (onlineFailure: Exception) {
                             if (onlineFailure is CancellationException) throw onlineFailure
+                            if (onlineFailure is FirebaseFirestoreException &&
+                                onlineFailure.code == FirebaseFirestoreException.Code.PERMISSION_DENIED
+                            ) throw onlineFailure
                             val cached = withContext(Dispatchers.IO) {
                                 chatCache.open(
                                     uid,
@@ -97,6 +164,15 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         if (epoch != token || activeConversation?.id != conversation.id) return@launch
                         activeRoomKey = key
                         startMessageObservation(conversation, uid, key, token)
+                        if (establishedKey) launch {
+                            try {
+                                secure.shareWithRegisteredDevices(conversation, key)
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                // Reading an established chat does not depend on approving other devices.
+                            }
+                        }
                         publishMessages(conversation.id, uid, key, null, token)
                     } catch (error: CancellationException) {
                         throw error
@@ -104,11 +180,13 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_secure_conversation)
                     } finally {
-                        if (epoch == token) {
+                        if (epoch == token && activeConversation?.id == conversation.id &&
+                            kotlinx.coroutines.currentCoroutineContext()[Job]?.isCancelled != true) {
                             messagingBusy = false
                             val updated = activeConversation
                             if (messageSubscription == null && updated?.id == conversation.id &&
-                                updated.updatedAt != conversation.updatedAt) {
+                                (updated.updatedAt != conversation.updatedAt ||
+                                  (activeRoomKey == null && keyVersion != initialKeyVersion))) {
                                 openConversation(updated)
                             }
                         }
@@ -118,8 +196,18 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
         }
     }
 
+    fun stopKeyObservation() {
+        openingChat?.cancel()
+        openingChat = null
+        keyListeners.forEach { it.remove() }
+        keyListeners = emptyList()
+        keyParticipants = emptyMap()
+        observedKeys.clear()
+    }
+
     // Session conversations: Stops conversation. It closes the active subscription or resource.
     fun closeConversation() {
+        stopKeyObservation()
         with(runtime) {
             with(state) {
                 messageSubscription?.close()
@@ -130,6 +218,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 activeRoomKey = null
                 chatMessages = emptyList()
                 remoteChatMessages = emptyList()
+                messagingBusy = false
                 message = null
             }
         }
@@ -334,6 +423,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                                     wrapped,
                                     KeyManager.deviceId(),
                                     System.currentTimeMillis(),
+                                    requireIndexed = true,
                                 )
                                 chatCache.saveMessages(
                                     ownerUid,

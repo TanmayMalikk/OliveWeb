@@ -147,7 +147,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     BackHandler { if (selected != null) selected = null else onBack() }
     val plan = selected
     if (plan != null) {
-        val ticketLabel = if (plan.ticketNumber >= 0L) "Ticket #${plan.ticketNumber}" else "Support ticket"
+        val ticketLabel = if (plan.ticketNumber >= 0L) "Consult Ticket #${plan.ticketNumber}" else "Consult Ticket"
         SafetyPlanScreen(
             session = session,
             ownerUid = plan.ownerUid,
@@ -168,7 +168,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
                     Button(
                         onClick = {
                             completionTarget = null
-                            session.messages.closeSupportChat(target.conversationId) {
+                            session.messages.closeSupportChat(target.conversationId, planCompleted = true) {
                                 selected = null
                                 controller.close()
                             }
@@ -187,6 +187,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
     }
     // Load once on entry; account invalidations refresh the encrypted consultation index afterward.
     LaunchedEffect(Unit) {
+        controller.observeAccess()
         controller.refreshConsultations()
     }
     FormColumn {
@@ -273,9 +274,9 @@ private fun ConsultationGroup(
                 }
                 consultations.forEach { consultation ->
                     val ticketLabel = if (consultation.ticketNumber >= 0L) {
-                        "Ticket #${consultation.ticketNumber}"
+                        "Consult Ticket #${consultation.ticketNumber}"
                     } else {
-                        "Support ticket"
+                        "Consult Ticket"
                     }
                     ElevatedCard(
                         onClick = { onSelected(consultation) },

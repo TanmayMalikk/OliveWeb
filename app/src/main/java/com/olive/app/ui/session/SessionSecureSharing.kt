@@ -49,6 +49,10 @@ import kotlinx.coroutines.sync.Mutex
 import com.olive.app.data.sync.PrioritySyncCoordinator
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 
 /** Coordinates encrypted conversations and private-entry sharing without exposing keys to UI code. */
@@ -59,13 +63,25 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
             val device = enrollment ?: error("No active account")
             val repository = messagingRepository ?: error("Messaging unavailable")
             val secure = secureChatRepository ?: error("Secure messaging unavailable")
+            messaging.registerMessagingIdentity(AccountIdentity(device.uid, state.coverUsername))
+            val prepared = if (conversation.type == "SUPPORT") {
+                val result = com.google.firebase.functions.FirebaseFunctions.getInstance("northamerica-northeast1")
+                    .getHttpsCallable("conversationPrepareKeys").call(mapOf("conversationId" to conversation.id)).await().data as Map<*, *>
+                val names = (result["participantUsernames"] as Map<*, *>).entries.associate {
+                    it.key.toString() to it.value.toString()
+                }
+                conversation.copy(participantUsernames = names)
+            } else conversation
             // Use the fallback when room key is unavailable.
             try {
-                val peers = conversation.participantIds.filter { it != device.uid }.map { uid ->
-                    val username = conversation.participantUsernames[uid]
-                        ?: error("Conversation participant unavailable")
-                    repository.searchUsers(username, device.uid).firstOrNull()
-                        ?: error("Every participant needs to open the updated app before secure messages can be sent.")
+                val peers = coroutineScope {
+                    prepared.participantIds.filter { it != device.uid }.map { uid ->
+                        async {
+                            val username = prepared.participantUsernames[uid] ?: error("Conversation participant unavailable")
+                            repository.searchUsers(username, device.uid).firstOrNull { it.uid == uid }
+                                ?: error("Every participant needs to open the updated app before secure messages can be sent.")
+                        }
+                    }.awaitAll()
                 }
                 require(peers.all { it.publicKey.isNotBlank() }) {
                     "Every participant needs to open the updated app before secure messages can be sent."
@@ -76,7 +92,7 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         peers.forEach { put(it.uid, KeyManager.decodePublicKey(it.publicKey)) }
                     }
                 }
-                return secure.ensureRoomKey(conversation, device.uid, keys)
+                return secure.ensureRoomKey(prepared, device.uid, keys)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (keySharingFailure: Exception) {
@@ -371,7 +387,6 @@ internal class SessionRuntime(
     var messageOutboxObservation: Job? = null
     var remoteChatMessages = emptyList<ChatMessage>()
     var activeRoomKey: javax.crypto.SecretKey? = null
-    var observedFriendshipIds = emptySet<String>()
     var chatQuickExitHintShown = false
     var verifiedMessagingIdentityMarker: String? = null
     var lastTouchAt = 0L

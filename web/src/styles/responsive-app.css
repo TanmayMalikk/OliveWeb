@@ -1,0 +1,13 @@
+.safety-checklist-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+.safety-checklist {
+  background: var(--white);
+  scroll-margin-top: 6rem;
+}
+.safety-plan-tabs > button[aria-pressed="true"] {
+  color: white;
+  background: var(--olive);
+}

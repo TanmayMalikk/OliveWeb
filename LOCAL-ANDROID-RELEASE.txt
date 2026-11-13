@@ -1,0 +1,84 @@
+& {
+    $version = 'v1.3.0.17'
+    $releaseNotes = @('Test Local APK Build')
+    $mandatory = $true
+
+    Set-Location -LiteralPath 'C:/Users/Tanma/StudioProjects/F26_D1'
+    $ErrorActionPreference = 'Stop'
+    $env:JAVA_HOME = Join-Path $env:LOCALAPPDATA 'Programs/AndroidStudio-Rabbit2-Clean/android-studio/jbr'
+    if (-not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin/java.exe'))) {
+        $env:JAVA_HOME = Join-Path $env:ProgramFiles 'Android/Android Studio/jbr'
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin/java.exe'))) {
+        throw 'Set JAVA_HOME to your Android Studio jbr folder or installed JDK.'
+    }
+
+    . .\release-publish.local.ps1
+    if (-not (Test-Path -LiteralPath $env:GOOGLE_APPLICATION_CREDENTIALS -PathType Leaf)) {
+        throw 'Set the Firebase service account JSON path in release-publish.local.ps1.'
+    }
+    $env:OLIVE_RELEASE_NOTES = $releaseNotes -join [Environment]::NewLine
+    $env:OLIVE_RELEASE_MANDATORY = $mandatory.ToString().ToLowerInvariant()
+
+    $releaseUrl = 'https://yourolivebranch.ca/api/android/releases/latest'
+    $current = Invoke-RestMethod $releaseUrl
+    if ($current.packageName -ne 'com.olive.app' -or $current.minimumSupportedVersionCode -lt 1) {
+        throw 'Unexpected live release metadata. Check the release manifest before building.'
+    }
+
+    $versionPattern = '^v([1-9][0-9]?)\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]?)\.(0|[1-9][0-9]{0,3})$'
+    if (-not $version) {
+        if ($current.versionName -notmatch $versionPattern -or [int]$Matches[4] -ge 9999) {
+            throw 'Set $version manually to the next release version.'
+        }
+        $version = "v$($Matches[1]).$($Matches[2]).$($Matches[3]).$([int]$Matches[4] + 1)"
+    }
+    if ($version -notmatch $versionPattern) {
+        throw 'Use a version like v1.2.3.0.'
+    }
+    $versionCode = 100000000L * [int]$Matches[1] + 1000000L * [int]$Matches[2] +
+        10000L * [int]$Matches[3] + [int]$Matches[4]
+    if ($versionCode -le $current.versionCode -or $versionCode -gt 2100000000) {
+        throw 'Choose a supported version newer than the live release.'
+    }
+
+    $env:OLIVE_VERSION_NAME = $version
+    $env:OLIVE_VERSION_CODE = [string]$versionCode
+    $env:OLIVE_MINIMUM_VERSION_CODE = [string]$current.minimumSupportedVersionCode
+    Write-Host "Building $env:OLIVE_VERSION_NAME ($env:OLIVE_VERSION_CODE)"
+    .\scripts\Package-Release.ps1
+
+
+    $metadata = Get-Content -LiteralPath 'app/build/outputs/apk/release/output-metadata.json' -Raw | ConvertFrom-Json
+    $built = $metadata.elements | Select-Object -First 1
+    if (-not $env:OLIVE_VERSION_CODE -or [string]$built.versionCode -ne $env:OLIVE_VERSION_CODE -or
+        $built.versionName -ne $env:OLIVE_VERSION_NAME) {
+        throw 'The release output does not match the version selected in step 2.'
+    }
+    $env:OLIVE_RELEASE_APK = (Resolve-Path -LiteralPath 'distribution/Olive-release.apk').Path
+    $releaseApk = (Resolve-Path -LiteralPath (Join-Path 'app/build/outputs/apk/release' $built.outputFile)).Path
+    $localHash = & .\scripts\Get-ReleaseSha256.ps1 -Path $env:OLIVE_RELEASE_APK
+    $buildHash = & .\scripts\Get-ReleaseSha256.ps1 -Path $releaseApk
+    if ($localHash -ne $buildHash) {
+        throw 'The distribution APK does not match the signed build output.'
+    }
+    npm.cmd ci --prefix functions
+    if ($LASTEXITCODE -ne 0) { throw 'Publisher dependency installation failed.' }
+    npm.cmd --prefix functions run publish-android-release
+    if ($LASTEXITCODE -ne 0) { throw 'Publishing reported an error. Check the live manifest before retrying.' }
+
+
+    for ($attempt = 1; $attempt -le 6; $attempt++) {
+        $live = Invoke-RestMethod $releaseUrl
+        if ([string]$live.versionCode -eq $env:OLIVE_VERSION_CODE -and $live.sha256 -eq $localHash) {
+            break
+        }
+        if ($attempt -lt 6) { Start-Sleep -Seconds 5 }
+    }
+    if ([string]$live.versionCode -ne $env:OLIVE_VERSION_CODE -or $live.sha256 -ne $localHash) {
+        throw 'Publishing finished, but the website has not picked up the expected APK yet. Check the live manifest.'
+    }
+    $live | Select-Object versionName, versionCode, mandatory, sha256
+    curl.exe --fail --silent --show-error --head https://yourolivebranch.ca/download/android
+    if ($LASTEXITCODE -ne 0) { throw 'Check the live download URL.' }
+}

@@ -1,0 +1,359 @@
+/* Private web workspace. The cover and organization portals use their own layouts. */
+.safe-shell {
+  --paper: #f4f5ef;
+  --white: #fff;
+  --ink: #202c25;
+  --muted: #526057;
+  --olive: #284b3c;
+  --soft: #e9efe6;
+  --line: #d9e1d9;
+  --radius: 1rem;
+  --workspace-rail: #223e32;
+  --workspace-header-height: 4.75rem;
+  background: var(--paper);
+  color: var(--ink);
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+}
+.safe-sidebar {
+  gap: 1.15rem;
+  padding: 1.2rem 0.85rem 1rem;
+  background: var(--workspace-rail);
+  border: 0;
+  color: #f2f6ee;
+}
+.safe-brand {
+  gap: 0.7rem;
+  padding: 0.35rem 0.55rem;
+  text-align: left;
+  color: inherit;
+}
+.safe-brand > span:last-child {
+  font: 1.35rem/1.1 var(--serif);
+  letter-spacing: -0.025em;
+}
+.safe-brand .safe-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  border-radius: 0.75rem;
+  background: #dceacb;
+  color: var(--workspace-rail);
+  flex-shrink: 0;
+}
+.safe-brand small {
+  color: #c8d9ce;
+  font: 0.7rem/1.25 system-ui, sans-serif;
+  margin-top: 0.18rem;
+}
+.safe-menu-toggle { display: none; }
+.safe-shell .safe-sidebar nav {
+  gap: 1rem;
+  align-content: start;
+}
+.safe-nav-group {
+  display: grid;
+  gap: 0.15rem;
+  align-content: start;
+  min-width: 0;
+}
+.safe-nav-group > p {
+  color: #bfcec3;
+  padding: 0 0.65rem;
+  margin-bottom: 0.2rem;
+  font: 600 0.69rem/1.4 system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.safe-nav-group > button {
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.6rem;
+  color: inherit;
+  text-align: left;
+  font-size: 0.86rem;
+}
+.safe-nav-group > button > svg { flex-shrink: 0; }
+.safe-nav-group > button:hover { background: #335647; }
+.safe-nav-group > button[aria-current="page"] {
+  background: #dceacb;
+  color: #223e32;
+  font-weight: 700;
+}
+.safe-sidebar :focus-visible { outline-color: #f0e1aa; }
+.safe-sidebar-bottom {
+  padding: 0.7rem 0.6rem 0.1rem;
+  border-top: 1px solid #587165;
+}
+.safe-sidebar-bottom small { color: #c8d9ce; }
+.safe-main {
+  width: min(100%, 80rem);
+  max-width: none;
+  padding-inline: clamp(1rem, 3vw, 3rem);
+}
+.safe-header {
+  min-height: var(--workspace-header-height);
+  padding-block: 0.6rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: 0.55rem;
+  background: var(--paper);
+}
+.safe-heading,
+.safe-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.safe-heading { min-width: 0; }
+.safe-heading h1 {
+  font: 650 clamp(1.28rem, 2.7vw, 1.9rem)/1.16 system-ui, sans-serif;
+  overflow-wrap: anywhere;
+  letter-spacing: -0.035em;
+}
+.safe-heading h1:focus { outline: none; }
+.safe-header-actions { flex-shrink: 0; }
+.safe-icon-button,
+.safe-menu-toggle {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border-radius: 0.65rem;
+  place-items: center;
+  flex-shrink: 0;
+}
+.safe-icon-button { display: inline-grid; }
+.safe-icon-button:hover { background: var(--soft); }
+.safe-menu-toggle:hover { background: #335647; }
+.safe-shell .button {
+  border-radius: 0.65rem;
+  min-height: 2.75rem;
+  padding: 0.6rem 0.95rem;
+  gap: 0.5rem;
+}
+.safe-shell .button:hover:not(:disabled) { transform: none; }
+.safe-shell .button.exit {
+  background: #f6e6de;
+  border-color: #dfc0b2;
+  color: #663527;
+}
+.safe-shell .button.exit:hover { background: #eed5ca; }
+.safe-main > main { padding-top: clamp(1rem, 2.6vw, 2rem); }
+.safe-shell .safe-footer { padding-block: 0.85rem 1.5rem; }
+.safe-shell .safe-footer .text-link { font-size: 0.85rem; }
+
+/* Home: prioritize the plan, with task shortcuts below it. */
+.safe-dashboard { display: grid; gap: clamp(1.5rem, 3vw, 2.5rem); }
+.safe-plan-feature {
+  min-width: 0;
+  min-height: 14rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  padding: clamp(1.25rem, 4vw, 2.75rem);
+  border-radius: 1.2rem;
+  background: #284b3c;
+  color: #f6faf3;
+}
+.safe-plan-feature h2 {
+  font: clamp(1.85rem, 4vw, 3rem)/1.07 var(--serif);
+  letter-spacing: -0.035em;
+}
+.safe-plan-feature p { color: #e1ebe0; max-width: 38ch; margin: 0.7rem 0 1.15rem; }
+.safe-plan-feature .button {
+  background: #e4eed8;
+  color: #233c2e;
+}
+.safe-plan-feature .button:hover:not(:disabled) { background: #f4f8ef; }
+.safe-plan-feature .button:focus-visible { outline-color: #f0e1aa; }
+.safe-plan-feature-mark {
+  display: grid;
+  place-items: center;
+  width: clamp(6rem, 13vw, 10rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #345848;
+  border: 1px solid #739480;
+  color: #e1ebd4;
+}
+.safe-plan-feature-mark svg { width: 48%; height: 48%; }
+.safe-dashboard-section h2 {
+  font: 650 clamp(1.15rem, 2vw, 1.35rem)/1.25 system-ui, sans-serif;
+  margin-bottom: 0.7rem;
+}
+.safe-shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.safe-task {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  text-align: left;
+  gap: 0.75rem;
+  padding: 0.95rem;
+  min-height: 5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--white);
+  color: var(--ink);
+}
+.safe-task:hover { background: #f7faf4; border-color: #8ca392; }
+.safe-task-icon {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.7rem;
+  background: var(--soft);
+  color: var(--olive);
+}
+.safe-task-copy { display: grid; gap: 0.2rem; }
+.safe-task-copy > strong { font-size: 0.91rem; line-height: 1.25; }
+.safe-task-copy > span { color: var(--muted); font-size: 0.8rem; line-height: 1.35; }
+.safe-task-arrow { color: var(--olive); }
+
+/* Common controls, lists, and page surfaces. */
+.safe-shell .panel { min-width: 0; }
+.safe-shell :is(.settings-grid, .profile-form, .note-card, .contact-card, .safe-feature-page, .safety-plan-summary) h2,
+.safe-shell :is(.chat-heading, .conversation-sidebar, .modal-top) h2,
+.safe-shell .empty h3 {
+  font: 650 clamp(1.1rem, 2vw, 1.4rem)/1.25 system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+.safe-shell :is(.profile-form, .conversation-sidebar, .settings-grid) h2 { margin-bottom: 0.85rem; }
+.safe-shell .empty { border-radius: var(--radius); background: #edf1e9; }
+.safe-shell .chat-panel > .empty { background: transparent; }
+.safe-shell .empty-icon { border-radius: 0.85rem; background: #dfe8dc; }
+.safe-shell :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="file"]) {
+  border-radius: 0.6rem;
+  font-size: 1rem;
+}
+.safe-shell .status-banner { border: 1px solid #ccdacb; }
+.safe-shell .page-toolbar {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.safe-shell .notes-grid { gap: 0.85rem; }
+.safe-shell .note-card { min-height: 13rem; }
+.safe-shell .note-open { padding-block: 0.9rem; }
+.safe-shell .note-open p { margin-top: 0.5rem; }
+.safe-shell .note-actions { flex-wrap: wrap; }
+.safe-shell .settings-grid { align-items: stretch; gap: 0.85rem; }
+.safe-shell .conversation-sidebar,
+.safe-shell .chat-panel { border-radius: var(--radius); }
+.safe-shell .conversation-sidebar h3 {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.safe-shell .friend-row { padding-inline: 0.65rem; min-height: 2.75rem; }
+.safe-shell .chat-messages { background: #fafbf8; }
+.safe-shell .chat-bubble { background: #e9ede8; }
+.safe-shell .chat-bubble.own { background: #d9e8d5; }
+.safe-shell .chat-bubble p { font-size: 0.94rem; }
+.safe-shell .chat-compose > .button { min-width: 2.75rem; padding: 0.55rem; }
+
+/* Give longer safety plans their own section index on wide screens. */
+.safety-workspace { display: grid; gap: 1rem; min-width: 0; }
+.safety-workspace > .safety-plan-group { min-width: 0; }
+.safety-workspace-nav {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  padding: 0.85rem;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.safety-workspace-nav .safety-plan-tabs { border-radius: 0.65rem; gap: 0.25rem; }
+.safety-workspace-nav [role="tab"] {
+  min-height: 2.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.84rem;
+}
+.safety-rail-label {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+.safety-section-links { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.safety-section-links button {
+  min-height: 2.75rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.55rem;
+  background: var(--soft);
+  color: var(--olive);
+  text-align: left;
+  font-size: 0.85rem;
+}
+.safety-section-links button:hover { background: #dce8d9; }
+.safe-shell .safety-checklist {
+  scroll-margin-top: calc(var(--workspace-header-height) + 0.75rem);
+  padding: clamp(0.65rem, 2vw, 1.25rem);
+}
+.safe-shell .safety-checklist legend {
+  color: var(--olive);
+  font-size: 1rem;
+}
+.safe-shell .safety-checklist-row > input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+.safe-shell .safety-checklist .safety-remove-step { min-height: 2.75rem; }
+@media (min-width: 65rem) {
+  .safety-workspace { grid-template-columns: 14rem minmax(0, 1fr); align-items: start; }
+  .safety-workspace-nav { grid-column: 1; grid-row: 1; }
+  .safety-section-links { display: grid; }
+}
+@media (min-width: 65rem) and (min-height: 43rem) {
+  .safety-workspace-nav {
+    position: sticky;
+    top: calc(var(--workspace-header-height) + 0.75rem);
+    max-height: calc(100svh - var(--workspace-header-height) - 1.5rem);
+    overflow-y: auto;
+  }
+}
+@media (max-width: 60rem) {
+  .safe-shell { grid-template-columns: minmax(0, 1fr); padding-bottom: 0; }
+  .safe-sidebar {
+    position: relative;
+    inset: auto;
+    height: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.35rem clamp(0.6rem, 3vw, 1rem);
+  }
+  .safe-brand { display: flex; }
+  .safe-sidebar-bottom { display: none; }
+  .safe-menu-toggle { display: inline-grid; }
+  .safe-shell .safe-sidebar nav {
+    display: none;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+    max-height: min(55svh, 25rem);
+    padding: 0.45rem 0.3rem;
+    gap: 0.65rem;
+  }
+  .safe-shell .safe-sidebar[data-menu-open="true"] nav { display: grid; }
+  .safe-header { padding-block: 0.5rem; }
+  .safe-shell { --workspace-header-height: 4rem; }
+}
+@media (max-width: 37rem) {
+  .safe-main { padding-inline: 0.75rem; }
+  .safe-shortcuts { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
+  .safe-plan-feature { grid-template-columns: minmax(0, 1fr); gap: 0; min-height: 0; }
+  .safe-plan-feature-mark { display: none; }
+  .safe-heading, .safe-header-actions { gap: 0.15rem; }
+  .safe-header-actions .safe-icon-button { display: none; }
+  .safe-shell .button.exit { font-size: 0.79rem; padding-inline: 0.55rem; }
+  .safe-shell .safety-checklist-row .safety-remove-step { grid-column: 2; }
+}

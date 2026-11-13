@@ -1,9 +1,8 @@
 // All safe-app roles: handles web account sign-in and registration.
 import { useState } from "react";
 import { siteHref } from "../../../sites/SiteRouting";
-import { ArrowLeft, ArrowRight, Check, Leaf } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Leaf, UserRound, UserRoundPlus } from "lucide-react";
 import {
-  Branch,
   Button,
   Field,
   Form,
@@ -12,7 +11,6 @@ import {
   StepProgress,
 } from "../../../components/SharedComponents";
 import {
-  covers,
   emptyProfile,
   validUsername,
   validPassword,
@@ -22,7 +20,6 @@ import {
 } from "../../../domain/DomainModels";
 import { useSession } from "../../../session/SessionProvider";
 import { accounts, triggerHash } from "../../../services/AccountService";
-import { CoverPreview } from "../../../public/GameLandingPage";
 // Shows the sign-in or registration form for the selected account role.
 export function AuthPage({
   organizationOnly = false,
@@ -32,175 +29,190 @@ export function AuthPage({
   const session = useSession();
   const create = !organizationOnly && session.path === "/account/create";
   const [role, setRole] = useState<Role>(organizationOnly ? "STAFF" : "USER");
-  return (
-    <div className="account-layout">
-      <aside className="account-aside">
-        <Logo />
-        <div>
-          <span className="eyebrow">YOUR OLIVE BRANCH</span>
-          <h1>
-            A familiar place.
-            <br />
-            <em>A fresh start.</em>
-          </h1>
-          <p>
-            Your everyday app is just the beginning. Let’s make this space your
-            own.
-          </p>
-        </div>
-        <Branch />
-        <span className="aside-bottom">A little more room to be you.</span>
-      </aside>
-      <main className="account-main" id="main">
-        {!organizationOnly && (
-          <button className="text-link" onClick={() => session.go("/")}>
-            <ArrowLeft size={17} /> Back to home
-          </button>
+  const form = (
+    <>
+      <Form
+        key={create ? "create-account" : "sign-in"}
+        onSubmit={async (data) => {
+          const username = String(data.get("username"));
+          const password = String(data.get("password"));
+          await session.perform(async () => {
+            if (create && !validUsername(username))
+              throw new Error(
+                "Use 8–24 lowercase letters, numbers, or underscores.",
+              );
+            if (create && !validPassword(password))
+              throw new Error(
+                "Use 8–24 characters with a letter, number, and special character.",
+              );
+            if (create && password !== data.get("confirmation"))
+              throw new Error("Passwords do not match.");
+            await session.authenticate(username, password, role, create);
+          });
+        }}
+      >
+        {create ? (
+          <fieldset className="signup-account-types">
+            <legend>Account type</legend>
+            <div className="signup-role-options">
+              <label className="signup-role">
+                <input type="radio" name="signup-role" checked={role === "USER"}
+                  onChange={() => setRole("USER")} />
+                <span><strong>Personal account</strong><small>Use your own Safe Space.</small></span>
+              </label>
+              <label className="signup-role">
+                <input type="radio" name="signup-role" checked={role === "SAFE_CONTACT"}
+                  onChange={() => setRole("SAFE_CONTACT")} />
+                <span><strong>Safe contact</strong><small>Support someone who shares a safety plan with you.</small></span>
+              </label>
+            </div>
+          </fieldset>
+        ) : (
+          <label className="field">
+            <span>Account type</span>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as Role)}
+            >
+              {organizationOnly ? (
+                <>
+                  <option value="STAFF">Organization staff</option>
+                  <option value="ADMIN">Organization administrator</option>
+                </>
+              ) : (
+                <>
+                  <option value="USER">Personal account</option>
+                  <option value="SAFE_CONTACT">Safe contact</option>
+                </>
+              )}
+            </select>
+          </label>
         )}
-        <div className="account-form">
-          <span className="eyebrow">
-            {create ? "A SIMPLE START" : "MAKE YOURSELF AT HOME"}
-          </span>
-          <h2>{create ? "Create your account." : "Welcome back."}</h2>
-          <p>
-            {create
-              ? "Your details first. Your everyday app next."
-              : "Sign in and we’ll take you to your linked app."}
+        <Field
+          label={
+            role === "STAFF" || role === "ADMIN"
+              ? "Username or organization email"
+              : "Username"
+          }
+          name="username"
+          autoComplete="username"
+          required
+          minLength={create ? 8 : 4}
+          maxLength={create ? 24 : 254}
+          hint={
+            create ? "8–24 letters, numbers, or underscores." : undefined
+          }
+        />
+        <Field
+          label="Password"
+          name="password"
+          type="password"
+          autoComplete={create ? "new-password" : "current-password"}
+          required
+          minLength={create ? 8 : 1}
+          maxLength={create ? 24 : 128}
+          hint={
+            create
+              ? "8–24 characters, including a letter, number, and special character."
+              : undefined
+          }
+        />
+        {create && (
+          <Field
+            label="Confirm password"
+            name="confirmation"
+            type="password"
+            autoComplete="new-password"
+            required
+            maxLength={24}
+          />
+        )}
+        {session.message && (
+          <p className="form-error" role="alert">
+            {session.message}
           </p>
-          <Form
-            onSubmit={async (data) => {
-              const username = String(data.get("username"));
-              const password = String(data.get("password"));
-              await session.perform(async () => {
-                if (create && !validUsername(username))
-                  throw new Error(
-                    "Use 8–24 lowercase letters, numbers, or underscores.",
-                  );
-                if (create && !validPassword(password))
-                  throw new Error(
-                    "Use 8–24 characters with a letter, number, and special character.",
-                  );
-                if (create && password !== data.get("confirmation"))
-                  throw new Error("Passwords do not match.");
-                await session.authenticate(username, password, role, create);
-              });
+        )}
+        <Button type="submit" disabled={session.busy}>
+          <Forward>
+            {session.busy
+              ? "Please wait…"
+              : create
+                ? "Create account"
+                : "Sign in"}
+          </Forward>
+        </Button>
+      </Form>
+      {!organizationOnly && (
+        <p className="auth-switch">
+          {create ? "Already have an account?" : "Need an account?"}{" "}
+          <button
+            className="text-link"
+            onClick={() => {
+              session.clearMessage();
+              session.go(create ? "/account/sign-in" : "/account/create");
             }}
           >
-            <label className="field">
-              <span>Account type</span>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-              >
-                {organizationOnly ? (
-                  <>
-                    <option value="STAFF">Organization staff</option>
-                    <option value="ADMIN">Organization administrator</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="USER">Personal account</option>
-                    <option value="SAFE_CONTACT">Safe contact</option>
-                  </>
-                )}
-              </select>
-            </label>
-            <Field
-              label={
-                role === "STAFF" || role === "ADMIN"
-                  ? "Username or organization email"
-                  : "Username"
-              }
-              name="username"
-              autoComplete="username"
-              required
-              minLength={create ? 8 : 4}
-              maxLength={254}
-              hint={
-                create ? "8–24 letters, numbers, or underscores." : undefined
-              }
-            />
-            <Field
-              label="Password"
-              name="password"
-              type="password"
-              autoComplete={create ? "new-password" : "current-password"}
-              required
-              minLength={create ? 8 : 1}
-              maxLength={create ? 24 : 128}
-              hint={
-                create
-                  ? "8–24 characters, including a letter, number, and special character."
-                  : undefined
-              }
-            />
-            {create && (
-              <Field
-                label="Confirm password"
-                name="confirmation"
-                type="password"
-                autoComplete="new-password"
-                required
-                maxLength={24}
-              />
-            )}
-            {session.message && (
-              <p className="form-error" role="alert">
-                {session.message}
-              </p>
-            )}
-            <Button type="submit" disabled={session.busy}>
-              <Forward>
-                {session.busy
-                  ? "Please wait…"
-                  : create
-                    ? "Create account"
-                    : "Sign in"}
-              </Forward>
-            </Button>
-          </Form>
-          {!organizationOnly && (
-            <p className="auth-switch">
-              {create ? "Already have an account?" : "New around here?"}{" "}
-              <button
-                className="text-link"
-                onClick={() => {
-                  session.clearMessage();
-                  session.go(create ? "/account/sign-in" : "/account/create");
-                }}
-              >
-                {create ? "Sign in" : "Create an account"}{" "}
-                <ArrowRight size={15} />
-              </button>
-            </p>
-          )}
-          {!organizationOnly && (
-            <div className="account-utility-links">
-              <a className="text-link" href={siteHref("/get")}>
-                Download & installation <ArrowRight size={15} />
-              </a>
-              {!create && (
-                <button
-                  className="text-link"
-                  onClick={() => {
-                    session.clearMessage();
-                    session.go("/account/link");
-                  }}
-                >
-                  Replace a lost personal link <ArrowRight size={15} />
-                </button>
-              )}
-            </div>
-          )}
-          <div className="storage-note">
-            <Leaf size={18} />
-            <span>
-              {session.cloudMode
-                ? "Connected to your shared Firebase account."
-                : "Local preview: accounts are encrypted in this browser. They do not sync with the Android app."}
-            </span>
-          </div>
+            {create ? "Sign in" : "Create an account"}{" "}
+            <ArrowRight size={15} />
+          </button>
+        </p>
+      )}
+      {!organizationOnly && !create && (
+        <div className="account-utility-links">
+          <button className="text-link" type="button" onClick={() => {
+            session.clearMessage();
+            session.go("/account/link");
+          }}>
+            Replace a lost personal link <ArrowRight size={15} aria-hidden="true" />
+          </button>
         </div>
+      )}
+      {!session.cloudMode && (
+        <div className="storage-note">
+          <Leaf size={18} aria-hidden="true" />
+          <span>Local preview. Accounts are stored in this browser.</span>
+        </div>
+      )}
+    </>
+  );
+
+  const Icon = create ? UserRoundPlus : organizationOnly ? Building2 : UserRound;
+  const contextTitle = create
+    ? "What comes next"
+    : organizationOnly ? "Organization portal" : "Personal and safe contact accounts";
+  const heading = create
+    ? "Create your account"
+    : organizationOnly ? "Organization sign-in" : "Sign in to Olive Branch";
+
+  return (
+    <div className="access-page">
+      <header className="access-header">
+        <Logo small />
+        {!organizationOnly && (
+          <a className="text-link" href={siteHref("/get")}>
+            Get the app <ArrowRight size={16} aria-hidden="true" />
+          </a>
+        )}
+      </header>
+      <main className={create ? "access-sign-in access-sign-up" : "access-sign-in"} id="main">
+        <section className="access-context" aria-labelledby="account-context">
+          <span className="access-mark"><Icon size={25} aria-hidden="true" /></span>
+          <p className="access-context-title" id="account-context">{contextTitle}</p>
+          <p>{create
+            ? "Set up your profile after signup. Personal accounts also choose a browser PIN and get a private entry link."
+            : organizationOnly
+              ? "Access the staff or administrator workspace with your organization account."
+              : "Choose the account type you registered with to continue."}</p>
+          {!organizationOnly && (
+            <button className="text-link" type="button" onClick={() => session.go("/")}>
+              <ArrowLeft size={16} aria-hidden="true" /> Back to Little Grove
+            </button>
+          )}
+        </section>
+        <section className="access-card" aria-labelledby="account-heading">
+          <h1 id="account-heading">{heading}</h1>
+          {form}
+        </section>
       </main>
     </div>
   );
@@ -212,18 +224,14 @@ export function Setup() {
   const existing = session.onboardingProfile;
   const personal = identity.role === "USER";
   const [step, setStep] = useState(
-    personal
-      ? existing && existing.fullName && existing.dob && existing.address.city
-        ? 2
-        : 0
-      : 1,
+    personal && existing?.fullName && existing.dob && existing.address.city ? 2 : 1,
   );
   const [profile, setProfile] = useState<Profile>(
     existing ?? emptyProfile(identity.username, identity.role),
   );
   const [trigger, setTrigger] = useState("");
   const steps = personal
-    ? ["Your cover", "About you", "Private entry"]
+    ? ["About you", "Private entry"]
     : ["Your profile", "Ready"];
   // Moves the setup form to the selected step and places focus on its heading.
   function update(key: keyof Profile, value: string) {
@@ -242,56 +250,21 @@ export function Setup() {
         </button>
       </header>
       <main id="main">
-        <StepProgress step={personal ? step : 0} steps={steps} />
+        <StepProgress step={step - 1} steps={steps} />
         <div className="setup-heading">
           <span className="eyebrow">
-            {step === 0
-              ? "YOUR EVERYDAY, YOUR WAY"
-              : step === 1
-                ? "A LITTLE ABOUT YOU"
-                : "ONE MORE THING"}
+            {step === 1 ? "ABOUT YOU" : "PRIVATE ENTRY"}
           </span>
           <h1>
-            {step === 0
-              ? "Choose your familiar."
-              : step === 1
-                ? "Make yourself at home."
-                : "Your personal doorway."}
+            {step === 1 ? "Set up your profile" : "Set up private entry"}
           </h1>
           <p>
-            {step === 0
-              ? "This is where you’ll land when you sign in. Your private space stays underneath."
-              : step === 1
-                ? "You can update these details in your profile at any time."
-                : "Your personal link opens the entry screen. Your PIN unlocks this browser. The trigger preference is shared with your Android app."}
+            {step === 1
+              ? "You can update these details in your profile at any time."
+              : "Use your personal link or the olive in Little Grove’s Account tab to reach your browser PIN."}
           </p>
         </div>
-        {step === 0 ? (
-          <>
-            <div className="setup-covers">
-              {covers.map((c) => (
-                <button
-                  key={c.id}
-                  className={`setup-cover ${profile.coverType === c.id ? "selected" : ""}`}
-                  aria-pressed={profile.coverType === c.id}
-                  onClick={() => setProfile({ ...profile, coverType: c.id })}
-                >
-                  <CoverPreview cover={c.id} />
-                  <span>
-                    {c.name}
-                    {profile.coverType === c.id && <Check size={18} />}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="setup-controls">
-              <span>You can change your cover later.</span>
-              <Button onClick={() => setStep(1)}>
-                <Forward>Continue</Forward>
-              </Button>
-            </div>
-          </>
-        ) : step === 1 ? (
+        {step === 1 ? (
           <Form
             className="setup-form"
             onSubmit={async () => {
@@ -331,25 +304,6 @@ export function Setup() {
                 max={new Date().toISOString().slice(0, 10)}
                 required
               />
-              <label className="field">
-                <span>Language</span>
-                <select
-                  value={profile.language}
-                  onChange={(e) => update("language", e.target.value)}
-                >
-                  {[
-                    "English",
-                    "French",
-                    "Spanish",
-                    "Arabic",
-                    "Chinese",
-                    "Tagalog",
-                    "Cree",
-                  ].map((l) => (
-                    <option key={l}>{l}</option>
-                  ))}
-                </select>
-              </label>
               <Field
                 label="City"
                 value={profile.address.city}
@@ -398,13 +352,7 @@ export function Setup() {
               </p>
             )}
             <div className="setup-controls">
-              {personal ? (
-                <Button variant="quiet" onClick={() => setStep(0)}>
-                  <ArrowLeft size={17} /> Back
-                </Button>
-              ) : (
-                <span />
-              )}
+              <span />
               <Button type="submit" disabled={session.busy}>
                 <Forward>{personal ? "Continue" : "Finish setup"}</Forward>
               </Button>

@@ -10,7 +10,6 @@ import {
 import { accounts } from "../services/AccountService";
 import { validEntryToken } from "../services/PrivateEntryLinks";
 import {
-  coverPath,
   emptyHistory,
   type Enrollment,
   type Profile,
@@ -98,7 +97,7 @@ export function useSessionSecurity({
           ? "/account/sign-in"
           : mode === "download"
             ? "/get"
-            : coverPath(enrollment?.cover ?? "FITNESS"),
+            : "/",
       );
       window.history.replaceState(
         {},

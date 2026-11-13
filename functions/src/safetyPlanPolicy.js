@@ -1,5 +1,6 @@
 // Users and support staff: checks safety plan rules.
 const {HttpsError} = require("firebase-functions/v2/https");
+const {mergeChecklist} = require("./safetyChecklistMerge");
 const SECTIONS = ["destination", "travel", "contacts", "essentials", "dependants", "aftercare", "documents", "grab"];
 const FIELD_KEYS = ["primary", "backup"].flatMap((plan) => SECTIONS.map((section) => `${plan}_${section}`));
 
@@ -27,6 +28,7 @@ function mergeFields(existing, defaults, changes, actorUid = "") {
   validFields(defaults, changes);
   const fields = {...existing};
   const conflicts = [];
+  const conflictValues = {};
   // Applies changes only when their revision still matches the stored section.
   for (const change of changes) {
     const old = fields[change.key];
@@ -60,7 +62,7 @@ function mergeFields(existing, defaults, changes, actorUid = "") {
       fields[key] = {value, revision: 1, mutationId: "initial"};
     }
   }
-  return {fields, conflicts};
+  return {fields, conflicts, conflictValues};
 }
 
 // Checks whether a staff account is active and has completed its required profile.

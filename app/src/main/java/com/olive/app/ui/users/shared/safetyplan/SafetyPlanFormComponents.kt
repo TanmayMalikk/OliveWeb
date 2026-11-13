@@ -148,32 +148,6 @@ internal fun SafetyChecklistSection(
             }
         }
         if (full) AccessibleMessage(stringResource(R.string.safety_checklist_full))
-        if (field.conflictRevision != null && editable) {
-            AccessibleMessage(
-                stringResource(R.string.safety_conflict),
-                modifier = Modifier.testTag("safety_conflict_$fieldKey")
-            )
-            Text(
-                stringResource(
-                    R.string.safety_synced_version,
-                    safetyChecklistPreview(field.conflictValue.orEmpty())
-                )
-            )
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = {
-                    onResolve(
-                        fieldKey,
-                        true
-                    )
-                }) { Text(stringResource(R.string.safety_keep_mine)) }
-                OutlinedButton(onClick = {
-                    onResolve(
-                        fieldKey,
-                        false
-                    )
-                }) { Text(stringResource(R.string.safety_use_synced)) }
-            }
-        }
     }
 }
 

@@ -3,27 +3,24 @@ import { expect, it } from "vitest";
 import config from "../../site.config.json";
 import {
   canonicalPath,
-  coverForRoute,
+  webCover,
   siteDestination,
   entryLinkUrl,
   siteMode,
 } from "./SiteRouting";
-// Inputs: the values in this case. Expected: recognizes legacy cover paths while keeping their canonical cover identity.
-it("recognizes legacy cover paths while keeping their canonical cover identity", () => {
-  for (const site of config.covers) {
-    expect(coverForRoute(site.path)?.id).toBe(site.id);
-    expect(coverForRoute(`/cover/${site.slug}/`)?.id).toBe(site.id);
+it("routes old cover bookmarks to the game", () => {
+  for (const slug of ["game", "daily-digest", "fitness"]) {
+    expect(canonicalPath(`/${slug}`)).toBe("/");
+    expect(canonicalPath(`/cover/${slug}/?q=a#b`)).toBe("/?q=a#b");
   }
-  const first = config.covers[0];
-  expect(canonicalPath(`/cover/${first.slug}/?q=a#b`)).toBe(`${first.path}?q=a#b`);
-  expect(coverForRoute("/")).toBeUndefined();
-  expect(coverForRoute("/safe")).toBeUndefined();
+  expect(webCover.id).toBe("GAME");
+  expect(canonicalPath("/safe")).toBe("/safe");
 });
 
 // Inputs: the values in this case. Expected: keeps local preview routes usable.
 it("keeps every page on the same origin", () => {
   expect(siteDestination("/daily-digest", "http://localhost:5173")).toBe(
-    "http://localhost:5173/daily-digest",
+    "http://localhost:5173/",
   );
   expect(siteDestination("/download", "http://127.0.0.1:5173")).toBe(
     "http://127.0.0.1:5173/get",
