@@ -9,7 +9,7 @@ import {
 
 describe("web and Android safety checklist compatibility", () => {
   it("uses the Android checklist order for both web plans", () => {
-    expect(safetySections).toEqual(["documents", "grab", "destination", "travel", "contacts", "aftercare"]);
+    expect(safetySections).toEqual(["documents", "grab", "destination", "travel", "contacts", "finances", "aftercare"]);
   });
 
   it("round-trips the structured checklist without displaying its JSON", () => {

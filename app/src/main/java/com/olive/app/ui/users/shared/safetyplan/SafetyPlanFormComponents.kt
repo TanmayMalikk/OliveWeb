@@ -412,11 +412,18 @@ private fun SafetyPlanContactPicker(
 
 // Adaptable prompts informed by PHAC safety-planning guidance; all starting text remains editable.
 // https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html
-internal fun safetyDefaults(context: Context): Map<String, String> = buildMap {
+internal fun safetyDefaults(context: Context, hasAffectedPeople: Boolean = false): Map<String, String> = buildMap {
     listOf("primary", "backup").forEach { plan ->
         SAFETY_SECTIONS.forEach { section ->
             val prompts = when (section) {
-                "documents" -> safetyDocumentSuggestions(context)
+                "documents" -> safetyDocumentSuggestions(context) + if (hasAffectedPeople) {
+                    listOf(context.getString(R.string.safety_documents_dependants))
+                } else emptyList()
+                "finances" -> listOf(
+                    context.getString(R.string.safety_finances_access),
+                    context.getString(R.string.safety_finances_costs),
+                    context.getString(R.string.safety_finances_support),
+                )
                 "grab" -> context.resources.getStringArray(R.array.safety_grab_checklist).toList()
                 "destination" -> context.resources.getStringArray(R.array.safety_destination_checklist)
                     .toList()
@@ -456,6 +463,7 @@ internal fun safetySectionLabel(section: String) = when (section) {
     "contacts" -> R.string.safety_contacts
     "documents" -> R.string.safety_documents_heading
     "grab" -> R.string.safety_grab_heading
+    "finances" -> R.string.safety_finances_heading
     "essentials" -> R.string.safety_essentials
     "dependants" -> R.string.safety_dependants
     else -> R.string.safety_aftercare

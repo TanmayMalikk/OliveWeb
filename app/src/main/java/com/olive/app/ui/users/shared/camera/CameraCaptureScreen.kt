@@ -91,6 +91,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
     }
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            session.endExternalFilePicker()
             permissionGranted = it
         }
     val captureFolder = remember { File(context.cacheDir, "captured-media").apply { mkdirs() } }
@@ -145,7 +146,10 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
         // Returns to the camera or closes it based on how capture was opened.
         when {
             !permissionGranted -> CameraPermissionPrompt(
-                { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                {
+                    session.beginExternalFilePicker()
+                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                },
                 session.navigation::back
             )
 

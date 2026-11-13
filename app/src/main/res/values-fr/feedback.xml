@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="idle_lock_minutes">Avertissement de verrouillage après %d min</string>
+    <string name="idle_lock_setting">Délai de verrouillage</string>
+    <string name="incident_date_format">Date de l’incident (AAAA-MM-JJ)</string>
+    <string name="incident_time_format">Heure approximative (HH:mm)</string>
+    <string name="incident_invalid_date">Saisissez une date valide au format AAAA-MM-JJ.</string>
+    <string name="incident_invalid_time">Saisissez une heure valide au format HH:mm (24 heures).</string>
+    <string name="role_picker_expanded">Développé</string>
+    <string name="role_picker_collapsed">Réduit</string>
+    <string name="admin_search_accounts">Rechercher des comptes</string>
+    <string name="admin_all_account_statuses">Tous les statuts</string>
+    <string name="note_attachment_count">Pièces jointes : %d</string>
+    <string name="chat_unread_only">Non lus uniquement</string>
+    <string name="chat_search_messages">Rechercher dans les messages</string>
+    <string name="chat_no_matching_messages">Aucun message correspondant</string>
+    <string name="chat_incoming_announcement">Nouveaux messages reçus : %d</string>
+    <string name="incident_no_address_suggestions">Aucune suggestion d’adresse. Vous pouvez garder l’adresse saisie ou réessayer.</string>
+    <string name="incident_latitude">Latitude</string>
+    <string name="incident_longitude">Longitude</string>
+    <string name="incident_use_coordinates">Utiliser les coordonnées</string>
+    <string name="resource_hours">Horaires : %s</string>
+    <string name="private_route_destination">Itinéraire vers une destination</string>
+    <string name="private_route_help">Saisissez une adresse ou le nom et la ville d’un refuge. Le fournisseur de cartes reçoit les coordonnées pour calculer l’itinéraire.</string>
+    <string name="private_route_address_not_found">Destination introuvable. Essayez une adresse complète.</string>
+    <string name="safety_finances_heading">Finances</string>
+    <string name="safety_finances_access">Listez les fonds et moyens de paiement auxquels vous avez accès seul.</string>
+    <string name="safety_finances_costs">Prévoyez le transport, un hébergement temporaire et les dépenses essentielles.</string>
+    <string name="safety_finances_support">Notez qui peut vous renseigner sur l’aide financière ou les comptes joints.</string>
+    <string name="admin_emergency_response">Intervention d’urgence</string>
+    <string name="admin_emergency_response_help">Consultez les tickets transmis pour les mises à jour et les informations partagées par la personne. Ce tableau de bord ne dépêche pas les services d’urgence.</string>
+    <string name="safety_documents_dependants">Rassemblez les pièces d’identité et les dossiers scolaires ou de soins des personnes qui partent avec vous, si nécessaire.</string>
+    <string name="feedback_person_name">Nom de la personne %d</string>
+    <string name="feedback_person_age">Âge de la personne %d (facultatif)</string>
+    <string name="feedback_remove_person">Retirer la personne %d</string>
+    <string name="feedback_add_person">Ajouter une autre personne</string>
+    <string name="feedback_situation_hint">Si vous le souhaitez, décrivez la situation, par exemple les violences physiques, émotionnelles ou financières.</string>
+    <plurals name="note_search_results_count">
+        <item quantity="one">%d résultat</item>
+        <item quantity="other">%d résultats</item>
+    </plurals>
+</resources>

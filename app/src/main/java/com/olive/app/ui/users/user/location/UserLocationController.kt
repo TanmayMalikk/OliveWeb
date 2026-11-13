@@ -1,6 +1,8 @@
 // Safe-app users: manages user location actions.
 package com.olive.app.ui.users.user.location
 
+import com.olive.app.data.account.DeliveryAddress
+
 import android.content.Context
 import android.location.Location
 import androidx.compose.runtime.getValue
@@ -51,6 +53,7 @@ internal data class LocationMapState(
     val working: Boolean = false,
     val error: String? = null,
     val navigationTargetUid: String? = null,
+    val privateDestination: MapLocationPoint? = null,
     val route: LocationRoute? = null,
     val navigating: Boolean = false,
     val routeWorking: Boolean = false,
@@ -110,7 +113,7 @@ internal class LocationMapController(
             ) {
                 if (token == generation) {
                     val target = state.navigationTargetUid?.takeIf { targetUid ->
-                        it.any { point -> point.uid == targetUid && point.live }
+                        targetUid == state.privateDestination?.uid || it.any { point -> point.uid == targetUid && point.live }
                     } ?: it.firstOrNull { point -> point.live }?.uid
                     state = state.copy(
                         contacts = it,
@@ -206,6 +209,7 @@ internal class LocationMapController(
         expiryJob = null
         subscription?.close()
         subscription = null
+        state = state.copy(privateDestination = null, route = null, navigating = false, routeWorking = false)
     }
 
     // Clears the selected route, target, and navigation message.
@@ -220,6 +224,28 @@ internal class LocationMapController(
             state = state.copy(navigationTargetUid = uid, routeError = null)
     }
 
+    fun selectPrivateDestination(name: String, latitude: Double, longitude: Double) {
+        if (state.navigating) return
+        state = state.copy(
+            privateDestination = MapLocationPoint("private-route-destination", name, latitude, longitude, 0L, false, null),
+            routeError = null,
+        )
+    }
+
+    suspend fun resolvePrivateDestination(address: String): Boolean {
+        val requestGeneration = generation
+        val coordinates = try {
+            DeviceLocation.coordinatesForAddress(applicationContext, DeliveryAddress(line1 = address))
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        } ?: return false
+        if (requestGeneration != generation) return false
+        selectPrivateDestination(address, coordinates.first, coordinates.second)
+        return true
+    }
+
     // Requests a route to the selected person and starts map navigation.
     fun startNavigation(
         notConfiguredMessage: String,
@@ -231,7 +257,7 @@ internal class LocationMapController(
             state = state.copy(routeError = notConfiguredMessage)
             return
         }
-        val targetUid = state.navigationTargetUid ?: state.contacts.firstOrNull { it.live }?.uid
+        val targetUid = state.privateDestination?.uid ?: state.navigationTargetUid ?: state.contacts.firstOrNull { it.live }?.uid
         if (state.ownPoint == null || targetUid == null) {
             state = state.copy(routeError = unavailableMessage)
             return
@@ -249,7 +275,7 @@ internal class LocationMapController(
             // User location controller: Keeps start navigation active while is active and state navigating.
             while (isActive && state.navigating) {
                 val origin = state.ownPoint
-                val target = state.contacts.firstOrNull {
+                val target = state.privateDestination ?: state.contacts.firstOrNull {
                     it.uid == state.navigationTargetUid && it.live
                 }
                 if (origin == null || target == null) {
@@ -278,6 +304,7 @@ internal class LocationMapController(
                             lastRoutedTarget = target
                         }
                     }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
                         state = state.copy(routeWorking = false, routeError = failedMessage)
                     }
                 } else {

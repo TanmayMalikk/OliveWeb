@@ -238,6 +238,9 @@ test('required profile fields and address whitelist are enforced', async () => {
   await assertFails(setDoc(target,{...profile,dob:''}));
   const address={line1:'123 Test Street',line2:'',city:'Edmonton',province:'Alberta',postalCode:'T5J 0N3',country:'Canada'};
   await assertSucceeds(setDoc(target,{...profile,address}));
+  const triggerVerifier = `600000:${"A".repeat(22)}==:${"A".repeat(43)}=`;
+  await assertSucceeds(setDoc(target,{...profile,address,triggerHash:triggerVerifier}));
+  await assertFails(setDoc(target,{...profile,address,triggerHash:triggerVerifier.replace("600000", "1")}));
   await assertFails(setDoc(target,{...profile,address:{...address,cardNumber:'4242424242424242'}}));
   await assertFails(setDoc(target,{...profile,cardNumber:'4242424242424242'}));
   await assertSucceeds(setDoc(target,{...profile,role:'SAFE_CONTACT',triggerHash:''}));

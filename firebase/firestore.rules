@@ -237,7 +237,9 @@ service cloud.firestore {
         && p.region is string && p.region.size() <= 200
 
         && p.triggerHash is string
-        && (p.triggerHash.matches('[a-f0-9]{64}') || (('role' in p) && p.role in ['SAFE_CONTACT','STAFF','ADMIN'] && p.triggerHash == ''))
+        && (p.triggerHash.matches('[a-f0-9]{64}')
+          || p.triggerHash.matches('600000:[A-Za-z0-9+/]{22}==:[A-Za-z0-9+/]{43}=')
+          || (('role' in p) && p.role in ['SAFE_CONTACT','STAFF','ADMIN'] && p.triggerHash == ''))
 
         && (!('role' in p) || p.role in ['USER','SAFE_CONTACT','STAFF','ADMIN'])
 

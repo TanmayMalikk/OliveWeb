@@ -102,7 +102,7 @@ class OliveActivity : FragmentActivity() {
     // Counts changes to location permission.
     private var locationPermissionVersion by mutableIntStateOf(0)
     private val permissions =
-        AppPermissions(this, { !session.localMode }, { session.accountRole == AccountRole.USER }) {
+        AppPermissions(this, { !session.localMode }) {
             locationPermissionVersion++
             session.syncLocalNotificationHandler()
         }

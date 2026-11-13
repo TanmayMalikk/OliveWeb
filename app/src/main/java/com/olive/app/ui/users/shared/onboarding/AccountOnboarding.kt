@@ -193,10 +193,11 @@ internal fun BirthdayPicker(
         Choice(
             uiText(R.string.year),
             year?.toString().orEmpty(),
-            (1950..LocalDate.now().year).reversed().map { it.toString() to it.toString() },
+            (LocalDate.now().minusYears(130).year..LocalDate.now().year).reversed().map { it.toString() to it.toString() },
             "${tag}_year"
         ) {
             year = it.toInt()
+            day = day?.coerceAtMost(java.time.YearMonth.of(it.toInt(), month ?: 1).lengthOfMonth())
             setDate(year, month, day)
         }
         Choice(
@@ -210,12 +211,13 @@ internal fun BirthdayPicker(
             "${tag}_month"
         ) {
             month = it.toInt()
+            day = day?.coerceAtMost(java.time.YearMonth.of(year ?: 2000, it.toInt()).lengthOfMonth())
             setDate(year, month, day)
         }
         Choice(
             uiText(R.string.day),
             day?.toString().orEmpty(),
-            (1..31).map { it.toString() to it.toString() },
+            (1..java.time.YearMonth.of(year ?: 2000, month ?: 1).lengthOfMonth()).map { it.toString() to it.toString() },
             "${tag}_day"
         ) {
             day = it.toInt()

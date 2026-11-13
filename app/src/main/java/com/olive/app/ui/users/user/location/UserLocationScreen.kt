@@ -24,6 +24,9 @@ import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
@@ -41,12 +44,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -54,11 +59,110 @@ import androidx.compose.ui.unit.dp
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
+import com.olive.app.data.safety.HotlineDirectory
+import com.olive.app.data.safety.HotlineResourceKind
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
+import kotlinx.coroutines.launch
 
 private const val MAX_SHARED_CONTACTS = 10
+
+@Composable
+private fun PrivateRouteControls(
+    controller: LocationMapController,
+    state: LocationMapState,
+    notConfigured: String,
+    unavailable: String,
+    failed: String,
+    city: String,
+) {
+    var choosing by remember { mutableStateOf(false) }
+    var address by remember { mutableStateOf("") }
+    var lookup by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var shelters by remember(city) { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(choosing, city) {
+        if (!choosing || city.isBlank()) return@LaunchedEffect
+        shelters = withContext(Dispatchers.IO) {
+            runCatching { HotlineDirectory.readBundled(context) }.getOrNull()?.resources.orEmpty()
+                .filter { it.kind == HotlineResourceKind.Shelter && it.city.equals(city.trim(), ignoreCase = true) }
+                .map { "${it.name}, ${it.city}" }
+        }
+    }
+    OutlinedButton(
+        onClick = {
+            if (state.navigating) controller.stopNavigation()
+            else {
+                address = state.privateDestination?.name.orEmpty()
+                error = false
+                choosing = true
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(if (state.navigating) R.string.location_stop_navigation else R.string.private_route_destination))
+    }
+    state.privateDestination?.let { destination ->
+        if (state.navigating) {
+            Text(destination.name, style = MaterialTheme.typography.labelLarge)
+            state.route?.let { route ->
+                val origin = state.ownPoint
+                val next = origin?.let { route.nextDirection(it.latitude, it.longitude) }
+                next?.let { Text(stringResource(R.string.location_next_direction, it.text)) }
+            }
+        }
+    }
+    if (choosing) AlertDialog(
+        onDismissRequest = { if (!lookup) choosing = false },
+        title = { Text(stringResource(R.string.private_route_destination)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.private_route_help))
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it.take(240); error = false },
+                    label = { Text(stringResource(R.string.location_navigation_destination)) },
+                    enabled = !lookup,
+                    singleLine = true,
+                )
+                shelters.take(3).forEach { shelter ->
+                    TextButton(enabled = !lookup, onClick = { address = shelter; error = false }) {
+                        Text(shelter)
+                    }
+                }
+                if (lookup) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (error) AccessibleMessage(stringResource(R.string.private_route_address_not_found))
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !lookup && address.isNotBlank(),
+                onClick = {
+                    lookup = true
+                    error = false
+                    scope.launch {
+                        try {
+                            if (controller.resolvePrivateDestination(address.trim())) {
+                                choosing = false
+                                controller.startNavigation(notConfigured, unavailable, failed)
+                            } else error = true
+                        } finally {
+                            lookup = false
+                        }
+                    }
+                },
+            ) { Text(stringResource(R.string.location_start_navigation)) }
+        },
+        dismissButton = {
+            TextButton(enabled = !lookup, onClick = { choosing = false }) { Text(stringResource(R.string.cancel)) }
+        },
+    )
+}
 
 // Shows the user and trusted-contact map, sharing controls, and route tools.
 @Composable
@@ -86,16 +190,15 @@ internal fun LocationMapScreen(session: SessionViewModel) {
     DisposableEffect(controller) { onDispose(controller::closeMap) }
     val state = controller.state
     val displayedOwn = state.displayedOwn(profile.role)
-    val points = listOfNotNull(displayedOwn) + state.contacts
+    val points = listOfNotNull(displayedOwn, state.privateDestination) + state.contacts
     val liveUsers = state.contacts.filter { it.live }
-    val navigationTarget = liveUsers.firstOrNull { it.uid == state.navigationTargetUid }
+    val navigationTarget = state.privateDestination ?: liveUsers.firstOrNull { it.uid == state.navigationTargetUid }
     LaunchedEffect(state.navigating) {
         if (!state.navigating) fullScreenNavigation = false
     }
 
     if (
         fullScreenNavigation &&
-        profile.role == AccountRole.SAFE_CONTACT &&
         state.navigating
     ) {
         BackHandler { fullScreenNavigation = false }
@@ -148,6 +251,10 @@ internal fun LocationMapScreen(session: SessionViewModel) {
             )
         }
         if (profile.role == AccountRole.USER) {
+            PrivateRouteControls(controller, state, routeNotConfigured, routeUnavailable, routeFailed, profile.address.city)
+            if (state.navigating) OutlinedButton(onClick = { fullScreenNavigation = true }) {
+                Text(stringResource(R.string.location_full_screen_navigation))
+            }
             Surface(
                 Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,

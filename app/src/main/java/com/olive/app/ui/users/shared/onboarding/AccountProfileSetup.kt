@@ -25,6 +25,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.SafeContact
@@ -35,6 +38,47 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import java.util.UUID
 
 // USER and SAFE CONTACT: shared profile questions live here.
+private data class AffectedPersonDraft(val name: String = "", val age: String = "")
+
+@Composable
+private fun AffectedPeopleFields(value: String, enabled: Boolean, onChange: (String) -> Unit) {
+    val uiText = rememberResourceText()
+    val ageSuffix = remember { Regex("""^(.*) \(([0-9]{1,3})\)$""") }
+    var people by remember {
+        mutableStateOf(value.lines().filter(String::isNotBlank).map { line ->
+            ageSuffix.matchEntire(line)?.let { AffectedPersonDraft(it.groupValues[1], it.groupValues[2]) }
+                ?: AffectedPersonDraft(line)
+        }.ifEmpty { listOf(AffectedPersonDraft()) })
+    }
+    fun update(rows: List<AffectedPersonDraft>) {
+        val saved = rows.filter { it.name.isNotBlank() }.joinToString("\n") {
+            it.name.trim() + if (it.age.isNotEmpty()) " (${it.age})" else ""
+        }
+        if (saved.length <= 500) {
+            people = rows
+            onChange(saved)
+        }
+    }
+    Text(uiText(R.string.names_of_people_experiencing_abuse_optional), style = MaterialTheme.typography.titleMedium)
+    people.forEachIndexed { index, person ->
+        Field(uiText(R.string.feedback_person_name, index + 1), person.name, "affected_name_$index", enabled = enabled) { name ->
+            update(people.toMutableList().also { it[index] = person.copy(name = name) })
+        }
+        Field(uiText(R.string.feedback_person_age, index + 1), person.age, "affected_age_$index", enabled = enabled) { age ->
+            if (age.isEmpty() || age.matches(Regex("[0-9]{1,3}")) && age.toInt() <= 130) {
+                update(people.toMutableList().also { it[index] = person.copy(age = age) })
+            }
+        }
+        if (people.size > 1) TextButton(onClick = { update(people.filterIndexed { row, _ -> row != index }) }, enabled = enabled) {
+            Text(uiText(R.string.feedback_remove_person, index + 1))
+        }
+    }
+    OutlinedButton(
+        onClick = { update(people + AffectedPersonDraft()) },
+        enabled = enabled && people.last().name.isNotBlank() && value.length < 500,
+    ) { Text(uiText(R.string.feedback_add_person)) }
+}
+
 // USER ONLY: abuse details, situation, trigger, optional safe contact, and cover-app choice are inside !safeContact blocks.
 // UI sizing/text: section titles use Material title sizes, helper text uses bodySmall, and all fields use the shared responsive form width.
 @Composable
@@ -97,8 +141,12 @@ internal fun ProfileSetup(session: SessionViewModel) {
             ) else emptyList()).take(25)
 
     // Checks the onboarding fields and saves the completed account profile.
-    fun saveProfile() = session.account.saveSetupProfile(
-        UserProfile(
+    val saveScope = rememberCoroutineScope()
+    var preparingProfile by remember { mutableStateOf(false) }
+    fun saveProfile() {
+        if (preparingProfile) return
+        val draftTrigger = trigger
+        val draft = UserProfile(
             username = session.account.setupUsername,
             fullName = fullName.trim(),
             affectedNames = affected.trim(),
@@ -107,13 +155,24 @@ internal fun ProfileSetup(session: SessionViewModel) {
             language = language.trim(),
             situation = situation.trim(),
             region = address.generalLocation,
-            triggerHash = if (safeContact) "" else InputPolicy.triggerHash(trigger),
+            triggerHash = "",
             contacts = if (safeContact) emptyList() else collectedContacts(),
             address = address,
             coverType = coverType,
             role = session.account.role
         )
-    )
+        preparingProfile = true
+        saveScope.launch {
+            try {
+                val verifier = if (safeContact) "" else withContext(Dispatchers.Default) {
+                    InputPolicy.triggerHash(draftTrigger)
+                }
+                session.account.saveSetupProfile(draft.copy(triggerHash = verifier))
+            } finally {
+                preparingProfile = false
+            }
+        }
+    }
     FormColumn(scrollResetKey = page) {
         Heading(uiText(R.string.your_profile), pages[page], focusKey = page)
         OnboardingProgress(progressCompleted, totalRequired, progressPage, stages, pageCompletion)
@@ -146,12 +205,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                     }
                     if (!safeContact) {
                         HorizontalDivider()
-                        Field(
-                            uiText(R.string.names_of_people_experiencing_abuse_optional),
-                            affected,
-                            "affected_names",
-                            enabled = !session.account.busy
-                        ) { affected = it.take(500) }
+                        AffectedPeopleFields(affected, !session.account.busy) { affected = it }
                         Field(
                             uiText(R.string.abuser_s_name_optional),
                             abuserName,
@@ -165,6 +219,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
                             multiline = true,
                             enabled = !session.account.busy
                         ) { situation = it.take(2000) }
+                        Text(uiText(R.string.feedback_situation_hint), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
 
@@ -316,7 +371,7 @@ internal fun ProfileSetup(session: SessionViewModel) {
             },
             last = last,
             nextTag = if (page == pages.lastIndex) "profile_submit" else "onboarding_next",
-            enabled = !session.account.busy,
+            enabled = !session.account.busy && !preparingProfile,
             nextLabel = if (!safeContact && page == pages.lastIndex) uiText(R.string.next) else null
         )
     }

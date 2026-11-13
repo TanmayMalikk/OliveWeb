@@ -177,7 +177,7 @@ export default function SafetyPlan() {
     baseRevisions.current = {};
     baseValues.current = {};
     if (!ownerUid) return;
-    void loadPlan(ownerUid)
+    void loadPlan(ownerUid, editable && Boolean(session.profile?.affectedNames.trim()))
       .then(async (value) => {
         if (!live) return;
         setPlan(value);
@@ -229,7 +229,7 @@ export default function SafetyPlan() {
       live = false;
       stop?.();
     };
-  }, [identity?.uid, sharedOwnerUid, editable]);
+  }, [identity?.uid, sharedOwnerUid, editable, session.profile?.affectedNames]);
   const updateSection = async (
     key: string,
     items: SafetyChecklistItem[],

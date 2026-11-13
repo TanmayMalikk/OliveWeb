@@ -100,9 +100,22 @@ internal fun OliveRoot(
             PackageManager.PERMISSION_GRANTED
         ) action() else {
             pendingCallPermissionAction = action
-            session.beginCallPermissionRequest()
-            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+    if (pendingCallPermissionAction != null && !session.callPermissionRequestOpen) {
+        AlertDialog(
+            onDismissRequest = { pendingCallPermissionAction = null },
+            text = { Text(uiText(R.string.ui_microphone_permission_required)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    session.beginCallPermissionRequest()
+                    microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                }) { Text(uiText(R.string.next)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingCallPermissionAction = null }) { Text(uiText(R.string.cancel)) }
+            },
+        )
     }
     LaunchedEffect(callAccountId, session.accountRole) {
         if (callAccountId.isNotBlank()) {
@@ -529,6 +542,7 @@ internal class SessionAccountEntry(private val runtime: SessionRuntime) {
 
     // Checks whether cover-app search text matches the saved hidden phrase.
     fun interceptSearch(value: String): Boolean = runtime.access.interceptSearch(value)
+    suspend fun interceptSearchAsync(value: String): Boolean = runtime.access.interceptSearchAsync(value)
     // Opens private authentication after the hidden olive is double-tapped.
     fun beginDiscreetEntry() = runtime.access.beginDiscreetEntry()
     // Checks the entered app PIN against the current private-entry challenge.

@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
 internal val OliveGreen = Color(0xFF45613C)
 internal val Ink = Color(0xFF253322)
 internal val Cream = Color(0xFFFAF9F5)
-internal val Muted = Color(0xFF677A3B)
+internal val Muted = Color(0xFF4E602D)
 internal val Paper = Color.White
 internal val PaleOlive = Color(0xFFE7EDDD)
 internal val WarmWhite = Color(0xFFF0F0E8)

@@ -37,6 +37,7 @@ import com.olive.app.data.news.NewsFeedCacheStore
 import com.olive.app.data.news.NewsScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 // Daily Digest refreshes local/global headlines while bookmarks stay saved separately.
@@ -136,14 +137,36 @@ internal fun NewsCover(
         }
         loading = false
     }
+    LaunchedEffect(query) {
+        if (session.account.interceptSearchAsync(query)) query = ""
+    }
+    LaunchedEffect(locationEditorOpen, locationDraft) {
+        if (locationEditorOpen && session.account.interceptSearchAsync(locationDraft)) locationDraft = ""
+    }
+    val locationSaveScope = rememberCoroutineScope()
+    var savingLocation by remember { mutableStateOf(false) }
     if (locationEditorOpen) NewsLocationDialog(locationDraft, { value ->
-        locationDraft = if (!session.account.interceptSearch(value)) value.take(120) else ""
+        locationDraft = value.take(120)
     }, onDismiss = { locationEditorOpen = false }, onSave = {
-        customPlace = locationDraft.trim()
-        currentPlace = customPlace
-        locationPreferences.edit { putString(locationPreferenceKey, customPlace) }
-        locationEditorOpen = false
-        refresh++
+        if (!savingLocation) {
+            val candidate = locationDraft
+            savingLocation = true
+            locationSaveScope.launch {
+                try {
+                    if (!session.account.interceptSearchAsync(candidate) &&
+                        locationEditorOpen && locationDraft == candidate
+                    ) {
+                        customPlace = candidate.trim()
+                        currentPlace = customPlace
+                        locationPreferences.edit { putString(locationPreferenceKey, customPlace) }
+                        locationEditorOpen = false
+                        refresh++
+                    }
+                } finally {
+                    savingLocation = false
+                }
+            }
+        }
     }, onUseDeviceLocation = {
         customPlace = ""
         currentPlace = fallbackPlace
@@ -243,7 +266,7 @@ internal fun NewsCover(
                 NewsFeedState(tab, scope, query, articles, saved, loading, newsError, currentPlace),
                 NewsFeedActions(
                     search = { value ->
-                        query = if (!session.account.interceptSearch(value)) value else ""
+                        query = value
                     },
                     changeScope = { scope = it },
                     editLocation = {

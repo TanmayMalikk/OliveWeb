@@ -131,10 +131,11 @@ internal val SAFETY_SECTIONS = listOf(
     "dependants",
     "aftercare",
     "documents",
-    "grab"
+    "grab",
+    "finances",
 )
 internal val SAFETY_CHECKLIST_SECTIONS =
-    listOf("documents", "grab", "destination", "travel", "contacts", "aftercare")
+    listOf("documents", "grab", "destination", "travel", "contacts", "finances", "aftercare")
 internal val SAFETY_FIELD_KEYS =
     listOf("primary", "backup").flatMap { plan -> SAFETY_SECTIONS.map { "${plan}_$it" } }
 

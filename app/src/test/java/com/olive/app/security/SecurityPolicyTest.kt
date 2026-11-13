@@ -66,9 +66,11 @@ class SecurityPolicyTest {
     // Inputs: the values shown below. Expected: trigger requires exact normalized match.
     @Test
     fun triggerRequiresExactNormalizedMatch() {
-        assertEquals(InputPolicy.triggerHash("  MY WORD  "), InputPolicy.triggerHash("my word"))
-        assertEquals(InputPolicy.triggerHash("  He L P  "), InputPolicy.triggerHash("help"))
-        assertNotEquals(InputPolicy.triggerHash("my word"), InputPolicy.triggerHash("my words"))
+        val verifier = InputPolicy.triggerHash("  MY WORD  ")
+        assertTrue(InputPolicy.matchesTrigger("myword", verifier))
+        assertFalse(InputPolicy.matchesTrigger("my words", verifier))
+        assertNotEquals(verifier, InputPolicy.triggerHash("myword"))
+        assertTrue(InputPolicy.matchesTrigger("MY WORD", InputPolicy.legacyTriggerHash("my word")))
     }
 
     // Inputs: the values shown below. Expected: credentials and birth dates are validated.

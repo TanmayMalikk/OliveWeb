@@ -1,7 +1,7 @@
 // Users and support staff: checks safety plan rules.
 const {HttpsError} = require("firebase-functions/v2/https");
 const {mergeChecklist} = require("./safetyChecklistMerge");
-const SECTIONS = ["destination", "travel", "contacts", "essentials", "dependants", "aftercare", "documents", "grab"];
+const SECTIONS = ["destination", "travel", "contacts", "essentials", "dependants", "aftercare", "documents", "grab", "finances"];
 const FIELD_KEYS = ["primary", "backup"].flatMap((plan) => SECTIONS.map((section) => `${plan}_${section}`));
 
 // Rejects malformed safety-plan defaults and offline changes before they are merged.

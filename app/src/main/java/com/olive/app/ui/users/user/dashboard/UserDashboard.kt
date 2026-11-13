@@ -480,7 +480,7 @@ private fun SafeHomeScreen(session: SessionViewModel, profile: UserProfile) {
             ), style = MaterialTheme.typography.bodySmall, color = Muted
         )
         Status(session)
-        TextButton(
+        OutlinedButton(
             onClick = session::signOut,
             enabled = !session.busy,
             modifier = Modifier.testTag("sign_out")

@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
@@ -251,9 +252,15 @@ internal fun PrivateNoteCard(
     open: () -> Unit, pin: () -> Unit, openLog: () -> Unit, modifier: Modifier = Modifier
 ) {
     val uiText = rememberResourceText()
+    val entryDetails = listOfNotNull(
+        uiText(R.string.pinned).takeIf { entry.pinned },
+        formatter.format(Instant.ofEpochMilli(entry.timestamp)),
+        uiText(R.string.note_attachment_count, entry.attachmentIds.size),
+    ).joinToString(", ")
     Card(
         onClick = open,
-        modifier = modifier.fillMaxWidth().testTag("private_entry_row"),
+        modifier = modifier.fillMaxWidth().testTag("private_entry_row")
+            .semantics { stateDescription = entryDetails },
         border = BorderStroke(1.dp, Color.Black),
         colors = CardDefaults.cardColors(containerColor = NotePaperCream)
     ) {
@@ -269,7 +276,7 @@ internal fun PrivateNoteCard(
                 )
                 IconButton(
                     onClick = pin,
-                    modifier = Modifier.size(34.dp).testTag("private_pin")
+                    modifier = Modifier.size(48.dp).testTag("private_pin")
                 ) {
                     Icon(
                         Icons.Outlined.PushPin,
@@ -292,7 +299,7 @@ internal fun PrivateNoteCard(
             Text(
                 (if (entry.edits.isNotEmpty()) "${stringResource(R.string.edited)} · " else "") + formatter.format(
                     Instant.ofEpochMilli(entry.updatedAt)
-                ), style = MaterialTheme.typography.bodySmall, color = Muted
+                ), style = MaterialTheme.typography.bodyMedium, color = Muted
             )
             if (entry.edits.isNotEmpty()) TextButton(
                 onClick = openLog,
