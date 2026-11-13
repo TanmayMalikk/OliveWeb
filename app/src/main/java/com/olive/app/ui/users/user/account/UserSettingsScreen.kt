@@ -19,10 +19,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -30,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -299,6 +302,16 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                 Text(stringResource(R.string.sign_out_on_this_device))
             }
         }
+        var idleMinutes by remember(profile.username) { mutableIntStateOf(session.idleTimeoutMinutes()) }
+        Text(stringResource(R.string.idle_lock_minutes, idleMinutes))
+        Slider(
+            value = idleMinutes.toFloat(),
+            onValueChange = { idleMinutes = it.toInt() },
+            onValueChangeFinished = { session.setIdleTimeoutMinutes(idleMinutes) },
+            valueRange = 1f..5f,
+            steps = 3,
+            modifier = Modifier.semantics { contentDescription = uiText(R.string.idle_lock_setting) },
+        )
         Status(session)
     }
 

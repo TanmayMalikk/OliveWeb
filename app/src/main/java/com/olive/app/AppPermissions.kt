@@ -14,26 +14,13 @@ import androidx.lifecycle.withResumed
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 
-internal enum class OnboardingPermission { Notifications, Location, Camera, Microphone, Done }
-
-// Returns the next Android permission needed by onboarding.
-internal fun nextOnboardingPermission(
-    notificationsNeeded: Boolean, notificationsAsked: Boolean,
-    locationGranted: Boolean, locationAsked: Boolean, cameraGranted: Boolean, cameraAsked: Boolean,
-    microphoneGranted: Boolean, microphoneAsked: Boolean
-) = when {
-    notificationsNeeded && !notificationsAsked -> OnboardingPermission.Notifications
-    !locationGranted && !locationAsked -> OnboardingPermission.Location
-    !cameraGranted && !cameraAsked -> OnboardingPermission.Camera
-    !microphoneGranted && !microphoneAsked -> OnboardingPermission.Microphone
-    else -> OnboardingPermission.Done
-}
+internal fun shouldRequestNotifications(enabled: Boolean, asked: Boolean, granted: Boolean) =
+    enabled && !asked && !granted
 
 // One owner serializes every post-onboarding prompt and explicit permission retries.
 internal class AppPermissions(
     private val activity: ComponentActivity,
     private val notificationsEnabled: () -> Boolean,
-    private val locationEnabled: () -> Boolean,
     private val onChanged: () -> Unit
 ) {
     private val preferences by lazy {
@@ -44,15 +31,12 @@ internal class AppPermissions(
     }
     private var notificationPrompt = false
     private var locationPrompt = false
-    private var cameraPrompt = false
-    private var microphonePrompt = false
     private var locationResult: CompletableDeferred<Boolean>? = null
-    val awaitingResult get() = notificationPrompt || locationPrompt || cameraPrompt || microphonePrompt
+    val awaitingResult get() = notificationPrompt || locationPrompt
     private val notifications =
         activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
             notificationPrompt = false
             onChanged()
-            afterOnboarding()
         }
     private val location =
         activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -64,7 +48,6 @@ internal class AppPermissions(
                 locationResult = null
                 pending?.complete(hasLocation())
                 onChanged()
-                afterOnboarding()
             }
         }
     private val backgroundLocation =
@@ -74,21 +57,7 @@ internal class AppPermissions(
             locationResult = null
             pending?.complete(hasLocation())
             onChanged()
-            afterOnboarding()
         }
-    private val camera =
-        activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            cameraPrompt = false
-            onChanged()
-            afterOnboarding()
-        }
-    private val microphone =
-        activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            microphonePrompt = false
-            onChanged()
-            afterOnboarding()
-        }
-
     // Checks whether Android granted approximate or precise location access.
     fun hasLocation() = listOf(
         Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -110,64 +79,26 @@ internal class AppPermissions(
         Manifest.permission.ACCESS_BACKGROUND_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
 
-    // Onboarding permissions: Opens the next permission prompt after onboarding. It checks saved prompt history and requests notifications, location, camera, or microphone in order.
+    // Notifications support tickets, calls, and updates after account setup.
     fun afterOnboarding() {
         activity.lifecycleScope.launch {
             activity.lifecycle.withResumed {
-                if (awaitingResult) return@withResumed
-                val needsNotifications = notificationsEnabled() && Build.VERSION.SDK_INT >= 33 &&
-                        ContextCompat.checkSelfPermission(
-                            activity,
-                            Manifest.permission.POST_NOTIFICATIONS
-                        ) != PackageManager.PERMISSION_GRANTED
-                when (nextOnboardingPermission(
-                    needsNotifications,
-                    preferences.getBoolean("notifications_asked", false),
-                    (hasLocation() && hasBackgroundLocation()) || !locationEnabled(),
-                    preferences.getBoolean("location_asked", false),
-                    hasPermission(Manifest.permission.CAMERA),
-                    preferences.getBoolean("camera_asked", false),
-                    hasPermission(Manifest.permission.RECORD_AUDIO),
-                    preferences.getBoolean("microphone_asked", false)
-                )) {
-                    OnboardingPermission.Notifications -> if (Build.VERSION.SDK_INT >= 33) {
-                        preferences.edit { putBoolean("notifications_asked", true) }
-                        notificationPrompt = true
-                        notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-
-                    OnboardingPermission.Location -> launchLocation()
-                    OnboardingPermission.Camera -> launchCamera()
-                    OnboardingPermission.Microphone -> launchMicrophone()
-                    OnboardingPermission.Done -> Unit
+                if (awaitingResult || Build.VERSION.SDK_INT < 33 || !shouldRequestNotifications(
+                        enabled = notificationsEnabled(),
+                        asked = preferences.getBoolean("notifications_asked", false),
+                        granted = ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS) ==
+                            PackageManager.PERMISSION_GRANTED,
+                    )
+                ) return@withResumed
+                preferences.edit { putBoolean("notifications_asked", true) }
+                notificationPrompt = true
+                try {
+                    notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } catch (_: IllegalStateException) {
+                    notificationPrompt = false
+                    preferences.edit { remove("notifications_asked") }
                 }
             }
-        }
-    }
-
-    // Asks Android whether one named permission is currently granted.
-    private fun hasPermission(permission: String) =
-        ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
-
-    // Camera permission: Opens the camera permission prompt. It records that the prompt was shown and clears its state if Android cannot launch it.
-    private fun launchCamera() {
-        preferences.edit { putBoolean("camera_asked", true) }
-        cameraPrompt = true
-        try {
-            camera.launch(Manifest.permission.CAMERA)
-        } catch (_: IllegalStateException) {
-            cameraPrompt = false
-        }
-    }
-
-    // Microphone permission: Opens the microphone permission prompt. It records that the prompt was shown and clears its state if Android cannot launch it.
-    private fun launchMicrophone() {
-        preferences.edit { putBoolean("microphone_asked", true) }
-        microphonePrompt = true
-        try {
-            microphone.launch(Manifest.permission.RECORD_AUDIO)
-        } catch (_: IllegalStateException) {
-            microphonePrompt = false
         }
     }
 
@@ -187,7 +118,6 @@ internal class AppPermissions(
 
     // Location permission: Opens the next location prompt. It asks for foreground access first, then background access on supported Android versions.
     private fun launchLocation() {
-        preferences.edit { putBoolean("location_asked", true) }
         locationPrompt = true
         if (locationResult == null) locationResult = CompletableDeferred()
         // Use the fallback when launch location is unavailable.

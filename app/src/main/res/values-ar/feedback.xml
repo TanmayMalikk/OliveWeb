@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="idle_lock_minutes">تحذير القفل بعد %d دقيقة</string>
+    <string name="idle_lock_setting">مهلة القفل</string>
+    <string name="incident_date_format">تاريخ الحادث (YYYY-MM-DD)</string>
+    <string name="incident_time_format">الوقت التقريبي (HH:mm)</string>
+    <string name="incident_invalid_date">أدخل تاريخًا صالحًا بتنسيق YYYY-MM-DD.</string>
+    <string name="incident_invalid_time">أدخل وقتًا صالحًا بنظام 24 ساعة بتنسيق HH:mm.</string>
+    <string name="role_picker_expanded">موسّع</string>
+    <string name="role_picker_collapsed">مطوي</string>
+    <string name="admin_search_accounts">البحث في الحسابات</string>
+    <string name="admin_all_account_statuses">كل الحالات</string>
+    <string name="note_attachment_count">المرفقات: %d</string>
+    <string name="chat_unread_only">غير المقروءة فقط</string>
+    <string name="chat_search_messages">البحث في الرسائل</string>
+    <string name="chat_no_matching_messages">لا توجد رسائل مطابقة</string>
+    <string name="chat_incoming_announcement">الرسائل الجديدة المستلمة: %d</string>
+    <string name="incident_no_address_suggestions">لا توجد اقتراحات للعناوين. يمكنك استخدام العنوان المكتوب أو إعادة المحاولة.</string>
+    <string name="incident_latitude">خط العرض</string>
+    <string name="incident_longitude">خط الطول</string>
+    <string name="incident_use_coordinates">استخدام الإحداثيات</string>
+    <string name="resource_hours">ساعات العمل: %s</string>
+    <string name="private_route_destination">مسار إلى وجهة</string>
+    <string name="private_route_help">أدخل عنوانًا أو اسم مأوى ومدينته. يتلقى مزود الخرائط الإحداثيات لحساب المسار.</string>
+    <string name="private_route_address_not_found">لم يتم العثور على الوجهة. جرّب عنوانًا كاملاً.</string>
+    <string name="safety_finances_heading">الشؤون المالية</string>
+    <string name="safety_finances_access">دوّن الأموال وطرق الدفع التي يمكنك الوصول إليها بنفسك.</string>
+    <string name="safety_finances_costs">خطط لتكاليف النقل والسكن المؤقت والاحتياجات الأساسية.</string>
+    <string name="safety_finances_support">دوّن من يمكنك سؤاله عن الدعم المالي أو الحسابات المشتركة.</string>
+    <string name="admin_emergency_response">الاستجابة للطوارئ</string>
+    <string name="admin_emergency_response_help">راجع التذاكر المصعّدة لمعرفة المستجدات والمعلومات التي شاركها المستخدم. لا ترسل هذه اللوحة خدمات الطوارئ.</string>
+    <string name="safety_documents_dependants">اجمع وثائق الهوية والسجلات المدرسية أو سجلات الرعاية اللازمة لمن سيغادرون معك.</string>
+    <string name="feedback_person_name">اسم الشخص %d</string>
+    <string name="feedback_person_age">عمر الشخص %d (اختياري)</string>
+    <string name="feedback_remove_person">إزالة الشخص %d</string>
+    <string name="feedback_add_person">إضافة شخص آخر</string>
+    <string name="feedback_situation_hint">إذا رغبت، صف ما يحدث مثل الأذى الجسدي أو النفسي أو المالي.</string>
+    <plurals name="note_search_results_count">
+        <item quantity="one">نتيجة واحدة (%d)</item>
+        <item quantity="other">%d نتائج</item>
+    </plurals>
+</resources>

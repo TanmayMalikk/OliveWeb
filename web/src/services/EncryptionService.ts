@@ -9,13 +9,14 @@ export const fromBase64 = (value: string) =>
   Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 // Makes a one-way hash of the private trigger. The trigger itself is never saved.
 export async function triggerHash(value: string) {
-  const bytes = await crypto.subtle.digest(
-    "SHA-256",
-    encoder.encode(value.toLowerCase().replace(/\s/gu, "")),
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const source = await crypto.subtle.importKey(
+    "raw", encoder.encode(value.toLowerCase().replace(/\s/gu, "")), "PBKDF2", false, ["deriveBits"],
   );
-  return Array.from(new Uint8Array(bytes), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
+  const bytes = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: 600_000 }, source, 256,
+  );
+  return `600000:${toBase64(salt)}:${toBase64(new Uint8Array(bytes))}`;
 }
 // Makes a strong encryption key from a secret and random salt. Repeating the work slows password guessing.
 export async function deriveKey(secret: string, salt: Uint8Array) {

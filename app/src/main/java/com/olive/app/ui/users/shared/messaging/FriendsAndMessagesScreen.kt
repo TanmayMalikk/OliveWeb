@@ -128,6 +128,7 @@ private fun MessagingSidebar(
 ) {
     val uiText = rememberResourceText()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+    var unreadOnly by rememberSaveable { mutableStateOf(false) }
     val allowedSupportTags = visibleSupportTags(session.accountRole)
     val roleConversations = if (organizationAccount) session.messages.conversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
@@ -137,7 +138,7 @@ private fun MessagingSidebar(
             it,
             session.messages.archivedConversationIds,
             session.messages.restoredClosedConversationIds,
-        ) == showingArchived
+        ) == showingArchived && (!unreadOnly || session.messages.isUnread(it))
     }
     val supportConversations = shownConversations.filter { it.type == "SUPPORT" }
     val directConversations = shownConversations.filter { it.type != "SUPPORT" }
@@ -216,6 +217,13 @@ private fun MessagingSidebar(
                     ) { Text(stringResource(R.string.reconnect)) }
                 }
             }
+        }
+        item("unread_filter") {
+            FilterChip(
+                selected = unreadOnly,
+                onClick = { unreadOnly = !unreadOnly },
+                label = { Text(uiText(R.string.chat_unread_only)) },
+            )
         }
         if (organizationAccount) item {
             Row(

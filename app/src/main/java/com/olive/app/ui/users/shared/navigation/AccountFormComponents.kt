@@ -24,6 +24,8 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -127,6 +129,7 @@ internal fun Field(
     enabled: Boolean = true,
     error: String? = null,
     onFocus: (() -> Unit)? = null,
+    newPassword: Boolean = false,
     onChange: (String) -> Unit
 ) {
     val uiText = rememberResourceText()
@@ -136,11 +139,20 @@ internal fun Field(
         tag.contains("trigger", ignoreCase = true) -> uiText(R.string.a11y_trigger_word)
         else -> uiText(R.string.a11y_password)
     }
+    val autofillType = when (tag) {
+        "username" -> ContentType.Username
+        "password" -> if (newPassword) ContentType.NewPassword else ContentType.Password
+        "confirm_password" -> ContentType.NewPassword
+        else -> null
+    }
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
-        modifier = Modifier.fillMaxWidth().testTag(tag).semantics { error?.let { error(it) } }
+        modifier = Modifier.fillMaxWidth().testTag(tag).semantics {
+            error?.let { error(it) }
+            autofillType?.let { contentType = it }
+        }
             .onFocusChanged { if (it.isFocused) onFocus?.invoke() }.keepVisibleWhileTyping(),
         enabled = enabled,
         singleLine = !multiline,

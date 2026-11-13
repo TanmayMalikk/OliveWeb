@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -43,6 +44,8 @@ internal fun AdminAccounts(
     val uiText = rememberResourceText()
     LaunchedEffect(Unit) { session.refreshAdminAccounts() }
     var noteTarget by remember { mutableStateOf<DirectoryUser?>(null) }
+    var search by rememberSaveable { mutableStateOf("") }
+    var status by rememberSaveable { mutableIntStateOf(0) }
     val expandedRoles = remember {
         mutableStateMapOf<AccountRole, Boolean>().apply {
             AccountRole.entries.forEach { role -> put(role, true) }
@@ -80,11 +83,29 @@ internal fun AdminAccounts(
                 ) { Text(stringResource(R.string.refresh)) }
             }
         }
+        item("account_filters") {
+            OutlinedTextField(
+                value = search,
+                onValueChange = { search = it },
+                label = { Text(uiText(R.string.admin_search_accounts)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(R.string.admin_all_account_statuses, R.string.ui_setup_complete, R.string.ui_setup_required)
+                    .forEachIndexed { index, label ->
+                        FilterChip(selected = status == index, onClick = { status = index }, label = { Text(uiText(label)) })
+                    }
+            }
+        }
         if (session.adminAccounts.isEmpty() && !session.busy) item("no_accounts") {
             Text(uiText(R.string.ui_no_accounts_found), color = Muted)
         }
         AccountRole.entries.forEach { role ->
-            val accounts = session.adminAccounts.filter { it.role == role }
+            val accounts = session.adminAccounts.filter {
+                it.role == role && (status == 0 || it.profileComplete == (status == 1)) &&
+                    listOf(it.username, it.fullName, it.email).any { value -> value.contains(search.trim(), ignoreCase = true) }
+            }
             item("role_${role.name}") {
                 AccountRoleHeader(
                     role = role,

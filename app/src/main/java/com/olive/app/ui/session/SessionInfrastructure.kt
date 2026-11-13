@@ -108,13 +108,20 @@ internal class SessionDataSources(
 internal class SessionAccess(private val runtime: SessionRuntime) {
     // Detects a valid private-entry search for session access.
     fun interceptSearch(value: String): Boolean {
+        val device = runtime.enrollment ?: return false
+        return openTrigger(device, InputPolicy.matchesTrigger(value, device.triggerHash))
+    }
+
+    suspend fun interceptSearchAsync(value: String): Boolean {
+        val device = runtime.enrollment ?: return false
+        val match = withContext(Dispatchers.Default) { InputPolicy.matchesTrigger(value, device.triggerHash) }
+        return openTrigger(device, match)
+    }
+
+    private fun openTrigger(device: DeviceEnrollment, match: Boolean): Boolean {
         with(runtime) {
             with(state) {
-                if (accountRole != AccountRole.USER) return false
-                val device = enrollment ?: return false
-                if (value.isBlank() || (InputPolicy.triggerHash(value) != device.triggerHash &&
-                        InputPolicy.legacyTriggerHash(value) != device.triggerHash)
-                ) return false
+                if (!match || accountRole != AccountRole.USER || enrollment != device) return false
                 if (screen == SessionScreen.Cover && !busy) {
                     val event =
                         TriggerEvent(source = if (coverType == CoverType.NEWS) "Daily Digest search" else "Olive search")

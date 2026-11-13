@@ -36,6 +36,7 @@ export default function AdminPortal() {
   const session = useSession();
   const [accounts, setAccounts] = useState<ManagedAccount[]>([]);
   const [search, setSearch] = useState("");
+  const [profileStatus, setProfileStatus] = useState<"all" | "complete" | "required">("all");
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<ManagedAccount | null>(null);
   const [plans, setPlans] = useState<
@@ -58,6 +59,7 @@ export default function AdminPortal() {
   }, []);
 
   const matchingAccounts = accounts.filter((account) =>
+    (profileStatus === "all" || Boolean(account.profileComplete) === (profileStatus === "complete")) &&
     [account.username, account.fullName, account.role, roleLabels[account.role]]
       .join(" ").toLowerCase().includes(search.trim().toLowerCase()),
   );
@@ -93,6 +95,11 @@ export default function AdminPortal() {
             )}
           </div>
         </section>
+        <section className="panel">
+          <h2>Emergency response</h2>
+          <p>Review escalated tickets for updates and information the user has shared. This dashboard does not dispatch emergency services.</p>
+          <Button variant="outline" onClick={() => navigate("messages")}>Open escalation chats</Button>
+        </section>
         <WorkspaceShortcuts pages={pages.slice(1)} onNavigate={navigate} />
       </>}
       {view === "accounts" && <>
@@ -105,6 +112,17 @@ export default function AdminPortal() {
               setSearch(event.target.value)
             }
           />
+          <label>
+            Profile status
+            <select value={profileStatus} onChange={(event) => {
+              const value = event.currentTarget.value;
+              setProfileStatus(value === "complete" || value === "required" ? value : "all");
+            }}>
+              <option value="all">All statuses</option>
+              <option value="complete">Setup complete</option>
+              <option value="required">Setup required</option>
+            </select>
+          </label>
           <div className="toolbar-actions">
             <Button
               variant="outline"

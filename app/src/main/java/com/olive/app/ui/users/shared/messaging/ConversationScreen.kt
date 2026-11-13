@@ -85,6 +85,18 @@ internal fun ChatPane(
         AccountRole.ADMIN,
     )
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
+    var searching by remember(active.id) { mutableStateOf(false) }
+    var messageSearch by remember(active.id) { mutableStateOf("") }
+    var latestIncomingId by remember(active.id) { mutableStateOf<String?>(null) }
+    var observedIncoming by remember(active.id) { mutableStateOf(false) }
+    var incomingAnnouncements by remember(active.id) { mutableIntStateOf(0) }
+    val latestIncoming = session.messages.chatMessages.lastOrNull { it.senderUid != currentUid && !it.unsent }
+    LaunchedEffect(latestIncoming?.id) {
+        val incoming = latestIncoming ?: return@LaunchedEffect
+        if (observedIncoming && latestIncomingId != incoming.id) incomingAnnouncements++
+        observedIncoming = true
+        latestIncomingId = incoming.id
+    }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
     var showChatInfo by rememberSaveable(active.id) { mutableStateOf(false) }
     var openedMedia by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
@@ -98,11 +110,15 @@ internal fun ChatPane(
         val subscription = session.messages.observeMembershipEvents(active.id) { membershipEvents = it }
         onDispose { subscription?.close() }
     }
-    val timeline = remember(session.messages.chatMessages, callHistory, membershipEvents) {
+    val timeline = remember(session.messages.chatMessages, callHistory, membershipEvents, messageSearch) {
         (session.messages.chatMessages.map(ConversationTimelineItem::Message) +
             callHistory.map(ConversationTimelineItem::Call) +
             membershipEvents.map(ConversationTimelineItem::Membership))
             .sortedWith(compareBy(ConversationTimelineItem::timestamp, ConversationTimelineItem::key))
+            .filter { item ->
+                messageSearch.isBlank() || (item is ConversationTimelineItem.Message && !item.value.unsent &&
+                    item.value.body.contains(messageSearch.trim(), ignoreCase = true))
+            }
     }
     var permissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val microphonePermission = rememberLauncherForActivityResult(
@@ -123,15 +139,28 @@ internal fun ChatPane(
             PackageManager.PERMISSION_GRANTED
         ) action() else {
             permissionAction = action
-            session.beginCallPermissionRequest()
-            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+    if (permissionAction != null && !session.callPermissionRequestOpen) {
+        AlertDialog(
+            onDismissRequest = { permissionAction = null },
+            text = { Text(uiText(R.string.ui_microphone_permission_required)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    session.beginCallPermissionRequest()
+                    microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                }) { Text(uiText(R.string.next)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { permissionAction = null }) { Text(uiText(R.string.cancel)) }
+            },
+        )
     }
     LaunchedEffect(currentUid, session.coverUsername, session.localMode) {
         session.documents.load(currentUid, session.coverUsername, session.localMode)
     }
     LaunchedEffect(timeline.lastOrNull()?.key, session.messages.chatMessages.lastOrNull()?.body) {
-        if (timeline.isNotEmpty()) listState.animateScrollToItem(timeline.lastIndex)
+        if (timeline.isNotEmpty() && messageSearch.isBlank()) listState.animateScrollToItem(timeline.lastIndex)
     }
     // Keep the newest message visible when the chat grows.
     LaunchedEffect(keyboardVisible) {
@@ -266,6 +295,31 @@ internal fun ChatPane(
                 Text(stringResource(message), color = MaterialTheme.colorScheme.error)
             }
             Column(Modifier.weight(1f).fillMaxWidth().imePadding()) {
+                if (incomingAnnouncements > 0) {
+                    AccessibleMessage(
+                        uiText(R.string.chat_incoming_announcement, incomingAnnouncements),
+                        showText = false,
+                    )
+                }
+                if (searching) {
+                    OutlinedTextField(
+                        value = messageSearch,
+                        onValueChange = { messageSearch = it.take(120) },
+                        label = { Text(uiText(R.string.chat_search_messages)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        trailingIcon = {
+                            IconButton(onClick = { searching = false; messageSearch = "" }) {
+                                Icon(Icons.Outlined.Close, uiText(R.string.clear_search))
+                            }
+                        },
+                    )
+                } else {
+                    TextButton(onClick = { searching = true }, modifier = Modifier.align(Alignment.End)) {
+                        Icon(Icons.Outlined.Search, contentDescription = null)
+                        Text(uiText(R.string.chat_search_messages))
+                    }
+                }
                 LazyColumn(
                     Modifier.weight(1f).fillMaxWidth(),
                     state = listState,
@@ -274,7 +328,8 @@ internal fun ChatPane(
                 ) {
                     if (timeline.isEmpty()) item {
                         Text(
-                            stringResource(R.string.no_messages_yet_say_hello_when_you_are_ready),
+                            stringResource(if (messageSearch.isBlank()) R.string.no_messages_yet_say_hello_when_you_are_ready
+                                else R.string.chat_no_matching_messages),
                             color = Muted,
                             modifier = Modifier.padding(12.dp)
                         )
@@ -378,7 +433,7 @@ internal fun ChatPane(
                                                 uiText(R.string.support_chat_name),
                                                 uiText(R.string.support_admin_chat_name),
                                             ),
-                                            style = MaterialTheme.typography.labelSmall,
+                                            style = MaterialTheme.typography.labelMedium,
                                             color = if (mine) Color.White.copy(alpha = .78f) else Muted
                                         )
                                         ChatMessageBody(

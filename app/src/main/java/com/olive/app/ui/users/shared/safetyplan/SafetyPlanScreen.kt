@@ -77,7 +77,8 @@ internal fun SafetyPlanScreen(
     }
 
     val lease = remember(ownerUid) { Any() }
-    val defaults = remember(context) { safetyDefaults(context) }
+    val hasAffectedPeople = ownerUid == session.coverAccountId && !session.profile?.affectedNames.isNullOrBlank()
+    val defaults = remember(context, hasAffectedPeople) { safetyDefaults(context, hasAffectedPeople) }
     // Stop this screen's plan listener when it leaves composition.
     DisposableEffect(lease) { onDispose { controller.close(lease) } }
     // Open once; its Firestore listener and durable reconciliation worker deliver later changes.

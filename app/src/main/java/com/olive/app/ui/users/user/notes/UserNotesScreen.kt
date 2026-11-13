@@ -42,10 +42,19 @@ import com.olive.app.ui.users.user.documents.SafetyDocumentUploadFlow
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.LocalDate
+import java.time.LocalTime
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+
+private fun validIncidentDate(value: String, saved: String?) =
+    value.isNotBlank() && (value == saved || runCatching { LocalDate.parse(value.trim()) }.isSuccess)
+
+private fun validIncidentTime(value: String, saved: String?) =
+    value.isBlank() || value == saved || (value.trim().matches(Regex("[0-9]{2}:[0-9]{2}")) &&
+        runCatching { LocalTime.parse(value.trim()) }.isSuccess)
 
 // Notes stay behind the PIN, with a searchable Keep-style board and a full-screen editor.
 // UI sizing/color: note editing uses 24dp sides, a 300dp minimum body field, yellow pinned icons, and an adaptive 160dp grid.
@@ -63,9 +72,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var incidentLatitude by remember { mutableStateOf<Double?>(null) }
     var incidentLongitude by remember { mutableStateOf<Double?>(null) }
     var incidentMapOpen by remember { mutableStateOf(false) }
+    var latitudeInput by remember { mutableStateOf("") }
+    var longitudeInput by remember { mutableStateOf("") }
     var selectedAttachments by remember { mutableStateOf(emptySet<String>()) }
     var attachmentMenuOpen by rememberSaveable { mutableStateOf(false) }
     var locationSuggestions by remember { mutableStateOf(emptyList<AddressSuggestion>()) }
+    var locationSearchRetry by remember { mutableIntStateOf(0) }
+    var locationSearchFailed by remember { mutableStateOf(false) }
     var attachAfterUpload by remember { mutableStateOf(false) }
     var filesBeforeUpload by remember { mutableStateOf(emptySet<String>()) }
     var currentLocationPoint by remember { mutableStateOf<MapLocationPoint?>(null) }
@@ -96,6 +109,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
         incidentLocation = entry?.incidentLocation.orEmpty()
         incidentLatitude = entry?.incidentLatitude
         incidentLongitude = entry?.incidentLongitude
+        latitudeInput = incidentLatitude?.toString().orEmpty()
+        longitudeInput = incidentLongitude?.toString().orEmpty()
         incidentMapOpen = false
         selectedAttachments = entry?.attachmentIds.orEmpty().toSet()
         editorOpen = true
@@ -104,6 +119,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { permissions ->
+        session.endExternalFilePicker()
         if (permissions.values.any { it }) scope.launch {
             DeviceLocation.currentCoordinates(context)?.let { fix ->
                 currentLocationPoint = MapLocationPoint(
@@ -121,13 +137,22 @@ internal fun PrivateNotes(session: SessionViewModel) {
     LaunchedEffect(uid, session.coverUsername, session.localMode) {
         if (uid != null) session.documents.load(uid, session.coverUsername, session.localMode)
     }
-    LaunchedEffect(incidentLocation, kind) {
+    LaunchedEffect(incidentLocation, kind, locationSearchRetry) {
         locationSuggestions = emptyList()
-        if (kind != PrivateEntryKind.Incident || incidentLocation.trim().length < 3 || !GeoapifyClient.configured) return@LaunchedEffect
+        locationSearchFailed = false
+        if (kind != PrivateEntryKind.Incident || incidentLatitude != null ||
+            incidentLocation.trim().length < 3 || !GeoapifyClient.configured
+        ) return@LaunchedEffect
         delay(300.milliseconds)
-        locationSuggestions = runCatching {
+        val results = try {
             GeoapifyClient.autocomplete(incidentLocation, false)
-        }.getOrDefault(emptyList())
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            emptyList()
+        }
+        locationSuggestions = results
+        locationSearchFailed = results.isEmpty()
     }
     LaunchedEffect(session.documents.state.files, attachAfterUpload) {
         if (!attachAfterUpload) return@LaunchedEffect
@@ -243,10 +268,14 @@ internal fun PrivateNotes(session: SessionViewModel) {
             if (kind == PrivateEntryKind.Incident) {
                 item {
                     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Field(stringResource(R.string.incident_date), incidentDate, "incident_date", enabled = !session.busy) {
+                        Field(stringResource(R.string.incident_date_format), incidentDate, "incident_date", enabled = !session.busy,
+                            error = if (incidentDate.isNotBlank() && !validIncidentDate(incidentDate, entry?.incidentDate))
+                                stringResource(R.string.incident_invalid_date) else null) {
                             incidentDate = it.take(40)
                         }
-                        Field(stringResource(R.string.incident_time), incidentTime, "incident_time", enabled = !session.busy) {
+                        Field(stringResource(R.string.incident_time_format), incidentTime, "incident_time", enabled = !session.busy,
+                            error = if (!validIncidentTime(incidentTime, entry?.incidentTime))
+                                stringResource(R.string.incident_invalid_time) else null) {
                             incidentTime = it.take(40)
                         }
                     }
@@ -255,7 +284,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedTextField(
                             value = incidentLocation,
-                            onValueChange = { incidentLocation = it.take(240) },
+                            onValueChange = {
+                                incidentLatitude = null
+                                incidentLongitude = null
+                                latitudeInput = ""
+                                longitudeInput = ""
+                                incidentLocation = it.take(240)
+                            },
                             label = { Text(stringResource(R.string.incident_location)) },
                             enabled = !session.busy,
                             singleLine = true,
@@ -282,11 +317,19 @@ internal fun PrivateNotes(session: SessionViewModel) {
                                         .filter(String::isNotBlank).joinToString(", ")
                                     incidentLatitude = suggestion.address.latitude
                                     incidentLongitude = suggestion.address.longitude
+                                    latitudeInput = incidentLatitude?.toString().orEmpty()
+                                    longitudeInput = incidentLongitude?.toString().orEmpty()
                                     locationSuggestions = emptyList()
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 Text(listOf(suggestion.primary, suggestion.secondary).filter(String::isNotBlank).joinToString(", "))
+                            }
+                        }
+                        if (locationSearchFailed) {
+                            AccessibleMessage(uiText(R.string.incident_no_address_suggestions))
+                            TextButton(onClick = { locationSearchRetry++ }) {
+                                Text(uiText(R.string.retry))
                             }
                         }
                     }
@@ -303,7 +346,32 @@ internal fun PrivateNotes(session: SessionViewModel) {
                             },
                         )
                         Text(stringResource(R.string.incident_pin_help), color = Muted)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                latitudeInput, { latitudeInput = it.take(16) },
+                                label = { Text(uiText(R.string.incident_latitude)) },
+                                singleLine = true, modifier = Modifier.weight(1f),
+                            )
+                            OutlinedTextField(
+                                longitudeInput, { longitudeInput = it.take(16) },
+                                label = { Text(uiText(R.string.incident_longitude)) },
+                                singleLine = true, modifier = Modifier.weight(1f),
+                            )
+                        }
+                        val latitude = latitudeInput.toDoubleOrNull()?.takeIf { it in -90.0..90.0 }
+                        val longitude = longitudeInput.toDoubleOrNull()?.takeIf { it in -180.0..180.0 }
+                        OutlinedButton(
+                            onClick = {
+                                if (latitude != null && longitude != null) {
+                                    incidentLatitude = latitude
+                                    incidentLongitude = longitude
+                                    incidentLocation = uiText(R.string.incident_dropped_pin, latitude, longitude)
+                                }
+                            },
+                            enabled = latitude != null && longitude != null,
+                        ) { Text(uiText(R.string.incident_use_coordinates)) }
                         TextButton(onClick = {
+                            session.beginExternalFilePicker()
                             locationPermission.launch(arrayOf(
                                 Manifest.permission.ACCESS_FINE_LOCATION,
                                 Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -316,6 +384,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
                             onSelectedLocationChange = { latitude, longitude ->
                                 incidentLatitude = latitude
                                 incidentLongitude = longitude
+                                latitudeInput = latitude.toString()
+                                longitudeInput = longitude.toString()
                                 if (incidentLocation.isBlank()) incidentLocation = uiText(R.string.incident_dropped_pin, latitude, longitude)
                             },
                             modifier = Modifier.fillMaxWidth().height(300.dp).testTag("incident_location_map"),
@@ -403,7 +473,9 @@ internal fun PrivateNotes(session: SessionViewModel) {
                         if (body.isNotBlank()) editorOpen = false
                     },
                     enabled = !session.busy && body.isNotBlank() &&
-                        (kind == PrivateEntryKind.Note || (title.isNotBlank() && incidentDate.isNotBlank() && incidentLocation.isNotBlank())),
+                        (kind == PrivateEntryKind.Note || (title.isNotBlank() && incidentLocation.isNotBlank() &&
+                            validIncidentDate(incidentDate, entry?.incidentDate) &&
+                            validIncidentTime(incidentTime, entry?.incidentTime))),
                     modifier = Modifier.fillMaxWidth().testTag("save_private_entry")
                 ) {
                     Text(if (editingId == null) uiText(R.string.save_private_entry) else uiText(R.string.update_private_entry))
@@ -514,6 +586,11 @@ internal fun PrivateNotes(session: SessionViewModel) {
         }
         if (session.message != null || session.busy) item(span = { GridItemSpan(maxLineSpan) }) {
             Status(session)
+        }
+        if (search.isNotBlank()) item(span = { GridItemSpan(maxLineSpan) }) {
+            AccessibleMessage(
+                androidx.compose.ui.res.pluralStringResource(R.plurals.note_search_results_count, filtered.size, filtered.size),
+            )
         }
         // Let the empty-search message use the full grid width.
         if (filtered.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {

@@ -27,9 +27,9 @@ and a link to this projects firebase console.
 
 Copy the debug token and open the link, then add your token as a rule to the firebase project.
 
-### Message to TA
+For a demo, use the signed release. If a debug build is needed, arrange in-person registration with a project administrator. Keep debug tokens out of email, chat, and the repository.
 
-If you send us your Debug token on your device we can add your device to the firebase project without needing to link your google account.
+For the Trusted Person demo, select the **Safe Contact** account type and use the provisioned username `demosafe`. The account must accept the user's friend request before they can open a direct chat. The user must explicitly share a document or safety plan with the contact.
 
 ---------------------------------------------
 # Testing

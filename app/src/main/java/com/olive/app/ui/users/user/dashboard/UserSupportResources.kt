@@ -54,14 +54,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
     val context = LocalContext.current
     val directory by produceState<Result<HotlineDirectory>?>(null, context) {
         value = withContext(Dispatchers.IO) {
-            runCatching {
-                val files = context.assets.list("hotlines/provinces").orEmpty().associate { name ->
-                    name.removePrefix("Resources").removeSuffix(".json") to
-                            context.assets.open("hotlines/provinces/$name").bufferedReader()
-                                .use { it.readText() }
-                }
-                HotlineDirectory.parseProvinceFiles(files)
-            }
+            runCatching { HotlineDirectory.readBundled(context) }
         }
     }
     val catalog = directory?.getOrNull()
@@ -329,6 +322,9 @@ private fun HotlineResourceCard(resource: HotlineResource, onOpen: (String, Bool
                     color = Muted
                 )
                 Text(resource.description, style = MaterialTheme.typography.bodyMedium)
+                if (resource.hours.isNotBlank()) {
+                    Text(stringResource(R.string.resource_hours, resource.hours), style = MaterialTheme.typography.bodyMedium)
+                }
                 Text(resource.phone, style = MaterialTheme.typography.headlineSmall)
             }
             FlowRow(

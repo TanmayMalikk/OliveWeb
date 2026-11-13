@@ -9,7 +9,7 @@ const provinces = readdirSync(androidDirectory).sort().map((file) => {
   const cities = JSON.parse(readFileSync(new URL(file, androidDirectory), "utf8"));
   return Object.entries(cities).flatMap(([city, groups]) =>
     Object.entries(groups).flatMap(([group, entries]) =>
-      Object.entries(entries).map(([name, { Desc, Phone, url }]) => {
+      Object.entries(entries).map(([name, { Desc, Phone, url, hours }]) => {
         if (!["Hotlines", "Shelters"].includes(group) || !/^[0-9+() -]+$/.test(Phone)) {
           throw new Error(`Invalid hotline entry: ${name}`);
         }
@@ -19,7 +19,7 @@ const provinces = readdirSync(androidDirectory).sort().map((file) => {
         if (website.protocol !== "https:" || !website.hostname || website.username || website.password) {
           throw new Error(`Invalid hotline website: ${name}`);
         }
-        return { region, city, group, name, description: Desc, phone: Phone, website: website.href };
+        return { region, city, group, name, description: Desc, phone: Phone, website: website.href, hours: hours?.trim() || "" };
       }),
     ),
   );

@@ -60,6 +60,7 @@ internal fun Welcome(session: SessionViewModel) {
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(roleOpen) },
                 modifier = Modifier.fillMaxWidth()
                     .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                    .semantics { stateDescription = uiText(if (roleOpen) R.string.role_picker_expanded else R.string.role_picker_collapsed) }
                     .testTag("account_role")
             )
             ExposedDropdownMenu(expanded = roleOpen, onDismissRequest = { roleOpen = false }) {
@@ -233,7 +234,8 @@ internal fun Credentials(session: SessionViewModel, create: Boolean) {
             secret = true,
             showSecretToggle = true,
             enabled = !session.account.busy,
-            error = passwordError
+            error = passwordError,
+            newPassword = create
         ) {
             password = it.take(if (create) 24 else 128)
             submitted =

@@ -265,8 +265,8 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                         runtime.application.getString(R.string.choose_a_trigger_word_or_phrase_of_3_64_characters)
                     return
                 }
-                val updated = existing.copy(triggerHash = InputPolicy.triggerHash(trigger))
                 operations.runOperation(runtime.application.getString(R.string.ui_the_trigger_word_could_not_be_saved_retry_here)) { token ->
+                    val updated = existing.copy(triggerHash = withContext(Dispatchers.Default) { InputPolicy.triggerHash(trigger) })
                     accounts.saveProfile(identity, updated)
                     withContext(Dispatchers.IO) { store.cacheProfile(identity.uid, updated) }
                     if (epoch == token) {
@@ -546,7 +546,8 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
                             )?.toLong() ?: 15_000L else 15_000L
                         val countdown = IdlePolicy.countdown(
                             SystemClock.elapsedRealtime() - lastTouchAt,
-                            warningDuration
+                            warningDuration,
+                            cloudState.getInt("idle_timeout_minutes_${enrollment?.uid}", 1).coerceIn(1, 5) * 60_000L,
                         )
                         if (countdown == 0) {
                             navigation.quickExit()

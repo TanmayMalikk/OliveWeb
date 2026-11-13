@@ -142,6 +142,18 @@ private fun AdminDashboard(
         }
         AccountCountGrid(session.adminCounts)
         TicketCountGrid(session.adminCounts)
+        OutlinedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    uiText(R.string.admin_emergency_response),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(uiText(R.string.admin_emergency_response_help))
+                OutlinedButton(onClick = onMessages) { Text(uiText(R.string.admin_escalation_chats)) }
+                OutlinedButton(onClick = onMap) { Text(uiText(R.string.organization_live_map)) }
+            }
+        }
         OrganizationDashboardCard(
             Icons.Outlined.HealthAndSafety,
             stringResource(R.string.safety_inbox),

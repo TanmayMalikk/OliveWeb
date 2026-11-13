@@ -239,7 +239,8 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
         with(state) {
             if (epoch != token || screen != SessionScreen.Safe || enrollment?.uid != device.uid) return@with
             val before = profile ?: return@with
-            val updated = before.copy(triggerHash = InputPolicy.triggerHash(trigger))
+            val updated = before.copy(triggerHash = withContext(Dispatchers.Default) { InputPolicy.triggerHash(trigger) })
+            if (epoch != token || screen != SessionScreen.Safe || enrollment?.uid != device.uid) return@with
             withContext(Dispatchers.IO) {
                 store.updateTrigger(
                     device.uid, updated, !localMode,
