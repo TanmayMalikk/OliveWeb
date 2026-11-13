@@ -7,6 +7,7 @@ import androidx.core.content.edit
 import com.olive.app.security.*
 import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.olive.app.data.messaging.ChatConversation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

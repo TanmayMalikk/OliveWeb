@@ -37,26 +37,26 @@
         "Phone": "780-423-4121",
         "url": "https://www.sace.ca/",
         "hours": "Daily, 9:00 a.m. - 9:00 p.m. MST"
+      }
+    },
+    "Shelters": {
+      "WIN House": {
+        "Desc": "24/7 emergency shelter, safety planning, and outreach support for women, non-binary individuals, and children fleeing domestic violence.",
+        "Phone": "780-479-0058",
+        "hours": "24/7",
+        "url": "https://winhouse.org/"
       },
-      "Shelters": {
-        "WIN House": {
-          "Desc": "24/7 emergency shelter, safety planning, and outreach support for women, non-binary individuals, and children fleeing domestic violence.",
-          "Phone": "780-479-0058",
-          "hours": "24/7",
-          "url": "https://winhouse.org/"
-        },
-        "Lurana Shelter": {
-          "Desc": "First-stage emergency shelter providing safe refuge, food, clothing, and advocacy for women and children fleeing domestic abuse.",
-          "Phone": "780-424-5875",
-          "hours": "24/7",
-          "url": "https://cssalberta.ca/Our-Services/Domestic-Abuse-Shelters-Support/Lurana-Shelter"
-        },
-        "Wings of Providence": {
-          "Desc": "Second-stage housing and long-term recovery support for women and children who have left abusive situations.",
-          "Phone": "780-426-4985",
-          "hours": "Monday through Friday, 9:00 a.m. - 4:30 p.m. MST",
-          "url": "https://www.wingsofprovidence.ca/"
-        }
+      "Lurana Shelter": {
+        "Desc": "First-stage emergency shelter providing safe refuge, food, clothing, and advocacy for women and children fleeing domestic abuse.",
+        "Phone": "780-424-5875",
+        "hours": "24/7",
+        "url": "https://cssalberta.ca/Our-Services/Domestic-Abuse-Shelters-Support/Lurana-Shelter"
+      },
+      "Wings of Providence": {
+        "Desc": "Second-stage housing and long-term recovery support for women and children who have left abusive situations.",
+        "Phone": "780-426-4985",
+        "hours": "Monday through Friday, 9:00 a.m. - 4:30 p.m. MST",
+        "url": "https://www.wingsofprovidence.ca/"
       }
     }
   },

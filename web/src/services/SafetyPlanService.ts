@@ -173,6 +173,7 @@ export async function saveField(plan: SafetyPlan, key: string, value: string, re
           key,
           value,
           revision: revision ?? current.revision,
+          baseValue: baseValue ?? current.value,
           mutationId: crypto.randomUUID(),
           writerId: safetyWriterId,
           clientSequence: ++safetyClientSequence,

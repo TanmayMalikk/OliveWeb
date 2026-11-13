@@ -15,6 +15,7 @@ function validFields(defaults, changes) {
     if (!change || !FIELD_KEYS.includes(change.key) || seen.has(change.key) || typeof change.value !== "string" || change.value.length > 4000 ||
         !Number.isSafeInteger(change.revision) || change.revision < 0 || typeof change.mutationId !== "string" ||
         !/^[a-zA-Z0-9-]{1,64}$/.test(change.mutationId) ||
+        (change.baseValue != null && (typeof change.baseValue !== "string" || change.baseValue.length > 4000)) ||
         ((change.writerId == null) !== (change.clientSequence == null)) ||
         (change.writerId != null && (!/^[a-zA-Z0-9-]{1,64}$/.test(change.writerId) ||
           !Number.isSafeInteger(change.clientSequence) || change.clientSequence < 1))) {
@@ -47,7 +48,20 @@ function mergeFields(existing, defaults, changes, actorUid = "") {
       continue;
     }
     if (old?.mutationId === change.mutationId) continue; // Retrying an acknowledged operation is idempotent.
-    if ((old?.revision || 0) !== change.revision) { conflicts.push(change.key); continue; }
+    if ((old?.revision || 0) !== change.revision) {
+      const merged = mergeChecklist(change.baseValue, change.value, old?.value);
+      if (!merged || merged.conflicted) {
+        conflicts.push(change.key);
+        conflictValues[change.key] = merged?.localValue ?? change.value;
+      }
+      if (merged && (!merged.conflicted || merged.remoteValue !== old.value)) {
+        fields[change.key] = merged.conflicted ?
+          {...old, value: merged.remoteValue, revision: old.revision + 1} :
+          {value: merged.remoteValue, revision: old.revision + 1, mutationId: change.mutationId,
+            ...(change.writerId ? {writerUid: actorUid, writerId: change.writerId, clientSequence: change.clientSequence} : {})};
+      }
+      continue;
+    }
     fields[change.key] = {value: change.value, revision: (old?.revision || 0) + 1, mutationId: change.mutationId,
       ...(change.writerId ? {writerUid: actorUid, writerId: change.writerId, clientSequence: change.clientSequence} : {})};
   }

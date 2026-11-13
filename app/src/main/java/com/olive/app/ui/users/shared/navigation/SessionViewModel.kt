@@ -13,6 +13,7 @@ import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.account.SafeContact
 import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.messaging.ChatMembershipEvent
 import com.olive.app.data.messaging.ChatMessage
 import com.olive.app.data.messaging.DirectoryUser
 import com.olive.app.data.messaging.Friend
@@ -215,7 +216,7 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
         runtime.conversationActions.openConversation(conversation)
 
     internal fun observeMembershipEvents(
-        id: String, actorUid: String? = null, onUpdate: (List<com.olive.app.data.ChatMembershipEvent>) -> Unit,
+        id: String, actorUid: String? = null, onUpdate: (List<ChatMembershipEvent>) -> Unit,
     ) = runtime.messagingRepository?.observeMembershipEvents(id, actorUid, onUpdate)
 
     suspend fun findRequestedConversation(id: String): ChatConversation? {

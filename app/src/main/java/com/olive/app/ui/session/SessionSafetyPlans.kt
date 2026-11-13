@@ -10,12 +10,15 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.seconds
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.Friend
+import com.olive.app.data.messaging.MessagingRepository
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.safety.SAFETY_FIELD_KEYS
 import com.olive.app.data.safety.SafetyAccessIndexStore
 import com.olive.app.data.safety.SafetyConsultation
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyField
 import com.olive.app.data.safety.SafetyPlan
 import com.olive.app.data.safety.SafetyPlanRepository
@@ -24,6 +27,8 @@ import com.olive.app.data.safety.SafetyPlanSyncWorker
 import com.olive.app.data.safety.SharedSafetyPlan
 import com.olive.app.data.safety.edit
 import com.olive.app.data.safety.mergeVisibleSafetyPlan
+import com.olive.app.data.safety.readSafetyChecklist
+import com.olive.app.data.safety.safetyChecklistWithPublishedDocuments
 import com.olive.app.data.safety.safetyPlanSyncDelayMillis
 import com.olive.app.data.safety.syncSafetyPlan
 import com.olive.app.ui.users.shared.navigation.SessionScreen
@@ -46,6 +51,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     private var activeOwner: String? = null
     private var lease: Any? = null
     private var planListener: ListenerRegistration? = null
+    private var accessListener: ListenerRegistration? = null
+    private var accessActor: String? = null
     private var generation = 0
     private var foregroundSync: Job? = null
     private val foregroundSyncRequests = Channel<Unit>(Channel.CONFLATED)

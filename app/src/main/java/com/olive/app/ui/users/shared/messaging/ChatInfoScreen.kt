@@ -24,6 +24,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
 import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.ChatMembershipAction
 import com.olive.app.data.messaging.ChatMessage
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.ui.shared.*
@@ -88,7 +89,7 @@ internal fun ChatInfoDialog(
     DisposableEffect(conversation.id, currentUid, ownsOpenTicket) {
         val subscription = if (ownsOpenTicket) session.messages.observeMembershipEvents(conversation.id, currentUid) { events ->
             ticketFriends = events.sortedBy { it.createdAt }.associateBy { it.participantUid }.values
-                .filter { it.action == com.olive.app.data.ChatMembershipAction.ADDED }.map { it.participantUid }.toSet()
+                .filter { it.action == ChatMembershipAction.ADDED }.map { it.participantUid }.toSet()
         } else null
         onDispose { subscription?.close() }
     }

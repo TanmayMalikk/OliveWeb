@@ -1,4 +1,4 @@
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import org.json.JSONObject
 

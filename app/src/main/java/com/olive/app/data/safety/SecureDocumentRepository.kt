@@ -143,6 +143,7 @@ internal data class SafetyField(
     val conflictValue: String? = null, val conflictRevision: Long? = null,
     val writerId: String? = null, val writerUid: String? = null,
     val clientSequence: Long = 0,
+    val baseValue: String? = null,
 ) {
     // Safety: Converts this record into JSON.
     fun toJson(): JSONObject =
@@ -150,6 +151,7 @@ internal data class SafetyField(
             .put("conflictValue", conflictValue).put("conflictRevision", conflictRevision)
             .put("writerId", writerId).put("writerUid", writerUid)
             .put("clientSequence", clientSequence)
+            .put("baseValue", baseValue)
 
     companion object {
         // Rebuilds this safety-plan record from protected JSON data.
@@ -163,7 +165,9 @@ internal data class SafetyField(
                 .takeIf { json.has("conflictRevision") && !json.isNull("conflictRevision") },
             json.optString("writerId").takeIf { it.isNotEmpty() },
             json.optString("writerUid").takeIf { it.isNotEmpty() },
-            json.optLong("clientSequence"))
+            json.optLong("clientSequence"),
+            json.optString("baseValue").takeIf { json.has("baseValue") && !json.isNull("baseValue") },
+        )
     }
 }
 
@@ -301,7 +305,7 @@ internal fun mergeSafetyPlan(
                 conflictRevision = null,
             )
 
-            local.revision != cloud.revision -> local.copy(
+            ownerEditing && local.revision != cloud.revision -> local.copy(
                 conflictValue = cloud.value,
                 conflictRevision = cloud.revision
             )
@@ -352,6 +356,7 @@ internal fun SafetyField.edit(
         writerId = nextWriterId,
         writerUid = nextWriterUid,
         clientSequence = nextSequence,
+        baseValue = if (mutationId == null) this.value else baseValue,
     )
 }
 
