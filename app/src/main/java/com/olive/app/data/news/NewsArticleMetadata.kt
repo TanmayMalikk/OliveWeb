@@ -1,6 +1,9 @@
 // News cover users: extracts titles and images for news articles.
 package com.olive.app.data.news
 
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.WebResourceRequest
@@ -43,15 +46,13 @@ internal fun isSecureNewsUrl(url: String): Boolean = runCatching {
     ) && !uri.host.isNullOrBlank() && uri.rawUserInfo == null
 }.getOrDefault(false)
 
+@Serializable
 internal data class NewsArticleMetadata(
     val publisherUrl: String = "", val imageUrl: String = "", val topic: String = "",
     val isPaywalled: Boolean? = null, val description: String = ""
 ) {
     // Converts this article into JSON for the local news cache.
-    fun toJson(): JSONObject =
-        JSONObject().put("publisherUrl", publisherUrl).put("imageUrl", imageUrl)
-            .put("topic", topic).put("isPaywalled", isPaywalled ?: JSONObject.NULL)
-            .put("description", description)
+    fun toJson(): JSONObject = JSONObject(cacheJson.encodeToString(this))
 
     // Fills missing article fields with publisher metadata while preserving existing feed values.
     fun applyTo(article: NewsArticle): NewsArticle = article.copy(
@@ -62,14 +63,12 @@ internal data class NewsArticleMetadata(
         summary = description.ifBlank { article.summary })
 
     companion object {
-        // Rebuilds a news article from cached JSON data.
-        fun fromJson(value: JSONObject): NewsArticleMetadata = NewsArticleMetadata(
-            value.optString("publisherUrl"),
-            value.optString("imageUrl"),
-            value.optString("topic"),
-            if (value.isNull("isPaywalled")) null else value.optBoolean("isPaywalled"),
-            value.optString("description")
-        )
+        private val cacheJson = Json {
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+        }
+
+        fun fromJson(value: JSONObject): NewsArticleMetadata = cacheJson.decodeFromString(value.toString())
     }
 }
 

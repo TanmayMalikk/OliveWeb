@@ -1,6 +1,8 @@
 // Safe-app users and support staff: loads and saves a user’s safety documents.
 package com.olive.app.data.safety
 
+import com.olive.app.data.sync.cloudStringMap
+
 import android.content.Context
 import com.google.firebase.firestore.*
 import com.google.firebase.storage.FirebaseStorage
@@ -527,10 +529,8 @@ class SafetyDocumentRepository(
         val owner = row.getString("owner_id") ?: return null
         val encryptedMetadata = row.getString("encrypted_metadata").orEmpty()
         val encryptionVersion = row.getLong("encryption_version")?.toInt() ?: 0
-        @Suppress("UNCHECKED_CAST")
-        val wrapped = (row.get("wrapped_keys") as? Map<String, String>).orEmpty()
-        @Suppress("UNCHECKED_CAST")
-        val deviceWrapped = (row.get("device_wrapped_keys") as? Map<String, String>).orEmpty()
+        val wrapped = row.get("wrapped_keys").cloudStringMap().orEmpty()
+        val deviceWrapped = row.get("device_wrapped_keys").cloudStringMap().orEmpty()
         val deviceKey = "$viewerUid--${KeyManager.deviceId()}"
         val metadata = if (encryptedMetadata.isBlank()) null else runCatching {
             val key = recovered ?: KeyManager.unwrapFirst(

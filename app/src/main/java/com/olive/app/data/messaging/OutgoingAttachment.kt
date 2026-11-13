@@ -4,9 +4,10 @@ package com.olive.app.data.messaging
 import com.olive.app.data.safety.SafetyDocument
 import java.security.GeneralSecurityException
 import javax.crypto.SecretKey
-import org.json.JSONObject
+import kotlinx.serialization.Serializable
 
 /** References ciphertext already published to the media service. */
+@Serializable
 data class OutgoingAttachment(
     val mediaId: String,
 ) {
@@ -14,17 +15,9 @@ data class OutgoingAttachment(
         require(validId(mediaId)) { "Attachment media ID is invalid" }
     }
 
-    internal fun toJson() = JSONObject().put(MEDIA_ID, mediaId)
-
     companion object {
-        internal fun fromJson(value: JSONObject) = OutgoingAttachment(
-            mediaId = value.getString(MEDIA_ID),
-        )
-
         private fun validId(value: String) =
             value.length <= 160 && value.all { it.isLetterOrDigit() || it == '-' || it == '_' }
-
-        private const val MEDIA_ID = "mediaId"
     }
 }
 

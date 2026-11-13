@@ -52,6 +52,8 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     internal val adminLocationMap = AdminLocationMapController(runtime.dataSources.adminLocations)
 
     // Root navigation, account entry, and device lock state.
+    val navigationState get() = runtime.state.navigationState
+    val dashboardState get() = runtime.state.dashboardState
     val screen get() = runtime.state.screen
     // These versions tell Compose to redraw after an entry or cover event.
     val pinChallengeVersion get() = runtime.state.pinChallengeVersion
@@ -168,6 +170,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
 // Users, safe contacts, staff, and admins: keeps message screen state and chat actions together.
 
 internal class SessionMessages(private val runtime: SessionRuntime) {
+    val state get() = runtime.state.messagingState
     val userSearchResults get() = runtime.state.userSearchResults
     val friends get() = runtime.state.friends
     val incomingFriendRequests get() = runtime.state.incomingFriendRequests

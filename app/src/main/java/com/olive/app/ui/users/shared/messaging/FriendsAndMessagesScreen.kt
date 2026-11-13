@@ -127,17 +127,18 @@ private fun MessagingSidebar(
     modifier: Modifier = Modifier,
 ) {
     val uiText = rememberResourceText()
+    val messaging by session.messages.state.collectAsState()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
     val allowedSupportTags = visibleSupportTags(session.accountRole)
-    val roleConversations = if (organizationAccount) session.messages.conversations.filter {
+    val roleConversations = if (organizationAccount) messaging.conversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
-    } else session.messages.conversations
+    } else messaging.conversations
     val shownConversations = roleConversations.filter {
         isConversationArchived(
             it,
-            session.messages.archivedConversationIds,
-            session.messages.restoredClosedConversationIds,
+            messaging.archivedConversationIds,
+            messaging.restoredClosedConversationIds,
         ) == showingArchived && (!unreadOnly || session.messages.isUnread(it))
     }
     val supportConversations = shownConversations.filter { it.type == "SUPPORT" }
@@ -145,8 +146,8 @@ private fun MessagingSidebar(
     val archivedCount = roleConversations.count {
         isConversationArchived(
             it,
-            session.messages.archivedConversationIds,
-            session.messages.restoredClosedConversationIds,
+            messaging.archivedConversationIds,
+            messaging.restoredClosedConversationIds,
         )
     }
     var conversationActions by remember { mutableStateOf<ChatConversation?>(null) }
