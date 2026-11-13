@@ -1,8 +1,8 @@
 // Tests private-screen previews and task identity for safe-app users.
 package com.olive.app
 
-import com.olive.app.data.AccountRole
-import com.olive.app.data.CoverType
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.CoverType
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

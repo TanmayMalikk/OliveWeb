@@ -1,15 +1,14 @@
 // Safe-app users: draws the PIN-to-safe-app olive animation with an Android View.
 package com.olive.app.ui.shared
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
-import android.view.animation.LinearInterpolator
 import androidx.core.graphics.toColorInt
 import androidx.core.graphics.withRotation
 import kotlin.math.atan2
+import kotlin.math.pow
 import kotlin.math.sin
 
 /**
@@ -30,10 +29,7 @@ internal class OliveAnimationView @JvmOverloads constructor(
             invalidate()
         }
 
-    var onAnimationFinished: (() -> Unit)? = null
     var onOlivePositionChanged: ((x: Float, y: Float) -> Unit)? = null
-
-    private var animator: ValueAnimator? = null
 
     // Paints
     private val branchPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -83,22 +79,6 @@ internal class OliveAnimationView @JvmOverloads constructor(
         Shader.TileMode.CLAMP,
     )
 
-    // Restarts the branch-and-olive transition from its first frame.
-    fun startAnimation(durationMs: Long = 2600L) {
-        animator?.cancel()
-        animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = durationMs
-            interpolator = LinearInterpolator()
-            addUpdateListener { va ->
-                progress = va.animatedValue as Float
-                if (progress >= 1f) {
-                    onAnimationFinished?.invoke()
-                }
-            }
-        }
-        animator?.start()
-    }
-
     // Rebuilds the branch path when the animation view changes size.
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -117,14 +97,13 @@ internal class OliveAnimationView @JvmOverloads constructor(
         super.onDraw(canvas)
         if (progress <= 0f || progress >= 1f) return
 
-        val w = width.toFloat()
         val h = height.toFloat()
 
         val branchGrowth = (progress / 0.38f).coerceIn(0f, 1f)
         val oliveGrowth = if (progress < 0.32f) 0f else ((progress - 0.32f) / 0.20f).coerceIn(0f, 1f)
         val oliveDrop = if (progress < 0.52f) 0f else {
             val d = ((progress - 0.52f) / 0.36f).coerceIn(0f, 1f)
-            Math.pow(d.toDouble(), 1.75).toFloat()
+            d.toDouble().pow(1.75).toFloat()
         }
         val ripple = if (progress < 0.86f) 0f else ((progress - 0.86f) / 0.14f).coerceIn(0f, 1f)
 

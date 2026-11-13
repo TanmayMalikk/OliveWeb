@@ -12,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.*
 import com.olive.app.security.InputPolicy
 import com.olive.app.ui.users.user.account.*
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -30,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
+import com.olive.app.data.account.AccountRole
 
 
 // ALL ACCOUNT TYPES: role selection routes each person into the correct onboarding path.

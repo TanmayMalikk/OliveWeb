@@ -110,7 +110,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         nowMillis: Long = System.currentTimeMillis(),
     ): FitnessSnapshot {
         val previous = preferences.getInt("last_sensor_value", -1)
-        val difference = if (previous < 0 || totalSinceBoot < previous) {
+        val difference = if (previous !in 0..totalSinceBoot) {
             0
         } else {
             totalSinceBoot - previous
@@ -155,7 +155,7 @@ internal class FitnessStore(context: Context, accountId: String) {
     ): FitnessSnapshot {
         val safeWatchSteps = watchSteps.coerceIn(0, MAX_DAILY_STEPS)
         val previousWatchSteps = preferences.getInt(watchStepsKey(today), -1)
-        val watchDelta = if (previousWatchSteps < 0 || safeWatchSteps < previousWatchSteps) {
+        val watchDelta = if (previousWatchSteps !in 0..safeWatchSteps) {
             0
         } else {
             safeWatchSteps - previousWatchSteps

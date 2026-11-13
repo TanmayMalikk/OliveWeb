@@ -1,5 +1,5 @@
 // Cover users: reads the device location for cover app features.
-package com.olive.app.data
+package com.olive.app.data.location
 
 import android.Manifest
 import android.content.Context
@@ -9,6 +9,7 @@ import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
 import android.os.Build
+import android.os.CancellationSignal
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
@@ -59,7 +60,7 @@ object CoverLocation {
             if (provider == null) continuation.resume(null)
             else runCatching {
                 LocationManagerCompat.getCurrentLocation(
-                    manager, provider, null as android.os.CancellationSignal?,
+                    manager, provider, null as CancellationSignal?,
                     ContextCompat.getMainExecutor(context)
                 ) { location ->
                     if (continuation.isActive) continuation.resume(location)

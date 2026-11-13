@@ -1,102 +1,109 @@
 {
   "Edmonton": {
     "Hotlines": {
-      "True North" : {
+      "True North": {
         "Desc": "True North Society support individuals impacted by abuse and domestic violence with emergency shelter, outreach services, and public education programs.",
         "Phone": "1-877-934-6634",
-        "url": "truenorthab.com"
+        "url": "https://truenorthab.com/",
+        "hours": "24/7"
       },
       "Family Violence Info Line": {
         "Desc": "Confidential 24/7 phone or text support, info, and referrals for anyone experiencing family violence in Alberta.",
-        "Phone": "310-1818",
-        "url": "https://www.alberta.ca/family-violence-find-supports"
+        "Phone": "211",
+        "Text": "211",
+        "url": "https://www.alberta.ca/family-violence-find-supports",
+        "hours": "24/7"
       },
       "Distress Line (CMHA Edmonton)": {
         "Desc": "Available 24/7 to provide free, confidential crisis support, intervention, and referral for anyone in crisis or distress.",
         "Phone": "780-482-4357",
-        "url": "https://edmonton.cmha.ca/programs-services/distress-line/"
+        "url": "https://edmonton.cmha.ca/programs-services/distress-line/",
+        "hours": "24/7"
       },
       "Seniors Abuse Helpline": {
         "Desc": "Confidential 24/7 support line for seniors experiencing abuse or anyone concerned about a senior.",
         "Phone": "780-454-8888",
-        "url": "https://www.sageomond.ca/"
+        "url": "https://edmonton.cmha.ca/brochure/seniors-abuse-hotline/",
+        "hours": "24/7"
       },
       "Brite Line": {
         "Desc": "Edmonton's first mental health and wellness helpline dedicated to supporting 2SLGBTQIA+ community members.",
         "Phone": "1-844-702-7483",
-        "url": "https://www.briteline.ca/"
+        "url": "https://www.briteline.ca/",
+        "hours": "24/7"
       },
       "Sexual Assault Centre of Edmonton (SACE)": {
         "Desc": "Support, information, and crisis intervention for individuals affected by sexual violence.",
         "Phone": "780-423-4121",
-        "url": "https://www.sace.ca/"
+        "url": "https://www.sace.ca/",
+        "hours": "Daily, 9:00 a.m. - 9:00 p.m. MST"
       },
-      "Warm Line": {
-        "Desc": "Safe, supportive phone service led by peers with lived experience in mental health journeys.",
-        "Phone": "780-482-4357",
-        "url": "https://edmonton.cmha.ca/"
-      }
-    },
-    "Shelters": {
-      "WIN House": {
-        "Desc": "24/7 emergency shelter, safety planning, and outreach support for women, non-binary individuals, and children fleeing domestic violence.",
-        "Phone": "780-479-0058",
-        "url": "https://winhouse.org/"
-      },
-      "Lurana Shelter": {
-        "Desc": "First-stage emergency shelter providing safe refuge, food, clothing, and advocacy for women and children fleeing domestic abuse.",
-        "Phone": "780-424-5875",
-        "url": "https://luranashelter.com/"
-      },
-      "Wings of Providence": {
-        "Desc": "Second-stage housing and long-term recovery support for women and children who have left abusive situations.",
-        "Phone": "780-426-4922",
-        "url": "https://www.wingsofprovidence.ca/"
+      "Shelters": {
+        "WIN House": {
+          "Desc": "24/7 emergency shelter, safety planning, and outreach support for women, non-binary individuals, and children fleeing domestic violence.",
+          "Phone": "780-479-0058",
+          "hours": "24/7",
+          "url": "https://winhouse.org/"
+        },
+        "Lurana Shelter": {
+          "Desc": "First-stage emergency shelter providing safe refuge, food, clothing, and advocacy for women and children fleeing domestic abuse.",
+          "Phone": "780-424-5875",
+          "hours": "24/7",
+          "url": "https://cssalberta.ca/Our-Services/Domestic-Abuse-Shelters-Support/Lurana-Shelter"
+        },
+        "Wings of Providence": {
+          "Desc": "Second-stage housing and long-term recovery support for women and children who have left abusive situations.",
+          "Phone": "780-426-4985",
+          "hours": "Monday through Friday, 9:00 a.m. - 4:30 p.m. MST",
+          "url": "https://www.wingsofprovidence.ca/"
+        }
       }
     }
   },
   "Calgary": {
     "Hotlines": {
-      "Calgary Women's Emergency Shelter Helpline": {
-        "Desc": "Confidential 24/7 crisis line providing safety planning, support, and emergency shelter access for family violence victims.",
+      "FearIsNotLove": {
+        "Desc": "FearIsNotLove offers free programs for any person experiencing domestic violence and abuse.",
         "Phone": "403-234-7233",
-        "url": "https://www.calgarywomensshelter.com/"
+        "hours": "24/7",
+        "url": "https://fearisnotlove.ca/"
       },
       "Distress Centre Calgary": {
         "Desc": "Free 24/7 crisis support, mental health support, and referrals via phone, text, and online chat.",
         "Phone": "403-266-4357",
+        "hours": "24/7",
         "url": "https://distresscentre.com/"
-      },
-      "Connect Family & Sexual Violence Network": {
-        "Desc": "24/7 phone and text line offering peer support and resources for those affected by family and sexual violence.",
-        "Phone": "403-237-5888",
-        "url": "https://www.connectnetwork.ca/"
       },
       "Calgary Communities Against Sexual Assault (CCASA)": {
         "Desc": "Support, crisis intervention, and counselling for individuals impacted by sexual abuse and assault.",
         "Phone": "403-237-5888",
+        "hours": "Daily, 9:00 a.m. - 9:00 p.m. MT",
         "url": "https://calgarycasa.com/"
       },
       "True North Society": {
         "Desc": "Support for individuals and families impacted by abuse with emergency shelter, outreach services, and education.",
         "Phone": "1-403-934-6634",
+        "hours": "24/7",
         "url": "https://truenorthab.com/"
       }
     },
     "Shelters": {
-      "Calgary Women's Emergency Shelter": {
-        "Desc": "Emergency shelter for women and children fleeing family violence and abuse, featuring 24/7 security and comprehensive care.",
+      "FearIsNotLove": {
+        "Desc": "FearIsNotLove offers free programs for any person experiencing domestic violence and abuse.",
         "Phone": "403-234-7233",
-        "url": "https://www.calgarywomensshelter.com/"
+        "hours": "24/7",
+        "url": "https://fearisnotlove.ca/"
       },
-      "Awo Taan Healing Lodge": {
+      "Niitoiyis Family Support Society": {
         "Desc": "24/7 emergency shelter incorporating Indigenous culture and healing traditions for women and children escaping violence.",
         "Phone": "403-531-1972",
-        "url": "https://www.awotaan.org/"
+        "hours": "24/7",
+        "url": "https://www.niitoiyis.com/"
       },
       "YWHISPER House (YWCA Calgary)": {
         "Desc": "Safe emergency shelter offering housing, safety planning, and trauma-informed support for women and mothers in crisis.",
         "Phone": "403-263-1550",
+        "hours": "24/7",
         "url": "https://www.ywcalgary.ca/"
       }
     }
@@ -105,60 +112,74 @@
     "Hotlines": {
       "Central Alberta Women's Emergency Shelter Helpline": {
         "Desc": "Confidential 24/7 helpline for individuals experiencing crisis, distress, or domestic violence.",
-        "Phone": "403-346-1611",
-        "url": "https://www.womensshelter.ca/"
+        "Phone": "403-346-5643",
+        "Text": "403-506-0485",
+        "hours": "24/7",
+        "url": "https://www.cawes.com/"
       },
-      "Central Alberta Sexual Assault Support Centre (CASASC)": {
+      "Sendero Centre": {
         "Desc": "24/7 support line offering confidential crisis intervention, information, and resources for sexual violence survivors.",
         "Phone": "1-866-956-1099",
-        "url": "https://casasc.ca/"
+        "hours": "24/7",
+        "url": "https://senderocentre.ca/"
       },
       "Red Deer Native Friendship Centre Crisis Support": {
         "Desc": "Cultural, community-based crisis support and family violence prevention resources for Indigenous and non-Indigenous community members.",
         "Phone": "403-340-0020",
+        "hours": "Monday - Thursday, 9 AM - 4 PM; Friday, 9 AM - 3:30 PM; Closed daily from 12 PM - 1 PM",
         "url": "https://rdnfc.com/"
       }
     },
     "Shelters": {
-      "Central Alberta Women's Emergency Shelter (CAWES)": {
+      "Central Alberta Women's Emergency Shelter Helpline": {
         "Desc": "24/7 safe shelter, emergency basic needs, crisis intervention, and outreach for women and children fleeing family violence.",
         "Phone": "403-346-5643",
-        "url": "https://www.womensshelter.ca/"
+        "Text": "403-506-0485",
+        "hours": "24/7",
+        "url": "https://www.cawes.com/"
       },
       "Mountain Rose Women's Shelter": {
         "Desc": "Emergency shelter, outreach services, and crisis support for women and children in Central Alberta experiencing domestic violence.",
         "Phone": "1-877-845-4141",
+        "hours": "24/7",
         "url": "https://www.mrwsa.net/"
       }
     }
   },
   "Grande Prairie": {
     "Hotlines": {
-      "Grande Prairie Domestic Violence Crisis Line": {
-        "Desc": "24/7 confidential crisis line offering support, safety planning, and shelter intake for individuals experiencing domestic violence.",
+      "Odyssey House": {
+        "Desc": "24/7 safe emergency shelter, crisis intervention, second-stage housing, and supportive services for women and children fleeing abuse.",
         "Phone": "780-532-2672",
-        "url": "https://www.gpcfs.ca/"
+        "Text": "780-532-2672",
+        "hours": "24/7",
+        "url": "https://odysseyhouse.ca/"
       },
       "Pace Community Support, Sexual Assault & Trauma Centre": {
         "Desc": "Crisis support, specialized trauma counselling, and advocacy for individuals affected by sexual violence and abuse.",
         "Phone": "780-539-6692",
+        "hours": "Monday - Friday: 8:30am - 4:30pm; Closed 12:00pm - 1:00pm",
         "url": "https://www.pacecentre.com/"
       },
       "Grande Prairie Friendship Centre Support Line": {
         "Desc": "Community outreach, emergency referral, and support for families in distress.",
         "Phone": "780-532-5722",
-        "url": "https://gpfriendship.com/"
+        "hours": "Monday - Friday, 9:00 AM - 4:00 PM",
+        "url": "https://www.gpfriendshipcentre.org/"
       }
     },
     "Shelters": {
       "Odyssey House": {
         "Desc": "24/7 safe emergency shelter, crisis intervention, second-stage housing, and supportive services for women and children fleeing abuse.",
         "Phone": "780-532-2672",
+        "Text": "780-532-2672",
+        "hours": "24/7",
         "url": "https://odysseyhouse.ca/"
       },
       "Peace River Regional Women's Shelter": {
         "Desc": "24-hour emergency shelter and crisis line providing safe refuge and advocacy for individuals escaping domestic violence.",
-        "Phone": "1-800-661-0844",
+        "Phone": "1-877-624-3466",
+        "hours": "24/7",
         "url": "https://prrws.com/"
       }
     }

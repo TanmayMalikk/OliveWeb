@@ -30,9 +30,9 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.AccountRole
-import com.olive.app.data.SafeContact
-import com.olive.app.data.UserProfile
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.account.UserProfile
 import com.olive.app.ui.shared.LightSage
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen

@@ -18,11 +18,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.test.platform.app.InstrumentationRegistry
-import com.olive.app.data.NewsArticle
+import com.olive.app.data.news.NewsArticle
 import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.covers.news.NewsArticleReader
 import com.olive.app.ui.covers.news.NewsArticleCard
-import com.olive.app.data.NewsMetadataRepository
+import com.olive.app.data.news.NewsMetadataRepository
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import android.util.Base64

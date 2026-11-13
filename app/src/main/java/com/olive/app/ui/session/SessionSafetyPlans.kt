@@ -6,27 +6,38 @@ import androidx.compose.runtime.*
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.functions.FirebaseFunctionsException
 import com.olive.app.R
-import com.olive.app.data.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.time.Duration.Companion.seconds
-import com.olive.app.data.AccountRole
-import com.olive.app.security.DeviceLockChallenge
-import com.olive.app.security.DeviceLockKey
-import com.olive.app.security.SafeEntryMethod
-import com.olive.app.security.InputPolicy
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.network.hasValidatedInternetConnection
+import com.olive.app.data.safety.SAFETY_FIELD_KEYS
+import com.olive.app.data.safety.SafetyAccessIndexStore
+import com.olive.app.data.safety.SafetyConsultation
+import com.olive.app.data.safety.SafetyField
+import com.olive.app.data.safety.SafetyPlan
+import com.olive.app.data.safety.SafetyPlanRepository
+import com.olive.app.data.safety.SafetyPlanStore
+import com.olive.app.data.safety.SafetyPlanSyncWorker
+import com.olive.app.data.safety.SharedSafetyPlan
+import com.olive.app.data.safety.edit
+import com.olive.app.data.safety.mergeVisibleSafetyPlan
+import com.olive.app.data.safety.safetyPlanSyncDelayMillis
+import com.olive.app.data.safety.syncSafetyPlan
 import com.olive.app.ui.users.shared.navigation.SessionScreen
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.olive.app.data.sync.SyncCompletionEvents
-import kotlinx.coroutines.flow.collect
-import javax.crypto.Cipher
+import kotlinx.coroutines.channels.Channel
+import java.util.UUID
+import android.os.SystemClock
 
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
 internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
+    private val safetyWriterId = UUID.randomUUID().toString()
     private val store = SafetyPlanStore(runtime.application, runtime.localMode)
     private val accessIndex = SafetyAccessIndexStore(runtime.application)
     private val repository by lazy { SafetyPlanRepository() }
@@ -37,14 +48,15 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
     private var planListener: ListenerRegistration? = null
     private var generation = 0
     private var foregroundSync: Job? = null
-    private var foregroundVersion = 0L
-    private var accessListener: ListenerRegistration? = null
-    private var accessActor: String? = null
+    private val foregroundSyncRequests = Channel<Unit>(Channel.CONFLATED)
+    private var immediateSyncRequested = false
     var plan by mutableStateOf<SafetyPlan?>(null)
         private set
     var error by mutableStateOf<Int?>(null)
         private set
     var saving by mutableIntStateOf(0)
+        private set
+    var syncing by mutableStateOf(false)
         private set
     var consultations by mutableStateOf<List<SafetyConsultation>>(emptyList())
         private set
@@ -100,6 +112,11 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (screenLease != null && lease !== screenLease) return
         planListener?.remove()
         foregroundSync?.cancel()
+        while (foregroundSyncRequests.tryReceive().isSuccess) {
+            // Drain requests owned by the screen that is closing.
+        }
+        immediateSyncRequested = false
+        syncing = false
         planListener = null
         lease =
             null
@@ -167,7 +184,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                                 writes.withLock { store.mergeRemote(actor, remote) }
                             }
                             if (current(actor, ownerUid, token)) {
-                                plan = updated
+                                plan = mergeVisibleSafetyPlan(plan, updated, actor)
                                 if (updated.pending) SafetyPlanSyncWorker.enqueue(
                                     runtime.application,
                                     actor,
@@ -204,7 +221,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (!authorized() || runtime.state.accountRole == AccountRole.SAFE_CONTACT || key !in SAFETY_FIELD_KEYS || value.length > 4000) return
         val field = old.fields[key] ?: return
         if (field.value == value) return
-        val edited = field.edit(value)
+        val edited = field.edit(value, safetyWriterId, runtime.coverAccountId.orEmpty())
         plan = old.copy(fields = old.fields + (key to edited))
         persist { saved -> saved.copy(fields = saved.fields + (key to edited)) }
     }
@@ -476,7 +493,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                 if (!runtime.localMode) {
                     SafetyPlanSyncWorker.enqueue(runtime.application, actor, owner)
                     if (current(actor, owner, token)) {
-                        syncForeground(actor, owner, token)
+                        requestForegroundSync(actor, owner, token)
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -489,28 +506,71 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         }
     }
 
-    private fun syncForeground(actor: String, owner: String, token: Int) {
-        foregroundVersion++
+    private fun requestForegroundSync(actor: String, owner: String, token: Int, immediate: Boolean = false) {
+        if (immediate) immediateSyncRequested = true
+        foregroundSyncRequests.trySend(Unit)
         if (foregroundSync?.isActive == true) return
-        foregroundSync = runtime.scope.launch {
+        val coordinator = runtime.scope.launch(start = CoroutineStart.LAZY) {
             try {
-                do {
-                    val version = foregroundVersion
-                    if (!current(actor, owner, token) || !hasValidatedInternetConnection(runtime.application)) break
-                    sync.withLock {
-                        withContext(Dispatchers.IO) { syncSafetyPlan(store, repository, actor, owner) }
+                while (current(actor, owner, token)) {
+                    foregroundSyncRequests.receive()
+                    val firstEditAt = SystemClock.elapsedRealtime()
+                    var lastEditAt = firstEditAt
+                    var immediateBatch = immediateSyncRequested
+                    immediateSyncRequested = false
+                    while (!immediateBatch) {
+                        val waitMillis = safetyPlanSyncDelayMillis(
+                            firstEditAt,
+                            lastEditAt,
+                            SystemClock.elapsedRealtime(),
+                        )
+                        if (waitMillis == 0L) break
+                        if (withTimeoutOrNull(waitMillis) {
+                            foregroundSyncRequests.receive()
+                        } == null) break
+                        lastEditAt = SystemClock.elapsedRealtime()
+                        if (immediateSyncRequested) {
+                            immediateBatch = true
+                            immediateSyncRequested = false
+                        }
                     }
-                    val saved = withContext(Dispatchers.IO) { store.read(actor, owner) }
-                    if (current(actor, owner, token) && saving == 0) plan = saved
-                } while (version != foregroundVersion)
+                    if (!current(actor, owner, token) || !hasValidatedInternetConnection(runtime.application)) continue
+                    syncing = true
+                    val saved = sync.withLock {
+                        withContext(Dispatchers.IO) {
+                            writes.withLock {
+                                val queued = store.read(actor, owner)
+                                if (queued?.pending == true) {
+                                    syncSafetyPlan(store, repository, actor, owner)
+                                    store.read(actor, owner)
+                                } else queued
+                            }
+                        }
+                    }
+                    if (current(actor, owner, token) && saved != null) {
+                        plan = mergeVisibleSafetyPlan(plan, saved, actor)
+                        if (!saved.pending) error = null
+                    }
+                    syncing = false
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 if (current(actor, owner, token)) error = R.string.safety_sync_error
             } finally {
-                foregroundSync = null
+                syncing = false
+                if (foregroundSync === currentCoroutineContext()[Job]) foregroundSync = null
             }
         }
+        foregroundSync = coordinator
+        coordinator.start()
+    }
+
+    // Flushes the latest locally durable edit when a field loses focus or a discrete control changes.
+    fun flushEdits() {
+        val actor = runtime.coverAccountId ?: return
+        val owner = activeOwner ?: return
+        requestForegroundSync(actor, owner, generation, immediate = true)
     }
 
     // Saves the current draft again after a local storage failure.

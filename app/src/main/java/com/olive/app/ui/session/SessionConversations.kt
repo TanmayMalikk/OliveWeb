@@ -5,16 +5,27 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import android.util.Log
 import androidx.core.content.edit
-import com.olive.app.data.*
 import com.olive.app.security.EncryptionUtils
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.ChatCacheException
+import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.messaging.ChatMessage
+import com.olive.app.data.messaging.DirectoryUser
+import com.olive.app.data.messaging.MessageDeliveryStatus
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.canDiscardFailedMessage
+import com.olive.app.data.messaging.canManuallyRetryMessage
+import com.olive.app.data.messaging.prepareOutgoingMessage
+import com.olive.app.security.KeyManager
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Job
-import com.olive.app.security.*
+import kotlin.time.Duration.Companion.milliseconds
 
 
 // Owns conversation selection, messages and read markers.
@@ -113,10 +124,20 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         val secure = checkNotNull(secureChatRepository)
                         var establishedKey = false
                         val key = try {
-                            withTimeoutOrNull(8_000) {
-                                val ready = secure.readyRoomKey(conversation, uid)
-                                establishedKey = ready != null
-                                ready?.secretKey ?: secureSharing.roomKey(conversation)
+                            withTimeoutOrNull(8_000.milliseconds) {
+                                val onlineKey = secureSharing.roomKey(conversation)
+                                val wrapped = secure.wrappedRoomKey(conversation.id, uid)
+                                    ?: error("Wrapped room key unavailable")
+                                withContext(Dispatchers.IO) {
+                                    chatCache.saveAccess(
+                                        uid,
+                                        conversation,
+                                        wrapped,
+                                        KeyManager.deviceId(),
+                                        System.currentTimeMillis(),
+                                    )
+                                }
+                                onlineKey
                             } ?: error("Online room key timed out")
                         } catch (onlineFailure: Exception) {
                             if (onlineFailure is CancellationException) throw onlineFailure
@@ -127,11 +148,11 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                                 chatCache.open(
                                     uid,
                                     conversation.id,
-                                    com.olive.app.security.KeyManager.deviceId(),
+                                    KeyManager.deviceId(),
                                     System.currentTimeMillis(),
                                 )
                             }
-                            val offlineKey = com.olive.app.security.KeyManager.unwrapKey(cached.wrappedRoomKey)
+                            val offlineKey = KeyManager.unwrapKey(cached.wrappedRoomKey)
                             val cachedMessages = withContext(Dispatchers.Default) {
                                 secure.decryptMessages(cached.messages, offlineKey)
                             }
@@ -252,11 +273,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
 
     // Retries only the failed encrypted queue head so later messages cannot overtake it.
     fun retryMessage(chat: ChatMessage) {
-        if (chat.deliveryStatus !in setOf(
-                MessageDeliveryStatus.FAILED_RETRYABLE,
-                MessageDeliveryStatus.FAILED_PERMANENT,
-            )
-        ) return
+        if (!canManuallyRetryMessage(chat.deliveryStatus)) return
         val uid = runtime.enrollment?.uid ?: return
         runtime.scope.launch {
             val outgoing = withContext(Dispatchers.IO) {
@@ -273,7 +290,24 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     }
                 }
             } ?: return@launch
-            MessageSendWorker.enqueue(runtime.application, outgoing)
+            MessageSendWorker.retryNow(runtime.application, outgoing)
+        }
+    }
+
+    // Discards only the permanently failed queue head, then resumes later ordered deliveries.
+    fun discardFailedMessage(chat: ChatMessage) {
+        if (!canDiscardFailedMessage(chat.deliveryStatus)) return
+        val uid = runtime.enrollment?.uid ?: return
+        runtime.scope.launch {
+            val removed = withContext(Dispatchers.IO) {
+                runtime.messageOutbox.get(chat.id)?.takeIf { candidate ->
+                    candidate.ownerUid == uid && canDiscardFailedMessage(candidate.status) &&
+                            runtime.messageOutbox.head(uid, candidate.conversationId)?.id == candidate.id
+                }?.also { runtime.messageOutbox.remove(uid, it.id) }
+            } ?: return@launch
+            runtime.messageOutbox.head(uid, removed.conversationId)?.let {
+                MessageSendWorker.enqueue(runtime.application, it)
+            }
         }
     }
 
@@ -380,15 +414,14 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                         try {
                             val wrapped = secure.wrappedRoomKey(conversation.id, ownerUid)
                                 ?: throw ChatCacheException("Wrapped room key unavailable")
-                            if (epoch != token || state.activeConversation?.id != conversation.id) return@launch
-                            val confirmedKey = com.olive.app.security.KeyManager.unwrapKey(wrapped)
+                            val confirmedKey = KeyManager.unwrapKey(wrapped)
                             withContext(Dispatchers.IO) {
                                 chatCache.saveAccess(
                                     ownerUid,
                                     state.activeConversation?.takeIf { it.id == conversation.id }
                                         ?: conversation,
                                     wrapped,
-                                    com.olive.app.security.KeyManager.deviceId(),
+                                    KeyManager.deviceId(),
                                     System.currentTimeMillis(),
                                     requireIndexed = true,
                                 )

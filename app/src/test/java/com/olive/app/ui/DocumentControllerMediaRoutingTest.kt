@@ -3,13 +3,13 @@ package com.olive.app.ui
 
 import android.content.Context
 import android.net.Uri
-import com.olive.app.data.AccountIdentity
-import com.olive.app.data.ChatSubscription
-import com.olive.app.data.DocumentOcrMetadata
-import com.olive.app.data.DocumentListSnapshot
-import com.olive.app.data.DocumentListSource
-import com.olive.app.data.SafetyDocument
-import com.olive.app.data.SafetyDocumentDataSource
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.safety.DocumentOcrMetadata
+import com.olive.app.data.safety.DocumentListSnapshot
+import com.olive.app.data.safety.DocumentListSource
+import com.olive.app.data.safety.SafetyDocument
+import com.olive.app.data.safety.SafetyDocumentDataSource
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaKind

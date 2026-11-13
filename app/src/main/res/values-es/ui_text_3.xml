@@ -19,64 +19,8 @@
     <string name="ui_could_not_reconnect_check_your_password_and_try_again">No se pudo volver a conectar. Verifique su contraseña e inténtelo nuevamente.</string>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    <string name="ui_new_headlines_are_available">Hay nuevos titulares disponibles.</string>
     <string name="ui_a_new_update_is_available">Hay una nueva actualización disponible.</string>
-    <string name="ui_an_account_update_is_available">Hay una actualización de cuenta disponible.</string>
-    <string name="ui_your_latest_digest_is_ready">Su último resumen está listo.</string>
-    <string name="ui_there_are_new_stories_to_browse">Hay nuevas historias para explorar.</string>
 
-    <string name="ui_open_the_app_to_see_what_s_new">Abra la aplicación para ver las novedades.</string>
-    <string name="ui_new_activity_is_waiting">Nueva actividad está esperando.</string>
-    <string name="ui_daily_digest_briefings">Resúmenes informativos diarios</string>
-    <string name="ui_daily_headlines_and_news_digest_notifications">Titulares diarios y notificaciones de resúmenes de noticias.</string>
-
-    <string name="ui_app_updates">Actualizaciones de aplicaciones</string>
-    <string name="ui_general_app_activity_notifications">Notificaciones generales de actividad de la aplicación</string>
-    <string name="ui_olive_branch_updates">Actualizaciones de la rama de olivo</string>
-    <string name="ui_olive_tree_updates">Actualizaciones del olivo</string>
     <string name="ui_call_invitation_notifications">Invitaciones de llamada</string>
     <string name="ui_speaker">Altavoz</string>
     <string name="ui_speaker_off">Desactivar altavoz</string>

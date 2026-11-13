@@ -1,6 +1,7 @@
 // News cover users: extracts titles and images for news articles.
-package com.olive.app.data
+package com.olive.app.data.news
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -21,12 +22,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 import javax.net.ssl.HttpsURLConnection
+import kotlin.collections.iterator
 import kotlin.coroutines.resume
 import kotlin.time.Duration.Companion.seconds
 
@@ -88,7 +91,7 @@ internal fun fallbackNewsTopic(title: String, fallback: String = "News"): String
 
 // Use a publisher-declared card-sized version of the same photo, preserving crop and photo identity.
 private fun responsiveArticleImage(
-    document: org.jsoup.nodes.Document,
+    document: Document,
     original: String,
     pageUrl: String
 ): String {
@@ -322,7 +325,7 @@ internal class NewsMetadataRepository(context: Context) {
     }
 
     // Google News redirects require JavaScript. This resolver allows HTTPS navigation only and exposes no native bridge.
-    @android.annotation.SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled")
     private suspend fun resolveGooglePublisher(link: String): String? {
         var resolver: WebView? = null
         return try {

@@ -3,7 +3,8 @@
     "Hotlines": {
       "NWT Helpline": {
         "Desc": "Free 24/7 confidential helpline offering support, crisis management, and referrals for NWT residents.",
-        "Phone": "1-800-661-0844",
+        "Phone": "1-844-259-1793",
+        "hours": "24/7",
         "url": "https://www.hss.gov.nt.ca/"
       }
     },
@@ -11,6 +12,7 @@
       "Alison McAteer House": {
         "Desc": "24/7 emergency shelter and crisis line for women and children fleeing family violence in Yellowknife.",
         "Phone": "1-866-223-7775",
+        "hours": "24/7",
         "url": "https://www.ywcanwt.ca/"
       }
     }

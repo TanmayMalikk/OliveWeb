@@ -1,9 +1,9 @@
 // Tests article images and paywall hints in the news cover.
 package com.olive.app.ui.covers.news
 
-import com.olive.app.data.NewsArticle
-import com.olive.app.data.fallbackNewsTopic
-import com.olive.app.data.parseNewsArticleMetadata
+import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.news.fallbackNewsTopic
+import com.olive.app.data.news.parseNewsArticleMetadata
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test

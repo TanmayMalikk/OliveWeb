@@ -1,10 +1,12 @@
 // Safe-app users and support staff: loads and saves a user’s safety documents.
-package com.olive.app.data
+package com.olive.app.data.safety
 
 import android.content.Context
 import com.google.firebase.firestore.*
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
+import com.olive.app.data.messaging.ChatSubscription
+import com.olive.app.data.messaging.OutgoingMessage
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaTicketDataSource
@@ -27,6 +29,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
+import javax.crypto.SecretKey
 
 data class SafetyDocument(
     val id: String, val ownerUid: String, val storagePath: String, val name: String,
@@ -457,7 +460,7 @@ class SafetyDocumentRepository(
 
     /** Wraps the document key for both the directory identity and every registered recipient device. */
     private suspend fun recipientAccess(
-        documentKey: javax.crypto.SecretKey,
+        documentKey: SecretKey,
         uid: String,
         username: String,
     ): RecipientAccess {
@@ -492,7 +495,7 @@ class SafetyDocumentRepository(
     }
 
     /** Uses this installation's key copy before the account envelope shared across installations. */
-    private suspend fun unwrapDocumentKey(document: SafetyDocument, uid: String): SecretKey {
+    private fun unwrapDocumentKey(document: SafetyDocument, uid: String): SecretKey {
         val candidates = documentKeyCandidates(document, uid, KeyManager.deviceId())
         val key = runCatching { KeyManager.unwrapFirst(candidates, document.encryptionVersion) }.getOrNull()
         return key ?: if (document.accountRecoveryReady) media.recoverDocumentKey(document.id)

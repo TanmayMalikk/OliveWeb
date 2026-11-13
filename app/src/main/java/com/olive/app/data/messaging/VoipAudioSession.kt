@@ -183,20 +183,11 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
             .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                .setAudioAttributes(attributes)
-                .setAcceptsDelayedFocusGain(false)
-                .build()
-                .also(audioManager::requestAudioFocus)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                null,
-                AudioManager.STREAM_VOICE_CALL,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
-            )
-        }
+        audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(attributes)
+            .setAcceptsDelayedFocusGain(false)
+            .build()
+            .also(audioManager::requestAudioFocus)
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
     }
 
@@ -205,13 +196,8 @@ class LiveKitAudioSession(context: Context) : VoipAudioSession {
         @Suppress("DEPRECATION")
         runCatching { audioManager.isSpeakerphoneOn = previousSpeakerEnabled }
         runCatching { audioManager.mode = previousAudioMode }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let(audioManager::abandonAudioFocusRequest)
-            audioFocusRequest = null
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.abandonAudioFocus(null)
-        }
+        audioFocusRequest?.let(audioManager::abandonAudioFocusRequest)
+        audioFocusRequest = null
     }
 }
 

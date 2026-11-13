@@ -18,6 +18,8 @@ export type SafetyField = {
   value: string;
   revision: number;
   mutationId?: string;
+  writerId?: string;
+  clientSequence?: number;
 };
 export type SafetyPlan = {
   ownerUid: string;
@@ -77,6 +79,9 @@ const starterItems: Record<string, string[]> = {
     "Children’s or pets’ essentials, if applicable",
   ],
 };
+
+const safetyWriterId = crypto.randomUUID();
+let safetyClientSequence = 0;
 
 function initialDefaults() {
   return Object.fromEntries(
@@ -169,7 +174,8 @@ export async function saveField(plan: SafetyPlan, key: string, value: string, re
           value,
           revision: revision ?? current.revision,
           mutationId: crypto.randomUUID(),
-          baseValue: baseValue ?? current.value,
+          writerId: safetyWriterId,
+          clientSequence: ++safetyClientSequence,
         },
       ],
     })

@@ -27,8 +27,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.olive.app.data.NewsArticle
-import com.olive.app.data.NewsScope
+import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.news.NewsScope
 import com.olive.app.R
 import com.olive.app.ui.covers.CoverAccountPanel
 import com.olive.app.ui.shared.LocalizedIcon as Icon

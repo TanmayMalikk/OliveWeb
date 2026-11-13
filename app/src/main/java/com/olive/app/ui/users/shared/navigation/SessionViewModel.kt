@@ -5,7 +5,21 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
-import com.olive.app.data.*
+import com.olive.app.data.account.AdminAccountDraft
+import com.olive.app.data.account.AdminAccountSummary
+import com.olive.app.data.account.CoverType
+import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.PrivateEntry
+import com.olive.app.data.account.PrivateEntryKind
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.messaging.ChatMessage
+import com.olive.app.data.messaging.DirectoryUser
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.messaging.FriendRelationship
+import com.olive.app.data.messaging.FriendRequest
+import com.olive.app.data.news.NewsArticle
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.ui.session.SessionRuntime
 import com.olive.app.ui.users.shared.organization.AdminLocationMapController
 import com.olive.app.ui.users.user.documents.MediaTransferController
@@ -67,7 +81,6 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val adminCounts get() = runtime.state.adminCounts
     val adminAccounts get() = runtime.state.adminAccounts
     val savedNews get() = runtime.state.savedNews
-    val coverDataVersion get() = runtime.state.coverDataVersion
     val idleCountdownSeconds get() = runtime.state.idleCountdownSeconds
     val privacyBlackout get() = runtime.state.privacyBlackout
     val coverReset get() = runtime.state.coverReset
@@ -236,6 +249,7 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
 
     // Retries the failed encrypted queue head without bypassing message order.
     fun retryMessage(chat: ChatMessage) = runtime.conversationActions.retryMessage(chat)
+    fun discardFailedMessage(chat: ChatMessage) = runtime.conversationActions.discardFailedMessage(chat)
     // Un-sends a message when the signed-in account is allowed to remove it.
     fun unsendMessage(chat: ChatMessage) = runtime.conversationActions.unsendMessage(chat)
     // Dismisses the quick-exit tip shown inside a chat.

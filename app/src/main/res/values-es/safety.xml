@@ -10,7 +10,9 @@
     <string name="safety_waiting">Esperando al siguiente miembro del personal disponible.</string>
     <string name="safety_share_queued">Solicitud guardada.</string>
     <string name="safety_saving">Guardando en este dispositivo…</string>
-    <string name="safety_saved">Guardado.</string>
+    <string name="safety_saved">Guardado y sincronizado.</string>
+    <string name="safety_saved_waiting">Guardado en este dispositivo. Esperando para sincronizar.</string>
+    <string name="safety_syncing">Sincronizando cambios…</string>
     <string name="safety_sync_error">No se pudieron actualizar los detalles de la consulta. Inténtalo de nuevo.</string>
     <string name="safety_storage_error">No se pudo guardar en este dispositivo. Mantén esta página abierta y reintenta.</string>
     <string name="safety_access_revoked">Este plan ya no se comparte contigo. Se eliminó su copia en caché.</string>

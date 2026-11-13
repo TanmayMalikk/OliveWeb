@@ -25,20 +25,18 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
-import com.olive.app.data.DirectoryUser
-import com.olive.app.data.Friend
-import com.olive.app.data.FriendRelationship
-import com.olive.app.data.FriendRequest
-import com.olive.app.data.SafetyDocument
+import com.olive.app.data.account.AccountRole
+import com.olive.app.data.messaging.DirectoryUser
+import com.olive.app.data.messaging.Friend
+import com.olive.app.data.messaging.FriendRelationship
+import com.olive.app.data.messaging.FriendRequest
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.media.OfflineMediaAvailability
+import com.olive.app.data.messaging.ChatMessage
 import com.olive.app.ui.shared.Muted
 import com.olive.app.ui.shared.OliveGreen
 import com.olive.app.ui.shared.SecureFileOpeningIndicator
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.shared.navigation.*
@@ -310,7 +308,7 @@ private fun LazyItemScope.FriendRow(
 // Shows text or the correct viewer button for one chat message.
 @Composable
 internal fun ChatMessageBody(
-    chat: com.olive.app.data.ChatMessage, session: SessionViewModel, mine: Boolean,
+    chat: ChatMessage, session: SessionViewModel, mine: Boolean,
     onOpenMedia: (SafetyDocument, File) -> Unit
 ) {
     val parts = chat.body.split(":", limit = 3)
@@ -443,8 +441,7 @@ internal fun SharedMediaMessage(
             session.documents.openShared(
                 uid,
                 id,
-                { document, local -> onOpen(document, local) },
-            )
+            ) { document, local -> onOpen(document, local) }
         }, enabled = !opening, shape = MaterialTheme.shapes.medium,
         color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
@@ -469,7 +466,9 @@ internal fun SharedMediaMessage(
             }
         }
     }
-    if (document?.objectKey?.isNotBlank() == true) {
+    if (document?.objectKey?.isNotBlank() == true &&
+        canManageSharedMediaOfflineCopy(session.accountRole)
+    ) {
         val cached = offline in setOf(
             OfflineMediaAvailability.AVAILABLE,
             OfflineMediaAvailability.REVALIDATION_REQUIRED,
@@ -500,3 +499,6 @@ internal fun SharedMediaMessage(
     }
     }
 }
+
+internal fun canManageSharedMediaOfflineCopy(role: AccountRole) =
+    role == AccountRole.USER || role == AccountRole.SAFE_CONTACT

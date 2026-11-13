@@ -1,11 +1,12 @@
 // Users and support staff: opens shared images, videos, and documents in the app.
 package com.olive.app.ui.users.user.documents
 
+import android.annotation.SuppressLint
 import com.olive.app.ui.shared.*
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.media.ExifInterface
+import androidx.exifinterface.media.ExifInterface
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import android.view.ViewGroup
@@ -49,20 +50,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.R
-import com.olive.app.data.SafetyDocument
+import com.olive.app.data.safety.SafetyDocument
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.File
 import java.util.zip.ZipFile
-
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
-import org.json.JSONArray
 
 
 // Opens an in-app image, video, PDF, or text viewer for a safety document.
@@ -375,6 +369,8 @@ private fun ZoomControls(
     onReset: () -> Unit,
     onZoomIn: () -> Unit,
     onRotate: (() -> Unit)? = null,
+    @SuppressLint("ModifierParameter")
+    //modifier wants to be the first optional parameter.
     modifier: Modifier = Modifier,
 ) {
     val resetDescription = stringResource(R.string.a11y_reset_zoom)

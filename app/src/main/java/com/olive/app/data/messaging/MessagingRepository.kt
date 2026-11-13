@@ -1,5 +1,5 @@
 // All chat roles: loads and saves direct messages and friend requests.
-package com.olive.app.data
+package com.olive.app.data.messaging
 
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
@@ -13,6 +13,8 @@ import com.olive.app.security.KeyManager
 import java.security.PublicKey
 import java.util.Base64
 import android.content.Context
+import com.google.firebase.firestore.Source
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.security.EncryptedVault
 import com.olive.app.security.child
 import kotlinx.coroutines.flow.Flow
@@ -252,41 +254,15 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
         return listener.asSubscription()
     }
 
-    // Reads server-authored history independently of the encrypted message stream.
-    internal fun observeMembershipEvents(
-        id: String, actorUid: String? = null, onUpdate: (List<ChatMembershipEvent>) -> Unit,
-    ): ChatSubscription {
-        val events = firestore.collection("conversations").document(id).collection("membershipEvents")
-        val query = if (actorUid == null) events.orderBy("createdAt").limitToLast(250)
-        else events.whereEqualTo("actorUid", actorUid)
-        return query.addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
-            if (error != null) {
-                onUpdate(emptyList())
-                return@addSnapshotListener
-            }
-            if (snapshot?.metadata?.isFromCache != false) return@addSnapshotListener
-            onUpdate(snapshot.documents.mapNotNull { row ->
-                val action = ChatMembershipAction.entries.firstOrNull { it.name == row.getString("action") }
-                    ?: return@mapNotNull null
-                ChatMembershipEvent(
-                    row.id, action, row.getString("actorUid") ?: return@mapNotNull null,
-                    row.getString("actorName").orEmpty(), row.getString("participantUid") ?: return@mapNotNull null,
-                    row.getString("participantName").orEmpty(),
-                    row.getTimestamp("createdAt")?.toDate()?.time ?: return@mapNotNull null,
-                )
-            })
-        }.asSubscription()
-    }
-
-    // Reads a newly created ticket before it reaches the conversation index.
+    // Loads one server-confirmed conversation for durable attachment authorization.
     suspend fun getConversation(id: String): ChatConversation? =
         conversationFrom(firestore.collection("conversations").document(id)
-            .get(com.google.firebase.firestore.Source.SERVER).await())
+            .get(Source.SERVER).await())
 
     // Loads a server-confirmed conversation index for background membership and key reconciliation.
     suspend fun listConversations(currentUid: String): List<ChatConversation> =
         firestore.collection("conversations").whereArrayContains("participantIds", currentUid)
-            .get(com.google.firebase.firestore.Source.SERVER).await().documents
+            .get(Source.SERVER).await().documents
             .mapNotNull(::conversationFrom)
             .sortedByDescending(ChatConversation::updatedAt)
 
@@ -427,8 +403,9 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
                 require(
                     existing.ownerUid == message.ownerUid &&
                             existing.conversationId == message.conversationId &&
-                            existing.ciphertext == message.ciphertext
-                ) { "A queued message id cannot identify different ciphertext" }
+                            existing.ciphertext == message.ciphertext &&
+                            existing.attachment == message.attachment
+                ) { "A queued message id cannot identify different encrypted content" }
                 persisted = existing
                 return@update
             }
@@ -470,7 +447,7 @@ class MessageOutboxStore internal constructor(private val vault: MessageOutboxVa
             collection.put(id, updated.toJson())
         }
         changes.tryEmit(checkNotNull(result).ownerUid)
-        return checkNotNull(result)
+        return result
     }
 
     /** The first unresolved message is a hard barrier for every later sequence. */

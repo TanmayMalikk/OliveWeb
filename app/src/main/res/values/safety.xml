@@ -10,7 +10,9 @@
     <string name="safety_waiting">Waiting for the next available staff member.</string>
     <string name="safety_share_queued">Request saved.</string>
     <string name="safety_saving">Saving on this device…</string>
-    <string name="safety_saved">Saved.</string>
+    <string name="safety_saved">Saved and synced.</string>
+    <string name="safety_saved_waiting">Saved on this device. Waiting to sync.</string>
+    <string name="safety_syncing">Syncing changes…</string>
     <string name="safety_sync_error">Could not update consultation details. Please try again.</string>
     <string name="safety_storage_error">Could not save on this device. Keep this page open and retry saving.</string>
     <string name="safety_access_revoked">This plan is no longer shared with you. Its cached copy has been removed.</string>
