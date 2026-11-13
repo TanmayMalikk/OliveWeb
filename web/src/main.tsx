@@ -3,25 +3,22 @@ import {
   Component,
   lazy,
   Suspense,
-  useEffect,
   useRef,
   useState,
   type ErrorInfo,
   type ReactNode,
 } from "react";
 import { createRoot } from "react-dom/client";
-import { LogOut, Delete, ArrowLeft, Leaf } from "lucide-react";
+import { LogOut, Delete, ArrowRight, Leaf, LockKeyhole } from "lucide-react";
 import { SessionProvider, useSession } from "./session/SessionProvider";
 import { AuthPage, Setup } from "./users/shared/auth/AccountEntryPage";
 import { Button, Field, Form } from "./components/SharedComponents";
 import Game from "./public/covers/OliveGamesCover";
-import { coverSite, siteMode, type SiteMode } from "./sites/SiteRouting";
+import { siteMode, type SiteMode } from "./sites/SiteRouting";
 import "./styles.css";
 const Download = lazy(() => import("./public/AppDownloadInstructions"));
 const EntryLink = lazy(() => import("./users/shared/auth/PrivateEntryLink"));
 const SafeApp = lazy(() => import("./users/shared/safe_app/SafeAppLayout"));
-const News = lazy(() => import("./public/covers/DailyDigestCover"));
-const Fitness = lazy(() => import("./public/covers/FitnessCover"));
 const AdminPortal = lazy(() => import("./users/admin/AdminDashboardPage"));
 const StaffPortal = lazy(() => import("./users/staff/StaffDashboardPage"));
 // User cover apps: asks for the private PIN before opening the Safe App.
@@ -29,23 +26,19 @@ function PinGate() {
   const s = useSession();
   const [pin, setPin] = useState("");
   return (
-    <main id="main" className="pin-page private-shell">
-      <div className="pin-top">
-        <span>
-          <Leaf size={20} /> A little space.
-        </span>
-        <Button variant="exit" onClick={s.quickExit}>
-          Quick Exit <LogOut size={17} />
-        </Button>
+    <main id="main" className="access-page pin-page private-shell">
+      <div className="access-header">
+        <span className="access-wordmark"><Leaf size={21} aria-hidden="true" /> Olive Branch</span>
+        {s.enrollment?.role === "USER" && (
+          <Button variant="exit" onClick={s.quickExit}>
+            <LogOut size={17} aria-hidden="true" /> Quick Exit
+          </Button>
+        )}
       </div>
-      <div className="pin-card">
-        <span className="eyebrow">YOUR PERSONAL ENTRY</span>
-        <h1>
-          A familiar
-          <br />
-          <em>way back.</em>
-        </h1>
-        <p>Enter your browser PIN to open your space.</p>
+      <section className="access-card pin-card" aria-labelledby="pin-heading">
+        <span className="access-mark"><LockKeyhole size={24} aria-hidden="true" /></span>
+        <h1 id="pin-heading">Unlock Safe Space</h1>
+        <p>Enter your browser PIN to continue.</p>
         <Form
           onSubmit={async () => {
             await s.perform(async () => {
@@ -70,87 +63,54 @@ function PinGate() {
             required
             maxLength={6}
           />
-          <div
-            className="pin-count"
-            aria-live="polite"
-            aria-label={`Digits entered: ${pin.length}`}
-          >
-            {Array.from({ length: 6 }, (_, i) => (
-              <i key={i} className={i < pin.length ? "entered" : ""} />
-            ))}
-          </div>
-          <div className="pin-keypad">
-            {[
-              "1",
-              "2",
-              "3",
-              "4",
-              "5",
-              "6",
-              "7",
-              "8",
-              "9",
-              "delete",
-              "0",
-              "unlock",
-            ].map((key) => (
+          <div className="pin-keypad" role="group" aria-label="PIN keypad">
+            {["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((digit) => (
               <button
-                type={key === "unlock" ? "submit" : "button"}
-                key={key}
-                aria-label={
-                  key === "delete"
-                    ? "Delete digit"
-                    : key === "unlock"
-                      ? "Unlock"
-                      : key
-                }
-                disabled={s.busy || (key === "unlock" && pin.length < 4)}
-                onClick={() => {
-                  if (key === "delete") setPin((v) => v.slice(0, -1));
-                  else if (key !== "unlock")
-                    setPin((v) => (v + key).slice(0, 6));
-                }}
+                type="button"
+                key={digit}
+                disabled={s.busy}
+                onClick={() => setPin((value) => (value + digit).slice(0, 6))}
               >
-                {key === "delete" ? (
-                  <Delete size={22} />
-                ) : key === "unlock" ? (
-                  <LogOut size={22} />
-                ) : (
-                  key
-                )}
+                {digit}
               </button>
             ))}
+            <button
+              type="button"
+              aria-label="Delete digit"
+              disabled={s.busy || pin.length === 0}
+              onClick={() => setPin((value) => value.slice(0, -1))}
+            >
+              <Delete size={20} aria-hidden="true" />
+            </button>
           </div>
           {s.message && (
             <p role="alert" className="form-error">
               {s.message}
             </p>
           )}
+          <Button type="submit" disabled={s.busy || pin.length < 4}>
+            {s.busy ? "Unlocking…" : "Unlock"} <ArrowRight size={17} aria-hidden="true" />
+          </Button>
         </Form>
         <button
           className="text-link"
+          type="button"
           onClick={() => {
             s.quickExit();
             s.go("/account/link");
           }}
         >
-          Need a new browser PIN or link? <ArrowLeft size={15} />
+          Need a new browser PIN or link? <ArrowRight size={15} aria-hidden="true" />
         </button>
-      </div>
+      </section>
     </main>
   );
 }
-// User cover apps: displays the cover chosen for this account.
+// Little Grove is the browser cover for every account.
 function Cover() {
   const s = useSession();
   const [accountOpen, setAccountOpen] = useState(false);
   const lastOliveTap = useRef(0);
-  const coverLabel =
-    s.cover === "NEWS"
-        ? "Daily Digest"
-        : s.cover === "FITNESS"
-          ? "Fitness"
-          : "Game";
   const tapOlive = () => {
     const now = Date.now();
     if (now - lastOliveTap.current > 1500) {
@@ -163,12 +123,12 @@ function Cover() {
   return (
     <main
       id="main"
-      className={`cover-container ${s.cover.toLowerCase()}-cover`}
+      className="cover-container game-cover"
     >
       <nav
         className="cover-account-tabs"
         role="tablist"
-        aria-label={`${coverLabel} app pages`}
+        aria-label="Little Grove pages"
       >
         <button
           type="button"
@@ -177,7 +137,7 @@ function Cover() {
           aria-controls="cover-display-panel"
           onClick={() => setAccountOpen(false)}
         >
-          {coverLabel}
+          Game
         </button>
         <button
           type="button"
@@ -195,13 +155,7 @@ function Cover() {
         role="tabpanel"
         hidden={accountOpen}
       >
-        {s.cover === "NEWS" ? (
-          <News />
-        ) : s.cover === "FITNESS" ? (
-          <Fitness />
-        ) : (
-          <Game />
-        )}
+        <Game />
       </div>
       <section
         id="cover-account-panel"
@@ -228,36 +182,6 @@ function Cover() {
 // Sends each domain and signed-in role to its matching web screen.
 function Routes({ mode }: { mode: SiteMode }) {
   const s = useSession();
-  // Read the current session whenever the route changes.
-  useEffect(() => {
-    const cover = coverSite(s.cover).slug;
-    let link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "manifest";
-      document.head.append(link);
-    }
-    link.href = `/${cover}/manifest.webmanifest`;
-    const icon = cover;
-    const apple = document.querySelector<HTMLLinkElement>(
-      'link[rel="apple-touch-icon"]',
-    );
-    if (apple) apple.href = `/icons/${icon}-192.png`;
-    const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-    if (favicon) favicon.href = `/icons/${icon}.svg`;
-    const appleName = document.querySelector<HTMLMetaElement>(
-      'meta[name="apple-mobile-web-app-title"]',
-    );
-    if (appleName)
-      appleName.content =
-        icon === "olive"
-          ? "Olive"
-          : icon === "daily-digest"
-            ? "Daily Digest"
-            : icon === "fitness"
-              ? "Fitness Tracker"
-              : "Little Grove";
-  }, [s.cover]);
   let content: ReactNode;
   if (mode === "download") content = <Download />;
   else if (mode === "admin") {
@@ -308,7 +232,7 @@ class ErrorBoundary extends Component<
         <p>
           This page could not open. Your stored account has not been deleted.
         </p>
-        <a href="/">Return to Fitness Tracker</a>
+        <a href="/">Return to Little Grove</a>
       </main>
     ) : (
       this.props.children

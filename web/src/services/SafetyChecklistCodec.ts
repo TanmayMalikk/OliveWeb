@@ -1,9 +1,36 @@
+// Keep the same display order as Android's SAFETY_CHECKLIST_SECTIONS.
+export const safetySections = [
+  "documents",
+  "grab",
+  "destination",
+  "travel",
+  "contacts",
+  "aftercare",
+] as const;
+export const olderSafetySections = ["essentials", "dependants"] as const;
+export const safetySectionLabels: Record<string, string> = {
+  documents: "Important documents",
+  grab: "Quick-grab necessities",
+  destination: "Safe destination",
+  travel: "Transportation",
+  contacts: "Trusted contact / safe place to stay",
+  aftercare: "After leaving",
+  essentials: "Essential items and documents",
+  dependants: "Children, dependants and pets",
+};
+
 export type SafetyChecklistItem = {
   id: string;
   text: string;
   checked: boolean;
   attachmentIds?: string[];
   excludedAttachmentIds?: string[];
+};
+
+export type SafetyChecklistConflictPreview = {
+  item: string;
+  property: string;
+  value: string;
 };
 
 function documentIds(value: unknown): string[] | undefined {
@@ -47,9 +74,62 @@ export function readSafetyChecklist(value: string): SafetyChecklistItem[] {
     return items;
   } catch {
     return value.trim()
-      ? [{ id: crypto.randomUUID(), text: value, checked: false }]
+      ? [{ id: "legacy-note", text: value, checked: false }]
       : [];
   }
+}
+
+// Returns only checklist rows and properties whose owner/incoming values disagree.
+export function safetyChecklistConflictPreview(
+  mine: string, incoming: string, showMine: boolean,
+): SafetyChecklistConflictPreview[] | null {
+  const isStructured = (value: string) => {
+    try {
+      return (JSON.parse(value) as { oliveSafetyChecklist?: unknown }).oliveSafetyChecklist === 1;
+    } catch {
+      return false;
+    }
+  };
+  if (!isStructured(mine) || !isStructured(incoming)) return null;
+
+  const mineById = new Map(readSafetyChecklist(mine).map((item) => [item.id, item]));
+  const incomingById = new Map(readSafetyChecklist(incoming).map((item) => [item.id, item]));
+  const preview: SafetyChecklistConflictPreview[] = [];
+  for (const id of new Set([...mineById.keys(), ...incomingById.keys()])) {
+    const yourItem = mineById.get(id);
+    const incomingItem = incomingById.get(id);
+    if (JSON.stringify(yourItem) === JSON.stringify(incomingItem)) continue;
+    if (!yourItem || !incomingItem) {
+      const item = yourItem ?? incomingItem;
+      if (!item) continue;
+      preview.push({
+        item: item.text,
+        property: "Step",
+        value: showMine ? (yourItem ? "Present" : "Removed") : (incomingItem ? "Present" : "Removed"),
+      });
+      continue;
+    }
+    const itemText = showMine ? yourItem.text : incomingItem.text;
+    if (yourItem.text !== incomingItem.text) {
+      preview.push({ item: itemText, property: "Text", value: itemText });
+    }
+    if (yourItem.checked !== incomingItem.checked) {
+      preview.push({
+        item: itemText,
+        property: "Completion",
+        value: (showMine ? yourItem.checked : incomingItem.checked) ? "Complete" : "Not complete",
+      });
+    }
+    if (JSON.stringify(yourItem.attachmentIds ?? []) !== JSON.stringify(incomingItem.attachmentIds ?? [])) {
+      const count = (showMine ? yourItem.attachmentIds : incomingItem.attachmentIds)?.length ?? 0;
+      preview.push({ item: itemText, property: "Attachments", value: `${count} attachment${count === 1 ? "" : "s"}` });
+    }
+    if (JSON.stringify(yourItem.excludedAttachmentIds ?? []) !== JSON.stringify(incomingItem.excludedAttachmentIds ?? [])) {
+      const count = (showMine ? yourItem.excludedAttachmentIds : incomingItem.excludedAttachmentIds)?.length ?? 0;
+      preview.push({ item: itemText, property: "Excluded attachments", value: `${count} excluded attachment${count === 1 ? "" : "s"}` });
+    }
+  }
+  return preview;
 }
 
 // Web safety plans: writes the exact checklist structure expected by Android.

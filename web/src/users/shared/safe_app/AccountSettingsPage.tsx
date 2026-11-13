@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Copy, RefreshCw } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
 import { Button, Field, Form, Modal } from "../../../components/SharedComponents";
-import { newEvent, validPassword, validPin, type Profile } from "../../../domain/DomainModels";
+import { newEvent, validPassword, validPin } from "../../../domain/DomainModels";
 import { accounts, triggerHash } from "../../../services/AccountService";
 import { issueEntryLink, savedEntryLink } from "../../../services/PrivateEntryLinks";
 export default function Settings() {
@@ -27,57 +27,7 @@ export default function Settings() {
   return (
     <div className="settings-grid">
       <section className="panel">
-        <h2>Your everyday.</h2>
-        <p>The cover you return to when you leave this space.</p>
-        <Form
-          onSubmit={async (data) => {
-            await s.perform(() =>
-              s.saveProfile(
-                {
-                  ...p,
-                  coverType: String(data.get("cover")) as Profile["coverType"],
-                  language: String(data.get("language")),
-                },
-                "Updated cover and language",
-              ),
-            );
-          }}
-        >
-          <label className="field">
-            <span>Cover app</span>
-            <select name="cover" defaultValue={p.coverType}>
-              <option value="NEWS">Daily Digest</option>
-              <option value="FITNESS">Fitness Tracker</option>
-              <option value="GAME">Little Grove</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>Profile language</span>
-            <select name="language" defaultValue={p.language}>
-              {[
-                "English",
-                "French",
-                "Spanish",
-                "Arabic",
-                "Chinese",
-                "Tagalog",
-                "Cree",
-              ].map((l) => (
-                <option key={l}>{l}</option>
-              ))}
-            </select>
-            <small>
-              Your language preference syncs with mobile. The web interface
-              currently uses English.
-            </small>
-          </label>
-          <Button type="submit" disabled={s.busy}>
-            Save preferences
-          </Button>
-        </Form>
-      </section>
-      <section className="panel">
-        <h2>Your personal link.</h2>
+        <h2>Personal entry link</h2>
         <p>
           Your link opens an entry gate. A password or enrolled-browser PIN is
           still required.
@@ -104,7 +54,7 @@ export default function Settings() {
         </Button>
       </section>
       <section className="panel">
-        <h2>Account password.</h2>
+        <h2>Account password</h2>
         <Form
           onSubmit={async (data) => {
             await s.perform(async () => {
@@ -150,7 +100,7 @@ export default function Settings() {
       {p.role === "USER" && (
         <>
           <section className="panel">
-            <h2>Browser PIN.</h2>
+            <h2>Browser PIN</h2>
             <Form
               onSubmit={async (data) => {
                 await s.perform(async () => {
@@ -198,10 +148,9 @@ export default function Settings() {
             </Form>
           </section>
           <section className="panel">
-            <h2>Cover trigger.</h2>
+            <h2>Android cover trigger</h2>
             <p>
-              Your web entry uses your personal link. This trigger preference
-              also syncs with your Android cover.
+              Change the phrase that opens the private entry prompt on Android. The web uses your personal link.
             </p>
             <Form
               onSubmit={async (data) => {
@@ -233,11 +182,11 @@ export default function Settings() {
         </>
       )}
       <section className="panel">
-        <h2>Your account connection.</h2>
+        <h2>Account sync</h2>
         <p>
           {s.cloudMode
-            ? "Profiles, notes, contacts, and activity use the same Firebase paths as Android."
-            : "This account is encrypted in this browser. It cannot read the Android app’s local vault."}
+            ? "Your profile, notes, contacts, and activity sync with Android."
+            : "This account’s data is stored in this browser. It is separate from your Android account."}
         </p>
         <Button
           variant="outline"
@@ -247,8 +196,7 @@ export default function Settings() {
           <RefreshCw size={16} /> Refresh account
         </Button>
         <p className="help-note">
-          Quick Exit does not clear browser history or prevent screen recording.
-          Keep access to your device and browser secure.
+          {s.profile?.role === "USER" ? "Quick Exit does not clear browser history or prevent screen recording." : "Keep access to your account secure."}
         </p>
       </section>
       {confirmRotation && (

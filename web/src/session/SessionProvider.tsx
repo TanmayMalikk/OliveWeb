@@ -1,18 +1,18 @@
 // Signed-in users: loads the account and keeps web session state in sync.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  accounts, cloudMode, triggerHash, firebase, observeAccountChanges,
+  accounts, cloudMode, firebase, observeAccountChanges,
 } from "../services/AccountService";
 import { database } from "../services/LocalDataStore";
 import {
   issueEntryLink, savedEntryLink, verifyEntryLink, validEntryToken,
 } from "../services/PrivateEntryLinks";
 import {
-  canonicalPath, coverForRoute, siteDestination, siteMode, type SiteMode,
+  canonicalPath, siteDestination, siteMode, webCover, type SiteMode,
 } from "../sites/SiteRouting";
 import {
-  coverPath, covers, emptyHistory, friendlyError, newEvent, normalizeCover,
-  type Cover, type Enrollment, type History, type Profile, type Role,
+  emptyHistory, friendlyError, newEvent,
+  type Enrollment, type History, type Profile, type Role,
   type Page, type Entry, type Event, type Category,
 } from "../domain/DomainModels";
 import { SessionContext, useSession, type SessionValue } from "./SessionContext";
@@ -61,16 +61,13 @@ export function SessionProvider({
   const [history, setHistory] = useState<History>(emptyHistory);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [page, setPage] = useState<Page>("Home");
+  const [requestedConversation, setRequestedConversation] = useState<{ id: string; uid: string } | null>(null);
   const [onboardingProfile, setOnboardingProfile] = useState<Profile | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [idleSeconds, setIdleSeconds] = useState<number | null>(null);
   const epoch = useRef(0);
   const working = useRef(false);
-  const routeCover = coverForRoute(path, location.origin)?.id as Cover | undefined;
-  const cover = normalizeCover(
-    routeCover ?? enrollment?.cover ?? profile?.coverType ?? "FITNESS",
-  );
 
   // Reloads account files when another phone or browser changes this account.
   useEffect(() => {
@@ -154,17 +151,19 @@ export function SessionProvider({
       .then((db) => db.get("device", "current"))
       .then(async (value) => {
         if (!live) return;
-        const savedEnrollment = value ? { ...value, cover: normalizeCover(value.cover) } : null;
+        const stored = value as (Enrollment & { cover?: unknown }) | undefined;
+        const savedEnrollment = stored ? { ...stored, webCover: webCover.id } : null;
+        if (savedEnrollment) delete savedEnrollment.cover;
         setEnrollment(savedEnrollment);
-        if (savedEnrollment && savedEnrollment.cover !== value?.cover)
+        if (savedEnrollment && (stored?.webCover !== webCover.id || stored?.cover !== undefined))
           await (await database).put("device", savedEnrollment, "current");
         // A saved account and a pending link are both needed before showing PIN entry.
-        if (value && pendingEntry.current) {
+        if (savedEnrollment && pendingEntry.current) {
           let authenticated = true;
           if (cloudMode) {
             const { auth } = await firebase();
             await auth.authStateReady();
-            authenticated = auth.currentUser?.uid === savedEnrollment?.uid;
+            authenticated = auth.currentUser?.uid === savedEnrollment.uid;
           }
           const entryToken = pendingEntry.current;
           if (entryToken && authenticated && live && pendingEntry.current === entryToken) {
@@ -189,7 +188,7 @@ export function SessionProvider({
           ? "/account/sign-in"
           : mode === "download"
             ? "/get"
-            : coverPath(profile?.coverType ?? cover);
+            : "/";
     epoch.current++;
     entryOwner.current = null;
     pendingEntry.current = null;
@@ -199,6 +198,7 @@ export function SessionProvider({
     setPersonalLink("");
     setHistory(emptyHistory());
     setPage("Home");
+    setRequestedConversation(null);
     setMessage("");
     setIdleSeconds(null);
     setBusy(false);
@@ -210,7 +210,7 @@ export function SessionProvider({
     );
     setPath(returnPath);
     window.scrollTo({ top: 0 });
-  }, [cover, mode, profile?.coverType, profile?.role]);
+  }, [mode, profile?.role]);
 
   const noteInteraction = useSessionSecurity({
     enrollment, entryOwner, epoch, mode, pendingEntry, phase,
@@ -226,8 +226,8 @@ export function SessionProvider({
         ? "Olive Branch Workspace"
         : mode === "download"
           ? "Olive Branch"
-          : (covers.find((candidate) => candidate.id === cover)?.name ?? "Game");
-  }, [cover, mode]);
+          : webCover.name;
+  }, [mode]);
 
   // Runs one account task at a time and keeps loading and error messages consistent.
   async function perform(work: () => Promise<void>) {
@@ -293,14 +293,14 @@ export function SessionProvider({
       setPersonalLink(await issueEntryLink(accounts.identity!.uid));
       setEnrollment(
         current && current.uid === accounts.identity?.uid
-          ? { ...current, cover: p.coverType }
+          ? { ...current, webCover: webCover.id }
           : null,
       );
       setPhase("link");
       return;
     }
     if (current && current.uid === accounts.identity?.uid) {
-      setEnrollment({ ...current, cover: p.coverType, triggerHash: p.triggerHash });
+      setEnrollment({ ...current, webCover: webCover.id, triggerHash: p.triggerHash });
       accounts.lock();
       const saved = await savedEntryLink(current.uid);
       const savedToken = saved ? new URL(saved).hash.slice(1) : "";
@@ -370,22 +370,6 @@ export function SessionProvider({
     setPhase("link");
   }
 
-  // Checks cover-app input for the user's private trigger phrase.
-  async function searchTrigger(value: string) {
-    if (!enrollment || enrollment.cover !== cover || enrollment.role !== "USER") return false;
-    if ((await triggerHash(value)) !== enrollment.triggerHash) return false;
-    if (entryOwner.current !== enrollment.uid) {
-      const saved = await savedEntryLink(enrollment.uid);
-      const token = saved ? new URL(saved).hash.slice(1) : "";
-      if (!validEntryToken(token)) return false;
-      pendingEntry.current = token;
-      entryOwner.current = enrollment.uid;
-    }
-    setMessage("");
-    setPhase("pin");
-    return true;
-  }
-
   // Verifies the link and PIN before loading private account data.
   async function unlock(pin: string) {
     const token = epoch.current;
@@ -432,11 +416,11 @@ export function SessionProvider({
   // Saves account settings and tells the other signed-in devices to refresh.
   async function saveProfile(p: Profile, action = "Saved profile settings") {
     const token = epoch.current;
-    await accounts.saveProfile(p);
+    const saved = await accounts.saveProfile(p);
     if (token !== epoch.current) return;
-    setProfile(p);
+    setProfile(saved);
     if (enrollment)
-      setEnrollment({ ...enrollment, cover: p.coverType, triggerHash: p.triggerHash });
+      setEnrollment({ ...enrollment, webCover: webCover.id, triggerHash: p.triggerHash });
     await record("settings", newEvent(action));
     setMessage("Changes saved.");
   }
@@ -468,6 +452,7 @@ export function SessionProvider({
           : "/";
     await accounts.signOut();
     epoch.current++;
+    setRequestedConversation(null);
     setProfile(null);
     setHistory(emptyHistory());
     setEnrollment(null);
@@ -480,9 +465,9 @@ export function SessionProvider({
     <SessionContext.Provider
       value={{
         path, go, phase, personalLink, hasEntryToken: Boolean(pendingEntry.current),
-        profile, history, enrollment, cover, page, setPage, busy, message,
+        profile, history, enrollment, page, setPage, requestedConversation, setRequestedConversation, busy, message,
         clearMessage: () => setMessage(""), perform, authenticate, completeSetup,
-        beginEntry, quickExit, searchTrigger, unlock, saveProfile, saveEntry,
+        beginEntry, quickExit, unlock, saveProfile, saveEntry,
         record, refresh, signOut, idleSeconds, noteInteraction, cloudMode, onboardingProfile,
       }}
     >

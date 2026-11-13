@@ -61,5 +61,6 @@
     <string name="notification_active_voice_calls">进行中的语音通话</string>
     <string name="notification_safe_app_updates">安全应用动态</string>
     <string name="notification_safe_app_activity">打开 Olive Branch 查看更新。</string>
+    <string name="notification_ticket_assigned">有一张新工单已分配给你。</string>
     <string name="notification_new_app_update">应用有新版本</string>
 </resources>

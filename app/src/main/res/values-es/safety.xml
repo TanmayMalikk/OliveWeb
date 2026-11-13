@@ -19,6 +19,13 @@
     <string name="safety_account_required">La consulta requiere iniciar sesión en una cuenta. Tus planes siguen disponibles sin conexión.</string>
     <string name="safety_conflict">Esta sección cambió en otro dispositivo. Tu edición se conserva. Elige qué versión guardar.</string>
     <string name="safety_synced_version">Versión sincronizada: %1$s</string>
+    <string name="safety_incoming_changes">Cambios recibidos</string>
+    <string name="safety_incoming_added">Añadido: %1$s</string>
+    <string name="safety_incoming_removed">Eliminado: %1$s</string>
+    <string name="safety_incoming_text_changed">Cambiado: %1$s → %2$s</string>
+    <string name="safety_incoming_completed">Marcado como completado: %1$s</string>
+    <string name="safety_incoming_incomplete">Marcado como pendiente: %1$s</string>
+    <string name="safety_incoming_attachments_changed">Archivos adjuntos actualizados: %1$s</string>
     <string name="safety_keep_mine">Conservar mi edición</string>
     <string name="safety_use_synced">Usar versión sincronizada</string>
     <string name="safety_destination">Destino seguro</string>
@@ -40,4 +47,14 @@
     <string name="safety_storage_videos">Vídeos</string>
     <string name="safety_storage_documents">Imágenes de documentos</string>
     <string name="safety_document_upload_hint">Los archivos subidos también aparecen en Documentos.</string>
+    <string name="safety_conflict_step">Paso</string>
+    <string name="safety_conflict_text">Texto</string>
+    <string name="safety_conflict_completion">Estado</string>
+    <string name="safety_conflict_attachments">Archivos adjuntos</string>
+    <string name="safety_conflict_excluded_attachments">Archivos adjuntos excluidos</string>
+    <string name="safety_conflict_present">Presente</string>
+    <string name="safety_conflict_removed">Eliminado</string>
+    <string name="safety_conflict_complete">Completado</string>
+    <string name="safety_conflict_not_complete">Sin completar</string>
+    <string name="safety_conflict_changed">Modificados</string>
 </resources>

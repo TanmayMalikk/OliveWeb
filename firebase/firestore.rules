@@ -128,7 +128,8 @@ service cloud.firestore {
         && data.revision >= data.mediaRevision
         && data.revision >= data.conversationRevision
         && data.revision >= data.accountRevision
-        && data.updatedAt is timestamp && data.updatedAt <= request.time;
+        // An open watch can evaluate later writes against its initial request time.
+        && data.updatedAt is timestamp;
     }
 
     // Priority sync markers contain no user payload. Server code owns every mutation so a client
@@ -300,7 +301,7 @@ service cloud.firestore {
       }
       function validEncryptedMedia(data, id) {
         return data.keys().hasOnly(['owner_id','object_key','encrypted_metadata','wrapped_keys','device_wrapped_keys','allowed_users',
-            'ciphertext_size','ciphertext_sha256','encryption_version','created_at','evidence'])
+            'ciphertext_size','ciphertext_sha256','encryption_version','created_at','evidence','account_recovery_ready'])
           && data.owner_id is string
           && data.object_key == 'users/' + data.owner_id + '/media/' + id
           && data.encrypted_metadata is string && data.encrypted_metadata.size() > 0
@@ -317,6 +318,7 @@ service cloud.firestore {
           && data.ciphertext_sha256 is string
           && data.ciphertext_sha256.matches('^[0-9a-f]{64}$')
           && data.encryption_version is int && data.encryption_version >= 1
+          && (!data.keys().hasAny(['account_recovery_ready']) || data.account_recovery_ready is bool)
           && data.created_at is timestamp
           && (!data.keys().hasAny(['evidence']) || data.evidence is bool);
       }
@@ -546,7 +548,7 @@ service cloud.firestore {
     function validConversation(data, conversationId) {
       return data.keys().hasOnly(['type','ownerUid','staffUid','adminUid','supportOrigin','supportTag','ticketNumber','ticketStatus','closedAt','completedAt','friendshipId','participantIds','participantUsernames','createdAt','updatedAt','lastMessage','lastMessageId','lastSenderUid','roomKeys','participantPublicKeys','requestSource','sourceConversationId','supportConversationId'])
         && data.friendshipId == conversationId
-        && (!data.keys().hasAny(['requestSource']) || data.requestSource in ['GROUP_CHAT'])
+        && (!data.keys().hasAny(['requestSource']) || data.requestSource in ['GROUP_CHAT', 'SUPPORT_BUTTON'])
         && (!data.keys().hasAny(['sourceConversationId']) || data.sourceConversationId is string)
         && (!data.keys().hasAny(['supportConversationId']) || data.supportConversationId is string)
         && (!data.keys().hasAny(['ticketNumber']) || (data.ticketNumber is int && data.ticketNumber >= 0))
@@ -564,11 +566,12 @@ service cloud.firestore {
               && (!data.keys().hasAny(['completedAt']) || data.completedAt is timestamp)
               && data.supportOrigin in ['PLAN_CONSULT', 'SUPPORT']
               && data.supportTag in ['PLAN_CONSULT', 'SUPPORT', 'NEEDS_ADMIN']
-              && conversationId.matches('^' + (data.supportOrigin == 'PLAN_CONSULT' ? 'plan-consult-' : 'support-')
+              && conversationId.matches('^(plan-consult-|support-)'
                 + data.ownerUid + '(-[A-Za-z0-9_-]{1,64})?$')
-              && data.participantIds is list && data.participantIds.size() >= 2
+              && data.participantIds is list && data.participantIds.size() >= 1
               && data.ownerUid in data.participantIds
-              && data.staffUid in data.participantIds
+              && (data.staffUid in data.participantIds ||
+                (data.staffUid == '' && data.participantIds == [data.ownerUid]))
               && validSupportAdmin(data))
           || (data.type == 'GROUP'
               && (!data.keys().hasAny(['ownerUid'])
@@ -604,6 +607,7 @@ service cloud.firestore {
       // Firestore rejects unfiltered and other-user queries because it cannot prove this predicate.
       allow get: if conversationParticipant(resource.data)
         || (signedIn()
+          && !exists(/databases/$(database)/documents/conversations/$(conversationId))
           && exists(/databases/$(database)/documents/friendships/$(conversationId))
           && request.auth.uid in get(/databases/$(database)/documents/friendships/$(conversationId)).data.participantIds);
       allow list: if signedIn()
@@ -630,12 +634,19 @@ service cloud.firestore {
         );
       allow delete: if false;
 
+      match /membershipEvents/{eventId} {
+        allow read: if conversationParticipant(
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data);
+        allow write: if false;
+      }
+
       match /messages/{messageId} {
         function parentConversation() {
           return get(/databases/$(database)/documents/conversations/$(conversationId)).data;
         }
         allow read: if conversationParticipant(parentConversation());
         allow create: if conversationParticipant(parentConversation())
+          && !parentConversation().keys().hasAny(['closedAt'])
           && request.resource.data.keys().hasOnly(['senderUid','senderUsername','body','ciphertext','deleted','sentAt','clientSentAt'])
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderUsername is string

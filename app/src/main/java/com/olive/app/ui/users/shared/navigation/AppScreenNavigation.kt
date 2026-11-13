@@ -143,7 +143,8 @@ internal fun OliveRoot(
     val safeUser = session.screen == SessionScreen.Safe && session.accountRole == AccountRole.USER
     val showSupport = safeUser && !inActiveChat && session.page != SafePage.Camera
     val chatHasQuickExit = session.screen == SessionScreen.Safe && inActiveChat
-    val showQuickExit = !isCover && !chatHasQuickExit
+    val userQuickExit = session.accountRole == AccountRole.USER
+    val showQuickExit = userQuickExit && !isCover && !chatHasQuickExit
     var supportExpanded by remember(
         session.screen,
         session.page,
@@ -292,7 +293,7 @@ internal fun OliveRoot(
                                 }
                                 CompositionLocalProvider(
                                     LocalAccessibilityMessagesVisible provides (targetScreen == session.screen && !supportExpanded),
-                                    LocalQuickExit provides exit,
+                                    LocalQuickExit provides if (userQuickExit) exit else null,
                                 ) {
                                     // Entry setup owns its pane title because choosing New PIN changes its local screen.
                                     Box((if (targetScreen == SessionScreen.DevicePin) Modifier else Modifier.semantics {
@@ -418,10 +419,10 @@ internal fun OliveRoot(
                     onDecline = {
                         session.calls.decline(invitation, callAccountId, session.accountRole)
                     },
-                    onQuickExit = {
+                    onQuickExit = if (userQuickExit) ({
                         session.calls.decline(invitation, callAccountId, session.accountRole)
                         exit()
-                    },
+                    }) else null,
                 )
             }
             if (shouldShowActiveCall(callState) && !callMinimized) ActiveCallDialog(
@@ -431,7 +432,7 @@ internal fun OliveRoot(
                 onSpeaker = session.calls::setSpeakerEnabled,
                 onFinish = { session.calls.finish(callAccountId) },
                 onMinimize = { callMinimized = true },
-                onQuickExit = exit,
+                onQuickExit = if (userQuickExit) exit else null,
             )
             if (shouldShowActiveCall(callState) && callMinimized) DraggableCallBubble(
                 state = callState,

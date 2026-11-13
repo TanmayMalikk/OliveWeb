@@ -3,27 +3,8 @@
   "downloadPath": "/get",
   "adminPath": "/admin",
   "voipOrigin": "https://voip.yourolivebranch.ca",
-  "covers": [
-    {
-      "id": "NEWS",
-      "slug": "daily-digest",
-      "name": "Daily Digest",
-      "path": "/daily-digest",
-      "origin": ""
-    },
-    {
-      "id": "FITNESS",
-      "slug": "fitness",
-      "name": "Fitness Tracker",
-      "path": "/fitness",
-      "origin": ""
-    },
-    {
-      "id": "GAME",
-      "slug": "game",
-      "name": "Little Grove",
-      "path": "/game",
-      "origin": ""
-    }
-  ]
+  "webCover": {
+    "slug": "game",
+    "name": "Little Grove"
+  }
 }

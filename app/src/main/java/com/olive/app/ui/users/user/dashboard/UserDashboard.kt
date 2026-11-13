@@ -102,7 +102,8 @@ private fun StaffHelpScreen(session: SessionViewModel) {
     LaunchedEffect(controller.conversationId, session.messages.conversations) {
         val chat = session.messages.conversations.firstOrNull {
             it.id == controller.conversationId
-        } ?: return@LaunchedEffect
+        } ?: session.messages.findRequestedConversation(controller.conversationId) ?: return@LaunchedEffect
+        if (chat.staffUid.isBlank() || chat.closedAt > 0L) return@LaunchedEffect
         session.navigation.back()
         session.navigation.openSafePage(SafePage.Messages)
         session.messages.openConversation(chat)

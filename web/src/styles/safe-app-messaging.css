@@ -118,6 +118,13 @@
   gap: 1rem;
   overscroll-behavior: contain;
 }
+.chat-membership-event {
+  align-self: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
 .chat-bubble {
   background: var(--soft);
   align-self: flex-start;
@@ -315,11 +322,6 @@
   border-radius: 999px;
   font-size: 0.75rem;
 }
-.organization-ticket-tabs button[aria-selected="true"] {
-  background: var(--soft);
-  border-color: var(--olive);
-  font-weight: 650;
-}
 .organization-ticket {
   display: flex;
   width: 100%;
@@ -331,7 +333,6 @@
   border-radius: 0.8rem;
   text-align: left;
 }
-.organization-ticket.selected,
 .organization-ticket:hover {
   background: var(--soft);
 }
@@ -390,10 +391,6 @@
   flex: 1;
   max-height: 30rem;
 }
-.organization-overview h2,
-.organization-plans h2 {
-  margin-top: 0;
-}
 .organization-counts {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -412,11 +409,6 @@
 }
 .organization-counts span {
   color: var(--muted);
-}
-.organization-plan-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
 }
 @media (max-width: 52rem) {
   .organization-inbox {

@@ -512,8 +512,8 @@ internal class SupportRepository(
     }
 
     // Closes the support ticket and archives it for every participant.
-    suspend fun close(conversationId: String) {
-        call("staffSupportClose", mapOf("conversationId" to conversationId))
+    suspend fun close(conversationId: String, planCompleted: Boolean = false) {
+        call("staffSupportClose", mapOf("conversationId" to conversationId, "planCompleted" to planCompleted))
     }
 }
 

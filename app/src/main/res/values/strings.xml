@@ -307,7 +307,7 @@
     <string name="private_entry_shared">Private entry shared securely.</string>
     <string name="unable_to_share_private_entry">Unable to share this private entry.</string>
     <string name="unable_to_open_shared_entry">Unable to open this shared entry.</string>
-    <string name="unable_to_open_secure_conversation">This device does not have this conversation’s encryption key. Open the conversation on an existing authorized device for this account, then try again.</string>
+    <string name="unable_to_open_secure_conversation">Unable to prepare this encrypted conversation. Check your connection and try opening it again.</string>
     <string name="secure_message">Secure message</string><string name="encrypted_message_unavailable">Encrypted message unavailable</string>
 <string name="news_near_location">News near %1$s</string>
 <string name="accounts">Accounts</string><string name="add_another_contact">Add another contact</string><string name="change_local_news_location">Change local news location</string><string name="city_or_region">City or region</string><string name="create">Create</string><string name="delete_account">Delete account</string><string name="reconnect">Reconnect</string><string name="refresh">Refresh</string><string name="save">Save</string><string name="save_profile">Save profile</string><string name="use_device_location">Use device location</string><string name="delete_managed_account_warning">This permanently removes the %1$s account from Firebase Authentication and deletes its account data.</string>
@@ -320,7 +320,14 @@
     <string name="organization_live_map">Live location map</string>
     <string name="organization_live_map_admin_description">See all user locations.</string>
     <string name="organization_live_map_staff_description">See all user locations.</string>
-    <string name="safety_mark_consultation_complete">Mark consultation complete</string>
+    <string name="safety_mark_consultation_complete">Mark complete</string>
+    <string name="safety_plans_completed">Your safety plan and backup plan are complete.</string>
+    <string name="safety_staff_assigned">A support staff member is working with you.</string>
+    <string name="safety_open_consultation">Open consultation ticket</string>
+    <string name="safety_conflicts_title">Conflicts</string>
+    <string name="safety_your_change">Your change</string>
+    <string name="safety_incoming_change">Incoming change</string>
+    <string name="safety_empty_value">Empty section</string>
     <string name="safety_complete_consultation_title">Complete this consultation?</string>
     <string name="safety_complete_consultation_description">This archives the consultation chat for everyone and removes this safety plan from your staff inbox.</string>
     <string name="safety_mark_complete">Mark complete</string>

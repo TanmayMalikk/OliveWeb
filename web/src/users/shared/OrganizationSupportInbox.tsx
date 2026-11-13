@@ -1,6 +1,6 @@
 // Staff and admins: reads assigned support chats and sends encrypted replies.
 import { useEffect, useMemo, useState } from "react";
-import { Archive, MessageCircle, Send, ShieldAlert } from "lucide-react";
+import { Archive, ArrowLeft, MessageCircle, Send, ShieldAlert } from "lucide-react";
 import { Button, Empty, Form } from "../../components/SharedComponents";
 import { accounts, cloudMode } from "../../services/AccountService";
 import * as messaging from "../../services/MessagingService";
@@ -10,6 +10,9 @@ import {
   requestAdministratorHelp,
 } from "../../services/OrganizationSupportService";
 import { useSession } from "../../session/SessionProvider";
+import { useChatDeviceKey, useChatTimeline } from "./useChatTimeline";
+
+const noMessages: Message[] = [];
 
 type TicketCategory = "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
 const categories: { id: TicketCategory; label: string }[] = [
@@ -31,12 +34,17 @@ export default function OrganizationSupportInbox() {
   const identity = accounts.identity;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
-  const [draft, setDraft] = useState("");
+  const [history, setHistory] = useState<{ ticketId: string; messages: Message[] } | null>(null);
+  const messages = history && history.ticketId === selected?.id ? history.messages : noMessages;
+  const [room, setRoom] = useState<{ ticketId: string; key: CryptoKey } | null>(null);
+  const roomKey = room && room.ticketId === selected?.id ? room.key : null;
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const draft = selected ? drafts[selected.id] ?? "" : "";
   const [feedback, setFeedback] = useState("");
   const [category, setCategory] = useState<TicketCategory>("SUPPORT");
   const [showArchived, setShowArchived] = useState(false);
+  const timeline = useChatTimeline(selected?.id, identity?.uid, messages);
+  const deviceKeyAvailable = useChatDeviceKey(selected?.id, identity?.uid);
 
   // Keeps the inbox current while the organization user is signed in.
   useEffect(() => {
@@ -44,13 +52,20 @@ export default function OrganizationSupportInbox() {
     let active = true;
     let stop: (() => void) | undefined;
     void messaging.register(identity)
+      .then(() => messaging.prepareSupportTickets())
       .then(() => {
         if (!active) return undefined;
         return messaging.subscribeConversations(
           identity.uid,
-          (value) =>
-            active &&
-            setConversations(value.filter((item) => item.type === "SUPPORT")),
+          (value) => {
+            if (!active) return;
+            const tickets = value.filter((item) => item.type === "SUPPORT");
+            setConversations(tickets);
+            setDrafts((current) => Object.fromEntries(tickets.flatMap(({ id, closedAt }) =>
+              !closedAt && current[id] ? [[id, current[id]]] : [],
+            )));
+            setSelected((current) => tickets.find((ticket) => ticket.id === current?.id) ?? null);
+          },
           (error) => active && setFeedback(error.message),
         );
       })
@@ -68,8 +83,8 @@ export default function OrganizationSupportInbox() {
 
   // Opens a selected ticket using its device-approved encryption key.
   useEffect(() => {
-    setMessages([]);
-    setRoomKey(null);
+    setHistory(null);
+    setRoom(null);
     if (!selected || !identity) return;
     let active = true;
     let stop: (() => void) | undefined;
@@ -77,11 +92,11 @@ export default function OrganizationSupportInbox() {
       .roomKey(selected.id, identity, selected)
       .then((key) => {
         if (!active) return undefined;
-        setRoomKey(key);
+        setRoom({ ticketId: selected.id, key });
         return messaging.subscribeMessages(
           selected.id,
           key,
-          (value) => active && setMessages(value),
+          (value) => active && setHistory({ ticketId: selected.id, messages: value }),
           (error) => active && setFeedback(error.message),
         );
       })
@@ -95,7 +110,7 @@ export default function OrganizationSupportInbox() {
       active = false;
       stop?.();
     };
-  }, [selected?.id, identity?.uid]);
+  }, [selected?.id, selected?.participantIds.join(","), identity?.uid, deviceKeyAvailable]);
 
   const visible = useMemo(
     () =>
@@ -106,6 +121,11 @@ export default function OrganizationSupportInbox() {
         .filter((item) => showArchived || categoryOf(item) === category),
     [conversations, category, showArchived],
   );
+  const openTicket = (ticket: Conversation | null) => {
+    setSelected(ticket);
+    setFeedback("");
+  };
+
   if (!identity) return null;
   if (!cloudMode)
     return (
@@ -117,17 +137,20 @@ export default function OrganizationSupportInbox() {
   return (
     <section
       className="organization-inbox"
+      data-detail-open={Boolean(selected)}
       aria-label="Organization support inbox"
     >
       <aside className="organization-ticket-list">
         <div className="organization-inbox-heading">
           <div>
-            <span className="eyebrow">SECURE SUPPORT</span>
             <h2>Ticket inbox</h2>
           </div>
           <Button
             variant="outline"
-            onClick={() => setShowArchived((value) => !value)}
+            onClick={() => {
+              openTicket(null);
+              setShowArchived((value) => !value);
+            }}
           >
             <Archive size={16} /> {showArchived ? "Active tickets" : "Archived"}
           </Button>
@@ -135,15 +158,18 @@ export default function OrganizationSupportInbox() {
         {!showArchived && (
           <div
             className="organization-ticket-tabs"
-            role="tablist"
+            role="group"
             aria-label="Ticket categories"
           >
             {categories.map((item) => (
               <button
                 key={item.id}
-                role="tab"
-                aria-selected={category === item.id}
-                onClick={() => setCategory(item.id)}
+                type="button"
+                aria-pressed={category === item.id}
+                onClick={() => {
+                  if (category !== item.id) openTicket(null);
+                  setCategory(item.id);
+                }}
               >
                 {item.label}
               </button>
@@ -165,7 +191,9 @@ export default function OrganizationSupportInbox() {
             <button
               key={item.id}
               className={`organization-ticket ${selected?.id === item.id ? "selected" : ""}`}
-              onClick={() => setSelected(item)}
+              type="button"
+              aria-pressed={selected?.id === item.id}
+              onClick={() => openTicket(item)}
             >
               <span className="organization-ticket-icon">
                 <MessageCircle size={18} />
@@ -200,6 +228,9 @@ export default function OrganizationSupportInbox() {
           </Empty>
         ) : (
           <>
+            <button className="text-link workspace-list-back" type="button" onClick={() => openTicket(null)}>
+              <ArrowLeft size={17} aria-hidden="true" /> Back to tickets
+            </button>
             <header className="organization-chat-heading">
               <div>
                 <span className="eyebrow">
@@ -235,7 +266,7 @@ export default function OrganizationSupportInbox() {
                     onClick={() =>
                       void session.perform(async () => {
                         await closeSupportTicket(selected.id);
-                        setSelected(null);
+                        openTicket(null);
                       })
                     }
                   >
@@ -249,18 +280,22 @@ export default function OrganizationSupportInbox() {
               aria-label="Support messages"
               aria-live="polite"
             >
-              {messages.length === 0 ? (
+              {timeline.length === 0 ? (
                 <p className="help-note">No messages yet.</p>
               ) : (
-                messages.map((message) => (
+                timeline.map((item) => item.kind === "membership" ? (
+                  <p key={`membership-${item.event.id}`} className="chat-membership-event">
+                    {messaging.membershipEventText(selected, item.event, identity.role)}
+                  </p>
+                ) : (
                   <article
-                    key={message.id}
-                    className={`chat-bubble ${message.senderUid === identity.uid ? "own" : ""}`}
+                    key={item.message.id}
+                    className={`chat-bubble ${item.message.senderUid === identity.uid ? "own" : ""}`}
                   >
-                    <small>{message.senderUsername}</small>
-                    <p>{message.deleted ? "Message unsent" : message.body}</p>
+                    <small>{messaging.chatSenderName(selected, item.message, identity.role)}</small>
+                    <p>{item.message.deleted ? "Message unsent" : item.message.body}</p>
                     <time>
-                      {new Date(message.clientSentAt).toLocaleString()}
+                      {new Date(item.message.clientSentAt).toLocaleString()}
                     </time>
                   </article>
                 ))
@@ -281,7 +316,7 @@ export default function OrganizationSupportInbox() {
                       draft,
                       roomKey,
                     );
-                    setDraft("");
+                    setDrafts((current) => ({ ...current, [selected.id]: "" }));
                   })
                 }
               >
@@ -292,7 +327,7 @@ export default function OrganizationSupportInbox() {
                   id="organization-message"
                   value={draft}
                   maxLength={2000}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) => setDrafts({ ...drafts, [selected.id]: event.target.value })}
                   placeholder="Write a secure reply…"
                   required
                 />

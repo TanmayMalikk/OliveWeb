@@ -17,7 +17,6 @@ html { font-size: 100%; }
 
 .landing-hero,
 .grove-main,
-.account-layout,
 .messages-layout {
   column-gap: var(--fluid-section-gap);
 }
@@ -84,10 +83,6 @@ html { font-size: 100%; }
   grid-template-columns: clamp(13.5rem, 15vi, 15rem) minmax(0, 1fr);
 }
 
-.account-layout {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-}
-
 .messages-layout {
   grid-template-columns: minmax(16rem, 20rem) minmax(0, 1fr);
 }
@@ -124,7 +119,6 @@ html { font-size: 100%; }
 @media (max-width: 48rem) {
   .landing-hero,
   .grove-main,
-  .account-layout,
   .messages-layout {
     grid-template-columns: minmax(0, 1fr);
   }

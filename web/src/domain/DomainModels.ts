@@ -1,5 +1,4 @@
 // All app roles: defines web app account, cover, contact, and message data.
-import { coverSite } from "../sites/SiteRouting";
 export type Cover = "NEWS" | "FITNESS" | "GAME";
 export type Role = "USER" | "SAFE_CONTACT" | "STAFF" | "ADMIN";
 export type Page =
@@ -14,7 +13,6 @@ export type Page =
   | "Hotlines"
   | "StaffHelp"
   | "Documents"
-  | "Camera"
   | "Location";
 export interface Address {
   line1: string;
@@ -101,7 +99,7 @@ export interface WrappedKey {
 export interface Enrollment {
   uid: string;
   username: string;
-  cover: Cover;
+  webCover: "GAME";
   role: Role;
   triggerHash: string;
   pinKey: WrappedKey;
@@ -154,8 +152,6 @@ export function normalizeCover(value: unknown): Cover {
 // Creates the title, description, and icon details for one cover app.
 export const coverInfo = (id: Cover) =>
   covers.find((cover) => cover.id === normalizeCover(id)) ?? covers[0];
-// Returns the public web address for the selected cover app.
-export const coverPath = (id: Cover) => coverSite(normalizeCover(id)).path;
 // Account sign-in: Normalizes a username for reliable matching. It removes outside spaces and converts every letter to lowercase.
 export const normalizeUsername = (v: string) => v.trim().toLowerCase();
 // Account sign-in: Validates a username. It requires 8–24 lowercase letters, numbers, or underscores and at least one letter.

@@ -77,7 +77,7 @@ data class PreparedEncryptedMedia(
  * more than retransmitting a small object in the common case.
  *
  * @property id client-generated idempotency key shared by WorkManager and the Firebase upload session.
- * @property source prepared ciphertext and zero-knowledge metadata.
+ * @property source prepared ciphertext and encrypted metadata.
  * @property mediaId server-generated stable identifier for the final `files` document and R2 object.
  * @property objectKey opaque R2 key returned by Firebase; the client never constructs or changes it.
  * @property uploadId R2 multipart session identifier; blank for single PUT uploads.
@@ -96,6 +96,7 @@ data class MediaUploadJob(
     val completedParts:Map<Int,String> = emptyMap(),
     val error:String?=null,
     val createdAt:Long=System.currentTimeMillis(),
+    val attachToSafetyPlan:Boolean=false,
 ) {
     /** Serializes the entire resumable state for storage inside the Keystore-backed vault. */
     fun toJson()=JSONObject().apply {
@@ -107,6 +108,7 @@ data class MediaUploadJob(
         put("kind",source.kind.name);put("ocrReview",source.ocrReview.name);put("status",status.name)
         mode?.let { put("mode",it.name) };put("mediaId",mediaId);put("objectKey",objectKey)
         put("uploadId",uploadId);put("partSize",partSize);put("createdAt",createdAt)
+        put("attachToSafetyPlan",attachToSafetyPlan)
         put("completedParts",JSONObject(completedParts.mapKeys { it.key.toString() }))
         error?.let { put("error",it) }
     }
@@ -133,7 +135,8 @@ data class MediaUploadJob(
             return MediaUploadJob(value.getString("id"),value.getString("ownerUid"),source,
                 MediaTransferStatus.valueOf(value.getString("status")),value.optString("mode").takeIf(String::isNotBlank)?.let(MediaUploadMode::valueOf),
                 value.optString("mediaId"),value.optString("objectKey"),value.optString("uploadId"),
-                value.optLong("partSize"),parts,value.optString("error").takeIf(String::isNotBlank),value.getLong("createdAt"))
+                value.optLong("partSize"),parts,value.optString("error").takeIf(String::isNotBlank),
+                value.getLong("createdAt"),value.optBoolean("attachToSafetyPlan"))
         }
     }
 }
@@ -152,7 +155,7 @@ data class MediaCompletedPart(val partNumber:Int,val etag:String)
 /** Short-lived capability for one authorized direct ciphertext GET from Cloudflare R2. */
 data class MediaDownloadTicket(val mediaId:String,val url:String,val headers:Map<String,String>,val expiresAt:Long)
 
-/** Zero-knowledge metadata returned after Firebase verifies and publishes an uploaded R2 object. */
+/** Encrypted metadata returned after Firebase verifies and publishes an uploaded R2 object. */
 data class CloudMediaRecord(
     val id:String,val ownerUid:String,val objectKey:String,val encryptedMetadata:String,
     val wrappedKeys:Map<String,String>,val allowedUsers:List<String>,val ciphertextSize:Long,

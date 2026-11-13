@@ -274,7 +274,7 @@
     <string name="no_private_notes_found">لم يتم العثور على ملاحظات.</string><string name="untitled_note">ملاحظة بلا عنوان</string><string name="no_incident_reports_found">لم يتم العثور على تقارير حوادث.</string>
 <string name="secure_shared_entry">عنصر مشترك آمن</string><string name="close_shared_entry">إغلاق العنصر المشترك</string>
     <string name="attach_secure_entry">إرفاق ملاحظة أو تقرير آمن</string><string name="encrypted_document">مستند مشفر</string><string name="shared_private_note">ملاحظة خاصة مشتركة</string><string name="shared_incident_report">تقرير حادث مشترك</string>
-    <string name="private_entry_shared">تمت مشاركة العنصر الخاص بأمان.</string><string name="unable_to_share_private_entry">تعذرت مشاركة هذا العنصر الخاص.</string><string name="unable_to_open_shared_entry">تعذر فتح هذا العنصر المشترك.</string><string name="unable_to_open_secure_conversation">لا يملك هذا الجهاز مفتاح تشفير هذه المحادثة. افتح المحادثة على جهاز معتمد سابقًا لهذا الحساب، ثم حاول مرة أخرى.</string>
+    <string name="private_entry_shared">تمت مشاركة العنصر الخاص بأمان.</string><string name="unable_to_share_private_entry">تعذرت مشاركة هذا العنصر الخاص.</string><string name="unable_to_open_shared_entry">تعذر فتح هذا العنصر المشترك.</string><string name="unable_to_open_secure_conversation">تعذر إعداد هذه المحادثة المشفرة. تحقق من اتصالك وحاول فتحها مجددًا.</string>
     <string name="secure_message">رسالة آمنة</string><string name="encrypted_message_unavailable">الرسالة المشفرة غير متاحة</string>
 <string name="news_near_location">أخبار بالقرب من %1$s</string>
 <string name="accounts">الحسابات</string>
@@ -437,7 +437,14 @@
     <string name="ui_group_voice_call">مكالمة صوتية جماعية</string>
     <string name="ui_group_call_status">%1$d متصلون • %2$s</string>
     <string name="organization_live_map_staff_description">اعرض مواقع جميع المستخدمين.</string>
-    <string name="safety_mark_consultation_complete">وضع علامة مكتمل على الاستشارة</string>
+    <string name="safety_mark_consultation_complete">وضع علامة كمكتمل</string>
+    <string name="safety_plans_completed">اكتملت خطة الأمان والخطة الاحتياطية.</string>
+    <string name="safety_staff_assigned">يعمل معك أحد أعضاء فريق الدعم.</string>
+    <string name="safety_open_consultation">فتح تذكرة الاستشارة</string>
+    <string name="safety_conflicts_title">التعارضات</string>
+    <string name="safety_your_change">تغييرك</string>
+    <string name="safety_incoming_change">التغيير الوارد</string>
+    <string name="safety_empty_value">قسم فارغ</string>
     <string name="safety_complete_consultation_title">هل تريد إكمال هذه الاستشارة؟</string>
     <string name="safety_complete_consultation_description">يؤدي هذا إلى أرشفة محادثة الاستشارة للجميع وإزالة خطة الأمان هذه من صندوق الوارد الخاص بالموظف.</string>
     <string name="safety_mark_complete">وضع علامة مكتمل</string>

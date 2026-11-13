@@ -294,6 +294,17 @@ class DeviceStore(
             .toSet()
     }
 
+    internal fun retainConversationPreferences(uid: String, visibleIds: Set<String>) {
+        vault.update { root ->
+            for (key in listOf("archivedConversations", "restoredClosedConversations")) {
+                val accounts = root.optJSONObject(key) ?: continue
+                val entries = accounts.optJSONArray(uid) ?: continue
+                val retained = (0 until entries.length()).map(entries::optString).filter { it in visibleIds }
+                if (retained.size != entries.length()) accounts.put(uid, JSONArray(retained))
+            }
+        }
+    }
+
     // Changes only where a completed chat is displayed; it never reopens its completed ticket.
     fun setClosedConversationRestored(uid: String, conversationId: String, restored: Boolean) {
         require(conversationId.isNotBlank() && conversationId.length <= 160)

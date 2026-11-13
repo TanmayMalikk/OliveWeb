@@ -24,6 +24,7 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
                 Log.e(VoipPushTokenRegistration.TAG, "Could not persist the Firebase messaging registration", error)
             }
         runCatching { LocalNotificationEventHandler.onFcmTokenRefreshed(this, installationId) }
+        AppUpdateScheduler.registerForUpdates(this)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -47,6 +48,7 @@ class OliveFirebaseMessagingService : FirebaseMessagingService() {
         if (data["type"] == APP_UPDATE) {
             val remoteVersion = data["versionCode"]?.toLongOrNull() ?: Long.MAX_VALUE
             if (remoteVersion > BuildConfig.VERSION_CODE) {
+                AppUpdateScheduler.announceRelease(this, data["versionName"].orEmpty())
                 runCatching { AppUpdateScheduler.triggerNow(this) }
             }
             return

@@ -85,7 +85,7 @@ internal fun SafetyPlanScreen(
     val organizationEditor = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     val viewerUid = session.coverAccountId.orEmpty()
     LaunchedEffect(ownerUid, viewerUid, session.coverUsername, session.localMode, organizationEditor) {
-        if (viewerUid.isNotBlank() && (ownerUid == viewerUid || organizationEditor)) {
+        if (viewerUid.isNotBlank()) {
             documentController.load(viewerUid, session.coverUsername, session.localMode)
         }
     }
@@ -93,19 +93,34 @@ internal fun SafetyPlanScreen(
     val plan = controller.plan
     val safeContact = session.accountRole == AccountRole.SAFE_CONTACT
     val attachedDocumentIds = remember(plan?.fields) {
-        plan?.fields.orEmpty().values.flatMapTo(linkedSetOf()) { field ->
-            readSafetyChecklist(field.value).flatMap { it.attachmentIds }
+        plan?.fields.orEmpty().values.filter { it.mutationId == null }.flatMapTo(linkedSetOf()) { field ->
+            readSafetyChecklist(field.value).flatMap { item -> item.attachmentIds - item.excludedAttachmentIds.toSet() }
         }
     }
     val attachmentAccessSnapshot = documentController.state.files.map { document ->
         document.id to document.allowedUsers.sorted()
     }
-    // The owner's phone wraps each attached file key for assigned staff and admins.
-    LaunchedEffect(ownerUid, viewerUid, attachedDocumentIds, attachmentAccessSnapshot) {
-        if (session.accountRole == AccountRole.USER && ownerUid == viewerUid && attachedDocumentIds.isNotEmpty()) {
-            val recipients = runCatching { controller.mediaRecipients() }.getOrDefault(emptyMap())
+    var recipients by remember(ownerUid, viewerUid) { mutableStateOf(emptyMap<String, String>()) }
+    var recipientDevicesVersion by remember(ownerUid, viewerUid) { mutableIntStateOf(0) }
+    LaunchedEffect(ownerUid, viewerUid, plan?.staffUid, plan?.adminUid, plan?.safeContactUids) {
+        recipients = runCatching { controller.mediaRecipients() }.getOrDefault(emptyMap())
+    }
+    DisposableEffect(recipients) {
+        val listeners = if (recipients.isEmpty()) emptyList()
+            else controller.observeRecipientDevices(recipients.values) { recipientDevicesVersion++ }
+        onDispose { listeners.forEach { it.remove() } }
+    }
+    LaunchedEffect(ownerUid, viewerUid, plan?.fields, documentController.state.files) {
+        if (session.accountRole == AccountRole.USER && ownerUid == viewerUid) {
+            controller.attachPublishedDocuments(documentController.state.files.filter { it.ownerUid == ownerUid })
+        }
+    }
+    // Wrap attached file keys for the current readers and any newly registered devices.
+    LaunchedEffect(ownerUid, viewerUid, attachedDocumentIds, attachmentAccessSnapshot, recipients, recipientDevicesVersion) {
+        if (session.accountRole == AccountRole.USER && ownerUid == viewerUid) {
+            if (attachedDocumentIds.isEmpty()) return@LaunchedEffect
             val pending = documentController.state.files.filter { document ->
-                document.id in attachedDocumentIds && recipients.keys.any { it !in document.allowedUsers }
+                document.id in attachedDocumentIds
             }
             if (pending.isNotEmpty() && recipients.isNotEmpty()) {
                 documentController.grantPlanAccess(pending, ownerUid, recipients)
@@ -117,6 +132,18 @@ internal fun SafetyPlanScreen(
     val expandedDescription = stringResource(R.string.support_expanded)
     val collapsedDescription = stringResource(R.string.support_collapsed)
     val prefix = if (backup) "backup" else "primary"
+    if (session.accountRole == AccountRole.USER && plan != null) {
+        val conflict = plan.fields.entries.firstOrNull {
+            it.value.conflictRevision != null || it.key in plan.pendingConflicts
+        }
+        if (conflict != null) {
+            val (key, field) = conflict
+            val incoming = field.conflictValue ?: plan.pendingConflicts[key]?.value.orEmpty()
+            SafetyConflictDialog(key, field.value, incoming, controller.saving == 0) { keepMine ->
+                controller.resolve(key, keepMine)
+            }
+        }
+    }
     var olderOpen by rememberSaveable(ownerUid, backup) { mutableStateOf(false) }
     val older = plan?.fields.orEmpty().filter { (key, field) ->
         key.startsWith("${prefix}_") && key.substringAfter('_') !in SAFETY_CHECKLIST_SECTIONS &&
@@ -125,6 +152,13 @@ internal fun SafetyPlanScreen(
     // Return to the top when switching between primary and backup plans.
     LaunchedEffect(backup) { state.scrollToItem(0) }
     openedDocument?.let { (document, file) ->
+        LaunchedEffect(plan, documentController.state.files) {
+            if (plan == null || documentController.state.files.none { it.id == document.id }) {
+                file.delete()
+                openedDocument = null
+            }
+        }
+        DisposableEffect(file) { onDispose { file.delete() } }
         SafetyDocumentViewer(document, file) {
             file.delete()
             openedDocument = null
@@ -175,13 +209,6 @@ internal fun SafetyPlanScreen(
                         label = { Text(stringResource(R.string.safety_backup)) },
                         modifier = Modifier.weight(1f).testTag("safety_backup")
                     )
-                }
-                if (session.accountRole == AccountRole.STAFF && onCompleteConsultation != null) {
-                    OutlinedButton(
-                        onClick = onCompleteConsultation,
-                        enabled = controller.saving == 0 && session.staffSupport.saving == 0,
-                        modifier = Modifier.fillMaxWidth().testTag("complete_safety_consultation"),
-                    ) { Text(stringResource(R.string.safety_mark_consultation_complete)) }
                 }
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -271,8 +298,7 @@ internal fun SafetyPlanScreen(
                                     onContactsChange = if (!organizationEditor && !safeContact && section == "contacts") session::saveContacts else null,
                                     editable = !safeContact,
                                     attachmentsEditable = !organizationEditor && !safeContact,
-                                    documents = if (ownerUid == viewerUid || organizationEditor)
-                                        documentController.state.files else emptyList(),
+                                    documents = documentController.state.files.filter { it.ownerUid == ownerUid },
                                     onOpenDocument = { document ->
                                         documentController.download(document) { file ->
                                             openedDocument = document to file
@@ -357,6 +383,13 @@ internal fun SafetyPlanScreen(
                                 onClick = { session.navigation.openSafePage(SafePage.Documents) },
                                 modifier = Modifier.fillMaxWidth().testTag("safety_documents")
                             ) { Text(stringResource(R.string.support_documents)) }
+                            if (session.accountRole == AccountRole.STAFF && onCompleteConsultation != null) {
+                                OutlinedButton(
+                                    onClick = onCompleteConsultation,
+                                    enabled = controller.saving == 0 && session.staffSupport.saving == 0,
+                                    modifier = Modifier.fillMaxWidth().testTag("complete_safety_consultation"),
+                                ) { Text(stringResource(R.string.safety_mark_consultation_complete)) }
+                            }
                             Text(
                                 stringResource(R.string.safety_source),
                                 style = MaterialTheme.typography.bodySmall,
@@ -391,6 +424,7 @@ internal fun SafetyPlanScreen(
 @Composable
 internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
     val controller = session.safetyPlans
+    LaunchedEffect(session.coverAccountId) { controller.observeAccess() }
     var selected by rememberSaveable { mutableStateOf<SharedSafetyPlan?>(null) }
     LaunchedEffect(Unit) { controller.refreshSharedPlans() }
     if (selected != null) SafetyPlanScreen(
@@ -512,14 +546,20 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val message = when {
             plan.shareAction == "stop" -> stringResource(R.string.safety_share_queued)
-            plan.consultationRequested && plan.staffUid.isNotBlank() -> stringResource(R.string.safety_shared, plan.staffName)
+            plan.consultationRequested && plan.staffUid.isNotBlank() -> stringResource(R.string.safety_staff_assigned)
             plan.shareAction == "request" && !plan.consultationRequested -> stringResource(R.string.safety_share_queued)
             plan.consultationRequested -> stringResource(R.string.safety_waiting)
+            plan.plansCompletedAt > 0 -> stringResource(R.string.safety_plans_completed)
             else -> null
         }
         if (message != null) Text(
             message, style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.testTag("safety_sharing_status").semantics { liveRegion = LiveRegionMode.Polite })
+        if (plan.consultationRequested && plan.consultationConversationId.isNotBlank()) {
+            OutlinedButton(onClick = { controller.openConsultation(plan.consultationConversationId) }) {
+                Text(stringResource(R.string.safety_open_consultation))
+            }
+        }
         if (plan.shareAction != "request" && !plan.consultationRequested) {
             OutlinedButton(
                 onClick = { controller.consult() }, enabled = !plan.hasConflicts && controller.saving == 0,
@@ -544,6 +584,67 @@ private fun SafetyConsultationControls(session: SessionViewModel, plan: SafetyPl
         }
         Text(stringResource(R.string.safety_consult_description), style = MaterialTheme.typography.bodySmall, color = Muted)
     }
+}
+
+@Composable
+private fun safetyConflictPropertyLabel(property: String) = stringResource(
+    when (property) {
+        "Step" -> R.string.safety_conflict_step
+        "Completion" -> R.string.safety_conflict_completion
+        "Attachments" -> R.string.safety_conflict_attachments
+        "Excluded attachments" -> R.string.safety_conflict_excluded_attachments
+        else -> R.string.safety_conflict_text
+    },
+)
+
+@Composable
+private fun safetyConflictValueLabel(value: String): String {
+    val resource = when (value) {
+        "Present" -> R.string.safety_conflict_present
+        "Removed" -> R.string.safety_conflict_removed
+        "Complete" -> R.string.safety_conflict_complete
+        "Not complete" -> R.string.safety_conflict_not_complete
+        "Changed" -> R.string.safety_conflict_changed
+        else -> return value
+    }
+    return stringResource(resource)
+}
+
+@Composable
+private fun SafetyConflictDialog(key: String, mine: String, incoming: String, enabled: Boolean, resolve: (Boolean) -> Unit) {
+    var keepMine by remember(key, mine, incoming) { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text(stringResource(R.string.safety_conflicts_title)) },
+        text = {
+            Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                listOf(true to mine, false to incoming).forEach { (isMine, value) ->
+                    Row {
+                        RadioButton(selected = keepMine == isMine, onClick = { keepMine = isMine })
+                        Column {
+                            Text(stringResource(if (isMine) R.string.safety_your_change else R.string.safety_incoming_change))
+                            val conflicts = remember(mine, incoming, isMine) {
+                                safetyChecklistConflictPreview(mine, incoming, isMine)
+                            }
+                            if (conflicts == null) {
+                                Text(safetyChecklistPreview(value).ifBlank { stringResource(R.string.safety_empty_value) })
+                            } else {
+                                conflicts.forEach { conflict ->
+                                    Text(conflict.item, style = MaterialTheme.typography.labelLarge)
+                                    Text("${safetyConflictPropertyLabel(conflict.property)}: ${safetyConflictValueLabel(conflict.value)}")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { resolve(keepMine) }, enabled = enabled) {
+                Text(stringResource(if (keepMine) R.string.safety_keep_mine else R.string.safety_use_synced))
+            }
+        },
+    )
 }
 
 // Match the arrow-only navigation used by Notes and Messages while retaining a localized TalkBack label.

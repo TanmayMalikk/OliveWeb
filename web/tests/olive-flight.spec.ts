@@ -161,14 +161,16 @@ test("Olive Flight supports keyboard flight, pause, collision, restart and retur
 // Inputs: the values in this case. Expected: Olive Flight fits phone and desktop widths and accepts touch input.
 test("Olive Flight fits phone and desktop widths and accepts touch input", async ({
   browser,
+  baseURL,
 }) => {
   const context = await browser.newContext({
+    baseURL,
     viewport: { width: 390, height: 844 },
     isMobile: true,
     hasTouch: true,
   });
   const page = await context.newPage();
-  await page.goto("http://127.0.0.1:5173/game");
+  await page.goto("/game");
   await page.getByRole("button", { name: "Olive Flight", exact: true }).tap();
   await page.getByRole("button", { name: "Start Olive Flight" }).tap();
   await page.getByRole("button", { name: "Pause", exact: true }).tap();

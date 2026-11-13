@@ -1,6 +1,9 @@
 // Tests that cloud endpoints for accounts, support, media, and nutrition keep their public names.
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { createCipheriv, randomBytes } = require("node:crypto");
+const { PutObjectCommand, UploadPartCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 process.env.FIREBASE_CONFIG = JSON.stringify({
   projectId: "olive-test",
   storageBucket: "olive-test.appspot.com",
@@ -9,6 +12,47 @@ process.env.FIREBASE_CONFIG = JSON.stringify({
 const { _test } = require("./index");
 const mediaTest = require("./src/mediaTickets")._test;
 const supportGroups = require("./src/supportGroups");
+
+test("document recovery encrypts the key and binds it to one file and owner", () => {
+  const key = randomBytes(32).toString("base64");
+  const masterKey = randomBytes(32).toString("base64");
+  const sealed = mediaTest.sealRecoveryKey(key, "file-a", "owner-a", masterKey);
+  assert.notEqual(sealed, key);
+  assert.notEqual(sealed, mediaTest.sealRecoveryKey(key, "file-a", "owner-a", masterKey));
+  assert.equal(mediaTest.openRecoveryKey(sealed, "file-a", "owner-a", masterKey), key);
+  assert.throws(() => mediaTest.openRecoveryKey(sealed, "file-b", "owner-a", masterKey));
+  assert.throws(() => mediaTest.openRecoveryKey(sealed, "file-a", "owner-b", masterKey));
+});
+
+test("document recovery rejects a key that cannot open the existing Android/web metadata", () => {
+  const key = randomBytes(32);
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const encrypted = Buffer.concat([cipher.update('{"name":"test.pdf"}'), cipher.final()]);
+  const metadata = Buffer.concat([iv, encrypted, cipher.getAuthTag()]).toString("base64");
+  assert.doesNotThrow(() => mediaTest.verifyRecoveryKey(key.toString("base64"), metadata));
+  assert.throws(() => mediaTest.verifyRecoveryKey(randomBytes(32).toString("base64"), metadata),
+    { code: "invalid-argument" });
+});
+
+test("R2 upload tickets do not sign the checksum of an empty body", async () => {
+  const client = mediaTest.client({
+    accountId: "example",
+    accessKeyId: "test",
+    secretAccessKey: "test",
+  });
+  const object = { Bucket: "test-bucket", Key: "test-file" };
+  const commands = [
+    new PutObjectCommand({ ...object, ContentType: "application/octet-stream" }),
+    new UploadPartCommand({ ...object, UploadId: "test-upload", PartNumber: 1 }),
+  ];
+  for (const command of commands) {
+    const { searchParams } = new URL(await getSignedUrl(client, command));
+    assert.ok(searchParams.has("X-Amz-Signature"));
+    assert.equal(searchParams.has("x-amz-checksum-crc32"), false);
+    assert.equal(searchParams.has("x-amz-sdk-checksum-algorithm"), false);
+  }
+});
 
 // Inputs: the values in this case. Expected: deployment keeps the existing callable endpoint names.
 test("deployment keeps the existing callable endpoint names", () => {
@@ -21,11 +65,32 @@ test("deployment keeps the existing callable endpoint names", () => {
     "mediaDownloadTicket", "mediaAccountAccessKey", "mediaStoreAccountAccessKey",
     "mediaUpdateAccess", "mediaShareInChat", "mediaUpdateDeviceKeys", "mediaUpdateEvidence", "mediaDelete", "staffSupportRequest",
     "notifyConversationUpdate", "safetySupportContact", "safetySupportAdmin", "conversationAddParticipant",
-    "conversationRemoveParticipant", "conversationRequestStaff", "staffSupportClose", "nutritionFoodSearch",
+    "conversationRemoveParticipant", "conversationRequestStaff", "conversationPrepareKeys", "supportTicketsPrepare", "staffSupportClose", "nutritionFoodSearch",
     "syncSafetyPlanInvalidation", "syncMediaInvalidation", "syncConversationInvalidation",
     "syncConversationDeviceKeyInvalidation", "syncAccountInvalidation"];
   assert.deepEqual(Object.keys(endpoints).filter((name) => name !== "_test").sort(), names.sort());
   names.forEach((name) => assert.equal(typeof endpoints[name], "function"));
+});
+
+test("ticket assignments notify staff and newly added administrators through the shared FCM payload", () => {
+  const {ticketAssignmentForUpdate, fcmTargetsForConversationUpdate} = require("./src/supportTickets")._test;
+  const id = "support-user-ticket";
+  const ticket = {type: "SUPPORT", ownerUid: "user", staffUid: "staff", participantIds: ["user", "staff"], lastMessageId: ""};
+  for (const origin of ["SUPPORT", "PLAN_CONSULT"]) {
+    assert.deepEqual(ticketAssignmentForUpdate(undefined, {...ticket, supportOrigin: origin}, id), {
+      recipients: ["staff"], data: {type: "safe_update", conversationId: id, eventId: "ticket-assigned"},
+    });
+  }
+  const waiting = {...ticket, staffUid: "", participantIds: ["user"]};
+  assert.equal(ticketAssignmentForUpdate(undefined, waiting, id), null);
+  assert.deepEqual(ticketAssignmentForUpdate(waiting, ticket, id).recipients, ["staff"]);
+  const escalated = {...ticket, adminUid: "admin", participantIds: ["user", "staff", "admin"],
+    lastMessageId: "first-message", lastSenderUid: "user"};
+  assert.deepEqual(ticketAssignmentForUpdate(ticket, escalated, id).recipients, ["admin"]);
+  assert.deepEqual(fcmTargetsForConversationUpdate(ticket, escalated, id).recipients, ["staff", "admin"]);
+  assert.equal(ticketAssignmentForUpdate(ticket, {...ticket, participantIds: ["user", "staff", "contact"]}, id), null);
+  assert.equal(ticketAssignmentForUpdate(ticket, ticket, id), null);
+  assert.equal(ticketAssignmentForUpdate(undefined, {...ticket, closedAt: new Date()}, id), null);
 });
 
 // Inputs: a three-person group, its owner, and one other member. Expected: only the owner can
@@ -291,7 +356,29 @@ const {
   TOPIC_APP_UPDATES,
   buildUpdateNotification,
   parseManifestConfig,
+  pruneOldReleases,
 } = require("./scripts/publish-android-release");
+
+test("release cleanup keeps the active APK and the immediately preceding build", async () => {
+  const apk = (version, label = `v1.0.0.${version}`) => `public/android/releases/${version}/OliveBranch${label}.apk`;
+  const active = apk(101);
+  const legacy = "public/android/releases/97/olive-branch-v1.0.0.97.apk";
+  const names = [apk(98), apk(100), active, apk(99), apk(102), legacy, "public/android/releases/97/readme.txt", apk(101, "v0.0.0.1")];
+  const removed = [];
+  const bucket = {getFiles: async ({prefix}) => {
+    assert.equal(prefix, "public/android/releases/");
+    return [names.map(name => ({name, metadata: {generation: "123"}, delete: async options => {
+      assert.equal(options.ifGenerationMatch, "123");
+      removed.push(name);
+    }}))];
+  }};
+  const manifest = {versionCode: 101, apkUrl: `https://example.com/o/${encodeURIComponent(active)}?alt=media`};
+  assert.equal(await pruneOldReleases(bucket, manifest), 4);
+  assert.deepEqual(new Set(removed), new Set([apk(98), apk(99), legacy, apk(101, "v0.0.0.1")]));
+  removed.length = 0;
+  await assert.rejects(pruneOldReleases(bucket, {...manifest, versionCode: 103}), /does not point/);
+  assert.deepEqual(removed, []);
+});
 
 // Inputs: valid release details. Expected: FCM app update payload targets high priority and the dedicated topic.
 test("fcm app update notifications target the app_updates topic with high priority", () => {

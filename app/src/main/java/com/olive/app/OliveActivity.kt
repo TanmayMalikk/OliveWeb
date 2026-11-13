@@ -33,6 +33,7 @@ import androidx.fragment.app.FragmentActivity
 import com.olive.app.data.account.CoverType
 import com.olive.app.data.account.AccountRole
 import com.olive.app.notification.OliveNotificationManager
+import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.ui.covers.CoverLauncher
 import com.olive.app.ui.users.shared.navigation.OliveRoot
 import com.olive.app.ui.shared.OliveTheme
@@ -428,6 +429,12 @@ class OliveApplication : Application() {
     // Creates app-wide notification channels and background services at startup.
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.FIREBASE_CONFIGURED) {
+            com.google.firebase.firestore.FirebaseFirestore.getInstance().firestoreSettings =
+                com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
+                    .setLocalCacheSettings(com.google.firebase.firestore.MemoryCacheSettings.newBuilder().build())
+                    .build()
+        }
         // Release updates are checked in the background. Android always keeps the final install
         // confirmation under the device owner's control.
         AppUpdateScheduler.schedule(this)
@@ -436,6 +443,8 @@ class OliveApplication : Application() {
             FirebaseAuth.getInstance().addAuthStateListener { auth ->
                 // The watch follows the account currently authenticated on this phone.
                 FitnessWatchSync.bindAccount(this@OliveApplication, auth.currentUser?.uid)
+                if (auth.currentUser != null) LocalNotificationEventHandler.start(this@OliveApplication)
+                else LocalNotificationEventHandler.cancel(this@OliveApplication)
             }
         }
     }

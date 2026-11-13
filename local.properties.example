@@ -1,2 +1,18 @@
-# Add the key normally without quotation marks.
-PLACES_API_KEY=
+# Copy to local.properties, or add these entries to the file Android Studio created.
+# Use forward slashes in Windows paths and enter values without quotation marks.
+# Keep actual keys in local.properties, which Git ignores.
+sdk.dir=C:/Users/your-name/AppData/Local/Android/Sdk
+
+# Required for release builds.
+GEOAPIFY_API_KEY=
+MAPBOX_ACCESS_TOKEN=
+
+# Use the production HTTPS endpoints for realtime and voice features.
+REALTIME_DATABASE_URL=https://olive-21239-default-rtdb.firebaseio.com
+VOIP_API_BASE_URL=https://voip.yourolivebranch.ca
+
+# Leave this URL in place for production update checks.
+UPDATE_MANIFEST_URL=https://yourolivebranch.ca/api/android/releases/latest
+
+# Release signing is configured separately in keystore.properties.
+# See keystore.properties.example and docs/DISTRIBUTION.md.

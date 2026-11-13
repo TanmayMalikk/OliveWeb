@@ -4,11 +4,10 @@ package com.olive.app.data.messaging
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.MemoryCacheSettings
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.functions.FirebaseFunctions
 import kotlinx.coroutines.tasks.await
 import com.olive.app.security.KeyManager
 import java.security.PublicKey
@@ -27,11 +26,10 @@ import org.json.JSONObject
 
 
 class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()) {
-    init {
-        firestore.firestoreSettings = FirebaseFirestoreSettings.Builder()
-            .setLocalCacheSettings(MemoryCacheSettings.newBuilder().build()).build()
+    suspend fun prepareSupportTickets() {
+        FirebaseFunctions.getInstance("northamerica-northeast1")
+            .getHttpsCallable("supportTicketsPrepare").call().await()
     }
-
     // Publishes this account's messaging key and device details to Firebase.
     suspend fun registerUser(
         identity: AccountIdentity,
@@ -224,8 +222,9 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                 if (key is String && value is String) key to value else null
             }?.toMap().orEmpty()
         val ref = firestore.collection("conversations").document(friend.friendshipId)
-        if (!ref.get().await().exists())
-            ref.set(directConversationData(friend.friendshipId, ids, names)).await()
+        val existing = ref.get().await()
+        if (existing.exists()) return checkNotNull(conversationFrom(existing))
+        ref.set(directConversationData(friend.friendshipId, ids, names)).await()
         return ChatConversation(friend.friendshipId, friend.friendshipId, ids, names)
     }
 
@@ -247,10 +246,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
                     }
                     val conversations = snapshot?.documents.orEmpty().mapNotNull(::conversationFrom)
                         .sortedByDescending { it.updatedAt }
-                    if (snapshot?.metadata?.isFromCache != true || conversations.isNotEmpty()) {
-                        onUpdate(conversations)
-                    }
                     if (snapshot != null && !snapshot.metadata.isFromCache) {
+                        onUpdate(conversations)
                         onServerUpdate?.invoke(conversations)
                     }
                 }
@@ -298,7 +295,8 @@ class MessagingRepository(private val firestore: FirebaseFirestore = FirebaseFir
             (row.get("participantUsernames") as? Map<*, *>)?.entries?.mapNotNull { (key, value) ->
                 if (key is String && value is String) key to value else null
             }?.toMap().orEmpty()
-        val friendshipId = row.getString("friendshipId") ?: return null
+        val friendshipId = row.getString("friendshipId") ?: row.id.takeIf { row.getString("type") == "SUPPORT" }
+            ?: return null
         return ChatConversation(
             row.id,
             friendshipId,

@@ -2,7 +2,6 @@
 import { createContext, useContext } from "react";
 import type {
   Category,
-  Cover,
   Enrollment,
   Entry,
   Event,
@@ -29,9 +28,10 @@ export type SessionValue = {
   profile: Profile | null;
   history: History;
   enrollment: Enrollment | null;
-  cover: Cover;
   page: Page;
   setPage: (page: Page) => void;
+  requestedConversation: { id: string; uid: string } | null;
+  setRequestedConversation: (conversation: { id: string; uid: string } | null) => void;
   busy: boolean;
   message: string;
   clearMessage: () => void;
@@ -45,7 +45,6 @@ export type SessionValue = {
   completeSetup: (profile: Profile, pin: string) => Promise<void>;
   beginEntry: () => Promise<void>;
   quickExit: () => void;
-  searchTrigger: (value: string) => Promise<boolean>;
   unlock: (pin: string) => Promise<void>;
   saveProfile: (profile: Profile, action?: string) => Promise<void>;
   saveEntry: (entry: Entry) => Promise<void>;

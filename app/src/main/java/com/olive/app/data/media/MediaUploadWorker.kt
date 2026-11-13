@@ -3,6 +3,7 @@ package com.olive.app.data.media
 
 import android.content.Context
 import android.util.Log
+import android.util.Base64
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -37,6 +38,8 @@ import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.functions.FirebaseFunctions
 import java.net.URI
 import kotlinx.coroutines.tasks.await
+import javax.crypto.SecretKey
+import javax.crypto.spec.SecretKeySpec
 
 
 /**
@@ -91,9 +94,12 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             val parts=upload(file,job)
 
             // Finalization tells R2 to assemble multipart chunks, verifies the remote byte count,
-            // and atomically publishes the zero-knowledge Firestore record.
+            // and atomically publishes the encrypted Firestore record.
             store.update(job.id) { it.copy(status=MediaTransferStatus.FINALIZING,error=null) }
             val record=repository.completeUpload(job.id,parts)
+            if (job.attachToSafetyPlan) {
+                SafetyPlanSyncWorker.enqueueAttachment(applicationContext,job.ownerUid,record.id)
+            }
             store.update(job.id) { it.copy(status=MediaTransferStatus.COMPLETE,mediaId=record.id,error=null) }
             // Preserve a bounded reuse window so an owner can pin the already-uploaded ciphertext
             // without downloading it from R2. Cleanup remains durable if the UI never opens.
@@ -288,11 +294,15 @@ interface MediaTicketDataSource {
     suspend fun abortUpload(jobId:String)
     /** Returns a short-lived GET capability after the callable checks `allowed_users`. */
     suspend fun downloadTicket(mediaId:String):MediaDownloadTicket
+    suspend fun recoverDocumentKey(mediaId: String): SecretKey = error("Document recovery is unavailable")
+    suspend fun storeDocumentKey(mediaId: String, key: SecretKey) = Unit
     /** Atomically replaces recipients plus their account/device-wrapped AES keys. */
     suspend fun updateAccess(
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        grantIndependentRecipients:List<String> = emptyList(),
+        revokeIndependentRecipients:List<String> = emptyList(),
     ):CloudMediaRecord
     suspend fun shareInChat(
         mediaId:String,
@@ -344,17 +354,43 @@ class MediaRepository(
 ):MediaTicketDataSource {
     // Requests short-lived upload URLs for one encrypted file.
     override suspend fun createUpload(job:MediaUploadJob):MediaUploadSession {
-        // Only ciphertext facts and already-encrypted metadata cross the Firebase boundary.
         val source=job.source
+        val wrapped = source.wrappedKeys.getValue(job.ownerUid)
+        val key = KeyManager.unwrapKey(wrapped, source.encryptionVersion)
         val result=call("mediaCreateUpload",mapOf(
             "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
             "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,
             "wrappedKeys" to source.wrappedKeys,"allowedUsers" to source.allowedUsers,
             "deviceWrappedKeys" to source.deviceWrappedKeys,
             "encryptionVersion" to source.encryptionVersion,
+            "recoveryKeyToSeal" to encodeRecoveryKey(key),
         ))
         return MediaUploadSession(job.id,result.string("mediaId"),result.string("objectKey"),
             MediaUploadMode.valueOf(result.string("mode")),result.optionalString("uploadId"),result.long("partSize"))
+    }
+
+    override suspend fun recoverDocumentKey(mediaId: String): SecretKey {
+        val result = call("mediaAccountAccessKey", mapOf("mediaId" to mediaId))
+        val raw = Base64.decode(result.string("accountAccessKey"), Base64.DEFAULT)
+        return try {
+            require(raw.size == 32) { "Invalid document recovery key" }
+            SecretKeySpec(raw, "AES")
+        } finally {
+            raw.fill(0)
+        }
+    }
+
+    override suspend fun storeDocumentKey(mediaId: String, key: SecretKey) {
+        call("mediaStoreAccountAccessKey", mapOf("mediaId" to mediaId, "recoveryKeyToSeal" to encodeRecoveryKey(key)))
+    }
+
+    private fun encodeRecoveryKey(key: SecretKey): String {
+        val raw = key.encoded
+        return try {
+            Base64.encodeToString(raw, Base64.NO_WRAP)
+        } finally {
+            raw.fill(0)
+        }
     }
 
     // Requests a protected upload ticket for an encrypted media file.
@@ -397,6 +433,8 @@ class MediaRepository(
         mediaId:String,
         wrappedKeys:Map<String,String>,
         deviceWrappedKeys:Map<String,String>,
+        grantIndependentRecipients:List<String>,
+        revokeIndependentRecipients:List<String>,
     ):CloudMediaRecord {
         require(wrappedKeys.isNotEmpty() && wrappedKeys.size<=25)
         require(deviceWrappedKeys.size<=250)
@@ -404,6 +442,8 @@ class MediaRepository(
             "mediaId" to mediaId,
             "wrappedKeys" to wrappedKeys,
             "deviceWrappedKeys" to deviceWrappedKeys,
+            "grantIndependentRecipients" to grantIndependentRecipients,
+            "revokeIndependentRecipients" to revokeIndependentRecipients,
         )).record()
     }
 

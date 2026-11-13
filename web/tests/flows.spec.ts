@@ -2,7 +2,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 const password = "Test-password1!";
-async function onboard(page: Page, cover = "Fitness Tracker") {
+async function onboard(page: Page) {
   await page.goto("/account/create");
   await page.getByLabel("Username", { exact: true }).fill("website_tester");
   await page.getByLabel("Password", { exact: true }).fill(password);
@@ -11,10 +11,9 @@ async function onboard(page: Page, cover = "Fitness Tracker") {
     .getByRole("button", { name: "Create account", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Choose your familiar." }),
+    page.getByRole("heading", { name: "Set up your profile" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: cover, exact: true }).click();
-  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByLabel("Language", { exact: true })).toHaveCount(0);
   await page.getByLabel("Full name", { exact: true }).fill("Test Person");
   await page.getByLabel("Date of birth", { exact: true }).fill("2000-01-02");
   await page.getByLabel("City", { exact: true }).fill("Edmonton");
@@ -41,45 +40,16 @@ async function unlock(page: Page, link: string) {
   await page.getByLabel("Browser PIN", { exact: true }).fill("123456");
   await page.getByRole("button", { name: "Unlock", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Welcome, Test." }),
+    page.getByRole("heading", { name: "Your Safe Space" }),
   ).toBeVisible();
 }
-async function newsFixture(page: Page) {
-  await page.route("**/api/news?*", (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: "a".repeat(24),
-          title: "A neighbourhood garden brings people together",
-          summary: "Volunteers build a welcoming garden for their community.",
-          link: "https://publisher.example/story",
-          source: "Test Gazette",
-          published: "2026-10-15T12:00:00Z",
-          topic: "Community",
-        },
-      ],
-    }),
-  );
-  await page.route("**/api/articles/*", (route) =>
-    route.fulfill({
-      json: {
-        title: "A neighbourhood garden brings people together",
-        content:
-          '<p>Full article text from the publisher.</p><script>window.injected=true</script><a href="javascript:alert(1)">Bad link</a>',
-        url: "https://publisher.example/story",
-        byline: "Test Author",
-      },
-    }),
-  );
-}
-
 test("incident pin loads and keeps the selected location when address lookup is unavailable", async ({ page }) => {
   await page.route("**/api/map-tiles/**", (route) => route.fulfill({ status: 404 }));
   await page.route("**/api/locations?**", (route) => route.fulfill({ status: 503, json: {} }));
   const link = await onboard(page);
   await page.getByRole("button", { name: "Continue to my cover" }).click();
   await unlock(page, link);
-  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }).click();
   await page.getByRole("button", { name: "New entry", exact: true }).click();
   await page.getByRole("tab", { name: "Incident", exact: true }).click();
   await page.getByRole("button", { name: "Choose incident location on map" }).click();
@@ -121,17 +91,17 @@ test("account creation enforces current credential rules before onboarding", asy
   await confirmation.fill(password);
   await submit.click();
   await expect(
-    page.getByRole("heading", { name: "Choose your familiar." }),
+    page.getByRole("heading", { name: "Set up your profile" }),
   ).toBeVisible();
 });
-// Inputs: the values in this case. Expected: plain domain and guessed private paths show Fitness, never a private workspace.
-test("plain domain and guessed private paths show Fitness, never a private workspace", async ({
+// Inputs: the values in this case. Expected: plain domain and guessed private paths show Little Grove.
+test("plain domain and guessed private paths show Little Grove", async ({
   page,
 }) => {
   for (const path of ["/", "/safe", "/entry"]) {
     await page.goto(path);
     await expect(
-      page.getByRole("heading", { name: "Fitness Tracker" }),
+      page.locator(".grove-games"),
     ).toBeVisible();
     await expect(
       page.getByText("Your personal entry", { exact: true }),
@@ -147,10 +117,10 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await expect(page).toHaveURL(/\/$/);
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Fitness Tracker" }),
+    page.locator(".grove-games"),
   ).toBeVisible();
   await unlock(page, link);
-  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }).click();
   await page.getByRole("button", { name: "New entry", exact: true }).click();
   await page.getByLabel("Title (optional)").fill("Private fixture note");
   await page
@@ -175,7 +145,7 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   });
   expect(vaults).not.toContain("Private fixture note");
   expect(vaults).not.toContain("Details only inside");
-  await page.getByRole("button", { name: "Contacts", exact: true }).click();
+  await page.getByRole("button", { name: "Trusted contacts", exact: true }).click();
   await page.getByRole("button", { name: "Add a contact" }).click();
   await page.getByLabel("Name", { exact: true }).fill("Trusted Friend");
   await page
@@ -186,16 +156,13 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
     page.getByRole("heading", { name: "Trusted Friend" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Cover app", exact: true })
-    .selectOption("NEWS");
-  await page.getByRole("button", { name: "Save preferences" }).click();
-  await expect(page.getByRole("status")).toContainText("Changes saved.");
+  await expect(page.getByRole("combobox", { name: /language/i })).toHaveCount(0);
+  await expect(page.getByLabel("Personal entry link", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Quick Exit", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText("Private fixture note")).toHaveCount(0);
   await unlock(page, link);
-  await page.getByRole("button", { name: "Notes", exact: true }).click();
+  await page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Private fixture note" }),
   ).toBeVisible();
@@ -221,14 +188,14 @@ test("invalid personal links cannot open an account even with valid account cred
   await page.getByRole("button", { name: "Unlock", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("current personal link");
   await expect(
-    page.getByRole("button", { name: "Notes", exact: true }),
+    page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);
 });
 // Inputs: the values in this case. Expected: returning account opens the PIN gate at the root URL without revealing private content.
 test("returning account opens the PIN gate at the root URL without revealing private content", async ({
   page,
 }) => {
-  await onboard(page, "Daily Digest");
+  await onboard(page);
   await page.getByRole("button", { name: "Continue to my cover" }).click();
   await page.goto("/account/sign-in");
   await page.getByLabel("Username", { exact: true }).fill("website_tester");
@@ -236,9 +203,29 @@ test("returning account opens the PIN gate at the root URL without revealing pri
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByLabel("Browser PIN", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Quick Exit", exact: true })).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Notes", exact: true }),
+    page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);
+});
+
+test("a browser enrollment with a phone cover migrates to its own game field", async ({ page }) => {
+  const link = await onboard(page);
+  await page.getByRole("button", { name: "Continue to my cover" }).click();
+  await page.evaluate(async () => {
+    const { database } = await import("/src/services/LocalDataStore.ts");
+    const db = await database;
+    const { webCover, ...enrollment } = await db.get("device", "current");
+    await db.put("device", { ...enrollment, cover: "NEWS" }, "current");
+  });
+  await page.goto("/fitness");
+  await expect(page.locator(".grove-games")).toBeVisible();
+  await expect.poll(() => page.evaluate(async () => {
+    const { database } = await import("/src/services/LocalDataStore.ts");
+    const saved = await (await database).get("device", "current");
+    return [saved.webCover, "cover" in saved];
+  })).toEqual(["GAME", false]);
+  await unlock(page, link);
 });
 // Inputs: the values in this case. Expected: personal links can be rotated and wrong PINs do not reveal private data.
 test("personal links can be rotated and wrong PINs do not reveal private data", async ({
@@ -251,7 +238,7 @@ test("personal links can be rotated and wrong PINs do not reveal private data", 
   await page.getByRole("button", { name: "Unlock", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Incorrect PIN");
   await expect(
-    page.getByRole("button", { name: "Notes", exact: true }),
+    page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);
   await page.getByLabel("Browser PIN", { exact: true }).fill("123456");
   await page.getByRole("button", { name: "Unlock", exact: true }).click();
@@ -288,83 +275,40 @@ test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus do
   await page.getByRole("button", { name: "Quick Exit", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
   await expect(
-    page.getByRole("heading", { name: "Welcome, Test." }),
+    page.getByRole("heading", { name: "Your Safe Space" }),
   ).toHaveCount(0);
   await unlock(page, link);
   await page.clock.install();
   await page.clock.fastForward(61_000);
   await expect(
-    page.getByRole("dialog", { name: "Would you like a little more time?" }),
+    page.getByRole("dialog", { name: "Your Safe Space is about to lock" }),
   ).toBeVisible();
   await page.clock.fastForward(15_000);
   await expect(page).toHaveURL(/\/$/);
   await expect(
-    page.getByRole("button", { name: "Notes", exact: true }),
+    page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);
 });
-// Inputs: each fitness navigation tab. Expected: every tracker summary opens without exposing private screens.
-test("fitness cover opens activity, vitals, and nutrition summaries", async ({
-  page,
-}) => {
-  await page.goto("/cover/fitness");
-  await expect(
-    page.getByRole("heading", { name: "Fitness Tracker" }),
-  ).toBeVisible();
-  await page.getByRole("tab", { name: /Activity/ }).click();
-  await expect(
-    page.getByRole("img", { name: "Steps, last 14 days" }),
-  ).toBeVisible();
-  await page.getByRole("tab", { name: /Vitals/ }).click();
-  await expect(page.getByText("— No data —")).toBeVisible();
-  await page.getByRole("tab", { name: /Nutrition/ }).click();
-  await expect(
-    page.getByRole("heading", { name: "0 of 2000 kcal" }),
-  ).toBeVisible();
-});
-// Inputs: the values in this case. Expected: news reader sanitizes publisher HTML and bookmarks stay available.
-test("news reader sanitizes publisher HTML and bookmarks stay available", async ({
-  page,
-}) => {
-  await newsFixture(page);
-  await page.goto("/cover/daily-digest");
-  await page.getByRole("button", { name: /Save article:/ }).click();
-  await page.getByRole("button", { name: "Saved stories" }).click();
-  await page
-    .getByRole("button", { name: /Community A neighbourhood garden/ })
-    .click();
-  await expect(
-    page.getByText("Full article text from the publisher."),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(() =>
-      Boolean((window as unknown as { injected?: boolean }).injected),
-    ),
-  ).toBe(false);
-  await expect(page.locator(".reader-body a")).not.toHaveAttribute(
-    "href",
-    /javascript:/,
-  );
-});
-// Inputs: the values in this case. Expected: PWA manifests use cover-specific identities and the download page offers the signed APK.
-test("PWA manifests use cover-specific identities and the download page offers the signed APK", async ({
+// Inputs: the values in this case. Expected: PWA manifests use the Little Grove identity and the download page offers the signed APK.
+test("PWA manifests use the Little Grove identity and the download page offers the signed APK", async ({
   page,
   request,
 }) => {
   const manifest = await (
     await request.get("/cover/daily-digest/manifest.webmanifest")
   ).json();
-  expect(manifest.name).toBe("Daily Digest");
+  expect(manifest.name).toBe("Little Grove");
   expect(manifest.start_url).toBe("/");
-  expect(manifest.icons[0].src).toContain("daily-digest-192");
+  expect(manifest.icons[0].src).toContain("game-192");
   await page.goto("/get");
   await expect(
-    page.getByRole("heading", { name: "A place on your Home Screen." }),
+    page.getByRole("heading", { name: "iPhone and iPad" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Begin onboarding" }),
+    page.getByRole("link", { name: "Create an account" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Download the signed Android app." }),
+    page.getByRole("heading", { name: "Android", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Download signed APK/i }),
@@ -373,7 +317,7 @@ test("PWA manifests use cover-specific identities and the download page offers t
     page.getByAltText("QR code for the latest signed Android app"),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Your space, on the web." }),
+    page.getByRole("heading", { name: "Use Olive Branch in your browser" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Open the web app/i }),
@@ -390,10 +334,11 @@ for (const size of [
     page,
   }) => {
     await page.setViewportSize(size);
-    await newsFixture(page);
     for (const path of [
       "/",
       "/account",
+      "/account/create",
+      "/admin",
       "/get",
       "/cover/daily-digest",
       "/cover/fitness",
@@ -407,16 +352,39 @@ for (const size of [
       expect(overflow, `${path} overflows ${size.width}px`).toBe(false);
       if (path === "/" || path === "/account")
         await page.screenshot({
-          path: `test-results/${size.width}-${path === "/" ? "fitness" : "account"}.png`,
+          path: `test-results/${size.width}-${path === "/" ? "game" : "account"}.png`,
           fullPage: true,
         });
     }
   });
-// Inputs: the values in this case. Expected: public Fitness and account screens meet core accessibility checks.
-test("public Fitness and account screens meet core accessibility checks", async ({
+test("Safe Space navigation fits narrow phones through wide desktops", async ({ page }) => {
+  const link = await onboard(page);
+  await unlock(page, link);
+  for (const width of [320, 390, 768, 1280, 1920]) {
+    await page.setViewportSize({ width, height: 850 });
+    const overflow = () => page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
+    expect(await overflow(), `Safe Space at ${width}px`).toBe(false);
+    const menu = page.getByRole("button", { name: "Navigation", exact: true });
+    if (width <= 960) {
+      await menu.focus();
+      await menu.press("Enter");
+      await expect(menu).toHaveAttribute("aria-expanded", "true");
+    }
+    const navigation = page.getByRole("navigation", { name: "Safe Space navigation" });
+    await expect(navigation.getByRole("button", { name: "Camera", exact: true })).toHaveCount(0);
+    await navigation.getByRole("button", { name: "Safety plan", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Safety plan", exact: true })).toBeFocused();
+    if (width <= 960) await expect(menu).toHaveAttribute("aria-expanded", "false");
+    expect(await overflow(), `Safety plan at ${width}px`).toBe(false);
+    await page.getByRole("button", { name: "Back to Safe Space" }).click();
+  }
+});
+
+// Inputs: the values in this case. Expected: public game and account screens meet core accessibility checks.
+test("public game and account screens meet core accessibility checks", async ({
   page,
 }) => {
-  for (const path of ["/", "/account/create", "/get"]) {
+  for (const path of ["/", "/account/create", "/account/sign-in", "/admin", "/get"]) {
     await page.goto(path);
     await expect(page.locator("h1,h2").first()).toBeVisible();
     const results = await new AxeBuilder({ page })
@@ -440,16 +408,16 @@ test("signed-in safe app pages meet core accessibility checks", async ({
   await unlock(page, link);
   for (const section of [
     "Home",
-    "Notes",
-    "Messages",
-    "SafetyPlan",
-    "Contacts",
-    "Profile",
+    "Notes & incidents",
+    "Friends & messages",
+    "Safety plan",
+    "Trusted contacts",
+    "My profile",
     "Settings",
-    "Activity",
+    "Account activity",
   ]) {
     if (section !== "Home") {
-      await page.getByRole("button", { name: section, exact: true }).click();
+      await page.getByRole("navigation", { name: "Safe Space navigation" }).getByRole("button", { name: section, exact: true }).click();
     }
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21aa"])

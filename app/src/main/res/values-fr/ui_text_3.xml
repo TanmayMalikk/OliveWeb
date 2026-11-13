@@ -61,5 +61,6 @@
     <string name="notification_active_voice_calls">Appels vocaux en cours</string>
     <string name="notification_safe_app_updates">Mises à jour de l’espace sécurisé</string>
     <string name="notification_safe_app_activity">Ouvrez Olive Branch pour consulter vos mises à jour.</string>
+    <string name="notification_ticket_assigned">Un nouveau ticket vous a été attribué.</string>
     <string name="notification_new_app_update">Nouvelle mise à jour de l’application</string>
 </resources>

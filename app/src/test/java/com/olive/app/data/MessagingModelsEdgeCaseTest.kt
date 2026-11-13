@@ -35,10 +35,10 @@ class MessagingModelsEdgeCaseTest {
     fun supportNamesHideBothStaffAndUserAccountNames() {
         val chat = conversation()
 
-        assertEquals("Olive Staff", chat.displayName("owner", AccountRole.USER, "Olive Staff"))
-        assertEquals("Olive Staff", chat.displayName("safe", AccountRole.SAFE_CONTACT, "Olive Staff"))
-        assertEquals("Ticket #0", chat.displayName("staff", AccountRole.STAFF, "Olive Staff"))
-        assertEquals("Ticket #0", chat.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
+        assertEquals("Support Ticket #0", chat.displayName("owner", AccountRole.USER, "Olive Staff"))
+        assertEquals("Support Ticket #0", chat.displayName("safe", AccountRole.SAFE_CONTACT, "Olive Staff"))
+        assertEquals("Support Ticket #0", chat.displayName("staff", AccountRole.STAFF, "Olive Staff"))
+        assertEquals("Support Ticket #0", chat.displayName("admin", AccountRole.ADMIN, "Olive Staff"))
     }
 
     // A missing username does not change the anonymous ticket label shown to organization accounts.
@@ -46,7 +46,7 @@ class MessagingModelsEdgeCaseTest {
     fun missingOwnerNameStillUsesAnonymousTicketNumber() {
         val chat = conversation(usernames = mapOf("staff" to "real_staff"))
 
-        assertEquals("Ticket #0", chat.displayName("staff", AccountRole.STAFF))
+        assertEquals("Support Ticket #0", chat.displayName("staff", AccountRole.STAFF))
     }
 
     // Inputs: the values shown below. Expected: direct chats show the other participant or conversation fallback.
@@ -83,15 +83,15 @@ class MessagingModelsEdgeCaseTest {
         )
 
         assertEquals(
-            "Olive Staff • Consultation",
+            "Consult Ticket #0",
             name(conversation(origin = SUPPORT_TAG_PLAN_CONSULT, tag = SUPPORT_TAG_PLAN_CONSULT)),
         )
-        assertEquals("Olive Staff • Support", name(conversation()))
+        assertEquals("Support Ticket #0", name(conversation()))
         assertEquals(
-            "Olive Staff • Escalation",
+            "Admin Ticket #0",
             name(conversation(origin = SUPPORT_TAG_PLAN_CONSULT, tag = SUPPORT_TAG_NEEDS_ADMIN)),
         )
-        assertEquals("Olive Staff • Support", name(conversation(origin = "", tag = "UNKNOWN")))
+        assertEquals("Support Ticket #0", name(conversation(origin = "", tag = "UNKNOWN")))
     }
 
     // Inputs: the values shown below. Expected: organization sender names are hidden only from personal accounts.
@@ -99,9 +99,11 @@ class MessagingModelsEdgeCaseTest {
     fun organizationSenderNamesAreHiddenOnlyFromPersonalAccounts() {
         val chat = conversation()
 
-        assertEquals("Olive Staff", chat.senderDisplayName("staff", "real_staff", AccountRole.USER, "Olive Staff"))
-        assertEquals("Olive Staff", chat.senderDisplayName("admin", "real_admin", AccountRole.SAFE_CONTACT, "Olive Staff"))
-        assertEquals("real_staff", chat.senderDisplayName("staff", "real_staff", AccountRole.ADMIN, "Olive Staff"))
-        assertEquals("visible_user", chat.senderDisplayName("owner", "visible_user", AccountRole.USER, "Olive Staff"))
+        assertEquals("Olive Staff", chat.senderDisplayName("staff", "real_staff", AccountRole.USER, "Olive Staff", "Olive Admin"))
+        AccountRole.entries.forEach { role ->
+            assertEquals("Olive Admin", chat.senderDisplayName("admin", "real_admin", role, "Olive Staff", "Olive Admin"))
+        }
+        assertEquals("real_staff", chat.senderDisplayName("staff", "real_staff", AccountRole.ADMIN, "Olive Staff", "Olive Admin"))
+        assertEquals("visible_user", chat.senderDisplayName("owner", "visible_user", AccountRole.USER, "Olive Staff", "Olive Admin"))
     }
 }
