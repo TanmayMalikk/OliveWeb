@@ -126,6 +126,13 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']);
     }
 
+    // Passkey verifier material, short-lived challenges, and ARK ciphertext envelopes are owned
+    // exclusively by callable functions. An encrypted envelope is released only after a verified,
+    // user-present passkey assertion, never through a direct Firestore read.
+    match /accountRecoveryPasskeys/{uid}/{document=**} {
+      allow read, write: if false;
+    }
+
     function validAccountSyncMarker(data) {
       return data.keys().hasAll(['revision','updatedAt'])
         && data.keys().hasOnly(['revision','updatedAt'])

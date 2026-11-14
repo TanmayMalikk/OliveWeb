@@ -193,6 +193,24 @@ test('account keysets are owner-only immutable ciphertext envelopes', async () =
   await assertFails(getDoc(target));
 });
 
+test('passkey recovery factors are callable-service-only', async () => {
+  const uid = 'passkey-alice';
+  const alice = env.authenticatedContext(uid).firestore();
+  const bob = env.authenticatedContext('passkey-bob').firestore();
+  const credentialPath = `accountRecoveryPasskeys/${uid}/credentials/credential_abcdefghijklmnop`;
+  const challengePath = `accountRecoveryPasskeys/${uid}/challenges/challenge_abcdefghijklmnop`;
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), credentialPath), {ownerUid: uid, ciphertext: 'opaque'});
+    await setDoc(doc(context.firestore(), challengePath), {ownerUid: uid, challenge: 'server-only'});
+  });
+
+  for (const client of [alice, bob, env.unauthenticatedContext().firestore()]) {
+    await assertFails(getDoc(doc(client, credentialPath)));
+    await assertFails(getDoc(doc(client, challengePath)));
+    await assertFails(setDoc(doc(client, credentialPath), {ownerUid: uid, ciphertext: 'forged'}));
+  }
+});
+
 test('safety plan reads require valid path identity and bounded access fields', async () => {
   const ownerUid='rules-plan-owner';
   const owner=env.authenticatedContext(ownerUid,{role:'USER'}).firestore();
