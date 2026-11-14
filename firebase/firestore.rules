@@ -100,7 +100,7 @@ service cloud.firestore {
     // Account keysets contain an ARK-encrypted private key, never an ARK or a raw file key.
     // The owner can create its initial ciphertext envelope and retry the exact same envelope; future
     // rotations require a dedicated, reviewed migration rather than a broad client update rule.
-    function validAccountKeyset(data, uid) {
+    function validAccountKeysetShape(data, uid) {
       return data.keys().hasOnly(['version','accountId','keyId','epoch','algorithm','publicKey','iv','ciphertext','updatedAt'])
         && data.version == 1
         && data.accountId is string && data.accountId == uid
@@ -111,14 +111,18 @@ service cloud.firestore {
         && data.iv is string && data.iv.matches('^[A-Za-z0-9+/]{16}$')
         && data.ciphertext is string && data.ciphertext.size() >= 2000 && data.ciphertext.size() <= 4096
         && data.ciphertext.matches('^[A-Za-z0-9+/=]+$')
-        && data.updatedAt == request.time;
+        && data.updatedAt is timestamp;
+    }
+
+    function validAccountKeysetWrite(data, uid) {
+      return validAccountKeysetShape(data, uid) && data.updatedAt == request.time;
     }
 
     match /accountKeysets/{uid} {
-      allow get: if owner(uid) && validAccountKeyset(resource.data, uid);
+      allow get: if owner(uid) && validAccountKeysetShape(resource.data, uid);
       allow list, delete: if false;
-      allow create: if owner(uid) && validAccountKeyset(request.resource.data, uid);
-      allow update: if owner(uid) && validAccountKeyset(request.resource.data, uid)
+      allow create: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid);
+      allow update: if owner(uid) && validAccountKeysetWrite(request.resource.data, uid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']);
     }
 
