@@ -16,8 +16,15 @@ import org.json.JSONObject
 
 /** AES-256 key that unlocks one account's encrypted keyset. */
 internal class AccountRecoveryKey private constructor(internal val value: SecretKey) {
+    internal fun encodedCopy(): ByteArray = value.encoded.copyOf()
+
     companion object {
         fun generate(): AccountRecoveryKey = AccountRecoveryKey(EncryptionUtils.generateSymmetricKey())
+
+        internal fun fromEncoded(encoded: ByteArray): AccountRecoveryKey {
+            require(encoded.size == 32) { "Invalid account recovery key" }
+            return AccountRecoveryKey(javax.crypto.spec.SecretKeySpec(encoded, "AES"))
+        }
     }
 }
 
