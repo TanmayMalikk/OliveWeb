@@ -1,0 +1,72 @@
+package com.olive.app.security
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertThrows
+import org.junit.Test
+import java.util.Base64
+
+class AccountKeysetEnvelopeTest {
+    @Test
+    fun `new account envelope unlocks only with its account recovery key`() {
+        val recoveryKey = AccountRecoveryKey.generate()
+        val envelope = AccountKeysetEnvelope.create("account-a", recoveryKey)
+
+        val unlocked = envelope.unlock("account-a", recoveryKey)
+
+        assertEquals("account-a", unlocked.accountId)
+        assertEquals(envelope.keyId, unlocked.keyId)
+        assertEquals(envelope.epoch, unlocked.epoch)
+        assertEquals(
+            Base64.getDecoder().decode(envelope.publicKeyBase64).toList(),
+            unlocked.publicKey.encoded.toList(),
+        )
+    }
+
+    @Test
+    fun `account identity recovery key and ciphertext are authenticated`() {
+        val recoveryKey = AccountRecoveryKey.generate()
+        val envelope = AccountKeysetEnvelope.create("account-a", recoveryKey)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            envelope.unlock("account-b", recoveryKey)
+        }
+        assertThrows(Exception::class.java) {
+            envelope.unlock("account-a", AccountRecoveryKey.generate())
+        }
+        assertThrows(Exception::class.java) {
+            envelope.copy(ciphertextBase64 = Base64.getEncoder().encodeToString(
+                envelope.ciphertext.reversedArray(),
+            ))
+                .unlock("account-a", recoveryKey)
+        }
+    }
+
+    @Test
+    fun `serialized envelope never includes account private key material`() {
+        val recoveryKey = AccountRecoveryKey.generate()
+        val envelope = AccountKeysetEnvelope.create("account-a", recoveryKey)
+        val privateKeyBase64 = Base64.getEncoder().encodeToString(
+            envelope.unlock("account-a", recoveryKey).privateKey.encoded,
+        )
+
+        val serialized = envelope.toJson().toString()
+
+        assertFalse(serialized.contains(privateKeyBase64))
+        assertEquals(envelope, AccountKeysetEnvelope.fromJson(envelope.toJson()))
+    }
+
+    @Test
+    fun `fresh account envelopes use distinct recovery keys and key identities`() {
+        val firstRecoveryKey = AccountRecoveryKey.generate()
+        val secondRecoveryKey = AccountRecoveryKey.generate()
+        val first = AccountKeysetEnvelope.create("account-a", firstRecoveryKey)
+        val second = AccountKeysetEnvelope.create("account-a", secondRecoveryKey)
+
+        assertNotEquals(first.keyId, second.keyId)
+        assertNotEquals(first.ciphertext.toList(), second.ciphertext.toList())
+        assertEquals("account-a", first.unlock("account-a", firstRecoveryKey).accountId)
+        assertEquals("account-a", second.unlock("account-a", secondRecoveryKey).accountId)
+    }
+}
