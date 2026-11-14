@@ -69,4 +69,17 @@ class AccountKeysetEnvelopeTest {
         assertEquals("account-a", first.unlock("account-a", firstRecoveryKey).accountId)
         assertEquals("account-a", second.unlock("account-a", secondRecoveryKey).accountId)
     }
+
+    @Test
+    fun `unlocked account keyset opens an OAEP wrapped file key`() {
+        val recoveryKey = AccountRecoveryKey.generate()
+        val accountKeyset = AccountKeysetEnvelope.create("account-a", recoveryKey)
+            .unlock("account-a", recoveryKey)
+        val fileKey = EncryptionUtils.generateSymmetricKey()
+
+        val wrapped = KeyManager.wrapKey(fileKey, accountKeyset.publicKey)
+        val unwrapped = KeyManager.unwrapKey(wrapped, accountKeyset.privateKey)
+
+        assertEquals(fileKey.encoded.toList(), unwrapped.encoded.toList())
+    }
 }

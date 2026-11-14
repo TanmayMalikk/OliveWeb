@@ -318,7 +318,7 @@ object KeyManager {
         // Bypass WRAP_MODE entirely
         cipher.init(Cipher.ENCRYPT_MODE, publicKey, spec)
         val wrappedBytes = cipher.doFinal(secretKey.encoded)
-        return android.util.Base64.encodeToString(wrappedBytes, android.util.Base64.NO_WRAP)
+        return Base64.getEncoder().encodeToString(wrappedBytes)
     }
 
     /**
@@ -335,9 +335,24 @@ object KeyManager {
      * Uses the user's secure hardware Private Key.
      */
     fun unwrapKey(wrappedKeyBase64: String, keyWrapVersion: Int? = null): SecretKey {
-        val decodedBytes = android.util.Base64.decode(wrappedKeyBase64, android.util.Base64.NO_WRAP)
         val privateKeys = getPrivateKeys()
         if (privateKeys.isEmpty()) error("Private key missing")
+        return unwrapKey(wrappedKeyBase64, privateKeys, keyWrapVersion)
+    }
+
+    /** Opens a File DEK with an unlocked account private key during the keyset migration. */
+    fun unwrapKey(
+        wrappedKeyBase64: String,
+        privateKey: PrivateKey,
+        keyWrapVersion: Int? = null,
+    ): SecretKey = unwrapKey(wrappedKeyBase64, listOf(privateKey), keyWrapVersion)
+
+    private fun unwrapKey(
+        wrappedKeyBase64: String,
+        privateKeys: List<PrivateKey>,
+        keyWrapVersion: Int?,
+    ): SecretKey {
+        val decodedBytes = Base64.getDecoder().decode(wrappedKeyBase64)
         val candidates = oaepProfiles(keyWrapVersion)
         var lastFailure: GeneralSecurityException? = null
         privateKeys.forEach { privateKey ->
