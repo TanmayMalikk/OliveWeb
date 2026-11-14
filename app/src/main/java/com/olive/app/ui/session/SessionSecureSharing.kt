@@ -357,6 +357,7 @@ internal class SessionRuntime(
     val chatCache get() = localStorage.chatCache
     val documentIndex get() = localStorage.documentIndex
     val offlineMediaCache get() = localStorage.offlineMediaCache
+    val accountKeysets get() = localStorage.accountKeysets
     val prioritySync = PrioritySyncCoordinator(application)
     val dataSources = dataSourcesOverride ?: SessionDataSources.create(
         application,

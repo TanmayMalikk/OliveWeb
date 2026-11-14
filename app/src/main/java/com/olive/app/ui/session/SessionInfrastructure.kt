@@ -61,6 +61,7 @@ internal class SessionLocalStorage(application: Application, localMode: Boolean)
     val chatCache = ChatCacheStore(application)
     val documentIndex = DocumentIndexStore(application)
     val offlineMediaCache = OfflineMediaCache(application)
+    val accountKeysets = AccountKeysetLocalStore(vault)
 }
 
 // Builds cloud repositories only for a Firebase session. Tests can supply a replacement bundle.

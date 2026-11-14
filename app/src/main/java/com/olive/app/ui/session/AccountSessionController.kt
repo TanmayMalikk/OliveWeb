@@ -314,6 +314,7 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
                             chatCache.purge(uid)
                             documentIndex.purge(uid)
                             offlineMediaCache.purge(uid)
+                            accountKeysets.purge(uid)?.let(AccountRecoveryKeyDeviceProtector()::forget)
                             SafetyAccessIndexStore(application).purge(uid)
                             SyncCheckpointStore(application).purge(uid)
                         }

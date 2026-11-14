@@ -86,6 +86,16 @@ internal class AccountRecoveryKeyDeviceProtector {
         }
     }
 
+    /** Removes a device key after its encrypted ARK record has been purged. */
+    fun forget(record: AccountRecoveryKeyDeviceRecord) {
+        runCatching {
+            KeyStore.getInstance(ANDROID_KEYSTORE).apply {
+                load(null)
+                deleteEntry(alias(record.accountId, record.protectionId))
+            }
+        }
+    }
+
     private fun alias(accountId: String, protectionId: String): String =
         "olive.account.ark.v1." + MessageDigest.getInstance("SHA-256")
             .digest(accountId.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) } +

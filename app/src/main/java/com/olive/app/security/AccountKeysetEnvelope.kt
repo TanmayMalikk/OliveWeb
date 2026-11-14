@@ -37,6 +37,10 @@ internal data class UnlockedAccountKeyset(
     val privateKey: PrivateKey,
 )
 
+/** Account keyset material is unusable if an authenticated envelope cannot be parsed or unlocked. */
+internal class AccountKeysetException(message: String, cause: Throwable? = null) :
+    IllegalStateException(message, cause)
+
 /**
  * Versioned ARK-encrypted account private-key envelope.
  *

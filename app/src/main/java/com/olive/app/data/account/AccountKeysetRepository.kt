@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import com.olive.app.security.AccountKeysetEnvelope
+import com.olive.app.security.AccountKeysetException
 import kotlinx.coroutines.tasks.await
 import org.json.JSONObject
 
@@ -50,7 +51,3 @@ internal class AccountKeysetRepository(
         private const val COLLECTION = "accountKeysets"
     }
 }
-
-/** A remote keyset must be treated as unusable when its authenticated envelope cannot be parsed. */
-internal class AccountKeysetException(message: String, cause: Throwable? = null) :
-    IllegalStateException(message, cause)
