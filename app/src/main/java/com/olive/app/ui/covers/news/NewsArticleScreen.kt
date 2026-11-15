@@ -123,7 +123,7 @@ internal fun NewsArticleCard(
                 Surface(
                     color = PaleOlive,
                     shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(.7.dp, OliveGreen.copy(alpha = .3f)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.weight(1f, fill = false).testTag("news_article_topic")
                 ) {
                     Text(

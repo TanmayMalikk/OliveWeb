@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
@@ -87,6 +88,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var search by rememberSaveable { mutableStateOf("") }
+    var shownKind by rememberSaveable { mutableStateOf<PrivateEntryKind?>(null) }
+    var newestFirst by rememberSaveable { mutableStateOf(true) }
     var logEntryId by remember { mutableStateOf<String?>(null) }
     var trashOpen by remember { mutableStateOf(false) }
     val editorTitleFocus = remember { FocusRequester() }
@@ -527,14 +530,15 @@ internal fun PrivateNotes(session: SessionViewModel) {
         }) { trashOpen = false }
         return
     }
-    val filtered = session.privateEntries.filter {
-        it.deletedAt == null && (search.isBlank() || it.title.contains(
-            search,
-            true
-        ) || it.body.contains(search, true))
+    val hasFilters = search.isNotBlank() || shownKind != null
+    val filtered = session.privateEntries.filter { entry ->
+        entry.deletedAt == null && (shownKind == null || entry.kind == shownKind) &&
+            (search.isBlank() || entry.title.contains(search, ignoreCase = true) ||
+                entry.body.contains(search, ignoreCase = true))
     }
-    val pinned = filtered.filter { it.pinned }.sortedByDescending { it.updatedAt }
-    val others = filtered.filterNot { it.pinned }.sortedByDescending { it.updatedAt }
+    val sorted = if (newestFirst) filtered.sortedByDescending { it.updatedAt }
+        else filtered.sortedBy { it.updatedAt }
+    val (pinned, others) = sorted.partition { it.pinned }
     val notesGridState = rememberLazyGridState()
     LazyVerticalGrid(
         columns = if (LocalDensity.current.fontScale >= 1.3f) GridCells.Fixed(1) else GridCells.Adaptive(192.dp),
@@ -598,7 +602,10 @@ internal fun PrivateNotes(session: SessionViewModel) {
         if (session.message != null || session.busy) item(span = { GridItemSpan(maxLineSpan) }) {
             Status(session)
         }
-        if (search.isNotBlank()) item(span = { GridItemSpan(maxLineSpan) }) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            NoteBoardControls(shownKind, newestFirst, { shownKind = it }, { newestFirst = it })
+        }
+        if (hasFilters) item(span = { GridItemSpan(maxLineSpan) }) {
             AccessibleMessage(
                 androidx.compose.ui.res.pluralStringResource(R.plurals.note_search_results_count, filtered.size, filtered.size),
             )
@@ -606,8 +613,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
         // Let the empty-search message use the full grid width.
         if (filtered.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
-                if (search.isBlank()) uiText(R.string.no_private_entries_yet)
-                else uiText(R.string.no_notes_found),
+                if (hasFilters) uiText(R.string.notes_board_no_matching_entries)
+                else uiText(R.string.no_private_entries_yet),
                 color = Muted
             )
         }
@@ -623,7 +630,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
         }
         if (others.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
             Text(
-                if (pinned.isEmpty()) uiText(R.string.all_notes) else uiText(R.string.others),
+                if (pinned.isEmpty()) uiText(noteBoardKindLabel(shownKind)) else uiText(R.string.others),
                 style = MaterialTheme.typography.titleMedium
             )
         }
@@ -632,6 +639,61 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 entry, formatter, { openEditor(entry) },
                 { session.togglePrivateEntryPin(entry.id) }, { logEntryId = entry.id }, Modifier.animateItem()
             )
+        }
+    }
+}
+
+private fun noteBoardKindLabel(kind: PrivateEntryKind?): Int = when (kind) {
+    PrivateEntryKind.Note -> R.string.notes_board_notes
+    PrivateEntryKind.Incident -> R.string.notes_board_incidents
+    null -> R.string.notes_board_all
+}
+
+@Composable
+private fun NoteBoardControls(
+    kind: PrivateEntryKind?,
+    newestFirst: Boolean,
+    onKindChange: (PrivateEntryKind?) -> Unit,
+    onOrderChange: (Boolean) -> Unit,
+) {
+    var sortOpen by remember { mutableStateOf(false) }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        itemVerticalAlignment = Alignment.CenterVertically,
+    ) {
+        listOf(null, PrivateEntryKind.Note, PrivateEntryKind.Incident).forEach { option ->
+            FilterChip(
+                selected = kind == option,
+                onClick = { onKindChange(option) },
+                label = { Text(stringResource(noteBoardKindLabel(option))) },
+                modifier = Modifier.testTag("private_filter_${option?.name?.lowercase() ?: "all"}"),
+            )
+        }
+        Box {
+            val orderLabel = stringResource(if (newestFirst) R.string.notes_board_newest else R.string.notes_board_oldest)
+            OutlinedButton(
+                onClick = { sortOpen = true },
+                modifier = Modifier.testTag("private_sort"),
+            ) {
+                Icon(Icons.Outlined.Sort, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(orderLabel)
+            }
+            DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
+                listOf(true, false).forEach { newest ->
+                    val label = stringResource(if (newest) R.string.notes_board_newest else R.string.notes_board_oldest)
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onOrderChange(newest)
+                            sortOpen = false
+                        },
+                        modifier = Modifier.testTag(if (newest) "private_sort_newest" else "private_sort_oldest")
+                            .semantics { selected = newestFirst == newest },
+                    )
+                }
+            }
         }
     }
 }

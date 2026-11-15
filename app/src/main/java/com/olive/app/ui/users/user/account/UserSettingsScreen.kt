@@ -387,6 +387,7 @@ private fun SettingsSection(title: String, content: @Composable ColumnScope.() -
         shape = OlivePrivateLayout.GroupShape,
         color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),

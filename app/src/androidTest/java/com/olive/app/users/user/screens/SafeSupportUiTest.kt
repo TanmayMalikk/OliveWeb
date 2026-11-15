@@ -25,6 +25,7 @@ import androidx.compose.ui.test.*
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import com.olive.app.data.account.DeliveryAddress
+import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.account.UserProfile
 import com.olive.app.security.InputPolicy
 import java.io.File
@@ -32,6 +33,41 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafeSupportUiTest : OliveUiTestBase() {
+    @Test
+    fun notesBoardSortsAndFiltersEntries() {
+        val session = setup()
+        val note = "Earlier sample note"
+        val incident = "Later sample incident"
+        click("safe_notes")
+        compose.runOnIdle {
+            session.savePrivateEntry(null, PrivateEntryKind.Note, note, "Synthetic note", "", "", "")
+        }
+        compose.waitUntil(10_000) { !session.busy && session.privateEntries.any { it.title == note } }
+        compose.runOnIdle {
+            session.savePrivateEntry(
+                null, PrivateEntryKind.Incident, incident, "Synthetic incident", "2026-11-01", "", "Edmonton"
+            )
+        }
+        compose.waitUntil(10_000) { !session.busy && session.privateEntries.any { it.title == incident } }
+        fun precedes(first: String, second: String): Boolean {
+            val a = compose.onNodeWithText(first).getUnclippedBoundsInRoot()
+            val b = compose.onNodeWithText(second).getUnclippedBoundsInRoot()
+            return a.top < b.top || (a.top == b.top && a.left < b.left)
+        }
+        assertTrue(precedes(incident, note))
+        click("private_sort")
+        click("private_sort_oldest")
+        compose.waitUntil(4_000) { precedes(note, incident) }
+        click("private_filter_note")
+        compose.onNodeWithText(note).assertExists()
+        compose.onNodeWithText(incident).assertDoesNotExist()
+        click("private_filter_incident")
+        compose.onNodeWithText(incident).assertExists()
+        compose.onNodeWithText(note).assertDoesNotExist()
+        fill("private_notes_search", "missing fixture")
+        compose.onNodeWithText("No notes or incidents match.").assertExists()
+    }
+
     @Test
     fun idleLockSliderSavesRecommendedAndMaximumDelays() {
         val session = setup()

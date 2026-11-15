@@ -14,6 +14,7 @@ import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -374,8 +375,15 @@ private fun ZoomControls(
     modifier: Modifier = Modifier,
 ) {
     val resetDescription = stringResource(R.string.a11y_reset_zoom)
-    Surface(modifier, shape = MaterialTheme.shapes.extraLarge, tonalElevation = 4.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    Surface(
+        modifier,
+        shape = MaterialTheme.shapes.extraLarge,
+        color = Paper,
+        contentColor = Ink,
+        border = BorderStroke(1.dp, OliveOutline),
+        shadowElevation = 4.dp,
+    ) {
+        FlowRow(itemVerticalAlignment = Alignment.CenterVertically) {
             if (onRotate != null) IconButton(
                 onClick = onRotate,
                 modifier = Modifier.testTag("media_rotate"),

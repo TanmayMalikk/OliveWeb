@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -322,11 +321,14 @@ internal fun SafeSupportControls(
             if (showSupport) {
                 val label = stringResource(if (expanded) R.string.support_close_menu else R.string.support_open_menu)
                 val state = stringResource(if (expanded) R.string.support_expanded else R.string.support_collapsed)
+                val shape = MaterialTheme.shapes.large
                 FloatingActionButton(
                     onClick = { onExpanded(!expanded) },
+                    shape = shape,
                     containerColor = OliveGreen,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    contentColor = Paper,
                     modifier = Modifier.align(Alignment.BottomStart).navigationBarsPadding().padding(12.dp)
+                        .border(1.dp, SageGreen, shape)
                         .testTag("support_menu_toggle").semantics {
                             contentDescription = label
                             stateDescription = state
@@ -438,21 +440,7 @@ private fun SafeHomeScreen(session: SessionViewModel, profile: UserProfile) {
                             )
                         }
                         ModeNotice(session)
-                        SafeHomeGroup {
-                            SafeHomeRow(
-                                label = stringResource(R.string.my_profile),
-                                icon = { Icon(Icons.Outlined.PersonOutline, null) },
-                                modifier = Modifier.testTag("safe_profile"),
-                                onClick = { session.navigation.openSafePage(SafePage.Profile) }
-                            )
-                            SafeHomeDivider()
-                            SafeHomeRow(
-                                label = stringResource(R.string.account_activity),
-                                icon = { Icon(Icons.Outlined.History, null) },
-                                modifier = Modifier.testTag("safe_activity"),
-                                onClick = { session.navigation.openSafePage(SafePage.Activity) }
-                            )
-                        }
+                        SafeHomeShortcuts(session)
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(
                                 stringResource(R.string.private_features),
@@ -482,6 +470,7 @@ private fun SafeHomeScreen(session: SessionViewModel, profile: UserProfile) {
                                 onClick = session::signOut,
                                 enabled = !session.busy,
                                 modifier = Modifier.testTag("sign_out")
+                                    .fillMaxWidth()
                             ) { Text(stringResource(R.string.sign_out_on_this_device)) }
                         }
                     }
@@ -570,13 +559,19 @@ private fun SafeFeatureCard(
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    val darkMode = isSystemInDarkTheme()
     Surface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.testTag(feature.tag).semantics { role = Role.Button },
         shape = MaterialTheme.shapes.extraLarge,
-        color = if (enabled) colors.surfaceContainerHigh else colors.surfaceContainer,
-        contentColor = if (enabled) colors.onSurface else colors.onSurfaceVariant
+        color = when {
+            !enabled -> colors.surfaceContainer
+            darkMode -> DarkSageSurface
+            else -> PaleOlive
+        },
+        contentColor = if (enabled) colors.onSurface else colors.onSurfaceVariant,
+        border = BorderStroke(1.dp, colors.outlineVariant)
     ) {
         Column(
             Modifier.heightIn(min = 124.dp).padding(16.dp),
@@ -586,8 +581,8 @@ private fun SafeFeatureCard(
             val icon: @Composable () -> Unit = {
                 Surface(
                     shape = CircleShape,
-                    color = colors.primaryContainer,
-                    contentColor = colors.onPrimaryContainer
+                    color = if (enabled) SageGreen else colors.surfaceVariant,
+                    contentColor = if (enabled) DarkOlive else colors.onSurfaceVariant
                 ) {
                     Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                         Icon(feature.icon, null, Modifier.size(26.dp))
@@ -603,6 +598,7 @@ private fun SafeFeatureCard(
             Text(
                 label,
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
                 textAlign = TextAlign.Center
             )
         }
@@ -610,49 +606,52 @@ private fun SafeFeatureCard(
 }
 
 @Composable
-private fun SafeHomeGroup(content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.extraLarge
-    ) { Column(content = content) }
+private fun SafeHomeShortcuts(session: SessionViewModel) {
+    val fontScale = LocalDensity.current.fontScale
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val sideBySide = maxWidth >= 280.dp && fontScale < 1.4f
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            maxItemsInEachRow = if (sideBySide) 2 else 1,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SafeHomeShortcut(
+                label = stringResource(R.string.my_profile),
+                icon = Icons.Outlined.PersonOutline,
+                modifier = Modifier.weight(1f).testTag("safe_profile"),
+                onClick = { session.navigation.openSafePage(SafePage.Profile) }
+            )
+            SafeHomeShortcut(
+                label = stringResource(R.string.account_activity),
+                icon = Icons.Outlined.History,
+                modifier = Modifier.weight(1f).testTag("safe_activity"),
+                onClick = { session.navigation.openSafePage(SafePage.Activity) }
+            )
+        }
+    }
 }
 
 @Composable
-private fun SafeHomeDivider() {
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = OlivePrivateLayout.RowSpacing),
-        color = MaterialTheme.colorScheme.outlineVariant
-    )
-}
-
-@Composable
-private fun SafeHomeRow(
+private fun SafeHomeShortcut(
     label: String,
-    icon: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
+    icon: ImageVector,
+    modifier: Modifier,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier.fillMaxWidth().heightIn(min = OlivePrivateLayout.RowMinHeight)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = OlivePrivateLayout.RowSpacing, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(OlivePrivateLayout.RowSpacing),
-        verticalAlignment = Alignment.CenterVertically
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 50.dp),
+        shape = MaterialTheme.shapes.large,
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
     ) {
-        val iconColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, contentColor = iconColor) {
-            Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { icon() }
-        }
-        Text(
-            label,
-            modifier = Modifier.weight(1f),
-            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.titleMedium
-        )
-        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = iconColor)
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(label, textAlign = TextAlign.Center)
     }
 }
 

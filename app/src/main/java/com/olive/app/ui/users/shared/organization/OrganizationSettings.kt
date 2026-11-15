@@ -274,7 +274,14 @@ internal fun OrganizationDashboardCard(
     onClick: () -> Unit,
     badgeCount: Int = 0,
 ) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+    OutlinedCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    ) {
         Row(
             Modifier.padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,

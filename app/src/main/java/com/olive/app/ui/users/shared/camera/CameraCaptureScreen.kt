@@ -210,7 +210,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                 )
                 Column(
                     Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)
-                        .background(Color.Black.copy(alpha = .55f), RoundedCornerShape(24.dp))
+                        .background(CameraControlScrim, RoundedCornerShape(24.dp))
                         .padding(4.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -237,7 +237,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                 IconButton(
                     onClick = session.navigation::back,
                     Modifier.align(Alignment.TopStart).statusBarsPadding().padding(8.dp)
-                        .background(Color.Black.copy(alpha = .55f), CircleShape)
+                        .background(CameraControlScrim, CircleShape)
                         .testTag("camera_back")
                 ) {
                     Icon(
@@ -250,7 +250,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     onClick = { viewModel.flip(lifecycleOwner, preview) },
                     enabled = ready && !busy && !recording,
                     modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)
-                        .background(Color.Black.copy(alpha = .55f), CircleShape)
+                        .background(CameraControlScrim, CircleShape)
                         .testTag("camera_flip")
                 ) {
                     Icon(
@@ -263,7 +263,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     Text(
                         it,
                         Modifier.align(Alignment.Center).padding(24.dp)
-                            .background(Color.Black.copy(alpha = .75f)).padding(12.dp),
+                            .background(CameraControlScrim).padding(12.dp),
                         color = Color.White
                     )
                 }
@@ -332,7 +332,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                 }
                 if (busy && mode == CameraMode.Document) Surface(
                     Modifier.align(Alignment.Center).testTag("camera_ocr_processing"),
-                    color = Color.Black.copy(alpha = .78f), shape = MaterialTheme.shapes.medium
+                    color = CameraControlScrim, shape = MaterialTheme.shapes.medium
                 ) {
                     Row(
                         Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
@@ -351,7 +351,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     stringResource(R.string.camera_recording),
                     Modifier.align(Alignment.BottomCenter)
                         .navigationBarsPadding().padding(bottom = 220.dp)
-                        .background(Color.Black.copy(alpha = .55f), RoundedCornerShape(16.dp))
+                        .background(CameraControlScrim, RoundedCornerShape(16.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                         .testTag("camera_recording_active"),
                     color = Color.White
@@ -369,7 +369,7 @@ private fun CameraModeSelector(
     onModeSelected: (CameraMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(modifier, color = Color.Black.copy(alpha = .55f), shape = RoundedCornerShape(24.dp)) {
+    Surface(modifier, color = CameraControlScrim, contentColor = Paper, shape = RoundedCornerShape(24.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -411,6 +411,7 @@ private fun RowScope.CameraModeButton(
     if (selected) Button(
         onClick = onClick,
         enabled = enabled,
+        colors = ButtonDefaults.buttonColors(containerColor = PaleOlive, contentColor = DarkOlive),
         modifier = Modifier.weight(1f).heightIn(min = 56.dp).semantics {
             this.selected = selected
         }.testTag(tag),
@@ -426,6 +427,7 @@ private fun RowScope.CameraModeButton(
         }.testTag(tag),
         contentPadding = PaddingValues(horizontal = 4.dp),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+        border = BorderStroke(1.dp, if (enabled) PaleOlive else OliveDivider),
     ) {
         Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
     }
@@ -462,7 +464,7 @@ private fun CameraShutter(
         modifier = modifier.size(84.dp).testTag("camera_shutter"),
         shape = CircleShape,
         colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = if (recording) Color.Red else Color.White
+            containerColor = if (recording) CallRed else Paper
         )
     ) {
         Icon(
@@ -516,7 +518,7 @@ private fun CameraReview(
             media.ocrResult?.let { result ->
                 Surface(
                     Modifier.fillMaxWidth().heightIn(max = 220.dp).testTag("camera_ocr_result"),
-                    color = Color.Black.copy(alpha = .78f), shape = MaterialTheme.shapes.medium
+                    color = CameraControlScrim, shape = MaterialTheme.shapes.medium
                 ) {
                     Column(
                         Modifier.verticalScroll(rememberScrollState()).padding(14.dp),
@@ -554,9 +556,9 @@ private fun CameraReview(
             )
             uploadError?.let {
                 AccessibleMessage(
-                    it, color = MaterialTheme.colorScheme.error,
+                    it, color = OliveErrorContainer,
                     modifier = Modifier.background(
-                        Color.Black.copy(alpha = .72f),
+                        CameraControlScrim,
                         MaterialTheme.shapes.small
                     ).padding(10.dp).testTag("camera_upload_error")
                 )
@@ -566,7 +568,8 @@ private fun CameraReview(
                     onClick = onRetake,
                     enabled = !controllerLoading,
                     modifier = Modifier.weight(1f).testTag("camera_retake"),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Paper),
+                    border = BorderStroke(1.dp, PaleOlive),
                 ) { Text(stringResource(R.string.take_again)) }
                 Button(
                     onClick = { onSave(media) },

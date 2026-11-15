@@ -27,9 +27,9 @@ let detailsOnlyForSelectedPoint=false;
 let selectedPointUid=null;
 // Keeps distant markers small enough to separate while leaving them visible in an Alberta-wide view.
 function markerSize(point){
-  const closeSize=(point.live||point.lastKnown)?24:22;
+  const closeSize=(point.live||point.lastKnown)?28:26;
   const zoomProgress=Math.max(0,Math.min(1,(map.getZoom()-4)/10));
-  return Math.round(12+(closeSize-12)*zoomProgress);
+  return Math.round(16+(closeSize-16)*zoomProgress);
 }
 // Map: Builds a marker at the size needed for the current zoom level.
 function markerIcon(point){

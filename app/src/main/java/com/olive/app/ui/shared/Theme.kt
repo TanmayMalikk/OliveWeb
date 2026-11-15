@@ -20,7 +20,7 @@ private val oliveLightColors = lightColorScheme(
     surfaceContainerHigh = LightSage,
     surfaceContainerHighest = PaleOlive,
     surfaceTint = OliveGreen,
-    outline = OliveOutline, outlineVariant = SoftGray,
+    outline = OliveOutline, outlineVariant = OliveDivider,
     inverseSurface = Ink, inverseOnSurface = Cream, inversePrimary = SageGreen,
     error = OliveError, onError = Paper,
     errorContainer = OliveErrorContainer, onErrorContainer = OliveError,

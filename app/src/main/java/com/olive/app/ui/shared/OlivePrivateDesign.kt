@@ -12,9 +12,7 @@ import androidx.compose.ui.unit.sp
 internal object OlivePrivateLayout {
     val ScreenPadding = 20.dp
     val SectionSpacing = 24.dp
-    val RowSpacing = 20.dp
     val GroupShape = RoundedCornerShape(28.dp)
-    val RowMinHeight = 64.dp
     val HeaderActionSize = 50.dp
     val FloatingActionClearance = 88.dp
 }
@@ -54,7 +52,7 @@ private val privateDarkColors = darkColorScheme(
     surfaceContainerHigh = CallControlBackground,
     surfaceContainerHighest = DarkOlive,
     outline = SageGreen,
-    outlineVariant = DarkOlive,
+    outlineVariant = OliveDarkDivider,
 )
 
 // Opt in from private screens so covers and role portals retain their own appearance.
@@ -69,7 +67,7 @@ internal fun OlivePrivateDesign(content: @Composable () -> Unit) {
         surfaceContainer = Paper,
         surfaceContainerHigh = CardTintEnabled,
         surfaceContainerHighest = PaleOlive,
-        outlineVariant = SoftGray,
+        outlineVariant = OliveDivider,
     )
     MaterialTheme(
         colorScheme = colors,
