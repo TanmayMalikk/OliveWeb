@@ -12,6 +12,7 @@ import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.SafeContact
 import com.olive.app.data.account.UserProfile
 import com.olive.app.data.safety.readSafetyChecklist
+import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.security.InputPolicy
 import org.junit.Assert.*
 import org.junit.Test
@@ -230,13 +231,27 @@ class SafetyPlanUiTest : OliveUiTestBase() {
 
     @Test
     fun checklistProgressUpdatesWhenAnItemIsChecked() {
-        setup()
+        val session = setup()
         val progress = compose.onNodeWithTag("safety_checklist_progress")
         val progressRange = SemanticsProperties.ProgressBarRangeInfo
         val initialProgress = progress.fetchSemanticsNode().config[progressRange].current
         compose.onNodeWithTag("safety_check_primary_documents_0").performScrollTo().performClick()
-        compose.onNodeWithTag("safety_plan_page").performScrollToIndex(0)
+        progress.assertIsDisplayed()
         assertTrue(progress.fetchSemanticsNode().config[progressRange].current > initialProgress)
+
+        val documentsTab = compose.onNodeWithTag("safety_jump_documents")
+        val complete = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Complete")
+        documentsTab.assert(!complete)
+        compose.runOnIdle {
+            val documents = readSafetyChecklist(session.safetyPlans.plan!!.fields.getValue("primary_documents").value)
+            session.safetyPlans.edit("primary_documents", writeSafetyChecklist(documents.map { it.copy(checked = true) }))
+        }
+        documentsTab.assert(complete)
+        click("safety_backup")
+        documentsTab.assert(!complete)
+        progress.assertIsDisplayed()
+        click("safety_primary")
+        documentsTab.assert(complete)
     }
 
     // Checks the checklist ticks persist and document items are visible step with the test's sample data.

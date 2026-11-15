@@ -2,7 +2,9 @@
 package com.olive.app.ui.users.shared.safetyplan
 
 import android.content.Context
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -39,23 +41,31 @@ import java.util.UUID
 @Composable
 internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean = false) {
     val fraction = if (total > 0) prepared.toFloat() / total else 0f
+    val count = stringResource(R.string.safety_prepared_count, prepared, total)
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (summary) Text(
-            stringResource(R.string.safety_checklist_progress),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.semantics { heading() }
-        )
-        Text(
-            stringResource(R.string.safety_prepared_count, prepared, total),
-            style = if (summary) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelMedium,
-            color = Muted
-        )
+        if (summary) {
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.safety_checklist_progress),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { heading() }
+                )
+                Text(count, style = MaterialTheme.typography.bodyMedium, color = Muted)
+            }
+        } else {
+            Text(count, style = MaterialTheme.typography.labelMedium, color = Muted)
+        }
         if (summary || total > 0) LinearProgressIndicator(
             progress = { fraction },
             modifier = Modifier.fillMaxWidth().height(if (summary) 10.dp else 6.dp)
+                .border(1.dp, OliveDivider, CircleShape)
                 .then(if (summary) Modifier.testTag("safety_checklist_progress") else Modifier),
             color = OliveGreen,
             trackColor = SageGreen,

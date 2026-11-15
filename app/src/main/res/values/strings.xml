@@ -273,6 +273,12 @@
     <string name="pinned">Pinned</string>
     <string name="others">Others</string>
     <string name="all_notes">All notes</string>
+    <string name="notes_board_all">All entries</string>
+    <string name="notes_board_notes">Notes</string>
+    <string name="notes_board_incidents">Incidents</string>
+    <string name="notes_board_newest">Newest first</string>
+    <string name="notes_board_oldest">Oldest first</string>
+    <string name="notes_board_no_matching_entries">No notes or incidents match.</string>
     <string name="new_private_entry">New private entry</string>
 <string name="untitled_entry">Untitled entry</string>
     <string name="revisions">revisions</string>

@@ -308,7 +308,7 @@ private fun NewsLoadingState() {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Box(Modifier.width(100.dp).height(16.dp).background(LightSage))
-                    HorizontalDivider(thickness = 2.dp, color = OliveGreen.copy(alpha = .4f))
+                    HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.outlineVariant)
                     Box(
                         Modifier.width(90.dp).height(30.dp)
                             .background(PaleOlive, RoundedCornerShape(8.dp))

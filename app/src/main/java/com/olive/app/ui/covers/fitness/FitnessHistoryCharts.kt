@@ -299,9 +299,10 @@ private fun HistoryChart(
     useBars: Boolean,
     valueText: (Float) -> String,
 ) {
-    Row(Modifier.fillMaxWidth().height(145.dp)) {
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    Row(Modifier.fillMaxWidth().height(145.dp * fontScale.coerceAtLeast(1f))) {
         Column(
-            modifier = Modifier.width(42.dp).fillMaxHeight().padding(vertical = 8.dp)
+            modifier = Modifier.width(52.dp * fontScale.coerceIn(1f, 1.65f)).fillMaxHeight().padding(vertical = 8.dp)
                 .clearAndSetSemantics { },
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.End,

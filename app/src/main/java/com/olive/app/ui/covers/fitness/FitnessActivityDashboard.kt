@@ -111,7 +111,7 @@ private fun DashboardMetric(value: String, label: String, color: Color) {
     ) {
         Spacer(Modifier.size(13.dp).background(color, CircleShape))
         Text(value, color = Paper, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(label, color = Paper.copy(alpha = 0.72f))
+        Text(label, color = Paper)
     }
 }
 

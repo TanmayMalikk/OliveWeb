@@ -2,15 +2,11 @@
 package com.olive.app.ui.covers.fitness
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,14 +14,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
+import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,9 +33,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -70,33 +69,26 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
             )
         }
         item {
-            Box(
+            Card(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(30.dp))
-                    .background(Brush.linearGradient(listOf(FitnessAccent, FitnessHeroEnd)))
-                    .clearAndSetSemantics { contentDescription = summaryDescription }
-                    .padding(22.dp),
+                    .clearAndSetSemantics { contentDescription = summaryDescription },
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = PaleOlive, contentColor = Ink),
             ) {
                 Column(
-                    Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
                         stringResource(R.string.today_summary),
                         style = MaterialTheme.typography.titleMedium,
-                        color = Paper,
+                        color = Ink,
                     )
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
-                        val stack = maxWidth < 270.dp || LocalDensity.current.fontScale >= 1.3f
-                        FlowRow(
-                            maxItemsInEachRow = if (stack) 1 else 3,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            HeroMetric(snapshot.stepsToday.toString(), stringResource(R.string.steps_today), Modifier.weight(1f))
-                            HeroMetric(snapshot.nutrition.calories.displayAmount(), stringResource(R.string.calories), Modifier.weight(1f))
-                            HeroMetric("${snapshot.nutrition.proteinGrams.displayAmount()} g", stringResource(R.string.protein), Modifier.weight(1f))
-                        }
-                    }
+                    SummaryMetric(snapshot.stepsToday.toString(), stringResource(R.string.steps_today), Icons.AutoMirrored.Outlined.DirectionsWalk)
+                    HorizontalDivider(color = OliveDivider)
+                    SummaryMetric(snapshot.nutrition.calories.displayAmount(), stringResource(R.string.calories), Icons.Outlined.LocalFireDepartment)
+                    HorizontalDivider(color = OliveDivider)
+                    SummaryMetric("${snapshot.nutrition.proteinGrams.displayAmount()} g", stringResource(R.string.protein), Icons.Outlined.Restaurant)
                 }
             }
         }
@@ -108,14 +100,15 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
                     containerColor = FitnessWarmCard,
                     contentColor = FitnessText,
                 ),
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onGoals),
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onGoals,
             ) {
                 Row(
                     Modifier.fillMaxWidth().padding(20.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(stringResource(R.string.goals), style = MaterialTheme.typography.titleMedium)
                         Text(stringResource(R.string.edit_fitness_goals), color = FitnessSubtle)
                     }
@@ -127,14 +120,21 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
 }
 // Draws one large summary value on the fitness home page.
 @Composable
-private fun HeroMetric(value: String, label: String, modifier: Modifier) {
-    Column(
-        modifier.clip(RoundedCornerShape(18.dp))
-            .background(DarkOlive).padding(horizontal = 10.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+private fun SummaryMetric(value: String, label: String, icon: ImageVector) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(value, color = Paper, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(label, color = Paper, style = MaterialTheme.typography.labelSmall)
+        Box(
+            Modifier.size(40.dp).clip(CircleShape).background(Paper),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, null, tint = OliveGreen) }
+        Text(label, color = Ink, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Text(
+            value, color = DarkOlive, style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold, modifier = Modifier.widthIn(max = 160.dp),
+        )
     }
 }
 
@@ -192,31 +192,19 @@ private fun StepSummaryCard(snapshot: FitnessSnapshot) {
                 progress = { progress },
                 modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
             )
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ActivityMiniMetric(snapshot.profile.stepGoal.toString(), stringResource(R.string.daily_step_goal))
-                ActivityMiniMetric(
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SummaryMetric(snapshot.profile.stepGoal.toString(), stringResource(R.string.daily_step_goal), Icons.AutoMirrored.Outlined.DirectionsWalk)
+                SummaryMetric(
                     "${FitnessMath.distanceKm(snapshot.stepsToday, snapshot.profile.heightCm).displayAmount()} km",
                     stringResource(R.string.distance),
+                    Icons.AutoMirrored.Outlined.DirectionsWalk,
                 )
-                ActivityMiniMetric(
+                SummaryMetric(
                     "${FitnessMath.walkingCalories(snapshot.stepsToday, snapshot.profile).displayAmount()} kcal",
                     stringResource(R.string.active_calories),
+                    Icons.Outlined.LocalFireDepartment,
                 )
             }
         }
-    }
-}
-
-// fitness cover shows this activity mini metric view so the user can view its details and use its actions.
-@Composable
-private fun RowScope.ActivityMiniMetric(value: String, label: String) {
-    Column(
-        Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(FitnessWarmCard)
-            .clearAndSetSemantics { contentDescription = "$label, $value" }
-            .padding(horizontal = 10.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        Text(value, color = FitnessText, fontWeight = FontWeight.Bold)
-        Text(label, color = FitnessSubtle, style = MaterialTheme.typography.labelSmall)
     }
 }

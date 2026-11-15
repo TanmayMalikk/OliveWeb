@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -247,69 +248,78 @@ internal fun GameCover(
         return
     }
     BackHandler(interactive) { }
-    Column(
-        Modifier.fillMaxSize().background(Cream).safeDrawingPadding().padding(24.dp)
-            .testTag("game_cover"),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Row(
-            modifier = Modifier.semantics(mergeDescendants = true) { },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+    BoxWithConstraints(Modifier.fillMaxSize().background(WarmWhite).safeDrawingPadding()) {
+        val viewportHeight = maxHeight
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                .heightIn(min = viewportHeight).padding(24.dp)
+                .testTag("game_cover"),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
-                Icon(
-                    Icons.Outlined.SportsEsports,
-                    contentDescription = null,
-                    modifier = Modifier.padding(12.dp).size(34.dp).testTag("cover_brand_game"),
-                    tint = OliveGreen,
+            Row(
+                modifier = Modifier.semantics(mergeDescendants = true) { },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                    Icon(
+                        Icons.Outlined.SportsEsports,
+                        contentDescription = null,
+                        modifier = Modifier.padding(12.dp).size(34.dp).testTag("cover_brand_game"),
+                        tint = OliveGreen,
+                    )
+                }
+                Text(
+                    stringResource(R.string.game_cover_title),
+                    modifier = Modifier.weight(1f, fill = false).semantics { heading() },
+                    fontFamily = FontFamily.Serif,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = OliveGreen,
+                )
+                if (sessionViewModel != null) OutlinedIconButton(
+                    onClick = { settingsOpen = true },
+                    enabled = interactive,
+                    modifier = Modifier.testTag("game_settings"),
+                ) {
+                    Icon(Icons.Outlined.Settings, stringResource(R.string.settings))
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.game_cover_instructions), color = Muted)
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = nickname,
+                onValueChange = { value ->
+                    nickname = if (onEntryAttempt(value)) "" else value.take(64)
+                },
+                enabled = interactive,
+                singleLine = true,
+                label = { Text(stringResource(R.string.game_player_name)) },
+                modifier = Modifier.fillMaxWidth().testTag("game_entry"),
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { score++ },
+                enabled = interactive,
+                modifier = Modifier.defaultMinSize(minWidth = 112.dp, minHeight = 112.dp).testTag("game_olive"),
+                shape = CircleShape,
+            ) {
+                Text(stringResource(R.string.game_tap_olive))
+            }
+            Spacer(Modifier.height(12.dp))
+            Surface(
+                shape = CircleShape, color = PaleOlive, contentColor = Ink,
+                border = BorderStroke(1.dp, OliveDivider),
+            ) {
+                Text(
+                    stringResource(R.string.game_score, score),
+                    modifier = Modifier.testTag("game_score").padding(horizontal = 18.dp, vertical = 8.dp)
+                        .semantics { liveRegion = LiveRegionMode.Polite },
+                    fontWeight = FontWeight.SemiBold,
                 )
             }
-            Text(
-                stringResource(R.string.game_cover_title),
-                modifier = Modifier.semantics { heading() },
-                fontFamily = FontFamily.Serif,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = OliveGreen,
-            )
-            if (sessionViewModel != null) IconButton(
-                onClick = { settingsOpen = true },
-                enabled = interactive,
-                modifier = Modifier.testTag("game_settings"),
-            ) {
-                Icon(Icons.Outlined.Settings, stringResource(R.string.settings))
-            }
         }
-        Spacer(Modifier.height(12.dp))
-        Text(stringResource(R.string.game_cover_instructions), color = Muted)
-        Spacer(Modifier.height(16.dp))
-        OutlinedTextField(
-            value = nickname,
-            onValueChange = { value ->
-                nickname = if (onEntryAttempt(value)) "" else value.take(64)
-            },
-            enabled = interactive,
-            singleLine = true,
-            label = { Text(stringResource(R.string.game_player_name)) },
-            modifier = Modifier.fillMaxWidth().testTag("game_entry"),
-        )
-        Spacer(Modifier.height(16.dp))
-        Button(
-            onClick = { score++ },
-            enabled = interactive,
-            modifier = Modifier.size(112.dp).testTag("game_olive"),
-            shape = CircleShape,
-        ) {
-            Text(stringResource(R.string.game_tap_olive))
-        }
-        Spacer(Modifier.height(12.dp))
-        Text(
-            stringResource(R.string.game_score, score),
-            modifier = Modifier.testTag("game_score")
-                .semantics { liveRegion = LiveRegionMode.Polite },
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }

@@ -346,7 +346,7 @@ internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) 
         shape = RoundedCornerShape(24.dp),
         color = CardSoftMint,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, OliveGreen.copy(alpha = .18f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically,
@@ -402,7 +402,7 @@ internal fun SafeContactActionCard(
         shape = RoundedCornerShape(24.dp),
         color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, OliveGreen.copy(alpha = .22f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         tonalElevation = 1.dp
     ) {
         Row(

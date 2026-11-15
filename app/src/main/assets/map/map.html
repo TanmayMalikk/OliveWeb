@@ -9,19 +9,22 @@
   <style>
     html,body{height:100%;width:100%;margin:0;background:#f1ede4}
     #map{height:100vh;width:100%;min-height:100%;margin:0;background:#f1ede4}
-    .leaflet-control-attribution{font:11px sans-serif}
+    .leaflet-container .leaflet-control-attribution{font:12px/1.4 sans-serif;background:#fff;color:#253322}
+    .leaflet-control-attribution a{color:#314b28;text-decoration:underline}
+    .leaflet-popup-content-wrapper,.leaflet-tooltip{background:#fff;color:#253322;border:1px solid #5d6952}
+    .leaflet-popup-content,.leaflet-tooltip{font-size:14px}
     .olive-live-marker{background:transparent;border:0}
     .olive-live-dot{border-radius:50%;background:#c52b25;
       box-shadow:0 0 0 2px rgba(117,22,19,.5);animation:olivePulse 2.4s ease-in-out infinite}
     .olive-last-known-dot{border-radius:50%;background:#c52b25;
       box-shadow:0 0 0 2px rgba(117,22,19,.5)}
-    .olive-own-live-dot{border-radius:50%;background:#1769aa;
+    .olive-own-live-dot{border-radius:28%;background:#1769aa;
       box-shadow:0 0 0 2px rgba(14,66,111,.5);animation:oliveBluePulse 2.4s ease-in-out infinite}
-    .olive-contact-dot{border-radius:50%;background:#466c3d;
+    .olive-contact-dot{border-radius:28%;background:#314b28;
       box-shadow:0 0 0 2px rgba(39,68,33,.35)}
-    @keyframes olivePulse{0%,100%{transform:scale(.9);opacity:.72;box-shadow:0 0 0 2px rgba(117,22,19,.45)}
+    @keyframes olivePulse{0%,100%{transform:scale(.95);box-shadow:0 0 0 2px rgba(117,22,19,.45)}
       50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(197,43,37,.12)}}
-    @keyframes oliveBluePulse{0%,100%{transform:scale(.9);opacity:.72;box-shadow:0 0 0 2px rgba(14,66,111,.45)}
+    @keyframes oliveBluePulse{0%,100%{transform:scale(.95);box-shadow:0 0 0 2px rgba(14,66,111,.45)}
       50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(23,105,170,.14)}}
     @media (prefers-reduced-motion:reduce){.olive-live-dot,.olive-own-live-dot{animation:none}}
   </style>

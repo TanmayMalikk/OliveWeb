@@ -295,7 +295,7 @@ private fun FitnessTab(
 ) {
     Column(
         modifier.clip(RoundedCornerShape(24.dp))
-            .background(if (selected) OliveGreen else Color.Transparent)
+            .background(if (selected) Paper else Color.Transparent)
             .selectable(
                 selected = selected,
                 enabled = enabled,
@@ -314,7 +314,7 @@ private fun FitnessTab(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         CompositionLocalProvider(
-            LocalContentColor provides if (selected) Paper else OliveGreen
+            LocalContentColor provides if (selected) DarkOlive else Muted
         ) {
             icon()
             Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
