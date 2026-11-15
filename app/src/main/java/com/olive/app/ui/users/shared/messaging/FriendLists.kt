@@ -309,13 +309,15 @@ private fun LazyItemScope.FriendRow(
 @Composable
 internal fun ChatMessageBody(
     chat: ChatMessage, session: SessionViewModel, mine: Boolean,
+    sender: String,
     onOpenMedia: (SafetyDocument, File) -> Unit
 ) {
     val parts = chat.body.split(":", limit = 3)
     if (!chat.unsent && parts.firstOrNull() == "SHARED_MEDIA" && parts.size >= 2) {
-        SharedMediaMessage(parts[1], parts.getOrNull(2).orEmpty(), session, mine, onOpenMedia)
+        SharedMediaMessage(parts[1], parts.getOrNull(2).orEmpty(), session, mine, onOpenMedia, sender)
         return
     }
+    val senderDescription = stringResource(R.string.chat_attachment_sender, sender)
     // An unsent location card can still be removed before it reaches the chat.
     if (!chat.unsent && parts.firstOrNull() == "SHARED_LOCATION") {
         val expiresAt = parts.getOrNull(1)?.toLongOrNull() ?: 0L
@@ -332,6 +334,7 @@ internal fun ChatMessageBody(
             color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 .testTag("shared_live_location")
+                .semantics { stateDescription = senderDescription }
         ) {
             Column {
                 Surface(
@@ -400,6 +403,7 @@ internal fun ChatMessageBody(
         onClick = { session.messages.openSharedPrivateEntry(parts[1]) }, shape = MaterialTheme.shapes.medium,
         color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+            .semantics { stateDescription = senderDescription }
     ) {
         Row(
             Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
@@ -427,12 +431,14 @@ internal fun ChatMessageBody(
 @Composable
 internal fun SharedMediaMessage(
     id: String, name: String, session: SessionViewModel, mine: Boolean,
-    onOpen: (SafetyDocument, File) -> Unit
+    onOpen: (SafetyDocument, File) -> Unit,
+    sender: String? = null,
 ) {
     val opening = id in session.documents.state.openingDocumentIds
     val document = session.documents.state.files.firstOrNull { it.id == id }
     val offline = session.media?.offlineCopies?.get(id) ?: OfflineMediaAvailability.NOT_CACHED
     val error = session.documents.state.attachmentErrors[id]
+    val senderDescription = sender?.let { stringResource(R.string.chat_attachment_sender, it) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
     Surface(
         onClick = {
@@ -445,6 +451,7 @@ internal fun SharedMediaMessage(
         }, enabled = !opening, shape = MaterialTheme.shapes.medium,
         color = if (mine) Color.White.copy(alpha = .2f) else Color.Black.copy(alpha = .05f),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("shared_media_$id")
+            .semantics { if (senderDescription != null) stateDescription = senderDescription }
     ) {
         Row(
             Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
@@ -458,7 +465,8 @@ internal fun SharedMediaMessage(
                     style = MaterialTheme.typography.labelSmall
                 )
                 Text(
-                    name.ifBlank { stringResource(R.string.encrypted_document) },
+                    document?.name?.takeIf { it.isNotBlank() }
+                        ?: name.ifBlank { stringResource(R.string.encrypted_document) },
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                     maxLines = 2

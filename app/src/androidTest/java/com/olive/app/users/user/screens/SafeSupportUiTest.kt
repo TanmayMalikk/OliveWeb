@@ -32,6 +32,78 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafeSupportUiTest : OliveUiTestBase() {
+    @Test
+    fun idleLockSliderSavesRecommendedAndMaximumDelays() {
+        val session = setup()
+        click("safe_settings")
+        fill("settings_full_name", "Unsaved test name")
+        click("settings_tab_privacy")
+        compose.onNodeWithTag("settings_tab_privacy").assertIsSelected()
+        compose.onNodeWithTag("settings_full_name").assertDoesNotExist()
+        val slider = compose.onNodeWithTag("idle_timeout").performScrollTo()
+        slider.performSemanticsAction(SemanticsActions.SetProgress) { it(1f) }
+        compose.runOnIdle { assertEquals(120, session.idleTimeoutSeconds()) }
+        slider.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "2 min (Recommended)"))
+        compose.onNode(hasScrollAction() and hasAnyDescendant(hasTestTag("idle_timeout")))
+            .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 300f) }
+        slider.performTouchInput { swipe(centerLeft.copy(x = width / 7f), centerRight) }
+        compose.runOnIdle { assertEquals(450, session.idleTimeoutSeconds()) }
+        click("settings_tab_profile")
+        compose.onNodeWithTag("settings_full_name").assertTextContains("Unsaved test name")
+        compose.runOnIdle { session.navigation.back() }
+        waitFor("safe_settings")
+        click("safe_settings")
+        click("settings_tab_privacy")
+        compose.onNodeWithTag("idle_timeout").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "7 min 30 sec")
+        )
+    }
+
+    @Test
+    fun incidentCalendarAndClockSaveTheSelectedValues() {
+        val session = setup()
+        click("safe_notes")
+        click("new_private_entry")
+        click("private_kind_incident")
+        fill("private_entry_title", "Test incident")
+        fill("private_entry_body", "Synthetic test details")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        click("incident_date")
+        compose.onNodeWithTag("incident_calendar").assertIsDisplayed()
+        click("incident_date_apply")
+        click("incident_time")
+        compose.onNodeWithTag("incident_clock").assertIsDisplayed()
+        click("incident_time_apply")
+        fill("incident_location", "Edmonton")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        click("save_private_entry")
+        compose.waitUntil(15_000) { session.privateEntries.any { it.title == "Test incident" } }
+        compose.runOnIdle {
+            val entry = session.privateEntries.single { it.title == "Test incident" }
+            assertEquals(java.time.LocalDate.now(), java.time.LocalDate.parse(entry.incidentDate))
+            assertTrue(entry.incidentTime.matches(Regex("[0-9]{2}:[0-9]{2}")))
+        }
+    }
+
+    @Test
+    fun safeHomeKeepsNavigationAndQuickExitAvailableWhenScrolled() {
+        val session = setup()
+        val home = compose.onNodeWithTag("safe_home_content")
+        home.performScrollToNode(hasTestTag("safe_notes"))
+        compose.onNodeWithTag("safe_notes").assertIsDisplayed()
+        home.performScrollToNode(hasTestTag("safe_documents"))
+        compose.onNodeWithTag("safe_documents").assertIsDisplayed()
+        compose.onNodeWithTag("safe_settings").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(SafePage.Settings, session.page) }
+        compose.runOnIdle { session.navigation.back() }
+        waitFor("safe_settings")
+        home.performScrollToNode(hasTestTag("sign_out"))
+        compose.onNodeWithTag("sign_out").assertIsDisplayed()
+        compose.onNodeWithTag("quick_exit").assertIsDisplayed().performClick()
+        waitCover()
+        home.assertDoesNotExist()
+    }
+
     // Checks the support overlay uses the shared talk back traversal order step with the test's sample data.
     @Test
     fun supportOverlayUsesTheSharedTalkBackTraversalOrder() {

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="idle_lock_minutes">闲置 %d 分钟后发出锁定提醒</string>
+    <string name="idle_lock_minutes">%d 分钟</string>
+    <string name="idle_lock_minutes_seconds">%1$d 分 %2$d 秒</string>
+    <string name="idle_lock_recommended">%s（推荐）</string>
     <string name="idle_lock_setting">闲置锁定时间</string>
     <string name="incident_date_format">事件日期（YYYY-MM-DD）</string>
     <string name="incident_time_format">大约时间（HH:mm）</string>
@@ -39,4 +41,16 @@
         <item quantity="one">%d 条匹配记录</item>
         <item quantity="other">%d 条匹配记录</item>
     </plurals>
+    <string name="dob_date_range_error">请输入今天至 130 年前之间的日期。</string>
+    <string name="dob_picker_title">选择出生日期</string>
+    <string name="dob_pick_year_range">选择年份范围</string>
+    <string name="dob_pick_year">选择年份</string>
+    <string name="dob_pick_month">选择月份</string>
+    <string name="dob_pick_day">选择日期</string>
+    <string name="dob_clear">清除出生日期</string>
+    <string name="location_background_access">启用后台位置</string>
+    <string name="location_background_settings">后台位置可在应用关闭时继续更新管理员的位置地图。在 Android 设置中选择 %1$s，然后返回此处。</string>
+    <string name="location_background_dialog">后台位置可在应用关闭时继续更新管理员的位置地图。请在 Android 提示中选择始终允许。</string>
+    <string name="chat_dms_tab">私信</string>
+    <string name="chat_tickets_tab">工单聊天</string>
 </resources>

@@ -65,10 +65,54 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
+import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
 import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import kotlinx.coroutines.launch
 
 private const val MAX_SHARED_CONTACTS = 10
+
+@Composable
+private fun BackgroundLocationButton(requestPermission: suspend () -> Boolean) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var explain by remember { mutableStateOf(false) }
+    var requesting by remember { mutableStateOf(false) }
+    val title = stringResource(R.string.location_background_access)
+    TextButton(onClick = { explain = true }, enabled = !requesting, modifier = Modifier.testTag("background_location")) {
+        Text(title)
+    }
+    if (explain) {
+        val help = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            stringResource(R.string.location_background_settings, context.packageManager.backgroundPermissionOptionLabel)
+        } else {
+            stringResource(R.string.location_background_dialog)
+        }
+        AlertDialog(
+            onDismissRequest = { explain = false },
+            title = { Text(title) },
+            text = { Text(help) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        explain = false
+                        requesting = true
+                        scope.launch {
+                            try {
+                                requestPermission()
+                            } finally {
+                                requesting = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.testTag("background_location_continue"),
+                ) { Text(stringResource(R.string.next)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { explain = false }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
+}
 
 @Composable
 private fun PrivateRouteControls(
@@ -171,6 +215,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
     val uid = session.coverAccountId ?: return
     val controller = session.locationMap
     val requestPermission = LocalLocationPermissionRequest.current
+    val requestBackgroundPermission = LocalBackgroundLocationPermissionRequest.current
     val youLabel = stringResource(R.string.you)
     val savedLocationLabel = stringResource(R.string.your_saved_location)
     val permissionRequired = stringResource(R.string.location_permission_required)
@@ -252,6 +297,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
         }
         if (profile.role == AccountRole.USER) {
             PrivateRouteControls(controller, state, routeNotConfigured, routeUnavailable, routeFailed, profile.address.city)
+            if (requestBackgroundPermission != null) BackgroundLocationButton(requestBackgroundPermission)
             if (state.navigating) OutlinedButton(onClick = { fullScreenNavigation = true }) {
                 Text(stringResource(R.string.location_full_screen_navigation))
             }

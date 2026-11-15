@@ -94,6 +94,7 @@ class SafeEntrySettingsUiTest : OliveUiTestBase() {
     // Checks the settings step with the test's sample data.
     private fun settings(model: SessionViewModel) {
         compose.runOnIdle { model.navigation.openSafePage(SafePage.Settings) }
+        click("settings_tab_cover")
         waitFor("entry_use_device")
     }
 

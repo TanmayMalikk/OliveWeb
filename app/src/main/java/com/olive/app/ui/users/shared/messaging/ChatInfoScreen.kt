@@ -159,6 +159,9 @@ internal fun ChatInfoDialog(
         ) {
             Scaffold(
                 containerColor = ChatPageBackground,
+                floatingActionButton = {
+                    if (quickExit != null) FloatingQuickExit(quickExit)
+                },
                 topBar = {
                     Row(
                         Modifier.fillMaxWidth().background(Color.White)
@@ -173,15 +176,14 @@ internal fun ChatInfoDialog(
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.weight(1f),
                         )
-                        if (quickExit != null) TextButton(onClick = quickExit) {
-                            Text(stringResource(R.string.quick_exit))
-                        }
                     }
                 },
             ) { padding ->
                 LazyColumn(
                     Modifier.fillMaxSize().padding(padding),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 20.dp, top = 20.dp, end = 20.dp, bottom = if (quickExit != null) 92.dp else 20.dp,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item {

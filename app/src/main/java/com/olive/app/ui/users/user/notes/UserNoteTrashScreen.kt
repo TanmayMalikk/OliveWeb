@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.PushPin as FilledPushPin
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -261,7 +262,7 @@ internal fun PrivateNoteCard(
         onClick = open,
         modifier = modifier.fillMaxWidth().testTag("private_entry_row")
             .semantics { stateDescription = entryDetails },
-        border = BorderStroke(1.dp, Color.Black),
+        border = BorderStroke(1.dp, OliveOutline),
         colors = CardDefaults.cardColors(containerColor = NotePaperCream)
     ) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -279,9 +280,9 @@ internal fun PrivateNoteCard(
                     modifier = Modifier.size(48.dp).testTag("private_pin")
                 ) {
                     Icon(
-                        Icons.Outlined.PushPin,
+                        if (entry.pinned) Icons.Filled.FilledPushPin else Icons.Outlined.PushPin,
                         if (entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry),
-                        tint = if (entry.pinned) PinnedStarGold else Muted
+                        tint = if (entry.pinned) OliveGreen else Muted,
                     )
                 }
             }
@@ -301,10 +302,9 @@ internal fun PrivateNoteCard(
                     Instant.ofEpochMilli(entry.updatedAt)
                 ), style = MaterialTheme.typography.bodyMedium, color = Muted
             )
-            if (entry.edits.isNotEmpty()) TextButton(
+            if (entry.edits.isNotEmpty()) OutlinedButton(
                 onClick = openLog,
                 modifier = Modifier.testTag("private_edit_log"),
-                contentPadding = PaddingValues(0.dp)
             ) {
                 Text("${stringResource(R.string.edit_log)} (${entry.edits.size})")
             }

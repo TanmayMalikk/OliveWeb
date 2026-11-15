@@ -243,12 +243,16 @@ internal fun TriggerSetup(session: SessionViewModel) {
     }
 }
 
+// Kept in memory for the lifetime of Settings, including when its Cover tab is hidden.
+internal class SafeEntryPinDraft {
+    var currentPin by mutableStateOf("")
+    var newPin by mutableStateOf("")
+    var confirmation by mutableStateOf("")
+}
+
 // Both methods may be configured; only the preferred method appears on a normal trigger.
 @Composable
-internal fun SafeEntrySettings(session: SessionViewModel) {
-    var currentPin by remember { mutableStateOf("") }
-    var newPin by remember { mutableStateOf("") }
-    var confirmation by remember { mutableStateOf("") }
+internal fun SafeEntrySettings(session: SessionViewModel, draft: SafeEntryPinDraft) = with(draft) {
     val text = rememberResourceText()
     Text(
         stringResource(R.string.entry_choose_method),

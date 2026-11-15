@@ -170,9 +170,12 @@ internal fun ChatPane(
         }
     }
     openedMedia?.let { (document, file) ->
-        SafetyDocumentViewer(document, file) {
-            file.delete()
-            openedMedia = null
+        Box(modifier) {
+            SafetyDocumentViewer(document, file) {
+                file.delete()
+                openedMedia = null
+            }
+            if (exit != null) FloatingQuickExit(exit, Modifier.align(Alignment.BottomEnd).padding(12.dp))
         }
         return
     }
@@ -181,7 +184,7 @@ internal fun ChatPane(
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 78.dp)
                     .background(Color.White)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(start = 12.dp, end = if (exit != null) 76.dp else 12.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -263,12 +266,7 @@ internal fun ChatPane(
                 ) {
                     Icon(Icons.Outlined.Call, stringResource(R.string.ui_start_voice_call))
                 }
-                if (exit != null) FilledTonalButton(
-                    onClick = exit,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier.heightIn(min = 44.dp)
-                        .testTag(if (canAttachMedia) "quick_exit" else "chat_exit_to_portal")
-                ) { Text(uiText(R.string.ui_exit)) }
+
             }
             HorizontalDivider()
             if (session.accountRole == AccountRole.STAFF &&
@@ -397,7 +395,7 @@ internal fun ChatPane(
                         ) {
                             Surface(
                                 color = if (mine) ChatSentBubble else ChatIncomingBubble,
-                                contentColor = if (mine) Color.White else Color.Unspecified,
+                                contentColor = if (mine) Paper else Ink,
                                 shape = RoundedCornerShape(
                                     topStart = 18.dp,
                                     topEnd = 18.dp,
@@ -425,72 +423,71 @@ internal fun ChatPane(
                                     ), verticalAlignment = Alignment.Top
                                 ) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(
+                                        val sender =
                                             if (mine && !active.isChatAdmin(chat.senderUid)) session.coverUsername else active.senderDisplayName(
                                                 chat.senderUid,
                                                 chat.senderUsername,
                                                 session.accountRole,
                                                 uiText(R.string.support_chat_name),
                                                 uiText(R.string.support_admin_chat_name),
-                                            ),
+                                            )
+                                        Text(
+                                            sender,
                                             style = MaterialTheme.typography.labelMedium,
-                                            color = if (mine) Color.White.copy(alpha = .78f) else Muted
+                                            color = if (mine) Paper else Muted
                                         )
                                         ChatMessageBody(
                                             chat,
                                             session,
-                                            mine
+                                            mine,
+                                            sender
                                         ) { document, file -> openedMedia = document to file }
                                         if (chat.sentAt > 0) Text(
                                             DateTimeFormatter.ofPattern(uiText(R.string.ui_mmm_d_hh_mm))
                                                 .withZone(ZoneId.systemDefault())
                                                 .format(Instant.ofEpochMilli(chat.sentAt)),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = if (mine) Color.White.copy(alpha = .7f) else Muted
+                                            color = if (mine) Paper else Muted
                                         )
                                         if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
                                             val retryable = canManuallyRetryMessage(chat.deliveryStatus)
                                             val discardable = canDiscardFailedMessage(chat.deliveryStatus)
-                                            TextButton(
-                                                onClick = {
-                                                    if (retryable) session.messages.retryMessage(chat)
-                                                    else if (discardable) session.messages.discardFailedMessage(chat)
-                                                },
-                                                enabled = retryable || discardable,
-                                                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-                                                modifier = Modifier.testTag("message_status_${chat.id}")
-                                                    .semantics { liveRegion = LiveRegionMode.Polite },
-                                            ) {
-                                                Text(
-                                                    stringResource(
-                                                        //TODO: this when branch is unreachable.
-                                                        when (chat.deliveryStatus) {
-                                                            MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued
-                                                            MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
-                                                            MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_retrying
-                                                            MessageDeliveryStatus.FAILED_PERMANENT ->
-                                                                if (chat.deliveryFailureCode in setOf(
-                                                                        "ATTACHMENT_ACCESS_REVOKED",
-                                                                        "ATTACHMENT_KEY_UNAVAILABLE",
-                                                                    )
-                                                                )
-                                                                    R.string.message_delivery_attachment_access_revoked
-                                                                else R.string.message_delivery_failed_permanent
-                                                            MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
-                                                        }
-                                                    ),
-                                                    color = Color.White.copy(
-                                                        alpha = if (retryable || discardable) 1f else .75f
-                                                    ),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                )
+                                            val label = stringResource(
+                                                when (chat.deliveryStatus) {
+                                                    MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued_retry
+                                                    MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
+                                                    MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_failed_retry
+                                                    MessageDeliveryStatus.FAILED_PERMANENT ->
+                                                        if (chat.deliveryFailureCode in setOf(
+                                                                "ATTACHMENT_ACCESS_REVOKED",
+                                                                "ATTACHMENT_KEY_UNAVAILABLE",
+                                                            )
+                                                        ) R.string.message_delivery_attachment_access_revoked
+                                                        else R.string.message_delivery_failed_permanent
+                                                    MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
+                                                }
+                                            )
+                                            val statusModifier = Modifier.testTag("message_status_${chat.id}")
+                                            if (retryable || discardable) {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        if (retryable) session.messages.retryMessage(chat)
+                                                        else session.messages.discardFailedMessage(chat)
+                                                    },
+                                                    border = BorderStroke(1.dp, Paper),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Paper),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                                    modifier = statusModifier.semantics { liveRegion = LiveRegionMode.Polite },
+                                                ) { Text(label, style = MaterialTheme.typography.labelMedium) }
+                                            } else {
+                                                AccessibleMessage(label, modifier = statusModifier, color = Paper)
                                             }
                                         }
                                     }
                                     if (mine && !chat.unsent && chat.deliveryStatus == MessageDeliveryStatus.SENT) Box {
                                         IconButton(
                                             onClick = { menuOpen = true },
-                                            modifier = Modifier.size(34.dp)
+                                            modifier = Modifier.size(48.dp)
                                         ) {
                                             Icon(
                                                 Icons.Outlined.MoreVert,
@@ -553,6 +550,9 @@ internal fun ChatPane(
                 }
             }
         }
+        if (exit != null) FloatingQuickExit(
+            exit, Modifier.align(Alignment.TopEnd).padding(12.dp), compact = true,
+        )
         if (exit != null && session.messages.chatQuickExitHintVisible && session.screen == SessionScreen.Safe && !session.privacyBlackout) {
             val density = LocalDensity.current
             Popup(
@@ -610,7 +610,7 @@ internal fun ChatPane(
                                 containerColor = Color.White,
                                 contentColor = OliveGreen
                             ),
-                            modifier = Modifier.align(Alignment.End).heightIn(min = 46.dp)
+                            modifier = Modifier.align(Alignment.End).heightIn(min = 48.dp)
                                 .testTag("dismiss_chat_quick_exit_hint")
                         ) {
                             Text(uiText(R.string.ui_okay), fontSize = 16.sp)

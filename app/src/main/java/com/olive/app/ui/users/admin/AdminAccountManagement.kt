@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
+import com.olive.app.security.InputPolicy
 import com.olive.app.data.account.AccountCounts
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.AdminAccountDraft
@@ -30,7 +31,6 @@ import com.olive.app.ui.shared.*
 import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.shared.messaging.PrivateContactNoteDialog
 import com.olive.app.ui.users.shared.navigation.*
-import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
 
 
 // admin account management shows this admin accounts view so the user can view its details and use its actions.
@@ -262,7 +262,8 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
-    var dob by remember { mutableStateOf("") }
+    var birthday by rememberBirthdayInput()
+    var showBirthdayErrors by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var city by remember { mutableStateOf("") }
@@ -325,7 +326,10 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
                 Field(uiText(R.string.full_name), fullName, "admin_full_name") {
                     fullName = it.take(120)
                 }
-                BirthdayPicker(dob, "admin_dob", true) { dob = it }
+                BirthdayPicker(
+                    birthday, "admin_dob", enabled = true,
+                    showErrors = showBirthdayErrors && birthday.isNotEmpty(), required = false,
+                ) { birthday = it }
                 // Only staff and admin accounts can be protected from deletion.
                 if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
                     Field(uiText(R.string.ui_login_email_optional), email, "admin_email") {
@@ -373,14 +377,16 @@ internal fun CreateAccountDialog(session: SessionViewModel, onDismiss: () -> Uni
             }
         },
         confirmButton = {
-            Button(onClick = {
+            Button(onClick = create@{
+                showBirthdayErrors = birthday.isNotEmpty() && !InputPolicy.validDob(birthday)
+                if (showBirthdayErrors) return@create
                 session.createManagedAccount(
                     AdminAccountDraft(
                         username = username,
                         password = password,
                         role = role,
                         fullName = fullName,
-                        dob = dob,
+                        dob = birthday,
                         email = email,
                         phone = phone,
                         city = city,

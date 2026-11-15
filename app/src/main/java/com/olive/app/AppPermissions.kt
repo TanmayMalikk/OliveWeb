@@ -13,6 +13,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.withResumed
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 internal fun shouldRequestNotifications(enabled: Boolean, asked: Boolean, granted: Boolean) =
     enabled && !asked && !granted
@@ -30,9 +32,9 @@ internal class AppPermissions(
         )
     }
     private var notificationPrompt = false
-    private var locationPrompt = false
+    private val locationRequests = Mutex()
     private var locationResult: CompletableDeferred<Boolean>? = null
-    val awaitingResult get() = notificationPrompt || locationPrompt
+    val awaitingResult get() = notificationPrompt || locationResult != null
     private val notifications =
         activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
             notificationPrompt = false
@@ -40,23 +42,11 @@ internal class AppPermissions(
         }
     private val location =
         activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            locationPrompt = false
-            if (hasLocation() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasBackgroundLocation()) {
-                launchBackgroundLocation()
-            } else {
-                val pending = locationResult
-                locationResult = null
-                pending?.complete(hasLocation())
-                onChanged()
-            }
+            finishLocationRequest(hasLocation())
         }
     private val backgroundLocation =
         activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            locationPrompt = false
-            val pending = locationResult
-            locationResult = null
-            pending?.complete(hasLocation())
-            onChanged()
+            finishLocationRequest(hasBackgroundLocation())
         }
     // Checks whether Android granted approximate or precise location access.
     fun hasLocation() = listOf(
@@ -65,13 +55,6 @@ internal class AppPermissions(
     ).any {
         ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED
     }
-
-    // Checks whether Android granted precise location access.
-    private fun hasPreciseLocation() =
-        ContextCompat.checkSelfPermission(
-            activity,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
 
     // Checks background location on Android 10 and newer; older versions do not need a separate grant.
     fun hasBackgroundLocation() = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || ContextCompat.checkSelfPermission(
@@ -102,66 +85,41 @@ internal class AppPermissions(
         }
     }
 
-    // Location permission: Waits for all required location access. It returns immediately when access exists or shares one pending request between callers.
-    suspend fun requestLocation(): Boolean {
-        if (hasPreciseLocation() && hasBackgroundLocation()) return true
-        locationResult?.let { return it.await() }
-        val pending = CompletableDeferred<Boolean>().also { locationResult = it }
-        // Use the fallback when request location is unavailable.
-        try {
-            activity.lifecycle.withResumed { launchLocation() }
-            return pending.await()
-        } finally {
-            if (!locationPrompt && locationResult === pending) locationResult = null
+    suspend fun requestLocation(): Boolean = locationRequests.withLock {
+        locationResult?.await()
+        hasLocation() || launchLocationRequest {
+            location.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
         }
     }
 
-    // Location permission: Opens the next location prompt. It asks for foreground access first, then background access on supported Android versions.
-    private fun launchLocation() {
-        locationPrompt = true
-        if (locationResult == null) locationResult = CompletableDeferred()
-        // Use the fallback when launch location is unavailable.
-        try {
-            // Location permission: Ask for foreground location before attempting background access.
-            if (!hasPreciseLocation()) {
-                location.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_COARSE_LOCATION,
-                        Manifest.permission.ACCESS_FINE_LOCATION
-                    )
-                )
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !hasBackgroundLocation()) {
-                launchBackgroundLocation()
-            } else {
-                locationPrompt = false
-                locationResult?.complete(true)
-                locationResult = null
-            }
-        } catch (_: IllegalStateException) {
-            locationPrompt = false
-            locationResult?.complete(false)
-            locationResult = null
-        }
-    }
-
-    // Background location: Opens the background-location prompt and completes the waiting request when Android returns a result.
-    private fun launchBackgroundLocation() {
-        locationPrompt = true
-        if (locationResult == null) locationResult = CompletableDeferred()
-        // Use the fallback when launch background location is unavailable.
-        try {
-            // Background location: Android 10 and newer need a separate prompt; older versions already have enough access.
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    suspend fun requestBackgroundLocation(): Boolean {
+        if (!requestLocation()) return false
+        return locationRequests.withLock {
+            locationResult?.await()
+            hasBackgroundLocation() || launchLocationRequest {
                 backgroundLocation.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-            } else {
-                locationPrompt = false
-                locationResult?.complete(true)
-                locationResult = null
             }
-        } catch (_: IllegalStateException) {
-            locationPrompt = false
-            locationResult?.complete(false)
-            locationResult = null
         }
+    }
+
+    private suspend fun launchLocationRequest(launch: () -> Unit): Boolean {
+        val pending = CompletableDeferred<Boolean>()
+        activity.lifecycle.withResumed {
+            locationResult = pending
+            try {
+                launch()
+            } catch (_: IllegalStateException) {
+                finishLocationRequest(false)
+            }
+        }
+        val granted = pending.await()
+        return activity.lifecycle.withResumed { granted }
+    }
+
+    private fun finishLocationRequest(granted: Boolean) {
+        val pending = locationResult
+        locationResult = null
+        onChanged()
+        pending?.complete(granted)
     }
 }

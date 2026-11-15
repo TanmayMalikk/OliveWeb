@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -80,15 +83,19 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
                     Text(
                         stringResource(R.string.today_summary),
                         style = MaterialTheme.typography.titleMedium,
-                        color = Paper.copy(alpha = 0.82f),
+                        color = Paper,
                     )
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        HeroMetric(snapshot.stepsToday.toString(), stringResource(R.string.steps_today))
-                        HeroMetric(snapshot.nutrition.calories.displayAmount(), stringResource(R.string.calories))
-                        HeroMetric("${snapshot.nutrition.proteinGrams.displayAmount()} g", stringResource(R.string.protein))
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        val stack = maxWidth < 270.dp || LocalDensity.current.fontScale >= 1.3f
+                        FlowRow(
+                            maxItemsInEachRow = if (stack) 1 else 3,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            HeroMetric(snapshot.stepsToday.toString(), stringResource(R.string.steps_today), Modifier.weight(1f))
+                            HeroMetric(snapshot.nutrition.calories.displayAmount(), stringResource(R.string.calories), Modifier.weight(1f))
+                            HeroMetric("${snapshot.nutrition.proteinGrams.displayAmount()} g", stringResource(R.string.protein), Modifier.weight(1f))
+                        }
                     }
                 }
             }
@@ -120,14 +127,14 @@ internal fun FitnessHomePage(snapshot: FitnessSnapshot, onGoals: () -> Unit) {
 }
 // Draws one large summary value on the fitness home page.
 @Composable
-private fun RowScope.HeroMetric(value: String, label: String) {
+private fun HeroMetric(value: String, label: String, modifier: Modifier) {
     Column(
-        Modifier.weight(1f).clip(RoundedCornerShape(18.dp))
-            .background(Paper.copy(alpha = 0.12f)).padding(horizontal = 10.dp, vertical = 12.dp),
+        modifier.clip(RoundedCornerShape(18.dp))
+            .background(DarkOlive).padding(horizontal = 10.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         Text(value, color = Paper, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(label, color = Paper.copy(alpha = 0.78f), style = MaterialTheme.typography.labelSmall)
+        Text(label, color = Paper, style = MaterialTheme.typography.labelSmall)
     }
 }
 

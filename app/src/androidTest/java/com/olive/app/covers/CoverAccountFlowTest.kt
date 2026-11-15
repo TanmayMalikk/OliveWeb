@@ -30,10 +30,12 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         register(username = "cover_switch_tester")
         unlock()
         click("safe_settings")
+        click("settings_tab_cover")
         listOf("news", "fitness", "game").forEach {
             compose.onNodeWithTag("cover_choice_icon_$it", useUnmergedTree = true).assertExists()
         }
         click("cover_choice_news")
+        click("settings_tab_profile")
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("news_cover")
@@ -47,6 +49,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         enterPin("123456")
         waitFor("safe_settings")
         click("safe_settings")
+        click("settings_tab_cover")
         // This flow checks switching covers; the sensor permission flow is tested separately.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
@@ -56,6 +59,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
                 )
         }
         click("cover_choice_fitness")
+        click("settings_tab_profile")
         compose.onNodeWithTag("settings_full_name").assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitFor("fitness_home")
@@ -79,21 +83,23 @@ class CoverAccountFlowTest : OliveUiTestBase() {
     @Test
     fun coverAccountSavesBirthdayAndLocationWithoutExposingPrivateDetails() {
         register(username = "cover_account_tester")
-        compose.onNodeWithText("Account").performClick()
-        compose.onNodeWithTag("cover_profile_summary").assertTextContains("Test Person")
-            .assertTextContains("@cover_account_tester")
+        click("fitness_account_settings")
+        compose.onNodeWithTag("cover_full_name").assertTextContains("Test Person")
+        compose.onNodeWithText("@cover_account_tester").assertExists()
         compose.onNodeWithTag("cover_sign_out").assertDoesNotExist()
-        compose.onNodeWithTag("cover_profile_summary")
-            .assertTextContains("Edmonton", substring = true)
+        compose.onNodeWithTag("address_city").assertTextContains("Edmonton")
         compose.onNodeWithText("2000-01-02").assertDoesNotExist()
         compose.onNodeWithText("Test Person Causing Harm").assertDoesNotExist()
         compose.onNodeWithText("moon garden").assertDoesNotExist()
         fill("cover_full_name", "Delivery Customer")
-        compose.onNodeWithTag("cover_dob_year").performScrollTo()
-            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
-        waitFor("cover_dob_year_1999")
+        hideKeyboard()
+        click("cover_dob_open")
+        click("cover_dob_range_2006")
         click("cover_dob_year_1999")
+        click("cover_dob_month_1")
+        click("cover_dob_day_2")
         fill("address_city", "Calgary")
+        hideKeyboard()
         compose.onNodeWithTag("cover_language").assertDoesNotExist()
         compose.onNodeWithTag("language").assertDoesNotExist()
         val session =
@@ -111,12 +117,7 @@ class CoverAccountFlowTest : OliveUiTestBase() {
                 }", error
             )
         }
-        compose.onNodeWithText(compose.activity.getString(R.string.discover))
-            .performClick()
-        waitCover()
-        compose.onNode(hasSetTextAction()).performTextInput("moon garden")
-        waitFor("unlock_pin")
-        enterPin("123456")
+        unlock()
         waitFor("safe_profile")
         click("safe_profile")
         compose.onNodeWithText("Delivery Customer").assertExists()

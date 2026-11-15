@@ -33,7 +33,6 @@ import com.olive.app.data.account.AccountRole
 import com.olive.app.data.account.CoverType
 import com.olive.app.R
 import com.olive.app.security.InputPolicy
-import com.olive.app.ui.users.shared.onboarding.BirthdayPicker
 import com.olive.app.ui.shared.AddressFields
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
@@ -74,19 +73,19 @@ internal fun DiscreetCoverEntry(
                 if (enabled) detectTapGestures(onDoubleTap = { onOpen() })
             }
     ) {
-        val oliveWidth = 11.dp.toPx()
-        val oliveHeight = 15.dp.toPx()
+        val oliveWidth = 16.dp.toPx()
+        val oliveHeight = 21.dp.toPx()
         val center = Offset(size.width * .58f, size.height * .58f)
         rotate(-18f, center) {
             drawOval(
-                color = OliveGreen.copy(alpha = .50f),
+                color = OliveGreen,
                 topLeft = Offset(center.x - oliveWidth / 2f, center.y - oliveHeight / 2f),
                 size = Size(oliveWidth, oliveHeight),
             )
         }
         rotate(-35f, Offset(center.x - 3.dp.toPx(), center.y - 8.dp.toPx())) {
             drawOval(
-                color = SageGreen.copy(alpha = .45f),
+                color = SageGreen,
                 topLeft = Offset(center.x - 6.dp.toPx(), center.y - 11.dp.toPx()),
                 size = Size(8.dp.toPx(), 4.dp.toPx()),
             )
@@ -128,7 +127,8 @@ internal fun CoverSettingsPage(session: SessionViewModel, onBack: () -> Unit) {
 @Composable
 internal fun CoverAccountPanel(session: SessionViewModel) {
     var fullName by remember(session.coverFullName) { mutableStateOf(session.coverFullName) }
-    var dob by remember(session.coverDob) { mutableStateOf(session.coverDob) }
+    var birthday by rememberBirthdayInput(session.coverDob)
+    var showBirthdayErrors by remember(session.coverDob) { mutableStateOf(false) }
     var address by remember(session.deliveryAddress) { mutableStateOf(session.deliveryAddress) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text("@${session.coverUsername}")
@@ -145,12 +145,15 @@ internal fun CoverAccountPanel(session: SessionViewModel) {
                 )
             }.keepVisibleWhileTyping()
         )
-        BirthdayPicker(dob, "cover_dob", !session.busy) { dob = it }
+        BirthdayPicker(birthday, "cover_dob", !session.busy, showBirthdayErrors) { birthday = it }
         Text(stringResource(R.string.location), style = MaterialTheme.typography.titleMedium)
         AddressFields(address, cityOnlyRequired = true) { address = it }
         Button(
-            onClick = { session.saveCoverSettings(fullName, dob, address) },
-            enabled = !session.busy && fullName.isNotBlank() && InputPolicy.validDob(dob) && address.locationValid,
+            onClick = {
+                showBirthdayErrors = !InputPolicy.validDob(birthday)
+                if (!showBirthdayErrors) session.saveCoverSettings(fullName, birthday, address)
+            },
+            enabled = !session.busy && fullName.isNotBlank() && address.locationValid,
             modifier = Modifier.fillMaxWidth().testTag("cover_save_settings")
         ) {
             Text(stringResource(R.string.save_account_settings))

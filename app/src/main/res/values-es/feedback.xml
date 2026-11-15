@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="idle_lock_minutes">Aviso de bloqueo tras %d min</string>
+    <string name="idle_lock_minutes">%d min</string>
+    <string name="idle_lock_minutes_seconds">%1$d min %2$d s</string>
+    <string name="idle_lock_recommended">%s (Recomendado)</string>
     <string name="idle_lock_setting">Tiempo de espera para el bloqueo</string>
     <string name="incident_date_format">Fecha del incidente (AAAA-MM-DD)</string>
     <string name="incident_time_format">Hora aproximada (HH:mm)</string>
@@ -39,4 +41,16 @@
         <item quantity="one">%d resultado</item>
         <item quantity="other">%d resultados</item>
     </plurals>
+    <string name="dob_date_range_error">Introduce una fecha entre hoy y hace 130 años.</string>
+    <string name="dob_picker_title">Elegir fecha de nacimiento</string>
+    <string name="dob_pick_year_range">Elige un intervalo de años</string>
+    <string name="dob_pick_year">Elige un año</string>
+    <string name="dob_pick_month">Elige un mes</string>
+    <string name="dob_pick_day">Elige un día</string>
+    <string name="dob_clear">Borrar fecha de nacimiento</string>
+    <string name="location_background_access">Activar la ubicación en segundo plano</string>
+    <string name="location_background_settings">La ubicación en segundo plano mantiene actualizado el mapa de administración cuando la aplicación está cerrada. En los ajustes de Android, elige %1$s y vuelve aquí.</string>
+    <string name="location_background_dialog">La ubicación en segundo plano mantiene actualizado el mapa de administración cuando la aplicación está cerrada. Elige Permitir siempre en el aviso de Android.</string>
+    <string name="chat_dms_tab">Mensajes directos</string>
+    <string name="chat_tickets_tab">Chats de tickets</string>
 </resources>

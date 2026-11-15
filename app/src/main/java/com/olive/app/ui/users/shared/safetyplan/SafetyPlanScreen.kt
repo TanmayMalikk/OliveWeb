@@ -135,6 +135,11 @@ internal fun SafetyPlanScreen(
     val expandedDescription = stringResource(R.string.support_expanded)
     val collapsedDescription = stringResource(R.string.support_collapsed)
     val prefix = if (backup) "backup" else "primary"
+    val checklistItems = remember(plan?.fields, prefix) {
+        SAFETY_CHECKLIST_SECTIONS.filterNot { it == "contacts" }.flatMap { section ->
+            plan?.fields?.get("${prefix}_$section")?.let { readSafetyChecklist(it.value) }.orEmpty()
+        }
+    }
     if (session.accountRole == AccountRole.USER && plan != null) {
         val conflict = plan.fields.entries.firstOrNull {
             it.value.conflictRevision != null || it.key in plan.pendingConflicts
@@ -253,6 +258,11 @@ internal fun SafetyPlanScreen(
                                 stringResource(R.string.safety_checklist_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Muted
+                            )
+                            if (plan != null) SafetyChecklistProgress(
+                                prepared = checklistItems.count { it.checked },
+                                total = checklistItems.size,
+                                summary = true
                             )
                             val status = when {
                                 controller.saving > 0 -> R.string.safety_saving

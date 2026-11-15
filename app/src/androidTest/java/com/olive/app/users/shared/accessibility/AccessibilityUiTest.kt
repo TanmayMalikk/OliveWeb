@@ -116,9 +116,16 @@ class AccessibilityUiTest : OliveUiTestBase() {
         register()
         unlock()
         val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        compose.runOnIdle { session.navigation.openSafePage(SafePage.Messages) }
+        waitFor("messages_dms_tab")
+        compose.onNodeWithTag("messages_dms_tab").assertIsSelected()
+        compose.onNodeWithTag("message_username").assertExists()
+        click("messages_tickets_tab")
+        compose.onNodeWithTag("messages_tickets_tab").assertIsSelected()
+        compose.onNodeWithTag("message_username").assertDoesNotExist()
+        click("messages_dms_tab")
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val uid = requireNotNull(session.coverAccountId)
-            session.navigation.openSafePage(SafePage.Messages)
             session.messages.openConversation(
                 ChatConversation(
                     "a11y-chat",
