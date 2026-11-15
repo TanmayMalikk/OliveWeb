@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Copy, RefreshCw } from "lucide-react";
 import { useSession } from "../../../session/SessionProvider";
+import { idleTimeoutOptions } from "../../../session/useSessionSecurity";
 import { Button, Field, Form, Modal } from "../../../components/SharedComponents";
 import { newEvent, validPassword, validPin } from "../../../domain/DomainModels";
 import { accounts, triggerHash } from "../../../services/AccountService";
@@ -26,6 +27,29 @@ export default function Settings() {
   }, []);
   return (
     <div className="settings-grid">
+      {p.role === "USER" && (
+        <section className="panel">
+          <h2>Privacy</h2>
+          <label className="field">
+            <span>Idle lock delay</span>
+            <select
+              value={s.idleTimeoutSeconds}
+              disabled={s.busy}
+              onChange={(event) => {
+                const seconds = Number(event.currentTarget.value);
+                void s.perform(() => s.setIdleTimeoutSeconds(seconds));
+              }}
+            >
+              {idleTimeoutOptions.map((seconds) => (
+                <option key={seconds} value={seconds}>
+                  {seconds === 450 ? "7 min 30 sec" : `${seconds / 60} min`}
+                  {seconds <= 120 ? " (Recommended)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </section>
+      )}
       <section className="panel">
         <h2>Personal entry link</h2>
         <p>

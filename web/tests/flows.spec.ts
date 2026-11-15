@@ -15,7 +15,12 @@ async function onboard(page: Page) {
   ).toBeVisible();
   await expect(page.getByLabel("Language", { exact: true })).toHaveCount(0);
   await page.getByLabel("Full name", { exact: true }).fill("Test Person");
-  await page.getByLabel("Date of birth", { exact: true }).fill("2000-01-02");
+  await page.getByRole("button", { name: "Choose date of birth" }).click();
+  const picker = page.getByRole("dialog", { name: "Choose date of birth" });
+  await picker.getByRole("button", { name: "2006–1997", exact: true }).click();
+  await picker.getByRole("button", { name: "2000", exact: true }).click();
+  await picker.getByRole("button", { name: "January", exact: true }).click();
+  await picker.getByRole("button", { name: "2", exact: true }).click();
   await page.getByLabel("City", { exact: true }).fill("Edmonton");
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page
@@ -93,6 +98,33 @@ test("account creation enforces current credential rules before onboarding", asy
   await expect(
     page.getByRole("heading", { name: "Set up your profile" }),
   ).toBeVisible();
+  await page.getByLabel("Full name", { exact: true }).fill("Test Person");
+  await page.getByLabel("City", { exact: true }).fill("Edmonton");
+  await page.getByRole("button", { name: "Choose date of birth" }).click();
+  const picker = page.getByRole("dialog", { name: "Choose date of birth" });
+  const option = (name: string) => picker.getByRole("button", { name, exact: true });
+  await expect(option("2016–2007")).toBeVisible();
+  await expect(option("1926")).toHaveCount(0);
+  await option("1936–1927").click();
+  await expect(picker.getByRole("button", { name: /^\d{4}$/ })).toHaveText(
+    Array.from({ length: 10 }, (_, i) => String(1936 - i)),
+  );
+  await option("Back").click();
+  await option("2006–1997").click();
+  await expect(picker.getByRole("button", { name: /^\d{4}$/ })).toHaveText(
+    Array.from({ length: 10 }, (_, i) => String(2006 - i)),
+  );
+  await option("2001").click();
+  await option("February").click();
+  await expect(option("29")).toHaveCount(0);
+  await option("Back").click();
+  await option("Back").click();
+  await option("2000").click();
+  await option("February").click();
+  await option("29").click();
+  await expect(page.locator('input[name="dob"]')).toHaveValue("2000-02-29");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(page.getByLabel("Browser PIN", { exact: true })).toBeVisible();
 });
 // Inputs: the values in this case. Expected: plain domain and guessed private paths show Little Grove.
 test("plain domain and guessed private paths show Little Grove", async ({
@@ -279,7 +311,7 @@ test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus do
   ).toHaveCount(0);
   await unlock(page, link);
   await page.clock.install();
-  await page.clock.fastForward(61_000);
+  await page.clock.fastForward(46_000);
   await expect(
     page.getByRole("dialog", { name: "Your Safe Space is about to lock" }),
   ).toBeVisible();
@@ -288,6 +320,21 @@ test("Quick Exit cancels an in-flight PIN operation and idle dialog autofocus do
   await expect(
     page.getByRole("main").getByRole("button", { name: "Notes & incidents", exact: true }),
   ).toHaveCount(0);
+  await unlock(page, link);
+  await page.getByRole("button", { name: "Open settings", exact: true }).click();
+  const timeout = page.getByLabel("Idle lock delay");
+  await expect(timeout.locator("option")).toHaveText([
+    "1 min (Recommended)", "2 min (Recommended)", "3 min", "4 min", "5 min", "6 min", "7 min", "7 min 30 sec",
+  ]);
+  await timeout.selectOption("450");
+  await expect(timeout).toHaveValue("450");
+  await page.clock.fastForward(434_000);
+  const warning = page.getByRole("dialog", { name: "Your Safe Space is about to lock" });
+  await expect(warning).toHaveCount(0);
+  await page.clock.fastForward(2_000);
+  await expect(warning).toBeVisible();
+  await page.clock.fastForward(15_000);
+  await expect(page.getByRole("heading", { name: "Your Safe Space" })).toHaveCount(0);
 });
 // Inputs: the values in this case. Expected: PWA manifests use the Little Grove identity and the download page offers the signed APK.
 test("PWA manifests use the Little Grove identity and the download page offers the signed APK", async ({

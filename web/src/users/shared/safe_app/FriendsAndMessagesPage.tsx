@@ -1,5 +1,5 @@
 // All safe-app roles: shows friends and direct messages in the web safe app.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowLeft,
   FileLock2,
@@ -32,6 +32,12 @@ import type {
   Conversation,
 } from "../../../services/MessagingService";
 
+const chatTabs = [
+  { id: "dms", label: "DMs" },
+  { id: "tickets", label: "Ticket chats" },
+] as const;
+type ChatTab = (typeof chatTabs)[number]["id"];
+
 export default function Messages() {
   const session = useSession();
   const [social, setSocial] = useState<{
@@ -40,6 +46,9 @@ export default function Messages() {
     outgoing: Request[];
   }>({ friends: [], incoming: [], outgoing: [] });
   const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [chatTab, setChatTab] = useState<ChatTab>("dms");
+  const tabsId = useId();
+  const tabButtons = useRef<Partial<Record<ChatTab, HTMLButtonElement>>>({});
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [rows, setRows] = useState<Message[]>([]);
   const [found, setFound] = useState<DirectoryUser | null>(null);
@@ -70,6 +79,7 @@ export default function Messages() {
     if (!requested || requested.uid !== identity?.uid) return;
     const ticket = conversations.find((item) => item.id === requested.id);
     if (!ticket) return;
+    setChatTab(ticket.type === "SUPPORT" ? "tickets" : "dms");
     setConversation(ticket);
     session.setRequestedConversation(null);
   }, [conversations, identity?.uid, session.requestedConversation, session.setRequestedConversation]);
@@ -202,135 +212,165 @@ export default function Messages() {
         "This protected record is not stored on this web account yet. Open it once in the updated Android app.",
       );
   };
+  const tabConversations = conversations.filter((item) => (item.type === "SUPPORT") === (chatTab === "tickets"));
+  const activeConversations = tabConversations.filter((item) => !item.closedAt);
+  const archivedConversations = tabConversations.filter((item) => item.closedAt);
+  function selectTab(tab: ChatTab) {
+    if (tab !== chatTab) setConversation(null);
+    setChatTab(tab);
+  }
   return (
     <div className={`messages-layout ${conversation ? "chat-open" : ""}`}>
       <aside className="conversation-sidebar">
         <h2>People you trust.</h2>
-        <Form
-          onSubmit={async (data) => {
-            await action(async () => {
-              setFeedback("");
-              const result = await messaging.searchUser(
-                String(data.get("username")),
-                identity.uid,
-              );
-              setFound(result);
-              if (!result) setFeedback("No matching account found.");
-            });
-          }}
-        >
-          <Field
-            label="Find an exact username"
-            name="username"
-            required
-            minLength={4}
-            maxLength={24}
-          />
-          <Button type="submit" variant="outline" disabled={session.busy}>
-            <Search size={16} /> Find person
-          </Button>
-        </Form>
-        {found && (
-          <div className="request-row">
-            <span>@{found.username}</span>
-            {social.friends.some((f) => f.friendUid === found.uid) ? (
-              <small>Already friends</small>
-            ) : social.outgoing.some((r) => r.recipientUid === found.uid) ? (
-              <small>Request sent</small>
-            ) : (
-              <Button
-                variant="quiet"
-                onClick={() =>
-                  void action(async () => {
-                    await messaging.sendRequest(identity, found);
-                    setFound(null);
-                  })
-                }
-              >
-                <UserPlus size={16} /> Add
-              </Button>
-            )}
-          </div>
-        )}
-        {social.incoming.length > 0 && <h3>Friend requests</h3>}
-        {social.incoming.map((request) => (
-          <div className="request-row" key={request.id}>
-            <strong>@{request.senderUsername}</strong>
-            <div>
-              <Button
-                variant="quiet"
-                onClick={() =>
-                  void action(() => messaging.acceptRequest(identity, request))
-                }
-              >
-                Accept
-              </Button>
-              <Button
-                variant="quiet"
-                onClick={() =>
-                  void action(() => messaging.dismissRequest(request))
-                }
-              >
-                Decline
-              </Button>
-            </div>
-          </div>
-        ))}
-        {social.outgoing.map((request) => (
-          <div className="request-row" key={request.id}>
-            <span>
-              @{request.recipientUsername}
-              <small> Request pending</small>
-            </span>
-            <Button
-              variant="quiet"
-              onClick={() =>
-                void action(() => messaging.dismissRequest(request))
-              }
+        <div className="message-tabs" role="tablist" aria-label="Chat type">
+          {chatTabs.map(({ id, label }) => (
+            <button
+              key={id}
+              ref={(node) => { if (node) tabButtons.current[id] = node; }}
+              id={`${tabsId}-${id}`}
+              type="button"
+              role="tab"
+              aria-selected={chatTab === id}
+              aria-controls={`${tabsId}-${id}-panel`}
+              tabIndex={chatTab === id ? 0 : -1}
+              onClick={() => selectTab(id)}
+              onKeyDown={(event) => {
+                const target = event.key === "Home" ? "dms" : event.key === "End" ? "tickets"
+                  : event.key === "ArrowLeft" || event.key === "ArrowRight"
+                    ? id === "dms" ? "tickets" : "dms"
+                    : null;
+                if (!target) return;
+                event.preventDefault();
+                selectTab(target);
+                tabButtons.current[target]?.focus();
+              }}
             >
-              Cancel
-            </Button>
-          </div>
+              {label}
+            </button>
+          ))}
+        </div>
+        {chatTabs.filter(({ id }) => id !== chatTab).map(({ id }) => (
+          <div key={id} role="tabpanel" id={`${tabsId}-${id}-panel`} aria-labelledby={`${tabsId}-${id}`} hidden />
         ))}
-        {conversations.some((item) => item.type === "SUPPORT" && !item.closedAt) && <h3>Support chats</h3>}
-        {conversations.filter((item) => item.type === "SUPPORT" && !item.closedAt).map((item) => (
-          <button
-            key={item.id}
-            className={`friend-row support-chat-row ${conversation?.id === item.id ? "selected" : ""}`}
-            onClick={() => setConversation(item)}
-          >
-            <span className="avatar">O</span>
-            <span>
-              {messaging.conversationName(item, identity)}
-              <small>{item.lastMessage || "New conversation"}</small>
-            </span>
-            <MessageCircle size={17} />
-          </button>
-        ))}
-        {conversations.some((item) => item.type === "DIRECT" && !item.closedAt) && <h3>Direct messages</h3>}
-        {conversations.filter((item) => item.type === "DIRECT" && !item.closedAt).map((item) => (
-          <button key={item.id}
-            className={`friend-row ${conversation?.id === item.id ? "selected" : ""}`}
-            onClick={() => setConversation(item)}>
-            <span className="avatar">{messaging.conversationName(item, identity)[0]?.toUpperCase()}</span>
-            <span>@{messaging.conversationName(item, identity)}<small>{item.lastMessage || "New conversation"}</small></span>
-            <MessageCircle size={17} />
-          </button>
-        ))}
-        {conversations.some((item) => item.closedAt) && <h3>Archived chats</h3>}
-        {conversations.filter((item) => item.closedAt).map((item) => (
-          <button key={item.id} className={`friend-row ${conversation?.id === item.id ? "selected" : ""}`}
-            onClick={() => setConversation(item)}>
-            <span className="avatar">{item.type === "SUPPORT" ? "O" : messaging.conversationName(item, identity)[0]?.toUpperCase()}</span>
-            <span>{messaging.conversationName(item, identity)}<small>Archived conversation</small></span>
-            <MessageCircle size={17} />
-          </button>
-        ))}
-        {!conversations.length && (
-          <p className="help-note">
-            Find a username and accept a friend request to start a conversation.
-          </p>
-        )}
+        <div role="tabpanel" id={`${tabsId}-${chatTab}-panel`} aria-labelledby={`${tabsId}-${chatTab}`} tabIndex={0}>
+          {chatTab === "dms" && <>
+            <Form
+              onSubmit={async (data) => {
+                await action(async () => {
+                  setFeedback("");
+                  const result = await messaging.searchUser(
+                    String(data.get("username")),
+                    identity.uid,
+                  );
+                  setFound(result);
+                  if (!result) setFeedback("No matching account found.");
+                });
+              }}
+            >
+              <Field
+                label="Find an exact username"
+                name="username"
+                required
+                minLength={4}
+                maxLength={24}
+              />
+              <Button type="submit" variant="outline" disabled={session.busy}>
+                <Search size={16} /> Find person
+              </Button>
+            </Form>
+            {found && (
+              <div className="request-row">
+                <span>@{found.username}</span>
+                {social.friends.some((f) => f.friendUid === found.uid) ? (
+                  <small>Already friends</small>
+                ) : social.outgoing.some((r) => r.recipientUid === found.uid) ? (
+                  <small>Request sent</small>
+                ) : (
+                  <Button
+                    variant="quiet"
+                    onClick={() =>
+                      void action(async () => {
+                        await messaging.sendRequest(identity, found);
+                        setFound(null);
+                      })
+                    }
+                  >
+                    <UserPlus size={16} /> Add
+                  </Button>
+                )}
+              </div>
+            )}
+            {social.incoming.length > 0 && <h3>Friend requests</h3>}
+            {social.incoming.map((request) => (
+              <div className="request-row" key={request.id}>
+                <strong>@{request.senderUsername}</strong>
+                <div>
+                  <Button
+                    variant="quiet"
+                    onClick={() =>
+                      void action(() => messaging.acceptRequest(identity, request))
+                    }
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    variant="quiet"
+                    onClick={() =>
+                      void action(() => messaging.dismissRequest(request))
+                    }
+                  >
+                    Decline
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {social.outgoing.map((request) => (
+              <div className="request-row" key={request.id}>
+                <span>
+                  @{request.recipientUsername}
+                  <small> Request pending</small>
+                </span>
+                <Button
+                  variant="quiet"
+                  onClick={() =>
+                    void action(() => messaging.dismissRequest(request))
+                  }
+                >
+                  Cancel
+                </Button>
+              </div>
+            ))}
+          </>}
+          {activeConversations.map((item) => (
+            <button
+              key={item.id}
+              className={`friend-row ${item.type === "SUPPORT" ? "support-chat-row" : ""} ${conversation?.id === item.id ? "selected" : ""}`}
+              onClick={() => setConversation(item)}
+            >
+              <span className="avatar">{item.type === "SUPPORT" ? "O" : messaging.conversationName(item, identity)[0]?.toUpperCase()}</span>
+              <span>
+                {item.type !== "SUPPORT" && "@"}{messaging.conversationName(item, identity)}
+                <small>{item.lastMessage || "New conversation"}</small>
+              </span>
+              <MessageCircle size={17} />
+            </button>
+          ))}
+          {archivedConversations.length > 0 && <h3>Archived chats</h3>}
+          {archivedConversations.map((item) => (
+            <button key={item.id} className={`friend-row ${conversation?.id === item.id ? "selected" : ""}`}
+              onClick={() => setConversation(item)}>
+              <span className="avatar">{item.type === "SUPPORT" ? "O" : messaging.conversationName(item, identity)[0]?.toUpperCase()}</span>
+              <span>{messaging.conversationName(item, identity)}<small>Archived conversation</small></span>
+              <MessageCircle size={17} />
+            </button>
+          ))}
+          {!tabConversations.length && (
+            <p className="help-note">
+              {chatTab === "tickets" ? "No ticket chats yet." : "Find a username and accept a friend request to start a conversation."}
+            </p>
+          )}
+        </div>
       </aside>
       <section className="chat-panel">
         {conversation ? (
@@ -486,9 +526,9 @@ export default function Messages() {
             </Form>
           </>
         ) : (
-          <Empty title="A conversation starts with connection.">
-            Choose a trusted person or find an exact username to send a friend
-            request.
+          <Empty title={chatTab === "tickets" ? "Select a ticket chat" : "A conversation starts with connection."}>
+            {chatTab === "tickets" ? "Choose a ticket from the list to open it."
+              : "Choose a trusted person or find an exact username to send a friend request."}
           </Empty>
         )}
       </section>
