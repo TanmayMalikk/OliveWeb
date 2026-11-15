@@ -48,34 +48,44 @@ import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.MapLocationPoint
 import kotlin.math.ceil
 
-// Keeps the map awake and shows the next direction while a safe contact is navigating.
+// Expands the same map for browsing or route guidance.
 @Composable
-internal fun FullScreenNavigationMap(
+internal fun FullScreenLocationMap(
     points: List<MapLocationPoint>,
     ownPoint: MapLocationPoint?,
     route: LocationRoute?,
     destinationName: String,
     routeWorking: Boolean,
     routeError: String?,
+    navigating: Boolean,
+    showOwnPointInBlue: Boolean,
     onExitFullScreen: () -> Unit,
     onStopNavigation: () -> Unit,
+    supportServices: List<com.olive.app.data.location.NearbySupportService> = emptyList(),
+    onSupportSelected: ((com.olive.app.data.location.NearbySupportService) -> Unit)? = null,
+    onViewportCenterChanged: ((Double, Double) -> Unit)? = null,
+    onLoadMoreSupport: (() -> Unit)? = null,
+    loadingMoreSupport: Boolean = false,
 ) {
     val direction = ownPoint?.let { route?.nextDirection(it.latitude, it.longitude) }
     val progress = ownPoint?.let { route?.progress(it.latitude, it.longitude) }
     val view = LocalView.current
-    DisposableEffect(view) {
+    DisposableEffect(view, navigating) {
         val previous = view.keepScreenOn
-        view.keepScreenOn = true
+        if (navigating) view.keepScreenOn = true
         onDispose { view.keepScreenOn = previous }
     }
-    Box(Modifier.fillMaxSize().testTag("full_screen_navigation")) {
+    Box(Modifier.fillMaxSize().testTag(if (navigating) "full_screen_navigation" else "full_screen_location_map")) {
         InteractiveLocationMap(
             points = points,
             modifier = Modifier.fillMaxSize(),
             ownPointUid = ownPoint?.uid,
-            showOwnPointInBlue = true,
+            showOwnPointInBlue = showOwnPointInBlue,
             route = route,
-            navigationActive = true,
+            navigationActive = navigating,
+            supportServices = supportServices,
+            onSupportSelected = onSupportSelected,
+            onViewportCenterChanged = onViewportCenterChanged,
         )
         IconButton(
             onClick = onExitFullScreen,
@@ -87,7 +97,7 @@ internal fun FullScreenNavigationMap(
         ) {
             Icon(Icons.Outlined.FullscreenExit, stringResource(R.string.location_exit_full_screen))
         }
-        Surface(
+        if (navigating) Surface(
             modifier = Modifier.statusBarsPadding().padding(start = 68.dp, end = 72.dp, top = 12.dp)
                 .fillMaxWidth().align(Alignment.TopCenter),
             shape = MaterialTheme.shapes.large,
@@ -96,26 +106,21 @@ internal fun FullScreenNavigationMap(
             shadowElevation = 8.dp,
         ) {
             Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-                Text(
+                if (routeWorking) com.olive.app.ui.shared.LoadingSkeleton(rows = 1)
+                else Text(
                     direction?.text ?: stringResource(R.string.location_finding_route),
                     style = MaterialTheme.typography.titleLarge,
                 )
-                if (routeWorking) {
-                    LinearProgressIndicator(
-                        Modifier.fillMaxWidth().padding(top = 8.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
-                }
             }
         }
-        Surface(
+        if (navigating || loadingMoreSupport || onLoadMoreSupport != null || routeError != null) Surface(
             modifier = Modifier.navigationBarsPadding().padding(14.dp).fillMaxWidth()
                 .align(Alignment.BottomCenter),
             shape = MaterialTheme.shapes.extraLarge,
             shadowElevation = 10.dp,
         ) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
+                if (navigating) Text(
                     stringResource(R.string.location_navigating_to, destinationName),
                     style = MaterialTheme.typography.titleMedium,
                 )
@@ -130,7 +135,11 @@ internal fun FullScreenNavigationMap(
                     )
                 }
                 routeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (loadingMoreSupport) com.olive.app.ui.shared.LoadingSkeleton(rows = 1)
+                else if (onLoadMoreSupport != null) OutlinedButton(onClick = onLoadMoreSupport) {
+                    Text(stringResource(R.string.load_more_hotline_locations))
+                }
+                if (navigating) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedButton(onClick = onExitFullScreen, modifier = Modifier.weight(1f)) {
                         Icon(Icons.Outlined.FullscreenExit, null)
                         Spacer(Modifier.width(6.dp))

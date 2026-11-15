@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -35,7 +36,7 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.organization.*
 import com.olive.app.ui.users.staff.SafetyConsultations
 
-private enum class AdminPage { Dashboard, Accounts, StaffManagement, Settings, Map, SafetyPlans, Messages }
+private enum class AdminPage { Dashboard, Accounts, StaffManagement, Settings, Map, SafetyPlans, Messages, Emergencies }
 
 // admin dashboard shows this admin portal view so the user can view its details and use its actions.
 @Composable
@@ -45,6 +46,19 @@ internal fun AdminPortal(session: SessionViewModel) {
     var page by remember { mutableStateOf(AdminPage.Dashboard) }
     var createOpen by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<AdminAccountSummary?>(null) }
+    val (emergencies, emergencyError) = observeEmergencyAlerts(session)
+    val context = LocalContext.current
+    val alertPreferences = remember { context.getSharedPreferences("emergency_alerts", android.content.Context.MODE_PRIVATE) }
+    val acknowledgementKey = "acknowledged_${session.coverAccountId}"
+    var acknowledged by remember(session.coverAccountId) {
+        mutableStateOf(alertPreferences.getStringSet(acknowledgementKey, emptySet())!!.toSet())
+    }
+    fun acknowledge(id: String) {
+        acknowledged = acknowledged + id
+        alertPreferences.edit().putStringSet(acknowledgementKey, acknowledged).apply()
+    }
+    var trackingUid by remember { mutableStateOf<String?>(null) }
+    val alert = emergencies.orEmpty().firstOrNull { it.resolvedAt == 0L && it.id !in acknowledged }
     BackHandler(enabled = page != AdminPage.Dashboard) { page = AdminPage.Dashboard }
     // Opens the selected admin dashboard section.
     when (page) {
@@ -56,6 +70,7 @@ internal fun AdminPortal(session: SessionViewModel) {
             onMap = { page = AdminPage.Map },
             onSafetyPlans = { page = AdminPage.SafetyPlans },
             onMessages = { page = AdminPage.Messages },
+            onEmergencies = { page = AdminPage.Emergencies },
         )
         AdminPage.Accounts -> AdminAccounts(
             session,
@@ -71,7 +86,12 @@ internal fun AdminPortal(session: SessionViewModel) {
             session,
             onBack = { page = AdminPage.Dashboard },
         )
-        AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard })
+        AdminPage.Map -> OrganizationMap(session, onBack = { page = AdminPage.Dashboard; trackingUid = null }, initialFollowUid = trackingUid)
+        AdminPage.Emergencies -> EmergencyResponseScreen(
+            session, emergencies, emergencyError,
+            onBack = { page = AdminPage.Dashboard },
+            onTrack = { trackingUid = it; page = AdminPage.Map },
+        )
         AdminPage.SafetyPlans -> SafetyConsultations(session, onBack = { page = AdminPage.Dashboard })
         AdminPage.Messages -> MessagesScreen(
             session,
@@ -79,6 +99,29 @@ internal fun AdminPortal(session: SessionViewModel) {
             initialSupportFilter = SUPPORT_TAG_NEEDS_ADMIN,
         )
     }
+    if (alert != null) AlertDialog(
+        onDismissRequest = { acknowledge(alert.id) },
+        title = { Text(stringResource(R.string.emergency_response_alert)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(alert.ownerName)
+                EmergencyLocationPreview(alert.ownerUid)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                acknowledge(alert.id)
+                trackingUid = alert.ownerUid
+                page = AdminPage.Map
+            }) { Text(stringResource(R.string.emergency_response_track)) }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                acknowledge(alert.id)
+                page = AdminPage.Emergencies
+            }) { Text(stringResource(R.string.emergency_response_title)) }
+        },
+    )
     if (session.viewedSharedEntry != null) SharedEntryViewer(session)
     // Open the protected-account form and close it when the admin dismisses it.
     if (createOpen) CreateAccountDialog(session, onDismiss = { createOpen = false })
@@ -115,6 +158,7 @@ private fun AdminDashboard(
     onMap: () -> Unit,
     onSafetyPlans: () -> Unit,
     onMessages: () -> Unit,
+    onEmergencies: () -> Unit,
 ) {
     val uiText = rememberResourceText()
     val dashboard by session.dashboardState.collectAsState()
@@ -142,8 +186,12 @@ private fun AdminDashboard(
                 Icon(Icons.Outlined.Settings, uiText(R.string.account_settings))
             }
         }
-        AccountCountGrid(dashboard.adminCounts)
-        TicketCountGrid(dashboard.adminCounts)
+        if (dashboard.adminSummaryOwner == session.coverAccountId && dashboard.adminSummaryOwner != null || session.localMode) {
+            AccountCountGrid(dashboard.adminCounts)
+            TicketCountGrid(dashboard.adminCounts)
+        } else if (session.busy || session.message == null) {
+            LoadingSkeleton(rows = 2)
+        } else Status(session)
         OutlinedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -152,8 +200,7 @@ private fun AdminDashboard(
                     modifier = Modifier.semantics { heading() },
                 )
                 Text(uiText(R.string.admin_emergency_response_help))
-                OutlinedButton(onClick = onMessages) { Text(uiText(R.string.admin_escalation_chats)) }
-                OutlinedButton(onClick = onMap) { Text(uiText(R.string.organization_live_map)) }
+                Button(onClick = onEmergencies) { Text(stringResource(R.string.emergency_response_title)) }
             }
         }
         OrganizationDashboardCard(
@@ -253,10 +300,11 @@ private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
             enabled = !session.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.refresh)) }
-        if (staff.isEmpty() && !session.busy) {
+        if (session.busy) LoadingSkeleton()
+        else if (staff.isEmpty() && session.message == null) {
             Text(stringResource(R.string.admin_no_staff_accounts), color = Muted)
         }
-        staff.forEach { account -> StaffWorkloadCard(account) }
+        if (!session.busy) staff.forEach { account -> StaffWorkloadCard(account) }
         Status(session)
     }
 }

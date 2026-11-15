@@ -110,9 +110,7 @@ internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
         enter = fadeIn(tween(120)) + expandVertically(),
         exit = fadeOut(tween(100)) + shrinkVertically()
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            CircularProgressIndicator(Modifier.size(26.dp), strokeWidth = 3.dp)
-        }
+        com.olive.app.ui.shared.LoadingSkeleton(Modifier.fillMaxWidth().padding(horizontal = 18.dp), rows = 1)
     }
 }
 

@@ -5,6 +5,11 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import android.util.Log
 import androidx.core.content.edit
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.olive.app.data.network.hasValidatedInternetConnection
+import kotlinx.coroutines.delay
 import com.olive.app.security.EncryptionUtils
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.olive.app.data.account.AccountIdentity
@@ -37,6 +42,15 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     private var keyParticipants = emptyMap<String, String>()
     private var keyVersion = 0
     private var openingChat: Job? = null
+    private var messageLoadTimeout: Job? = null
+    var loadingConversation by mutableStateOf(false)
+        private set
+
+    private fun finishLoadingConversation() {
+        messageLoadTimeout?.cancel()
+        messageLoadTimeout = null
+        loadingConversation = false
+    }
     // Opens a conversation after loading its participants and encryption access.
     fun openConversation(conversation: ChatConversation, preserveMessages: Boolean = false) {
         with(runtime) {
@@ -90,6 +104,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     )
                 }
                 if (!preserveMessages || !sameConversation) {
+                    finishLoadingConversation()
                     chatMessages = emptyList()
                     remoteChatMessages = emptyList()
                     activeRoomKey = null
@@ -109,6 +124,16 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     return
                 }
                 messagingBusy = true
+                if (!preserveMessages || !sameConversation) {
+                    loadingConversation = true
+                    messageLoadTimeout = scope.launch {
+                        delay(12_000)
+                        if (epoch == token && activeConversation?.id == conversation.id && loadingConversation) {
+                            loadingConversation = false
+                            if (chatMessages.isEmpty()) message = application.getString(R.string.unable_to_open_secure_conversation)
+                        }
+                    }
+                }
                 openingChat = scope.launch {
                     try {
                         val secure = checkNotNull(secureChatRepository)
@@ -167,6 +192,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: Exception) { // Do not expose key details; show the safe conversation error when encrypted room setup fails.
+                        if (epoch == token && activeConversation?.id == conversation.id) finishLoadingConversation()
                         if (epoch == token) message =
                             runtime.application.getString(R.string.unable_to_open_secure_conversation)
                     } finally {
@@ -187,6 +213,7 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     }
 
     fun stopKeyObservation() {
+        finishLoadingConversation()
         openingChat?.cancel()
         openingChat = null
         keySubscription?.close()
@@ -388,10 +415,15 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 { rows ->
                     if (epoch == token && state.activeConversation?.id == conversation.id) {
                         remoteChatMessages = rows
-                        scope.launch { publishMessages(conversation.id, ownerUid, roomKey, null, token) }
+                        scope.launch {
+                            publishMessages(conversation.id, ownerUid, roomKey, null, token)
+                            if (epoch == token && state.activeConversation?.id == conversation.id &&
+                                !hasValidatedInternetConnection(application)) finishLoadingConversation()
+                        }
                     }
                 },
                 { error ->
+                    if (epoch == token && state.activeConversation?.id == conversation.id) finishLoadingConversation()
                     if (epoch == token && remoteChatMessages.isEmpty()) {
                         state.message = application.getString(
                             R.string.ui_unable_to_load_this_conversation_value,
@@ -401,6 +433,10 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
                 },
                 { encrypted ->
                     scope.launch {
+                        if (epoch == token && state.activeConversation?.id == conversation.id) {
+                            publishMessages(conversation.id, ownerUid, roomKey, null, token)
+                            if (epoch == token && state.activeConversation?.id == conversation.id) finishLoadingConversation()
+                        }
                         try {
                             val wrapped = secure.wrappedRoomKey(conversation.id, ownerUid)
                                 ?: throw ChatCacheException("Wrapped room key unavailable")

@@ -96,8 +96,10 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     val context = LocalContext.current
     val accountId = session.coverAccountId ?: "guest"
     val store = remember(context, accountId) { FitnessStore(context, accountId) }
-    var snapshot by remember(store) { mutableStateOf(store.snapshot()) }
-    val history = remember(store, snapshot) { store.history(days = 14) }
+    var loaded by remember(store) { mutableStateOf<Pair<FitnessSnapshot, List<FitnessHistoryDay>>?>(null) }
+    var pendingSnapshot by remember(store) { mutableStateOf<FitnessSnapshot?>(null) }
+    val snapshot = pendingSnapshot ?: loaded?.first
+    val history = loaded?.second.orEmpty()
     var page by remember { mutableStateOf(FitnessPage.HOME) }
     val pageFocus = remember { FocusRequester() }
     val pageLabel = when (page) {
@@ -110,22 +112,26 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         FitnessPage.ACCOUNT -> stringResource(R.string.settings)
     }
 
-    FitnessStepSensor(store) { snapshot = it }
+    FitnessStepSensor(store) { pendingSnapshot = it }
     // Load fitness history and watch data when the cover becomes active.
     LaunchedEffect(store) {
         while (true) {
+            val pendingAtRead = pendingSnapshot
+            loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                store.snapshot() to store.history(days = 14)
+            }
+            if (pendingSnapshot === pendingAtRead) pendingSnapshot = null
             delay(2_000L.milliseconds)
-            snapshot = store.snapshot()
         }
     }
     LaunchedEffect(snapshot) {
+        snapshot ?: return@LaunchedEffect
         FitnessWatchSync.publish(context, accountId, snapshot)
         if (!session.localMode) {
             FitnessCloudSync.upload(accountId, snapshot, history)
         }
     }
     LaunchedEffect(session.coverReset) {
-        snapshot = store.snapshot()
         page = FitnessPage.HOME
     }
     // Back returns from a fitness submenu or section before it is allowed to leave the cover app.
@@ -166,7 +172,9 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                 onSettings = { page = FitnessPage.ACCOUNT },
             )
             // Opens the selected fitness overview, activity, nutrition, or vitals page.
-            when (page) {
+            if (snapshot == null || loaded == null) {
+                com.olive.app.ui.shared.LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 3)
+            } else when (page) {
                 FitnessPage.HOME -> FitnessHomePage(
                     snapshot = snapshot,
                     onGoals = { page = FitnessPage.GOALS },
@@ -183,13 +191,13 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                     enabled = interactive,
                     padding = PaddingValues(0.dp),
                     onAddFood = { page = FitnessPage.FOOD_SEARCH },
-                    onRemoveFood = { snapshot = store.removeFood(it) },
+                    onRemoveFood = { pendingSnapshot = store.removeFood(it) },
                 )
                 FitnessPage.FOOD_SEARCH -> FoodSearchPage(
                     enabled = interactive,
                     padding = PaddingValues(0.dp),
                     onFoodAdded = { food, servings, meal ->
-                        snapshot = store.addFood(food, servings, meal)
+                        pendingSnapshot = store.addFood(food, servings, meal)
                         page = FitnessPage.NUTRITION
                     },
                 )
@@ -199,7 +207,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                     padding = PaddingValues(0.dp),
                     onSave = {
                         store.saveProfile(it)
-                        snapshot = store.snapshot()
+                        pendingSnapshot = store.snapshot()
                         page = FitnessPage.HOME
                     },
                 )

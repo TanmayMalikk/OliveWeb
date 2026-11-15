@@ -299,20 +299,23 @@ internal fun FoodSearchPage(
                     loading = true
                     searched = true
                     scope.launch {
-                        result = repository.search(query)
-                        loading = false
+                        try {
+                            result = repository.search(query)
+                        } finally {
+                            loading = false
+                        }
                     }
                 },
                 enabled = enabled && !loading && query.trim().length >= 2,
             ) { Icon(Icons.Outlined.Search, stringResource(R.string.search)) }
         }
         if (loading) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            com.olive.app.ui.shared.LoadingSkeleton(rows = 2)
         } else if (searched && result.foods.isEmpty()) {
             val message = if (result.providerFailures >= 2) R.string.food_search_unavailable else R.string.no_food_results
             Text(stringResource(message))
         }
-        if (result.providerFailures == 1) {
+        if (!loading && result.providerFailures == 1) {
             Text(stringResource(R.string.some_food_sources_unavailable), color = FitnessSubtle)
         }
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -321,7 +324,7 @@ internal fun FoodSearchPage(
             state = listState,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(result.foods, key = NutritionFood::id) { food ->
+            items(if (loading) emptyList() else result.foods, key = NutritionFood::id) { food ->
                 FoodSearchResultCard(food, enabled) { selectedFood = food }
             }
         }

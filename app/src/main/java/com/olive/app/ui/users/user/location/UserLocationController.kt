@@ -58,6 +58,7 @@ internal data class LocationMapState(
     val navigating: Boolean = false,
     val routeWorking: Boolean = false,
     val routeError: String? = null,
+    val locating: Boolean = false,
 ) {
     // Chooses the user's own map marker from live or saved location data.
     fun displayedOwn(role: AccountRole) =
@@ -95,6 +96,7 @@ internal class LocationMapController(
         val friendIds = configuration.friends.mapTo(mutableSetOf()) { it.uid }
         state = LocationMapState(
             ownerUid = uid,
+            locating = true,
             livePoint = LiveLocationState.current.value,
             selected = LiveLocationController.selected(applicationContext).intersect(friendIds),
             liveActive = LiveLocationController.active(applicationContext),
@@ -165,6 +167,7 @@ internal class LocationMapController(
                             )
                         }
                     }
+                    if (token == generation && state.locating) state = state.copy(locating = false)
                     delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
                 }
             } else if (configuration.profile.role == AccountRole.SAFE_CONTACT) {
@@ -189,6 +192,7 @@ internal class LocationMapController(
                     }
                 }
             }
+            if (token == generation && state.locating) state = state.copy(locating = false)
         }
         if (
             configuration.profile.role == AccountRole.SAFE_CONTACT &&
@@ -352,9 +356,9 @@ internal class LocationMapController(
 
     // Adds or removes one safe contact from the next live-location share.
     fun selectContact(uid: String, enabled: Boolean) {
-        if (state.liveActive) return
+        if (state.liveActive || state.working) return
         val updated = if (enabled) state.selected + uid else state.selected - uid
-        if (updated.size <= MAX_SHARED_CONTACTS) state = state.copy(selected = updated)
+        state = state.copy(selected = updated)
     }
 
     // Starts the user's live-location sharing session.
@@ -395,14 +399,14 @@ internal class LocationMapController(
                     permissionError
                 )
             } else try {
-                val end = System.currentTimeMillis() + durationMillis
-                val startedAt = System.currentTimeMillis()
                 val key = checkNotNull(
                     checkNotNull(repository).setLiveRecipients(
                         configuration.identity.uid,
                         recipients
                     )
                 )
+                val startedAt = System.currentTimeMillis()
+                val end = startedAt + durationMillis
                 LiveLocationController.start(
                     applicationContext,
                     configuration.identity.uid,
@@ -478,7 +482,6 @@ internal class LocationMapController(
     }
 
     private companion object {
-        const val MAX_SHARED_CONTACTS = 10
         const val MAP_LOCATION_REFRESH_MILLIS = 2_000L
         const val NAVIGATION_CHECK_MILLIS = 2_000L
         const val MIN_ROUTE_REQUEST_INTERVAL_MILLIS = 20_000L

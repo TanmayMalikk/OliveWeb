@@ -541,8 +541,8 @@ data class GateState(val failures: Int = 0) {
 
 object IdlePolicy {
     const val DEFAULT_TIMEOUT_SECONDS = 60
-    const val MAX_TIMEOUT_SECONDS = 450
-    val timeoutOptions = (1..7).map { it * 60 } + MAX_TIMEOUT_SECONDS
+    const val MAX_TIMEOUT_SECONDS = 420
+    val timeoutOptions = (1..7).map { it * 60 }
 
     fun normalizeTimeout(seconds: Int): Int =
         timeoutOptions.last { it <= seconds.coerceIn(DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS) }

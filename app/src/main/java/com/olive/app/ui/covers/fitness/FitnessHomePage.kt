@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.Route
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -197,7 +198,7 @@ private fun StepSummaryCard(snapshot: FitnessSnapshot) {
                 SummaryMetric(
                     "${FitnessMath.distanceKm(snapshot.stepsToday, snapshot.profile.heightCm).displayAmount()} km",
                     stringResource(R.string.distance),
-                    Icons.AutoMirrored.Outlined.DirectionsWalk,
+                    Icons.Outlined.Route,
                 )
                 SummaryMetric(
                     "${FitnessMath.walkingCalories(snapshot.stepsToday, snapshot.profile).displayAmount()} kcal",

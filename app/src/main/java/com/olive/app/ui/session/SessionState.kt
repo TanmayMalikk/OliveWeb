@@ -86,6 +86,7 @@ internal data class SessionMessagingState(
 
 internal data class SessionDashboardState(
     val adminCounts: AccountCounts = AccountCounts(),
+    val adminSummaryOwner: String? = null,
     val adminAccounts: List<AdminAccountSummary> = emptyList<AdminAccountSummary>(),
     val savedNews: List<NewsArticle> = emptyList(),
     val coverDataVersion: Int = 0,
@@ -282,6 +283,9 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
     var adminCounts: AccountCounts
         get() = dashboardSnapshot.adminCounts
         set(value) = updateDashboard { it.copy(adminCounts = value) }
+
+    fun setAdminSummary(ownerUid: String, counts: AccountCounts) =
+        updateDashboard { it.copy(adminSummaryOwner = ownerUid, adminCounts = counts) }
     var adminAccounts: List<AdminAccountSummary>
         get() = dashboardSnapshot.adminAccounts
         set(value) = updateDashboard { it.copy(adminAccounts = value) }

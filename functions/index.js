@@ -19,6 +19,10 @@ const supportTicketRepair = require("./src/supportTicketRepair");
 exports.conversationPrepareKeys = supportTicketRepair.conversationPrepareKeys;
 exports.supportTicketsPrepare = supportTicketRepair.supportTicketsPrepare;
 Object.assign(exports, require("./src/mediaTickets"));
+const emergencies = require("./src/emergencyReports");
+for (const [name, handler] of Object.entries(emergencies)) {
+  if (name !== "canReadEmergencyMedia") exports[name] = handler;
+}
 Object.assign(exports, require("./src/nutritionFoods"));
 const syncInvalidations = require("./src/syncInvalidations");
 Object.entries(syncInvalidations).filter(([name]) => name !== "_test")

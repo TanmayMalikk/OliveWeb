@@ -20,6 +20,26 @@ import org.junit.Test
 
 class DocumentIndexStoreTest {
     @Test
+    fun `evidence changes pass through the index wrapper and survive export rereads`() = runBlocking {
+        val index = DocumentIndexStore(FakeJsonVault())
+        val remote = FakeRemote()
+        val original = document("standalone-evidence", ALICE).copy(evidence = false)
+        remote.documents = listOf(original)
+        val repository = IndexedSafetyDocumentRepository(remote, index)
+        repository.listFor(ALICE)
+        repository.setEvidence(original, ALICE, true)
+        assertTrue(repository.cachedFor(ALICE, original.id)!!.evidence)
+        val exportDocuments = repository.listFor(ALICE).documents
+        assertTrue(exportDocuments.single().evidence)
+        assertTrue(repository.cachedFor(ALICE, original.id)!!.evidence)
+        val media = exportDocuments.map {
+            com.olive.app.ui.users.user.documents.EmergencyReportMedia(it, null)
+        }
+        assertEquals(listOf(original.id), com.olive.app.ui.users.user.documents.unattachedEmergencyEvidence(emptyList(), media).map { it.document.id })
+        repository.setEvidence(exportDocuments.single(), ALICE, false)
+        assertFalse(repository.listFor(ALICE).documents.single().evidence)
+    }
+    @Test
     fun `index isolates accounts and retains only viewer wrapped keys`() {
         val store = DocumentIndexStore(FakeJsonVault())
         store.replace(ALICE, listOf(document("one", ALICE)), 100)
@@ -106,10 +126,15 @@ class DocumentIndexStoreTest {
     ).also { require(viewer in it.allowedUsers) }
 
     private class FakeRemote(private val getFailure: Exception? = null) : SafetyDocumentDataSource {
+        var documents = emptyList<SafetyDocument>()
         private var observer: ((DocumentListSnapshot) -> Unit)? = null
         fun emit(value: DocumentListSnapshot) = checkNotNull(observer).invoke(value)
         override suspend fun listFor(uid: String) =
-            DocumentListSnapshot(emptyList(), DocumentListSource.SERVER, 1)
+            DocumentListSnapshot(documents, DocumentListSource.SERVER, 1)
+        override suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
+            require(document.ownerUid == ownerUid)
+            documents = documents.map { if (it.id == document.id) it.copy(evidence = evidence) else it }
+        }
         override fun observeFor(uid: String, onUpdate: (DocumentListSnapshot) -> Unit, onError: (String) -> Unit) =
             ChatSubscription { observer = null }.also { observer = onUpdate }
         override suspend fun getFor(uid: String, id: String): SafetyDocument {

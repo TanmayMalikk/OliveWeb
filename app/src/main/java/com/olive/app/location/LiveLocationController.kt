@@ -62,7 +62,7 @@ internal object LiveLocationController {
         expiresAt: Long,
         key: SecretKey
     ) {
-        require(contactUids.size <= 10)
+        require(contactUids.isNotEmpty() && uid !in contactUids)
         require(expiresAt > System.currentTimeMillis())
         LiveLocationKeyStore(context).save(uid, key)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
@@ -75,7 +75,6 @@ internal object LiveLocationController {
             uid
         )
             .putExtra(LiveLocationService.DISPLAY_NAME, name)
-            .putExtra(LiveLocationService.CONTACT_UIDS, contactUids.toTypedArray())
             .putExtra(LiveLocationService.EXPIRES_AT, expiresAt)
             .putExtra(LiveLocationService.RESET_TRAIL, true)
         ContextCompat.startForegroundService(context, intent)
@@ -85,11 +84,9 @@ internal object LiveLocationController {
     fun stop(context: Context) {
         val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val ownerUid = preferences.getString("live_owner_uid", null)
-        val contacts = preferences.getStringSet("live_contacts", emptySet()).orEmpty()
         context.startService(
             Intent(context, LiveLocationService::class.java).setAction(LiveLocationService.STOP)
                 .putExtra(LiveLocationService.OWNER_UID, ownerUid)
-                .putExtra(LiveLocationService.CONTACT_UIDS, contacts.toTypedArray())
         )
         preferences.edit {
             putBoolean("live_active", false).remove("live_owner_uid").remove("live_owner_name")

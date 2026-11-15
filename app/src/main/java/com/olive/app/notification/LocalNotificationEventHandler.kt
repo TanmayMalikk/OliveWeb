@@ -189,6 +189,12 @@ object LocalNotificationEventHandler {
     ) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
         val conversationId = data["conversationId"].orEmpty()
+        if (data["type"] == "emergency") {
+            if (data["recipientId"] == uid && !data["emergencyId"].isNullOrBlank()) {
+                OliveNotificationManager.showSafeUpdate(context, R.string.emergency_admin_notification, "emergency:$uid:${data["emergencyId"]}")
+            }
+            return
+        }
         if (data["eventId"] == "ticket-assigned") {
             if (data["recipientId"] == uid && conversationId.isNotBlank()) {
                 OliveNotificationManager.showSafeUpdate(

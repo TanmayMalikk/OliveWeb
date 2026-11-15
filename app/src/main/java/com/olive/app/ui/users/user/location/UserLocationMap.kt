@@ -51,6 +51,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -67,6 +68,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.MapLocationPoint
+import com.olive.app.data.location.NearbySupportService
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
@@ -86,8 +88,12 @@ internal fun InteractiveLocationMap(
     navigationActive: Boolean = false,
     detailsOnlyForSelectedPoint: Boolean = false,
     userSearchEnabled: Boolean = false,
+    initialFollowUid: String? = null,
     selectedLocation: Pair<Double, Double>? = null,
     onSelectedLocationChange: ((Double, Double) -> Unit)? = null,
+    supportServices: List<NearbySupportService> = emptyList(),
+    onSupportSelected: ((NearbySupportService) -> Unit)? = null,
+    onViewportCenterChanged: ((Double, Double) -> Unit)? = null,
 ) {
     val description = stringResource(R.string.location_map_accessibility)
     val lastKnownLabel = stringResource(R.string.location_last_known)
@@ -99,11 +105,21 @@ internal fun InteractiveLocationMap(
     var searchOpen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var routeWasShown by remember { mutableStateOf(false) }
+    var supportWereFitted by remember { mutableStateOf(false) }
+    val currentSupportServices by rememberUpdatedState(supportServices)
+    val currentSupportSelection by rememberUpdatedState(onSupportSelected)
+    val currentViewportCallback by rememberUpdatedState(onViewportCenterChanged)
     val followTargetUid = selectedFollowUid ?: if (navigationActive) ownPointUid
     else points.firstOrNull { it.live || it.lastKnown }?.uid ?: ownPointUid
     val matchingUsers = remember(points, searchQuery) {
         points.filter { it.name.contains(searchQuery.trim(), ignoreCase = true) }
             .sortedBy { it.name.lowercase() }
+    }
+    LaunchedEffect(initialFollowUid) {
+        if (initialFollowUid != null) {
+            selectedFollowUid = initialFollowUid
+            following = true
+        }
     }
 
     LaunchedEffect(attempt) {
@@ -156,6 +172,18 @@ internal fun InteractiveLocationMap(
         )
     }
 
+    fun updateSupportServices(view: WebView) {
+        val encoded = JSONArray().apply {
+            supportServices.forEach { service -> put(JSONObject().apply {
+                put("id", service.id); put("name", service.name)
+                put("latitude", service.latitude); put("longitude", service.longitude)
+            }) }
+        }
+        val fit = !supportWereFitted && supportServices.isNotEmpty() && !navigationActive
+        view.evaluateJavascript("window.oliveSetServices($encoded,$fit);", null)
+        if (fit) supportWereFitted = true
+    }
+
     // Draws the current navigation route and can fit the camera around it.
     fun updateRoute(view: WebView, fitRoute: Boolean) {
         val encoded = JSONArray().apply {
@@ -189,19 +217,19 @@ internal fun InteractiveLocationMap(
         if (loadState == MapLoadState.Ready) webView[0]?.evaluateJavascript(
             "window.oliveSetFollow(" +
                 "$following,${JSONObject.quote(followTargetUid.orEmpty())}," +
-                "${userSearchEnabled && selectedFollowUid != null});",
+                "${selectedFollowUid != null && (userSearchEnabled || initialFollowUid != null)});",
             null
         )
     }
 
     LaunchedEffect(navigationActive) {
-        following = navigationActive
+        if (initialFollowUid == null || navigationActive) following = navigationActive
         if (!navigationActive) routeWasShown = false
     }
 
     // Stops following when the selected user is no longer available in the organization feed.
     LaunchedEffect(points, selectedFollowUid) {
-        if (selectedFollowUid != null && points.none { it.uid == selectedFollowUid }) {
+        if (selectedFollowUid != null && selectedFollowUid != initialFollowUid && points.none { it.uid == selectedFollowUid }) {
             selectedFollowUid = null
             following = false
         }
@@ -268,6 +296,16 @@ internal fun InteractiveLocationMap(
                         settings.allowContentAccess = false
                         settings.allowFileAccess = true
                         settings.setSupportZoom(false)
+                        if (onViewportCenterChanged != null) addJavascriptInterface(
+                            LocationSelectionBridge { latitude, longitude ->
+                                currentViewportCallback?.invoke(latitude, longitude)
+                            }, "OliveMapViewport",
+                        )
+                        if (onSupportSelected != null) addJavascriptInterface(
+                            SupportSelectionBridge { id ->
+                                currentSupportServices.firstOrNull { it.id == id }?.let { currentSupportSelection?.invoke(it) }
+                            }, "OliveSupportSelection",
+                        )
                         if (onSelectedLocationChange != null) {
                             addJavascriptInterface(
                                 LocationSelectionBridge(onSelectedLocationChange),
@@ -278,6 +316,9 @@ internal fun InteractiveLocationMap(
                             // The bundled map uses its page title to report that JavaScript is ready.
                             override fun onReceivedTitle(view: WebView, title: String?) {
                                 if (title == MAP_READY_TITLE) loadState = MapLoadState.Ready
+                                if (title == MAP_READY_TITLE && onViewportCenterChanged != null) {
+                                    view.evaluateJavascript("window.oliveReportMapCenter();", null)
+                                }
                             }
                         }
                         webViewClient = object : WebViewClient() {
@@ -311,7 +352,8 @@ internal fun InteractiveLocationMap(
                     resizeMap(view)
                     if (loadState == MapLoadState.Ready) {
                         updatePoints(view, false)
-                        if (userSearchEnabled && selectedFollowUid != null) {
+                        updateSupportServices(view)
+                        if ((userSearchEnabled || initialFollowUid != null) && selectedFollowUid != null) {
                             view.evaluateJavascript(
                                 "window.oliveSetFollow($following,${JSONObject.quote(selectedFollowUid)},false);",
                                 null,
@@ -331,9 +373,9 @@ internal fun InteractiveLocationMap(
         }
         // Shows map loading, retry, or nothing once the map is ready.
         when (loadState) {
-            MapLoadState.Loading -> CircularProgressIndicator(
-                Modifier.align(Alignment.Center).testTag("map_loading")
-            )
+MapLoadState.Loading -> Surface(Modifier.fillMaxSize().testTag("map_loading")) {
+                com.olive.app.ui.shared.LoadingSkeleton(Modifier.padding(16.dp), rows = 1, preview = true)
+            }
 
             MapLoadState.Error -> Column(
                 Modifier.align(Alignment.Center).padding(24.dp),
@@ -510,6 +552,14 @@ private class LocationSelectionBridge(
         if (latitude in -90.0..90.0 && longitude in -180.0..180.0) {
             mainHandler.post { onChange(latitude, longitude) }
         }
+    }
+
+}
+
+private class SupportSelectionBridge(private val onSelected: (String) -> Unit) {
+    private val handler = Handler(Looper.getMainLooper())
+    @JavascriptInterface fun selected(id: String) {
+        if (id.length in 1..512) handler.post { onSelected(id) }
     }
 }
 

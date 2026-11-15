@@ -1,9 +1,7 @@
 package com.olive.app.ui.shared
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,37 +27,11 @@ private val privateTypography = defaultTypography.copy(
     titleMedium = defaultTypography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp),
 )
 
-private val privateDarkColors = darkColorScheme(
-    primary = SageGreen,
-    onPrimary = Ink,
-    primaryContainer = DarkOlive,
-    onPrimaryContainer = PaleOlive,
-    secondary = LightSage,
-    onSecondary = Ink,
-    secondaryContainer = DarkOlive,
-    onSecondaryContainer = PaleOlive,
-    tertiary = LightSage,
-    onTertiary = Ink,
-    tertiaryContainer = DarkOlive,
-    onTertiaryContainer = PaleOlive,
-    background = CallBackground,
-    onBackground = Cream,
-    surface = CallBackground,
-    onSurface = Cream,
-    surfaceVariant = CallControlBackground,
-    onSurfaceVariant = PaleOlive,
-    surfaceContainer = FitnessDarkCard,
-    surfaceContainerHigh = CallControlBackground,
-    surfaceContainerHighest = DarkOlive,
-    outline = SageGreen,
-    outlineVariant = OliveDarkDivider,
-)
-
 // Opt in from private screens so covers and role portals retain their own appearance.
 @Composable
 internal fun OlivePrivateDesign(content: @Composable () -> Unit) {
     val inheritedColors = MaterialTheme.colorScheme
-    val colors = if (isSystemInDarkTheme()) privateDarkColors else inheritedColors.copy(
+    val colors = inheritedColors.copy(
         tertiary = inheritedColors.secondary,
         onTertiary = inheritedColors.onSecondary,
         tertiaryContainer = inheritedColors.secondaryContainer,

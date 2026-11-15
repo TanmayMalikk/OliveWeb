@@ -62,13 +62,13 @@ class SecurityPolicyTest {
     }
 
     @Test
-    fun idleTimeoutCapsAtSevenMinutesAndThirtySeconds() {
-        assertEquals(450, IdlePolicy.normalizeTimeout(Int.MAX_VALUE))
+    fun idleTimeoutCapsAtSevenMinutes() {
+        assertEquals(420, IdlePolicy.normalizeTimeout(Int.MAX_VALUE))
         assertEquals(420, IdlePolicy.normalizeTimeout(449))
-        assertNull(IdlePolicy.countdown(434_999, idleDurationMs = 450_000))
-        assertEquals(15, IdlePolicy.countdown(435_000, idleDurationMs = 450_000))
-        assertEquals(1, IdlePolicy.countdown(449_999, idleDurationMs = 450_000))
-        assertEquals(0, IdlePolicy.countdown(450_000, Long.MAX_VALUE, Long.MAX_VALUE))
+        assertNull(IdlePolicy.countdown(404_999, idleDurationMs = 420_000))
+        assertEquals(15, IdlePolicy.countdown(405_000, idleDurationMs = 420_000))
+        assertEquals(1, IdlePolicy.countdown(419_999, idleDurationMs = 420_000))
+        assertEquals(0, IdlePolicy.countdown(420_000, Long.MAX_VALUE, Long.MAX_VALUE))
     }
 
     // Inputs: the values shown below. Expected: trigger requires exact normalized match.

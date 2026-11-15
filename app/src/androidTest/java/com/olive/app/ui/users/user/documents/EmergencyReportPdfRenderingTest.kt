@@ -7,6 +7,8 @@ import com.olive.app.data.account.DeliveryAddress
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.account.UserProfile
+import com.olive.app.data.account.SafeContact
+import com.olive.app.data.safety.SafetyDocument
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,6 +30,7 @@ class EmergencyReportPdfRenderingTest {
             situation = "Sample situation text used to check report wrapping and spacing.",
             region = "Alberta",
             triggerHash = "hash",
+            contacts = listOf(SafeContact("sample-contact", "Sample Emergency Contact", "555-0100")),
             address = DeliveryAddress(
                 line1 = "1 Olive Way",
                 city = "Edmonton",
@@ -50,7 +53,16 @@ class EmergencyReportPdfRenderingTest {
             profile,
             listOf(incident),
             EmergencyReportLocation(53.5461, -113.4938, 8f, 1_793_568_600_000L),
-            emptyMap(),
+            mapOf("standalone-evidence" to EmergencyReportMedia(
+                SafetyDocument(
+                    id = "standalone-evidence", ownerUid = "demo_user", storagePath = "",
+                    name = "standalone-evidence.txt", mimeType = "text/plain",
+                    allowedUsers = listOf("demo_user"), evidence = true,
+                ),
+                File(context.cacheDir, "sample-evidence.txt").apply {
+                    writeText("Standalone evidence without an incident attachment.")
+                },
+            )),
         )
         assertTrue(generated.parentFile == File(context.cacheDir, "emergency-reports"))
         val preview = File(context.getExternalFilesDir(null), "emergency-report-sample.pdf")

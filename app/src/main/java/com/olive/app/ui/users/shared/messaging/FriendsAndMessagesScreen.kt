@@ -320,8 +320,9 @@ private fun MessagingSidebar(
                 ) { Text(stringResource(R.string.search)) }
             }
         }
-        if (session.messages.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+        if (session.messages.loadingIndex) item { com.olive.app.ui.shared.LoadingSkeleton(rows = 3) }
         item { Status(session) }
+        if (session.messages.loadingIndex) return@LazyColumn
         if (!organizationAccount && !ticketChats && !showingArchived) friendLists(
             session = session,
             pendingExpanded = pendingExpanded,

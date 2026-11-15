@@ -12,7 +12,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -232,9 +231,7 @@ internal fun OliveRoot(
                 focus.clearFocus(force = true)
                 session.navigation.back()
             }
-            val darkHome = isSystemInDarkTheme() && session.accountRole == AccountRole.USER &&
-                navigation.screen == SessionScreen.Safe && navigation.page == SafePage.Home
-            val screenBackground = if (darkHome) CallBackground else MaterialTheme.colorScheme.background
+            val screenBackground = MaterialTheme.colorScheme.background
             Surface(Modifier.fillMaxSize(), color = screenBackground) {
                 Box(Modifier.fillMaxSize().accessibilityTraversalGroup()) {
                     Scaffold(
@@ -325,7 +322,7 @@ internal fun OliveRoot(
                                             SessionScreen.Loading -> Box(
                                                 Modifier.fillMaxSize(),
                                                 contentAlignment = Alignment.Center
-                                            ) { CircularProgressIndicator() }
+                                            ) { com.olive.app.ui.shared.LoadingSkeleton(Modifier.fillMaxWidth().padding(24.dp), rows = 3) }
 
                                             SessionScreen.Welcome -> Welcome(session)
                                             SessionScreen.NewCredentials -> Credentials(

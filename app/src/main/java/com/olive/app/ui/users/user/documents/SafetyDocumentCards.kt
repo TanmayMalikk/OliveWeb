@@ -81,7 +81,7 @@ internal fun SafetyDocumentCard(
             }
             // Only the owner may change evidence status; shared viewers do not see this action.
             if (own) Row(
-                Modifier.fillMaxWidth().testTag("document_evidence_${file.id}")
+                Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("document_evidence_${file.id}")
                     .toggleable(
                         value = file.evidence,
                         enabled = !evidenceUpdating,
@@ -94,7 +94,9 @@ internal fun SafetyDocumentCard(
                     checked = file.evidence,
                     onCheckedChange = null,
                     enabled = !evidenceUpdating,
+                    modifier = Modifier.size(48.dp),
                 )
+                Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.evidence), style = MaterialTheme.typography.titleSmall)
                     Text(

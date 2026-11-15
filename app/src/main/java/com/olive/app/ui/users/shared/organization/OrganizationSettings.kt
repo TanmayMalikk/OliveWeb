@@ -4,8 +4,6 @@ package com.olive.app.ui.users.shared.organization
 import android.util.Patterns
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
@@ -31,6 +29,7 @@ import com.olive.app.ui.shared.LocalizedIcon as Icon
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.onboarding.*
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
+import com.olive.app.ui.users.user.account.SettingsSection
 
 
 // Shows profile and password settings for staff and admin accounts.
@@ -46,91 +45,94 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp).padding(bottom = 40.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.ui_back))
+    var passwordTab by rememberSaveable(session.coverAccountId) { mutableStateOf(false) }
+    OlivePrivateDesign {
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText(R.string.ui_back))
+                }
+                Text(
+                    stringResource(R.string.settings),
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { heading() },
+                )
             }
-            Text(
-                stringResource(R.string.account_settings),
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.semantics { heading() },
-            )
+            SecondaryScrollableTabRow(selectedTabIndex = if (passwordTab) 1 else 0, edgePadding = 8.dp) {
+                Tab(
+                    selected = !passwordTab, onClick = { passwordTab = false },
+                    text = { Text(uiText(R.string.ui_profile)) },
+                )
+                Tab(
+                    selected = passwordTab, onClick = { passwordTab = true },
+                    text = { Text(uiText(R.string.password)) },
+                )
+            }
+            FormColumn {
+                if (!passwordTab) SettingsSection(uiText(R.string.settings_category_profile)) {
+                    Field(
+                        uiText(R.string.full_name),
+                        fullName,
+                        "organization_settings_name",
+                        enabled = !session.account.busy,
+                    ) { fullName = it.take(120) }
+                    BirthdayPicker(
+                        birthday, "organization_settings_dob", !session.account.busy, showBirthdayErrors,
+                    ) { birthday = it }
+                    Field(
+                        uiText(R.string.ui_email),
+                        email,
+                        "organization_settings_email",
+                        enabled = !session.account.busy,
+                    ) { email = it.take(254) }
+                    Field(
+                        uiText(R.string.ui_phone_optional),
+                        phone,
+                        "organization_settings_phone",
+                        enabled = !session.account.busy,
+                    ) { phone = it.take(40) }
+                    Button(
+                        onClick = {
+                            showBirthdayErrors = !InputPolicy.validDob(birthday)
+                            if (!showBirthdayErrors) session.updateOrganizationProfile(fullName, birthday, email, phone)
+                        },
+                        enabled = !session.account.busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.save_profile)) }
+                } else SettingsSection(uiText(R.string.change_password)) {
+                    Field(
+                        uiText(R.string.current_password),
+                        currentPassword,
+                        "organization_current_password",
+                        secret = true,
+                        showSecretToggle = true,
+                        enabled = !session.account.busy,
+                    ) { currentPassword = it.take(128) }
+                    Field(
+                        uiText(R.string.new_password),
+                        newPassword,
+                        "organization_new_password",
+                        secret = true,
+                        showSecretToggle = true,
+                        enabled = !session.account.busy,
+                    ) { newPassword = it.take(24) }
+                    Field(
+                        uiText(R.string.confirm_new_password),
+                        confirmation,
+                        "organization_confirm_password",
+                        secret = true,
+                        showSecretToggle = true,
+                        enabled = !session.account.busy,
+                    ) { confirmation = it.take(24) }
+                    Button(
+                        onClick = { session.changePassword(currentPassword, newPassword, confirmation) },
+                        enabled = !session.account.busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.change_password)) }
+                }
+                Status(session)
+            }
         }
-        Text(
-            uiText(R.string.ui_profile_information),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.semantics { heading() },
-        )
-        Field(
-            uiText(R.string.full_name),
-            fullName,
-            "organization_settings_name",
-            enabled = !session.account.busy,
-        ) { fullName = it.take(120) }
-        BirthdayPicker(
-            birthday, "organization_settings_dob", !session.account.busy, showBirthdayErrors,
-        ) { birthday = it }
-        Field(
-            uiText(R.string.ui_email),
-            email,
-            "organization_settings_email",
-            enabled = !session.account.busy,
-        ) { email = it.take(254) }
-        Field(
-            uiText(R.string.ui_phone_optional),
-            phone,
-            "organization_settings_phone",
-            enabled = !session.account.busy,
-        ) { phone = it.take(40) }
-        Button(
-            onClick = {
-                showBirthdayErrors = !InputPolicy.validDob(birthday)
-                if (!showBirthdayErrors) session.updateOrganizationProfile(fullName, birthday, email, phone)
-            },
-            enabled = !session.account.busy,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.save_profile)) }
-        HorizontalDivider()
-        Text(
-            stringResource(R.string.change_password),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.semantics { heading() },
-        )
-        Field(
-            uiText(R.string.current_password),
-            currentPassword,
-            "organization_current_password",
-            secret = true,
-            showSecretToggle = true,
-            enabled = !session.account.busy,
-        ) { currentPassword = it.take(128) }
-        Field(
-            uiText(R.string.new_password),
-            newPassword,
-            "organization_new_password",
-            secret = true,
-            showSecretToggle = true,
-            enabled = !session.account.busy,
-        ) { newPassword = it.take(24) }
-        Field(
-            uiText(R.string.confirm_new_password),
-            confirmation,
-            "organization_confirm_password",
-            secret = true,
-            showSecretToggle = true,
-            enabled = !session.account.busy,
-        ) { confirmation = it.take(24) }
-        Button(
-            onClick = { session.changePassword(currentPassword, newPassword, confirmation) },
-            enabled = !session.account.busy,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(stringResource(R.string.change_password)) }
-        Status(session)
     }
 }
 
@@ -227,7 +229,7 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
 
 /** Opens the organization feed and draws each user as a red live or last-known marker. */
 @Composable
-internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
+internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, initialFollowUid: String? = null) {
     BackHandler(onBack = onBack)
     DisposableEffect(session.coverAccountId, session.accountRole) {
         session.adminLocationMap.open(session.accountRole)
@@ -240,6 +242,7 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
             ownPointUid = null,
             detailsOnlyForSelectedPoint = true,
             userSearchEnabled = true,
+            initialFollowUid = initialFollowUid,
             modifier = Modifier.fillMaxSize(),
         )
         Surface(
@@ -261,7 +264,9 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
                 )
             }
         }
-        if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+if (state.loading) Surface(Modifier.fillMaxSize()) {
+            LoadingSkeleton(Modifier.padding(16.dp), rows = 1, preview = true)
+        }
         val status = state.error ?: if (!state.loading && state.points.isEmpty())
             stringResource(R.string.organization_location_feed_empty) else null
         status?.let {

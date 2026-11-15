@@ -70,7 +70,6 @@ class LiveLocationService : Service() {
         // Stop location sharing immediately when the notification action asks for it.
         if (intent?.action == STOP) {
             intent.getStringExtra(OWNER_UID)?.let { ownerUid = it }
-            intent.getStringArrayExtra(CONTACT_UIDS)?.let { authorized = it.toSet() }
             stopSharing()
             return START_NOT_STICKY
         }
@@ -87,8 +86,7 @@ class LiveLocationService : Service() {
         displayName =
             intent?.getStringExtra(DISPLAY_NAME) ?: preferences.getString("live_owner_name", null)
                 .orEmpty()
-        authorized = intent?.getStringArrayExtra(CONTACT_UIDS)?.take(10)?.toSet()
-            ?: preferences.getStringSet("live_contacts", emptySet()).orEmpty().take(10).toSet()
+        authorized = preferences.getStringSet("live_contacts", emptySet()).orEmpty().toSet()
         expiresAt = intent?.getLongExtra(EXPIRES_AT, 0L)?.takeIf { it > 0L } ?: preferences.getLong(
             "live_expires_at",
             0L
@@ -259,7 +257,6 @@ class LiveLocationService : Service() {
     companion object {
         const val OWNER_UID = "owner_uid"
         const val DISPLAY_NAME = "display_name"
-        const val CONTACT_UIDS = "contact_uids"
         const val EXPIRES_AT = "expires_at"
         const val STOP = "stop"
         const val PING = "ping"

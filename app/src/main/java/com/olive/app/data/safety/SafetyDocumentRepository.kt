@@ -548,7 +548,8 @@ class SafetyDocumentRepository(
                 ?: row.getString("file_name").orEmpty().ifBlank { "Encrypted document" },
             mimeType = metadata?.optString("mimeType")?.takeIf(String::isNotBlank)
                 ?: row.getString("file_type").orEmpty().ifBlank { "application/octet-stream" },
-            allowedUsers = (row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty(),
+            allowedUsers = ((row.get("allowed_users") as? List<*>)?.filterIsInstance<String>().orEmpty() +
+                if (!row.getString("emergency_id").isNullOrBlank()) listOf(viewerUid) else emptyList()).distinct(),
             createdAt = row.getTimestamp("created_at")?.toDate()?.time ?: 0,
             ocrText = ocr?.text,
             ocrConfidence = ocr?.confidence,
@@ -583,6 +584,17 @@ class IndexedSafetyDocumentRepository(
     private val index: DocumentIndexDataSource,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : SafetyDocumentDataSource {
+    override suspend fun setEvidence(document: SafetyDocument, ownerUid: String, evidence: Boolean) {
+        remote.setEvidence(document, ownerUid, evidence)
+        // The acknowledged write must also survive an offline fallback before the listener catches up.
+        val cached = index.read(ownerUid)
+        if (cached.documents.any { it.id == document.id }) index.replace(
+            ownerUid,
+            cached.documents.map { if (it.id == document.id) it.copy(evidence = evidence) else it },
+            cached.lastSyncedAt ?: clock(),
+        )
+    }
+
     override suspend fun upgradeOwnedRecoveryKeys(uid: String) = remote.upgradeOwnedRecoveryKeys(uid)
 
     override suspend fun listFor(uid: String): DocumentListSnapshot = try {

@@ -65,6 +65,10 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         private set
     var syncing by mutableStateOf(false)
         private set
+    var loadingPlan by mutableStateOf(true)
+        private set
+    var loadingAccess by mutableStateOf(true)
+        private set
     var consultations by mutableStateOf<List<SafetyConsultation>>(emptyList())
         private set
     var sharedPlans by mutableStateOf<List<SharedSafetyPlan>>(emptyList())
@@ -130,10 +134,12 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         generation++
         activeOwner = null
         plan = null
+        loadingPlan = true
         error = null
         saving =
             0
         if (screenLease == null) {
+            loadingAccess = true
             consultations = emptyList()
             accessListener?.remove()
             accessListener = null
@@ -157,6 +163,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val token = generation
         activeOwner = ownerUid
         plan = null
+        loadingPlan = true
         error = null
         saving = 0
         // Use the fallback when open is unavailable.
@@ -192,6 +199,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                             }
                             if (current(actor, ownerUid, token)) {
                                 plan = mergeVisibleSafetyPlan(plan, updated, actor)
+                                loadingPlan = false
                                 if (updated.pending) SafetyPlanSyncWorker.enqueue(
                                     runtime.application,
                                     actor,
@@ -219,6 +227,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             throw cancelled
         } catch (_: Exception) { // Keep locally available plan data on screen and report that cloud storage could not be loaded.
             if (current(actor, ownerUid, token)) error = R.string.safety_storage_error
+        } finally {
+            if (current(actor, ownerUid, token)) loadingPlan = false
         }
     }
 
@@ -439,6 +449,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val token = generation
         runtime.scope.launch {
             // Turn an unexpected refresh shared plans failure into a readable message.
+            loadingAccess = true
             try {
                 if (actor != null) loadCachedAccessLists(actor)
                 val result = repository.sharedWithMe()
@@ -452,6 +463,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             } catch (_: Exception) { // Keep the current consultation state and show a storage error when the request fails.
                 if (actor != null && runtime.coverAccountId == actor && authorized()) error =
                     R.string.safety_sync_error
+            } finally {
+                if (runtime.coverAccountId == actor && authorized()) loadingAccess = false
             }
         }
     }
@@ -655,6 +668,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (!authorized() || runtime.state.accountRole !in setOf(AccountRole.STAFF, AccountRole.ADMIN) || runtime.localMode) return
         val actor = runtime.coverAccountId ?: return
         // Turn an unexpected refresh consultations failure into a readable message.
+        loadingAccess = true
         try {
             if (consultations.isEmpty()) loadCachedAccessLists(actor)
             if (!hasValidatedInternetConnection(runtime.application)) return
@@ -674,6 +688,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             throw cancelled
         } catch (_: Exception) { // Retain the last plan snapshot and tell the signed-in account that refresh failed.
             if (authorized() && actor == runtime.coverAccountId) error = R.string.safety_sync_error
+        } finally {
+            if (authorized() && actor == runtime.coverAccountId) loadingAccess = false
         }
     }
 
