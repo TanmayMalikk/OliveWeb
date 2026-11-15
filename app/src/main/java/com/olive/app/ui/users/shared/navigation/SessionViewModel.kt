@@ -71,6 +71,8 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     val privacyHistory get() = runtime.state.privacyHistory
     val triggerHistory get() = runtime.state.triggerHistory
     val privateEntries get() = runtime.state.privateEntries
+    val loadingHistory get() = coverAccountId?.let { it == runtime.history.loadingUid } == true
+    val historyLoadFailed get() = coverAccountId?.let { it == runtime.history.failedUid } == true
     val viewedSharedEntry get() = runtime.state.viewedSharedEntry
     internal val safetyPlans get() = runtime.safety
     internal val staffSupport get() = runtime.staffSupport
@@ -182,6 +184,8 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     val activeConversation get() = runtime.state.activeConversation
     val chatQuickExitHintVisible get() = runtime.state.chatQuickExitHintVisible
     val chatMessages get() = runtime.state.chatMessages
+    val loadingIndex get() = runtime.messaging.loadingIndex
+    val loadingConversation get() = runtime.conversationActions.loadingConversation
     val busy get() = runtime.state.messagingBusy
     val needsReconnect get() = runtime.state.messagingNeedsReconnect
     val pendingActionCount get() = runtime.pendingMessageActionCount

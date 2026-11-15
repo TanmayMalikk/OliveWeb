@@ -373,7 +373,7 @@ private enum class SettingsCategory(val label: Int, val tag: String) {
 }
 
 @Composable
-private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = OlivePrivateLayout.GroupShape,

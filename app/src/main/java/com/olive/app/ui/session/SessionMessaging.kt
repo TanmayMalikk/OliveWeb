@@ -1,6 +1,10 @@
 // Signed-in users: loads and sends chat messages.
 package com.olive.app.ui.session
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
 import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.R
 import androidx.core.content.edit
@@ -8,7 +12,9 @@ import com.olive.app.security.*
 import com.olive.app.notification.LocalNotificationEventHandler
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.olive.app.data.messaging.ChatConversation
+import com.olive.app.data.network.hasValidatedInternetConnection
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,6 +41,15 @@ import com.olive.app.ui.users.shared.navigation.SessionScreen
 internal class SessionMessaging(private val runtime: SessionRuntime) {
     private var preparedSupportUid: String? = null
     private var serverConversationIndexLoaded = false
+    var loadingIndex by mutableStateOf(false)
+        private set
+    private var waitingForSocial = false
+    private var waitingForConversations = false
+    private var indexLoadTimeout: kotlinx.coroutines.Job? = null
+
+    private fun updateIndexLoading() {
+        loadingIndex = waitingForSocial || waitingForConversations
+    }
     private var cacheIndexUpdate: kotlinx.coroutines.Job? = null
 
     // Session messaging: Reports whether messaging screen active.
@@ -82,11 +97,21 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                     return
                 }
                 messagingNeedsReconnect = false
+                val online = hasValidatedInternetConnection(application)
+                waitingForSocial = online
+                waitingForConversations = online
+                updateIndexLoading()
                 val identity = AccountIdentity(device.uid, coverUsername)
                 // Organization accounts stay in the portal, so keep their notification listener
                 // active while the message list listener drives unread badges on the dashboard.
                 LocalNotificationEventHandler.start(application)
                 val token = epoch
+                indexLoadTimeout = scope.launch {
+                    delay(10_000)
+                    if (epoch == token && loadingIndex) {
+                        waitingForConversations = false
+                    }
+                }
                 if (showFeedback) message = null
                 observeConversations(token)
                 socialSubscription = repository.observeSocial(device.uid, { social ->
@@ -94,10 +119,21 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                         friends = social.friends
                         incomingFriendRequests = social.incoming
                         outgoingFriendRequests = social.outgoing
+                        waitingForSocial = false
+                        updateIndexLoading()
                     }
                 }, { error ->
+                    if (epoch == token && enrollment?.uid == device.uid) {
+                        waitingForSocial = false
+                        updateIndexLoading()
+                    }
                     if (epoch == token && messagingScreenActive() && (showFeedback || page == SafePage.Messages)) {
                         message = application.getString(R.string.ui_unable_to_load_friend_information_value, error)
+                    }
+                }, {
+                    if (epoch == token && enrollment?.uid == device.uid) {
+                        waitingForSocial = false
+                        updateIndexLoading()
                     }
                 })
                 scope.launch {
@@ -194,7 +230,9 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                             }
                         }
                     }, { error ->
-                        if (epoch == token && page == SafePage.Messages) {
+                        if (epoch == token && enrollment?.uid == ownerUid) {
+                            waitingForConversations = false
+                            updateIndexLoading()
                             conversationLoadFailed = true
                             message = runtime.application.getString(
                                 R.string.ui_unable_to_load_messages_value,
@@ -204,6 +242,8 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
                     }, { serverRows ->
                         if (epoch != token || enrollment?.uid != ownerUid) return@observeConversations
                         serverConversationIndexLoaded = true
+                        waitingForConversations = false
+                        updateIndexLoading()
                         val visibleIds = serverRows.mapTo(mutableSetOf(), ChatConversation::id)
                         activeConversation?.takeIf { it.id !in visibleIds }?.let {
                             conversationActions.closeConversation()
@@ -264,7 +304,12 @@ internal class SessionMessaging(private val runtime: SessionRuntime) {
 
     // Removes friend and conversation listeners when messaging is no longer needed.
     fun stopMessaging(clearRows: Boolean = true) {
+        indexLoadTimeout?.cancel()
+        indexLoadTimeout = null
         serverConversationIndexLoaded = false
+        waitingForSocial = false
+        waitingForConversations = false
+        updateIndexLoading()
         runtime.conversationActions.stopKeyObservation()
         with(runtime) {
             with(state) {

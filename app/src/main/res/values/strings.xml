@@ -36,7 +36,7 @@
     <string name="safety_finances_costs">Plan how to pay for transport, a temporary place to stay, and essentials.</string>
     <string name="safety_finances_support">Note who you can ask about financial support or joint accounts.</string>
     <string name="admin_emergency_response">Emergency response</string>
-    <string name="admin_emergency_response_help">Review escalated tickets for updates and information the user has shared. This dashboard does not dispatch emergency services.</string>
+    <string name="admin_emergency_response_help">Emergency alerts, shared reports and live locations.</string>
     <string name="safety_documents_dependants">Gather identification and any applicable school or care records for people leaving with you.</string>
     <string name="feedback_person_name">Person %d name</string>
     <string name="feedback_person_age">Person %d age (optional)</string>

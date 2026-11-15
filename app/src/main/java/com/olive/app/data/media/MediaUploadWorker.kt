@@ -364,6 +364,12 @@ class MediaRepository(
         val source=job.source
         val wrapped = source.wrappedKeys.getValue(job.ownerUid)
         val key = KeyManager.unwrapKey(wrapped, source.encryptionVersion)
+        val metadata = org.json.JSONObject(com.olive.app.security.EncryptionUtils.decryptText(source.encryptedMetadata, key))
+        val emergencyId = Regex("^emergency-report-([0-9a-f-]{36})\\.pdf$")
+            .matchEntire(metadata.optString("name"))?.groupValues?.get(1)
+        if (emergencyId != null) call(
+            "emergencyAttachUpload", mapOf("id" to emergencyId, "jobId" to job.id)
+        )
         val result=call("mediaCreateUpload",mapOf(
             "jobId" to job.id,"ciphertextSize" to source.ciphertextSize,
             "ciphertextSha256" to source.ciphertextSha256,"encryptedMetadata" to source.encryptedMetadata,

@@ -270,10 +270,9 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                 if (ready) Spacer(
                     Modifier.size(1.dp).align(Alignment.Center).testTag("camera_ready")
                 )
-                else if (cameraError == null) CircularProgressIndicator(
-                    Modifier.align(Alignment.Center),
-                    color = Color.White
-                )
+                else if (cameraError == null) Surface(Modifier.fillMaxSize()) {
+                    com.olive.app.ui.shared.LoadingSkeleton(Modifier.padding(16.dp), rows = 1, preview = true)
+                }
                 CameraShutter(
                     mode,
                     recording,

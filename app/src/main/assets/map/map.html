@@ -26,7 +26,11 @@
       50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(197,43,37,.12)}}
     @keyframes oliveBluePulse{0%,100%{transform:scale(.95);box-shadow:0 0 0 2px rgba(14,66,111,.45)}
       50%{transform:scale(1.12);opacity:1;box-shadow:0 0 0 9px rgba(23,105,170,.14)}}
-    @media (prefers-reduced-motion:reduce){.olive-live-dot,.olive-own-live-dot{animation:none}}
+    .olive-service-marker{display:grid;place-items:center;background:transparent;border:0}
+    .olive-service-dot{width:14px;height:14px;border:2px solid #fff;border-radius:50%;background:#258142;
+      box-shadow:0 0 0 2px #175c2c;animation:oliveServiceBreath 3.6s ease-in-out infinite}
+    @keyframes oliveServiceBreath{0%,100%{opacity:.65;transform:scale(.9)}50%{opacity:1;transform:scale(1)}}
+    @media (prefers-reduced-motion:reduce){.olive-live-dot,.olive-own-live-dot,.olive-service-dot{animation:none}}
   </style>
 </head>
 <body>

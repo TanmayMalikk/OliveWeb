@@ -161,10 +161,10 @@ internal fun AttachmentPicker(
                         }
 
                         AttachmentCategory.Media -> {
-                            val media = documentState.files.filter {
+                            val media = (if (documentState.loading) emptyList() else documentState.files).filter {
                                 isDurableChatAttachment(it, uid)
                             }
-                            if (documentState.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+if (documentState.loading) item { com.olive.app.ui.shared.LoadingSkeleton() }
                             if (documentState.error != null) item {
                                 Text(stringResource(R.string.documents_load_failed), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
                             }

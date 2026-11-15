@@ -324,7 +324,11 @@ internal fun ChatPane(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (timeline.isEmpty()) item {
+                    if (session.messages.loadingConversation) {
+                        item { com.olive.app.ui.shared.LoadingSkeleton(rows = 3) }
+                        return@LazyColumn
+                    }
+                    if (timeline.isEmpty() && session.message == null) item {
                         Text(
                             stringResource(if (messageSearch.isBlank()) R.string.no_messages_yet_say_hello_when_you_are_ready
                                 else R.string.chat_no_matching_messages),

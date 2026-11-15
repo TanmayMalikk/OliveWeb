@@ -98,7 +98,11 @@ internal fun AdminAccounts(
                     }
             }
         }
-        if (session.adminAccounts.isEmpty() && !session.busy) item("no_accounts") {
+        if (session.busy) {
+            item("loading_accounts") { com.olive.app.ui.shared.LoadingSkeleton(rows = 3) }
+            return@LazyColumn
+        }
+        if (session.adminAccounts.isEmpty() && session.message == null) item("no_accounts") {
             Text(uiText(R.string.ui_no_accounts_found), color = Muted)
         }
         AccountRole.entries.forEach { role ->

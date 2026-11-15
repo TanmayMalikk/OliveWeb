@@ -90,9 +90,12 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
             with(state) {
                 val repository = adminRepository ?: return
                 if (accountRole != AccountRole.ADMIN || busy) return
+                val ownerUid = enrollment?.uid ?: return
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
                     val counts = repository.summary()
-                    if (epoch == token && screen == SessionScreen.Portal) adminCounts = counts
+                    if (epoch == token && screen == SessionScreen.Portal && enrollment?.uid == ownerUid) {
+                        setAdminSummary(ownerUid, counts)
+                    }
                 }
             }
         }

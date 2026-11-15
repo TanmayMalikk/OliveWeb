@@ -56,7 +56,7 @@ internal fun NewsCover(
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<NewsArticle?>(null) }
     var articles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    var completedRequest by remember { mutableStateOf<List<Any>?>(null) }
     var newsError by remember { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
     val tabHistory = remember { mutableListOf<String>() }
@@ -97,22 +97,18 @@ internal fun NewsCover(
             }
         }
     }
-    LaunchedEffect(
+    val request = listOf(
         session.language,
         scope,
         refresh,
         session.coverReset,
         fallbackPlace,
         locationPermissionVersion,
-        customPlace
-    ) {
-        val cached = withContext(Dispatchers.IO) { feedCache.load(session.language, scope) }
-        if (cached != null) {
-            articles = cached.articles
-            if (scope == NewsScope.LOCAL && customPlace.isBlank() && cached.place.isNotBlank()) currentPlace =
-                cached.place
-        }
-        loading = articles.isEmpty()
+        customPlace,
+        locationPreferenceKey,
+    )
+    val loading = request != completedRequest
+    LaunchedEffect(request) {
         newsError = false
         if (scope == NewsScope.LOCAL) currentPlace =
             customPlace.ifBlank { CoverLocation.city(context, fallbackPlace) }
@@ -132,10 +128,12 @@ internal fun NewsCover(
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) { // Keep cached articles visible; show the error state only when no news is available.
-            newsError = articles.isEmpty()
+        } catch (_: Exception) {
+            val cached = withContext(Dispatchers.IO) { feedCache.load(session.language, scope) }
+            articles = cached?.takeIf { scope != NewsScope.LOCAL || it.place == currentPlace }?.articles.orEmpty()
+            newsError = true
         }
-        loading = false
+        completedRequest = request
     }
     LaunchedEffect(query) {
         if (session.account.interceptSearchAsync(query)) query = ""

@@ -112,7 +112,7 @@ private fun StaffHelpScreen(session: SessionViewModel) {
             stringResource(R.string.support_staff_search_help)
         )
         if (controller.staffUid.isBlank()) {
-            CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
+LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 3)
         }
         Text(
             if (controller.staffUid.isBlank()) stringResource(R.string.support_looking_for_staff)
@@ -148,6 +148,7 @@ internal fun SafeSupportControls(
     var emergencyExportBusy by remember { mutableStateOf(false) }
     val emergencySavedMessage = stringResource(R.string.emergency_report_saved)
     val emergencyFailureMessage = stringResource(R.string.emergency_report_failed)
+    val emergencyVerificationFailureMessage = stringResource(R.string.emergency_report_device_verification_failed)
 
     // The emergency action adds the completed report to the user's encrypted Documents list.
     fun createEmergencyReport() {
@@ -156,15 +157,20 @@ internal fun SafeSupportControls(
         val ownerUid = session.coverAccountId ?: return
         emergencyExportBusy = true
         scope.launch {
-            val fix = DeviceLocation.currentCoordinates(context)
-            val location = fix?.let {
-                EmergencyReportLocation(it.latitude, it.longitude, it.accuracy, it.timestamp)
+            if (!session.localMode) {
+                runCatching {
+                    com.olive.app.location.AdminLocationService.start(context, ownerUid, profile.fullName)
+                }
             }
             session.documents.createEmergencyReport(
                 identity = AccountIdentity(ownerUid, session.coverUsername),
                 profile = profile,
                 entries = session.privateEntries,
-                location = location,
+                location = {
+                    DeviceLocation.currentCoordinates(context)?.let {
+                        EmergencyReportLocation(it.latitude, it.longitude, it.accuracy, it.timestamp)
+                    }
+                },
             ) { result ->
                 emergencyExportBusy = false
                 result.onSuccess {
@@ -173,10 +179,11 @@ internal fun SafeSupportControls(
                         emergencySavedMessage,
                         Toast.LENGTH_LONG,
                     ).show()
-                }.onFailure {
+                }.onFailure { error ->
                     Toast.makeText(
                         context,
-                        emergencyFailureMessage,
+                        if (error is com.olive.app.data.media.MediaDeviceVerificationException)
+                            emergencyVerificationFailureMessage else emergencyFailureMessage,
                         Toast.LENGTH_LONG,
                     ).show()
                 }
@@ -413,19 +420,13 @@ private fun SafeHomeScreen(session: SessionViewModel, profile: UserProfile) {
                     Column(
                         Modifier.fillMaxSize().testTag("safe_home_content").oliveScrollbar(scroll).verticalScroll(scroll)
                             .padding(horizontal = OlivePrivateLayout.ScreenPadding)
-                            .padding(top = 24.dp, bottom = OlivePrivateLayout.FloatingActionClearance),
+                            .padding(top = 4.dp, bottom = OlivePrivateLayout.FloatingActionClearance),
                         verticalArrangement = Arrangement.spacedBy(OlivePrivateLayout.SectionSpacing)
                     ) {
                         Column(
                             Modifier.fillMaxWidth().onSizeChanged { headingHeight = it.height },
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                stringResource(R.string.olive_branch),
-                                fontFamily = FontFamily.Serif,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
                             Text(
                                 title,
                                 style = MaterialTheme.typography.displaySmall,
@@ -497,6 +498,11 @@ private fun SafeHomeBar(session: SessionViewModel, title: String, compact: Boole
                     title,
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.clearAndSetSemantics {}
+                ) else Text(
+                    stringResource(R.string.olive_branch),
+                    fontFamily = FontFamily.Serif,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
             FilledTonalIconButton(
@@ -559,17 +565,12 @@ private fun SafeFeatureCard(
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    val darkMode = isSystemInDarkTheme()
     Surface(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.testTag(feature.tag).semantics { role = Role.Button },
         shape = MaterialTheme.shapes.extraLarge,
-        color = when {
-            !enabled -> colors.surfaceContainer
-            darkMode -> DarkSageSurface
-            else -> PaleOlive
-        },
+        color = if (enabled) PaleOlive else colors.surfaceContainer,
         contentColor = if (enabled) colors.onSurface else colors.onSurfaceVariant,
         border = BorderStroke(1.dp, colors.outlineVariant)
     ) {

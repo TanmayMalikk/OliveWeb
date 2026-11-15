@@ -37,7 +37,6 @@ import com.olive.app.notification.LocalNotificationEventHandler
 import com.olive.app.ui.covers.CoverLauncher
 import com.olive.app.ui.users.shared.navigation.OliveRoot
 import com.olive.app.ui.shared.OliveTheme
-import androidx.compose.foundation.isSystemInDarkTheme
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.SessionScreen
 import com.olive.app.ui.users.shared.navigation.SafePage
@@ -140,7 +139,6 @@ class OliveActivity : FragmentActivity() {
 
             val selectedCover = session.coverType
             val selectedRole = session.accountRole
-            val darkTheme = isSystemInDarkTheme()
             val notificationAccountId = session.coverAccountId
             val locationAccountName = session.coverFullName.ifBlank { session.coverUsername }
             LaunchedEffect(
@@ -148,8 +146,7 @@ class OliveActivity : FragmentActivity() {
                 selectedRole,
                 session.screen,
                 session.page,
-                darkTheme
-            ) { applySystemBarContrast(darkTheme) }
+            ) { applySystemBarContrast() }
             // Keep the current activity available to privacy and permission callbacks.
             LaunchedEffect(notificationAccountId, selectedCover, selectedRole) {
                 // Update the open task now; the Home-screen alias changes after the user leaves the app.
@@ -390,12 +387,10 @@ class OliveActivity : FragmentActivity() {
     }
 
     // Applies system bar contrast.
-    private fun applySystemBarContrast(darkTheme: Boolean = false) {
+    private fun applySystemBarContrast() {
         val transparent = Color.TRANSPARENT
         val camera = session.screen == SessionScreen.Safe && session.page == SafePage.Camera
-        val darkHome = darkTheme && session.accountRole == AccountRole.USER &&
-            session.screen == SessionScreen.Safe && session.page == SafePage.Home
-        val barStyle = if (camera || darkHome) SystemBarStyle.dark(transparent)
+        val barStyle = if (camera) SystemBarStyle.dark(transparent)
             else SystemBarStyle.light(transparent, transparent)
         enableEdgeToEdge(
             statusBarStyle = barStyle,

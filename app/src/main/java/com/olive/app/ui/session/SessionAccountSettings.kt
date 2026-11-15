@@ -2,6 +2,9 @@
 package com.olive.app.ui.session
 
 import com.olive.app.ui.users.shared.navigation.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import com.olive.app.R
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
@@ -416,6 +419,11 @@ internal class SessionSettings(private val runtime: SessionRuntime) {
 
 // Owns activity records and history synchronization.
 internal class SessionHistory(private val runtime: SessionRuntime) {
+    private var loadVersion = 0
+    var loadingUid by mutableStateOf<String?>(null)
+        private set
+    var failedUid by mutableStateOf<String?>(null)
+        private set
     // Adds a non-sensitive settings action to private account history.
     fun recordSettingsInteraction(area: String, action: String) {
         with(runtime) {
@@ -439,21 +447,31 @@ internal class SessionHistory(private val runtime: SessionRuntime) {
     fun refreshHistory(uid: String) {
         with(runtime) {
             with(state) {
+                val version = ++loadVersion
+                loadingUid = uid
+                failedUid = null
                 scope.launch {
-                    val (histories, cleanupNeeded) = withContext(Dispatchers.IO) {
-                        val purged = store.purgeExpiredPrivateEntries(uid)
-                        Pair(store.settingsHistory(uid), store.triggerHistory(uid)) to purged
+                    try {
+                        val (histories, cleanupNeeded) = withContext(Dispatchers.IO) {
+                            val purged = store.purgeExpiredPrivateEntries(uid)
+                            Triple(store.settingsHistory(uid), store.triggerHistory(uid), store.privateEntries(uid)) to purged
+                        }
+                        if (enrollment?.uid == uid && version == loadVersion) {
+                            settingsHistory = histories.first.filter {
+                                it.area != "Privacy" && (it.area != "Olive Branch" || it.changes.isNotEmpty())
+                            }
+                            privacyHistory = histories.first.filter { it.area == "Privacy" }
+                            triggerHistory = histories.second
+                            privateEntries = histories.third
+                        }
+                        if (cleanupNeeded) queueHistorySync()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        if (enrollment?.uid == uid && version == loadVersion) failedUid = uid
+                    } finally {
+                        if (version == loadVersion) loadingUid = null
                     }
-                    val entries = withContext(Dispatchers.IO) { store.privateEntries(uid) }
-                    // Ignore results from an account that signed out while history was loading.
-                    if (enrollment?.uid == uid) {
-                        settingsHistory =
-                            histories.first.filter { it.area != "Privacy" && (it.area != "Olive Branch" || it.changes.isNotEmpty()) }
-                        privacyHistory = histories.first.filter { it.area == "Privacy" }
-                        triggerHistory = histories.second
-                        privateEntries = entries
-                    }
-                    if (cleanupNeeded) queueHistorySync()
                 }
             }
         }

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.olive.app.R
+import com.olive.app.data.account.parseIncidentDate
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -37,7 +38,8 @@ internal fun IncidentDateTimeFields(
     onTimeChange: (String) -> Unit
 ) {
     var openPicker by remember { mutableStateOf<IncidentPicker?>(null) }
-    val initialDate = remember(date) { runCatching { LocalDate.parse(date) }.getOrNull() }
+    val today = LocalDate.now()
+    val initialDate = remember(date, today) { parseIncidentDate(date, today) }
     val initialTime = remember(time) { runCatching { LocalTime.parse(time) }.getOrNull() }
     val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
     val timePattern = DateFormat.getBestDateTimePattern(java.util.Locale.getDefault(), if (use24Hour) "Hm" else "hm")
@@ -52,6 +54,9 @@ internal fun IncidentDateTimeFields(
             enabled,
             { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) }
         ) { openPicker = IncidentPicker.Date }
+        if (date.isNotBlank() && initialDate == null) {
+            Text(stringResource(R.string.incident_date_invalid), color = MaterialTheme.colorScheme.error)
+        }
         IncidentPickerButton(
             timeLabel,
             initialTime?.format(DateTimeFormatter.ofPattern(timePattern)) ?: time,
@@ -70,10 +75,15 @@ internal fun IncidentDateTimeFields(
 
     when (openPicker) {
         IncidentPicker.Date -> {
-            val calendarDate = initialDate?.takeIf { it.year in 1..9999 } ?: LocalDate.now()
+            val calendarDate = initialDate ?: today
             val picker = rememberDatePickerState(
                 initialSelectedDateMillis = calendarDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
-                yearRange = minOf(1900, calendarDate.year)..maxOf(2100, calendarDate.year)
+                yearRange = minOf(1900, calendarDate.year)..today.year,
+                selectableDates = object : SelectableDates {
+                    override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                        !Instant.ofEpochMilli(utcTimeMillis).atOffset(ZoneOffset.UTC).toLocalDate().isAfter(today)
+                    override fun isSelectableYear(year: Int): Boolean = year <= today.year
+                },
             )
             DatePickerDialog(
                 onDismissRequest = { openPicker = null },

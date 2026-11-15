@@ -148,9 +148,8 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 }
             }
         }
-        if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { AccessibleMessage(it) }
-        val shown = state.files.filter { file ->
+        val shown = (if (state.loading) emptyList() else state.files).filter { file ->
             // Opens the protected file picker only after private entry is confirmed.
             when (filter) {
                 DocumentFilter.All -> true
@@ -161,7 +160,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
                 )
             }
         }
-        if (!state.loading && !preparing && uploads.isEmpty() && shown.isEmpty()) Surface(
+        if (!state.loading && state.error == null && !preparing && uploads.isEmpty() && shown.isEmpty()) Surface(
             Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
             color = LightSage
@@ -186,6 +185,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (state.loading) item(key = "loading_documents") { LoadingSkeleton() }
             if (preparing) item(key = "preparing_upload") { PreparingUploadCard() }
             items(uploads, key = { "upload_${it.jobId}" }) { upload ->
                 PendingUploadCard(upload) { mediaController?.retryUpload(upload.jobId) }

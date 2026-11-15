@@ -127,7 +127,7 @@ internal fun SafetyPlanScreen(
         }
     }
     var backup by rememberSaveable(ownerUid) { mutableStateOf(false) }
-    val plan = controller.plan
+    val plan = controller.plan?.takeIf { !controller.loadingPlan && it.ownerUid == ownerUid }
     val safeContact = session.accountRole == AccountRole.SAFE_CONTACT
     val attachedDocumentIds = remember(plan?.fields) {
         plan?.fields.orEmpty().values.filter { it.mutationId == null }.flatMapTo(linkedSetOf()) { field ->
@@ -292,6 +292,7 @@ internal fun SafetyPlanScreen(
                     }
                 }
             }
+            if (controller.loadingPlan) com.olive.app.ui.shared.LoadingSkeleton(rows = 1)
             if (plan != null) {
                 SafetyChecklistProgress(
                     prepared = selectedCompletion.prepared,
@@ -315,14 +316,9 @@ internal fun SafetyPlanScreen(
                 ) {
                     item {
                         Column(
-                            Modifier.padding(16.dp),
+                            Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                stringResource(R.string.safety_checklist_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Muted
-                            )
                             val status = when {
                                 controller.saving > 0 -> R.string.safety_saving
                                 controller.syncing -> R.string.safety_syncing
@@ -514,7 +510,10 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
             stringResource(R.string.safe_contact_shared_plans_intro)
         )
         if (session.localMode) Text(stringResource(R.string.safety_account_required), color = Muted)
-        if (controller.sharedPlans.isEmpty()) Surface(
+        if (controller.loadingAccess && !session.localMode) com.olive.app.ui.shared.LoadingSkeleton()
+        controller.error?.let { AccessibleMessage(stringResource(it)) }
+        val visiblePlans = if (controller.loadingAccess) emptyList() else controller.sharedPlans
+        if (visiblePlans.isEmpty() && (!controller.loadingAccess || session.localMode) && controller.error == null) Surface(
             Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
             color = LightSage
@@ -531,7 +530,7 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
                 )
             }
         }
-        controller.sharedPlans.forEach { shared ->
+        visiblePlans.forEach { shared ->
             OutlinedCard(
                 onClick = { selected = shared },
                 modifier = Modifier.fillMaxWidth().testTag("shared_plan_${shared.ownerUid}")

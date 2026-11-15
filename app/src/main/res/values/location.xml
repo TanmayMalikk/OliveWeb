@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="location_expand_map">Expand map to full screen</string>
     <string name="powered_by_geoapify">Powered by Geoapify</string>
     <string name="location_map">Map view</string>
     <string name="organization_map_live">Live</string>
@@ -15,7 +16,9 @@
     <string name="you">You</string>
     <string name="your_saved_location">Your saved location</string>
     <string name="share_live_location_with">Share live location with</string>
-    <string name="location_contacts_selected">%1$d of 10 contacts selected</string>
+    <string name="location_contacts_selected">Selected friends: %1$d</string>
+    <string name="location_search_friends">Search friends</string>
+    <string name="location_no_matching_friends">No friends match your search.</string>
     <string name="location_no_friends">Add and accept a friend before sharing location.</string>
     <string name="start_sharing_location">Start sharing live location</string>
     <string name="stop_sharing_location">Stop sharing</string>

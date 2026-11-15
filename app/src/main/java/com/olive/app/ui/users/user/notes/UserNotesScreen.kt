@@ -49,8 +49,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
-private fun validIncidentDate(value: String, saved: String?) =
-    value.isNotBlank() && (value == saved || runCatching { LocalDate.parse(value.trim()) }.isSuccess)
+private fun validIncidentDate(value: String) = com.olive.app.data.account.parseIncidentDate(value) != null
 
 private fun validIncidentTime(value: String, saved: String?) =
     value.isBlank() || value == saved || (value.trim().matches(Regex("[0-9]{2}:[0-9]{2}")) &&
@@ -73,8 +72,6 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var incidentLatitude by remember { mutableStateOf<Double?>(null) }
     var incidentLongitude by remember { mutableStateOf<Double?>(null) }
     var incidentMapOpen by remember { mutableStateOf(false) }
-    var latitudeInput by remember { mutableStateOf("") }
-    var longitudeInput by remember { mutableStateOf("") }
     var selectedAttachments by remember { mutableStateOf(emptySet<String>()) }
     var attachmentMenuOpen by rememberSaveable { mutableStateOf(false) }
     var locationSuggestions by remember { mutableStateOf(emptyList<AddressSuggestion>()) }
@@ -115,8 +112,6 @@ internal fun PrivateNotes(session: SessionViewModel) {
         incidentLocation = entry?.incidentLocation.orEmpty()
         incidentLatitude = entry?.incidentLatitude
         incidentLongitude = entry?.incidentLongitude
-        latitudeInput = incidentLatitude?.toString().orEmpty()
-        longitudeInput = incidentLongitude?.toString().orEmpty()
         incidentMapOpen = false
         currentLocationPoint = null
         locationLookupFailed = false
@@ -186,10 +181,14 @@ internal fun PrivateNotes(session: SessionViewModel) {
         }
     }
     // Announce the map panel only after the user opens it from the location field.
-    LaunchedEffect(incidentMapOpen) {
+    LaunchedEffect(incidentMapOpen, editorVersion) {
         if (incidentMapOpen) {
             withFrameNanos { }
             mapTitleFocus.requestFocus()
+            do {
+                showCurrentLocation()
+                delay(15_000L)
+            } while (editorOpen && incidentMapOpen && !locationLookupFailed)
         }
     }
     BackHandler(editorOpen || logEntryId != null || trashOpen) {
@@ -298,11 +297,19 @@ internal fun PrivateNotes(session: SessionViewModel) {
                             onValueChange = {
                                 incidentLatitude = null
                                 incidentLongitude = null
-                                latitudeInput = ""
-                                longitudeInput = ""
                                 incidentLocation = it.take(240)
+                                val coordinates = it.split(',').map(String::trim)
+                                if (coordinates.size == 2) {
+                                    val lat = coordinates[0].toDoubleOrNull()?.takeIf { value -> value.isFinite() && value in -90.0..90.0 }
+                                    val lon = coordinates[1].toDoubleOrNull()?.takeIf { value -> value.isFinite() && value in -180.0..180.0 }
+                                    if (lat != null && lon != null) {
+                                        incidentLatitude = lat
+                                        incidentLongitude = lon
+                                    }
+                                }
                             },
                             label = { Text(stringResource(R.string.incident_location)) },
+                            supportingText = { Text(stringResource(R.string.incident_location_formats)) },
                             enabled = !session.busy,
                             singleLine = true,
                             trailingIcon = {
@@ -328,8 +335,6 @@ internal fun PrivateNotes(session: SessionViewModel) {
                                         .filter(String::isNotBlank).joinToString(", ")
                                     incidentLatitude = suggestion.address.latitude
                                     incidentLongitude = suggestion.address.longitude
-                                    latitudeInput = incidentLatitude?.toString().orEmpty()
-                                    longitudeInput = incidentLongitude?.toString().orEmpty()
                                     locationSuggestions = emptyList()
                                 },
                                 modifier = Modifier.fillMaxWidth(),
@@ -356,41 +361,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                                 paneTitle = uiText(R.string.incident_pin_title)
                             },
                         )
-                        Text(stringResource(R.string.incident_pin_help), color = Muted)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedTextField(
-                                latitudeInput, { latitudeInput = it.take(16) },
-                                label = { Text(uiText(R.string.incident_latitude)) },
-                                singleLine = true, modifier = Modifier.weight(1f),
-                            )
-                            OutlinedTextField(
-                                longitudeInput, { longitudeInput = it.take(16) },
-                                label = { Text(uiText(R.string.incident_longitude)) },
-                                singleLine = true, modifier = Modifier.weight(1f),
-                            )
-                        }
-                        val latitude = latitudeInput.toDoubleOrNull()?.takeIf { it in -90.0..90.0 }
-                        val longitude = longitudeInput.toDoubleOrNull()?.takeIf { it in -180.0..180.0 }
-                        OutlinedButton(
-                            onClick = {
-                                if (latitude != null && longitude != null) {
-                                    incidentLatitude = latitude
-                                    incidentLongitude = longitude
-                                    incidentLocation = uiText(R.string.incident_dropped_pin, latitude, longitude)
-                                }
-                            },
-                            enabled = latitude != null && longitude != null,
-                        ) { Text(uiText(R.string.incident_use_coordinates)) }
                         if (locationLookupFailed) AccessibleMessage(stringResource(R.string.incident_location_lookup_failed))
-                        OutlinedButton(onClick = ::showCurrentLocation, enabled = !findingLocation) {
-                            Text(stringResource(
-                                when {
-                                    findingLocation -> R.string.incident_location_lookup_in_progress
-                                    locationLookupFailed -> R.string.retry
-                                    else -> R.string.incident_show_location
-                                }
-                            ))
-                        }
                         InteractiveLocationMap(
                             points = currentLocationPoint?.let(::listOf)
                                 ?: session.locationMap.state.displayedOwn(session.accountRole)?.let(::listOf).orEmpty(),
@@ -398,9 +369,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
                             onSelectedLocationChange = { latitude, longitude ->
                                 incidentLatitude = latitude
                                 incidentLongitude = longitude
-                                latitudeInput = latitude.toString()
-                                longitudeInput = longitude.toString()
-                                if (incidentLocation.isBlank()) incidentLocation = uiText(R.string.incident_dropped_pin, latitude, longitude)
+                                incidentLocation = uiText(R.string.incident_dropped_pin, latitude, longitude)
+                                locationSuggestions = emptyList()
                             },
                             modifier = Modifier.fillMaxWidth().height(300.dp).testTag("incident_location_map"),
                         )
@@ -488,7 +458,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     },
                     enabled = !session.busy && body.isNotBlank() &&
                         (kind == PrivateEntryKind.Note || (title.isNotBlank() && incidentLocation.isNotBlank() &&
-                            validIncidentDate(incidentDate, entry?.incidentDate) &&
+                            validIncidentDate(incidentDate) &&
                             validIncidentTime(incidentTime, entry?.incidentTime))),
                     modifier = Modifier.fillMaxWidth().testTag("save_private_entry")
                 ) {
@@ -565,9 +535,10 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     modifier = (Modifier.weight(1f)).semantics { heading() })
                 IconButton(
                     onClick = { trashOpen = true },
+                    enabled = !session.loadingHistory && !session.historyLoadFailed,
                     modifier = Modifier.testTag("open_scratchpad")
                 ) {
-                    BadgedBox(badge = { if (trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) } }) {
+                    BadgedBox(badge = { if (!session.loadingHistory && !session.historyLoadFailed && trashed.isNotEmpty()) Badge { Text(trashed.size.toString()) } }) {
                         Icon(Icons.Outlined.DeleteOutline, uiText(R.string.ui_trash))
                     }
                 }
@@ -577,6 +548,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     modifier = Modifier.testTag("new_private_entry")
                 ) { Icon(Icons.Outlined.Add, uiText(R.string.ui_new_note)) }
             }
+        }
+        if (session.loadingHistory || session.historyLoadFailed) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                if (session.loadingHistory) LoadingSkeleton(rows = 3)
+                else AccessibleMessage(stringResource(R.string.account_history_load_failed))
+            }
+            return@LazyVerticalGrid
         }
         item(span = { GridItemSpan(maxLineSpan) }) {
             OutlinedTextField(
