@@ -81,6 +81,17 @@
 .button.exit:hover {
   background: #eddfcc;
 }
+.button.floating-quick-exit {
+  position: fixed;
+  inset-inline-end: max(0.85rem, env(safe-area-inset-right));
+  bottom: max(0.85rem, env(safe-area-inset-bottom));
+  z-index: 10;
+  min-height: 3rem;
+  box-shadow: 0 4px 12px #0002;
+}
+.safe-shell:has(> .floating-quick-exit) .safe-footer {
+  padding-inline-end: 9rem;
+}
 .text-link {
   display: inline-flex;
   align-items: center;
@@ -179,6 +190,31 @@
 .field small {
   color: var(--muted);
   font-size: 0.74rem;
+}
+.birthday-field {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0 0 1.1rem;
+  padding: 0;
+  border: 0;
+}
+.birthday-field legend {
+  margin-bottom: 0.65rem;
+  font-weight: 600;
+}
+.birthday-field > .button {
+  margin-inline-end: 0.5rem;
+  margin-bottom: 0.35rem;
+  min-height: 3rem;
+}
+.birthday-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  gap: 0.5rem;
+  margin-block: 1rem;
+}
+.birthday-options .button {
+  min-height: 3rem;
 }
 .input-wrap {
   position: relative;

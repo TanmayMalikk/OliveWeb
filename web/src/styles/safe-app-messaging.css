@@ -34,6 +34,29 @@
 .conversation-sidebar .button {
   font-size: 0.73rem;
 }
+.message-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.25rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.message-tabs [role="tab"] {
+  min-height: 3rem;
+  padding-inline: 0.35rem;
+  border-radius: 0.5rem;
+  color: var(--ink);
+}
+.message-tabs [aria-selected="true"] {
+  background: var(--soft);
+  color: var(--olive);
+  font-weight: 700;
+}
+.message-tabs [role="tab"]:focus-visible {
+  outline: 2px solid var(--olive);
+  outline-offset: 2px;
+}
 .request-row {
   border-bottom: 1px solid var(--line);
   padding-block: 1rem;

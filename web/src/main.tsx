@@ -30,7 +30,7 @@ function PinGate() {
       <div className="access-header">
         <span className="access-wordmark"><Leaf size={21} aria-hidden="true" /> Olive Branch</span>
         {s.enrollment?.role === "USER" && (
-          <Button variant="exit" onClick={s.quickExit}>
+          <Button variant="exit floating-quick-exit" onClick={s.quickExit}>
             <LogOut size={17} aria-hidden="true" /> Quick Exit
           </Button>
         )}

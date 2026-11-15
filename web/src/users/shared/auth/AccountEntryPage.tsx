@@ -1,5 +1,6 @@
 // All safe-app roles: handles web account sign-in and registration.
 import { useState } from "react";
+import { BirthdayField } from "../../../components/BirthdayField";
 import { siteHref } from "../../../sites/SiteRouting";
 import { ArrowLeft, ArrowRight, Building2, Leaf, UserRound, UserRoundPlus } from "lucide-react";
 import {
@@ -309,19 +310,16 @@ export function Setup() {
         {step === 1 ? (
           <Form
             className="setup-form"
-            onSubmit={async () => {
+            onSubmit={async (data) => {
               await session.perform(async () => {
-                if (
-                  !profile.fullName.trim() ||
-                  !profile.dob ||
-                  new Date(profile.dob) > new Date() ||
-                  !profile.address.city.trim()
-                )
-                  throw new Error(
-                    "Add your name, a valid birth date, and city.",
-                  );
-                if (personal) setStep(2);
-                else await session.completeSetup(profile, "");
+                const next = { ...profile, dob: String(data.get("dob") ?? "") };
+                if (!next.fullName.trim() || !next.dob || !next.address.city.trim()) {
+                  throw new Error("Add your name, a valid birth date, and city.");
+                }
+                if (personal) {
+                  setProfile(next);
+                  setStep(2);
+                } else await session.completeSetup(next, "");
               });
             }}
           >
@@ -336,16 +334,7 @@ export function Setup() {
                 required
                 maxLength={120}
               />
-              <Field
-                label="Date of birth"
-                type="date"
-                value={profile.dob}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  update("dob", e.target.value)
-                }
-                max={new Date().toISOString().slice(0, 10)}
-                required
-              />
+              <BirthdayField defaultValue={profile.dob} required />
               <Field
                 label="City"
                 value={profile.address.city}

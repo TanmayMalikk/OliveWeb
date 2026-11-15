@@ -1,5 +1,6 @@
 // Admins: shows account totals and controls to admins.
 import { useEffect, useState } from "react";
+import { BirthdayField } from "../../components/BirthdayField";
 import { LayoutDashboard, MessageCircle, Plus, RefreshCw, ShieldCheck, Users } from "lucide-react";
 import {
   Button,
@@ -227,7 +228,7 @@ export default function AdminPortal() {
               </select>
             </label>
             <Field label="Full name" name="fullName" maxLength={120} />
-            <Field label="Date of birth" name="dob" type="date" />
+            <BirthdayField />
             <Field
               label="Login email (optional for staff and administrators)"
               name="email"
