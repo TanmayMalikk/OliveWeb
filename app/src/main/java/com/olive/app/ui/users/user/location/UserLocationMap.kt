@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -40,6 +42,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +60,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.olive.app.R
+import com.olive.app.ui.shared.Muted
+import com.olive.app.ui.shared.OliveGreen
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import com.olive.app.data.location.LocationRoute
 import com.olive.app.data.location.MapLocationPoint
 import kotlinx.coroutines.delay
@@ -305,7 +313,7 @@ internal fun InteractiveLocationMap(
                         updatePoints(view, false)
                         if (userSearchEnabled && selectedFollowUid != null) {
                             view.evaluateJavascript(
-                                "window.oliveSetFollow(true,${JSONObject.quote(selectedFollowUid)},false);",
+                                "window.oliveSetFollow($following,${JSONObject.quote(selectedFollowUid)},false);",
                                 null,
                             )
                         }
@@ -390,6 +398,48 @@ internal fun InteractiveLocationMap(
             }
         }
 
+        if (userSearchEnabled && following) {
+            points.firstOrNull { it.uid == selectedFollowUid }?.let { point ->
+                Surface(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth()
+                        .testTag("followed_user_coordinates"),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    shadowElevation = 6.dp,
+                ) {
+                    Column(
+                        Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()).padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(point.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(if (point.live && !point.lastKnown) R.string.organization_map_live else R.string.location_last_known),
+                            color = if (point.live && !point.lastKnown) OliveGreen else Muted,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        Text(
+                            stringResource(R.string.incident_latitude) + ": " + point.latitude.toString(),
+                            modifier = Modifier.testTag("followed_user_latitude"),
+                        )
+                        Text(
+                            stringResource(R.string.incident_longitude) + ": " + point.longitude.toString(),
+                            modifier = Modifier.testTag("followed_user_longitude"),
+                        )
+                        point.accuracy?.takeIf { it.isFinite() && it >= 0 }?.let {
+                            Text(stringResource(R.string.organization_map_accuracy, it.toDouble()), style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (point.updatedAt > 0) Text(
+                            stringResource(
+                                R.string.organization_map_updated,
+                                DateTimeFormatter.ofPattern("MMM d, HH:mm:ss").withZone(ZoneId.systemDefault())
+                                    .format(Instant.ofEpochMilli(point.updatedAt)),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Muted,
+                        )
+                    }
+                }
+            }
+        }
         if (searchOpen && userSearchEnabled) {
             AlertDialog(
                 onDismissRequest = { searchOpen = false },

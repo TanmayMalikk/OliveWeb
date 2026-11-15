@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -32,7 +33,7 @@ import com.olive.app.ui.users.shared.onboarding.*
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
 
 
-// Shows profile and sign-out settings for staff and admin accounts.
+// Shows profile and password settings for staff and admin accounts.
 @Composable
 internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit) {
     val uiText = rememberResourceText()
@@ -233,32 +234,47 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit) {
         onDispose(session.adminLocationMap::close)
     }
     val state = session.adminLocationMap.state
-    Column(
-        Modifier.fillMaxSize().padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        OutlinedButton(onClick = onBack) { Text(stringResource(R.string.safety_back)) }
-        Text(
-            stringResource(R.string.organization_live_map),
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.semantics { heading() },
+    Box(Modifier.fillMaxSize().testTag("organization_location_map")) {
+        InteractiveLocationMap(
+            points = state.points,
+            ownPointUid = null,
+            detailsOnlyForSelectedPoint = true,
+            userSearchEnabled = true,
+            modifier = Modifier.fillMaxSize(),
         )
-        Box(
-            Modifier.fillMaxWidth().height(420.dp),
-            contentAlignment = Alignment.Center,
+        Surface(
+            modifier = Modifier.align(Alignment.TopStart).padding(12.dp).widthIn(max = 280.dp),
+            shape = MaterialTheme.shapes.large,
+            shadowElevation = 4.dp,
         ) {
-            InteractiveLocationMap(
-                points = state.points,
-                ownPointUid = null,
-                detailsOnlyForSelectedPoint = true,
-                userSearchEnabled = true,
-                modifier = Modifier.fillMaxSize(),
-            )
-            if (state.loading) CircularProgressIndicator()
+            Row(
+                Modifier.padding(end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.testTag("organization_map_back")) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.back))
+                }
+                Text(
+                    stringResource(R.string.organization_live_map),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f).semantics { heading() },
+                )
+            }
         }
-        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        if (!state.loading && state.error == null && state.points.isEmpty()) {
-            Text(stringResource(R.string.organization_location_feed_empty), color = Muted)
+        if (state.loading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+        val status = state.error ?: if (!state.loading && state.points.isEmpty())
+            stringResource(R.string.organization_location_feed_empty) else null
+        status?.let {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp).fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+            ) {
+                AccessibleMessage(
+                    it,
+                    modifier = Modifier.padding(16.dp),
+                    color = if (state.error != null) MaterialTheme.colorScheme.error else Muted,
+                )
+            }
         }
     }
 }

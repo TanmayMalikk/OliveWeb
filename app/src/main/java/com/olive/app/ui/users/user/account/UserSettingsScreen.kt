@@ -270,14 +270,6 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 )
                             }
                         }
-                        if (!userRole) {
-                            OutlinedButton(
-                                onClick = session::signOut, enabled = !session.busy,
-                                modifier = Modifier.fillMaxWidth().testTag("sign_out")
-                            ) {
-                                Text(stringResource(R.string.sign_out_on_this_device))
-                            }
-                        }
                     }
                     SettingsCategory.Privacy ->
                         SettingsSection(uiText(R.string.settings_category_privacy)) {
