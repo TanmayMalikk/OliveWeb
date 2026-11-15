@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="idle_lock_minutes">تحذير القفل بعد %d دقيقة</string>
+    <string name="idle_lock_minutes">%d دقيقة</string>
+    <string name="idle_lock_minutes_seconds">%1$d دقيقة و%2$d ثانية</string>
+    <string name="idle_lock_recommended">%s (موصى به)</string>
     <string name="idle_lock_setting">مهلة القفل</string>
     <string name="incident_date_format">تاريخ الحادث (YYYY-MM-DD)</string>
     <string name="incident_time_format">الوقت التقريبي (HH:mm)</string>
@@ -39,4 +41,16 @@
         <item quantity="one">نتيجة واحدة (%d)</item>
         <item quantity="other">%d نتائج</item>
     </plurals>
+    <string name="dob_date_range_error">أدخل تاريخًا بين اليوم وقبل ١٣٠ عامًا.</string>
+    <string name="dob_picker_title">اختر تاريخ الميلاد</string>
+    <string name="dob_pick_year_range">اختر نطاق السنوات</string>
+    <string name="dob_pick_year">اختر السنة</string>
+    <string name="dob_pick_month">اختر الشهر</string>
+    <string name="dob_pick_day">اختر اليوم</string>
+    <string name="dob_clear">امسح تاريخ الميلاد</string>
+    <string name="location_background_access">تفعيل الموقع في الخلفية</string>
+    <string name="location_background_settings">يحافظ الموقع في الخلفية على تحديث معلومات الموقع لفريق الإدارة عند إغلاق التطبيق. في إعدادات Android، اختر %1$s، ثم عد إلى هنا.</string>
+    <string name="location_background_dialog">يحافظ الموقع في الخلفية على تحديث معلومات الموقع لفريق الإدارة عند إغلاق التطبيق. اختر السماح طوال الوقت في نافذة Android.</string>
+    <string name="chat_dms_tab">الرسائل المباشرة</string>
+    <string name="chat_tickets_tab">محادثات التذاكر</string>
 </resources>

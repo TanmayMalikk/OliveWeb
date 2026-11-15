@@ -188,7 +188,7 @@ internal fun NewsFeed(
                                     )
                                     IconButton(
                                         onClick = { actions.editLocation() },
-                                        modifier = Modifier.size(36.dp)
+                                        modifier = Modifier.size(48.dp)
                                             .testTag("change_news_location")
                                     ) {
                                         Icon(

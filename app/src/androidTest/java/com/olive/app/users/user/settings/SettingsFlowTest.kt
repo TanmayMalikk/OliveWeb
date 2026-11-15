@@ -27,6 +27,7 @@ class SettingsFlowTest : OliveUiTestBase() {
         fill("address_country", "Canada")
         click("save_settings")
         compose.waitUntil(30_000) { !session.busy && session.profile?.situation == "Updated test situation" }
+        click("settings_tab_cover")
         fill("settings_trigger", "new secret")
         fill(
             "settings_pin",

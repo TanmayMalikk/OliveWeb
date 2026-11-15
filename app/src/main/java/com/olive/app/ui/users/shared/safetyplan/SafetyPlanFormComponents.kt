@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
@@ -34,6 +35,35 @@ import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
+
+@Composable
+internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean = false) {
+    val fraction = if (total > 0) prepared.toFloat() / total else 0f
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        if (summary) Text(
+            stringResource(R.string.safety_checklist_progress),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.semantics { heading() }
+        )
+        Text(
+            stringResource(R.string.safety_prepared_count, prepared, total),
+            style = if (summary) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.labelMedium,
+            color = Muted
+        )
+        if (summary || total > 0) LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth().height(if (summary) 10.dp else 6.dp)
+                .then(if (summary) Modifier.testTag("safety_checklist_progress") else Modifier),
+            color = OliveGreen,
+            trackColor = SageGreen,
+            strokeCap = StrokeCap.Round,
+            drawStopIndicator = {},
+        )
+    }
+}
 
 // Sections share one continuous note surface. Each heading and checkbox remains separately navigable with TalkBack.
 @Composable
@@ -64,10 +94,7 @@ internal fun SafetyChecklistSection(
         Text(
             title, style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.testTag("safety_heading_$fieldKey").semantics { heading() })
-        if (section != "contacts") Text(
-            stringResource(R.string.safety_prepared_count, items.count { it.checked }, items.size),
-            style = MaterialTheme.typography.labelMedium, color = Muted
-        )
+        if (section != "contacts") SafetyChecklistProgress(items.count { it.checked }, items.size)
         safetySectionHint(section)?.let {
             Text(
                 stringResource(it),

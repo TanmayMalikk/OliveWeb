@@ -38,7 +38,8 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
     val uiText = rememberResourceText()
     val profile = session.profile ?: return
     var fullName by remember(profile) { mutableStateOf(profile.fullName) }
-    var dob by remember(profile) { mutableStateOf(profile.dob) }
+    var birthday by rememberBirthdayInput(profile.dob)
+    var showBirthdayErrors by remember(profile.dob) { mutableStateOf(false) }
     var email by remember(profile) { mutableStateOf(profile.email) }
     var phone by remember(profile) { mutableStateOf(profile.phone) }
     var currentPassword by remember { mutableStateOf("") }
@@ -70,7 +71,9 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
             "organization_settings_name",
             enabled = !session.account.busy,
         ) { fullName = it.take(120) }
-        BirthdayPicker(dob, "organization_settings_dob", !session.account.busy) { dob = it }
+        BirthdayPicker(
+            birthday, "organization_settings_dob", !session.account.busy, showBirthdayErrors,
+        ) { birthday = it }
         Field(
             uiText(R.string.ui_email),
             email,
@@ -84,7 +87,10 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
             enabled = !session.account.busy,
         ) { phone = it.take(40) }
         Button(
-            onClick = { session.updateOrganizationProfile(fullName, dob, email, phone) },
+            onClick = {
+                showBirthdayErrors = !InputPolicy.validDob(birthday)
+                if (!showBirthdayErrors) session.updateOrganizationProfile(fullName, birthday, email, phone)
+            },
             enabled = !session.account.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.save_profile)) }
@@ -135,7 +141,8 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
     val uiText = rememberResourceText()
     val existing = session.account.setupProfile
     var fullName by remember(existing) { mutableStateOf(existing?.fullName.orEmpty()) }
-    var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
+    var birthday by rememberBirthdayInput(existing?.dob.orEmpty())
+    val dob = birthday
     var email by remember(existing) { mutableStateOf(existing?.email.orEmpty()) }
     var phone by remember(existing) { mutableStateOf(existing?.phone.orEmpty()) }
     var page by rememberSaveable(existing?.username) { mutableIntStateOf(0) }
@@ -170,12 +177,8 @@ internal fun OrganizationProfileSetup(session: SessionViewModel) {
                 showErrors = false
             }
             BirthdayPicker(
-                dob, "organization_dob", !session.account.busy,
-                error = if (showErrors && !InputPolicy.validDob(dob)) uiText(R.string.ui_birthday_required) else null
-            ) {
-                dob = it
-                showErrors = false
-            }
+                birthday, "organization_dob", !session.account.busy, showErrors,
+            ) { birthday = it }
         } else {
             Field(
                 uiText(R.string.ui_email_required),

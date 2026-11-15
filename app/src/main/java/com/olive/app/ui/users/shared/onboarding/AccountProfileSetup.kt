@@ -89,7 +89,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
     var fullName by remember(existing) { mutableStateOf(existing?.fullName.orEmpty()) }
     var affected by remember(existing) { mutableStateOf(existing?.affectedNames.orEmpty()) }
     var abuserName by remember(existing) { mutableStateOf(existing?.abuserName.orEmpty()) }
-    var dob by remember(existing) { mutableStateOf(existing?.dob.orEmpty()) }
+    var birthday by rememberBirthdayInput(existing?.dob.orEmpty())
+    val dob = birthday
     val language = existing?.language?.ifBlank { "English" } ?: "English"
     var situation by remember(existing) { mutableStateOf(existing?.situation.orEmpty()) }
     var address by remember(existing) { mutableStateOf(existing?.address ?: DeliveryAddress()) }
@@ -195,14 +196,8 @@ internal fun ProfileSetup(session: SessionViewModel) {
                         showErrors = false
                     }
                     BirthdayPicker(
-                        dob,
-                        "dob",
-                        !session.account.busy,
-                        error = if (showErrors && !InputPolicy.validDob(dob)) uiText(R.string.ui_birthday_required) else null
-                    ) {
-                        dob = it
-                        showErrors = false
-                    }
+                        birthday, "dob", !session.account.busy, showErrors,
+                    ) { birthday = it }
                     if (!safeContact) {
                         HorizontalDivider()
                         AffectedPeopleFields(affected, !session.account.busy) { affected = it }

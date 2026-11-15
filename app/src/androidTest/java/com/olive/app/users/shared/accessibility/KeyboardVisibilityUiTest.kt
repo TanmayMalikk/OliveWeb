@@ -111,6 +111,7 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
         register(username = "keyboard_tester")
         unlock()
         click("safe_settings")
+        click("settings_tab_password")
         focus("current_password")
         focus("new_password")
         focus("confirm_new_password")

@@ -1,29 +1,29 @@
-// All app roles: centralizes every color and the shared Material theme in one file.
+// Olive palette shared by the cover apps and private screens.
 package com.olive.app.ui.shared
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // Core Olive brand and surface palette used across covers and the private Safe App.
-internal val OliveGreen = Color(0xFF45613C)
+internal val OliveGreen = Color(0xFF354E2C)
 internal val Ink = Color(0xFF253322)
 internal val Cream = Color(0xFFFAF9F5)
-internal val Muted = Color(0xFF4E602D)
+internal val Muted = Color(0xFF39492D)
 internal val Paper = Color.White
 internal val PaleOlive = Color(0xFFE7EDDD)
 internal val WarmWhite = Color(0xFFF0F0E8)
 internal val LightSage = Color(0xFFE1E8D7)
 internal val SageGreen = Color(0xFFD2DDC6)
 internal val SoftGray = Color(0xFFD6D9CD)
+internal val OliveOutline = Color(0xFF69755C)
+internal val OliveError = Color(0xFF8C302B)
+internal val OliveErrorContainer = Color(0xFFFFDAD5)
 internal val DarkOlive = Color(0xFF314B28)
 internal val MossGreen = Color(0xFF6C7A3D)
 internal val OliveBrown = Color(0xFF7A5326)
 
 // Scrollbar track and thumb colors for scrollable lists and grids.
-internal val ScrollTrack = Color(0x2445613C)
-internal val ScrollThumb = Color(0xB345613C)
+internal val ScrollTrack = Color(0x24354E2C)
+internal val ScrollThumb = Color(0xB3354E2C)
 
 // Fitness Tracker cover and nutrition/activity chart palette.
 internal val FitnessBackground = Cream
@@ -31,7 +31,7 @@ internal val FitnessSurface = Paper
 internal val FitnessAccent = OliveGreen
 internal val FitnessText = Ink
 internal val FitnessSubtle = Muted
-internal val FitnessHeroEnd = Color(0xFF6F8459)
+internal val FitnessHeroEnd = Color(0xFF425A36)
 internal val FitnessWarmCard = Color(0xFFF1F3E9)
 internal val FitnessDarkCard = Color(0xFF263722)
 internal val FitnessStopRed = Color(0xFF8A453E)
@@ -47,7 +47,7 @@ internal val FatPlum = Color(0xFF875E78)
 // Messaging, friend list, and voice call screen palette.
 internal val ChatPageBackground = Color(0xFFF8F7F1)
 internal val ChatIncomingBubble = Color(0xFFF0F2E8)
-internal val ChatSentBubble = Color(0xFF49683B)
+internal val ChatSentBubble = Color(0xFF354E2C)
 internal val ChatBorder = Color(0xFFD8DDCE)
 internal val ChatDangerRed = Color(0xFF9D3E37)
 internal val OnlineIndicatorGreen = Color(0xFF38B56C)
@@ -81,22 +81,4 @@ internal val LeafShadowTint = Color(0x66334411)
 internal val FruitHighlight = Color(0xFF7A933B)
 internal val FruitMid = Color(0xFF4A6223)
 internal val FruitShadow = Color(0xFF2C3E14)
-
-// Applies the shared Olive color scheme across every cover and private screen.
-@Composable
-internal fun OliveTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = OliveGreen, onPrimary = Paper,
-            primaryContainer = PaleOlive, onPrimaryContainer = Ink,
-            secondary = OliveGreen, onSecondary = Paper,
-            secondaryContainer = PaleOlive, onSecondaryContainer = Ink,
-            background = Cream, onBackground = Ink,
-            surface = Cream, onSurface = Ink,
-            surfaceVariant = WarmWhite, onSurfaceVariant = Muted,
-            outline = SoftGray,
-        ),
-        content = content,
-    )
-}
 

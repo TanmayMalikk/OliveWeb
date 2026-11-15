@@ -12,6 +12,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -21,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalContext
@@ -61,7 +63,6 @@ import com.olive.app.ui.session.SessionRuntime
 
 
 // Keep the chosen cover loaded under the safe flow so Quick exit can reveal it fast.
-// UI sizing/color: this root fills the window; the 12dp quick-exit inset and OliveGreen button styling live in its Scaffold.
 internal fun shouldComposeCover(usesCover: Boolean) = usesCover
 
 internal val LocalQuickExit = staticCompositionLocalOf<(() -> Unit)?> { null }
@@ -133,6 +134,12 @@ internal fun OliveRoot(
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val isCover = navigation.screen == SessionScreen.Cover
+    val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    var imeWasVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(isCover, imeVisible) {
+        if (!isCover && imeWasVisible && !imeVisible) focus.clearFocus()
+        imeWasVisible = !isCover && imeVisible
+    }
     val view = LocalView.current
     val accessibilityRoot = (view.parent as? ComposeView) ?: view
     val privacyHidden = navigation.privacyBlackout
@@ -225,17 +232,17 @@ internal fun OliveRoot(
                 focus.clearFocus(force = true)
                 session.navigation.back()
             }
-            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            val darkHome = isSystemInDarkTheme() && session.accountRole == AccountRole.USER &&
+                navigation.screen == SessionScreen.Safe && navigation.page == SafePage.Home
+            val screenBackground = if (darkHome) CallBackground else MaterialTheme.colorScheme.background
+            Surface(Modifier.fillMaxSize(), color = screenBackground) {
                 Box(Modifier.fillMaxSize().accessibilityTraversalGroup()) {
                     Scaffold(
+                        containerColor = screenBackground,
+                        contentColor = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.testTag("session_screen_content")
                             .accessibilityTraversal(AccessibilityTraversalOrder.ScreenContent)
                             .then(if (supportExpanded || showPinAnimation) Modifier.clearAndSetSemantics {} else Modifier),
-                        bottomBar = {
-                            if (showQuickExit) Spacer(
-                                Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp)
-                            )
-                        },
                         contentWindowInsets = if (navigation.screen == SessionScreen.Safe && navigation.page == SafePage.Camera)
                             WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
                     ) { padding ->
@@ -369,7 +376,7 @@ internal fun OliveRoot(
                         }
                     }
                     if (showPinAnimation) PinSafeOliveTransition(
-                        backgroundColor = MaterialTheme.colorScheme.background,
+                        backgroundColor = screenBackground,
                         modifier = Modifier.fillMaxSize().testTag("pin_safe_animation")
                             .pointerInput(Unit) {
                                 awaitPointerEventScope {

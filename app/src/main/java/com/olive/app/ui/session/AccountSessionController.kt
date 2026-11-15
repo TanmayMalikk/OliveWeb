@@ -477,6 +477,20 @@ internal class AccountSessionController(private val runtime: SessionRuntime) {
 
 // Keeps private-note actions separate from the rest of the signed-in session.
 internal class SessionPrivacy(private val runtime: SessionRuntime) {
+    fun idleTimeoutSeconds(): Int {
+        val uid = runtime.coverAccountId ?: return IdlePolicy.DEFAULT_TIMEOUT_SECONDS
+        val preferences = runtime.cloudState
+        val previousMinutes = preferences.getInt("idle_timeout_minutes_$uid", 1).coerceIn(1, 5)
+        return IdlePolicy.normalizeTimeout(preferences.getInt("idle_timeout_seconds_$uid", previousMinutes * 60))
+    }
+
+    fun setIdleTimeoutSeconds(seconds: Int) {
+        val uid = runtime.coverAccountId ?: return
+        runtime.cloudState.edit()
+            .putInt("idle_timeout_seconds_$uid", IdlePolicy.normalizeTimeout(seconds))
+            .apply()
+        noteInteraction()
+    }
     // Opens or closes the private note editor for the selected person.
     fun noteInteraction() {
         with(runtime) {
@@ -547,7 +561,7 @@ internal class SessionPrivacy(private val runtime: SessionRuntime) {
                         val countdown = IdlePolicy.countdown(
                             SystemClock.elapsedRealtime() - lastTouchAt,
                             warningDuration,
-                            cloudState.getInt("idle_timeout_minutes_${enrollment?.uid}", 1).coerceIn(1, 5) * 60_000L,
+                            idleTimeoutSeconds() * 1_000L,
                         )
                         if (countdown == 0) {
                             navigation.quickExit()

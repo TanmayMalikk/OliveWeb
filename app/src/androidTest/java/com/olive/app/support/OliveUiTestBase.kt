@@ -177,13 +177,12 @@ abstract class OliveUiTestBase {
         click("onboarding_next")
     }
 
-    // Opens the birthday picker and chooses a valid test date.
     protected fun chooseBirthday() {
-        click("dob_year")
+        hideKeyboard()
+        click("dob_open")
+        click("dob_range_2006")
         click("dob_year_2000")
-        click("dob_month")
         click("dob_month_1")
-        click("dob_day")
         click("dob_day_2")
     }
 

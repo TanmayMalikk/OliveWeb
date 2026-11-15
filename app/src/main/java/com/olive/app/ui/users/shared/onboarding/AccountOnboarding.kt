@@ -26,12 +26,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.Role
@@ -43,31 +43,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.olive.app.R
 import com.olive.app.ui.shared.LocalizedIcon as Icon
-import java.time.LocalDate
-import java.time.Month
-import java.util.Locale
 import kotlin.random.Random
 
 // Requirement bullets begin neutral, then turn green or red as the user types.
 @Composable
 internal fun RequirementBullet(text: String, met: Boolean, active: Boolean) {
     val color = when {
-        !active -> Color.Black
+        !active -> MaterialTheme.colorScheme.onSurface
         met -> OliveGreen
         else -> MaterialTheme.colorScheme.error
     }
+    val status = stringResource(if (met) R.string.requirement_met_status else R.string.requirement_not_met_status)
     Row(
         Modifier.fillMaxWidth().clearAndSetSemantics {
             contentDescription = text
             role = Role.Checkbox
             toggleableState = if (active && met) ToggleableState.On else ToggleableState.Off
+            if (active) {
+                stateDescription = status
+                liveRegion = LiveRegionMode.Polite
+            }
         },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("•", color = color, fontSize = 14.sp, lineHeight = 14.sp)
-        Text(text, color = color, style = MaterialTheme.typography.bodySmall, lineHeight = 14.sp)
-        Spacer(Modifier.weight(1f))
+        Text(text, color = color, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
         AnimatedVisibility(
             visible = active && met,
             enter = fadeIn(tween(150)),
@@ -112,124 +113,6 @@ internal fun OnboardingNavigation(
             Spacer(Modifier.width(8.dp))
             Icon(Icons.AutoMirrored.Outlined.ArrowForward, null)
         }
-    }
-}
-
-// USER and SAFE CONTACT: birthday is required and saved as YYYY-MM-DD.
-// UI sizing: the three birthday buttons share one row equally with 8dp gaps and 8dp horizontal button padding.
-@Composable
-internal fun BirthdayPicker(
-    value: String,
-    tag: String,
-    enabled: Boolean,
-    error: String? = null,
-    onChange: (String) -> Unit
-) {
-    val uiText = rememberResourceText()
-    val keyboard = LocalSoftwareKeyboardController.current
-    val focus = LocalFocusManager.current
-    val initial = remember { runCatching { LocalDate.parse(value) }.getOrNull() }
-    var year by remember { mutableStateOf(initial?.year) }
-    var month by remember { mutableStateOf(initial?.monthValue) }
-    var day by remember { mutableStateOf(initial?.dayOfMonth) }
-    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
-    // Saves the date entered on the current onboarding step.
-    fun setDate(y: Int?, m: Int?, d: Int?) {
-        if (y != null && m != null && d != null) onChange(
-            "%04d-%02d-%02d".format(
-                Locale.ROOT,
-                y,
-                m,
-                d
-            )
-        )
-    }
-    Text(
-        stringResource(R.string.date_of_birth_required),
-        style = MaterialTheme.typography.labelLarge
-    )
-    Row(Modifier.fillMaxWidth().testTag(tag), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        // shared safe app account onboarding shows this choice view so the user can view its details and use its actions.
-        @Composable
-        fun Choice(
-            label: String,
-            selected: String,
-            options: List<Pair<String, String>>,
-            choiceTag: String,
-            choose: (String) -> Unit
-        ) {
-            var open by remember { mutableStateOf(false) }
-            Box(Modifier.weight(1f)) {
-                OutlinedButton(
-                    onClick = {
-                        keyboard?.hide()
-                        focus.clearFocus(force = true)
-                        open = true
-                    },
-                    enabled = enabled,
-                    border = if (error != null) BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.error
-                    ) else ButtonDefaults.outlinedButtonBorder(enabled),
-                    modifier = Modifier.fillMaxWidth().testTag(choiceTag),
-                    contentPadding = PaddingValues(horizontal = 8.dp)
-                ) {
-                    Text(selected.ifBlank { label }, maxLines = 1)
-                }
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    options.forEach { (id, text) ->
-                        DropdownMenuItem(
-                            text = { Text(text) },
-                            onClick = {
-                                choose(id)
-                                open = false
-                            },
-                            modifier = Modifier.testTag("${choiceTag}_$id")
-                        )
-                    }
-                }
-            }
-        }
-        Choice(
-            uiText(R.string.year),
-            year?.toString().orEmpty(),
-            (LocalDate.now().minusYears(130).year..LocalDate.now().year).reversed().map { it.toString() to it.toString() },
-            "${tag}_year"
-        ) {
-            year = it.toInt()
-            day = day?.coerceAtMost(java.time.YearMonth.of(it.toInt(), month ?: 1).lengthOfMonth())
-            setDate(year, month, day)
-        }
-        Choice(
-            uiText(R.string.month),
-            month?.let { Month.of(it).getDisplayName(java.time.format.TextStyle.FULL, locale) }
-                .orEmpty(),
-            (1..12).map {
-                it.toString() to Month.of(it)
-                    .getDisplayName(java.time.format.TextStyle.FULL, locale)
-            },
-            "${tag}_month"
-        ) {
-            month = it.toInt()
-            day = day?.coerceAtMost(java.time.YearMonth.of(year ?: 2000, it.toInt()).lengthOfMonth())
-            setDate(year, month, day)
-        }
-        Choice(
-            uiText(R.string.day),
-            day?.toString().orEmpty(),
-            (1..java.time.YearMonth.of(year ?: 2000, month ?: 1).lengthOfMonth()).map { it.toString() to it.toString() },
-            "${tag}_day"
-        ) {
-            day = it.toInt()
-            setDate(year, month, day)
-        }
-    }
-    error?.let {
-        AccessibleMessage(
-            it,
-            color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodySmall
-        )
     }
 }
 

@@ -47,6 +47,8 @@ internal val LocalHotlineLocationLookup =
     staticCompositionLocalOf<suspend (Context) -> DeliveryAddress?> { DeviceLocation::address }
 internal val LocalLocationPermissionRequest =
     staticCompositionLocalOf<suspend () -> Boolean> { { false } }
+internal val LocalBackgroundLocationPermissionRequest =
+    staticCompositionLocalOf<(suspend () -> Boolean)?> { null }
 
 // Start from the saved address. Device lookup is explicit and never writes the detected address to the account.
 @Composable

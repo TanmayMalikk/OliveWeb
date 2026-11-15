@@ -539,12 +539,17 @@ data class GateState(val failures: Int = 0) {
         GateState(if (failures in 0..3) failures + 1 else if (failures == 4) 5 else 1)
 }
 
-// One minute without interaction starts a warning; accessibility settings can extend its fifteen-second default.
 object IdlePolicy {
-    // Calculates the remaining failed-entry cooldown for older saved records.
+    const val DEFAULT_TIMEOUT_SECONDS = 60
+    const val MAX_TIMEOUT_SECONDS = 450
+    val timeoutOptions = (1..7).map { it * 60 } + MAX_TIMEOUT_SECONDS
+
+    fun normalizeTimeout(seconds: Int): Int =
+        timeoutOptions.last { it <= seconds.coerceIn(DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS) }
+
     fun countdown(elapsedMs: Long, warningDurationMs: Long = 15_000L, idleDurationMs: Long = 60_000L): Int? {
-        val warningAt = idleDurationMs.coerceIn(60_000L, 300_000L)
-        val lockAt = warningAt + warningDurationMs.coerceIn(15_000L, Int.MAX_VALUE.toLong())
+        val lockAt = idleDurationMs.coerceIn(DEFAULT_TIMEOUT_SECONDS * 1_000L, MAX_TIMEOUT_SECONDS * 1_000L)
+        val warningAt = lockAt - warningDurationMs.coerceIn(15_000L, lockAt)
         return when {
             elapsedMs < warningAt -> null
             elapsedMs >= lockAt -> 0

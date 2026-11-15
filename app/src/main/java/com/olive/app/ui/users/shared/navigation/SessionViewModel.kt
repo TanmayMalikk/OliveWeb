@@ -348,14 +348,8 @@ internal interface SessionCoverNotesActivityActions {
 
     // Passes the private-note button action to the session privacy controller.
     fun noteInteraction() = runtime.privacy.noteInteraction()
-    fun idleTimeoutMinutes(): Int =
-        runtime.cloudState.getInt("idle_timeout_minutes_${runtime.coverAccountId}", 1).coerceIn(1, 5)
-
-    fun setIdleTimeoutMinutes(minutes: Int) {
-        val uid = runtime.coverAccountId ?: return
-        runtime.cloudState.edit().putInt("idle_timeout_minutes_$uid", minutes.coerceIn(1, 5)).apply()
-        noteInteraction()
-    }
+    fun idleTimeoutSeconds(): Int = runtime.privacy.idleTimeoutSeconds()
+    fun setIdleTimeoutSeconds(seconds: Int) = runtime.privacy.setIdleTimeoutSeconds(seconds)
     // Records that Android detected a screenshot or screen recording.
     fun captureDetected(kind: String) = runtime.privacy.captureDetected(kind)
     // Records when Android reports that screen recording has stopped.

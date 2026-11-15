@@ -1,10 +1,7 @@
 // Safe-app users: shows the user’s private notes.
 package com.olive.app.ui.users.user.notes
 
-import android.Manifest
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -29,6 +27,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.olive.app.R
+import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import com.olive.app.data.account.PrivateEntry
 import com.olive.app.data.account.PrivateEntryKind
 import com.olive.app.data.location.AddressSuggestion
@@ -62,6 +61,7 @@ private fun validIncidentTime(value: String, saved: String?) =
 internal fun PrivateNotes(session: SessionViewModel) {
     val uiText = rememberResourceText()
     var editorOpen by remember { mutableStateOf(false) }
+    var editorVersion by remember { mutableIntStateOf(0) }
     var editingId by remember { mutableStateOf<String?>(null) }
     var kind by remember { mutableStateOf(PrivateEntryKind.Note) }
     var title by remember { mutableStateOf("") }
@@ -82,6 +82,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
     var attachAfterUpload by remember { mutableStateOf(false) }
     var filesBeforeUpload by remember { mutableStateOf(emptySet<String>()) }
     var currentLocationPoint by remember { mutableStateOf<MapLocationPoint?>(null) }
+    var findingLocation by remember { mutableStateOf(false) }
+    var locationLookupFailed by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var search by rememberSaveable { mutableStateOf("") }
@@ -99,6 +101,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     // Opens a new or existing private note in the editor.
     fun openEditor(entry: PrivateEntry?) {
         session.clearPrivateEntryStatus()
+        editorVersion++
         editingId = entry?.id
         kind = entry?.kind ?: PrivateEntryKind.Note
         title = entry?.title.orEmpty()
@@ -112,25 +115,35 @@ internal fun PrivateNotes(session: SessionViewModel) {
         latitudeInput = incidentLatitude?.toString().orEmpty()
         longitudeInput = incidentLongitude?.toString().orEmpty()
         incidentMapOpen = false
+        currentLocationPoint = null
+        locationLookupFailed = false
         selectedAttachments = entry?.attachmentIds.orEmpty().toSet()
         editorOpen = true
     }
     val uid = session.coverAccountId
-    val locationPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { permissions ->
-        session.endExternalFilePicker()
-        if (permissions.values.any { it }) scope.launch {
-            DeviceLocation.currentCoordinates(context)?.let { fix ->
-                currentLocationPoint = MapLocationPoint(
-                    uid ?: "current",
-                    uiText(R.string.current_location),
-                    fix.latitude,
-                    fix.longitude,
-                    fix.timestamp,
-                    true,
-                    fix.accuracy,
+    val requestLocationPermission = LocalLocationPermissionRequest.current
+    fun showCurrentLocation() {
+        scope.launch {
+            if (findingLocation) return@launch
+            findingLocation = true
+            locationLookupFailed = false
+            val requestVersion = editorVersion
+            try {
+                val granted = requestLocationPermission()
+                if (!editorOpen || editorVersion != requestVersion) return@launch
+                if (!granted) {
+                    locationLookupFailed = true
+                    return@launch
+                }
+                val fix = DeviceLocation.currentCoordinates(context)
+                if (!editorOpen || editorVersion != requestVersion) return@launch
+                locationLookupFailed = fix == null
+                if (fix != null) currentLocationPoint = MapLocationPoint(
+                    uid ?: "current", uiText(R.string.current_location), fix.latitude, fix.longitude,
+                    fix.timestamp, true, fix.accuracy,
                 )
+            } finally {
+                findingLocation = false
             }
         }
     }
@@ -223,12 +236,12 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     if (entry != null) IconButton(
                         onClick = { session.togglePrivateEntryPin(entry.id) },
                         enabled = !session.busy,
-                        modifier = Modifier.testTag("private_pin_editor")
+                        modifier = Modifier.size(48.dp).testTag("private_pin_editor")
                     ) {
                         Icon(
                             Icons.Outlined.PushPin,
                             if (entry.pinned) uiText(R.string.ui_unpin_entry) else uiText(R.string.ui_pin_entry),
-                            tint = if (entry.pinned) PinnedStarGold else Muted
+                            tint = if (entry.pinned) OliveGreen else Muted
                         )
                     }
                     if (entry != null) IconButton(
@@ -267,18 +280,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
             }
             if (kind == PrivateEntryKind.Incident) {
                 item {
-                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Field(stringResource(R.string.incident_date_format), incidentDate, "incident_date", enabled = !session.busy,
-                            error = if (incidentDate.isNotBlank() && !validIncidentDate(incidentDate, entry?.incidentDate))
-                                stringResource(R.string.incident_invalid_date) else null) {
-                            incidentDate = it.take(40)
-                        }
-                        Field(stringResource(R.string.incident_time_format), incidentTime, "incident_time", enabled = !session.busy,
-                            error = if (!validIncidentTime(incidentTime, entry?.incidentTime))
-                                stringResource(R.string.incident_invalid_time) else null) {
-                            incidentTime = it.take(40)
-                        }
-                    }
+                    IncidentDateTimeFields(
+                        date = incidentDate,
+                        time = incidentTime,
+                        enabled = !session.busy,
+                        onDateChange = { incidentDate = it },
+                        onTimeChange = { incidentTime = it },
+                    )
                 }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -370,13 +378,16 @@ internal fun PrivateNotes(session: SessionViewModel) {
                             },
                             enabled = latitude != null && longitude != null,
                         ) { Text(uiText(R.string.incident_use_coordinates)) }
-                        TextButton(onClick = {
-                            session.beginExternalFilePicker()
-                            locationPermission.launch(arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                        if (locationLookupFailed) AccessibleMessage(stringResource(R.string.incident_location_lookup_failed))
+                        OutlinedButton(onClick = ::showCurrentLocation, enabled = !findingLocation) {
+                            Text(stringResource(
+                                when {
+                                    findingLocation -> R.string.incident_location_lookup_in_progress
+                                    locationLookupFailed -> R.string.retry
+                                    else -> R.string.incident_show_location
+                                }
                             ))
-                        }) { Text(stringResource(R.string.incident_show_location)) }
+                        }
                         InteractiveLocationMap(
                             points = currentLocationPoint?.let(::listOf)
                                 ?: session.locationMap.state.displayedOwn(session.accountRole)?.let(::listOf).orEmpty(),
@@ -526,7 +537,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
     val others = filtered.filterNot { it.pinned }.sortedByDescending { it.updatedAt }
     val notesGridState = rememberLazyGridState()
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(160.dp),
+        columns = if (LocalDensity.current.fontScale >= 1.3f) GridCells.Fixed(1) else GridCells.Adaptive(192.dp),
         modifier = Modifier.fillMaxSize().oliveScrollbar(notesGridState),
         state = notesGridState,
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 112.dp),

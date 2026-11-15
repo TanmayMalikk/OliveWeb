@@ -228,6 +228,17 @@ class SafetyPlanUiTest : OliveUiTestBase() {
         }
     }
 
+    @Test
+    fun checklistProgressUpdatesWhenAnItemIsChecked() {
+        setup()
+        val progress = compose.onNodeWithTag("safety_checklist_progress")
+        val progressRange = SemanticsProperties.ProgressBarRangeInfo
+        val initialProgress = progress.fetchSemanticsNode().config[progressRange].current
+        compose.onNodeWithTag("safety_check_primary_documents_0").performScrollTo().performClick()
+        compose.onNodeWithTag("safety_plan_page").performScrollToIndex(0)
+        assertTrue(progress.fetchSemanticsNode().config[progressRange].current > initialProgress)
+    }
+
     // Checks the checklist ticks persist and document items are visible step with the test's sample data.
     @Test
     fun checklistTicksPersistAndDocumentItemsAreVisible() {
