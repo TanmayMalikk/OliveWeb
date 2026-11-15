@@ -129,7 +129,7 @@ private fun StaffDashboard(
         OutlinedButton(
             onClick = session::signOut,
             enabled = !session.busy,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("sign_out"),
         ) { Text(stringResource(R.string.sign_out)) }
     }
 }

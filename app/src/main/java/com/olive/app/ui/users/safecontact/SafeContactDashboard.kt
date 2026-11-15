@@ -182,6 +182,11 @@ private fun SafeContactHome(session: SessionViewModel) {
             }
         }
         Status(session)
+        OutlinedButton(
+            onClick = session::signOut,
+            enabled = !session.busy,
+            modifier = Modifier.fillMaxWidth().testTag("sign_out"),
+        ) { Text(stringResource(R.string.sign_out_on_this_device)) }
     }
 }
 
