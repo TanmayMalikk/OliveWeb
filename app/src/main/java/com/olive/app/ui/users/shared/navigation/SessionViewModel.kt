@@ -51,6 +51,10 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
         LocationMapController(application, viewModelScope, runtime.locationSharingRepository)
     internal val adminLocationMap = AdminLocationMapController(runtime.dataSources.adminLocations)
 
+    val preparingVoiceConversationId get() = runtime.secureSharing.preparingVoiceConversationId
+    fun sendVoiceMessage(file: java.io.File, metadata: String): Boolean =
+        media?.let { runtime.secureSharing.sendVoice(file, metadata, it) } ?: false
+
     // Root navigation, account entry, and device lock state.
     val navigationState get() = runtime.state.navigationState
     val dashboardState get() = runtime.state.dashboardState
@@ -176,7 +180,9 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     val userSearchResults get() = runtime.state.userSearchResults
     val friends get() = runtime.state.friends
     val incomingFriendRequests get() = runtime.state.incomingFriendRequests
+        .filter { it.recipientUid == runtime.enrollment?.uid }
     val outgoingFriendRequests get() = runtime.state.outgoingFriendRequests
+        .filter { it.senderUid == runtime.enrollment?.uid }
     val conversations get() = runtime.state.conversations
     val archivedConversationIds get() = runtime.state.archivedConversationIds
     val restoredClosedConversationIds get() = runtime.state.restoredClosedConversationIds
@@ -192,10 +198,13 @@ internal class SessionMessages(private val runtime: SessionRuntime) {
     fun isUnread(conversation: ChatConversation) = runtime.isConversationUnread(conversation)
     fun unreadCountForSupportTag(tag: String) = runtime.state.conversations.count { conversation ->
         conversation.type == "SUPPORT" && conversation.supportTag == tag &&
-                conversation.closedAt == 0L &&
-                conversation.id !in runtime.state.archivedConversationIds &&
-                runtime.isConversationUnread(conversation)
+            runtime.isActiveUnreadConversation(conversation)
     }
+
+    fun unreadCountForChatTab(tickets: Boolean): Int =
+        runtime.state.conversations.count {
+            (it.type == "SUPPORT") == tickets && runtime.isActiveUnreadConversation(it)
+        } + if (tickets) 0 else runtime.incomingFriendRequestCount
 
     // Starts chat listeners when the current screen needs messaging.
     fun ensureMessagingObservation(showFeedback: Boolean = false) =

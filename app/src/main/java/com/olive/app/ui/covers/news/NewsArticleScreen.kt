@@ -429,7 +429,7 @@ internal fun NewsArticleReader(
                     })
             }
             if (progress < 100 && !failed) com.olive.app.ui.shared.LoadingSkeleton(
-                Modifier.fillMaxWidth().padding(16.dp), preview = true,
+                SkeletonLayout.NewsArticle, Modifier.fillMaxWidth().padding(16.dp), rows = 1,
             )
             if (failed) Column(
                 Modifier.fillMaxSize().background(Cream).padding(24.dp),

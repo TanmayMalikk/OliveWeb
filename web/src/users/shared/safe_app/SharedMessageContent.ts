@@ -1,5 +1,6 @@
 // Web and Android messaging: turns shared-item message codes into readable attachment details.
 export type SharedMessage =
+  | { kind: "voice"; id: string; title: string }
   | { kind: "media"; id: string; title: string }
   | { kind: "incident" | "note"; id: string; title: string }
   | { kind: "safety-plan"; title: string }
@@ -7,6 +8,8 @@ export type SharedMessage =
 
 export function sharedMessage(body: string): SharedMessage | null {
   const [type, id = "", title = ""] = body.split(":", 3);
+  if (type === "SHARED_VOICE" && /^[A-Za-z0-9_-]{1,64}$/.test(id))
+    return { kind: "voice", id, title: "Voice message" };
   if (type === "SHARED_MEDIA" && id)
     return { kind: "media", id, title: title || "Shared file" };
   if (type === "SHARED_INCIDENT" && id)

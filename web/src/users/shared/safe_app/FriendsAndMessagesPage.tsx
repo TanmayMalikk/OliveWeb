@@ -21,6 +21,7 @@ import {
   type BrowserDocument,
 } from "../../../services/MediaService";
 import type { Entry } from "../../../domain/DomainModels";
+import { VoiceMessageBubble, VoiceMessageComposer } from "./VoiceMessages";
 import { SafeMediaViewer } from "./SafeMediaViewer";
 import { sharedMessage } from "./SharedMessageContent";
 import { useChatDeviceKey, useChatTimeline, useMembershipHistory } from "../useChatTimeline";
@@ -54,7 +55,11 @@ export default function Messages() {
   const [found, setFound] = useState<DirectoryUser | null>(null);
   const [feedback, setFeedback] = useState("");
   const [draft, setDraft] = useState("");
-  const [roomKey, setRoomKey] = useState<CryptoKey | null>(null);
+  const roomScope = conversation ? JSON.stringify([
+    accounts.identity?.uid, conversation.id, conversation.participantIds,
+  ]) : "";
+  const [room, setRoom] = useState<{ scope: string; key: CryptoKey } | null>(null);
+  const roomKey = room?.scope === roomScope ? room.key : null;
   const [viewerDocument, setViewerDocument] = useState<BrowserDocument | null>(null);
   const [viewerUrl, setViewerUrl] = useState("");
   const [viewerEntry, setViewerEntry] = useState<Entry | null>(null);
@@ -139,7 +144,7 @@ export default function Messages() {
   useEffect(() => {
     setRows([]);
     setDraft("");
-    setRoomKey(null);
+    setRoom(null);
     setViewerDocument(null);
     setViewerUrl("");
     setViewerEntry(null);
@@ -150,7 +155,7 @@ export default function Messages() {
       .roomKey(conversation.id, identity, conversation)
       .then((key) => {
         if (!active) return undefined;
-        setRoomKey(key);
+        setRoom({ scope: roomScope, key });
         return messaging.subscribeMessages(
           conversation.id,
           key,
@@ -179,7 +184,7 @@ export default function Messages() {
       active = false;
       stop?.();
     };
-  }, [conversation?.id, conversation?.participantIds.join(","), identity?.uid, deviceKeyAvailable]);
+  }, [roomScope, deviceKeyAvailable]);
   if (!cloudMode)
     return (
       <Empty
@@ -438,7 +443,9 @@ export default function Messages() {
                     className={`chat-bubble ${message.senderUid === identity.uid ? "own" : ""}`}
                   >
                     <small>{messaging.chatSenderName(conversation, message, identity.role)}</small>
-                    {shared ? (
+                    {shared?.kind === "voice" ? (
+                      <VoiceMessageBubble key={identity.uid + shared.id} mediaId={shared.id} identity={identity} />
+                    ) : shared ? (
                       <button
                         type="button"
                         className="shared-message-card"
@@ -491,6 +498,15 @@ export default function Messages() {
               )}
               <div ref={messageEnd} />
             </div>
+            {!conversation.closedAt && (
+              <VoiceMessageComposer
+                key={`${identity.uid}:${conversation.id}`}
+                identity={identity}
+                conversation={conversation}
+                roomKey={roomKey}
+                disabled={session.busy || !roomKey || conversation.participantIds.length < 2}
+              />
+            )}
             <Form
               className="chat-compose"
               onSubmit={async () => {

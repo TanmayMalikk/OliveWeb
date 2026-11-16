@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
@@ -241,8 +242,8 @@ internal fun GameCover(
     onEntryAttempt: (String) -> Boolean = { false },
 ) {
     var nickname by remember { mutableStateOf("") }
-    var score by remember { mutableIntStateOf(0) }
-    var settingsOpen by remember { mutableStateOf(false) }
+    var score by rememberSaveable(sessionViewModel?.coverAccountId) { mutableIntStateOf(0) }
+    var settingsOpen by rememberSaveable(sessionViewModel?.coverAccountId) { mutableStateOf(false) }
     if (settingsOpen && sessionViewModel != null) {
         CoverSettingsPage(sessionViewModel) { settingsOpen = false }
         return

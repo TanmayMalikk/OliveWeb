@@ -18,6 +18,9 @@ import kotlinx.coroutines.withContext
 import java.security.PublicKey
 import com.olive.app.ui.users.shared.navigation.*
 import android.app.Application
+import java.io.File
+import com.olive.app.data.media.PendingVoiceMessage
+import com.olive.app.ui.users.user.documents.MediaTransferController
 import androidx.compose.runtime.*
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.Friend
@@ -158,8 +161,6 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                         ).copy(attachment = OutgoingAttachment(mediaId = document.id))
                         val queued = withContext(Dispatchers.IO) { messageOutbox.write(outgoing) }
                         MessageSendWorker.enqueue(application, queued)
-                        if (epoch == token) message =
-                            runtime.application.getString(R.string.message_delivery_queued)
                     } catch (error: CancellationException) {
                         throw error
                     } catch (_: Exception) {
@@ -170,6 +171,46 @@ internal class SessionSecureSharing(private val runtime: SessionRuntime) {
                     }
                 }
             }
+        }
+    }
+
+    var preparingVoiceConversationId by mutableStateOf<String?>(null)
+        private set
+
+    fun sendVoice(file: File, metadata: String, transfers: MediaTransferController): Boolean = with(runtime) {
+        with(state) {
+            val conversation = activeConversation ?: return false
+            val device = enrollment ?: return false
+            if (preparingVoiceConversationId != null || conversation.closedAt != 0L ||
+                conversation.participantIds.size < 2
+            ) return false
+            val token = epoch
+            val identity = AccountIdentity(device.uid, coverUsername)
+            val openedKey = activeRoomKey
+            preparingVoiceConversationId = conversation.id
+            message = null
+            scope.launch {
+                try {
+                    val key = outgoingRoomKey(openedKey) { roomKey(conversation) }
+                    check(enrollment?.uid == identity.uid)
+                    val wrappedKey = withContext(Dispatchers.IO) {
+                        KeyManager.wrapKey(key, KeyManager.getOrCreatePublicKey())
+                    }
+                    transfers.queueVoiceMessage(file, identity, PendingVoiceMessage(
+                        conversation.id, identity.username, wrappedKey, metadata,
+                    ))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (epoch == token && activeConversation?.id == conversation.id) {
+                        message = application.getString(R.string.voice_send_failed)
+                    }
+                } finally {
+                    file.delete()
+                    preparingVoiceConversationId = null
+                }
+            }
+            true
         }
     }
 

@@ -112,7 +112,7 @@ private fun StaffHelpScreen(session: SessionViewModel) {
             stringResource(R.string.support_staff_search_help)
         )
         if (controller.staffUid.isBlank()) {
-LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 3)
+            LoadingSkeleton(SkeletonLayout.SupportAssignment, Modifier.fillMaxWidth().padding(16.dp))
         }
         Text(
             if (controller.staffUid.isBlank()) stringResource(R.string.support_looking_for_staff)

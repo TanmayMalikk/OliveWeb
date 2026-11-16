@@ -2,6 +2,7 @@
 package com.olive.app.ui.users.user.location
 
 
+import com.olive.app.ui.shared.SkeletonLayout
 import android.annotation.SuppressLint
 import android.webkit.JavascriptInterface
 import android.graphics.Color
@@ -374,7 +375,7 @@ internal fun InteractiveLocationMap(
         // Shows map loading, retry, or nothing once the map is ready.
         when (loadState) {
 MapLoadState.Loading -> Surface(Modifier.fillMaxSize().testTag("map_loading")) {
-                com.olive.app.ui.shared.LoadingSkeleton(Modifier.padding(16.dp), rows = 1, preview = true)
+                com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Map, Modifier.fillMaxSize().padding(12.dp))
             }
 
             MapLoadState.Error -> Column(

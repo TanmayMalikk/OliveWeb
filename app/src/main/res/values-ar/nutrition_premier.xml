@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_barcode">الرمز الشريطي</string>
+    <string name="nutrition_all_foods">كل الأطعمة</string>
+    <string name="nutrition_generic">عامة</string>
+    <string name="nutrition_branded">ماركات</string>
+    <string name="nutrition_more">تحميل المزيد</string>
+    <string name="nutrition_ip_approval">يتطلب FatSecret الموافقة على عنوان IP للخادم. تظل المصادر الأخرى المتاحة تعمل.</string>
+    <string name="nutrition_manual">إدخال طعام يدوياً</string>
+    <string name="nutrition_label_basis">أدخل القيم لحصة واحدة ثم حدد الكمية التي أكلتها. السعرات والبروتين والكربوهيدرات والدهون مطلوبة؛ أدخل 0 إذا كان الملصق يذكر صفراً. باقي العناصر اختيارية.</string>
+    <string name="nutrition_scan_label">قراءة صورة الملصق</string>
+    <string name="nutrition_scan_failed">تعذرت قراءة القيم. أدخلها يدوياً أو جرّب صورة أوضح.</string>
+    <string name="nutrition_scan_review">تحقق من كل قيمة وحجم الحصة على الملصق قبل المتابعة.</string>
+    <string name="nutrition_food_name">اسم الطعام</string>
+    <string name="nutrition_serving_basis">حجم الحصة (مثلاً قطعة أو 40 غ أو 100 غ)</string>
+    <string name="nutrition_more_nutrients">عناصر إضافية (اختياري)</string>
+    <string name="nutrition_fewer_nutrients">عناصر أقل</string>
+    <string name="nutrition_choose_portion">اختيار الكمية</string>
+</resources>

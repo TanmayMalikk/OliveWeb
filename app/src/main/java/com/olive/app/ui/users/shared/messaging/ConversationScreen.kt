@@ -87,6 +87,10 @@ internal fun ChatPane(
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
     var searching by remember(active.id) { mutableStateOf(false) }
     var messageSearch by remember(active.id) { mutableStateOf("") }
+    val closeSearch = {
+        searching = false
+        messageSearch = ""
+    }
     var latestIncomingId by remember(active.id) { mutableStateOf<String?>(null) }
     var observedIncoming by remember(active.id) { mutableStateOf(false) }
     var incomingAnnouncements by remember(active.id) { mutableIntStateOf(0) }
@@ -186,7 +190,7 @@ internal fun ChatPane(
                     .background(Color.White)
                     .padding(start = 12.dp, end = if (exit != null) 76.dp else 12.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (showBack) IconButton(
                     onClick = session.messages::closeConversation,
@@ -266,7 +270,12 @@ internal fun ChatPane(
                 ) {
                     Icon(Icons.Outlined.Call, stringResource(R.string.ui_start_voice_call))
                 }
-
+                IconButton(
+                    onClick = { if (searching) closeSearch() else searching = true },
+                    modifier = Modifier.testTag("chat_search_toggle"),
+                ) {
+                    Icon(Icons.Outlined.Search, uiText(R.string.chat_search_messages))
+                }
             }
             HorizontalDivider()
             if (session.accountRole == AccountRole.STAFF &&
@@ -307,16 +316,11 @@ internal fun ChatPane(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         trailingIcon = {
-                            IconButton(onClick = { searching = false; messageSearch = "" }) {
+                            IconButton(onClick = closeSearch) {
                                 Icon(Icons.Outlined.Close, uiText(R.string.clear_search))
                             }
                         },
                     )
-                } else {
-                    TextButton(onClick = { searching = true }, modifier = Modifier.align(Alignment.End)) {
-                        Icon(Icons.Outlined.Search, contentDescription = null)
-                        Text(uiText(R.string.chat_search_messages))
-                    }
                 }
                 LazyColumn(
                     Modifier.weight(1f).fillMaxWidth(),
@@ -325,7 +329,7 @@ internal fun ChatPane(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (session.messages.loadingConversation) {
-                        item { com.olive.app.ui.shared.LoadingSkeleton(rows = 3) }
+                        item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Conversation, rows = 3) }
                         return@LazyColumn
                     }
                     if (timeline.isEmpty() && session.message == null) item {
@@ -512,45 +516,79 @@ internal fun ChatPane(
                         }
                     }
                 }
+                val transfers = session.media
+                val pendingVoice = transfers?.uploads?.firstOrNull {
+                    it.ownerUid == currentUid && it.voiceConversationId == active.id
+                }
+                if (pendingVoice != null) {
+                    VoiceMessageUploadStatus(pendingVoice) { transfers.retryUpload(pendingVoice.jobId) }
+                } else if (session.preparingVoiceConversationId == active.id) {
+                    VoiceMessageUploadStatus()
+                }
                 Status(session)
                 if (active.closedAt == 0L) Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
                     border = BorderStroke(1.dp, ChatBorder),
                 ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (canAttachMedia) {
-                        IconButton(
-                            onClick = { showAttachmentPicker = true },
-                            enabled = !session.messages.busy,
-                            modifier = Modifier.testTag("attach_private_entry")
+                    val composer: @Composable (Boolean, (@Composable () -> Unit)?) -> Unit = { voiceOpen, mic ->
+                        // The outlined field reserves space above the outline for its floating label.
+                        val labelInset = 8.dp
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                Icons.Outlined.AttachFile,
-                                stringResource(R.string.attach_secure_entry)
-                            )
+                            if (canAttachMedia) {
+                                IconButton(
+                                    onClick = { showAttachmentPicker = true },
+                                    enabled = !voiceOpen && !session.messages.busy,
+                                    modifier = Modifier.padding(top = labelInset)
+                                        .testTag("attach_private_entry")
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.AttachFile,
+                                        stringResource(R.string.attach_secure_entry)
+                                    )
+                                }
+                            }
+                            Box(Modifier.weight(1f)) {
+                                OutlinedTextField(
+                                    draft,
+                                    { if (it.length <= 2_000) draft = it },
+                                    label = { Text(stringResource(R.string.message)) },
+                                    modifier = Modifier.fillMaxWidth().testTag("message_body")
+                                        .keepVisibleWhileTyping(),
+                                    readOnly = voiceOpen,
+                                    maxLines = 4,
+                                    shape = RoundedCornerShape(24.dp),
+                                    trailingIcon = if (mic != null) { { Spacer(Modifier.size(48.dp)) } } else null,
+                                )
+                                if (mic != null) Box(
+                                    Modifier.matchParentSize().padding(top = labelInset),
+                                    contentAlignment = Alignment.CenterEnd,
+                                ) { mic() }
+                            }
+                            FilledIconButton(
+                                onClick = { session.messages.sendMessage(draft) { draft = "" } },
+                                enabled = !voiceOpen && draft.isNotBlank() && !session.messages.busy &&
+                                    (active.type != "SUPPORT" || active.participantIds.size >= 2),
+                                modifier = Modifier.padding(top = labelInset)
+                                    .size(50.dp).testTag("send_message")
+                            ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
                         }
                     }
-                    OutlinedTextField(
-                        draft,
-                        { if (it.length <= 2_000) draft = it },
-                        label = { Text(stringResource(R.string.message)) },
-                        modifier = Modifier.weight(1f).testTag("message_body")
-                            .keepVisibleWhileTyping(),
-                        maxLines = 4,
-                        shape = RoundedCornerShape(24.dp),
-                    )
-                    FilledIconButton(
-                        onClick = { session.messages.sendMessage(draft) { draft = "" } },
-                        enabled = draft.isNotBlank() && !session.messages.busy &&
-                            (active.type != "SUPPORT" || active.participantIds.size >= 2),
-                        modifier = Modifier.size(50.dp).testTag("send_message")
-                    ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
-                }
+                    if (!session.localMode && !session.privacyBlackout && callState == VoipSessionState.Idle) {
+                        key(currentUid, active.id) {
+                            VoiceMessageComposer(
+                                enabled = session.preparingVoiceConversationId == null && !session.messages.busy &&
+                                    active.participantIds.size >= 2,
+                                withMicrophonePermission = withMicrophonePermission,
+                                onSend = session::sendVoiceMessage,
+                                content = composer,
+                            )
+                        }
+                    } else composer(false, null)
                 }
             }
         }

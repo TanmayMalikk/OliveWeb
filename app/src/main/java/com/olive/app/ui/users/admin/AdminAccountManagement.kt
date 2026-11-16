@@ -99,7 +99,7 @@ internal fun AdminAccounts(
             }
         }
         if (session.busy) {
-            item("loading_accounts") { com.olive.app.ui.shared.LoadingSkeleton(rows = 3) }
+            item("loading_accounts") { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Accounts, rows = 3) }
             return@LazyColumn
         }
         if (session.adminAccounts.isEmpty() && session.message == null) item("no_accounts") {

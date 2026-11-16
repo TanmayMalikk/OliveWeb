@@ -195,6 +195,27 @@
   margin-top: auto;
   align-items: flex-end;
 }
+.voice-compose {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 1rem;
+  font-size: 0.85rem;
+}
+.voice-compose button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+.voice-message audio, .voice-compose audio {
+  width: min(16rem, 100%);
+  max-width: 100%;
+}
+.voice-message > span {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+}
 .chat-compose textarea {
   min-height: 3.2rem;
   max-height: 8rem;

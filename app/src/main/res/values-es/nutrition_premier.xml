@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_barcode">Código de barras</string>
+    <string name="nutrition_all_foods">Todos</string>
+    <string name="nutrition_generic">Genéricos</string>
+    <string name="nutrition_branded">Marcas</string>
+    <string name="nutrition_more">Cargar más</string>
+    <string name="nutrition_ip_approval">FatSecret necesita autorización de la IP del servidor. Las otras fuentes disponibles siguen funcionando.</string>
+    <string name="nutrition_manual">Introducir alimento</string>
+    <string name="nutrition_label_basis">Introduce los valores de una porción y luego la cantidad consumida. Calorías, proteínas, carbohidratos y grasas son obligatorios; introduce 0 si así lo indica la etiqueta. Los demás nutrientes son opcionales.</string>
+    <string name="nutrition_scan_label">Leer foto de etiqueta</string>
+    <string name="nutrition_scan_failed">No se pudieron leer los valores. Introdúcelos manualmente o prueba una foto más clara.</string>
+    <string name="nutrition_scan_review">Comprueba cada valor y la porción con la etiqueta antes de continuar.</string>
+    <string name="nutrition_food_name">Nombre del alimento</string>
+    <string name="nutrition_serving_basis">Porción (p. ej. 1 barra, 40 g o 100 g)</string>
+    <string name="nutrition_more_nutrients">Más nutrientes (opcional)</string>
+    <string name="nutrition_fewer_nutrients">Menos nutrientes</string>
+    <string name="nutrition_choose_portion">Elegir cantidad</string>
+</resources>

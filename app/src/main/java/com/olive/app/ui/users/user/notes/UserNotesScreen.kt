@@ -49,7 +49,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
-private fun validIncidentDate(value: String) = com.olive.app.data.account.parseIncidentDate(value) != null
+private fun validIncidentDate(value: String) =
+    value.isBlank() || com.olive.app.data.account.parseIncidentDate(value) != null
 
 private fun validIncidentTime(value: String, saved: String?) =
     value.isBlank() || value == saved || (value.trim().matches(Regex("[0-9]{2}:[0-9]{2}")) &&
@@ -274,7 +275,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
             }
             item {
                 Field(
-                    if (kind == PrivateEntryKind.Incident) uiText(R.string.title) else uiText(R.string.title_optional),
+                    uiText(R.string.title_optional),
                     title,
                     "private_entry_title",
                     enabled = !session.busy
@@ -282,6 +283,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
             }
             if (kind == PrivateEntryKind.Incident) {
                 item {
+                    Text(stringResource(R.string.incident_optional_fields), color = Muted)
                     IncidentDateTimeFields(
                         date = incidentDate,
                         time = incidentTime,
@@ -384,8 +386,8 @@ internal fun PrivateNotes(session: SessionViewModel) {
                     label = {
                         Text(
                             stringResource(
-                                if (kind == PrivateEntryKind.Incident) R.string.incident_body
-                                else R.string.note_content
+                                if (kind == PrivateEntryKind.Incident) R.string.incident_body_required
+                                else R.string.note_content_required
                             )
                         )
                     },
@@ -395,50 +397,32 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 )
             }
             item {
-                Card(
-                    Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                Button(
+                    onClick = { attachmentMenuOpen = true },
+                    enabled = uid != null && !session.busy,
+                    modifier = Modifier.fillMaxWidth().testTag("private_add_attachment"),
                 ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    Icon(Icons.Outlined.Attachment, null)
+                    Text(
+                        stringResource(R.string.add_attachment),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                if (kind == PrivateEntryKind.Incident) Text(
+                    stringResource(R.string.incident_attachments_help),
+                    color = Muted,
+                )
+                session.documents.state.files.filter { it.id in selectedAttachments }.forEach { document ->
+                    Row(
+                        Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(stringResource(R.string.attachments), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(
-                                if (kind == PrivateEntryKind.Incident) R.string.incident_attachments_help
-                                else R.string.note_attachments_help
-                            ),
-                            color = Muted,
+                        Checkbox(
+                            checked = true,
+                            onCheckedChange = { selectedAttachments = selectedAttachments - document.id },
                         )
-                        Button(
-                            onClick = { attachmentMenuOpen = true },
-                            enabled = uid != null && !session.busy,
-                            modifier = Modifier.fillMaxWidth().testTag("private_add_attachment"),
-                        ) {
-                            Icon(Icons.Outlined.Attachment, null)
-                            Text(
-                                stringResource(R.string.add_attachment),
-                                modifier = Modifier.padding(start = 8.dp),
-                            )
-                        }
-                        session.documents.state.files.filter { it.id in selectedAttachments }.forEach { document ->
-                        Row(
-                            Modifier.fillMaxWidth().semantics(mergeDescendants = true) { },
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Checkbox(
-                                checked = true,
-                                onCheckedChange = { selectedAttachments = selectedAttachments - document.id },
-                            )
-                            Text(document.name, modifier = Modifier.weight(1f))
-                            if (document.evidence) Text(stringResource(R.string.evidence), color = OliveGreen)
-                        }
-                    }
-                        if (selectedAttachments.isEmpty()) Text(
-                            stringResource(R.string.attachments_empty_help),
-                            color = Muted,
-                        )
+                        Text(document.name, modifier = Modifier.weight(1f))
+                        if (document.evidence) Text(stringResource(R.string.evidence), color = OliveGreen)
                     }
                 }
             }
@@ -457,8 +441,7 @@ internal fun PrivateNotes(session: SessionViewModel) {
                         if (body.isNotBlank()) editorOpen = false
                     },
                     enabled = !session.busy && body.isNotBlank() &&
-                        (kind == PrivateEntryKind.Note || (title.isNotBlank() && incidentLocation.isNotBlank() &&
-                            validIncidentDate(incidentDate) &&
+                        (kind == PrivateEntryKind.Note || (validIncidentDate(incidentDate) &&
                             validIncidentTime(incidentTime, entry?.incidentTime))),
                     modifier = Modifier.fillMaxWidth().testTag("save_private_entry")
                 ) {
@@ -549,10 +532,13 @@ internal fun PrivateNotes(session: SessionViewModel) {
                 ) { Icon(Icons.Outlined.Add, uiText(R.string.ui_new_note)) }
             }
         }
-        if (session.loadingHistory || session.historyLoadFailed) {
+        if (session.loadingHistory) {
+            items(3, key = { "loading_note_$it" }) { LoadingSkeleton(SkeletonLayout.Notes, rows = 1) }
+            return@LazyVerticalGrid
+        }
+        if (session.historyLoadFailed) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                if (session.loadingHistory) LoadingSkeleton(rows = 3)
-                else AccessibleMessage(stringResource(R.string.account_history_load_failed))
+                AccessibleMessage(stringResource(R.string.account_history_load_failed))
             }
             return@LazyVerticalGrid
         }

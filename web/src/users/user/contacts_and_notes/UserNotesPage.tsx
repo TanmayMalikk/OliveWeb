@@ -225,8 +225,6 @@ export default function Notes() {
                 const incidentLongitude = longitudeText ? Number(longitudeText) : Number.NaN;
                 const attachmentIds = data.getAll("attachments").map(String);
                 if (!body) throw new Error("Write something before saving.");
-                if (kind === "Incident" && (!title || !incidentDate || !incidentLocation))
-                  throw new Error("Add a title, incident date, and incident location.");
                 const changes = [
                   ["Title", editing.title, title],
                   ["Body", editing.body, body],
@@ -298,15 +296,15 @@ export default function Notes() {
               <input type="hidden" name="kind" value={editing.kind} />
             </div>
             <Field
-              label={editing.kind === "Incident" ? "Title" : "Title (optional)"}
+              label="Title (optional)"
               name="title"
               defaultValue={editing.title}
               maxLength={160}
-              required={editing.kind === "Incident"}
             />
             {editing.kind === "Incident" && (
               <>
-                <Field label="Date of incident" name="incidentDate" type="date" defaultValue={editing.incidentDate ?? ""} required />
+                <p className="help-note">Date, time, and location are optional but recommended.</p>
+                <Field label="Date of incident" name="incidentDate" type="date" defaultValue={editing.incidentDate ?? ""} />
                 <Field label="Approx. time of incident" name="incidentTime" type="time" defaultValue={editing.incidentTime ?? ""} />
                 <IncidentLocationPicker
                   label={editing.incidentLocation ?? ""}
@@ -325,7 +323,7 @@ export default function Notes() {
               </>
             )}
             <label className="field">
-              <span>Your words</span>
+              <span>{editing.kind === "Incident" ? "Incident details (required)" : "Note (required)"}</span>
               <textarea
                 name="body"
                 defaultValue={editing.body}
@@ -335,59 +333,62 @@ export default function Notes() {
                 autoFocus
               />
             </label>
-            <fieldset className="field attachment-picker">
-              <legend>Attachments</legend>
-              <p>Choose saved photos, videos, or documents. Incident attachments become evidence.</p>
-              <label className="button outline">
-                {attachmentUploadProgress === null
-                  ? "Upload a new attachment"
-                  : `Uploading ${Math.round(attachmentUploadProgress * 100)}%`}
-                <input
-                  className="sr-only"
-                  type="file"
-                  accept="image/*,video/*,application/pdf,text/*"
-                  disabled={attachmentUploadProgress !== null || !accounts.identity}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    const identity = accounts.identity;
-                    if (!file || !identity) return;
-                    const previous = new Set(documents.map((document) => document.id));
-                    setAttachmentError("");
-                    setAttachmentUploadProgress(0);
-                    void uploadBrowserDocument(file, identity, setAttachmentUploadProgress)
-                      .then(() => listBrowserDocuments(identity))
-                      .then((updated) => {
-                        setDocuments(updated);
-                        const added = updated.find((document) => !previous.has(document.id));
-                        if (added) setEditing((current) => current && ({
-                          ...current,
-                          attachmentIds: [...new Set([...(current.attachmentIds ?? []), added.id])],
-                        }));
-                      })
-                      .catch((failure) => setAttachmentError(
-                        failure instanceof Error ? failure.message : "Unable to upload this attachment.",
-                      ))
-                      .finally(() => {
-                        setAttachmentUploadProgress(null);
-                        event.target.value = "";
-                      });
-                  }}
-                />
-              </label>
-              {attachmentError && <small className="error" role="alert">{attachmentError}</small>}
-              {documents.map((document) => (
-                <label key={document.id}>
+            <details>
+              <summary className="button outline">Add attachment</summary>
+              <div className="attachment-picker">
+                <label className="button outline">
+                  {attachmentUploadProgress === null
+                    ? "Upload a new attachment"
+                    : `Uploading ${Math.round(attachmentUploadProgress * 100)}%`}
                   <input
-                    type="checkbox"
-                    name="attachments"
-                    value={document.id}
-                    defaultChecked={(editing.attachmentIds ?? []).includes(document.id)}
+                    className="sr-only"
+                    type="file"
+                    accept="image/*,video/*,application/pdf,text/*"
+                    disabled={attachmentUploadProgress !== null || !accounts.identity}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      const identity = accounts.identity;
+                      if (!file || !identity) return;
+                      const previous = new Set(documents.map((document) => document.id));
+                      setAttachmentError("");
+                      setAttachmentUploadProgress(0);
+                      void uploadBrowserDocument(file, identity, setAttachmentUploadProgress)
+                        .then(() => listBrowserDocuments(identity))
+                        .then((updated) => {
+                          setDocuments(updated);
+                          const added = updated.find((document) => !previous.has(document.id));
+                          if (added) setEditing((current) => current && ({
+                            ...current,
+                            attachmentIds: [...new Set([...(current.attachmentIds ?? []), added.id])],
+                          }));
+                        })
+                        .catch((failure) => setAttachmentError(
+                          failure instanceof Error ? failure.message : "Unable to upload this attachment.",
+                        ))
+                        .finally(() => {
+                          setAttachmentUploadProgress(null);
+                          event.target.value = "";
+                        });
+                    }}
                   />
-                  {document.name}{document.evidence ? " · Evidence" : ""}
                 </label>
-              ))}
-              {!documents.length && <small>Upload files in Documents, then attach them here.</small>}
-            </fieldset>
+                {attachmentError && <small className="error" role="alert">{attachmentError}</small>}
+                {documents.map((document) => (
+                  <label key={document.id}>
+                    <input
+                      type="checkbox"
+                      name="attachments"
+                      value={document.id}
+                      defaultChecked={(editing.attachmentIds ?? []).includes(document.id)}
+                    />
+                    {document.name}{document.evidence ? " · Evidence" : ""}
+                  </label>
+                ))}
+              </div>
+            </details>
+            {editing.kind === "Incident" && (
+              <small>Incident attachments are automatically marked as evidence.</small>
+            )}
             <div className="modal-actions">
               <Button type="submit" disabled={s.busy}>
                 Save entry

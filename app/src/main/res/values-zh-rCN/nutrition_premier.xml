@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_barcode">条形码</string>
+    <string name="nutrition_all_foods">所有食物</string>
+    <string name="nutrition_generic">通用</string>
+    <string name="nutrition_branded">品牌</string>
+    <string name="nutrition_more">加载更多食物</string>
+    <string name="nutrition_ip_approval">FatSecret 需要批准服务器 IP。其他可用的食物来源仍可使用。</string>
+    <string name="nutrition_manual">手动输入食物</string>
+    <string name="nutrition_label_basis">输入标签上一份的营养数值，再选择食用量。热量、蛋白质、碳水和脂肪为必填；标签标为零时请输入 0。其他营养素可选。</string>
+    <string name="nutrition_scan_label">读取标签照片</string>
+    <string name="nutrition_scan_failed">无法读取营养数值。请手动输入或重试更清晰的照片。</string>
+    <string name="nutrition_scan_review">继续前请对照标签检查所有扫描数值和每份大小。</string>
+    <string name="nutrition_food_name">食物名称</string>
+    <string name="nutrition_serving_basis">每份大小（如 1 根、40 克或 100 克）</string>
+    <string name="nutrition_more_nutrients">更多营养素（可选）</string>
+    <string name="nutrition_fewer_nutrients">减少营养素</string>
+    <string name="nutrition_choose_portion">选择食用量</string>
+</resources>

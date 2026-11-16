@@ -250,11 +250,6 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                         runtime.application.getString(R.string.use_up_to_120_title_characters_and_10_000_detail_characters)
                     return
                 }
-                if (kind == PrivateEntryKind.Incident &&
-                    (cleanTitle.isBlank() || cleanDate.isBlank() || cleanLocation.isBlank())) {
-                    message = runtime.application.getString(R.string.incident_required_fields)
-                    return
-                }
                 val uid = enrollment?.uid ?: return
                 val existing =
                     id?.let { wanted -> privateEntries.firstOrNull { it.id == wanted && it.deletedAt == null } }

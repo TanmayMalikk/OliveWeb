@@ -15,7 +15,12 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.account.AccountIdentity
+import com.olive.app.data.messaging.MessageOutboxStore
+import com.olive.app.data.messaging.MessageSendWorker
+import com.olive.app.data.messaging.OutgoingAttachment
 import com.olive.app.data.messaging.OutgoingMessage
+import com.olive.app.data.messaging.prepareOutgoingMessage
 import com.olive.app.data.safety.SafetyPlanSyncWorker
 import com.olive.app.security.KeyManager
 import java.io.File
@@ -93,6 +98,17 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
                 job=store.update(job.id) { it.copy(status=MediaTransferStatus.UPLOADING,mode=session.mode,
                     mediaId=session.mediaId,objectKey=session.objectKey,uploadId=session.uploadId,partSize=session.partSize,error=null) }
             }
+            job.voiceDraft?.let { draft ->
+                val voice = prepareOutgoingMessage(
+                    draft.conversationId,
+                    AccountIdentity(job.ownerUid, draft.senderUsername),
+                    "SHARED_VOICE:${job.mediaId}" + draft.metadata.takeIf(String::isNotEmpty)?.let { ":$it" }.orEmpty(),
+                    KeyManager.unwrapKey(draft.wrappedRoomKey, KeyManager.CURRENT_KEY_WRAP_VERSION),
+                    id = job.id,
+                    now = job.createdAt,
+                ).copy(attachment = OutgoingAttachment(job.mediaId))
+                job = store.update(job.id) { it.copy(voiceDraft = null, voiceMessage = voice) }
+            }
             val parts=upload(file,job)
 
             // Finalization tells R2 to assemble multipart chunks, verifies the remote byte count,
@@ -102,7 +118,13 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             if (job.attachToSafetyPlan) {
                 SafetyPlanSyncWorker.enqueueAttachment(applicationContext,job.ownerUid,record.id)
             }
-            store.update(job.id) { it.copy(status=MediaTransferStatus.COMPLETE,mediaId=record.id,error=null) }
+            job.voiceMessage?.let { voice ->
+                val queued = MessageOutboxStore(applicationContext).write(voice)
+                MessageSendWorker.enqueue(applicationContext, queued)
+            }
+            store.update(job.id) {
+                it.copy(status=MediaTransferStatus.COMPLETE,mediaId=record.id,error=null,voiceMessage=null)
+            }
             // Preserve a bounded reuse window so an owner can pin the already-uploaded ciphertext
             // without downloading it from R2. Cleanup remains durable if the UI never opens.
             runCatching {
@@ -173,7 +195,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
     // Separates upload errors that can be retried from errors that need user action.
     private fun permanent(job:MediaUploadJob,message:String):Result {
         // A permanent result requires explicit user/app intervention rather than automatic backoff.
-        store.write(job.copy(status=MediaTransferStatus.FAILED,error=message.take(240)))
+        store.update(job.id) { it.copy(status=MediaTransferStatus.FAILED,error=message.take(240)) }
         return Result.failure(workDataOf(ERROR to message.take(240)))
     }
     // Saves the upload error and asks WorkManager to retry after a delay.
@@ -183,7 +205,7 @@ class MediaUploadWorker(context:Context,parameters:WorkerParameters):CoroutineWo
             is SocketTimeoutException -> "Encrypted upload timed out. Retrying automatically."
             else -> error.localizedMessage?.take(240) ?: "Encrypted upload interrupted. Retrying automatically."
         }
-        store.write(job.copy(status=MediaTransferStatus.QUEUED,error=message))
+        store.update(job.id) { it.copy(status=MediaTransferStatus.QUEUED,error=message) }
         return Result.retry()
     }
 

@@ -292,7 +292,7 @@ internal fun SafetyPlanScreen(
                     }
                 }
             }
-            if (controller.loadingPlan) com.olive.app.ui.shared.LoadingSkeleton(rows = 1)
+            if (controller.loadingPlan) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Checklist)
             if (plan != null) {
                 SafetyChecklistProgress(
                     prepared = selectedCompletion.prepared,
@@ -510,7 +510,7 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
             stringResource(R.string.safe_contact_shared_plans_intro)
         )
         if (session.localMode) Text(stringResource(R.string.safety_account_required), color = Muted)
-        if (controller.loadingAccess && !session.localMode) com.olive.app.ui.shared.LoadingSkeleton()
+        if (controller.loadingAccess && !session.localMode) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.SharedPlans)
         controller.error?.let { AccessibleMessage(stringResource(it)) }
         val visiblePlans = if (controller.loadingAccess) emptyList() else controller.sharedPlans
         if (visiblePlans.isEmpty() && (!controller.loadingAccess || session.localMode) && controller.error == null) Surface(

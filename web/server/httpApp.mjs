@@ -81,7 +81,7 @@ export function createServerApp({ development = false } = {}) {
       "X-Content-Type-Options": "nosniff",
       "Referrer-Policy": "no-referrer",
       "X-Frame-Options": "DENY",
-      "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
+      "Permissions-Policy": "camera=(), microphone=(self), geolocation=(self)",
       "Cross-Origin-Opener-Policy": "same-origin",
       "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     });

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_manual_short">Alimento manual</string>
+    <string name="nutrition_label_short">Valores por porción. Introduce 0 cuando la etiqueta indique cero.</string>
+    <string name="nutrition_serving_short">Tamaño de porción</string>
+    <string name="nutrition_scan_barcode">Escanear código de barras</string>
+    <string name="nutrition_barcode_failed">No se encontró un código válido único. Prueba una foto más clara o introduce los dígitos.</string>
+    <string name="nutrition_other_nutrients">Otros nutrientes</string>
+    <string name="nutrition_custom_portion">Cantidad personalizada</string>
+    <string name="nutrition_amount">Cantidad</string>
+    <string name="nutrition_water">Agua</string>
+    <string name="nutrition_add_water">Añadir agua</string>
+    <string name="nutrition_water_amount">Cantidad bebida</string>
+    <string name="nutrition_water_goal">Objetivo diario</string>
+    <string name="nutrition_water_progress">Agua: %1$d de %2$d ml. Toca para añadir.</string>
+    <string name="nutrition_water_minus">Quitar 250 ml de agua</string>
+    <string name="nutrition_water_plus">Añadir 250 ml de agua</string>
+    <string name="nutrition_edit_food">Editar alimento</string>
+    <string name="nutrition_edit_details">Editar detalles</string>
+</resources>

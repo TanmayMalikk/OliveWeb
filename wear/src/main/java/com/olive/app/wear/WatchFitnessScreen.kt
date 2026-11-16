@@ -74,7 +74,7 @@ internal fun OliveWatchFitnessApp(state: WatchFitnessState) {
     ) {
         Column(
             modifier = Modifier.fillMaxSize().background(WatchBackground)
-                .padding(horizontal = 18.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp).padding(top = 22.dp, bottom = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(

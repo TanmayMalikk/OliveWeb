@@ -185,7 +185,7 @@ internal fun SafetyDocumentsScreen(session: SessionViewModel) {
             Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (state.loading) item(key = "loading_documents") { LoadingSkeleton() }
+            if (state.loading) item(key = "loading_documents") { LoadingSkeleton(SkeletonLayout.Documents) }
             if (preparing) item(key = "preparing_upload") { PreparingUploadCard() }
             items(uploads, key = { "upload_${it.jobId}" }) { upload ->
                 PendingUploadCard(upload) { mediaController?.retryUpload(upload.jobId) }

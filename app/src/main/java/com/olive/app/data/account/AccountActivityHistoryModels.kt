@@ -283,11 +283,15 @@ class FirebaseAccountRepository : AccountRepository {
         val result = functions.getHttpsCallable("createPublicAccount").call(
             mapOf("username" to normalized, "password" to password, "role" to role.name)
         ).await().data as? Map<*, *> ?: error("Missing account")
-        check(result["uid"]?.toString()?.isNotBlank() == true) { "Missing account" }
+        val createdUid = result["uid"]?.toString()?.takeIf(String::isNotBlank) ?: error("Missing account")
         val user = auth.signInWithEmailAndPassword(
             AccountPolicy.signInEmail(normalized, role),
             password
         ).await().user ?: error("Missing account")
+        if (user.uid != createdUid) {
+            auth.signOut()
+            error("The newly created account could not be signed in.")
+        }
         return AccountIdentity(user.uid, normalized)
     }
 
@@ -316,6 +320,11 @@ class FirebaseAccountRepository : AccountRepository {
                     .await().user
             }
         } ?: error("Missing account")
+        val claimedRole = user.getIdToken(false).await().claims["role"] as? String
+        if (claimedRole != null && claimedRole != role.name) {
+            auth.signOut()
+            error("This account is registered under a different account type.")
+        }
         // Sign-in has already succeeded. Refreshing the older email alias must not block access if that optional update fails.
         if (role in setOf(AccountRole.STAFF, AccountRole.ADMIN)) {
             runCatching {
@@ -432,6 +441,11 @@ class FirebaseAccountRepository : AccountRepository {
         auth.currentUser?.displayName?.takeIf(InputPolicy::validExistingUsername)
             ?: auth.currentUser?.email?.substringBefore('@')?.let(InputPolicy::username)
 
+    override suspend fun authenticatedRole(): AccountRole? {
+        val claim = auth.currentUser?.getIdToken(false)?.await()?.claims?.get("role")
+        return AccountRole.entries.firstOrNull { it.name == claim }
+    }
+
     // Account: Signs out the current account.
     override fun signOut() = auth.signOut()
 
@@ -500,6 +514,7 @@ interface AccountRepository {
     fun authenticatedUid(): String?
     // Returns the normalized username of the signed-in account.
     fun authenticatedUsername(): String?
+    suspend fun authenticatedRole(): AccountRole? = null
     // Signs out the current account and clears its repository session.
     fun signOut()
 }

@@ -198,7 +198,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
             stringResource(R.string.olive_tree),
         )
         if (controller.loadingAccess && !session.localMode) {
-            com.olive.app.ui.shared.LoadingSkeleton()
+            com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.SharedPlans)
             return@FormColumn
         }
         if (session.accountRole == AccountRole.STAFF) {

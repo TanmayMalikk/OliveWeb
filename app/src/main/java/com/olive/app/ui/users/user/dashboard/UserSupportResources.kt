@@ -142,7 +142,7 @@ internal fun SafeResourcesScreen(session: SessionViewModel, profile: UserProfile
         // Show a loading sign or a useful message while the hotline list loads.
         if (catalog == null) item {
             // The directory is still loading, so keep the user informed.
-            if (directory == null) LoadingSkeleton() else {
+            if (directory == null) LoadingSkeleton(SkeletonLayout.HotlineDirectory) else {
                 AccessibleMessage(stringResource(R.string.support_load_failed))
                 TextButton(onClick = {
                     open(

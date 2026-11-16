@@ -41,28 +41,14 @@ internal data class WatchTileSnapshot(
 internal object WatchTileData {
     // Reads the latest synchronized fitness snapshot used by both watch tiles.
     fun read(context: Context): WatchTileSnapshot {
-        val preferences = context.getSharedPreferences("watch_fitness", Context.MODE_PRIVATE)
-        val today = LocalDate.now().toString()
-        val isToday = preferences.getString("step_date", null) == today
-        val watchSteps = if (isToday) preferences.getInt("steps_today", 0) else 0
-        val steps = maxOf(watchSteps, preferences.getInt("phone_steps", 0))
-        val heartRateIsToday = preferences.getString("heart_rate_date", null) == today
-        val samples = if (heartRateIsToday) preferences.getInt("heart_rate_samples", 0) else 0
-        val total = if (heartRateIsToday) preferences.getLong("heart_rate_total", 0L) else 0L
+        val state = WatchFitnessData.snapshot(context)
         return WatchTileSnapshot(
-            steps = steps,
-            stepGoal = preferences.getInt("step_goal", 8_000).coerceAtLeast(1),
-            caloriesBurned = (steps * 0.04f).roundToInt(),
-            currentHeartRate = preferences.getInt("heart_rate_latest", 0).takeIf {
-                heartRateIsToday && it in 30..240
-            },
-            peakHeartRate = preferences.getInt("heart_rate_peak", 0).takeIf {
-                heartRateIsToday && it > 0
-            },
-            lowestHeartRate = preferences.getInt("heart_rate_lowest", 0).takeIf {
-                heartRateIsToday && it > 0
-            },
-            averageHeartRate = if (samples > 0) (total / samples).toInt() else null,
+            steps = state.displayedSteps, stepGoal = state.stepGoal,
+            caloriesBurned = (state.displayedSteps * 0.04f).roundToInt(),
+            currentHeartRate = state.heartRate,
+            peakHeartRate = state.heartRateSummary.peakBpm.takeIf { it > 0 },
+            lowestHeartRate = state.heartRateSummary.lowestBpm.takeIf { it > 0 },
+            averageHeartRate = state.heartRateSummary.averageBpm,
         )
     }
 }
