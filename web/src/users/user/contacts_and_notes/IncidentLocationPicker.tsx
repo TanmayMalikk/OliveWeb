@@ -220,7 +220,6 @@ export function IncidentLocationPicker({
               chooseLocation({ label: event.target.value, latitude: NaN, longitude: NaN });
             }}
             autoComplete="off"
-            required
           />
           <button
             type="button"

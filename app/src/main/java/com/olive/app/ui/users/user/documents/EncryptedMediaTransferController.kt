@@ -16,6 +16,7 @@ import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.media.DocumentDownloadGate
 import com.olive.app.data.media.MAX_MEDIA_CIPHERTEXT_BYTES
+import com.olive.app.data.media.PendingVoiceMessage
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.copyAndVerifyEncryptedDownload
 import com.olive.app.data.media.MediaPreprocessor
@@ -212,6 +213,24 @@ internal class MediaTransferController(
         }
     }
 
+    suspend fun queueVoiceMessage(file: File, owner: AccountIdentity, voice: PendingVoiceMessage) {
+        try {
+            val job = withContext(Dispatchers.IO) {
+                val job = prepare(file.inputStream(), "Voice message.m4a", "audio/mp4", owner,
+                    MediaKind.AUDIO, OcrReview.NOT_APPLICABLE).copy(voiceDraft = voice)
+                store.write(job)
+                MediaUploadWorker.enqueue(applicationContext, job.id)
+                job
+            }
+            if (observedOwnerUid == owner.uid) {
+                observe(job.id)
+                refreshUploads(owner.uid)
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
     /** Re-enqueues an existing durable job without repeating OCR, compression, or encryption. */
     fun retry(jobId:String) {
         val job=store.get(jobId) ?: return
@@ -381,7 +400,8 @@ internal class MediaTransferController(
                     metadata?.optString("name")?.takeIf(String::isNotBlank) ?: "Encrypted document",
                     metadata?.optString("mimeType")?.takeIf(String::isNotBlank) ?: "application/octet-stream",
                     job.status,progress?.first ?: completedBytes(job),progress?.second ?: job.source.ciphertextSize,
-                    job.mediaId,job.error,job.createdAt)
+                    job.mediaId,job.error,job.createdAt,
+                    job.voiceDraft?.conversationId ?: job.voiceMessage?.conversationId)
             }
         }
         if(observedOwnerUid==ownerUid) uploads=jobs

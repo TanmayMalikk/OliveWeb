@@ -302,7 +302,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
         }
         if (profile.role == AccountRole.USER) {
             when {
-                requestedArea != null -> LoadingSkeleton(rows = 1)
+                requestedArea != null -> LoadingSkeleton(SkeletonLayout.NearbySupport)
                 failedArea != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.nearby_support_failed), Modifier.weight(1f))
                     TextButton(onClick = { requestedArea = uncoveredCenter ?: failedArea }) {
@@ -313,7 +313,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
                     Text(stringResource(R.string.load_more_hotline_locations))
                 }
                 loadedAreas.isEmpty() && serviceSearchEnabled && (origin != null || state.locating || state.ownerUid != uid) ->
-                    LoadingSkeleton(rows = 1)
+                    LoadingSkeleton(SkeletonLayout.NearbySupport)
                 loadedAreas.isEmpty() && origin == null -> Text(
                     stringResource(R.string.nearby_support_location_required), style = MaterialTheme.typography.bodySmall,
                 )
@@ -343,7 +343,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
                         style = MaterialTheme.typography.bodySmall,
                         color = Muted
                     )
-                    if (session.messages.loadingIndex) LoadingSkeleton(rows = 1)
+                    if (session.messages.loadingIndex) LoadingSkeleton(SkeletonLayout.Contacts, rows = 1)
                     else {
                         LocationShareFriendPicker(
                             accountId = uid,
@@ -455,7 +455,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
                             )
                         }
                     }
-                    if (state.routeWorking) LoadingSkeleton(rows = 1)
+                    if (state.routeWorking) LoadingSkeleton(SkeletonLayout.Directions)
                     Button(
                         onClick = {
                             if (state.navigating) controller.stopNavigation()

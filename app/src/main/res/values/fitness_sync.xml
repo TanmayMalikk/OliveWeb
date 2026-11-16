@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fitness_connect_health">Connect Health Connect</string>
+    <string name="fitness_health_permissions">Health permissions</string>
+    <string name="fitness_health_privacy">Olive Fitness reads steps and heart rate from Health Connect to update your fitness history. With background access, it can sync while closed. Fitness records are saved privately to your signed-in Firebase profile. You can revoke permissions in Health Connect at any time.</string>
+    <string name="fitness_sync_pending">Fitness sync is unavailable. Changes are saved on this device and will retry.</string>
+</resources>

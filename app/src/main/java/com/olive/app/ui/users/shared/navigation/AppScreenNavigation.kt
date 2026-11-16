@@ -192,19 +192,21 @@ internal fun OliveRoot(
             Box(Modifier.fillMaxSize()) {
                 if (shouldComposeCover(session.usesCover)) {
                     // Keep the user's selected cover alive underneath private screens.
-                    when (session.coverType) {
-                        CoverType.NEWS -> NewsCover(
-                            session,
-                            locationPermissionVersion,
-                            isCover && !navigation.privacyBlackout
-                        )
+                    key(session.coverAccountId ?: "guest") {
+                        when (session.coverType) {
+                            CoverType.NEWS -> NewsCover(
+                                session,
+                                locationPermissionVersion,
+                                isCover && !navigation.privacyBlackout
+                            )
 
-                        CoverType.FITNESS -> FitnessCover(session, isCover)
-                        CoverType.GAME -> GameCover(
-                            sessionViewModel = session,
-                            interactive = isCover,
-                            onEntryAttempt = session.account::interceptSearch,
-                        )
+                            CoverType.FITNESS -> FitnessCover(session, isCover)
+                            CoverType.GAME -> GameCover(
+                                sessionViewModel = session,
+                                interactive = isCover,
+                                onEntryAttempt = session.account::interceptSearch,
+                            )
+                        }
                     }
                 }
             }
@@ -322,7 +324,7 @@ internal fun OliveRoot(
                                             SessionScreen.Loading -> Box(
                                                 Modifier.fillMaxSize(),
                                                 contentAlignment = Alignment.Center
-                                            ) { com.olive.app.ui.shared.LoadingSkeleton(Modifier.fillMaxWidth().padding(24.dp), rows = 3) }
+                                            ) { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Action, Modifier.widthIn(max = 180.dp).fillMaxWidth()) }
 
                                             SessionScreen.Welcome -> Welcome(session)
                                             SessionScreen.NewCredentials -> Credentials(

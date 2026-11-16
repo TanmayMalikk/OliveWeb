@@ -2,4 +2,5 @@
 <paths>
     <cache-path name="opened_documents" path="opened-documents/" />
     <files-path name="verified_app_updates" path="updates/" />
+    <cache-path name="fitness_scans" path="fitness-scans/" />
 </paths>

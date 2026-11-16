@@ -12,6 +12,9 @@ import {
 import { useSession } from "../../session/SessionProvider";
 import { useChatDeviceKey, useChatTimeline } from "./useChatTimeline";
 
+import { sharedMessage } from "./safe_app/SharedMessageContent";
+import { VoiceMessageBubble, VoiceMessageComposer } from "./safe_app/VoiceMessages";
+
 const noMessages: Message[] = [];
 
 type TicketCategory = "PLAN_CONSULT" | "SUPPORT" | "NEEDS_ADMIN";
@@ -36,8 +39,9 @@ export default function OrganizationSupportInbox() {
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [history, setHistory] = useState<{ ticketId: string; messages: Message[] } | null>(null);
   const messages = history && history.ticketId === selected?.id ? history.messages : noMessages;
-  const [room, setRoom] = useState<{ ticketId: string; key: CryptoKey } | null>(null);
-  const roomKey = room && room.ticketId === selected?.id ? room.key : null;
+  const roomScope = selected ? JSON.stringify([identity?.uid, selected.id, selected.participantIds]) : "";
+  const [room, setRoom] = useState<{ scope: string; key: CryptoKey } | null>(null);
+  const roomKey = room?.scope === roomScope ? room.key : null;
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const draft = selected ? drafts[selected.id] ?? "" : "";
   const [feedback, setFeedback] = useState("");
@@ -92,7 +96,7 @@ export default function OrganizationSupportInbox() {
       .roomKey(selected.id, identity, selected)
       .then((key) => {
         if (!active) return undefined;
-        setRoom({ ticketId: selected.id, key });
+        setRoom({ scope: roomScope, key });
         return messaging.subscribeMessages(
           selected.id,
           key,
@@ -110,7 +114,7 @@ export default function OrganizationSupportInbox() {
       active = false;
       stop?.();
     };
-  }, [selected?.id, selected?.participantIds.join(","), identity?.uid, deviceKeyAvailable]);
+  }, [roomScope, deviceKeyAvailable]);
 
   const visible = useMemo(
     () =>
@@ -283,24 +287,39 @@ export default function OrganizationSupportInbox() {
               {timeline.length === 0 ? (
                 <p className="help-note">No messages yet.</p>
               ) : (
-                timeline.map((item) => item.kind === "membership" ? (
-                  <p key={`membership-${item.event.id}`} className="chat-membership-event">
-                    {messaging.membershipEventText(selected, item.event, identity.role)}
-                  </p>
-                ) : (
-                  <article
-                    key={item.message.id}
-                    className={`chat-bubble ${item.message.senderUid === identity.uid ? "own" : ""}`}
-                  >
-                    <small>{messaging.chatSenderName(selected, item.message, identity.role)}</small>
-                    <p>{item.message.deleted ? "Message unsent" : item.message.body}</p>
-                    <time>
-                      {new Date(item.message.clientSentAt).toLocaleString()}
-                    </time>
-                  </article>
-                ))
+                timeline.map((item) => {
+                  const shared = item.kind === "message" && !item.message.deleted
+                    ? sharedMessage(item.message.body) : null;
+                  return item.kind === "membership" ? (
+                    <p key={`membership-${item.event.id}`} className="chat-membership-event">
+                      {messaging.membershipEventText(selected, item.event, identity.role)}
+                    </p>
+                  ) : (
+                    <article
+                      key={item.message.id}
+                      className={`chat-bubble ${item.message.senderUid === identity.uid ? "own" : ""}`}
+                    >
+                      <small>{messaging.chatSenderName(selected, item.message, identity.role)}</small>
+                      {shared?.kind === "voice" ? (
+                        <VoiceMessageBubble key={identity.uid + shared.id} mediaId={shared.id} identity={identity} />
+                      ) : <p>{item.message.deleted ? "Message unsent" : item.message.body}</p>}
+                      <time>
+                        {new Date(item.message.clientSentAt).toLocaleString()}
+                      </time>
+                    </article>
+                  );
+                })
               )}
             </div>
+            {!selected.closedAt && (
+              <VoiceMessageComposer
+                key={`${identity.uid}:${selected.id}`}
+                identity={identity}
+                conversation={selected}
+                roomKey={roomKey}
+                disabled={session.busy || !roomKey || selected.participantIds.length < 2}
+              />
+            )}
             {!selected.closedAt && (
               <Form
                 className="chat-compose"

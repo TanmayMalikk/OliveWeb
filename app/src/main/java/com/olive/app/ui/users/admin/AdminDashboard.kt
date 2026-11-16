@@ -190,7 +190,7 @@ private fun AdminDashboard(
             AccountCountGrid(dashboard.adminCounts)
             TicketCountGrid(dashboard.adminCounts)
         } else if (session.busy || session.message == null) {
-            LoadingSkeleton(rows = 2)
+            LoadingSkeleton(SkeletonLayout.DashboardCounts)
         } else Status(session)
         OutlinedCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -300,7 +300,7 @@ private fun StaffManagement(session: SessionViewModel, onBack: () -> Unit) {
             enabled = !session.busy,
             modifier = Modifier.fillMaxWidth(),
         ) { Text(stringResource(R.string.refresh)) }
-        if (session.busy) LoadingSkeleton()
+        if (session.busy) LoadingSkeleton(SkeletonLayout.StaffWorkload)
         else if (staff.isEmpty() && session.message == null) {
             Text(stringResource(R.string.admin_no_staff_accounts), color = Muted)
         }

@@ -1,12 +1,14 @@
 package com.olive.app.ui.users.user.notes
 
 import android.text.format.DateFormat
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -47,30 +50,27 @@ internal fun IncidentDateTimeFields(
     val timeLabel = stringResource(R.string.incident_time)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        IncidentPickerButton(
-            dateLabel,
-            initialDate?.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) ?: date,
-            "incident_date",
-            enabled,
-            { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) }
+        IncidentPickerField(
+            label = dateLabel,
+            value = initialDate?.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) ?: date,
+            tag = "incident_date",
+            enabled = enabled,
+            icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+            clearLabel = stringResource(R.string.incident_clear_date),
+            onClear = { onDateChange("") },
         ) { openPicker = IncidentPicker.Date }
         if (date.isNotBlank() && initialDate == null) {
             Text(stringResource(R.string.incident_date_invalid), color = MaterialTheme.colorScheme.error)
         }
-        IncidentPickerButton(
-            timeLabel,
-            initialTime?.format(DateTimeFormatter.ofPattern(timePattern)) ?: time,
-            "incident_time",
-            enabled,
-            { Icon(Icons.Outlined.AccessTime, contentDescription = null) }
+        IncidentPickerField(
+            label = timeLabel,
+            value = initialTime?.format(DateTimeFormatter.ofPattern(timePattern)) ?: time,
+            tag = "incident_time",
+            enabled = enabled,
+            icon = { Icon(Icons.Outlined.AccessTime, contentDescription = null) },
+            clearLabel = stringResource(R.string.incident_clear_time),
+            onClear = { onTimeChange("") },
         ) { openPicker = IncidentPicker.Time }
-        if (time.isNotBlank()) {
-            TextButton(
-                onClick = { onTimeChange("") },
-                enabled = enabled,
-                modifier = Modifier.align(Alignment.End).testTag("incident_time_clear")
-            ) { Text(stringResource(R.string.incident_clear_time)) }
-        }
     }
 
     when (openPicker) {
@@ -158,26 +158,52 @@ internal fun IncidentDateTimeFields(
 }
 
 @Composable
-private fun IncidentPickerButton(
+private fun IncidentPickerField(
     label: String,
     value: String,
     tag: String,
     enabled: Boolean,
     icon: @Composable () -> Unit,
-    onClick: () -> Unit
+    clearLabel: String,
+    onClear: () -> Unit,
+    onClick: () -> Unit,
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = Modifier.fillMaxWidth().testTag(tag),
+    val colors = ButtonDefaults.outlinedButtonColors()
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+        color = if (enabled) colors.containerColor else colors.disabledContainerColor,
+        contentColor = if (enabled) colors.contentColor else colors.disabledContentColor,
+        border = ButtonDefaults.outlinedButtonBorder(enabled),
     ) {
-        icon()
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelMedium)
-            Text(value.ifBlank { stringResource(R.string.olive_not_selected) })
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f)
+                    .testTag(tag)
+                    .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                    .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                icon()
+                Column {
+                    Text(label, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        value.ifBlank { stringResource(R.string.olive_not_selected) },
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+            if (value.isNotBlank()) {
+                IconButton(
+                    onClick = onClear,
+                    enabled = enabled,
+                    modifier = Modifier.padding(end = 4.dp).testTag("${tag}_clear"),
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) {
+                    Icon(Icons.Outlined.Close, contentDescription = clearLabel)
+                }
+            }
         }
     }
 }

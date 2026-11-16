@@ -24,6 +24,7 @@ import com.olive.app.data.location.DeviceLocationUpdates
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
+import java.time.LocalDate
 import kotlin.math.asin
 import kotlin.math.cos
 import kotlin.math.sin
@@ -109,10 +110,7 @@ internal object FitnessWorkoutMath {
 }
 
 internal class FitnessWorkoutStore(context: Context, accountId: String) {
-    private val preferences = context.getSharedPreferences(
-        "fitness_workout_${accountId.hashCode().toUInt().toString(16)}",
-        Context.MODE_PRIVATE,
-    )
+    private val preferences = fitnessPreferences(context, accountId, workout = true)
 
     // Loads the snapshot needed by the fitness cover.
     fun snapshot(): OutdoorWorkoutSnapshot = OutdoorWorkoutSnapshot(
@@ -531,12 +529,18 @@ internal class FitnessWatchListenerService : WearableListenerService() {
                 FirebaseAuth.getInstance().currentUser?.uid
             }.getOrNull()
             // Ignore delayed readings from a watch session owned by another account.
-            if (watchAccountId != accountId || signedInAccountId != accountId) return@forEach
+            if (watchAccountId != accountId || signedInAccountId != accountId || !FitnessAccountSync.ready.value) return@forEach
+            val prefs = getSharedPreferences(FitnessWatchSync.SYNC_PREFERENCES, MODE_PRIVATE)
+            if (watchData.getString(FitnessWatchSync.SESSION_ID) != prefs.getString(FitnessWatchSync.SESSION_ID, null) ||
+                watchData.getString("date") != LocalDate.now().toString() ||
+                watchData.getLong("updatedAt") < prefs.getLong("accountStartedAt", 0L)) return@forEach
             FitnessStore(applicationContext, accountId).recordWatchActivity(
                 watchSteps = watchData.getInt("watchSteps"),
                 heartRate = watchData.getInt("heartRate"),
                 watchUpdatedAt = watchData.getLong("updatedAt"),
+                heartRateUpdatedAt = watchData.getLong("heartRateAt"),
             )
+            FitnessAccountSync.publish(applicationContext, accountId)
         }
     }
 }

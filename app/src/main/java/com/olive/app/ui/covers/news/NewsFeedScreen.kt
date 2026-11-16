@@ -222,7 +222,7 @@ internal fun NewsFeed(
                         }
                         if (tab == "Today") {
                             // Show a loading row while the first news stories are being fetched.
-                            if (loading) item { com.olive.app.ui.shared.LoadingSkeleton(preview = true) }
+                            if (loading) item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.NewsFeed, rows = 1) }
                             if (newsError && !loading) item {
                                 Card(
                                     modifier = Modifier.semantics(mergeDescendants = true) {},

@@ -269,6 +269,18 @@ service cloud.firestore {
 
     }
 
+    // Fitness history and goals are private to the signed-in profile. Deletions use tombstones for offline sync.
+    match /users/{uid}/fitness/{entryId} {
+      allow read: if owner(uid);
+      allow create, update: if owner(uid)
+        && entryId.matches('[A-Za-z0-9_-]{1,180}')
+        && request.resource.data.keys().hasOnly(['schemaVersion', 'payload', 'updatedAt'])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.payload is string && request.resource.data.payload.size() <= 524288
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     match /users/{uid} {
 
       allow get: if owner(uid);

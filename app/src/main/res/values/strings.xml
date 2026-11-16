@@ -477,7 +477,7 @@
     <string name="requirement_not_met_status">Not met</string>
     <string name="dob_spoken_range">Years %1$s through %2$s</string>
     <string name="attachments">Attachments</string>
-    <string name="incident_attachments_help">Choose saved photos, videos, or documents. Incident attachments are automatically tagged as evidence.</string>
+    <string name="incident_attachments_help">Incident attachments are automatically marked as evidence.</string>
     <string name="note_attachments_help">Add a new file or choose one you already saved in OLIVE Storage.</string>
     <string name="attachments_empty_help">Upload files in Documents, then attach them here.</string>
     <string name="title">Title</string>
@@ -519,4 +519,19 @@
     <string name="dob_pick_month">Choose a month</string>
     <string name="dob_pick_day">Choose a day</string>
     <string name="dob_clear">Clear date of birth</string>
+    <string name="voice_message">Voice message</string>
+    <string name="voice_record">Record a voice message</string>
+    <string name="voice_recording">Recording</string>
+    <string name="voice_stop">Stop recording</string>
+    <string name="voice_failed">Could not record audio. Try again.</string>
+    <string name="voice_play">Play voice message</string>
+    <string name="voice_pause">Pause voice message</string>
+    <string name="voice_play_failed">Could not play this voice message.</string>
+    <string name="voice_sending">Uploading voice message…</string>
+    <string name="voice_send_failed">Could not send this voice message.</string>
+    <string name="voice_playback_speed">Playback speed %1$s</string>
+    <string name="incident_optional_fields">Date, time, and location are optional but recommended.</string>
+    <string name="incident_clear_date">Clear date</string>
+    <string name="incident_body_required">Incident details (required)</string>
+    <string name="note_content_required">Note (required)</string>
 </resources>

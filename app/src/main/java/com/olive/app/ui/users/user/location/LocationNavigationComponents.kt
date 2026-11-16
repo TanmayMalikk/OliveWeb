@@ -1,6 +1,7 @@
 // Safe-app users: provides full-screen route guidance and location-sharing dialogs.
 package com.olive.app.ui.users.user.location
 
+import com.olive.app.ui.shared.SkeletonLayout
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -106,7 +107,7 @@ internal fun FullScreenLocationMap(
             shadowElevation = 8.dp,
         ) {
             Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp)) {
-                if (routeWorking) com.olive.app.ui.shared.LoadingSkeleton(rows = 1)
+                if (routeWorking) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Directions)
                 else Text(
                     direction?.text ?: stringResource(R.string.location_finding_route),
                     style = MaterialTheme.typography.titleLarge,
@@ -135,7 +136,7 @@ internal fun FullScreenLocationMap(
                     )
                 }
                 routeError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                if (loadingMoreSupport) com.olive.app.ui.shared.LoadingSkeleton(rows = 1)
+                if (loadingMoreSupport) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.NearbySupport)
                 else if (onLoadMoreSupport != null) OutlinedButton(onClick = onLoadMoreSupport) {
                     Text(stringResource(R.string.load_more_hotline_locations))
                 }

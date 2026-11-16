@@ -313,6 +313,14 @@ internal fun ChatMessageBody(
     onOpenMedia: (SafetyDocument, File) -> Unit
 ) {
     val parts = chat.body.split(":", limit = 3)
+    if (!chat.unsent && parts.firstOrNull() == "SHARED_VOICE" &&
+        parts.getOrNull(1)?.matches(Regex("[A-Za-z0-9_-]{1,64}")) == true
+    ) {
+        if (!session.privacyBlackout) key(session.coverAccountId, chat.id) {
+            VoiceMessageBubble(parts[1], parts.getOrNull(2).orEmpty(), session, mine)
+        }
+        return
+    }
     if (!chat.unsent && parts.firstOrNull() == "SHARED_MEDIA" && parts.size >= 2) {
         SharedMediaMessage(parts[1], parts.getOrNull(2).orEmpty(), session, mine, onOpenMedia, sender)
         return

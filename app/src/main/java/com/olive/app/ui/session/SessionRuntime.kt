@@ -69,7 +69,13 @@ internal class SessionRuntime(
     val mediaRepository get() = dataSources.media
     val safetyDocumentRepository get() = dataSources.safetyDocuments
     val locationSharingRepository get() = dataSources.locations
-    var enrollment by mutableStateOf<DeviceEnrollment?>(null)
+    private var activeEnrollment by mutableStateOf<DeviceEnrollment?>(null)
+    var enrollment: DeviceEnrollment?
+        get() = activeEnrollment
+        set(value) {
+            if (activeEnrollment?.uid != value?.uid) messaging.stopMessaging()
+            activeEnrollment = value
+        }
     var pendingIdentity: AccountIdentity? = null
     var pendingProfile: UserProfile? = null
     var operationJob: Job? = null
@@ -124,7 +130,7 @@ internal class SessionRuntime(
     fun isConversationUnread(conversation: ChatConversation): Boolean {
         state.readMessageVersion
         val uid = enrollment?.uid ?: return false
-        return conversation.lastMessageId.isNotBlank() &&
+        return uid in conversation.participantIds && conversation.lastMessageId.isNotBlank() &&
                 conversation.lastSenderUid.isNotBlank() &&
                 conversation.lastSenderUid != uid &&
                 messageReadState.getString(
@@ -132,11 +138,19 @@ internal class SessionRuntime(
                     null,
                 ) != conversation.lastMessageId
     }
-    val unreadMessageCount: Int
+    fun isActiveUnreadConversation(conversation: ChatConversation) =
+        conversation.closedAt == 0L && conversation.id !in state.archivedConversationIds &&
+            isConversationUnread(conversation)
+
+    val incomingFriendRequestCount: Int
         get() {
-            return state.conversations.count(::isConversationUnread)
+            val account = enrollment ?: return 0
+            if (account.role == AccountRole.STAFF || account.role == AccountRole.ADMIN) return 0
+            return state.incomingFriendRequests.count { it.recipientUid == account.uid }
         }
-    val pendingMessageActionCount get() = state.incomingFriendRequests.size + unreadMessageCount
+
+    val pendingMessageActionCount
+        get() = incomingFriendRequestCount + state.conversations.count(::isActiveUnreadConversation)
 
     // User access requires a verified app PIN or Android authentication for this enrollment and epoch.
     private fun canEnterSafe(): Boolean {

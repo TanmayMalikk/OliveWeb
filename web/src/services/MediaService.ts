@@ -3,6 +3,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   onSnapshot,
   query,
@@ -11,7 +12,9 @@ import {
 } from "firebase/firestore";
 import { firebase } from "./AccountService";
 import {
+  encryptChatMessage,
   messageDevice,
+  type Conversation,
   register,
   unwrapRoomKeyBytes,
 } from "./MessagingService";
@@ -216,7 +219,7 @@ export async function uploadBrowserDocument(
           ? "VIDEO"
           : file.type.startsWith("image/")
             ? "IMAGE"
-            : "DOCUMENT",
+            : file.type.startsWith("audio/") ? "AUDIO" : "DOCUMENT",
         ocrReview: "NOT_RUN",
       }),
     );
@@ -295,6 +298,67 @@ async function resolveDocumentKey(mediaId: string, identity: Identity, deviceId:
     if (result.accountAccessKey) return fromBase64(result.accountAccessKey);
   }
   throw new Error("The account does not have a usable document key.");
+}
+
+// Builds one idempotent chat delivery for an uploaded recording.
+export async function prepareVoiceMessage(
+  mediaId: string,
+  conversation: Conversation,
+  roomKey: CryptoKey,
+) {
+  return {
+    mediaId,
+    conversationId: conversation.id,
+    messageId: crypto.randomUUID(),
+    ciphertext: await encryptChatMessage(`SHARED_VOICE:${mediaId}`, roomKey),
+    clientSentAt: Date.now(),
+  };
+}
+
+export async function publishVoiceMessage(
+  message: Awaited<ReturnType<typeof prepareVoiceMessage>>,
+  identity: Identity,
+) {
+  const { db, functions } = await firebase();
+  const [file, chat, device] = await Promise.all([
+    getDocFromServer(doc(db, "files", message.mediaId)),
+    getDocFromServer(doc(db, "conversations", message.conversationId)),
+    messageDevice(identity.uid),
+  ]);
+  const value = file.data() as StoredMedia | undefined;
+  const participants = chat.data() as Conversation | undefined;
+  if (!value || value.owner_id !== identity.uid || !participants?.participantIds.includes(identity.uid)) {
+    throw new Error("This voice message is no longer available to send.");
+  }
+  const recipientUids = participants.participantIds.filter((uid) => uid !== identity.uid);
+  const raw = await resolveDocumentKey(message.mediaId, identity, device.deviceId, value);
+  try {
+    const recipients = await Promise.all(recipientUids.map(async (uid) => ({
+      uid,
+      ...await wrapForDocumentRecipient(raw, { uid, username: participants.participantUsernames[uid] ?? "" }),
+    })));
+    const ownerKey = (value.wrapped_keys as Record<string, string>)[identity.uid];
+    const wrappedKeys = Object.fromEntries([
+      [identity.uid, ownerKey],
+      ...recipients.map(({ uid, accountKey }) => [uid, accountKey]),
+    ]);
+    const deviceWrappedKeys = Object.assign({}, ...recipients.map(({ deviceKeys }) => deviceKeys));
+    const { httpsCallable } = await import("firebase/functions");
+    await httpsCallable(functions, "mediaShareInChat")({
+      ...message, recipientUids, wrappedKeys, deviceWrappedKeys,
+    });
+  } finally {
+    raw.fill(0);
+  }
+}
+
+export async function openVoiceMessage(mediaId: string, identity: Identity) {
+  const { db } = await firebase();
+  const row = await getDocFromServer(doc(db, "files", mediaId));
+  if (!row.exists()) throw new Error("This voice message is unavailable.");
+  const [recording] = await resolveBrowserDocuments(identity, [row]);
+  if (!recording.mimeType.startsWith("audio/")) throw new Error("This recording could not be opened.");
+  return openBrowserDocument(recording);
 }
 
 // Wrap an attached document for the selected plan readers using their published device keys.

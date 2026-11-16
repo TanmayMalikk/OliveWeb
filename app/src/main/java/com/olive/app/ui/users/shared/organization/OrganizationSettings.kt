@@ -265,7 +265,7 @@ internal fun OrganizationMap(session: SessionViewModel, onBack: () -> Unit, init
             }
         }
 if (state.loading) Surface(Modifier.fillMaxSize()) {
-            LoadingSkeleton(Modifier.padding(16.dp), rows = 1, preview = true)
+            LoadingSkeleton(SkeletonLayout.Map, Modifier.fillMaxSize().padding(16.dp))
         }
         val status = state.error ?: if (!state.loading && state.points.isEmpty())
             stringResource(R.string.organization_location_feed_empty) else null

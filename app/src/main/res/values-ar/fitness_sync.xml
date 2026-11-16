@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fitness_connect_health">ربط Health Connect</string>
+    <string name="fitness_health_permissions">أذونات الصحة</string>
+    <string name="fitness_health_privacy">يقرأ Olive Fitness الخطوات ومعدل القلب لتحديث السجل. يتيح إذن الخلفية المزامنة عند إغلاق التطبيق. تحفظ البيانات بشكل خاص في حساب Firebase ويمكن سحب الأذونات من Health Connect.</string>
+    <string name="fitness_sync_pending">المزامنة غير متاحة. التغييرات محفوظة على هذا الجهاز وستتم إعادة المحاولة.</string>
+</resources>

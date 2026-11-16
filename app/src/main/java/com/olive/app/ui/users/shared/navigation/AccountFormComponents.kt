@@ -110,7 +110,7 @@ internal fun Status(session: SessionViewModel, showMessage: Boolean = true) {
         enter = fadeIn(tween(120)) + expandVertically(),
         exit = fadeOut(tween(100)) + shrinkVertically()
     ) {
-        com.olive.app.ui.shared.LoadingSkeleton(Modifier.fillMaxWidth().padding(horizontal = 18.dp), rows = 1)
+        com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Action, Modifier.fillMaxWidth().padding(horizontal = 18.dp))
     }
 }
 

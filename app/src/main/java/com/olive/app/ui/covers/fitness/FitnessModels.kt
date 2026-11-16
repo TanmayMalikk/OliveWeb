@@ -12,6 +12,7 @@ internal data class FitnessProfile(
     val proteinGoal: Int = 120,
     val carbohydrateGoal: Int = 250,
     val fatGoal: Int = 65,
+    val waterGoalMl: Int = 2000,
 )
 
 internal data class NutritionFood(
@@ -25,6 +26,7 @@ internal data class NutritionFood(
     val fatGrams: Float,
     val source: FoodDataSource,
     val barcode: String = "",
+    val servingOptions: List<NutritionFood> = emptyList(),
     val saturatedFatGrams: Float = 0f,
     val transFatGrams: Float = 0f,
     val fiberGrams: Float = 0f,
@@ -129,6 +131,7 @@ internal data class FitnessSnapshot(
     val heartRateHistory: List<HeartRateVitals> = emptyList(),
     val watchConnected: Boolean = false,
     val watchSeenWithinFourteenDays: Boolean = false,
+    val waterTodayMl: Int = 0,
 ) {
     val nutrition = foodsToday.fold(NutritionTotals()) { total, entry ->
         val servings = entry.servings

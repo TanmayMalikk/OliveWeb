@@ -65,10 +65,10 @@ internal fun MessagesScreen(
     exit: (() -> Unit)? = null,
     initialSupportFilter: String? = null,
 ) {
-    val active = session.messages.activeConversation
     val currentUid = session.coverAccountId.orEmpty()
+    val active = session.messages.activeConversation?.takeIf { currentUid in it.participantIds }
     // Keep the chosen list visible while a phone opens a chat and returns from it.
-    var showingArchived by rememberSaveable { mutableStateOf(false) }
+    var showingArchived by rememberSaveable(currentUid) { mutableStateOf(false) }
     val allowedSupportTags = visibleSupportTags(session.accountRole)
     var supportFilter by rememberSaveable(initialSupportFilter, session.accountRole) {
         mutableStateOf(initialSupportFilter?.takeIf { it in allowedSupportTags }
@@ -128,6 +128,14 @@ internal fun MessagesScreen(
     }
 }
 
+@Composable
+private fun ChatTabLabel(label: String, count: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label)
+        if (count > 0) Badge { Text(if (count > 99) "99+" else count.toString()) }
+    }
+}
+
 // Chooses whether Back returns to the dashboard or closes the organization portal.
 private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
     if (session.screen == SessionScreen.Portal) exit else null
@@ -152,9 +160,10 @@ private fun MessagingSidebar(
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
     var unreadOnly by rememberSaveable { mutableStateOf(false) }
     val allowedSupportTags = visibleSupportTags(session.accountRole)
-    val roleConversations = if (organizationAccount) messaging.conversations.filter {
+    val memberConversations = messaging.conversations.filter { currentUid in it.participantIds }
+    val roleConversations = if (organizationAccount) memberConversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
-    } else messaging.conversations.filter { (it.type == "SUPPORT") == ticketChats }
+    } else memberConversations.filter { (it.type == "SUPPORT") == ticketChats }
     val shownConversations = roleConversations.filter {
         isConversationArchived(
             it,
@@ -207,13 +216,13 @@ private fun MessagingSidebar(
                 Tab(
                     selected = !ticketChats,
                     onClick = { onChatTabChange(false) },
-                    text = { Text(uiText(R.string.chat_dms_tab)) },
+                    text = { ChatTabLabel(uiText(R.string.chat_dms_tab), session.messages.unreadCountForChatTab(false)) },
                     modifier = Modifier.testTag("messages_dms_tab"),
                 )
                 Tab(
                     selected = ticketChats,
                     onClick = { onChatTabChange(true) },
-                    text = { Text(uiText(R.string.chat_tickets_tab)) },
+                    text = { ChatTabLabel(uiText(R.string.chat_tickets_tab), session.messages.unreadCountForChatTab(true)) },
                     modifier = Modifier.testTag("messages_tickets_tab"),
                 )
             }
@@ -320,7 +329,10 @@ private fun MessagingSidebar(
                 ) { Text(stringResource(R.string.search)) }
             }
         }
-        if (session.messages.loadingIndex) item { com.olive.app.ui.shared.LoadingSkeleton(rows = 3) }
+        if (session.messages.loadingIndex) item {
+            val layout = if (organizationAccount || ticketChats) SkeletonLayout.TicketList else SkeletonLayout.ChatList
+            com.olive.app.ui.shared.LoadingSkeleton(layout, rows = 3)
+        }
         item { Status(session) }
         if (session.messages.loadingIndex) return@LazyColumn
         if (!organizationAccount && !ticketChats && !showingArchived) friendLists(

@@ -166,7 +166,7 @@ private fun ImageViewer(file: File, name: String) {
     }
     Box(imageModifier, contentAlignment = Alignment.Center) {
         val bitmap = image?.getOrNull()
-        if (image == null) LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 1, preview = true)
+        if (image == null) LoadingSkeleton(SkeletonLayout.Image, Modifier.fillMaxWidth().padding(16.dp))
         else if (bitmap == null) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
         else Image(
             bitmap.asImageBitmap(), contentDescription = name, contentScale = ContentScale.Fit,
@@ -237,7 +237,7 @@ private fun VideoViewer(file: File) {
             rotationZ = rotation.toFloat(),
         ))
         if (failed) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
-        else if (!ready) LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 1, preview = true)
+        else if (!ready) LoadingSkeleton(SkeletonLayout.Video, Modifier.fillMaxWidth().padding(16.dp))
         else ZoomControls(
             scale = scale,
             onZoomOut = { scale = (scale / 1.25f).coerceAtLeast(1f) },
@@ -275,7 +275,7 @@ private fun PdfViewer(file: File) {
     else if (result == null) Box(
         Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
-    ) { LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 1, preview = true) }
+    ) { LoadingSkeleton(SkeletonLayout.DocumentPage, Modifier.fillMaxWidth().padding(16.dp)) }
     else Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
         // Keep page controls above the preview, clear of floating safety actions.
         Row(
@@ -330,7 +330,7 @@ private fun PdfViewer(file: File) {
             contentAlignment = Alignment.Center,
         ) {
             if (failedPage) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
-            else if (result.index != page) LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 1, preview = true)
+            else if (result.index != page) LoadingSkeleton(SkeletonLayout.DocumentPage, Modifier.fillMaxWidth().padding(16.dp))
             else Image(
                 result.bitmap.asImageBitmap(),
                 contentDescription = stringResource(
@@ -395,7 +395,7 @@ private fun TextViewer(file: File, docx: Boolean) {
     if (content == null) Box(
         Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
-    ) { LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 3) }
+    ) { LoadingSkeleton(SkeletonLayout.TextDocument, Modifier.fillMaxWidth().padding(16.dp), rows = 3) }
     else if (content?.isFailure == true) AccessibleMessage(stringResource(R.string.documents_preview_unavailable))
     else Column(Modifier.fillMaxSize()) {
         ZoomControls(

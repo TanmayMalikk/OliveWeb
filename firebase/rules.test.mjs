@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import { ref, set, get, remove } from 'firebase/database';
 
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { before, after, test } from 'node:test';
@@ -332,6 +333,21 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   const duplicateAlice=env.authenticatedContext('social-duplicate',{email:'social_alice@safe.olive.invalid'}).firestore();
   await assertFails(setDoc(doc(duplicateAlice,'messageDirectory/social_alice'),
     {uid:'social-duplicate',username:'social_alice',publicKey:'duplicate-key',updatedAt:serverTimestamp()}));
+
+  const safeRequest = doc(bob, 'friendRequests/social-b--social-c');
+  await assertSucceeds(setDoc(safeRequest, {
+    senderUid: 'social-b', senderUsername: 'social_bob',
+    recipientUid: 'social-c', recipientUsername: 'social_charlie',
+    friendshipId: 'social-b--social-c', createdAt: serverTimestamp(),
+  }));
+  const received = await getDocs(query(collection(charlie, 'friendRequests'),
+    where('recipientUid', '==', 'social-c')));
+  assert.deepEqual(received.docs.map(row => row.id), ['social-b--social-c']);
+  const unrelated = await getDocs(query(collection(alice, 'friendRequests'),
+    where('recipientUid', '==', 'social-a')));
+  assert.equal(unrelated.size, 0);
+  await assertFails(deleteDoc(doc(alice, 'friendRequests/social-b--social-c')));
+  await assertSucceeds(deleteDoc(doc(charlie, 'friendRequests/social-b--social-c')));
 
   await assertSucceeds(getDoc(doc(alice,'messageDirectory/social_bob')));
   await assertFails(getDocs(query(collection(alice,'messageDirectory'),where('username','>=','social_b'))));
@@ -700,4 +716,28 @@ test('private entry recipients and wrapped keys must match exactly', async () =>
   const recipients=Array.from({length:26},(_,index)=>`recipient-${index}`);
   await assertFails(setDoc(doc(owner,'privateEntries/too-many'),{...base,id:'too-many',allowedUsers:['private-owner',...recipients],
     wrappedKeys:Object.fromEntries(['private-owner',...recipients].map(uid=>[uid,'key']))}));
+});
+
+
+test('fitness records are profile-owned, bounded, and retain deletion tombstones', async () => {
+  const alice = env.authenticatedContext('fitness-alice').firestore();
+  const bob = env.authenticatedContext('fitness-bob').firestore();
+  const anon = env.unauthenticatedContext().firestore();
+  const path = 'users/fitness-alice/fitness/meal_2026-11-15_test-entry';
+  const record = {schemaVersion: 1, payload: JSON.stringify({type:'string', value:'synthetic meal'}), updatedAt:serverTimestamp()};
+  await assertSucceeds(setDoc(doc(alice,path),record));
+  await assertSucceeds(getDoc(doc(alice,path)));
+  await assertSucceeds(getDocs(collection(alice,'users/fitness-alice/fitness')));
+  await assertFails(getDoc(doc(bob,path)));
+  await assertFails(getDocs(collection(bob,'users/fitness-alice/fitness')));
+  await assertFails(getDoc(doc(anon,path)));
+  await assertFails(setDoc(doc(bob,path),record));
+  await assertFails(setDoc(doc(alice,path),{...record,admin:true}));
+  await assertFails(setDoc(doc(alice,path),{...record,payload:'x'.repeat(524289)}));
+  await assertFails(setDoc(doc(alice,path),{...record,schemaVersion:2}));
+  await assertFails(deleteDoc(doc(alice,path)));
+  const tombstone={...record,payload:JSON.stringify({type:'null',value:null})};
+  await assertSucceeds(setDoc(doc(alice,path),tombstone));
+  assert.equal(JSON.parse((await getDoc(doc(alice,path))).data().payload).type,'null');
+  await assertSucceeds(setDoc(doc(alice,path),record));
 });

@@ -437,6 +437,9 @@ class OliveApplication : Application() {
     // Creates app-wide notification channels and background services at startup.
     override fun onCreate() {
         super.onCreate()
+        cacheDir.listFiles { file ->
+            file.name.startsWith(com.olive.app.ui.users.shared.messaging.VOICE_DRAFT_PREFIX)
+        }?.forEach(java.io.File::delete)
         if (BuildConfig.FIREBASE_CONFIGURED) {
             com.google.firebase.firestore.FirebaseFirestore.getInstance().firestoreSettings =
                 com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
@@ -450,7 +453,7 @@ class OliveApplication : Application() {
             AppCheckProviderInstaller.install()
             FirebaseAuth.getInstance().addAuthStateListener { auth ->
                 // The watch follows the account currently authenticated on this phone.
-                FitnessWatchSync.bindAccount(this@OliveApplication, auth.currentUser?.uid)
+                com.olive.app.ui.covers.fitness.FitnessAccountSync.bind(this@OliveApplication, auth.currentUser?.uid)
                 if (auth.currentUser != null) LocalNotificationEventHandler.start(this@OliveApplication)
                 else LocalNotificationEventHandler.cancel(this@OliveApplication)
             }

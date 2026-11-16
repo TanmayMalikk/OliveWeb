@@ -43,6 +43,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -50,6 +52,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -100,7 +103,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     var pendingSnapshot by remember(store) { mutableStateOf<FitnessSnapshot?>(null) }
     val snapshot = pendingSnapshot ?: loaded?.first
     val history = loaded?.second.orEmpty()
-    var page by remember { mutableStateOf(FitnessPage.HOME) }
+    var page by rememberSaveable(accountId) { mutableStateOf(FitnessPage.HOME) }
     val pageFocus = remember { FocusRequester() }
     val pageLabel = when (page) {
         FitnessPage.HOME -> stringResource(R.string.home)
@@ -112,27 +115,51 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
         FitnessPage.ACCOUNT -> stringResource(R.string.settings)
     }
 
-    FitnessStepSensor(store) { pendingSnapshot = it }
-    // Load fitness history and watch data when the cover becomes active.
+    var sensorPermissionSettled by remember(accountId) { mutableStateOf(false) }
+    val ready by FitnessAccountSync.ready.collectAsState()
+    val cloudFailed by FitnessAccountSync.failed.collectAsState()
+    if (session.localMode || accountId == "guest" || ready) FitnessStepSensor(
+        store, interactive, onPermissionSettled = { sensorPermissionSettled = true },
+    ) { pendingSnapshot = it }
+    DisposableEffect(store) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+            pendingSnapshot = store.snapshot()
+            loaded = pendingSnapshot!! to store.history(days = 14)
+        }
+        store.preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { store.preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     LaunchedEffect(store) {
+        var date = java.time.LocalDate.now()
         while (true) {
-            val pendingAtRead = pendingSnapshot
-            loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                store.snapshot() to store.history(days = 14)
+            if (java.time.LocalDate.now() != date) {
+                pendingSnapshot = null
+                date = java.time.LocalDate.now()
             }
-            if (pendingSnapshot === pendingAtRead) pendingSnapshot = null
-            delay(2_000L.milliseconds)
+            loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.snapshot() to store.history(days = 14) }
+            val nextDay = java.time.LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()
+            delay(java.time.Duration.between(java.time.Instant.now(), nextDay).toMillis().coerceAtLeast(1000L))
         }
     }
-    LaunchedEffect(snapshot) {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(accountId, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+            while (true) {
+                if (accountId != "guest") try {
+                    FitnessHealthConnect.read(context, accountId)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                  catch (_: Exception) { /* Permission/provider changes are retried on the next foreground read. */ }
+                delay(15_000L)
+            }
+        }
+    }
+    LaunchedEffect(snapshot, ready) {
         snapshot ?: return@LaunchedEffect
+        if (!session.localMode && accountId != "guest" && !ready) return@LaunchedEffect
         FitnessWatchSync.publish(context, accountId, snapshot)
         if (!session.localMode) {
             FitnessCloudSync.upload(accountId, snapshot, history)
         }
-    }
-    LaunchedEffect(session.coverReset) {
-        page = FitnessPage.HOME
     }
     // Back returns from a fitness submenu or section before it is allowed to leave the cover app.
     BackHandler(enabled = interactive) {
@@ -172,8 +199,18 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                 onSettings = { page = FitnessPage.ACCOUNT },
             )
             // Opens the selected fitness overview, activity, nutrition, or vitals page.
-            if (snapshot == null || loaded == null) {
-                com.olive.app.ui.shared.LoadingSkeleton(Modifier.fillMaxWidth().padding(16.dp), rows = 3)
+            FitnessHealthConnection(accountId, interactive && sensorPermissionSettled)
+            if (cloudFailed) Text(stringResource(R.string.fitness_sync_pending), Modifier.padding(horizontal = 16.dp))
+            if (snapshot == null || loaded == null || (!session.localMode && accountId != "guest" && !ready)) {
+                val skeleton = when (page) {
+                    FitnessPage.HOME -> SkeletonLayout.FitnessSummary
+                    FitnessPage.ACTIVITY -> SkeletonLayout.FitnessActivity
+                    FitnessPage.VITALS -> SkeletonLayout.FitnessVitals
+                    FitnessPage.NUTRITION -> SkeletonLayout.FitnessNutrition
+                    FitnessPage.FOOD_SEARCH -> SkeletonLayout.FoodResults
+                    FitnessPage.GOALS, FitnessPage.ACCOUNT -> SkeletonLayout.Form
+                }
+                com.olive.app.ui.shared.LoadingSkeleton(skeleton, Modifier.fillMaxWidth().padding(16.dp))
             } else when (page) {
                 FitnessPage.HOME -> FitnessHomePage(
                     snapshot = snapshot,
@@ -192,6 +229,8 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                     padding = PaddingValues(0.dp),
                     onAddFood = { page = FitnessPage.FOOD_SEARCH },
                     onRemoveFood = { pendingSnapshot = store.removeFood(it) },
+                    onAddWater = { amount, goal -> pendingSnapshot = store.addWater(amount, goal) },
+                    onUpdateFood = { pendingSnapshot = store.updateFood(it) },
                 )
                 FitnessPage.FOOD_SEARCH -> FoodSearchPage(
                     enabled = interactive,
@@ -332,7 +371,7 @@ private fun FitnessTab(
 
 // Starts and stops the phone step sensor with the screen lifecycle.
 @Composable
-private fun FitnessStepSensor(store: FitnessStore, onUpdate: (FitnessSnapshot) -> Unit) {
+private fun FitnessStepSensor(store: FitnessStore, enabled: Boolean, onPermissionSettled: () -> Unit, onUpdate: (FitnessSnapshot) -> Unit) {
     val context = LocalContext.current
     val sensorManager = remember(context) { context.getSystemService(SensorManager::class.java) }
     val stepSensor = remember(sensorManager) { sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER) }
@@ -347,12 +386,13 @@ private fun FitnessStepSensor(store: FitnessStore, onUpdate: (FitnessSnapshot) -
     }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { permissionGranted = it }
+    ) { permissionGranted = it; onPermissionSettled() }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(enabled) {
+        if (!enabled) return@LaunchedEffect
         if (!permissionGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             permissionLauncher.launch(Manifest.permission.ACTIVITY_RECOGNITION)
-        }
+        } else onPermissionSettled()
     }
     // Start or stop the phone step sensor as permission and lifecycle change.
     DisposableEffect(stepSensor, permissionGranted, store) {
@@ -473,6 +513,7 @@ private fun FitnessGoalsPage(
                             carbohydrateGoal = carbohydrates.toIntOrNull()
                                 ?: profile.carbohydrateGoal,
                             fatGoal = fat.toIntOrNull() ?: profile.fatGoal,
+                            waterGoalMl = profile.waterGoalMl,
                         )
                     )
                 },
@@ -500,20 +541,28 @@ private fun GoalField(value: String, onChange: (String) -> Unit, label: String, 
 // Fitness cover users: sends today's goals and nutrition totals to a paired Wear OS watch.
 
 internal object FitnessWatchSync {
+    private var lastPublished = ""
     const val DAILY_DATA_PATH = "/olive/fitness/daily"
     const val WATCH_ACTIVITY_PATH = "/olive/fitness/watch-activity"
     const val ACCOUNT_SESSION_PATH = "/olive/account/session"
     const val SYNC_PREFERENCES = "fitness_watch_sync"
     const val ACTIVE_ACCOUNT_ID = "active_account_id"
+    const val SESSION_ID = "sessionId"
 
     // Tells the paired watch which phone account owns future fitness readings.
     fun bindAccount(context: Context, accountId: String?) {
         val safeAccountId = accountId.orEmpty().trim()
-        context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE).edit {
-            if (safeAccountId.isBlank()) remove(ACTIVE_ACCOUNT_ID)
-            else putString(ACTIVE_ACCOUNT_ID, safeAccountId)
+        val prefs = context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE)
+        if (prefs.getString(ACTIVE_ACCOUNT_ID, "") != safeAccountId || !prefs.contains(SESSION_ID)) {
+            prefs.edit(commit = true) {
+                if (safeAccountId.isBlank()) remove(ACTIVE_ACCOUNT_ID) else putString(ACTIVE_ACCOUNT_ID, safeAccountId)
+                putString(SESSION_ID, java.util.UUID.randomUUID().toString())
+                putLong("accountStartedAt", System.currentTimeMillis())
+            }
         }
         val request = PutDataMapRequest.create(ACCOUNT_SESSION_PATH).apply {
+            dataMap.putString(SESSION_ID, prefs.getString(SESSION_ID, "").orEmpty())
+            dataMap.putLong("sessionStartedAt", prefs.getLong("accountStartedAt", 0L))
             dataMap.putBoolean("signedIn", safeAccountId.isNotBlank())
             dataMap.putString("accountId", safeAccountId)
             dataMap.putLong("updatedAt", System.currentTimeMillis())
@@ -522,14 +571,19 @@ internal object FitnessWatchSync {
     }
 
     // Sends the latest phone fitness summary to the paired Wear OS app.
-    fun publish(context: Context, accountId: String, snapshot: FitnessSnapshot) {
+    @Synchronized fun publish(context: Context, accountId: String, snapshot: FitnessSnapshot) {
         if (accountId.isBlank() || accountId == "guest") return
-        context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE).edit {
-            putString(ACTIVE_ACCOUNT_ID, accountId)
-        }
+        val prefs = context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE)
+        if (prefs.getString(ACTIVE_ACCOUNT_ID, null) != accountId ||
+            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid != accountId) return
         val nutrition = snapshot.nutrition
+        val signature = "$accountId|${prefs.getString(SESSION_ID, "")}|${java.time.LocalDate.now()}|${snapshot.profile}|${snapshot.stepsToday}|$nutrition"
+        if (signature == lastPublished) return
+        lastPublished = signature
         val request = PutDataMapRequest.create(DAILY_DATA_PATH).apply {
             dataMap.putString("accountId", accountId)
+            dataMap.putString(SESSION_ID, prefs.getString(SESSION_ID, "").orEmpty())
+            dataMap.putString("date", java.time.LocalDate.now().toString())
             dataMap.putLong("updatedAt", System.currentTimeMillis())
             dataMap.putInt("phoneSteps", snapshot.stepsToday.coerceAtLeast(0))
             dataMap.putInt("stepGoal", snapshot.profile.stepGoal)
@@ -546,6 +600,8 @@ internal object FitnessWatchSync {
             dataMap.putFloat("sodium", nutrition.sodiumMilligrams.coerceAtLeast(0f))
         }.asPutDataRequest().setUrgent()
 
-        Wearable.getDataClient(context).putDataItem(request)
+        Wearable.getDataClient(context).putDataItem(request).addOnFailureListener {
+            synchronized(this) { if (lastPublished == signature) lastPublished = "" }
+        }
     }
 }

@@ -51,10 +51,16 @@ internal fun NewsCover(
 ) {
     val uiText = rememberResourceText()
     val context = LocalContext.current
-    var tab by remember { mutableStateOf("Today") }
-    var scope by remember { mutableStateOf(NewsScope.LOCAL) }
+    var tab by rememberSaveable(session.coverAccountId) { mutableStateOf("Today") }
+    var scope by rememberSaveable(session.coverAccountId) { mutableStateOf(NewsScope.LOCAL) }
     var query by remember { mutableStateOf("") }
-    var selected by remember { mutableStateOf<NewsArticle?>(null) }
+    val articleSaver = remember {
+        androidx.compose.runtime.saveable.Saver<NewsArticle?, String>(
+            save = { it?.toJson()?.toString() },
+            restore = { runCatching { NewsArticle.fromJson(org.json.JSONObject(it)) }.getOrNull() },
+        )
+    }
+    var selected by rememberSaveable(session.coverAccountId, stateSaver = articleSaver) { mutableStateOf<NewsArticle?>(null) }
     var articles by remember { mutableStateOf<List<NewsArticle>>(emptyList()) }
     var completedRequest by remember { mutableStateOf<List<Any>?>(null) }
     var newsError by remember { mutableStateOf(false) }

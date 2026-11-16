@@ -1,5 +1,6 @@
 package com.olive.app.ui.users.admin
 
+import com.olive.app.ui.shared.SkeletonLayout
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -110,7 +111,7 @@ internal fun EmergencyResponseScreen(
                 FilterChip(selected = showResolved, onClick = { showResolved = true }, label = { Text(stringResource(R.string.emergency_response_resolved)) })
             }
         }
-        if (alerts == null && error == null) item { com.olive.app.ui.shared.LoadingSkeleton() }
+        if (alerts == null && error == null) item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.EmergencyAlerts) }
         if (alerts != null && visibleAlerts.isEmpty() && error == null) item { Text(stringResource(R.string.emergency_response_empty)) }
         items(visibleAlerts, key = { it.id }) { alert ->
             OutlinedCard(Modifier.fillMaxWidth()) {
