@@ -271,7 +271,7 @@
   }
 }
 
-/* Shared Canvas Arcade Stage (Canopy Breaker & Orchard Catch) */
+/* Canvas stage for Canopy Breaker */
 .canvas-stage {
   position: relative;
   width: min(100%, 40rem);
@@ -293,16 +293,51 @@
 
 /* Grove 2048 Merge Grid */
 .merge-board-wrap {
+  --board-inset: clamp(0.45rem, 1.4vw, 0.7rem);
+  --tile-gap: clamp(0.35rem, 1.2vw, 0.5rem);
   position: relative;
   width: min(100%, 27rem);
   aspect-ratio: 1;
   border: 1px solid #d9e1d9;
   border-radius: 0.95rem;
-  padding: clamp(0.45rem, 1.4vw, 0.7rem);
   background: #dfe7dd;
   touch-action: none;
   user-select: none;
   outline: none;
+}
+.merge-board-stage,
+.merge-tiles-layer {
+  position: absolute;
+  inset: var(--board-inset);
+}
+.merge-tiles-layer {
+  inset: 0;
+  pointer-events: none;
+}
+.merge-tile-node {
+  --tile-size: calc((100% - 3 * var(--tile-gap)) / 4);
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: var(--tile-size);
+  height: var(--tile-size);
+  container-type: inline-size;
+  transform: translate(
+    calc(var(--col) * (100% + var(--tile-gap))),
+    calc(var(--row) * (100% + var(--tile-gap)))
+  );
+  transition: transform 0.12s ease-out;
+}
+.merge-tile-ghost {
+  animation: merge-source 0.12s step-end forwards;
+}
+@keyframes merge-source {
+  to { visibility: hidden; }
+}
+.merge-tile-art {
+  display: block;
+  width: min(34%, 1.8rem);
+  aspect-ratio: 1;
+  flex: 0 0 auto;
 }
 .merge-grid {
   width: 100%;
@@ -310,7 +345,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(4, minmax(0, 1fr));
-  gap: clamp(0.35rem, 1.2vw, 0.5rem);
+  gap: var(--tile-gap);
 }
 .merge-cell {
   border-radius: 0.65rem;
@@ -328,14 +363,15 @@
   border: 1px solid #d2ded0;
 }
 .merge-tile {
+  height: 100%;
   box-shadow: 0 2px 5px #223e3212;
   border: 1px solid rgba(34, 62, 50, 0.14);
 }
 .merge-tile strong {
-  font: 700 clamp(1.05rem, 3.6cqi, 1.65rem)/1 var(--serif);
+  font: 700 clamp(0.92rem, 26cqi, 1.65rem)/1 var(--serif);
 }
 .merge-tile small {
-  font-size: clamp(0.54rem, 1.4cqi, 0.68rem);
+  font-size: clamp(0.48rem, 11cqi, 0.68rem);
   font-weight: 600;
   letter-spacing: 0.03em;
   opacity: 0.88;
@@ -352,15 +388,18 @@
 .merge-v-512 { background: #7c4619; color: #fff; }
 .merge-v-1024 { background: #6c331c; color: #fff; }
 .merge-v-2048 { background: #223e32; color: #f6e7a6; border-color: #d8b54f; }
+.merge-v-4096 { background: #3b315c; color: #fff2c2; }
 
 .merge-pop {
   animation: merge-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  animation-delay: 0.12s;
+  animation-fill-mode: backwards;
 }
 .merge-spawn {
   animation: merge-spawn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes merge-pop {
-  0% { transform: scale(0.86); }
+  0% { transform: scale(0.86); opacity: 0; }
   60% { transform: scale(1.08); }
   100% { transform: scale(1); }
 }

@@ -308,6 +308,184 @@
   line-height: 1.1;
   font-weight: 600;
 }
+.memory-grid > .memory-card:not(.memory-free) {
+  perspective: 420px;
+  background: transparent;
+}
+.memory-card > .memory-flip {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 280ms cubic-bezier(0.28, 0.72, 0.32, 1);
+  border-radius: inherit;
+}
+.memory-card.turned > .memory-flip {
+  transform: rotateY(180deg);
+}
+.memory-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  border-radius: inherit;
+  backface-visibility: hidden;
+}
+.memory-face-down {
+  background: var(--soft);
+}
+.memory-face-down svg {
+  width: 48cqi;
+  height: 48cqi;
+}
+.memory-face-up {
+  color: var(--olive);
+  background: var(--white);
+  transform: rotateY(180deg);
+}
+.memory-face-up svg {
+  width: 32cqi;
+  height: 32cqi;
+}
+.memory-card.matched .memory-face-up {
+  background: var(--olive);
+  color: white;
+}
+@media (prefers-reduced-motion: reduce) {
+  .memory-card > .memory-flip {
+    transition: none;
+  }
+}
+.tetris-arena {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+.tetris-stage {
+  position: relative;
+  display: grid;
+  --tetris-sidebar: clamp(3rem, 14vw, 5.4rem);
+  grid-template-columns: var(--tetris-sidebar) min(48vw, 15rem, 29vh) var(--tetris-sidebar);
+  align-items: start;
+  gap: clamp(0.3rem, 1.6vw, 0.8rem);
+  padding: 0.6rem;
+  max-width: 100%;
+  border-radius: 0.85rem;
+  background: #e8efe1;
+}
+.tetris-stage:focus-visible {
+  outline: 2px solid #426048;
+}
+.tetris-well {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  grid-template-rows: repeat(20, minmax(0, 1fr));
+  aspect-ratio: 1 / 2;
+  gap: 1px;
+  overflow: hidden;
+  border: 2px solid #263e34;
+  border-radius: 0.35rem;
+  background: #263e34;
+}
+.tetris-cell {
+  display: block;
+  border-radius: 1px;
+  background: #31483b;
+}
+.tetris-well .tetris-ghost {
+  background: #586d5c;
+  box-shadow: inset 0 0 0 1px #9aa999;
+}
+.tetris-I { background: #65c8c3; }
+.tetris-J { background: #809edf; }
+.tetris-L { background: #eea365; }
+.tetris-O { background: #efd161; }
+.tetris-S { background: #98c65e; }
+.tetris-T { background: #bb94d4; }
+.tetris-Z { background: #e88781; }
+.tetris-previews,
+.tetris-preview {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.tetris-preview {
+  border-radius: 0.4rem;
+  padding: 0.35rem;
+  background: #f8f9f4;
+  color: #2d4636;
+  font-size: 0.78rem;
+}
+.tetris-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  aspect-ratio: 2 / 1;
+  gap: 1px;
+}
+.tetris-preview-grid .tetris-cell:not([class*="tetris-cell tetris-"]) {
+  background: #e9eee6;
+}
+.tetris-controls {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: min(100%, 36rem);
+  margin: 0.55rem auto 0;
+  gap: 0.35rem;
+}
+.tetris-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-height: 2.75rem;
+  padding: 0.2rem;
+  border: 1px solid #bacdbb;
+  border-radius: 0.5rem;
+  background: #eef3ea;
+  color: #283e31;
+  font: inherit;
+  font-size: clamp(0.66rem, 2vw, 0.84rem);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.tetris-game kbd {
+  display: inline-block;
+  padding: 0.12rem 0.24rem;
+  border: 1px solid #bdcbbb;
+  border-bottom-width: 2px;
+  border-radius: 0.22rem;
+  background: #fcfdf7;
+  color: #294437;
+  font: 600 0.7rem/1.15 system-ui, sans-serif;
+  white-space: nowrap;
+}
+.tetris-previews .button {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem;
+  padding-inline: 0.1rem;
+  font-size: 0.75rem;
+}
+.tetris-clear {
+  color: #345644;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+@media (max-width: 34rem) {
+  .tetris-controls {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .tetris-controls button {
+    flex-wrap: wrap;
+    gap: 0.18rem 0.3rem;
+  }
+}
+.tetris-controls button:active { background: #dceacd; }
+.tetris-controls button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 .memory-free {
   display: flex;
   flex-direction: column;

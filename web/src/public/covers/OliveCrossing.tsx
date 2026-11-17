@@ -13,7 +13,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { Button } from "../../components/SharedComponents";
-import CrossingBoard from "./OliveCrossingBoard";
+import CrossingBoard, { crossingCamera } from "./OliveCrossingBoard";
 import { GameOverlay } from "./GameOverlay";
 import { gameSfx } from "./game-audio";
 import {
@@ -77,12 +77,7 @@ export default function OliveCrossing() {
   const [eagleLevel, setEagleLevel] = useState(0);
   const stallRef = useRef(0);
 
-  const [camera, setCamera] = useState({
-    x: 0,
-    width: CROSSING.columns * CROSSING.cell,
-  });
-  const cameraRef = useRef(camera);
-  cameraRef.current = camera;
+  const [aspectRatio, setAspectRatio] = useState(7 / 8);
 
   const phaseRef = useRef(phase);
   phaseRef.current = phase;
@@ -94,43 +89,13 @@ export default function OliveCrossing() {
   useEffect(() => {
     const board = boardRef.current;
     if (!board) return;
-    const updateCamera = () => {
-      const bounds = board.getBoundingClientRect();
-      if (!bounds.width || !bounds.height) return;
-      const fullWidth = CROSSING.columns * CROSSING.cell;
-      if (window.matchMedia("(min-width: 48.01rem)").matches) {
-        setCamera((current) =>
-          current.x === 0 && current.width === fullWidth
-            ? current
-            : { x: 0, width: fullWidth },
-        );
-        return;
-      }
-      const worldHeight = CROSSING.rows * CROSSING.cell;
-      const width = Math.min(
-        fullWidth,
-        Math.max(
-          7 * CROSSING.cell,
-          worldHeight * (bounds.width / bounds.height),
-        ),
-      );
-      const playerCenter =
-        world.playerColumn * CROSSING.cell + CROSSING.cell / 2;
-      const x = Math.max(
-        0,
-        Math.min(fullWidth - width, playerCenter - width / 2),
-      );
-      setCamera((current) =>
-        Math.abs(current.x - x) < 0.1 && Math.abs(current.width - width) < 0.1
-          ? current
-          : { x, width },
-      );
-    };
-    updateCamera();
-    const observer = new ResizeObserver(updateCamera);
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width && height) setAspectRatio(width / height);
+    });
     observer.observe(board);
     return () => observer.disconnect();
-  }, [world.playerColumn]);
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -346,19 +311,17 @@ export default function OliveCrossing() {
       return;
     }
 
-    const board = boardRef.current;
-    if (!board) return;
-    const bounds = board.getBoundingClientRect();
-    if (!bounds.width || !bounds.height) return;
-    const cam = cameraRef.current;
+    const matrix = boardRef.current
+      ?.querySelector("svg")
+      ?.getScreenCTM();
+    if (!matrix) return;
     const w = worldRef.current;
-    const tapWorldX = cam.x + ((clientX - bounds.left) / bounds.width) * cam.width;
-    const tapWorldY =
-      ((clientY - bounds.top) / bounds.height) * (CROSSING.rows * CROSSING.cell);
+    const point = new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
+    const tap = crossingCamera(w.playerColumn, aspectRatio).unproject(point.x, point.y);
     const oliveX = w.playerColumn * CROSSING.cell + CROSSING.cell / 2;
     const oliveY = w.playerRow * CROSSING.cell + CROSSING.cell / 2;
-    const relX = tapWorldX - oliveX;
-    const relY = tapWorldY - oliveY;
+    const relX = tap.x - oliveX;
+    const relY = tap.y - oliveY;
 
     if (
       Math.abs(relX) > Math.abs(relY) * 1.15 &&
@@ -481,7 +444,7 @@ export default function OliveCrossing() {
           }}
         >
           <CrossingBoard
-            camera={camera}
+            aspectRatio={aspectRatio}
             hop={hop}
             world={world}
             character={activeCharacter}
