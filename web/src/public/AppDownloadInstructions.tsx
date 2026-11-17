@@ -37,6 +37,7 @@ export default function DownloadPage() {
             <div className="install-qr-panel">
               <a className="install-qr" href={androidDownload} aria-label="Download signed Android APK">
                 <img src="/android-download-qr.svg?v=direct-apk-v2" width={128} height={128}
+                  loading="lazy" decoding="async"
                   alt="QR code for the latest signed Android app" />
               </a>
               <div>

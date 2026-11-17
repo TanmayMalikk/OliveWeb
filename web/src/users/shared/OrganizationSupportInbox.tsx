@@ -1,5 +1,5 @@
 // Staff and admins: reads assigned support chats and sends encrypted replies.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Archive, ArrowLeft, MessageCircle, Send, ShieldAlert } from "lucide-react";
 import { Button, Empty, Form } from "../../components/SharedComponents";
 import { accounts, cloudMode } from "../../services/AccountService";
@@ -49,6 +49,11 @@ export default function OrganizationSupportInbox() {
   const [showArchived, setShowArchived] = useState(false);
   const timeline = useChatTimeline(selected?.id, identity?.uid, messages);
   const deviceKeyAvailable = useChatDeviceKey(selected?.id, identity?.uid);
+  const logEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [selected?.id, timeline.length]);
 
   // Keeps the inbox current while the organization user is signed in.
   useEffect(() => {
@@ -165,19 +170,22 @@ export default function OrganizationSupportInbox() {
             role="group"
             aria-label="Ticket categories"
           >
-            {categories.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                aria-pressed={category === item.id}
-                onClick={() => {
-                  if (category !== item.id) openTicket(null);
-                  setCategory(item.id);
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+            {categories.map((item) => {
+              const count = conversations.filter((c) => !c.closedAt && categoryOf(c) === item.id).length;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={category === item.id}
+                  onClick={() => {
+                    if (category !== item.id) openTicket(null);
+                    setCategory(item.id);
+                  }}
+                >
+                  {item.label} ({count})
+                </button>
+              );
+            })}
           </div>
         )}
         {visible.length === 0 ? (
@@ -284,7 +292,9 @@ export default function OrganizationSupportInbox() {
               aria-label="Support messages"
               aria-live="polite"
             >
-              {timeline.length === 0 ? (
+              {!roomKey && !feedback ? (
+                <p className="help-note">Opening encrypted room…</p>
+              ) : timeline.length === 0 ? (
                 <p className="help-note">No messages yet.</p>
               ) : (
                 timeline.map((item) => {
@@ -310,6 +320,7 @@ export default function OrganizationSupportInbox() {
                   );
                 })
               )}
+              <div ref={logEndRef} />
             </div>
             {!selected.closedAt && (
               <VoiceMessageComposer
