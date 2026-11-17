@@ -1,5 +1,6 @@
 // All safe-app roles: shows profile details for signed-in users.
 import { Check } from "lucide-react";
+import { BirthdayField } from "../../../components/BirthdayField";
 import { useSession } from "../../../session/SessionProvider";
 import { Button, Field, Form } from "../../../components/SharedComponents";
 export default function Profile() {
@@ -37,7 +38,7 @@ export default function Profile() {
           if (
             !next.fullName.trim() ||
             !next.address.city.trim() ||
-            new Date(next.dob) > new Date()
+            !next.dob
           )
             throw new Error("Add a name, valid birth date, and city.");
           await s.saveProfile(next);
@@ -53,14 +54,7 @@ export default function Profile() {
           required
           maxLength={120}
         />
-        <Field
-          label="Date of birth"
-          type="date"
-          name="dob"
-          defaultValue={p.dob}
-          required
-          max={new Date().toISOString().slice(0, 10)}
-        />
+        <BirthdayField defaultValue={p.dob} required />
         <Field
           label="People affected"
           name="affectedNames"

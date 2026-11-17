@@ -27,6 +27,12 @@ class SettingsFlowTest : OliveUiTestBase() {
         fill("address_country", "Canada")
         click("save_settings")
         compose.waitUntil(30_000) { !session.busy && session.profile?.situation == "Updated test situation" }
+        click("settings_tab_cover")
+        // Trigger search is offered by the news cover, rather than the default fitness cover.
+        click("cover_choice_news")
+        compose.waitUntil(30_000) {
+            !session.busy && session.coverType == com.olive.app.data.account.CoverType.NEWS
+        }
         fill("settings_trigger", "new secret")
         fill(
             "settings_pin",
@@ -45,7 +51,7 @@ class SettingsFlowTest : OliveUiTestBase() {
         waitCover()
         compose.activityRule.scenario.recreate()
         waitCover()
-        compose.onNode(hasSetTextAction()).performTextInput("new secret")
+        fill("news_search", "new secret")
         waitFor("unlock_pin")
         enterPin("1234")
         waitFor("safe_settings")

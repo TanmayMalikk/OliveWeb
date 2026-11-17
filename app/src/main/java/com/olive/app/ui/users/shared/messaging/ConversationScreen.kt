@@ -85,6 +85,22 @@ internal fun ChatPane(
         AccountRole.ADMIN,
     )
     var draft by rememberSaveable(active.id) { mutableStateOf("") }
+    var searching by remember(active.id) { mutableStateOf(false) }
+    var messageSearch by remember(active.id) { mutableStateOf("") }
+    val closeSearch = {
+        searching = false
+        messageSearch = ""
+    }
+    var latestIncomingId by remember(active.id) { mutableStateOf<String?>(null) }
+    var observedIncoming by remember(active.id) { mutableStateOf(false) }
+    var incomingAnnouncements by remember(active.id) { mutableIntStateOf(0) }
+    val latestIncoming = session.messages.chatMessages.lastOrNull { it.senderUid != currentUid && !it.unsent }
+    LaunchedEffect(latestIncoming?.id) {
+        val incoming = latestIncoming ?: return@LaunchedEffect
+        if (observedIncoming && latestIncomingId != incoming.id) incomingAnnouncements++
+        observedIncoming = true
+        latestIncomingId = incoming.id
+    }
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
     var showChatInfo by rememberSaveable(active.id) { mutableStateOf(false) }
     var openedMedia by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
@@ -98,11 +114,15 @@ internal fun ChatPane(
         val subscription = session.messages.observeMembershipEvents(active.id) { membershipEvents = it }
         onDispose { subscription?.close() }
     }
-    val timeline = remember(session.messages.chatMessages, callHistory, membershipEvents) {
+    val timeline = remember(session.messages.chatMessages, callHistory, membershipEvents, messageSearch) {
         (session.messages.chatMessages.map(ConversationTimelineItem::Message) +
             callHistory.map(ConversationTimelineItem::Call) +
             membershipEvents.map(ConversationTimelineItem::Membership))
             .sortedWith(compareBy(ConversationTimelineItem::timestamp, ConversationTimelineItem::key))
+            .filter { item ->
+                messageSearch.isBlank() || (item is ConversationTimelineItem.Message && !item.value.unsent &&
+                    item.value.body.contains(messageSearch.trim(), ignoreCase = true))
+            }
     }
     var permissionAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     val microphonePermission = rememberLauncherForActivityResult(
@@ -123,15 +143,28 @@ internal fun ChatPane(
             PackageManager.PERMISSION_GRANTED
         ) action() else {
             permissionAction = action
-            session.beginCallPermissionRequest()
-            microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+    if (permissionAction != null && !session.callPermissionRequestOpen) {
+        AlertDialog(
+            onDismissRequest = { permissionAction = null },
+            text = { Text(uiText(R.string.ui_microphone_permission_required)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    session.beginCallPermissionRequest()
+                    microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                }) { Text(uiText(R.string.next)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { permissionAction = null }) { Text(uiText(R.string.cancel)) }
+            },
+        )
     }
     LaunchedEffect(currentUid, session.coverUsername, session.localMode) {
         session.documents.load(currentUid, session.coverUsername, session.localMode)
     }
     LaunchedEffect(timeline.lastOrNull()?.key, session.messages.chatMessages.lastOrNull()?.body) {
-        if (timeline.isNotEmpty()) listState.animateScrollToItem(timeline.lastIndex)
+        if (timeline.isNotEmpty() && messageSearch.isBlank()) listState.animateScrollToItem(timeline.lastIndex)
     }
     // Keep the newest message visible when the chat grows.
     LaunchedEffect(keyboardVisible) {
@@ -141,9 +174,12 @@ internal fun ChatPane(
         }
     }
     openedMedia?.let { (document, file) ->
-        SafetyDocumentViewer(document, file) {
-            file.delete()
-            openedMedia = null
+        Box(modifier) {
+            SafetyDocumentViewer(document, file) {
+                file.delete()
+                openedMedia = null
+            }
+            if (exit != null) FloatingQuickExit(exit, Modifier.align(Alignment.BottomEnd).padding(12.dp))
         }
         return
     }
@@ -152,9 +188,9 @@ internal fun ChatPane(
             Row(
                 Modifier.fillMaxWidth().heightIn(min = 78.dp)
                     .background(Color.White)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .padding(start = 12.dp, end = if (exit != null) 76.dp else 12.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (showBack) IconButton(
                     onClick = session.messages::closeConversation,
@@ -234,12 +270,12 @@ internal fun ChatPane(
                 ) {
                     Icon(Icons.Outlined.Call, stringResource(R.string.ui_start_voice_call))
                 }
-                if (exit != null) FilledTonalButton(
-                    onClick = exit,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier.heightIn(min = 44.dp)
-                        .testTag(if (canAttachMedia) "quick_exit" else "chat_exit_to_portal")
-                ) { Text(uiText(R.string.ui_exit)) }
+                IconButton(
+                    onClick = { if (searching) closeSearch() else searching = true },
+                    modifier = Modifier.testTag("chat_search_toggle"),
+                ) {
+                    Icon(Icons.Outlined.Search, uiText(R.string.chat_search_messages))
+                }
             }
             HorizontalDivider()
             if (session.accountRole == AccountRole.STAFF &&
@@ -266,15 +302,40 @@ internal fun ChatPane(
                 Text(stringResource(message), color = MaterialTheme.colorScheme.error)
             }
             Column(Modifier.weight(1f).fillMaxWidth().imePadding()) {
+                if (incomingAnnouncements > 0) {
+                    AccessibleMessage(
+                        uiText(R.string.chat_incoming_announcement, incomingAnnouncements),
+                        showText = false,
+                    )
+                }
+                if (searching) {
+                    OutlinedTextField(
+                        value = messageSearch,
+                        onValueChange = { messageSearch = it.take(120) },
+                        label = { Text(uiText(R.string.chat_search_messages)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        trailingIcon = {
+                            IconButton(onClick = closeSearch) {
+                                Icon(Icons.Outlined.Close, uiText(R.string.clear_search))
+                            }
+                        },
+                    )
+                }
                 LazyColumn(
                     Modifier.weight(1f).fillMaxWidth(),
                     state = listState,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    if (timeline.isEmpty()) item {
+                    if (session.messages.loadingConversation) {
+                        item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Conversation, rows = 3) }
+                        return@LazyColumn
+                    }
+                    if (timeline.isEmpty() && session.message == null) item {
                         Text(
-                            stringResource(R.string.no_messages_yet_say_hello_when_you_are_ready),
+                            stringResource(if (messageSearch.isBlank()) R.string.no_messages_yet_say_hello_when_you_are_ready
+                                else R.string.chat_no_matching_messages),
                             color = Muted,
                             modifier = Modifier.padding(12.dp)
                         )
@@ -342,7 +403,7 @@ internal fun ChatPane(
                         ) {
                             Surface(
                                 color = if (mine) ChatSentBubble else ChatIncomingBubble,
-                                contentColor = if (mine) Color.White else Color.Unspecified,
+                                contentColor = if (mine) Paper else Ink,
                                 shape = RoundedCornerShape(
                                     topStart = 18.dp,
                                     topEnd = 18.dp,
@@ -370,72 +431,71 @@ internal fun ChatPane(
                                     ), verticalAlignment = Alignment.Top
                                 ) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(
+                                        val sender =
                                             if (mine && !active.isChatAdmin(chat.senderUid)) session.coverUsername else active.senderDisplayName(
                                                 chat.senderUid,
                                                 chat.senderUsername,
                                                 session.accountRole,
                                                 uiText(R.string.support_chat_name),
                                                 uiText(R.string.support_admin_chat_name),
-                                            ),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = if (mine) Color.White.copy(alpha = .78f) else Muted
+                                            )
+                                        Text(
+                                            sender,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = if (mine) Paper else Muted
                                         )
                                         ChatMessageBody(
                                             chat,
                                             session,
-                                            mine
+                                            mine,
+                                            sender
                                         ) { document, file -> openedMedia = document to file }
                                         if (chat.sentAt > 0) Text(
                                             DateTimeFormatter.ofPattern(uiText(R.string.ui_mmm_d_hh_mm))
                                                 .withZone(ZoneId.systemDefault())
                                                 .format(Instant.ofEpochMilli(chat.sentAt)),
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = if (mine) Color.White.copy(alpha = .7f) else Muted
+                                            color = if (mine) Paper else Muted
                                         )
                                         if (mine && chat.deliveryStatus != MessageDeliveryStatus.SENT) {
                                             val retryable = canManuallyRetryMessage(chat.deliveryStatus)
                                             val discardable = canDiscardFailedMessage(chat.deliveryStatus)
-                                            TextButton(
-                                                onClick = {
-                                                    if (retryable) session.messages.retryMessage(chat)
-                                                    else if (discardable) session.messages.discardFailedMessage(chat)
-                                                },
-                                                enabled = retryable || discardable,
-                                                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-                                                modifier = Modifier.testTag("message_status_${chat.id}")
-                                                    .semantics { liveRegion = LiveRegionMode.Polite },
-                                            ) {
-                                                Text(
-                                                    stringResource(
-                                                        //TODO: this when branch is unreachable.
-                                                        when (chat.deliveryStatus) {
-                                                            MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued
-                                                            MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
-                                                            MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_retrying
-                                                            MessageDeliveryStatus.FAILED_PERMANENT ->
-                                                                if (chat.deliveryFailureCode in setOf(
-                                                                        "ATTACHMENT_ACCESS_REVOKED",
-                                                                        "ATTACHMENT_KEY_UNAVAILABLE",
-                                                                    )
-                                                                )
-                                                                    R.string.message_delivery_attachment_access_revoked
-                                                                else R.string.message_delivery_failed_permanent
-                                                            MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
-                                                        }
-                                                    ),
-                                                    color = Color.White.copy(
-                                                        alpha = if (retryable || discardable) 1f else .75f
-                                                    ),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                )
+                                            val label = stringResource(
+                                                when (chat.deliveryStatus) {
+                                                    MessageDeliveryStatus.QUEUED -> R.string.message_delivery_queued_retry
+                                                    MessageDeliveryStatus.SENDING -> R.string.message_delivery_sending
+                                                    MessageDeliveryStatus.FAILED_RETRYABLE -> R.string.message_delivery_failed_retry
+                                                    MessageDeliveryStatus.FAILED_PERMANENT ->
+                                                        if (chat.deliveryFailureCode in setOf(
+                                                                "ATTACHMENT_ACCESS_REVOKED",
+                                                                "ATTACHMENT_KEY_UNAVAILABLE",
+                                                            )
+                                                        ) R.string.message_delivery_attachment_access_revoked
+                                                        else R.string.message_delivery_failed_permanent
+                                                    MessageDeliveryStatus.SENT -> R.string.message_delivery_sent
+                                                }
+                                            )
+                                            val statusModifier = Modifier.testTag("message_status_${chat.id}")
+                                            if (retryable || discardable) {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        if (retryable) session.messages.retryMessage(chat)
+                                                        else session.messages.discardFailedMessage(chat)
+                                                    },
+                                                    border = BorderStroke(1.dp, Paper),
+                                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Paper),
+                                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                                    modifier = statusModifier.semantics { liveRegion = LiveRegionMode.Polite },
+                                                ) { Text(label, style = MaterialTheme.typography.labelMedium) }
+                                            } else {
+                                                AccessibleMessage(label, modifier = statusModifier, color = Paper)
                                             }
                                         }
                                     }
                                     if (mine && !chat.unsent && chat.deliveryStatus == MessageDeliveryStatus.SENT) Box {
                                         IconButton(
                                             onClick = { menuOpen = true },
-                                            modifier = Modifier.size(34.dp)
+                                            modifier = Modifier.size(48.dp)
                                         ) {
                                             Icon(
                                                 Icons.Outlined.MoreVert,
@@ -456,48 +516,85 @@ internal fun ChatPane(
                         }
                     }
                 }
+                val transfers = session.media
+                val pendingVoice = transfers?.uploads?.firstOrNull {
+                    it.ownerUid == currentUid && it.voiceConversationId == active.id
+                }
+                if (pendingVoice != null) {
+                    VoiceMessageUploadStatus(pendingVoice) { transfers.retryUpload(pendingVoice.jobId) }
+                } else if (session.preparingVoiceConversationId == active.id) {
+                    VoiceMessageUploadStatus()
+                }
                 Status(session)
                 if (active.closedAt == 0L) Surface(
                     color = Color.White,
                     shadowElevation = 8.dp,
                     border = BorderStroke(1.dp, ChatBorder),
                 ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (canAttachMedia) {
-                        IconButton(
-                            onClick = { showAttachmentPicker = true },
-                            enabled = !session.messages.busy,
-                            modifier = Modifier.testTag("attach_private_entry")
+                    val composer: @Composable (Boolean, (@Composable () -> Unit)?) -> Unit = { voiceOpen, mic ->
+                        // The outlined field reserves space above the outline for its floating label.
+                        val labelInset = 8.dp
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                Icons.Outlined.AttachFile,
-                                stringResource(R.string.attach_secure_entry)
-                            )
+                            if (canAttachMedia) {
+                                IconButton(
+                                    onClick = { showAttachmentPicker = true },
+                                    enabled = !voiceOpen && !session.messages.busy,
+                                    modifier = Modifier.padding(top = labelInset)
+                                        .testTag("attach_private_entry")
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.AttachFile,
+                                        stringResource(R.string.attach_secure_entry)
+                                    )
+                                }
+                            }
+                            Box(Modifier.weight(1f)) {
+                                OutlinedTextField(
+                                    draft,
+                                    { if (it.length <= 2_000) draft = it },
+                                    label = { Text(stringResource(R.string.message)) },
+                                    modifier = Modifier.fillMaxWidth().testTag("message_body")
+                                        .keepVisibleWhileTyping(),
+                                    readOnly = voiceOpen,
+                                    maxLines = 4,
+                                    shape = RoundedCornerShape(24.dp),
+                                    trailingIcon = if (mic != null) { { Spacer(Modifier.size(48.dp)) } } else null,
+                                )
+                                if (mic != null) Box(
+                                    Modifier.matchParentSize().padding(top = labelInset),
+                                    contentAlignment = Alignment.CenterEnd,
+                                ) { mic() }
+                            }
+                            FilledIconButton(
+                                onClick = { session.messages.sendMessage(draft) { draft = "" } },
+                                enabled = !voiceOpen && draft.isNotBlank() && !session.messages.busy &&
+                                    (active.type != "SUPPORT" || active.participantIds.size >= 2),
+                                modifier = Modifier.padding(top = labelInset)
+                                    .size(50.dp).testTag("send_message")
+                            ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
                         }
                     }
-                    OutlinedTextField(
-                        draft,
-                        { if (it.length <= 2_000) draft = it },
-                        label = { Text(stringResource(R.string.message)) },
-                        modifier = Modifier.weight(1f).testTag("message_body")
-                            .keepVisibleWhileTyping(),
-                        maxLines = 4,
-                        shape = RoundedCornerShape(24.dp),
-                    )
-                    FilledIconButton(
-                        onClick = { session.messages.sendMessage(draft) { draft = "" } },
-                        enabled = draft.isNotBlank() && !session.messages.busy &&
-                            (active.type != "SUPPORT" || active.participantIds.size >= 2),
-                        modifier = Modifier.size(50.dp).testTag("send_message")
-                    ) { Icon(Icons.AutoMirrored.Outlined.Send, stringResource(R.string.send)) }
-                }
+                    if (!session.localMode && !session.privacyBlackout && callState == VoipSessionState.Idle) {
+                        key(currentUid, active.id) {
+                            VoiceMessageComposer(
+                                enabled = session.preparingVoiceConversationId == null && !session.messages.busy &&
+                                    active.participantIds.size >= 2,
+                                withMicrophonePermission = withMicrophonePermission,
+                                onSend = session::sendVoiceMessage,
+                                content = composer,
+                            )
+                        }
+                    } else composer(false, null)
                 }
             }
         }
+        if (exit != null) FloatingQuickExit(
+            exit, Modifier.align(Alignment.TopEnd).padding(12.dp), compact = true,
+        )
         if (exit != null && session.messages.chatQuickExitHintVisible && session.screen == SessionScreen.Safe && !session.privacyBlackout) {
             val density = LocalDensity.current
             Popup(
@@ -555,7 +652,7 @@ internal fun ChatPane(
                                 containerColor = Color.White,
                                 contentColor = OliveGreen
                             ),
-                            modifier = Modifier.align(Alignment.End).heightIn(min = 46.dp)
+                            modifier = Modifier.align(Alignment.End).heightIn(min = 48.dp)
                                 .testTag("dismiss_chat_quick_exit_hint")
                         ) {
                             Text(uiText(R.string.ui_okay), fontSize = 16.sp)

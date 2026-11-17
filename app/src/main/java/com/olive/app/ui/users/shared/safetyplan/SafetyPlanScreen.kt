@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.HealthAndSafety
 import androidx.compose.material.icons.outlined.SupportAgent
 import androidx.compose.material3.*
@@ -53,6 +54,39 @@ private data class SafetyAttachmentTarget(
     val uploadTag: String,
 )
 
+private data class ChecklistCompletion(val prepared: Int, val total: Int) {
+    val complete get() = total > 0 && prepared == total
+}
+
+@Composable
+private fun PlanPickerChip(
+    selected: Boolean,
+    complete: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val completeLabel = stringResource(R.string.safety_conflict_complete)
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        leadingIcon = if (complete) ({
+            Icon(
+                Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(18.dp),
+                tint = if (selected) Paper else DarkOlive,
+            )
+        }) else null,
+        colors = if (complete) FilterChipDefaults.filterChipColors(
+            containerColor = SageGreen,
+            labelColor = DarkOlive,
+            selectedContainerColor = DarkOlive,
+            selectedLabelColor = Paper,
+        ) else FilterChipDefaults.filterChipColors(),
+        modifier = modifier.semantics { if (complete) stateDescription = completeLabel },
+    )
+}
+
 // shared safe app safety plan screen shows this safety plan screen so the user can view its details and use its actions.
 @Composable
 internal fun SafetyPlanScreen(
@@ -77,7 +111,8 @@ internal fun SafetyPlanScreen(
     }
 
     val lease = remember(ownerUid) { Any() }
-    val defaults = remember(context) { safetyDefaults(context) }
+    val hasAffectedPeople = ownerUid == session.coverAccountId && !session.profile?.affectedNames.isNullOrBlank()
+    val defaults = remember(context, hasAffectedPeople) { safetyDefaults(context, hasAffectedPeople) }
     // Stop this screen's plan listener when it leaves composition.
     DisposableEffect(lease) { onDispose { controller.close(lease) } }
     // Open once; its Firestore listener and durable reconciliation worker deliver later changes.
@@ -92,7 +127,7 @@ internal fun SafetyPlanScreen(
         }
     }
     var backup by rememberSaveable(ownerUid) { mutableStateOf(false) }
-    val plan = controller.plan
+    val plan = controller.plan?.takeIf { !controller.loadingPlan && it.ownerUid == ownerUid }
     val safeContact = session.accountRole == AccountRole.SAFE_CONTACT
     val attachedDocumentIds = remember(plan?.fields) {
         plan?.fields.orEmpty().values.filter { it.mutationId == null }.flatMapTo(linkedSetOf()) { field ->
@@ -134,6 +169,20 @@ internal fun SafetyPlanScreen(
     val expandedDescription = stringResource(R.string.support_expanded)
     val collapsedDescription = stringResource(R.string.support_collapsed)
     val prefix = if (backup) "backup" else "primary"
+    val sectionsByPlan = remember(plan?.fields) {
+        listOf("primary", "backup").associateWith { planPrefix ->
+            SAFETY_CHECKLIST_SECTIONS.filterNot { it == "contacts" }.associateWith { section ->
+                val items = plan?.fields?.get("${planPrefix}_$section")
+                    ?.let { readSafetyChecklist(it.value) }.orEmpty()
+                ChecklistCompletion(items.count { it.checked }, items.size)
+            }
+        }
+    }
+    val completionByPlan = sectionsByPlan.mapValues { (_, sections) ->
+        ChecklistCompletion(sections.values.sumOf { it.prepared }, sections.values.sumOf { it.total })
+    }
+    val selectedCompletion = completionByPlan.getValue(prefix)
+    val completeLabel = stringResource(R.string.safety_conflict_complete)
     if (session.accountRole == AccountRole.USER && plan != null) {
         val conflict = plan.fields.entries.firstOrNull {
             it.value.conflictRevision != null || it.key in plan.pendingConflicts
@@ -168,9 +217,9 @@ internal fun SafetyPlanScreen(
         return
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val headerMaxHeight = maxHeight * .5f
+        val headerMaxHeight = maxHeight * .4f
         Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-            // Keep navigation available; on compact screens/with the keyboard, leave at least half the space for the note.
+            // Allow the tabs to scroll vertically in compact windows while the progress stays fixed.
             Column(
                 Modifier.fillMaxWidth().heightIn(max = headerMaxHeight)
                     .verticalScroll(rememberScrollState())
@@ -199,16 +248,18 @@ internal fun SafetyPlanScreen(
                 }
                 if (organizationEditor || safeContact) Text(displayOwnerName, style = MaterialTheme.typography.labelLarge)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
+                    PlanPickerChip(
                         selected = !backup,
+                        complete = completionByPlan.getValue("primary").complete,
                         onClick = { leaveEditor(); backup = false },
-                        label = { Text(stringResource(R.string.safety_primary)) },
+                        label = stringResource(R.string.safety_primary),
                         modifier = Modifier.weight(1f).testTag("safety_primary")
                     )
-                    FilterChip(
+                    PlanPickerChip(
                         selected = backup,
+                        complete = completionByPlan.getValue("backup").complete,
                         onClick = { leaveEditor(); backup = true },
-                        label = { Text(stringResource(R.string.safety_backup)) },
+                        label = stringResource(R.string.safety_backup),
                         modifier = Modifier.weight(1f).testTag("safety_backup")
                     )
                 }
@@ -217,6 +268,7 @@ internal fun SafetyPlanScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     SAFETY_CHECKLIST_SECTIONS.forEachIndexed { index, section ->
+                        val complete = sectionsByPlan.getValue(prefix)[section]?.complete == true
                         val label = when (section) {
                             "documents" -> R.string.safety_documents_jump
                             "grab" -> R.string.safety_grab_jump
@@ -225,17 +277,36 @@ internal fun SafetyPlanScreen(
                         OutlinedButton(
                             onClick = { leaveEditor(); scope.launch { state.animateScrollToItem(index + 1) } },
                             enabled = plan != null,
+                            colors = if (complete) ButtonDefaults.outlinedButtonColors(
+                                containerColor = SageGreen, contentColor = DarkOlive
+                            ) else ButtonDefaults.outlinedButtonColors(),
                             modifier = Modifier.testTag("safety_jump_$section")
-                        ) { Text(stringResource(label)) }
+                                .semantics { if (complete) stateDescription = completeLabel }
+                        ) {
+                            if (complete) {
+                                Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(stringResource(label))
+                        }
                     }
                 }
+            }
+            if (controller.loadingPlan) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Checklist)
+            if (plan != null) {
+                SafetyChecklistProgress(
+                    prepared = selectedCompletion.prepared,
+                    total = selectedCompletion.total,
+                    summary = true,
+                )
+                Spacer(Modifier.height(8.dp))
             }
             Surface(
                 Modifier.weight(1f).fillMaxWidth().testTag("safety_checklist_note"),
                 shape = MaterialTheme.shapes.medium,
                 color = WarmWhite,
                 contentColor = Ink,
-                border = BorderStroke(1.dp, LightSage)
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             ) {
                 LazyColumn(
                     Modifier.fillMaxSize().oliveScrollbar(state).testTag("safety_plan_page"),
@@ -245,14 +316,9 @@ internal fun SafetyPlanScreen(
                 ) {
                     item {
                         Column(
-                            Modifier.padding(16.dp),
+                            Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                stringResource(R.string.safety_checklist_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Muted
-                            )
                             val status = when {
                                 controller.saving > 0 -> R.string.safety_saving
                                 controller.syncing -> R.string.safety_syncing
@@ -444,7 +510,10 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
             stringResource(R.string.safe_contact_shared_plans_intro)
         )
         if (session.localMode) Text(stringResource(R.string.safety_account_required), color = Muted)
-        if (controller.sharedPlans.isEmpty()) Surface(
+        if (controller.loadingAccess && !session.localMode) com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.SharedPlans)
+        controller.error?.let { AccessibleMessage(stringResource(it)) }
+        val visiblePlans = if (controller.loadingAccess) emptyList() else controller.sharedPlans
+        if (visiblePlans.isEmpty() && (!controller.loadingAccess || session.localMode) && controller.error == null) Surface(
             Modifier.fillMaxWidth(),
             shape = MaterialTheme.shapes.large,
             color = LightSage
@@ -461,7 +530,7 @@ internal fun SafeContactSafetyPlansScreen(session: SessionViewModel) {
                 )
             }
         }
-        controller.sharedPlans.forEach { shared ->
+        visiblePlans.forEach { shared ->
             OutlinedCard(
                 onClick = { selected = shared },
                 modifier = Modifier.fillMaxWidth().testTag("shared_plan_${shared.ownerUid}")

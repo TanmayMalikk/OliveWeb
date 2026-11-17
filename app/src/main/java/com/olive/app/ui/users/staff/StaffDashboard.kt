@@ -129,7 +129,7 @@ private fun StaffDashboard(
         OutlinedButton(
             onClick = session::signOut,
             enabled = !session.busy,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().testTag("sign_out"),
         ) { Text(stringResource(R.string.sign_out)) }
     }
 }
@@ -197,6 +197,10 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
             stringResource(if (session.accountRole == AccountRole.ADMIN) R.string.safety_admin_intro else R.string.safety_staff_intro),
             stringResource(R.string.olive_tree),
         )
+        if (controller.loadingAccess && !session.localMode) {
+            com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.SharedPlans)
+            return@FormColumn
+        }
         if (session.accountRole == AccountRole.STAFF) {
             val availabilityLabel = stringResource(R.string.safety_available)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -210,7 +214,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
             }
         }
         controller.error?.let { AccessibleMessage(stringResource(it)) }
-        if (controller.consultations.isEmpty()) Text(stringResource(R.string.safety_inbox_empty))
+        if (controller.consultations.isEmpty() && controller.error == null) Text(stringResource(R.string.safety_inbox_empty))
         val assigned = controller.consultations.filter { it.staffUid.isNotBlank() }
         val waiting = controller.consultations.filter { it.staffUid.isBlank() }
         ConsultationGroup(

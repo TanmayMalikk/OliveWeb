@@ -15,7 +15,9 @@
     <string name="you">您</string>
     <string name="your_saved_location">您保存的位置</string>
     <string name="share_live_location_with">实时位置共享对象</string>
-    <string name="location_contacts_selected">已选择 10 位联系人中的 %1$d 位</string>
+    <string name="location_contacts_selected">已选择 %1$d 位好友</string>
+    <string name="location_search_friends">搜索好友</string>
+    <string name="location_no_matching_friends">没有匹配的好友。</string>
     <string name="location_no_friends">请先添加并接受好友，再共享位置。</string>
     <string name="start_sharing_location">开始共享实时位置</string>
     <string name="stop_sharing_location">停止共享</string>

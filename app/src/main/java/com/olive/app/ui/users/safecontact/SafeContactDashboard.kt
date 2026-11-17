@@ -182,6 +182,11 @@ private fun SafeContactHome(session: SessionViewModel) {
             }
         }
         Status(session)
+        OutlinedButton(
+            onClick = session::signOut,
+            enabled = !session.busy,
+            modifier = Modifier.fillMaxWidth().testTag("sign_out"),
+        ) { Text(stringResource(R.string.sign_out_on_this_device)) }
     }
 }
 
@@ -258,64 +263,64 @@ internal fun SharedEntryViewer(session: SessionViewModel) {
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Header Toolbar
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = stringResource(R.string.secure_shared_entry),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(start = 12.dp).semantics { heading() },
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (quickExit != null) TextButton(onClick = quickExit) {
-                            Text(stringResource(R.string.quick_exit))
+            Box(Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Header Toolbar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.secure_shared_entry),
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(start = 12.dp).semantics { heading() },
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { session.messages.closeSharedPrivateEntry() }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = stringResource(R.string.close_shared_entry)
+                                )
+                            }
                         }
-                        IconButton(onClick = { session.messages.closeSharedPrivateEntry() }) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = stringResource(R.string.close_shared_entry)
+                    }
+
+                    HorizontalDivider()
+
+                    // Decrypted Content Payload
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = if (quickExit != null) 92.dp else 24.dp)
+                    ) {
+                        if (entry.kind == PrivateEntryKind.Incident) {
+                            SharedIncidentField(stringResource(R.string.title), entry.title)
+                            SharedIncidentField(stringResource(R.string.incident_date), entry.incidentDate)
+                            SharedIncidentField(stringResource(R.string.incident_time), entry.incidentTime)
+                            SharedIncidentField(stringResource(R.string.incident_location), entry.incidentLocation)
+                            SharedIncidentField(stringResource(R.string.incident_body), entry.body, minLines = 5)
+                        } else {
+                            Text(
+                                text = entry.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = entry.body,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
                             )
                         }
                     }
                 }
-
-                HorizontalDivider()
-
-                // Decrypted Content Payload
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(24.dp)
-                ) {
-                    if (entry.kind == PrivateEntryKind.Incident) {
-                        SharedIncidentField(stringResource(R.string.title), entry.title)
-                        SharedIncidentField(stringResource(R.string.incident_date), entry.incidentDate)
-                        SharedIncidentField(stringResource(R.string.incident_time), entry.incidentTime)
-                        SharedIncidentField(stringResource(R.string.incident_location), entry.incidentLocation)
-                        SharedIncidentField(stringResource(R.string.incident_body), entry.body, minLines = 5)
-                    } else {
-                        Text(
-                            text = entry.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = entry.body,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.85f)
-                        )
-                    }
-                }
+                if (quickExit != null) FloatingQuickExit(quickExit, Modifier.align(Alignment.BottomEnd).padding(12.dp))
             }
         }
     }
@@ -346,7 +351,7 @@ internal fun SafeContactIdentityCard(profile: UserProfile, onClick: () -> Unit) 
         shape = RoundedCornerShape(24.dp),
         color = CardSoftMint,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, OliveGreen.copy(alpha = .18f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Row(
             Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically,
@@ -402,7 +407,7 @@ internal fun SafeContactActionCard(
         shape = RoundedCornerShape(24.dp),
         color = CardTintEnabled,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, OliveGreen.copy(alpha = .22f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         tonalElevation = 1.dp
     ) {
         Row(

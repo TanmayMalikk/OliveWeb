@@ -98,6 +98,7 @@ export default function HotlinesPage() {
               <h3>{resource.name}</h3>
               <p>{resource.group === "Hotlines" ? "Hotline" : "Shelter"} · {resource.city}, {regions[resource.region]}</p>
               <p>{resource.description}</p>
+              {resource.hours && <p>Hours: {resource.hours}</p>}
               <div className="toolbar-actions">
                 <a className="button outline" href={`tel:${resource.phone.replace(/[^+\d]/g, "")}`}>
                   <Phone size={17} /> {resource.phone}

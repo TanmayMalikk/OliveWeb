@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="idle_lock_minutes">%d 分钟</string>
+    <string name="idle_lock_minutes_seconds">%1$d 分 %2$d 秒</string>
+    <string name="idle_lock_recommended">%s（推荐）</string>
+    <string name="idle_lock_setting">闲置锁定时间</string>
+    <string name="incident_date_format">事件日期（YYYY-MM-DD）</string>
+    <string name="incident_time_format">大约时间（HH:mm）</string>
+    <string name="incident_invalid_date">请输入 YYYY-MM-DD 格式的有效日期。</string>
+    <string name="incident_invalid_time">请输入 HH:mm 格式的有效 24 小时时间。</string>
+    <string name="role_picker_expanded">已展开</string>
+    <string name="role_picker_collapsed">已收起</string>
+    <string name="admin_search_accounts">搜索账号</string>
+    <string name="admin_all_account_statuses">所有状态</string>
+    <string name="note_attachment_count">附件：%d</string>
+    <string name="chat_unread_only">仅显示未读</string>
+    <string name="chat_search_messages">搜索消息</string>
+    <string name="chat_no_matching_messages">没有匹配的消息</string>
+    <string name="chat_incoming_announcement">收到新消息：%d 条</string>
+    <string name="incident_no_address_suggestions">没有地址建议。你可以保留输入的地址或重试。</string>
+    <string name="incident_latitude">纬度</string>
+    <string name="incident_longitude">经度</string>
+    <string name="incident_use_coordinates">使用坐标</string>
+    <string name="resource_hours">开放时间：%s</string>
+    <string name="private_route_destination">规划前往目的地的路线</string>
+    <string name="private_route_help">输入街道地址，或输入庇护所名称和城市。地图服务商使用坐标计算路线。</string>
+    <string name="private_route_address_not_found">找不到目的地。请尝试输入完整地址。</string>
+    <string name="safety_finances_heading">财务</string>
+    <string name="safety_finances_access">列出你可以独立使用的资金和付款方式。</string>
+    <string name="safety_finances_costs">计划如何支付交通、临时住宿和基本生活开销。</string>
+    <string name="safety_finances_support">记下可以向谁咨询财务支持或联名账户。</string>
+    <string name="admin_emergency_response">紧急响应</string>
+    <string name="admin_emergency_response_help">查看已升级的工单和用户主动分享的信息。此面板不派遣紧急救援服务。</string>
+    <string name="safety_documents_dependants">收集与你一起离开的人员的身份证件及适用的学校或照护记录。</string>
+    <string name="feedback_person_name">第 %d 人的姓名</string>
+    <string name="feedback_person_age">第 %d 人的年龄（选填）</string>
+    <string name="feedback_remove_person">移除第 %d 人</string>
+    <string name="feedback_add_person">添加其他人</string>
+    <string name="feedback_situation_hint">如果你愿意，可以描述正在发生的情况，例如身体、情感或经济上的伤害。</string>
+    <plurals name="note_search_results_count">
+        <item quantity="one">%d 条匹配记录</item>
+        <item quantity="other">%d 条匹配记录</item>
+    </plurals>
+    <string name="dob_date_range_error">请输入今天至 130 年前之间的日期。</string>
+    <string name="dob_picker_title">选择出生日期</string>
+    <string name="dob_pick_year_range">选择年份范围</string>
+    <string name="dob_pick_year">选择年份</string>
+    <string name="dob_pick_month">选择月份</string>
+    <string name="dob_pick_day">选择日期</string>
+    <string name="dob_clear">清除出生日期</string>
+    <string name="location_background_access">启用后台位置</string>
+    <string name="location_background_settings">后台位置可在应用关闭时继续更新管理员的位置地图。在 Android 设置中选择 %1$s，然后返回此处。</string>
+    <string name="location_background_dialog">后台位置可在应用关闭时继续更新管理员的位置地图。请在 Android 提示中选择始终允许。</string>
+    <string name="chat_dms_tab">私信</string>
+    <string name="chat_tickets_tab">工单聊天</string>
+</resources>

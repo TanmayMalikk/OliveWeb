@@ -1,8 +1,32 @@
 // Users and authorized viewers: defines encrypted media transfer states and metadata.
 package com.olive.app.data.media
 
+import com.olive.app.data.messaging.OutgoingMessage
 import org.json.JSONArray
 import org.json.JSONObject
+
+/** A requested send waiting for the upload service to assign the encrypted media ID. */
+data class PendingVoiceMessage(
+    val conversationId: String,
+    val senderUsername: String,
+    val wrappedRoomKey: String,
+    val metadata: String = "",
+) {
+    internal fun toJson() = JSONObject()
+        .put("conversationId", conversationId)
+        .put("senderUsername", senderUsername)
+        .put("wrappedRoomKey", wrappedRoomKey)
+        .put("metadata", metadata)
+
+    companion object {
+        internal fun fromJson(value: JSONObject) = PendingVoiceMessage(
+            value.getString("conversationId"),
+            value.getString("senderUsername"),
+            value.getString("wrappedRoomKey"),
+            value.optString("metadata"),
+        )
+    }
+}
 
 /** Approved upper bound for one encrypted R2 media object. */
 internal const val MAX_MEDIA_CIPHERTEXT_BYTES=250L*1024L*1024L
@@ -97,6 +121,8 @@ data class MediaUploadJob(
     val error:String?=null,
     val createdAt:Long=System.currentTimeMillis(),
     val attachToSafetyPlan:Boolean=false,
+    val voiceDraft: PendingVoiceMessage? = null,
+    val voiceMessage: OutgoingMessage? = null,
 ) {
     /** Serializes the entire resumable state for storage inside the Keystore-backed vault. */
     fun toJson()=JSONObject().apply {
@@ -109,6 +135,8 @@ data class MediaUploadJob(
         mode?.let { put("mode",it.name) };put("mediaId",mediaId);put("objectKey",objectKey)
         put("uploadId",uploadId);put("partSize",partSize);put("createdAt",createdAt)
         put("attachToSafetyPlan",attachToSafetyPlan)
+        voiceDraft?.let { put("voiceDraft", it.toJson()) }
+        voiceMessage?.let { put("voiceMessage", it.toJson()) }
         put("completedParts",JSONObject(completedParts.mapKeys { it.key.toString() }))
         error?.let { put("error",it) }
     }
@@ -136,7 +164,9 @@ data class MediaUploadJob(
                 MediaTransferStatus.valueOf(value.getString("status")),value.optString("mode").takeIf(String::isNotBlank)?.let(MediaUploadMode::valueOf),
                 value.optString("mediaId"),value.optString("objectKey"),value.optString("uploadId"),
                 value.optLong("partSize"),parts,value.optString("error").takeIf(String::isNotBlank),
-                value.getLong("createdAt"),value.optBoolean("attachToSafetyPlan"))
+                value.getLong("createdAt"),value.optBoolean("attachToSafetyPlan"),
+                value.optJSONObject("voiceDraft")?.let(PendingVoiceMessage::fromJson),
+                value.optJSONObject("voiceMessage")?.let(OutgoingMessage::fromJson))
         }
     }
 }
@@ -197,6 +227,7 @@ data class MediaUploadPresentation(
     val mediaId:String,
     val error:String?,
     val createdAt:Long,
+    val voiceConversationId: String? = null,
 ) {
     /** A bounded fraction suitable for a determinate progress indicator. */
     val progress:Float? get()=totalBytes.takeIf { it>0 }?.let {

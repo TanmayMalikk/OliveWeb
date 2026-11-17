@@ -90,9 +90,12 @@ internal class OrganizationAccounts(private val runtime: SessionRuntime) {
             with(state) {
                 val repository = adminRepository ?: return
                 if (accountRole != AccountRole.ADMIN || busy) return
+                val ownerUid = enrollment?.uid ?: return
                 operations.runOperation(runtime.application.getString(R.string.ui_unable_to_load_organization_accounts)) { token ->
                     val counts = repository.summary()
-                    if (epoch == token && screen == SessionScreen.Portal) adminCounts = counts
+                    if (epoch == token && screen == SessionScreen.Portal && enrollment?.uid == ownerUid) {
+                        setAdminSummary(ownerUid, counts)
+                    }
                 }
             }
         }
@@ -245,11 +248,6 @@ internal class SessionNotes(private val runtime: SessionRuntime) {
                 if (cleanTitle.length > 120 || cleanBody.length > 10_000) {
                     message =
                         runtime.application.getString(R.string.use_up_to_120_title_characters_and_10_000_detail_characters)
-                    return
-                }
-                if (kind == PrivateEntryKind.Incident &&
-                    (cleanTitle.isBlank() || cleanDate.isBlank() || cleanLocation.isBlank())) {
-                    message = runtime.application.getString(R.string.incident_required_fields)
                     return
                 }
                 val uid = enrollment?.uid ?: return

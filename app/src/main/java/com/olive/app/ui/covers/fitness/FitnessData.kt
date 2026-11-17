@@ -11,11 +11,8 @@ import java.util.UUID
 import kotlin.math.roundToInt
 
 // Each cover account receives separate local fitness and meal history.
-internal class FitnessStore(context: Context, accountId: String) {
-    private val preferences = context.getSharedPreferences(
-        "fitness_cover_${accountId.hashCode()}",
-        Context.MODE_PRIVATE,
-    )
+internal class FitnessStore(private val context: Context, private val accountId: String) {
+    internal val preferences = fitnessPreferences(context, accountId)
 
     // Loads fitness goals and body details saved on this phone.
     fun profile() = FitnessProfile(
@@ -26,6 +23,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         proteinGoal = preferences.getInt("protein_goal", 120),
         carbohydrateGoal = preferences.getInt("carbohydrate_goal", 250),
         fatGoal = preferences.getInt("fat_goal", 65),
+        waterGoalMl = preferences.getInt("water_goal_ml", 2000),
     )
 
     // Saves calorie, macro, activity, and body goals for the fitness cover.
@@ -37,6 +35,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         putInt("protein_goal", value.proteinGoal.coerceIn(10, 1_000))
         putInt("carbohydrate_goal", value.carbohydrateGoal.coerceIn(10, 2_000))
         putInt("fat_goal", value.fatGoal.coerceIn(10, 1_000))
+        putInt("water_goal_ml", value.waterGoalMl.coerceIn(250, 10000))
     }
 
     // Loads the snapshot needed by the fitness cover.
@@ -69,6 +68,7 @@ internal class FitnessStore(context: Context, accountId: String) {
             heartRateHistory = heartRateHistory,
             watchConnected = watchConnected,
             watchSeenWithinFourteenDays = watchSeenWithinFourteenDays,
+            waterTodayMl = waterTotal(today),
         )
     }
 
@@ -152,7 +152,9 @@ internal class FitnessStore(context: Context, accountId: String) {
         watchUpdatedAt: Long,
         today: LocalDate = LocalDate.now(),
         nowMillis: Long = System.currentTimeMillis(),
+        heartRateUpdatedAt: Long = watchUpdatedAt,
     ): FitnessSnapshot {
+        if (watchUpdatedAt <= preferences.getLong(watchReportAtKey(today), 0L)) return snapshot(today, nowMillis)
         val safeWatchSteps = watchSteps.coerceIn(0, MAX_DAILY_STEPS)
         val previousWatchSteps = preferences.getInt(watchStepsKey(today), -1)
         val watchDelta = if (previousWatchSteps !in 0..safeWatchSteps) {
@@ -167,14 +169,15 @@ internal class FitnessStore(context: Context, accountId: String) {
         } else {
             activitySteps(today)
         }
-        val watchIsWorn = heartRate > 0 || watchDelta > 0
+        val watchIsWorn = (heartRate in 30..240 && heartRateUpdatedAt >= watchUpdatedAt - 60_000L) || watchDelta > 0
         val shouldReconcile = previousWatchSteps < 0 || watchIsWorn
         val safeUpdatedAt = watchUpdatedAt.takeIf {
             it in 1L..(nowMillis + 60_000L)
         } ?: nowMillis
         val safeHeartRate = heartRate.takeIf { it in 30..240 }
         val lastHeartRateAt = preferences.getLong(heartRateLastSampleAtKey(today), 0L)
-        val isNewHeartRateSample = safeHeartRate != null && safeUpdatedAt > lastHeartRateAt
+        val safeHeartRateAt = heartRateUpdatedAt.takeIf { it in 1L..(nowMillis + 60_000L) } ?: 0L
+        val isNewHeartRateSample = safeHeartRate != null && safeHeartRateAt > lastHeartRateAt
         val updatedHeartRateStats = if (isNewHeartRateSample) {
             heartRateStats(today).record(
                 heartRate = safeHeartRate,
@@ -186,7 +189,7 @@ internal class FitnessStore(context: Context, accountId: String) {
         val updatedGraphSamples = safeHeartRate?.takeIf { isNewHeartRateSample }?.let { bpm ->
             appendHeartRateGraphSample(
                 existing = heartRateSamples(today),
-                sample = HeartRateSample(safeUpdatedAt, bpm),
+                sample = HeartRateSample(safeHeartRateAt, bpm),
             )
         }
 
@@ -210,7 +213,7 @@ internal class FitnessStore(context: Context, accountId: String) {
                     heartRateRestingSampleCountKey(today),
                     updatedHeartRateStats.restingSampleCount,
                 )
-                putLong(heartRateLastSampleAtKey(today), safeUpdatedAt)
+                putLong(heartRateLastSampleAtKey(today), safeHeartRateAt)
                 putString(
                     heartRateGraphSamplesKey(today),
                     encodeHeartRateSamples(updatedGraphSamples.orEmpty()),
@@ -219,6 +222,51 @@ internal class FitnessStore(context: Context, accountId: String) {
         }
         return snapshot(today, nowMillis)
     }
+
+    // Health Connect aggregates overlapping step sources; merge by maximum rather than adding them.
+    fun recordHealthConnect(steps: Int, samples: List<HeartRateSample>, today: LocalDate = LocalDate.now()) {
+        var stats = heartRateStats(today)
+        var graph = heartRateSamples(today)
+        var last = preferences.getLong(heartRateLastSampleAtKey(today), 0L)
+        samples.sortedBy { it.recordedAt }.forEach { sample ->
+            if (sample.recordedAt > last && sample.bpm in 30..240) {
+                stats = stats.record(sample.bpm, resting = false)
+                graph = appendHeartRateGraphSample(graph, sample)
+                last = sample.recordedAt
+            }
+        }
+        preferences.edit {
+            putInt(activityStepsKey(today), maxOf(activitySteps(today), steps.coerceIn(0, MAX_DAILY_STEPS)))
+            if (samples.isNotEmpty()) {
+                putInt(heartRatePeakKey(today), stats.peakBpm)
+                putInt(heartRateLowestKey(today), stats.lowestBpm)
+                putLong(heartRateTotalKey(today), stats.totalBpm)
+                putInt(heartRateSampleCountKey(today), stats.sampleCount)
+                putLong(heartRateLastSampleAtKey(today), last)
+                putString(heartRateGraphSamplesKey(today), encodeHeartRateSamples(graph))
+            }
+        }
+    }
+
+    fun addWater(milliliters: Int, goalMl: Int, today: LocalDate = LocalDate.now()): FitnessSnapshot {
+        require(milliliters in -10000..10000 && milliliters != 0 && goalMl in 250..10000)
+        val adjustment = if (milliliters < 0) maxOf(milliliters, -waterTotal(today)) else milliliters
+        if (adjustment == 0) return snapshot(today)
+        val id = UUID.randomUUID().toString()
+        val drink = JSONObject().put("logId", id).put("milliliters", adjustment)
+        val key = "water_$today"
+        val entries = runCatching { JSONArray(preferences.getString(key, "[]")) }.getOrDefault(JSONArray())
+        entries.put(drink)
+        preferences.edit { putString(key, entries.toString()); putInt("water_goal_ml", goalMl) }
+        FitnessAccountSync.water(context, accountId, today.toString(), id, drink.toString())
+        return snapshot(today)
+    }
+
+    private fun waterTotal(today: LocalDate): Int = runCatching {
+        val entries = JSONArray(preferences.getString("water_$today", "[]"))
+        (0 until entries.length()).sumOf { entries.getJSONObject(it).optInt("milliliters").coerceIn(-10000, 10000).toLong() }
+            .coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
+    }.getOrDefault(0)
 
     // Adds a selected food and its nutrients to today's diary.
     fun addFood(
@@ -230,16 +278,27 @@ internal class FitnessStore(context: Context, accountId: String) {
         val entry = FoodLogEntry(
             logId = UUID.randomUUID().toString(),
             food = food,
-            servings = servings.coerceIn(0.05f, 100f),
+            servings = servings.coerceIn(0.0001f, 10_000f),
             meal = meal,
         )
         saveFoods(today, foods(today) + entry)
+        FitnessAccountSync.meal(context, accountId, today.toString(), entry.logId, entry.toJson().toString())
+        return snapshot(today)
+    }
+
+    fun updateFood(entry: FoodLogEntry, today: LocalDate = LocalDate.now()): FitnessSnapshot {
+        require(entry.servings.isFinite() && entry.servings in 0.0001f..10000f)
+        val existing = foods(today)
+        if (existing.none { it.logId == entry.logId }) return snapshot(today)
+        saveFoods(today, existing.map { if (it.logId == entry.logId) entry else it })
+        FitnessAccountSync.meal(context, accountId, today.toString(), entry.logId, entry.toJson().toString())
         return snapshot(today)
     }
 
     // Removes one food entry from today's diary.
     fun removeFood(logId: String, today: LocalDate = LocalDate.now()): FitnessSnapshot {
         saveFoods(today, foods(today).filterNot { it.logId == logId })
+        FitnessAccountSync.meal(context, accountId, today.toString(), logId, null)
         return snapshot(today)
     }
 
@@ -401,7 +460,7 @@ private fun parseFoodLogEntry(value: JSONObject): FoodLogEntry? = runCatching {
     val food = value.getJSONObject("food")
     FoodLogEntry(
         logId = value.getString("logId"),
-        servings = value.getDouble("servings").toFloat().coerceIn(0.05f, 100f),
+        servings = value.getDouble("servings").toFloat().coerceIn(0.0001f, 10_000f),
         meal = MealType.valueOf(value.getString("meal")),
         food = NutritionFood(
             id = food.getString("id"),
@@ -430,7 +489,9 @@ private fun JSONObject.safeNutrient(name: String) =
     optDouble(name, 0.0).toFloat().takeIf(Float::isFinite)?.coerceAtLeast(0f) ?: 0f
 
 // Formats the food serving amount shown in the diary.
-internal fun Float.displayAmount(): String = if (this == roundToInt().toFloat()) {
+internal fun Float.displayAmount(): String = if (this > 0f && this < 1f) {
+    java.math.BigDecimal(toString()).setScale(4, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+} else if (this == roundToInt().toFloat()) {
     roundToInt().toString()
 } else {
     String.format(Locale.ROOT, "%.1f", this)

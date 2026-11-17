@@ -58,29 +58,46 @@ internal fun visibleSupportTags(role: AccountRole): List<String> = when (role) {
 }
 
 // Friends and DMs share this adaptive screen: one pane on phones and a sidebar plus chat on wider devices.
-// UI sizing: messaging switches to two panes at 720dp; the sidebar is 340dp wide and leaves 96dp for bottom controls.
+// UI sizing: messaging switches to two panes at 720dp; the sidebar is 340dp wide and the list scrolls past the floating controls.
 @Composable
 internal fun MessagesScreen(
     session: SessionViewModel,
     exit: (() -> Unit)? = null,
     initialSupportFilter: String? = null,
 ) {
-    val active = session.messages.activeConversation
     val currentUid = session.coverAccountId.orEmpty()
+    val active = session.messages.activeConversation?.takeIf { currentUid in it.participantIds }
     // Keep the chosen list visible while a phone opens a chat and returns from it.
-    var showingArchived by rememberSaveable { mutableStateOf(false) }
+    var showingArchived by rememberSaveable(currentUid) { mutableStateOf(false) }
     val allowedSupportTags = visibleSupportTags(session.accountRole)
     var supportFilter by rememberSaveable(initialSupportFilter, session.accountRole) {
         mutableStateOf(initialSupportFilter?.takeIf { it in allowedSupportTags }
             ?: allowedSupportTags.firstOrNull() ?: SUPPORT_TAG_SUPPORT)
     }
+    var ticketChats by rememberSaveable(currentUid, session.accountRole) { mutableStateOf(false) }
+    LaunchedEffect(active?.id) {
+        if (allowedSupportTags.isEmpty() && active != null && ticketChats != (active.type == "SUPPORT")) {
+            ticketChats = active.type == "SUPPORT"
+            showingArchived = isConversationArchived(
+                active, session.messages.archivedConversationIds, session.messages.restoredClosedConversationIds,
+            )
+        }
+    }
+    val changeChatTab: (Boolean) -> Unit = { tickets ->
+        if (ticketChats != tickets) {
+            if (active != null) session.messages.closeConversation()
+            ticketChats = tickets
+            showingArchived = false
+        }
+    }
     val chatExit = exit.takeIf { session.accountRole == AccountRole.USER }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 720.dp
         // Wide screens place the conversation list and open chat beside each other.
-        if (wide) Row(Modifier.fillMaxSize().padding(bottom = 96.dp)) {
+        if (wide) Row(Modifier.fillMaxSize()) {
             MessagingSidebar(
                 session, currentUid, portalExit(session, exit), showingArchived,
+                ticketChats = ticketChats, onChatTabChange = changeChatTab,
                 supportFilter = supportFilter,
                 onSupportFilterChange = { supportFilter = it },
                 onShowingArchivedChange = { showingArchived = it },
@@ -98,6 +115,7 @@ internal fun MessagesScreen(
             } else ChatPane(session, currentUid, false, chatExit, Modifier.weight(1f).fillMaxHeight())
         } else if (active == null) MessagingSidebar(
             session, currentUid, portalExit(session, exit), showingArchived,
+            ticketChats = ticketChats, onChatTabChange = changeChatTab,
             supportFilter = supportFilter,
             onSupportFilterChange = { supportFilter = it },
             onShowingArchivedChange = { showingArchived = it },
@@ -110,11 +128,20 @@ internal fun MessagesScreen(
     }
 }
 
+@Composable
+private fun ChatTabLabel(label: String, count: Int) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label)
+        if (count > 0) Badge { Text(if (count > 99) "99+" else count.toString()) }
+    }
+}
+
 // Chooses whether Back returns to the dashboard or closes the organization portal.
 private fun portalExit(session: SessionViewModel, exit: (() -> Unit)?) =
     if (session.screen == SessionScreen.Portal) exit else null
 
 // UI sizing/color: the sidebar uses 20dp side padding, 10dp list gaps, soft status-card colors, and Material title styles.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MessagingSidebar(
     session: SessionViewModel,
@@ -123,29 +150,32 @@ private fun MessagingSidebar(
     showingArchived: Boolean,
     onShowingArchivedChange: (Boolean) -> Unit,
     supportFilter: String,
+    ticketChats: Boolean,
+    onChatTabChange: (Boolean) -> Unit,
     onSupportFilterChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiText = rememberResourceText()
+    val messaging by session.messages.state.collectAsState()
     val organizationAccount = session.accountRole in setOf(AccountRole.STAFF, AccountRole.ADMIN)
+    var unreadOnly by rememberSaveable { mutableStateOf(false) }
     val allowedSupportTags = visibleSupportTags(session.accountRole)
-    val roleConversations = if (organizationAccount) session.messages.conversations.filter {
+    val memberConversations = messaging.conversations.filter { currentUid in it.participantIds }
+    val roleConversations = if (organizationAccount) memberConversations.filter {
         it.type == "SUPPORT" && it.supportTag == supportFilter
-    } else session.messages.conversations
+    } else memberConversations.filter { (it.type == "SUPPORT") == ticketChats }
     val shownConversations = roleConversations.filter {
         isConversationArchived(
             it,
-            session.messages.archivedConversationIds,
-            session.messages.restoredClosedConversationIds,
-        ) == showingArchived
+            messaging.archivedConversationIds,
+            messaging.restoredClosedConversationIds,
+        ) == showingArchived && (!unreadOnly || session.messages.isUnread(it))
     }
-    val supportConversations = shownConversations.filter { it.type == "SUPPORT" }
-    val directConversations = shownConversations.filter { it.type != "SUPPORT" }
     val archivedCount = roleConversations.count {
         isConversationArchived(
             it,
-            session.messages.archivedConversationIds,
-            session.messages.restoredClosedConversationIds,
+            messaging.archivedConversationIds,
+            messaging.restoredClosedConversationIds,
         )
     }
     var conversationActions by remember { mutableStateOf<ChatConversation?>(null) }
@@ -156,6 +186,7 @@ private fun MessagingSidebar(
     var pendingExpanded by rememberSaveable { mutableStateOf(false) }
     var outgoingExpanded by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    LaunchedEffect(ticketChats) { listState.scrollToItem(0) }
     LazyColumn(
         modifier,
         state = listState,
@@ -179,6 +210,22 @@ private fun MessagingSidebar(
                 stringResource(R.string.messaging_needs_a_firebase_connected_build),
                 color = Muted
             )
+        }
+        if (!organizationAccount) item("chat_tabs") {
+            PrimaryTabRow(selectedTabIndex = if (ticketChats) 1 else 0) {
+                Tab(
+                    selected = !ticketChats,
+                    onClick = { onChatTabChange(false) },
+                    text = { ChatTabLabel(uiText(R.string.chat_dms_tab), session.messages.unreadCountForChatTab(false)) },
+                    modifier = Modifier.testTag("messages_dms_tab"),
+                )
+                Tab(
+                    selected = ticketChats,
+                    onClick = { onChatTabChange(true) },
+                    text = { ChatTabLabel(uiText(R.string.chat_tickets_tab), session.messages.unreadCountForChatTab(true)) },
+                    modifier = Modifier.testTag("messages_tickets_tab"),
+                )
+            }
         }
         if (session.messages.needsReconnect) item {
             Surface(
@@ -217,6 +264,13 @@ private fun MessagingSidebar(
                 }
             }
         }
+        item("unread_filter") {
+            FilterChip(
+                selected = unreadOnly,
+                onClick = { unreadOnly = !unreadOnly },
+                label = { Text(uiText(R.string.chat_unread_only)) },
+            )
+        }
         if (organizationAccount) item {
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -254,7 +308,7 @@ private fun MessagingSidebar(
                 }
             }
         }
-        if (!organizationAccount) item {
+        if (!organizationAccount && !ticketChats && !showingArchived) item {
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -275,9 +329,13 @@ private fun MessagingSidebar(
                 ) { Text(stringResource(R.string.search)) }
             }
         }
-        if (session.messages.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+        if (session.messages.loadingIndex) item {
+            val layout = if (organizationAccount || ticketChats) SkeletonLayout.TicketList else SkeletonLayout.ChatList
+            com.olive.app.ui.shared.LoadingSkeleton(layout, rows = 3)
+        }
         item { Status(session) }
-        if (!organizationAccount) friendLists(
+        if (session.messages.loadingIndex) return@LazyColumn
+        if (!organizationAccount && !ticketChats && !showingArchived) friendLists(
             session = session,
             pendingExpanded = pendingExpanded,
             onPendingExpandedChange = { pendingExpanded = it },
@@ -291,21 +349,22 @@ private fun MessagingSidebar(
             Text(stringResource(R.string.archived_chats), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() })
         }
-        item {
-            Text(stringResource(if (!organizationAccount) R.string.support_conversations else when (supportFilter) {
+        if (organizationAccount) item {
+            Text(stringResource(when (supportFilter) {
                 SUPPORT_TAG_PLAN_CONSULT -> R.string.support_filter_plan_consults
                 SUPPORT_TAG_NEEDS_ADMIN -> R.string.support_filter_needs_admin
                 else -> R.string.support_filter_support
             }), style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.semantics { heading() })
         }
-        if (supportConversations.isEmpty() && showingArchived) item {
+        if (shownConversations.isEmpty() && (!organizationAccount || showingArchived)) item {
             Text(stringResource(when {
                 showingArchived -> R.string.no_archived_chats
-                else -> R.string.support_no_conversations
+                ticketChats -> R.string.support_no_conversations
+                else -> R.string.no_conversations_yet
             }), color = Muted)
         }
-        items(supportConversations, key = { "conversation-${it.id}" }) { conversation ->
+        items(shownConversations, key = { "conversation-${it.id}" }) { conversation ->
             ConversationRow(
                 conversation, currentUid, session.accountRole,
                 Modifier.animateItem().fillMaxWidth().testTag("conversation_${conversation.id}"),
@@ -313,26 +372,6 @@ private fun MessagingSidebar(
                 onOpen = { session.messages.openConversation(conversation) },
                 onActions = { conversationActions = conversation },
             )
-        }
-        // Personal accounts also show friend requests and direct messages.
-        if (!organizationAccount) {
-            item {
-                Text(stringResource(R.string.direct_messages), style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.semantics { heading() })
-            }
-            if (directConversations.isEmpty()) item {
-                Text(stringResource(if (showingArchived) R.string.no_archived_chats
-                    else R.string.no_conversations_yet), color = Muted)
-            }
-            items(directConversations, key = { "conversation-${it.id}" }) { conversation ->
-                ConversationRow(
-                    conversation, currentUid, session.accountRole,
-                    Modifier.animateItem().fillMaxWidth().testTag("conversation_${conversation.id}"),
-                    unread = session.messages.isUnread(conversation),
-                    onOpen = { session.messages.openConversation(conversation) },
-                    onActions = { conversationActions = conversation },
-                )
-            }
         }
         item {
             OutlinedButton(

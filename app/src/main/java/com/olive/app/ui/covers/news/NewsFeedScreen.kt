@@ -180,7 +180,8 @@ internal fun NewsFeed(
                                         tint = OliveGreen,
                                         modifier = Modifier.size(18.dp)
                                     )
-                                    Text(
+                                    if (loading) com.olive.app.ui.shared.SkeletonBlock(Modifier.weight(1f).height(16.dp))
+                                    else Text(
                                         uiText(R.string.news_near_location, currentPlace),
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = OliveGreen,
@@ -188,7 +189,7 @@ internal fun NewsFeed(
                                     )
                                     IconButton(
                                         onClick = { actions.editLocation() },
-                                        modifier = Modifier.size(36.dp)
+                                        modifier = Modifier.size(48.dp)
                                             .testTag("change_news_location")
                                     ) {
                                         Icon(
@@ -221,8 +222,8 @@ internal fun NewsFeed(
                         }
                         if (tab == "Today") {
                             // Show a loading row while the first news stories are being fetched.
-                            if (loading && articles.isEmpty()) item { NewsLoadingState() }
-                            if (newsError) item {
+                            if (loading) item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.NewsFeed, rows = 1) }
+                            if (newsError && !loading) item {
                                 Card(
                                     modifier = Modifier.semantics(mergeDescendants = true) {},
                                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -243,7 +244,7 @@ internal fun NewsFeed(
                                 }
                             }
                         }
-                        val visible = visibleArticles
+                        val visible = if (loading && tab == "Today") emptyList() else visibleArticles
                         // Show the empty-news message only after loading ends without an error.
                         if (visible.isEmpty() && !loading && !newsError) item {
                             NewsEmptyState(
@@ -292,37 +293,6 @@ private fun NewsScopeButton(
     }
 }
 
-// Loading placeholders use the same rounded cream card and olive rule as loaded stories.
-@Composable
-private fun NewsLoadingState() {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-        LinearProgressIndicator(Modifier.fillMaxWidth())
-        repeat(2) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Cream),
-                border = BorderStroke(.7.dp, SoftGray),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(
-                    Modifier.fillMaxWidth().padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(Modifier.width(100.dp).height(16.dp).background(LightSage))
-                    HorizontalDivider(thickness = 2.dp, color = OliveGreen.copy(alpha = .4f))
-                    Box(
-                        Modifier.width(90.dp).height(30.dp)
-                            .background(PaleOlive, RoundedCornerShape(8.dp))
-                    )
-                    Box(Modifier.fillMaxWidth().height(24.dp).background(WarmWhite))
-                    Box(
-                        Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                            .background(LightSage, RoundedCornerShape(9.dp))
-                    )
-                }
-            }
-        }
-    }
-}
 
 // UI sizing/color: empty news states use 38dp vertical space, a 42dp Muted icon, and centered text.
 @Composable

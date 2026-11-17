@@ -33,6 +33,7 @@
     <string name="safety_grab_jump">Quick-grab</string>
     <string name="safety_previous_notes">Previous plan notes</string>
     <string name="safety_prepared_count">Prepared: %1$d / %2$d</string>
+    <string name="safety_checklist_progress">Checklist progress</string>
     <string name="safety_destination_hint">Where will you go?</string>
     <string-array name="safety_destination_checklist">
         <item>Choose a safe place to go.</item>

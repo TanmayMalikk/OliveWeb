@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nutrition_manual_short">手动食物</string>
+    <string name="nutrition_label_short">每份营养数值。标签标为零的营养素请输入 0。</string>
+    <string name="nutrition_serving_short">每份大小</string>
+    <string name="nutrition_scan_barcode">扫描条形码</string>
+    <string name="nutrition_barcode_failed">未找到唯一有效条形码。请重拍清晰照片或输入数字。</string>
+    <string name="nutrition_other_nutrients">其他营养素</string>
+    <string name="nutrition_custom_portion">自定义份量</string>
+    <string name="nutrition_amount">数量</string>
+    <string name="nutrition_water">饮水</string>
+    <string name="nutrition_add_water">添加饮水</string>
+    <string name="nutrition_water_amount">本次饮水量</string>
+    <string name="nutrition_water_goal">每日目标</string>
+    <string name="nutrition_water_progress">饮水：%1$d / %2$d 毫升。点击添加。</string>
+    <string name="nutrition_water_minus">减少 250 毫升饮水</string>
+    <string name="nutrition_water_plus">添加 250 毫升饮水</string>
+    <string name="nutrition_edit_food">编辑食物记录</string>
+    <string name="nutrition_edit_details">编辑食物详情</string>
+</resources>

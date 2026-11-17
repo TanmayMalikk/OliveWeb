@@ -23,9 +23,14 @@ import com.olive.app.data.media.MediaDeviceVerificationException
 import com.olive.app.data.media.MediaKind
 import com.olive.app.data.media.OcrReview
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.tasks.await
 import java.io.File
 
 internal data class SafetyDocumentsState(
@@ -53,20 +58,25 @@ internal class SafetyDocumentsController(
     private val applicationContext = context.applicationContext
     private var generation = 0
     private var subscription: ChatSubscription? = null
+    private var initialLoadTimeout: Job? = null
+    private val evidenceWrites = mutableMapOf<String, CompletableDeferred<Unit>>()
     var state by mutableStateOf(SafetyDocumentsState())
         private set
 
     // Clears old document state before loading a different account owner.
     fun prepare(ownerUid: String) {
+        initialLoadTimeout?.cancel()
         subscription?.close()
         subscription = null
         generation++
+        evidenceWrites.clear()
         state = SafetyDocumentsState(ownerUid = ownerUid)
     }
 
     // Watches the owner's allowed documents and updates the screen as Firebase changes.
     fun load(ownerUid: String, username: String, localMode: Boolean) {
         if (state.ownerUid != ownerUid) {
+            initialLoadTimeout?.cancel()
             subscription?.close()
             subscription = null
             generation++
@@ -76,11 +86,28 @@ internal class SafetyDocumentsController(
         media?.observeUploads(ownerUid)
         if (subscription != null) return
         val token = generation
+        var awaitingServer = hasValidatedInternetConnection(applicationContext)
         state = state.copy(loading = true, error = null)
+        initialLoadTimeout = scope.launch {
+            delay(10_000)
+            if (token == generation && awaitingServer) {
+                awaitingServer = false
+                state = state.copy(loading = false, error = applicationContext.getString(R.string.documents_load_failed))
+            }
+        }
         subscription = repository.observeFor(ownerUid, { snapshot ->
             // Apply loaded documents only when the same owner and request are still active.
             if (token == generation && state.ownerUid == ownerUid) {
-                state = state.copy(files = snapshot.documents, loading = false, error = null,
+                val documents = snapshot.documents.map { incoming ->
+                    if (incoming.id in state.evidenceUpdates) incoming.copy(
+                        evidence = state.files.firstOrNull { it.id == incoming.id }?.evidence ?: incoming.evidence,
+                    ) else incoming
+                }
+                if (snapshot.source == DocumentListSource.SERVER) {
+                    awaitingServer = false
+                    initialLoadTimeout?.cancel()
+                }
+                state = state.copy(files = documents, loading = awaitingServer, error = null,
                     source = snapshot.source, lastSyncedAt = snapshot.lastSyncedAt)
                 media?.acknowledgePublished(snapshot.documents.mapTo(mutableSetOf()) { it.id })
                 media?.onDocumentSnapshot(ownerUid, snapshot.documents,
@@ -93,6 +120,8 @@ internal class SafetyDocumentsController(
             }
         }, { error ->
             if (token == generation && state.ownerUid == ownerUid) {
+                awaitingServer = false
+                initialLoadTimeout?.cancel()
                 subscription?.close()
                 subscription = null
                 state = state.copy(loading = false,
@@ -158,8 +187,10 @@ internal class SafetyDocumentsController(
                 runCatching { openDocument(document, viewerUid) }
                     .onSuccess { file ->
                         if (token == generation && state.ownerUid == viewerUid) onReady(file)
+                        else file.delete()
                     }
                     .onFailure { failure ->
+                        if (failure is CancellationException) throw failure
                         if (token == generation) {
                             val message = localizedFailure(failure)
                             state = state.copy(error = message,
@@ -195,11 +226,15 @@ internal class SafetyDocumentsController(
                         ?: throw MediaAccessException(MediaAccessError.NOT_CACHED)
                     val file = openDocument(document, viewerUid)
                     if (token == generation && state.ownerUid == viewerUid) onReady(document, file)
-                }.onFailure { if (token == generation) {
-                    val message = localizedFailure(it)
-                    state = state.copy(error = message,
-                        attachmentErrors = state.attachmentErrors + (documentId to message))
-                } }
+                    else file.delete()
+                }.onFailure { failure ->
+                    if (failure is CancellationException) throw failure
+                    if (token == generation) {
+                        val message = localizedFailure(failure)
+                        state = state.copy(error = message,
+                            attachmentErrors = state.attachmentErrors + (documentId to message))
+                    }
+                }
             } finally {
                 finishOpening(documentId, token)
             }
@@ -226,6 +261,8 @@ internal class SafetyDocumentsController(
         if (state.ownerUid != ownerUid || document.ownerUid != ownerUid ||
             document.id in state.evidenceUpdates || document.evidence == evidence) return
         val token = generation
+        val write = CompletableDeferred<Unit>()
+        evidenceWrites[document.id] = write
         state = state.copy(
             files = state.files.map { if (it.id == document.id) it.copy(evidence = evidence) else it },
             error = null,
@@ -235,6 +272,7 @@ internal class SafetyDocumentsController(
             runCatching {
                 checkNotNull(repository).setEvidence(document, ownerUid, evidence)
             }.onSuccess {
+                write.complete(Unit)
                 if (token == generation && state.ownerUid == ownerUid) {
                     state = state.copy(
                         error = null,
@@ -242,6 +280,7 @@ internal class SafetyDocumentsController(
                     )
                 }
             }.onFailure { failure ->
+                write.completeExceptionally(failure)
                 if (token == generation && state.ownerUid == ownerUid) {
                     state = state.copy(
                         files = state.files.map {
@@ -254,6 +293,7 @@ internal class SafetyDocumentsController(
                     )
                 }
             }
+            if (evidenceWrites[document.id] === write) evidenceWrites.remove(document.id)
         }
     }
 
@@ -262,7 +302,7 @@ internal class SafetyDocumentsController(
         identity: AccountIdentity,
         profile: UserProfile,
         entries: List<PrivateEntry>,
-        location: EmergencyReportLocation?,
+        location: suspend () -> EmergencyReportLocation?,
         onFinished: (Result<Unit>) -> Unit,
     ) {
         val ownerUid = identity.uid
@@ -272,8 +312,29 @@ internal class SafetyDocumentsController(
         val token = generation
         scope.launch {
             state = state.copy(loading = true, error = null)
+            val emergencyId = java.util.UUID.randomUUID().toString()
             val result = runCatching {
+                check(token == generation) { "The account changed. Try again." }
+                val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                check(user?.uid == ownerUid) { "Sign in again before sending an emergency report." }
+                user.getIdToken(false).await()
+                try {
+                    com.google.firebase.appcheck.FirebaseAppCheck.getInstance().getAppCheckToken(false).await()
+                } catch (error: Exception) {
+                    if (error is CancellationException) throw error
+                    throw MediaDeviceVerificationException(
+                        applicationContext.getString(R.string.emergency_report_device_verification_failed), error,
+                    )
+                }
+                com.google.firebase.functions.FirebaseFunctions.getInstance("northamerica-northeast1")
+                    .getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                val pressedLocation = location()
+                check(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid && token == generation) {
+                    "The account changed. Try again."
+                }
                 val incidents = emergencyIncidents(entries)
+                // A just-selected Evidence checkbox must reach the server before the export rereads it.
+                evidenceWrites.values.toList().forEach { it.await() }
                 val available = repository?.listFor(ownerUid)?.documents ?: state.files
                 val relevantIds = incidents.flatMapTo(linkedSetOf()) { it.attachmentIds }.apply {
                     addAll(available.filter(SafetyDocument::evidence).map(SafetyDocument::id))
@@ -285,7 +346,7 @@ internal class SafetyDocumentsController(
                     files[document.id] = EmergencyReportMedia(document, file)
                 }
                 withContext(Dispatchers.IO) {
-                    EmergencyReportPdf.create(applicationContext, profile, incidents, location, files)
+                    EmergencyReportPdf.create(applicationContext, profile, incidents, pressedLocation, files)
                 }
             }
             result.onFailure { error ->
@@ -294,6 +355,10 @@ internal class SafetyDocumentsController(
                     onFinished(Result.failure(error))
                 }
             }.onSuccess { report ->
+                if (token != generation) {
+                    report.delete()
+                    return@onSuccess
+                }
                 val transfers = media
                 if (transfers == null) {
                     report.delete()
@@ -306,7 +371,7 @@ internal class SafetyDocumentsController(
                 }
                 transfers.queueFile(
                     file = report,
-                    name = report.name,
+                    name = "emergency-report-$emergencyId.pdf",
                     mimeType = "application/pdf",
                     owner = identity,
                     kind = MediaKind.DOCUMENT,

@@ -1,5 +1,5 @@
 // Tests lane movement and obstacles in the olive crossing cover game.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./coverageFixture";
 import AxeBuilder from "@axe-core/playwright";
 
 // Inputs: the values in this case. Expected: Olive Crossing supports keyboard play, pausing and restarting.

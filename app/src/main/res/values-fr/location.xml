@@ -15,7 +15,9 @@
     <string name="you">Vous</string>
     <string name="your_saved_location">Votre emplacement enregistré</string>
     <string name="share_live_location_with">Partager la position en direct avec</string>
-    <string name="location_contacts_selected">%1$d contacts sur 10 sélectionnés</string>
+    <string name="location_contacts_selected">Amis sélectionnés : %1$d</string>
+    <string name="location_search_friends">Rechercher des amis</string>
+    <string name="location_no_matching_friends">Aucun ami ne correspond à votre recherche.</string>
     <string name="location_no_friends">Ajoutez et acceptez un ami avant de partager votre position.</string>
     <string name="start_sharing_location">Commencer le partage en direct</string>
     <string name="stop_sharing_location">Arrêter le partage</string>

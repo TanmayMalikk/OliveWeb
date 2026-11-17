@@ -166,7 +166,10 @@ abstract class OliveUiTestBase {
     protected fun openOnboarding(grantPermissions: Boolean = true) {
         if (grantPermissions) grantFeaturePermissions()
         waitCover()
-        click("fitness_account_settings")
+        // Quick exit preserves the cover's settings page when it was already open.
+        if (compose.onAllNodesWithTag("discreet_cover_olive").fetchSemanticsNodes().isEmpty()) {
+            click("fitness_account_settings")
+        }
         waitFor("discreet_cover_olive")
         visibleNode("discreet_cover_olive").performTouchInput { doubleClick() }
         waitFor("new_user")
@@ -177,13 +180,12 @@ abstract class OliveUiTestBase {
         click("onboarding_next")
     }
 
-    // Opens the birthday picker and chooses a valid test date.
     protected fun chooseBirthday() {
-        click("dob_year")
+        hideKeyboard()
+        click("dob_open")
+        click("dob_range_2006")
         click("dob_year_2000")
-        click("dob_month")
         click("dob_month_1")
-        click("dob_day")
         click("dob_day_2")
     }
 

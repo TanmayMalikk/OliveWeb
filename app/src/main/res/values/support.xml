@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="load_more_hotline_locations">Load more hotline locations</string>
+    <string name="loaded_hotline_locations">Loaded support locations (%1$d)</string>
+    <string name="account_history_load_failed">Could not load the saved data. Reopen this screen to try again.</string>
+    <string name="emergency_alerts_load_failed">Could not refresh emergency requests. Check your connection.</string>
+    <string name="nearby_support_title">Nearby support services</string>
+    <string name="nearby_support_location_required">Allow location access to find nearby support services.</string>
+    <string name="nearby_support_failed">Could not load nearby services.</string>
+    <string name="nearby_support_empty">No public support locations found within 50 km.</string>
+    <string name="nearby_support_count">%1$d support locations within %2$d km · Tap a green dot to navigate</string>
+    <string name="incident_location_formats">Enter coordinates, choose an address suggestion, or describe any location in your own words.</string>
+    <string name="emergency_response_reopen">Reopen request</string>
+    <string name="hotline_filter_247">24/7 only</string>
+    <string name="incident_date_invalid">Choose a valid incident date on or before today.</string>
+    <string name="hotline_available_247">Available 24 hours a day, 7 days a week</string>
+    <string name="emergency_response_resolve">Mark as resolved</string>
+    <string name="emergency_response_active">Active</string>
+    <string name="emergency_response_resolved">Resolved</string>
+    <string name="emergency_report_device_verification_failed">App verification failed. Reopen the app and try again. Debug builds must be registered with Firebase App Check.</string>
     <string name="support_menu">Support</string>
     <string name="support_open_menu">Open support menu</string>
     <string name="support_close_menu">Close support menu</string>
@@ -31,6 +49,14 @@
     <string name="support_emergency">Emergency</string>
     <string name="emergency_report_creating">Creating emergency PDF…</string>
     <string name="emergency_report_saved">Emergency PDF added to Documents for secure upload.</string>
+    <string name="emergency_admin_notification">Emergency alert. Open Emergency response to view the report and live map.</string>
+    <string name="emergency_response_title">Emergency response</string>
+    <string name="emergency_response_empty">No emergency alerts.</string>
+    <string name="emergency_response_waiting_pdf">Report upload pending</string>
+    <string name="emergency_response_pdf">Open report PDF</string>
+    <string name="emergency_response_track">Track live location</string>
+    <string name="emergency_response_alert">A user requested emergency assistance.</string>
+    <string name="emergency_response_no_location">Waiting for this user’s location.</string>
     <string name="emergency_report_failed">The emergency PDF could not be created. Check your connection and try again.</string>
     <string name="support_hotlines">Hotline resources</string>
     <string name="support_coming_soon">%1$s · Coming soon</string>

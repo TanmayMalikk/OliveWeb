@@ -19,6 +19,9 @@ import java.net.URLEncoder
 import javax.crypto.SecretKey
 import javax.net.ssl.HttpsURLConnection
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -174,29 +177,42 @@ private class LiveLocationSharingDataSource(
 ) {
     // Replaces the trusted contacts allowed to receive live location.
     suspend fun setRecipients(ownerUid: String, friends: List<Friend>): SecretKey? {
-        require(friends.size <= 10)
-        val collection =
-            firestore.collection("liveLocationShares").document(ownerUid).collection("recipients")
+        require(friends.none { it.uid == ownerUid })
+        val recipients = friends.distinctBy { it.uid }
+        val collection = firestore.collection("liveLocationShares").document(ownerUid).collection("recipients")
         val old = collection.get().await()
-        val batch = firestore.batch()
-        old.documents.forEach { batch.delete(it.reference) }
-        if (friends.isEmpty()) {
+        val key = if (recipients.isEmpty()) null else EncryptionUtils.generateSymmetricKey()
+        // Resolve every selected friend's key before making any changes.
+        val wrapped = if (key == null) emptyList() else recipients.chunked(10).flatMap { group ->
+            coroutineScope {
+                group.map { friend ->
+                    async { friend to KeyManager.wrapKey(key, friendPublicKey(firestore, friend)) }
+                }.awaitAll()
+            }
+        }
+        val selectedIds = recipients.mapTo(mutableSetOf()) { it.uid }
+        old.documents.filterNot { it.id in selectedIds }.chunked(500).forEach { group ->
+            val batch = firestore.batch()
+            group.forEach { batch.delete(it.reference) }
             batch.commit().await()
-            return null
         }
-        val key = EncryptionUtils.generateSymmetricKey()
-        friends.forEach { friend ->
-            batch.set(
-                collection.document(friend.uid), mapOf(
-                    "ownerUid" to ownerUid,
-                    "recipientUid" to friend.uid,
-                    "friendshipId" to friend.friendshipId,
-                    "wrappedKey" to KeyManager.wrapKey(key, friendPublicKey(firestore, friend)),
-                    "createdAt" to FieldValue.serverTimestamp()
+        // Rules can check the friendship three times per write. Six writes stay below
+        // Firestore's 20 access-call limit even when rule reads are not cached.
+        wrapped.chunked(6).forEach { group ->
+            val batch = firestore.batch()
+            group.forEach { (friend, envelope) ->
+                batch.set(
+                    collection.document(friend.uid), mapOf(
+                        "ownerUid" to ownerUid,
+                        "recipientUid" to friend.uid,
+                        "friendshipId" to friend.friendshipId,
+                        "wrappedKey" to envelope,
+                        "createdAt" to FieldValue.serverTimestamp()
+                    )
                 )
-            )
+            }
+            batch.commit().await()
         }
-        batch.commit().await()
         return key
     }
 

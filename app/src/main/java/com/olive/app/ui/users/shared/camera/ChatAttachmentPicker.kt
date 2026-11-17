@@ -1,6 +1,7 @@
 // All safe-app roles: lets chat participants choose a photo, video, or document.
 package com.olive.app.ui.users.shared.camera
 
+import com.olive.app.ui.shared.SkeletonLayout
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
@@ -161,10 +162,10 @@ internal fun AttachmentPicker(
                         }
 
                         AttachmentCategory.Media -> {
-                            val media = documentState.files.filter {
+                            val media = (if (documentState.loading) emptyList() else documentState.files).filter {
                                 isDurableChatAttachment(it, uid)
                             }
-                            if (documentState.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                            if (documentState.loading) item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Documents) }
                             if (documentState.error != null) item {
                                 Text(stringResource(R.string.documents_load_failed), Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
                             }

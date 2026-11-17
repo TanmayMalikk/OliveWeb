@@ -1,6 +1,8 @@
 // Safe-app users: manages user location actions.
 package com.olive.app.ui.users.user.location
 
+import com.olive.app.data.account.DeliveryAddress
+
 import android.content.Context
 import android.location.Location
 import androidx.compose.runtime.getValue
@@ -51,10 +53,12 @@ internal data class LocationMapState(
     val working: Boolean = false,
     val error: String? = null,
     val navigationTargetUid: String? = null,
+    val privateDestination: MapLocationPoint? = null,
     val route: LocationRoute? = null,
     val navigating: Boolean = false,
     val routeWorking: Boolean = false,
     val routeError: String? = null,
+    val locating: Boolean = false,
 ) {
     // Chooses the user's own map marker from live or saved location data.
     fun displayedOwn(role: AccountRole) =
@@ -92,6 +96,7 @@ internal class LocationMapController(
         val friendIds = configuration.friends.mapTo(mutableSetOf()) { it.uid }
         state = LocationMapState(
             ownerUid = uid,
+            locating = true,
             livePoint = LiveLocationState.current.value,
             selected = LiveLocationController.selected(applicationContext).intersect(friendIds),
             liveActive = LiveLocationController.active(applicationContext),
@@ -110,7 +115,7 @@ internal class LocationMapController(
             ) {
                 if (token == generation) {
                     val target = state.navigationTargetUid?.takeIf { targetUid ->
-                        it.any { point -> point.uid == targetUid && point.live }
+                        targetUid == state.privateDestination?.uid || it.any { point -> point.uid == targetUid && point.live }
                     } ?: it.firstOrNull { point -> point.live }?.uid
                     state = state.copy(
                         contacts = it,
@@ -162,6 +167,7 @@ internal class LocationMapController(
                             )
                         }
                     }
+                    if (token == generation && state.locating) state = state.copy(locating = false)
                     delay(MAP_LOCATION_REFRESH_MILLIS.milliseconds)
                 }
             } else if (configuration.profile.role == AccountRole.SAFE_CONTACT) {
@@ -186,6 +192,7 @@ internal class LocationMapController(
                     }
                 }
             }
+            if (token == generation && state.locating) state = state.copy(locating = false)
         }
         if (
             configuration.profile.role == AccountRole.SAFE_CONTACT &&
@@ -206,6 +213,7 @@ internal class LocationMapController(
         expiryJob = null
         subscription?.close()
         subscription = null
+        state = state.copy(privateDestination = null, route = null, navigating = false, routeWorking = false)
     }
 
     // Clears the selected route, target, and navigation message.
@@ -220,6 +228,28 @@ internal class LocationMapController(
             state = state.copy(navigationTargetUid = uid, routeError = null)
     }
 
+    fun selectPrivateDestination(name: String, latitude: Double, longitude: Double) {
+        if (state.navigating) return
+        state = state.copy(
+            privateDestination = MapLocationPoint("private-route-destination", name, latitude, longitude, 0L, false, null),
+            routeError = null,
+        )
+    }
+
+    suspend fun resolvePrivateDestination(address: String): Boolean {
+        val requestGeneration = generation
+        val coordinates = try {
+            DeviceLocation.coordinatesForAddress(applicationContext, DeliveryAddress(line1 = address))
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        } ?: return false
+        if (requestGeneration != generation) return false
+        selectPrivateDestination(address, coordinates.first, coordinates.second)
+        return true
+    }
+
     // Requests a route to the selected person and starts map navigation.
     fun startNavigation(
         notConfiguredMessage: String,
@@ -231,7 +261,7 @@ internal class LocationMapController(
             state = state.copy(routeError = notConfiguredMessage)
             return
         }
-        val targetUid = state.navigationTargetUid ?: state.contacts.firstOrNull { it.live }?.uid
+        val targetUid = state.privateDestination?.uid ?: state.navigationTargetUid ?: state.contacts.firstOrNull { it.live }?.uid
         if (state.ownPoint == null || targetUid == null) {
             state = state.copy(routeError = unavailableMessage)
             return
@@ -249,7 +279,7 @@ internal class LocationMapController(
             // User location controller: Keeps start navigation active while is active and state navigating.
             while (isActive && state.navigating) {
                 val origin = state.ownPoint
-                val target = state.contacts.firstOrNull {
+                val target = state.privateDestination ?: state.contacts.firstOrNull {
                     it.uid == state.navigationTargetUid && it.live
                 }
                 if (origin == null || target == null) {
@@ -278,6 +308,7 @@ internal class LocationMapController(
                             lastRoutedTarget = target
                         }
                     }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
                         state = state.copy(routeWorking = false, routeError = failedMessage)
                     }
                 } else {
@@ -325,9 +356,9 @@ internal class LocationMapController(
 
     // Adds or removes one safe contact from the next live-location share.
     fun selectContact(uid: String, enabled: Boolean) {
-        if (state.liveActive) return
+        if (state.liveActive || state.working) return
         val updated = if (enabled) state.selected + uid else state.selected - uid
-        if (updated.size <= MAX_SHARED_CONTACTS) state = state.copy(selected = updated)
+        state = state.copy(selected = updated)
     }
 
     // Starts the user's live-location sharing session.
@@ -368,14 +399,14 @@ internal class LocationMapController(
                     permissionError
                 )
             } else try {
-                val end = System.currentTimeMillis() + durationMillis
-                val startedAt = System.currentTimeMillis()
                 val key = checkNotNull(
                     checkNotNull(repository).setLiveRecipients(
                         configuration.identity.uid,
                         recipients
                     )
                 )
+                val startedAt = System.currentTimeMillis()
+                val end = startedAt + durationMillis
                 LiveLocationController.start(
                     applicationContext,
                     configuration.identity.uid,
@@ -451,7 +482,6 @@ internal class LocationMapController(
     }
 
     private companion object {
-        const val MAX_SHARED_CONTACTS = 10
         const val MAP_LOCATION_REFRESH_MILLIS = 2_000L
         const val NAVIGATION_CHECK_MILLIS = 2_000L
         const val MIN_ROUTE_REQUEST_INTERVAL_MILLIS = 20_000L

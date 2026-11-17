@@ -1,11 +1,27 @@
 // Watch fitness accessibility tests: verifies readable labels without requiring live sensors.
 package com.olive.app.wear
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.activity.ComponentActivity
+import org.junit.Before
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -14,7 +30,16 @@ import org.junit.Test
 
 class WatchFitnessAccessibilityTest {
     @get:Rule
-    val composeRule = createComposeRule()
+    val composeRule = createAndroidComposeRule<ComponentActivity>()
+
+    @Before
+    fun keepWatchDisplayAwake() {
+        composeRule.activityRule.scenario.onActivity { activity ->
+            activity.setShowWhenLocked(true)
+            activity.setTurnScreenOn(true)
+            activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
 
     // Shows a representative step total and checks that TalkBack hears both value and goal together.
     @Test
@@ -46,5 +71,30 @@ class WatchFitnessAccessibilityTest {
         composeRule.onNodeWithText("Vitals").performClick().assertIsSelected()
         composeRule.waitForIdle()
         composeRule.onNodeWithContentDescription("Vitals fitness summary").assertIsFocused()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val file = java.io.File(context.getExternalFilesDir(null), "watch-tabs-test.png")
+        file.outputStream().use { output ->
+            composeRule.onRoot().captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, output)
+        }
+    }
+
+    @Test
+    fun tabsRemainReachableOnNarrowScreensWithLargeText() {
+        composeRule.setContent {
+            val density = LocalDensity.current
+            val selected = remember { mutableStateOf(WatchPage.HOME) }
+            CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1.5f)) {
+                androidx.wear.compose.material3.MaterialTheme {
+                    Box(Modifier.width(170.dp)) {
+                        WatchTabs(selected.value) { selected.value = it }
+                    }
+                }
+            }
+        }
+        for (label in listOf("Food", "Home", "Move", "Vitals")) {
+            composeRule.onNodeWithText(label).performScrollTo().performClick()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithText(label).assertIsDisplayed().assertIsSelected()
+        }
     }
 }

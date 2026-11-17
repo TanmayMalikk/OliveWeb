@@ -212,7 +212,7 @@ export function SessionProvider({
     window.scrollTo({ top: 0 });
   }, [mode, profile?.role]);
 
-  const noteInteraction = useSessionSecurity({
+  const { noteInteraction, idleTimeoutSeconds, setIdleTimeoutSeconds } = useSessionSecurity({
     enrollment, entryOwner, epoch, mode, pendingEntry, phase,
     role: profile?.role ?? null, quickExit, setBusy,
     setEnrollmentAttempt: setEntryAttempt, setHistory, setIdleSeconds,
@@ -468,7 +468,7 @@ export function SessionProvider({
         profile, history, enrollment, page, setPage, requestedConversation, setRequestedConversation, busy, message,
         clearMessage: () => setMessage(""), perform, authenticate, completeSetup,
         beginEntry, quickExit, unlock, saveProfile, saveEntry,
-        record, refresh, signOut, idleSeconds, noteInteraction, cloudMode, onboardingProfile,
+        record, refresh, signOut, idleSeconds, idleTimeoutSeconds, setIdleTimeoutSeconds, noteInteraction, cloudMode, onboardingProfile,
       }}
     >
       {children}

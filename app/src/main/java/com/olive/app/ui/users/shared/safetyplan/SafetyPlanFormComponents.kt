@@ -2,7 +2,9 @@
 package com.olive.app.ui.users.shared.safetyplan
 
 import android.content.Context
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -12,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
@@ -34,6 +37,43 @@ import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.ui.shared.*
 import com.olive.app.ui.users.shared.navigation.*
 import java.util.UUID
+
+@Composable
+internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean = false) {
+    val fraction = if (total > 0) prepared.toFloat() / total else 0f
+    val count = stringResource(R.string.safety_prepared_count, prepared, total)
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        if (summary) {
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.safety_checklist_progress),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { heading() }
+                )
+                Text(count, style = MaterialTheme.typography.bodyMedium, color = Muted)
+            }
+        } else {
+            Text(count, style = MaterialTheme.typography.labelMedium, color = Muted)
+        }
+        if (summary || total > 0) LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth().height(if (summary) 10.dp else 6.dp)
+                .border(1.dp, OliveDivider, CircleShape)
+                .then(if (summary) Modifier.testTag("safety_checklist_progress") else Modifier),
+            color = OliveGreen,
+            trackColor = SageGreen,
+            strokeCap = StrokeCap.Round,
+            drawStopIndicator = {},
+        )
+    }
+}
 
 // Sections share one continuous note surface. Each heading and checkbox remains separately navigable with TalkBack.
 @Composable
@@ -64,10 +104,7 @@ internal fun SafetyChecklistSection(
         Text(
             title, style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.testTag("safety_heading_$fieldKey").semantics { heading() })
-        if (section != "contacts") Text(
-            stringResource(R.string.safety_prepared_count, items.count { it.checked }, items.size),
-            style = MaterialTheme.typography.labelMedium, color = Muted
-        )
+        if (section != "contacts") SafetyChecklistProgress(items.count { it.checked }, items.size)
         safetySectionHint(section)?.let {
             Text(
                 stringResource(it),
@@ -412,11 +449,18 @@ private fun SafetyPlanContactPicker(
 
 // Adaptable prompts informed by PHAC safety-planning guidance; all starting text remains editable.
 // https://www.canada.ca/en/public-health/services/health-promotion/stop-family-violence/plan-your-safety.html
-internal fun safetyDefaults(context: Context): Map<String, String> = buildMap {
+internal fun safetyDefaults(context: Context, hasAffectedPeople: Boolean = false): Map<String, String> = buildMap {
     listOf("primary", "backup").forEach { plan ->
         SAFETY_SECTIONS.forEach { section ->
             val prompts = when (section) {
-                "documents" -> safetyDocumentSuggestions(context)
+                "documents" -> safetyDocumentSuggestions(context) + if (hasAffectedPeople) {
+                    listOf(context.getString(R.string.safety_documents_dependants))
+                } else emptyList()
+                "finances" -> listOf(
+                    context.getString(R.string.safety_finances_access),
+                    context.getString(R.string.safety_finances_costs),
+                    context.getString(R.string.safety_finances_support),
+                )
                 "grab" -> context.resources.getStringArray(R.array.safety_grab_checklist).toList()
                 "destination" -> context.resources.getStringArray(R.array.safety_destination_checklist)
                     .toList()
@@ -456,6 +500,7 @@ internal fun safetySectionLabel(section: String) = when (section) {
     "contacts" -> R.string.safety_contacts
     "documents" -> R.string.safety_documents_heading
     "grab" -> R.string.safety_grab_heading
+    "finances" -> R.string.safety_finances_heading
     "essentials" -> R.string.safety_essentials
     "dependants" -> R.string.safety_dependants
     else -> R.string.safety_aftercare
