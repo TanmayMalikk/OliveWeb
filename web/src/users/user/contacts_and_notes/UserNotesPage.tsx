@@ -16,6 +16,7 @@ import { IncidentLocationPicker } from "./IncidentLocationPicker";
 export default function Notes() {
   const s = useSession();
   const [query, setQuery] = useState("");
+  const [kindFilter, setKindFilter] = useState<"all" | "Note" | "Incident">("all");
   const [trash, setTrash] = useState(false);
   const [editing, setEditing] = useState<Entry | null>(null);
   const [revisions, setRevisions] = useState<Entry | null>(null);
@@ -48,6 +49,7 @@ export default function Notes() {
       (e) =>
         !e.purgedAt &&
         Boolean(e.deletedAt) === trash &&
+        (kindFilter === "all" || (e.kind ?? "Note") === kindFilter) &&
         `${e.title} ${e.body}`.toLowerCase().includes(query.toLowerCase()),
     )
     .sort(
@@ -81,6 +83,21 @@ export default function Notes() {
           />
         </label>
         <div className="toolbar-actions">
+          {!trash && (
+            <div className="entry-type-tabs" role="group" aria-label="Filter entries">
+              {(["all", "Note", "Incident"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  aria-pressed={kindFilter === tab}
+                  className={kindFilter === tab ? "active" : ""}
+                  onClick={() => setKindFilter(tab)}
+                >
+                  {tab === "all" ? "All" : `${tab}s`}
+                </button>
+              ))}
+            </div>
+          )}
           <Button variant="quiet" onClick={() => setTrash(!trash)}>
             <Trash2 size={17} />
             {trash ? "Back to notes" : "Trash"}
@@ -187,21 +204,29 @@ export default function Notes() {
       {!shown.length && (
         <Empty
           title={
-            trash
-              ? "Nothing in the trash."
-              : "A blank page can be a good place to start."
+            query.trim() || kindFilter !== "all"
+              ? "No entries match your filter."
+              : trash
+                ? "Nothing in the trash."
+                : "A blank page can be a good place to start."
           }
           action={
-            !trash ? (
+            query.trim() || kindFilter !== "all" ? (
+              <Button variant="outline" onClick={() => { setQuery(""); setKindFilter("all"); }}>
+                Clear filters
+              </Button>
+            ) : !trash ? (
               <Button onClick={add}>
                 <Plus size={16} /> Write your first entry
               </Button>
             ) : undefined
           }
         >
-          {trash
-            ? "Expired entries are removed from view."
-            : "Write a note or record an incident. You choose what belongs here."}
+          {query.trim() || kindFilter !== "all"
+            ? "Try another search term or view all entry types."
+            : trash
+              ? "Expired entries are removed from view."
+              : "Write a note or record an incident. You choose what belongs here."}
         </Empty>
       )}
       {editing && (
@@ -372,6 +397,13 @@ export default function Notes() {
                     }}
                   />
                 </label>
+                {attachmentUploadProgress !== null && (
+                  <progress
+                    className="progress-bar"
+                    max={100}
+                    value={Math.round(attachmentUploadProgress * 100)}
+                  />
+                )}
                 {attachmentError && <small className="error" role="alert">{attachmentError}</small>}
                 {documents.map((document) => (
                   <label key={document.id}>

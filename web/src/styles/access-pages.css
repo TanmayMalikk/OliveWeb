@@ -160,6 +160,25 @@
 .pin-card > p { margin-bottom: 0.9rem; }
 .pin-card .field { margin-bottom: 0.75rem; text-align: left; }
 .pin-card input { text-align: center; letter-spacing: 0.38em; }
+.pin-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+.pin-dot {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50%;
+  border: 1.5px solid #8ea095;
+  background: transparent;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+}
+.pin-dot.filled {
+  background: var(--olive);
+  border-color: var(--olive);
+  transform: scale(1.1);
+}
 .pin-keypad {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -169,16 +188,18 @@
 .pin-keypad > button {
   display: grid;
   place-items: center;
-  min-height: 2.75rem;
+  min-height: 2.95rem;
   padding: 0.35rem;
   border: 1px solid var(--line);
-  border-radius: 0.65rem;
+  border-radius: 0.75rem;
   background: var(--paper);
   font-size: 1.18rem;
   font-weight: 600;
+  transition: background 0.12s ease, transform 0.12s ease;
 }
 .pin-keypad > button:nth-child(10) { grid-column: 2; }
 .pin-keypad > button:hover:not(:disabled) { background: var(--soft); }
+.pin-keypad > button:active:not(:disabled) { transform: scale(0.96); }
 .pin-card .form-error { margin-bottom: 0.75rem; text-align: left; }
 .pin-card > .text-link { margin-top: 0.45rem; }
 
@@ -215,11 +236,12 @@
 .install-qr {
   display: block;
   width: clamp(5.5rem, 12vw, 7.5rem);
+  aspect-ratio: 1;
   padding: 0.25rem;
   border-radius: 0.35rem;
   background: white;
 }
-.install-qr img { display: block; width: 100%; height: auto; }
+.install-qr img { display: block; width: 100%; height: auto; aspect-ratio: 1; background: var(--paper); border-radius: 0.2rem; }
 .install-qr-panel h3 { display: flex; align-items: center; gap: 0.35rem; }
 .install-qr-panel h3 svg { flex-shrink: 0; }
 .install-qr-panel p, .install-guide p { font-size: 0.86rem; margin-top: 0.2rem; }

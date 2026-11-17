@@ -1,17 +1,19 @@
 /* Styles the base part of the web app. */
 :root {
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
-  color: #263523;
-  background: #f7f7ef;
+  font-family:
+    "Avenir Next", "SF Pro Text", "Segoe UI Variable", system-ui, -apple-system,
+    sans-serif;
+  color: #243321;
+  background: #f5f6ee;
   font-synthesis: none;
-  --paper: #f7f7ef;
+  --paper: #f5f6ee;
   --white: #fdfdf8;
-  --ink: #263523;
-  --olive: #435d35;
-  --muted: #626d59;
-  --line: #dfe3d5;
-  --soft: #e9eddf;
-  --serif: Georgia, "Times New Roman", serif;
+  --ink: #243321;
+  --olive: #38532f;
+  --muted: #56634f;
+  --line: #dbe1d0;
+  --soft: #e8edde;
+  --serif: "Charter", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --radius: 1.25rem;
 }
 * {
@@ -20,10 +22,12 @@
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 1rem;
+  -webkit-text-size-adjust: 100%;
 }
 body {
   margin: 0;
   min-width: 20rem;
+  background: var(--paper);
 }
 button,
 input,
@@ -56,8 +60,8 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid #7e995b;
-  outline-offset: 4px;
+  outline: 3px solid #6f8d4e;
+  outline-offset: 3px;
 }
 button,
 a {
@@ -84,8 +88,9 @@ h3 {
 h1,
 h2 {
   font-family: var(--serif);
-  letter-spacing: -0.045em;
-  line-height: 1.05;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  text-wrap: balance;
 }
 h1 {
   font-size: clamp(2.8rem, 5.5vw, 5.8rem);
@@ -98,12 +103,12 @@ h3 {
   line-height: 1.4;
 }
 p {
-  line-height: 1.75;
+  line-height: 1.72;
   color: var(--muted);
 }
 em {
   font-weight: 400;
-  color: #6c7d52;
+  color: #5b6d43;
 }
 img,
 svg {

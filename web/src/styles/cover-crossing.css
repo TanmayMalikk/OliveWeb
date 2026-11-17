@@ -1,45 +1,100 @@
-/* Styles the cover-crossing part of the web app. */
+/* Styles interactive cover games, overlays, canvas stages, 2048 tiles, and mobile touch pads. */
 .grove-games {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 1.75rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.25rem;
 }
 .grove-games button {
-  min-height: 44px;
-  padding: 0.65rem 1rem;
-  border: 1px solid #b9c4a9;
-  border-radius: 999px;
-  color: #405333;
-  background: #f8f8ee;
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 0.6rem;
+  color: #f2f6ee;
+  background: transparent;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 500;
+  text-align: left;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.grove-games button:hover {
+  background: #335647;
 }
 .grove-games button[aria-pressed="true"] {
-  background: #435e35;
-  color: #fff;
-  border-color: #435e35;
+  background: #dceacb;
+  color: #223e32;
+  border-color: #dceacb;
+  font-weight: 700;
 }
+
+@media (max-width: 48rem) {
+  .grove-games {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 0.32rem;
+    padding-bottom: 1px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .grove-games::-webkit-scrollbar {
+    display: none;
+  }
+  .grove-games button {
+    flex: 0 0 auto;
+    justify-content: center;
+    white-space: nowrap;
+    min-height: 2.25rem;
+    font-size: 0.76rem;
+    padding: 0.3rem 0.65rem;
+    gap: 0.38rem;
+    background: #2b4c3d;
+  }
+}
+
 .flight-stage {
   display: block;
   position: relative;
   width: 100%;
+  aspect-ratio: 4 / 3;
   padding: 0;
-  border: 1px solid #c5ceb6;
-  border-radius: 1rem;
+  border: 1px solid #d9e1d9;
+  border-radius: 0.85rem;
   overflow: hidden;
   background: #e6eddb;
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .flight-stage > svg {
   display: block;
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: auto;
+  pointer-events: none;
 }
-.crossing-arena {
+.flight-fx-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.crossing-arena,
+.canvas-arena,
+.merge-arena {
   display: grid;
   place-items: center;
 }
@@ -48,9 +103,9 @@
   width: min(100%, 35rem);
   aspect-ratio: 7 / 8;
   overflow: hidden;
-  border: 1px solid #c5ceb6;
-  border-radius: 1rem;
-  background: #e6eddb;
+  border: 1px solid #d9e1d9;
+  border-radius: 0.85rem;
+  background: #eaf0e2;
   touch-action: none;
   user-select: none;
   outline: none;
@@ -60,8 +115,17 @@
   width: 100%;
   height: 100%;
 }
-.crossing-stage:focus-visible {
-  box-shadow: inset 0 0 0 3px #78935f;
+.crossing-stage:focus-visible,
+.canvas-stage:focus-visible,
+.merge-board-wrap:focus-visible {
+  box-shadow: inset 0 0 0 3px #284b3c;
+}
+
+.crossing-player {
+  transition: transform 95ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.crossing-player.crossing-player-riding {
+  transition: none;
 }
 .crossing-lane {
   animation: crossing-lane-in 0.22s ease-out both;
@@ -77,6 +141,8 @@
   animation: crossing-wheel-turn 0.45s linear infinite;
 }
 .crossing-dust {
+  transform-box: fill-box;
+  transform-origin: center;
   animation: crossing-dust 0.55s ease-out infinite;
 }
 .crossing-tree circle {
@@ -87,7 +153,7 @@
 .crossing-wave {
   animation: crossing-water-flow 1.8s linear infinite;
 }
-.crossing-lilypad > * {
+.crossing-lilypad-inner {
   transform-box: fill-box;
   transform-origin: center;
   animation: crossing-lily-bob 1.6s ease-in-out infinite alternate;
@@ -119,6 +185,12 @@
 .crossing-crashed {
   animation: crossing-crash 0.28s ease-out;
 }
+.crossing-splash {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: crossing-splash-ring 0.55s ease-out;
+}
+
 @keyframes crossing-lane-in {
   from {
     opacity: 0.65;
@@ -188,52 +260,389 @@
     transform: translateX(-2px);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .crossing-lane,
-  .crossing-vehicle-body,
-  .crossing-wheel,
-  .crossing-dust,
-  .crossing-tree circle,
-  .crossing-wave,
-  .crossing-lilypad > *,
-  .crossing-signal-light,
-  .crossing-train,
-  .crossing-player-hop,
-  .crossing-crashed {
-    animation: none;
+@keyframes crossing-splash-ring {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
 }
-.crossing-bottom {
+
+/* Shared Canvas Arcade Stage (Canopy Breaker & Orchard Catch) */
+.canvas-stage {
+  position: relative;
+  width: min(100%, 40rem);
+  aspect-ratio: 4 / 3;
+  border: 1px solid #d9e1d9;
+  border-radius: 0.85rem;
+  overflow: hidden;
+  background: #edf1e9;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+.canvas-stage > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+/* Grove 2048 Merge Grid */
+.merge-board-wrap {
+  position: relative;
+  width: min(100%, 27rem);
+  aspect-ratio: 1;
+  border: 1px solid #d9e1d9;
+  border-radius: 0.95rem;
+  padding: clamp(0.45rem, 1.4vw, 0.7rem);
+  background: #dfe7dd;
+  touch-action: none;
+  user-select: none;
+  outline: none;
+}
+.merge-grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: clamp(0.35rem, 1.2vw, 0.5rem);
+}
+.merge-cell {
+  border-radius: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.25rem;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.merge-empty {
+  background: #eef3ec;
+  border: 1px solid #d2ded0;
+}
+.merge-tile {
+  box-shadow: 0 2px 5px #223e3212;
+  border: 1px solid rgba(34, 62, 50, 0.14);
+}
+.merge-tile strong {
+  font: 700 clamp(1.05rem, 3.6cqi, 1.65rem)/1 var(--serif);
+}
+.merge-tile small {
+  font-size: clamp(0.54rem, 1.4cqi, 0.68rem);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  opacity: 0.88;
+  margin-top: 0.15rem;
+}
+.merge-v-2 { background: #fbfaf0; color: #223e32; }
+.merge-v-4 { background: #e9efe6; color: #223e32; }
+.merge-v-8 { background: #dceacb; color: #1d352a; }
+.merge-v-16 { background: #b8d3b0; color: #193024; }
+.merge-v-32 { background: #8bb48c; color: #14261c; }
+.merge-v-64 { background: #3e6d4b; color: #fff; }
+.merge-v-128 { background: #2c573e; color: #fff; }
+.merge-v-256 { background: #8f5c1e; color: #fff; }
+.merge-v-512 { background: #7c4619; color: #fff; }
+.merge-v-1024 { background: #6c331c; color: #fff; }
+.merge-v-2048 { background: #223e32; color: #f6e7a6; border-color: #d8b54f; }
+
+.merge-pop {
+  animation: merge-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.merge-spawn {
+  animation: merge-spawn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes merge-pop {
+  0% { transform: scale(0.86); }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes merge-spawn {
+  from { opacity: 0.35; transform: scale(0.75); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Shared Safe-App Modal-Styled Start / Pause / Game Over Overlay Card */
+.game-stage-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(0.6rem, 2.2cqi, 1.35rem);
+  background: rgba(244, 245, 239, 0.78);
+  backdrop-filter: blur(4px);
+  overflow-y: auto;
+  z-index: 4;
+}
+.game-overlay-card {
+  width: min(100%, 22.5rem);
+  padding: clamp(1rem, 3cqi, 1.45rem);
+  background: #ffffff;
+  border: 1px solid #d9e1d9;
+  border-radius: 1rem;
+  box-shadow: 0 0.75rem 2rem rgba(34, 62, 50, 0.12);
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 0.5rem;
+  color: #202c25;
+}
+.game-overlay-emblem {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.7rem;
+  background: #e9efe6;
+  color: #284b3c;
+  display: grid;
+  place-items: center;
+}
+.game-overlay-title {
+  font: 650 clamp(1.18rem, 3cqi, 1.45rem)/1.2 system-ui, sans-serif;
+  letter-spacing: -0.02em;
+  color: #202c25;
+}
+.game-overlay-subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #526057;
+}
+.game-overlay-stats {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr));
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  margin-block: 0.15rem;
+  border-radius: 0.7rem;
+  background: #f4f5ef;
+  border: 1px solid #d9e1d9;
+}
+.game-overlay-stats > div {
+  display: grid;
+  gap: 0.1rem;
+}
+.game-overlay-stats span {
+  font-size: 0.64rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #526057;
+}
+.game-overlay-stats strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  font: 1.2rem/1.1 var(--serif);
+  color: #284b3c;
+  font-variant-numeric: tabular-nums;
+}
+.game-overlay-record {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.45rem;
+  background: #dceacb;
+  color: #223e32;
+  font: 700 0.64rem/1 system-ui, sans-serif;
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+.game-overlay-hint {
+  font-size: 0.73rem;
+  line-height: 1.45;
+  color: #526057;
+}
+.game-overlay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+.game-overlay-actions > .button {
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border-radius: 0.65rem;
+  gap: 0.45rem;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+.game-overlay-actions > .button > svg {
+  width: 16px;
+  height: 16px;
+}
+.crossing-char-picker {
+  width: 100%;
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.7rem;
+  background: #f4f5ef;
+  border: 1px solid #d9e1d9;
+}
+.crossing-char-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #223e32;
+}
+.crossing-coin-bank {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.4rem;
+  background: #dceacb;
+  color: #223e32;
+  font-variant-numeric: tabular-nums;
+}
+.crossing-char-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.3rem;
+}
+.crossing-char-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0.25rem 0.15rem;
+  min-height: 2.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid #d9e1d9;
+  background: #ffffff;
+  color: #202c25;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+.crossing-char-btn:hover:not(:disabled) {
+  background: #eef3ec;
+  border-color: #93ad96;
+}
+.crossing-char-btn.is-selected {
+  background: #dceacb;
+  border-color: #284b3c;
+  box-shadow: inset 0 0 0 1px #284b3c;
+}
+.crossing-char-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.crossing-char-cost {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 3px;
+  border-radius: 0.3rem;
+  background: #223e32;
+  color: #ffffff;
+  font-size: 0.55rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.flight-medal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1.5px solid #844e1d;
+  color: #202c25;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+/* Mobile & iPad Touch Arcade Controls */
+.crossing-bottom,
+.touch-game-bottom {
   align-items: center;
 }
-.crossing-actions {
+.crossing-actions,
+.touch-arcade-controls {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   justify-content: flex-end;
   max-width: 100%;
-  gap: 0.65rem;
+  gap: 0.55rem;
+}
+.touch-steer-pad {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.touch-steer-pad > button[type="button"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-width: 5.25rem;
+  min-height: 46px;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid #d9e1d9;
+  border-radius: 0.65rem;
+  background: #e9efe6;
+  color: #284b3c;
+  font-size: 0.84rem;
+  font-weight: 600;
+  touch-action: manipulation;
+  user-select: none;
+}
+.touch-steer-pad > button[type="button"]:hover {
+  background: #dce8d9;
+}
+.touch-steer-pad > button[type="button"]:active {
+  background: #cde0cb;
+  transform: scale(0.97);
 }
 .crossing-round-actions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.35rem;
 }
 .crossing-pad {
   display: grid;
-  grid-template-columns: repeat(3, 2.5rem);
-  grid-template-rows: repeat(2, 2.5rem);
-  gap: 0.2rem;
+  grid-template-columns: repeat(3, 2.75rem);
+  grid-template-rows: repeat(2, 2.75rem);
+  gap: 0.25rem;
 }
 .crossing-pad button {
   display: grid;
   place-items: center;
   min-width: 44px;
   min-height: 44px;
-  border: 1px solid #c3cdb1;
+  border: 1px solid #d9e1d9;
   border-radius: 0.65rem;
-  background: #eef1e3;
-  color: #425936;
+  background: #e9efe6;
+  color: #284b3c;
   cursor: pointer;
+  touch-action: manipulation;
+}
+.crossing-pad button:hover {
+  background: #dce8d9;
+}
+.crossing-pad button:active {
+  background: #cde0cb;
+  transform: scale(0.96);
 }
 .crossing-pad button:first-child {
   grid-column: 2;
@@ -250,56 +659,43 @@
   grid-column: 3;
   grid-row: 2;
 }
-.flight-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  background: #f8f8edb8;
-  color: #34462b;
-  text-align: center;
-}
-.flight-overlay strong {
-  font: 1.8rem/1.15 var(--serif);
-}
-.flight-overlay > span {
-  font-size: 0.8rem;
-  line-height: 1.6;
-}
-.flight-overlay > .button {
-  width: auto;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0.7rem 1rem;
-  gap: 0.45rem;
-  font-size: 0.82rem;
-  white-space: nowrap;
-}
-.flight-overlay > .button > svg {
-  width: 16px;
-  height: 16px;
-}
 .flight-instructions {
-  margin: 0.85rem 0 0;
-  color: #626d59;
-  font-size: 0.75rem;
-  line-height: 1.6;
+  margin: 0.7rem 0 0;
+  color: #55654b;
+  font-size: 0.76rem;
+  line-height: 1.5;
 }
 .flight-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
+  align-items: center;
+  gap: 0.35rem;
+}
+.flight-flap-btn {
+  min-height: 46px;
+  padding-inline: 1.15rem;
 }
 .flight-game .game-bottom {
   flex-wrap: wrap;
 }
-@media (max-width: 760px) {
-  .grove-games {
-    justify-content: center;
+
+@media (prefers-reduced-motion: reduce) {
+  .crossing-player,
+  .crossing-lane,
+  .crossing-vehicle-body,
+  .crossing-wheel,
+  .crossing-dust,
+  .crossing-tree circle,
+  .crossing-wave,
+  .crossing-lilypad-inner,
+  .crossing-signal-light,
+  .crossing-train,
+  .crossing-player-hop,
+  .crossing-crashed,
+  .merge-pop,
+  .merge-spawn {
+    animation: none;
+    transition: none;
   }
 }
 
@@ -314,18 +710,204 @@
   display: grid;
   place-items: center;
 }
-.grove-header {
-  padding-block: clamp(0.9rem, 2.5svh, 1.6rem);
+
+/* Compact overlay cards automatically whenever the stage container or viewport is short */
+@container (max-height: 26rem) {
+  .game-stage-overlay {
+    padding: 0.45rem;
+  }
+  .game-overlay-card {
+    width: min(100%, 20.5rem);
+    padding: 0.65rem 0.85rem;
+    gap: 0.28rem;
+    border-radius: 0.8rem;
+  }
+  .game-overlay-emblem {
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 0.55rem;
+  }
+  .game-overlay-title {
+    font-size: 1.04rem;
+  }
+  .game-overlay-subtitle {
+    font-size: 0.74rem;
+    line-height: 1.32;
+  }
+  .game-overlay-stats {
+    padding: 0.3rem 0.48rem;
+    margin-block: 0.05rem;
+  }
+  .game-overlay-stats strong {
+    font-size: 1.02rem;
+  }
+  .game-overlay-hint {
+    font-size: 0.68rem;
+    line-height: 1.3;
+  }
+  .crossing-char-picker {
+    padding: 0.32rem 0.45rem;
+    gap: 0.22rem;
+  }
+  .crossing-char-btn {
+    min-height: 2rem;
+    padding: 0.15rem;
+  }
+  .game-overlay-actions > .button {
+    min-height: 40px;
+    padding: 0.38rem 0.85rem;
+    font-size: 0.8rem;
+  }
 }
-.grove-footer {
-  padding-block: clamp(0.7rem, 1.8svh, 1.25rem);
-}
-.grove-games button {
-  transition:
-    background 0.15s,
-    box-shadow 0.15s;
-}
-.grove-games button[aria-pressed="true"] {
-  box-shadow: 0 0.3rem 0.75rem #344b2d18;
+@container (max-height: 19rem) {
+  .game-overlay-emblem,
+  .game-overlay-hint {
+    display: none;
+  }
 }
 
+@media (max-width: 48rem) {
+  .flight-arena,
+  .crossing-arena,
+  .canvas-arena,
+  .merge-arena {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    container-type: size;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 0.75rem;
+  }
+  .flight-arena,
+  .crossing-arena {
+    background: #eef2ea;
+  }
+  .flight-stage,
+  .crossing-stage {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0.75rem;
+  }
+  .flight-stage > svg {
+    width: 100%;
+    height: 100%;
+  }
+  .canvas-stage {
+    width: min(100cqi, calc(100cqb * 4 / 3));
+    height: min(100cqb, calc(100cqi * 3 / 4));
+    border-radius: 0.75rem;
+  }
+  .merge-board-wrap {
+    width: min(100cqi, 100cqb);
+    height: min(100cqi, 100cqb);
+    padding: 0.35rem;
+    border-radius: 0.8rem;
+  }
+  .flight-instructions {
+    display: none;
+  }
+  .crossing-bottom,
+  .touch-game-bottom {
+    gap: 0.3rem;
+  }
+  .crossing-actions,
+  .touch-arcade-controls {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.35rem;
+  }
+  .touch-steer-pad {
+    gap: 0.3rem;
+  }
+  .touch-steer-pad > button[type="button"] {
+    min-width: 3.9rem;
+    min-height: 2.45rem;
+    padding: 0.32rem 0.55rem;
+    font-size: 0.76rem;
+    gap: 0.25rem;
+  }
+  .crossing-pad {
+    grid-template-columns: repeat(3, 2.35rem);
+    grid-template-rows: repeat(2, 2.35rem);
+    gap: 0.2rem;
+  }
+  .crossing-pad button {
+    min-width: 2.35rem;
+    min-height: 2.35rem;
+    border-radius: 0.55rem;
+  }
+  .flight-flap-btn {
+    min-height: 2.45rem;
+    padding-inline: 0.85rem;
+  }
+  .game-overlay-card {
+    padding: 0.75rem 0.9rem;
+    gap: 0.32rem;
+  }
+}
+
+@media (max-width: 48rem) and (max-height: 41rem) {
+  .crossing-pad {
+    grid-template-columns: repeat(4, 2.3rem);
+    grid-template-rows: 2.3rem;
+  }
+  .crossing-pad button {
+    min-width: 2.3rem;
+    min-height: 2.3rem;
+  }
+  .crossing-pad button:first-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .crossing-pad button:nth-child(2) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .crossing-pad button:nth-child(3) {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .crossing-pad button:nth-child(4) {
+    grid-column: 4;
+    grid-row: 1;
+  }
+}
+
+.grove-placeholder-stage {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #e9efe6 0%, #f4f5ef 50%, #e9efe6 100%);
+  background-size: 200% 200%;
+  animation: grove-placeholder-shimmer 1.8s ease-in-out infinite;
+}
+.grove-placeholder-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  padding: 1rem 1.35rem;
+  border-radius: 0.85rem;
+  background: #ffffff;
+  border: 1px solid #d9e1d9;
+  color: #284b3c;
+  text-align: center;
+}
+.grove-placeholder-card strong {
+  font: 650 1rem/1.2 system-ui, sans-serif;
+  color: #202c25;
+}
+.grove-placeholder-card span {
+  font-size: 0.78rem;
+  color: #526057;
+}
+@keyframes grove-placeholder-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grove-placeholder-stage {
+    animation: none;
+  }
+}
