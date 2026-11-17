@@ -1,6 +1,7 @@
 // Cover users: shows the Little Grove cover with 6 botanical games and touch-ready controls.
 import { Suspense, lazy, useEffect, useState, type CSSProperties } from "react";
 import {
+  Apple,
   Cloud,
   Feather,
   Flower2,
@@ -13,7 +14,6 @@ import {
   Sprout,
   Sun,
   TreePine,
-  Blocks,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -27,20 +27,20 @@ const loadFlight = () => import("./OliveFlight");
 const loadCrossing = () => import("./OliveCrossing");
 const loadBreaker = () => import("./OliveBreaker");
 const loadMerge = () => import("./GroveMerge");
-const loadTetris = () => import("./GroveTetris");
+const loadCatch = () => import("./OrchardCatch");
 
 const OliveFlight = lazy(loadFlight);
 const OliveCrossing = lazy(loadCrossing);
 const OliveBreaker = lazy(loadBreaker);
 const GroveMerge = lazy(loadMerge);
-const Tetris = lazy(loadTetris);
+const OrchardCatch = lazy(loadCatch);
 
 function preloadGame(id: GroveGameId) {
   if (id === "flight") void loadFlight();
   else if (id === "crossing") void loadCrossing();
   else if (id === "breaker") void loadBreaker();
   else if (id === "merge") void loadMerge();
-  else if (id === "tetris") void loadTetris();
+  else if (id === "catch") void loadCatch();
 }
 
 type GroveGameId =
@@ -49,7 +49,7 @@ type GroveGameId =
   | "crossing"
   | "breaker"
   | "merge"
-  | "tetris";
+  | "catch";
 
 const GAME_META: Record<
   GroveGameId,
@@ -91,8 +91,8 @@ const GAME_META: Record<
     label: "Canopy Breaker",
     eyebrow: "Arcade focus",
     description: [
-      "Bounce the olive off the log paddle.",
-      "Clear both brick walls and catch falling power-ups with the paddle.",
+      "Bounce the bouncing olive across leafy timber bricks.",
+      "Catch wide-paddle, twin-olive, and calm-breeze boosts.",
     ],
     icon: Sparkles,
   },
@@ -105,14 +105,14 @@ const GAME_META: Record<
     ],
     icon: LayoutGrid,
   },
-  tetris: {
-    label: "Tetris",
-    eyebrow: "Falling block puzzle",
+  catch: {
+    label: "Orchard Catch",
+    eyebrow: "Harvest rush",
     description: [
-      "Rotate and stack falling pieces to clear full rows.",
-      "Use the keyboard or the on-screen controls.",
+      "Drag or tap to catch ripe olives, figs, and golden blossoms.",
+      "Build harvest streaks while weaving past tumbling pinecones.",
     ],
-    icon: Blocks,
+    icon: Apple,
   },
 };
 
@@ -387,7 +387,7 @@ export default function Game({ landing = false }: { landing?: boolean }) {
             ) : game === "merge" ? (
               <GroveMerge />
             ) : (
-              <Tetris />
+              <OrchardCatch />
             )}
           </Suspense>
         ) : (
@@ -439,14 +439,19 @@ export default function Game({ landing = false }: { landing?: boolean }) {
                       }
                       aria-disabled={matched.includes(index)}
                     >
-                      <span className="memory-flip" aria-hidden="true">
-                        <span className="memory-face memory-face-down">
+                      <span>
+                        {visible ? (
+                          <>
+                            <Icon
+                              size={44}
+                              strokeWidth={1.2}
+                              aria-hidden="true"
+                            />
+                            <b>{symbol + 1}</b>
+                          </>
+                        ) : (
                           <Sprout size={30} strokeWidth={1} />
-                        </span>
-                        <span className="memory-face memory-face-up">
-                          <Icon size={44} strokeWidth={1.2} />
-                          <b>{symbol + 1}</b>
-                        </span>
+                        )}
                       </span>
                     </button>
                   );
