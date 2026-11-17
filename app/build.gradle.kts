@@ -67,6 +67,7 @@ android {
     buildTypes {
         getByName("debug") {
             enableUnitTestCoverage = true
+            enableAndroidTestCoverage = providers.gradleProperty("oliveDeviceCoverage").orNull.equals("true", ignoreCase = true)
         }
         getByName("release") {
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("oliveRelease")
@@ -194,3 +195,5 @@ val verifyReleaseConfiguration = tasks.register("verifyReleaseConfiguration") {
     }
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(verifyReleaseConfiguration) }
+
+apply(from = rootProject.file("gradle/device-coverage.gradle.kts"))

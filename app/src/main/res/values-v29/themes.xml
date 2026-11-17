@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.Olive" parent="Theme.Olive.Base">
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>

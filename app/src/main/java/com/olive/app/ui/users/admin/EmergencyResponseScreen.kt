@@ -12,12 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.google.firebase.firestore.FirebaseFirestore
+import com.olive.app.ui.session.EmergencyAlert
 import com.olive.app.R
-import com.olive.app.data.location.AdminLocationRepository
 import com.olive.app.data.location.MapLocationPoint
 import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.ui.shared.AccessibleMessage
@@ -29,15 +27,6 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
-import com.google.firebase.appcheck.FirebaseAppCheck
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.functions.FirebaseFunctions
-
-internal data class EmergencyAlert(
-    val id: String, val ownerUid: String, val ownerName: String,
-    val createdAt: Long, val mediaId: String, val resolvedAt: Long = 0L,
-)
 
 @Composable
 internal fun observeEmergencyAlerts(session: SessionViewModel): Pair<List<EmergencyAlert>?, String?> {
@@ -46,22 +35,11 @@ internal fun observeEmergencyAlerts(session: SessionViewModel): Pair<List<Emerge
     }
     var error by remember(session.coverAccountId) { mutableStateOf<String?>(null) }
     DisposableEffect(session.coverAccountId, session.localMode) {
-        val listener = if (session.localMode) null else FirebaseFirestore.getInstance()
-            .collection("emergencyReports").addSnapshotListener(com.google.firebase.firestore.MetadataChanges.INCLUDE) { snapshot, failure ->
-                if (failure != null) error = failure.localizedMessage
-                if (snapshot != null && !snapshot.metadata.isFromCache) {
-                    error = null
-                    alerts = snapshot.documents.mapNotNull { doc ->
-                        val owner = doc.getString("ownerUid") ?: return@mapNotNull null
-                        EmergencyAlert(
-                            doc.id, owner, doc.getString("ownerName") ?: owner,
-                            doc.getTimestamp("createdAt")?.toDate()?.time ?: 0L, doc.getString("mediaId").orEmpty(),
-                            doc.getTimestamp("resolvedAt")?.toDate()?.time ?: 0L,
-                        )
-                    }.sortedByDescending { it.createdAt }
-                }
-            }
-        onDispose { listener?.remove() }
+        val listener = if (session.localMode) null else session.emergencyResponses.observeAlerts(
+            onUpdate = { alerts = it; error = null },
+            onError = { error = it },
+        )
+        onDispose { listener?.close() }
     }
     val unavailable = stringResource(R.string.emergency_alerts_load_failed)
     LaunchedEffect(session.coverAccountId, alerts) {
@@ -86,7 +64,6 @@ internal fun EmergencyResponseScreen(
     var resolving by remember { mutableStateOf(emptySet<String>()) }
     var resolveError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val visibleAlerts = alerts.orEmpty().filter { (it.resolvedAt > 0L) == showResolved }
     opened?.let { (document, file) ->
         SafetyDocumentViewer(document, file) { opened = null }
@@ -142,19 +119,9 @@ internal fun EmergencyResponseScreen(
                             resolveError = null
                             scope.launch {
                                 try {
-                                    val uid = session.coverAccountId
-                                    val user = FirebaseAuth.getInstance().currentUser
-                                    check(uid != null && user?.uid == uid) { "Sign in again to resolve this request." }
-                                    user.getIdToken(false).await()
-                                    try {
-                                        FirebaseAppCheck.getInstance().getAppCheckToken(false).await()
-                                    } catch (failure: Exception) {
-                                        if (failure is kotlinx.coroutines.CancellationException) throw failure
-                                        throw IllegalStateException(context.getString(R.string.emergency_report_device_verification_failed), failure)
-                                    }
-                                    FirebaseFunctions.getInstance("northamerica-northeast1")
-                                        .getHttpsCallable(if (alert.resolvedAt == 0L) "emergencyResolve" else "emergencyReopen")
-                                        .call(mapOf("id" to alert.id)).await()
+                                    session.emergencyResponses.setResolved(
+                                        session.coverAccountId, alert.id, alert.resolvedAt == 0L,
+                                    )
                                 } catch (failure: Exception) {
                                     if (failure is kotlinx.coroutines.CancellationException) throw failure
                                     resolveError = failure.localizedMessage
@@ -175,11 +142,11 @@ internal fun EmergencyResponseScreen(
 }
 
 @Composable
-internal fun EmergencyLocationPreview(ownerUid: String) {
+internal fun EmergencyLocationPreview(session: SessionViewModel, ownerUid: String) {
     var points by remember(ownerUid) { mutableStateOf(emptyList<MapLocationPoint>()) }
     var error by remember(ownerUid) { mutableStateOf<String?>(null) }
-    DisposableEffect(ownerUid) {
-        val subscription = AdminLocationRepository().observe(
+    DisposableEffect(session.coverAccountId, ownerUid) {
+        val subscription = session.emergencyResponses.observeLocations(
             onUpdate = { values -> points = values.filter { it.uid == ownerUid } },
             onError = { error = it },
         )

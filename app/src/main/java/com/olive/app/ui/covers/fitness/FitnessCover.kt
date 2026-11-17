@@ -575,7 +575,7 @@ internal object FitnessWatchSync {
         if (accountId.isBlank() || accountId == "guest") return
         val prefs = context.getSharedPreferences(SYNC_PREFERENCES, Context.MODE_PRIVATE)
         if (prefs.getString(ACTIVE_ACCOUNT_ID, null) != accountId ||
-            com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid != accountId) return
+            fitnessAuthenticatedUid() != accountId) return
         val nutrition = snapshot.nutrition
         val signature = "$accountId|${prefs.getString(SESSION_ID, "")}|${java.time.LocalDate.now()}|${snapshot.profile}|${snapshot.stepsToday}|$nutrition"
         if (signature == lastPublished) return

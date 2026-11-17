@@ -2,8 +2,28 @@ package com.olive.app.ui.covers.fitness
 
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(manifest = Config.NONE, sdk = [34])
 class FoodNutritionRepositoryTest {
+    @Test fun localEntryAndShortQueriesDoNotInitializeFirebase() = kotlinx.coroutines.runBlocking {
+        var initialized = false
+        val repository = FoodNutritionRepository(functions = {
+            initialized = true
+            error("No Firebase configuration")
+        })
+        assertFalse(initialized)
+        assertEquals(FoodSearchResult(), repository.search(" "))
+        assertEquals(FoodSearchResult(), repository.search("a"))
+        assertFalse(initialized)
+        // Remote failures remain a retryable result, rather than crashing the screen.
+        assertEquals(2, repository.lookupBarcode("12345678").providerFailures)
+        assertTrue(initialized)
+    }
+
     @Test fun servingSelectionRetainsIndependentNutrientsAndScalesDiaryTotals() {
         val food = parseFatSecretFood(mapOf(
             "id" to "42", "name" to "Oats", "calories" to 400, "servingDescription" to "100 g",

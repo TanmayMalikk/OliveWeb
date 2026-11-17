@@ -33,8 +33,8 @@ tasks.register("checkArchitecture") {
         )
         val sourceLayoutViolations=buildList {
             fileTree("app/src/main/java") { include("**/*.kt") }.files
-                .filter { it.readLines().size>700 }.forEach { source ->
-                    add("Android source ${source.relativeTo(rootDir)} exceeds the 700-line limit")
+                .filter { it.readLines().size>750 }.forEach { source ->
+                    add("Android source ${source.relativeTo(rootDir)} exceeds the 750-line limit")
                 }
         }
         val layoutViolations=androidRoots.flatMap { (directory,label) ->

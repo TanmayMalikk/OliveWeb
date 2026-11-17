@@ -11,17 +11,22 @@ class CoverAccountFlowTest : OliveUiTestBase() {
     @Test
     fun guestDeliveryAreaOpensAddressEditorWithoutStartingOnboarding() {
         waitCover()
-        compose.onNodeWithText("DELIVER TO").performClick()
-        waitFor("save_address")
+        val session = androidx.lifecycle.ViewModelProvider(compose.activity)[
+            com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java
+        ]
+        compose.runOnIdle { session.runtime.state.coverType = com.olive.app.data.account.CoverType.NEWS }
+        waitFor("news_cover")
+        click("change_news_location")
+        fill("news_location_input", "Edmonton")
+        click("news_location_save")
+        val preferences = compose.activity.getSharedPreferences("daily_digest_preferences", android.content.Context.MODE_PRIVATE)
+        compose.waitUntil(10_000) { preferences.getString("custom_location_guest", null) == "Edmonton" }
+        compose.onNodeWithTag("news_location_input").assertDoesNotExist()
         compose.onNodeWithTag("new_user").assertDoesNotExist()
-        fill("address_line1", "123 Test Street")
-        fill("address_city", "Edmonton")
-        fill("address_province", "Alberta")
-        fill("address_postal", "T5J 0N3")
-        fill("address_country", "Canada")
-        click("save_address")
-        compose.onNodeWithTag("save_address").assertDoesNotExist()
-        compose.onNodeWithText("Edmonton", substring = true).assertExists()
+        compose.runOnIdle {
+            assertFalse(session.account.configured)
+            assertEquals(com.olive.app.ui.users.shared.navigation.SessionScreen.Cover, session.screen)
+        }
     }
 
     // Checks the cover choice switches news and fitness and both reach safe area step with the test's sample data.

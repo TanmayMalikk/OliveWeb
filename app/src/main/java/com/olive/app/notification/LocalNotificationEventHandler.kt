@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -239,11 +240,16 @@ object LocalNotificationEventHandler {
         WorkManager.getInstance(context).enqueueUniqueWork(BACKGROUND_WORK, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
     }
 
+    // Local accounts can sign out even when this build has no Firebase application.
+    internal fun cancellationAccountId(preferences: SharedPreferences): String? =
+        runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
+            ?: preferences.getString(KEY_ACTIVE_UID, null)
+
     // Cancels the scheduled notification check and removes the device's FCM token when signing out.
     fun cancel(context: Context) {
         stopForegroundListeners()
         val preferences = context.getSharedPreferences(LocalSafeUpdateCheckWorker.STATE_FILE, Context.MODE_PRIVATE)
-        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: preferences.getString(KEY_ACTIVE_UID, null)
+        val uid = cancellationAccountId(preferences)
         val devId = preferences.getString(KEY_DEVICE_ID, null)
         if (!uid.isNullOrBlank() && !devId.isNullOrBlank()) {
             runCatching {

@@ -37,7 +37,7 @@ class VideoMediaCompressorInstrumentedTest {
             assertEquals("video/mp4",result.mimeType)
             assertEquals("clip.mp4",result.displayName("clip.mov"))
             assertTrue(processed.isNotEmpty())
-            assertTrue(processed.size<original.size)
+            assertTrue("Expected compressed fixture: source=${original.size}, result=${processed.size}", processed.size<original.size)
             assertEquals(before,folder.listFiles().orEmpty().toSet())
             assertArrayEquals(processed,encryptedRoundTrip(processed))
         } finally { source.delete() }

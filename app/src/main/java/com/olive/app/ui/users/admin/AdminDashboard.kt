@@ -105,7 +105,7 @@ internal fun AdminPortal(session: SessionViewModel) {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(alert.ownerName)
-                EmergencyLocationPreview(alert.ownerUid)
+                EmergencyLocationPreview(session, alert.ownerUid)
             }
         },
         confirmButton = {

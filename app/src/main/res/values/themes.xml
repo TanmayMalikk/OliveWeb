@@ -1,11 +1,11 @@
 <resources>
-    <style name="Theme.Olive" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.Olive.Base" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
-        <item name="android:forceDarkAllowed">false</item>
         <item name="android:windowActionModeOverlay">true</item>
         <item name="android:colorAccent">#354E2C</item>
         <item name="android:windowBackground">#FAF9F5</item>
     </style>
+    <style name="Theme.Olive" parent="Theme.Olive.Base" />
 </resources>

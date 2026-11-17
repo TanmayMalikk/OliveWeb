@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -45,14 +46,15 @@ internal fun IncidentDateTimeFields(
     val initialDate = remember(date, today) { parseIncidentDate(date, today) }
     val initialTime = remember(time) { runCatching { LocalTime.parse(time) }.getOrNull() }
     val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
-    val timePattern = DateFormat.getBestDateTimePattern(java.util.Locale.getDefault(), if (use24Hour) "Hm" else "hm")
+    val locale = LocalConfiguration.current.locales[0]
+    val timePattern = DateFormat.getBestDateTimePattern(locale, if (use24Hour) "Hm" else "hm")
     val dateLabel = stringResource(R.string.incident_date)
     val timeLabel = stringResource(R.string.incident_time)
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         IncidentPickerField(
             label = dateLabel,
-            value = initialDate?.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) ?: date,
+            value = initialDate?.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)) ?: date,
             tag = "incident_date",
             enabled = enabled,
             icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
@@ -64,7 +66,7 @@ internal fun IncidentDateTimeFields(
         }
         IncidentPickerField(
             label = timeLabel,
-            value = initialTime?.format(DateTimeFormatter.ofPattern(timePattern)) ?: time,
+            value = initialTime?.format(DateTimeFormatter.ofPattern(timePattern, locale)) ?: time,
             tag = "incident_time",
             enabled = enabled,
             icon = { Icon(Icons.Outlined.AccessTime, contentDescription = null) },

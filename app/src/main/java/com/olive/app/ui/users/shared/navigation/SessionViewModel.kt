@@ -36,6 +36,7 @@ internal class SessionViewModel(application: Application) : AndroidViewModel(app
     SessionCoverNotesActivityActions,
     SessionAccountManagementActions {
     override val runtime = SessionRuntime(application, viewModelScope)
+    val emergencyResponses = com.olive.app.ui.session.EmergencyResponseController(application)
     val account = SessionAccountEntry(runtime)
     val messages = SessionMessages(runtime)
     val calls = SessionCalls(application, viewModelScope)
