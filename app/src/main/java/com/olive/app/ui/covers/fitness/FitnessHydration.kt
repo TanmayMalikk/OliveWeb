@@ -94,14 +94,14 @@ internal fun WaterTracker(totalMl: Int, goalMl: Int, enabled: Boolean, onAdd: (I
         AlertDialog(onDismissRequest = { open = false }, title = { Text(stringResource(R.string.nutrition_add_water)) },
             text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(amount, { amount = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_amount)) },
-                    suffix = { Text("ml") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(150, 250, 500).forEach { value ->
                         SuggestionChip(onClick = { amount = value.toString() }, label = { Text("$value ml") })
                     }
                 }
                 OutlinedTextField(goal, { goal = it.take(5) }, label = { Text(stringResource(R.string.nutrition_water_goal)) },
-                    suffix = { Text("ml") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    suffix = { Text(stringResource(R.string.nutrition_volume_unit)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
             } },
             confirmButton = { Button(onClick = { onAdd(amount.toInt(), goal.toInt()); open = false },
                 enabled = amount.toIntOrNull()?.let { it in 1..10000 } == true && goal.toIntOrNull()?.let { it in 250..10000 } == true) { Text(stringResource(R.string.nutrition_add_water)) } },

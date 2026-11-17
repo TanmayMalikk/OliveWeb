@@ -1,10 +1,16 @@
 param(
     [switch]$WithDeviceTests,
+    [switch]$WithCoverage,
+    [switch]$DeviceTestsOnly,
+    [switch]$KeepGoing,
+    [string]$WearDeviceSerial = "",
     [switch]$SkipFirebaseRules,
     [string]$DeviceSerial = ""
 )
 
 $ErrorActionPreference = "Stop"
+if ($DeviceTestsOnly -and -not $WithDeviceTests) { throw "Use -WithDeviceTests with -DeviceTestsOnly." }
+if ($WearDeviceSerial -and -not $WithDeviceTests) { throw "Use -WithDeviceTests with -WearDeviceSerial." }
 $testRunMutex = [System.Threading.Mutex]::new($false, "Local\OliveBranch.F26_D1.TestAll")
 $ownsTestRunMutex = $false
 try {
@@ -22,10 +28,13 @@ try {
 if ($env:FORCE_COLOR -and $env:NO_COLOR) { Remove-Item Env:NO_COLOR }
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $completedChecks = [System.Collections.Generic.List[string]]::new()
+$deviceFailures = [System.Collections.Generic.List[string]]::new()
 $testReportDirectory = Join-Path $projectRoot "build\reports"
 New-Item -ItemType Directory -Force -Path $testReportDirectory | Out-Null
+if (-not $DeviceTestsOnly) {
 Remove-Item -LiteralPath (Join-Path $projectRoot "app\build\test-results\testDebugUnitTest") -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -LiteralPath (Join-Path $projectRoot "wear\build\test-results\testDebugUnitTest") -Recurse -Force -ErrorAction SilentlyContinue
+}
 @(
     "current-test-check.txt",
     "failed-test-check.txt",
@@ -35,7 +44,11 @@ Remove-Item -LiteralPath (Join-Path $projectRoot "wear\build\test-results\testDe
     "web-browser-tests.xml",
     "functions-tests.xml",
     "firebase-rules-tests.xml"
-) | ForEach-Object { Remove-Item -LiteralPath (Join-Path $testReportDirectory $_) -Force -ErrorAction SilentlyContinue }
+) | ForEach-Object {
+    if (-not $DeviceTestsOnly -or $_ -notlike "*.xml") {
+        Remove-Item -LiteralPath (Join-Path $testReportDirectory $_) -Force -ErrorAction SilentlyContinue
+    }
+}
 Remove-Item -LiteralPath (Join-Path $testReportDirectory "device-ui-tests") -Recurse -Force -ErrorAction SilentlyContinue
 $androidJava = "C:\Program Files\Android\Android Studio\jbr"
 if (Test-Path -LiteralPath $androidJava) {
@@ -144,9 +157,45 @@ function Install-AndroidTestApk {
     throw "$Label failed after 3 attempts."
 }
 
+# Keep each instrumented process's binary execution data; PowerShell text redirection corrupts .ec files.
+function Save-DeviceCoverage {
+    param([string]$Serial, [string]$Module, [string]$Name)
+    $directory = Join-Path $projectRoot "$Module\build\outputs\device-test-coverage"
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo.FileName = $adb
+    $process.StartInfo.Arguments = "-s $Serial exec-out run-as com.olive.app cat coverage.ec"
+    $process.StartInfo.UseShellExecute = $false
+    $process.StartInfo.RedirectStandardOutput = $true
+    $process.StartInfo.RedirectStandardError = $true
+    $process.StartInfo.CreateNoWindow = $true
+    $destination = Join-Path $directory "$Name.ec"
+    try {
+        [void]$process.Start()
+        $stream = [System.IO.File]::Create($destination)
+        try { $process.StandardOutput.BaseStream.CopyTo($stream) } finally { $stream.Dispose() }
+        $failure = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0 -or (Get-Item -LiteralPath $destination).Length -eq 0) {
+            throw "No device coverage produced for $Module/$Name on ${Serial}: $failure"
+        }
+    } finally { $process.Dispose() }
+}
+if ($WithCoverage -and $WithDeviceTests) {
+    foreach ($module in @("app", "wear")) {
+        $directory = Join-Path $projectRoot "$module\build\outputs\device-test-coverage"
+        if (Test-Path -LiteralPath $directory) {
+            Get-ChildItem -LiteralPath $directory -Filter "*.ec" -File | Remove-Item -Force
+        }
+    }
+}
+
+if (-not $DeviceTestsOnly) {
 Set-Location -LiteralPath $projectRoot
 Invoke-Checked "Android and Wear unit tests, APKs, UI-test APK, and lint" {
-    & ".\gradlew.bat" :app:testDebugUnitTest :wear:testDebugUnitTest :app:assembleDebug :wear:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :wear:lintDebug checkArchitecture
+    $phoneUnitTask = if ($WithCoverage) { ":app:createDebugUnitTestCoverageReport" } else { ":app:testDebugUnitTest" }
+    $wearUnitTask = if ($WithCoverage) { ":wear:createDebugUnitTestCoverageReport" } else { ":wear:testDebugUnitTest" }
+    & ".\gradlew.bat" $phoneUnitTask $wearUnitTask "-PoliveLocalTest=$($WithDeviceTests.ToString().ToLowerInvariant())" "-PoliveDeviceCoverage=$($WithCoverage -and $WithDeviceTests)" :app:assembleDebug :wear:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :wear:lintDebug checkArchitecture
 }
 @(
     "$projectRoot\app\build\outputs\apk\debug\app-debug.apk",
@@ -160,15 +209,18 @@ $completedChecks.Add("Required Android artifacts created")
 Push-Location -LiteralPath "$projectRoot\web"
 try {
     if (-not (Test-Path -LiteralPath "node_modules")) { Invoke-Checked "Install web dependencies" { & npm.cmd ci } }
-    Invoke-Checked "Web unit tests" { & npm.cmd test }
+    if ($WithCoverage) { Invoke-Checked "Web unit tests and coverage" { & npm.cmd run test:coverage } }
+    else { Invoke-Checked "Web unit tests" { & npm.cmd test } }
     Invoke-Checked "Web production build" { & npm.cmd run build }
-    Invoke-Checked "Web browser and accessibility tests" { & npm.cmd run test:e2e }
+    if ($WithCoverage) { Invoke-Checked "Web browser and accessibility tests with coverage" { & npm.cmd run test:e2e:coverage } }
+    else { Invoke-Checked "Web browser and accessibility tests" { & npm.cmd run test:e2e } }
 } finally { Pop-Location }
 
 Push-Location -LiteralPath "$projectRoot\functions"
 try {
     if (-not (Test-Path -LiteralPath "node_modules")) { Invoke-Checked "Install Cloud Functions dependencies" { & npm.cmd ci } }
-    Invoke-Checked "Cloud Functions unit tests" { & npm.cmd test }
+    if ($WithCoverage) { Invoke-Checked "Cloud Functions unit tests and coverage" { & npm.cmd run test:coverage } }
+    else { Invoke-Checked "Cloud Functions unit tests" { & npm.cmd test } }
     Invoke-Checked "Cloud Functions dependency audit" { & npm.cmd audit --omit=dev }
 } finally { Pop-Location }
 
@@ -200,6 +252,8 @@ if (-not $SkipFirebaseRules) {
     }
 }
 
+}
+
 if ($WithDeviceTests) {
     Set-Location -LiteralPath $projectRoot
     $adb = Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools\adb.exe"
@@ -222,7 +276,7 @@ if ($WithDeviceTests) {
         throw "Android device tests are blocked on physical phones. Select a disposable emulator."
     }
     Write-Host "Using Android device: $selectedDevice" -ForegroundColor Cyan
-    Invoke-Checked "Build Android UI tests" { & ".\gradlew.bat" -PoliveLocalTest=true assembleDebug assembleDebugAndroidTest }
+    Invoke-Checked "Build Android UI tests" { & ".\gradlew.bat" -PoliveLocalTest=true "-PoliveDeviceCoverage=$WithCoverage" assembleDebug assembleDebugAndroidTest }
     Wait-ForAndroidPackageManager -Adb $adb -Serial $selectedDevice
     # Remove saved Android tasks as well as app data. Otherwise a previous isolated Compose
     # test can be restored as the starting activity for the next instrumentation run.
@@ -233,6 +287,17 @@ if ($WithDeviceTests) {
     }
     Invoke-Checked "Install Olive UI tests" {
         Install-AndroidTestApk -Label "Install Olive UI tests" -Adb $adb -Serial $selectedDevice -Apk "$projectRoot\app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk" -TestOnly
+    }
+    $phoneSdk = [int]((& $adb -s $selectedDevice shell getprop ro.build.version.sdk) -join "").Trim()
+    # The fitness cover prompts for its step sensor on launch; unrelated UI tests must not see that dialog.
+    if ($phoneSdk -ge 29) {
+        & $adb -s $selectedDevice shell pm grant com.olive.app android.permission.ACTIVITY_RECOGNITION
+        if ($LASTEXITCODE -ne 0) { throw "Could not prepare activity permission for device UI tests." }
+    }
+    if ($phoneSdk -ge 33) {
+        # Notification dialogs are not under test here and can cover replacement Compose content.
+        & $adb -s $selectedDevice shell pm grant com.olive.app android.permission.POST_NOTIFICATIONS
+        if ($LASTEXITCODE -ne 0) { throw "Could not prepare notification permission for device UI tests." }
     }
     & $adb -s $selectedDevice shell input keyevent KEYCODE_WAKEUP | Out-Null
     & $adb -s $selectedDevice shell wm dismiss-keyguard | Out-Null
@@ -316,6 +381,7 @@ if ($WithDeviceTests) {
     # Android 17 can crash its activity transaction handler after several Compose activity
     # replacements in one instrumentation process. Isolating methods removes shared activity
     # state and tells developers exactly which workflow needs attention.
+    $coverageArguments = if ($WithCoverage) { @("-e", "coverage", "true", "-e", "coverageFile", "/data/user/0/com.olive.app/coverage.ec") } else { @() }
     $deviceTestCases = Get-ChildItem -LiteralPath "$projectRoot\app\src\androidTest\java" -Recurse -Filter "*Test.kt" |
         ForEach-Object {
             $source = Get-Content -LiteralPath $_.FullName -Raw
@@ -326,7 +392,7 @@ if ($WithDeviceTests) {
                     "$($packageMatch.Groups[1].Value).$($classMatch.Groups[1].Value)#$($_.Groups[1].Value)"
                 }
             }
-        } | Sort-Object
+        } | Sort-Object @{ Expression = { if ($_ -like '*FirstRunLocationPermissionUiTest*') { 0 } else { 1 } } }, @{ Expression = { $_ } }
     if ($deviceTestCases.Count -eq 0) { throw "No Android device test methods were found." }
     $deviceLockTestNames = @(
         'SafeEntrySettingsUiTest#switchingAndBackupSetupRequireProofAndNeverExposePinDuringDeviceLock',
@@ -352,7 +418,7 @@ if ($WithDeviceTests) {
             & $adb -s $selectedDevice shell am force-stop com.olive.app | Out-Null
             & $adb -s $selectedDevice shell am force-stop com.olive.app.test | Out-Null
             Ensure-DeviceAwake
-            $instrumentationOutput = & $adb -s $selectedDevice shell am instrument -w -r -e clearPackageData true -e class $testCase com.olive.app.test/androidx.test.runner.AndroidJUnitRunner 2>&1
+            $instrumentationOutput = & $adb -s $selectedDevice shell am instrument -w -r @coverageArguments -e clearPackageData true -e class $testCase com.olive.app.test/androidx.test.runner.AndroidJUnitRunner 2>&1
             $instrumentationOutput | ForEach-Object { Write-Host $_ }
             $deviceResult = $instrumentationOutput -join "`n"
             $countMatch = [regex]::Match($deviceResult, 'OK \(([1-9][0-9]*) tests?\)')
@@ -366,8 +432,11 @@ if ($WithDeviceTests) {
         if (-not $passed) {
             Save-DeviceTestResult -TestCase $testCase -Status "FAILED" -Output $deviceResult -DurationSeconds $testDuration
             Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value "Android device UI test $testCase|1"
+            $deviceFailures.Add($testCase)
+            if ($KeepGoing) { continue }
             throw "Android device UI test $testCase failed on $selectedDevice."
         }
+        if ($WithCoverage) { Save-DeviceCoverage -Serial $selectedDevice -Module "app" -Name ($testCase -replace '[^A-Za-z0-9_.-]', '_') }
         Save-DeviceTestResult -TestCase $testCase -Status "PASSED" -Output $deviceResult -DurationSeconds $testDuration
         $deviceTestCount += [int]$countMatch.Groups[1].Value
     }
@@ -394,6 +463,58 @@ if ($WithDeviceTests) {
     }
 }
 
+if ($WithDeviceTests -and $WearDeviceSerial) {
+    if ($WearDeviceSerial -eq $selectedDevice) { throw "Phone and watch tests require separate emulator targets." }
+    $watchEmulator = ((& $adb -s $WearDeviceSerial shell getprop ro.kernel.qemu 2>&1) -join "`n").Trim()
+    $watchFeatures = ((& $adb -s $WearDeviceSerial shell getprop ro.build.characteristics 2>&1) -join "`n").Trim()
+    if ($watchEmulator -ne '1' -or $watchFeatures -notmatch 'watch') {
+        throw "Wear UI tests require a disposable Wear OS emulator: $WearDeviceSerial"
+    }
+    Invoke-Checked "Build Wear UI tests" { & ".\gradlew.bat" "-PoliveDeviceCoverage=$WithCoverage" :wear:assembleDebug :wear:assembleDebugAndroidTest }
+    Install-AndroidTestApk -Label "Install watch app" -Adb $adb -Serial $WearDeviceSerial -Apk "$projectRoot\wear\build\outputs\apk\debug\wear-debug.apk"
+    Install-AndroidTestApk -Label "Install watch UI tests" -Adb $adb -Serial $WearDeviceSerial -Apk "$projectRoot\wear\build\outputs\apk\androidTest\debug\wear-debug-androidTest.apk" -TestOnly
+    & $adb -s $WearDeviceSerial shell input keyevent KEYCODE_WAKEUP | Out-Null
+    & $adb -s $WearDeviceSerial shell wm dismiss-keyguard | Out-Null
+    $watchOutput = & $adb -s $WearDeviceSerial shell am instrument -w -r @coverageArguments com.olive.app.test/androidx.test.runner.AndroidJUnitRunner 2>&1
+    $watchOutput | ForEach-Object { Write-Host $_ }
+    $watchResult = $watchOutput -join "`n"
+    $watchPassed = $LASTEXITCODE -eq 0 -and $watchResult -match 'OK \([1-9][0-9]* tests?\)' -and $watchResult -notmatch 'FAILURES!!!'
+    Set-Content -LiteralPath (Join-Path $deviceReportDirectory "wear-instrumentation.log") -Value $watchResult -Encoding UTF8
+    Save-DeviceTestResult -TestCase "com.olive.app.wear.WatchFitnessAccessibilityTest" -Status $(if ($watchPassed) { "PASSED" } else { "FAILED" }) -Output $watchResult
+    if (-not $watchPassed) {
+        $deviceFailures.Add("Wear OS UI tests")
+        if (-not $KeepGoing) { throw "Wear UI tests failed on $WearDeviceSerial." }
+    }
+    if ($WithCoverage -and $watchPassed) { Save-DeviceCoverage -Serial $WearDeviceSerial -Module "wear" -Name "watch-ui" }
+    $completedChecks.Add("Wear OS UI tests on $WearDeviceSerial")
+} elseif ($WithDeviceTests) {
+    Write-Host "Watch UI tests were not requested. Add -WearDeviceSerial <watch-emulator-serial> to include them." -ForegroundColor Yellow
+}
+
+if ($WithCoverage) {
+    Set-Location -LiteralPath $projectRoot
+    if ($WithDeviceTests) {
+        $combinedTasks = @(':app:combinedDebugCoverageReport', ':app:deviceTestLineDetails')
+        if ($WearDeviceSerial) { $combinedTasks += ':wear:combinedDebugCoverageReport' }
+        Invoke-Checked "Combined unit and device coverage" { & ".\gradlew.bat" @combinedTasks }
+    }
+    $androidCoverage = if ($WithDeviceTests) { "app/build/reports/coverage/combinedDebug/report.xml" } else { "app/build/reports/coverage/test/debug/report.xml" }
+    $dashboardOptions = @()
+    if ($WithDeviceTests) { $dashboardOptions += '--phone' }
+    if ($WearDeviceSerial) { $dashboardOptions += '--watch' }
+    if ($SkipFirebaseRules -and -not $DeviceTestsOnly) { $dashboardOptions += '--skip-rules' }
+    Invoke-Checked "Project coverage dashboard" { & python scripts/coverage_dashboard.py @dashboardOptions }
+    Invoke-Checked "Android coverage threshold (10%)" { & python scripts/check_coverage.py jacoco $androidCoverage 10 --name Android }
+    Invoke-Checked "Web coverage threshold (10%)" { & python scripts/check_coverage.py lcov web/coverage/combined/lcov.info 10 --name Web }
+    Invoke-Checked "Functions coverage threshold (30%)" { & python scripts/check_coverage.py lcov functions/coverage/lcov.info 30 --name "Cloud Functions" }
+    if (-not (Test-Path -LiteralPath "$projectRoot\wear\build\reports\coverage\test\debug\report.xml")) { throw "Wear coverage report was not generated." }
+    $completedChecks.Add("Wear unit-test coverage report generated")
+}
+
+if ($deviceFailures.Count -gt 0) {
+    Set-Content -LiteralPath (Join-Path $testReportDirectory "failed-test-check.txt") -Value $deviceFailures
+    throw "$($deviceFailures.Count) device UI tests failed. See build/reports/device-ui-tests for each failure."
+}
 Write-Host "`nAll requested Olive tests passed ($($completedChecks.Count) checks):" -ForegroundColor Green
 $completedChecks | ForEach-Object { Write-Host "  PASS  $_" -ForegroundColor Green }
 Set-Content -LiteralPath (Join-Path $testReportDirectory "completed-test-checks.txt") -Value $completedChecks

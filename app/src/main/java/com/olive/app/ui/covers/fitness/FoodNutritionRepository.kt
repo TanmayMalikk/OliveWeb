@@ -21,9 +21,12 @@ internal class FoodNutritionRepository(
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build(),
-    private val functions: FirebaseFunctions =
-        FirebaseFunctions.getInstance("northamerica-northeast1"),
+    functions: () -> FirebaseFunctions = {
+        FirebaseFunctions.getInstance("northamerica-northeast1")
+    },
 ) {
+    // Manual entry and scanning can open before Firebase is available.
+    private val remoteFunctions by lazy(functions)
     // Both sources are independent. A failure in one source does not hide results from the other.
     suspend fun search(query: String, page: Int = 0, foodType: String = ""): FoodSearchResult = coroutineScope {
         val cleanQuery = query.trim().take(80)
@@ -59,7 +62,7 @@ internal class FoodNutritionRepository(
     }
 
     suspend fun suggestions(query: String): List<String> {
-        val response = functions.getHttpsCallable("nutritionFoodSearch")
+        val response = remoteFunctions.getHttpsCallable("nutritionFoodSearch")
             .call(mapOf("query" to query.trim().take(80), "action" to "suggest")).await()
             .data as? Map<*, *> ?: return emptyList()
         return (response["suggestions"] as? List<*>).orEmpty().filterIsInstance<String>().take(4)
@@ -79,7 +82,7 @@ internal class FoodNutritionRepository(
         fatSecret(mapOf("query" to query, "page" to page, "foodType" to foodType))
 
     private suspend fun fatSecret(parameters: Map<String, Any>): FoodSearchResult {
-        val response = functions.getHttpsCallable("nutritionFoodSearch")
+        val response = remoteFunctions.getHttpsCallable("nutritionFoodSearch")
             .call(parameters).await().data as? Map<*, *> ?: error("Missing food response")
         return FoodSearchResult(
             foods = (response["foods"] as? List<*>).orEmpty().mapNotNull { raw ->

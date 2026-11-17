@@ -166,7 +166,10 @@ abstract class OliveUiTestBase {
     protected fun openOnboarding(grantPermissions: Boolean = true) {
         if (grantPermissions) grantFeaturePermissions()
         waitCover()
-        click("fitness_account_settings")
+        // Quick exit preserves the cover's settings page when it was already open.
+        if (compose.onAllNodesWithTag("discreet_cover_olive").fetchSemanticsNodes().isEmpty()) {
+            click("fitness_account_settings")
+        }
         waitFor("discreet_cover_olive")
         visibleNode("discreet_cover_olive").performTouchInput { doubleClick() }
         waitFor("new_user")

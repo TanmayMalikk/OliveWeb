@@ -53,7 +53,10 @@ function fixture() {
     },
   };
   const api = {};
-  new Function("require", "exports", fs.readFileSync(path.join(__dirname, "src/emergencyReports.js"), "utf8"))(
+  require("node:vm").compileFunction(
+    fs.readFileSync(path.join(__dirname, "src/emergencyReports.js"), "utf8"),
+    ["require", "exports"], {filename: path.join(__dirname, "src/emergencyReports.js")},
+  )(
     name => { assert.ok(imports[name], name); return imports[name]; }, api,
   );
   return {api, records, deliveries, users, setCaller: value => { caller = value; }};

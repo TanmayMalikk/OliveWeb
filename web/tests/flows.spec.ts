@@ -1,5 +1,5 @@
 // Tests cover entry, sign-in, and safe-app navigation in the browser.
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./coverageFixture";
 import AxeBuilder from "@axe-core/playwright";
 const password = "Test-password1!";
 async function onboard(page: Page) {
@@ -156,7 +156,7 @@ test("account onboarding, unique-link gate, encrypted notes, contact CRUD, setti
   await page.getByRole("button", { name: "New entry", exact: true }).click();
   await page.getByLabel("Title (optional)").fill("Private fixture note");
   await page
-    .getByLabel("Your words")
+    .getByLabel("Note (required)", { exact: true })
     .fill("Details only inside the encrypted vault.");
   await page.getByRole("button", { name: "Save entry", exact: true }).click();
   await expect(

@@ -16,7 +16,6 @@ import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.work.*
-import com.google.firebase.auth.FirebaseAuth
 import com.olive.app.R
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -41,7 +40,7 @@ internal object FitnessHealthConnect {
     }
 
     suspend fun read(context: Context, owner: String, background: Boolean = false) = readLock.withLock { withContext(Dispatchers.IO) {
-        if (!FitnessAccountSync.ready.value || FirebaseAuth.getInstance().currentUser?.uid != owner || !available(context)) return@withContext
+        if (!FitnessAccountSync.ready.value || fitnessAuthenticatedUid() != owner || !available(context)) return@withContext
         val client = HealthConnectClient.getOrCreate(context)
         val granted = client.permissionController.getGrantedPermissions()
         if (background && HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND !in granted) return@withContext
@@ -81,16 +80,16 @@ internal object FitnessHealthConnect {
             } while (page != null)
         }
         // Reads begun in an old login session cannot be applied to a new session, including A -> B -> A.
-        if (FirebaseAuth.getInstance().currentUser?.uid != owner || session.getString("sessionId", null) != token) return@withContext
+        if (fitnessAuthenticatedUid() != owner || session.getString("sessionId", null) != token) return@withContext
         FitnessStore(context, owner).recordHealthConnect(steps, samples, today)
         samples.maxOfOrNull { it.recordedAt }?.let { last -> local.edit { putLong("_hc_read_$today", last) } }
     } }
 }
 
-class FitnessHealthWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+internal class FitnessHealthWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val owner = inputData.getString("uid") ?: return Result.failure()
-        if (FirebaseAuth.getInstance().currentUser?.uid != owner) return Result.success()
+        if (fitnessAuthenticatedUid() != owner) return Result.success()
         return try { FitnessHealthConnect.read(applicationContext, owner, background = true); Result.success() }
         catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
         catch (_: SecurityException) { Result.success() }
@@ -110,7 +109,7 @@ internal fun FitnessHealthConnection(accountId: String, enabled: Boolean) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
             // Check once per cover visit, before launching: dismissal or permission-screen return must not loop.
             if (checked || !enabled || accountId == "guest" ||
-                FirebaseAuth.getInstance().currentUser?.uid != accountId || !FitnessHealthConnect.available(context)) return@repeatOnLifecycle
+                fitnessAuthenticatedUid() != accountId || !FitnessHealthConnect.available(context)) return@repeatOnLifecycle
             try {
                 val client = HealthConnectClient.getOrCreate(context)
                 val wanted = FitnessHealthConnect.permissions.toMutableSet()
@@ -125,7 +124,7 @@ internal fun FitnessHealthConnection(accountId: String, enabled: Boolean) {
     }
 }
 
-class FitnessHealthPrivacyActivity : androidx.activity.ComponentActivity() {
+internal class FitnessHealthPrivacyActivity : androidx.activity.ComponentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(android.widget.TextView(this).apply {

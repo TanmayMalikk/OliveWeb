@@ -17,4 +17,5 @@
     <string name="nutrition_water_plus">Add 250 ml of water</string>
     <string name="nutrition_edit_food">Edit food entry</string>
     <string name="nutrition_edit_details">Edit food details</string>
+    <string name="nutrition_volume_unit">ml</string>
 </resources>

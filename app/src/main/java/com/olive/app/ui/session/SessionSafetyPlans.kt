@@ -569,7 +569,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
                     }
                     if (current(actor, owner, token) && saved != null) {
                         plan = mergeVisibleSafetyPlan(plan, saved, actor)
-                        if (!saved.pending) error = null
+                        if (!saved.pending && error != R.string.safety_account_required) error = null
                     }
                     syncing = false
                 }
@@ -588,6 +588,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
 
     // Flushes the latest locally durable edit when a field loses focus or a discrete control changes.
     fun flushEdits() {
+        if (runtime.localMode) return
         val actor = runtime.coverAccountId ?: return
         val owner = activeOwner ?: return
         requestForegroundSync(actor, owner, generation, immediate = true)
@@ -644,7 +645,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
             val saved = withContext(Dispatchers.IO) { store.read(actor, owner) }
             if (current(actor, owner, token) && saving == 0) {
                 plan = saved
-                error = null
+                if (error != R.string.safety_account_required) error = null
             }
         } catch (_: TimeoutCancellationException) { /* Retain the local draft; the durable queue retries when connected. */
         } catch (cancelled: CancellationException) {

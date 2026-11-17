@@ -116,7 +116,12 @@ class AccessibilityUiTest : OliveUiTestBase() {
         waitFor("safe_settings")
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
-        compose.onNodeWithContentDescription("Returned to Olive")
+        compose.onNodeWithContentDescription(
+            compose.activity.getString(
+                R.string.a11y_returned_to_cover,
+                session.coverType.localizedTitle(ResourceText(compose.activity.resources)),
+            ),
+        )
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.LiveRegion,

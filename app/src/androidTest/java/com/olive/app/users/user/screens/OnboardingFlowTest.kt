@@ -41,7 +41,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("new_user").assertDoesNotExist()
         compose.onNodeWithText("Set up account").assertDoesNotExist()
 
-        compose.onNodeWithTag("discreet_cover_olive").performTouchInput { doubleClick() }
+        compose.onNodeWithTag("discreet_cover_olive").performScrollTo().performTouchInput { doubleClick() }
 
         waitFor("new_user")
         compose.onNodeWithTag("new_user").assertIsDisplayed()
@@ -50,8 +50,6 @@ class OnboardingFlowTest : OliveUiTestBase() {
     @Test
     fun quickExitFromOnboardingReturnsToCoverAndDiscardsForm() {
         openOnboarding()
-        click("account_role")
-        click("role_safe_contact")
         click("new_user")
         fill("username", "unfinished_contact")
 
@@ -123,7 +121,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         compose.onNodeWithTag("sign_out").assertExists()
         compose.onNodeWithTag("safe_contact_activity").assertDoesNotExist()
         compose.onNodeWithTag("change_device_pin").assertDoesNotExist()
-        compose.onNodeWithTag("quick_exit").assertIsDisplayed()
+        compose.onNodeWithTag("quick_exit").assertDoesNotExist()
         click("safe_contact_settings")
         waitFor("save_settings")
         compose.onNodeWithTag("sign_out").assertDoesNotExist()
@@ -152,7 +150,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         nextOnboarding()
         fill("trigger", "moon garden")
         hideKeyboard()
-        compose.onNodeWithTag("cover_choice_food").assertIsSelected()
+        compose.onNodeWithTag("cover_choice_fitness").performScrollTo().assertIsSelected()
         compose.onNodeWithTag("cover_choice_news").assertIsNotSelected().performClick()
         // The cover picker is inside AnimatedContent, so its semantics update can land on the
         // following frame even though the click callback has already changed the draft profile.
@@ -162,7 +160,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
             }.isSuccess
         }
         compose.onNodeWithTag("cover_choice_news").assertIsSelected()
-        compose.onNodeWithTag("cover_choice_food").assertIsNotSelected()
+        compose.onNodeWithTag("cover_choice_fitness").assertIsNotSelected()
         waitFor(
             "profile_submit"
         )
@@ -182,7 +180,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
     @Test
     fun everyCoverChoiceCanBecomeTheSingleSelectedOption() {
         reachCoverPicker("cover_picker_test")
-        val tags = listOf("cover_choice_food", "cover_choice_news", "cover_choice_fitness", "cover_choice_game")
+        val tags = listOf("cover_choice_news", "cover_choice_fitness", "cover_choice_game")
         tags.forEach { selectedTag ->
             compose.onNodeWithTag(selectedTag).performScrollTo().performClick()
             compose.waitUntil(5_000) {
@@ -199,10 +197,9 @@ class OnboardingFlowTest : OliveUiTestBase() {
     fun onboardingContactsQuickExitAndReturningUser() {
         register(username = "returning_user_tester")
         compose.runOnIdle { assertFalse(compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0) }
-        // Cover cart stays alive through the secure overlay.
-        compose.onNodeWithText("Garden harvest bowl").performClick()
-        compose.onNodeWithText("Add to cart").performScrollTo().performClick()
-        compose.onNodeWithText("Discover").performClick()
+        // The selected fitness tab stays alive through private screens and recreation.
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.activity)).performClick()
+        waitFor("fitness_activity")
         unlock()
         compose.onNodeWithTag("safe_notes").assertExists()
         compose.onNodeWithTag("safe_messages").assertExists()
@@ -338,8 +335,8 @@ class OnboardingFlowTest : OliveUiTestBase() {
             .assertExists()
         compose.onNodeWithTag("quick_exit").performClick()
         waitCover()
-        compose.onNodeWithText("Cart").performClick()
-        compose.onNodeWithText("Garden harvest bowl").assertExists()
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.activity)).assertIsSelected()
+        compose.onNodeWithTag("fitness_activity").assertExists()
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         waitCover()
         unlock()
@@ -383,7 +380,7 @@ class OnboardingFlowTest : OliveUiTestBase() {
         fill("confirm_pin", "654321")
         click("pin_setup_submit")
         waitCover()
-        compose.onNodeWithText("Discover").performClick()
+        compose.onNodeWithContentDescription(compose.activity.getString(R.string.activity)).performClick()
         waitCover()
         unlock("654321")
         click("support_menu_toggle")

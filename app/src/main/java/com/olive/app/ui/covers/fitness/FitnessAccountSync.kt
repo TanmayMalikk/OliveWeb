@@ -15,7 +15,7 @@ import org.json.JSONObject
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-private fun fitnessAuthenticatedUid(): String? = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
+internal fun fitnessAuthenticatedUid(): String? = runCatching { FirebaseAuth.getInstance().currentUser?.uid }.getOrNull()
 
 internal fun fitnessAccountKey(uid: String): String = MessageDigest.getInstance("SHA-256")
     .digest(uid.toByteArray()).joinToString("") { "%02x".format(it) }
@@ -202,7 +202,7 @@ internal object FitnessAccountSync {
     }
 }
 
-class FitnessUploadWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
+internal class FitnessUploadWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result {
         val owner = inputData.getString("uid") ?: return Result.failure()
         if (fitnessAuthenticatedUid() != owner) return Result.success()

@@ -39,6 +39,9 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
     @Test
     fun newsNavigationStaysAtTheBottomWhileTyping() {
         register(username = "cover_keyboard")
+        val session = ViewModelProvider(compose.activity)[SessionViewModel::class.java]
+        compose.runOnIdle { session.runtime.state.coverType = com.olive.app.data.account.CoverType.NEWS }
+        waitFor("news_cover")
         val newsBar = compose.onNodeWithTag("cover_navigation").fetchSemanticsNode().boundsInWindow
         focus("news_search")
         val newsWithKeyboard =
@@ -56,8 +59,6 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
     private fun focus(tag: String) {
         // Request focus through semantics, then click the field so the platform creates an input connection.
         compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-        val bounds = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInWindow
-        tapOnScreen(bounds.center.x, bounds.center.y)
         compose.waitForIdle()
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val focused = compose.activity.currentFocus
@@ -82,6 +83,10 @@ class KeyboardVisibilityUiTest : OliveUiTestBase() {
             val field = node.boundsInWindow
             field.height >= node.layoutInfo.height - 1 && field.top >= 0 && field.bottom <= decor.height - bottom + 1
         }
+        // The IME resizes the chat composer. Tap its settled bounds, not its pre-keyboard position.
+        val bounds = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInWindow
+        tapOnScreen(bounds.center.x, bounds.center.y)
+        compose.waitForIdle()
         compose.onNodeWithTag(tag).assertIsFocused()
     }
 

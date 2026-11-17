@@ -83,7 +83,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNode(hasScrollAction() and hasAnyDescendant(hasTestTag("idle_timeout")))
             .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 300f) }
         slider.performTouchInput { swipe(centerLeft.copy(x = width / 7f), centerRight) }
-        compose.runOnIdle { assertEquals(450, session.idleTimeoutSeconds()) }
+        compose.runOnIdle { assertEquals(420, session.idleTimeoutSeconds()) }
         click("settings_tab_profile")
         compose.onNodeWithTag("settings_full_name").assertTextContains("Unsaved test name")
         compose.runOnIdle { session.navigation.back() }
@@ -91,7 +91,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
         click("safe_settings")
         click("settings_tab_privacy")
         compose.onNodeWithTag("idle_timeout").assert(
-            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "7 min 30 sec")
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "7 min")
         )
     }
 
@@ -225,8 +225,8 @@ class SafeSupportUiTest : OliveUiTestBase() {
     fun availableSupportActionsAndQuickExitWorkWithTheMenuOpen() {
         setup()
         toggle()
-        listOf("support_walkthrough", "support_emergency")
-            .forEach { compose.onNodeWithTag(it).assertIsNotEnabled() }
+        compose.onNodeWithTag("support_walkthrough").assertIsNotEnabled()
+        compose.onNodeWithTag("support_emergency").assertIsEnabled()
         compose.onNodeWithTag("support_staff_help").assertIsEnabled()
         compose.onNodeWithTag("support_hotlines").assertIsEnabled()
         compose.onNodeWithTag("support_contacts").assertIsEnabled()
@@ -266,8 +266,8 @@ class SafeSupportUiTest : OliveUiTestBase() {
                 .isNotEmpty()
         }
         compose.onNodeWithTag("hotline_city").assertDoesNotExist()
-        compose.onNodeWithTag("hotline_location_summary")
-            .assertTextContains("Edmonton", substring = true)
+        compose.onNodeWithTag("hotline_region")
+            .assertTextContains(compose.activity.getString(R.string.support_region_ab))
         compose.onNodeWithTag("hotline_page")
             .performScrollToNode(hasText("Family Violence Info Line"))
         compose.onNodeWithText("Family Violence Info Line").assertIsDisplayed()
@@ -275,8 +275,8 @@ class SafeSupportUiTest : OliveUiTestBase() {
         compose.onNodeWithTag("hotline_page").performScrollToNode(hasTestTag("hotline_region"))
         compose.onNodeWithTag("hotline_region").performClick()
         compose.onNodeWithTag("hotline_region_ON").performScrollTo().performClick()
-        compose.onNodeWithTag("hotline_page").performScrollToNode(hasText("1-866-863-7867"))
-        compose.onNodeWithText("1-866-863-7867").assertExists()
+        compose.onNodeWithTag("hotline_page").performScrollToNode(hasText("1-866-863-0511"))
+        compose.onNodeWithText("1-866-863-0511").assertExists()
         compose.onNodeWithTag("hotline_page").performScrollToNode(hasTestTag("hotline_search"))
         fill("hotline_search", "no-such-provider")
         compose.onNodeWithTag("hotline_page")
@@ -316,14 +316,13 @@ class SafeSupportUiTest : OliveUiTestBase() {
         waitFor("hotline_use_device_location")
         compose.onNodeWithTag("hotline_use_device_location").performScrollTo().performClick()
         compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag("hotline_location_summary").fetchSemanticsNodes()
-                .any {
-                    it.config.getOrElse(SemanticsProperties.Text) { emptyList() }
-                        .any { text -> text.text.contains("Toronto") }
-                }
+            runCatching {
+                compose.onNodeWithTag("hotline_region")
+                    .assertTextContains(compose.activity.getString(R.string.support_region_on))
+            }.isSuccess
         }
-        compose.onNodeWithTag("hotline_page").performScrollToNode(hasText("1-866-863-7867"))
-        compose.onNodeWithText("1-866-863-7867").assertExists()
+        compose.onNodeWithTag("hotline_page").performScrollToNode(hasText("1-866-863-0511"))
+        compose.onNodeWithText("1-866-863-0511").assertExists()
         compose.runOnIdle {
             assertEquals(
                 "Edmonton",
@@ -405,13 +404,17 @@ class SafeSupportUiTest : OliveUiTestBase() {
                 )
             )
             compose.onNodeWithTag("safe_settings").assertDoesNotExist()
-            compose.onNodeWithTag("support_emergency").assertIsNotEnabled()
+            compose.onNodeWithTag("support_emergency").assertIsEnabled()
             activate("support_hotlines")
             waitFor("hotline_page")
             activate("support_menu_toggle")
             activate("quick_exit")
             waitCover()
-            compose.onNodeWithContentDescription("Returned to Olive")
+            val returnedToCover = compose.activity.getString(
+                R.string.a11y_returned_to_cover,
+                session.coverType.localizedTitle(ResourceText(compose.activity.resources)),
+            )
+            compose.onNodeWithContentDescription(returnedToCover)
                 .assert(
                     SemanticsMatcher.expectValue(
                         SemanticsProperties.LiveRegion,
@@ -420,7 +423,7 @@ class SafeSupportUiTest : OliveUiTestBase() {
                 )
             assertTrue(
                 "Quick-exit status must not move TalkBack focus",
-                talkBack.focused.none { it.contains("Returned to Olive") })
+                talkBack.focused.none { it.contains(returnedToCover) })
             assertNull(session.profile)
             compose.onNodeWithTag("hotline_page").assertDoesNotExist()
         }
