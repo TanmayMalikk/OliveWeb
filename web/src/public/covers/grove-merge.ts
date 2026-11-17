@@ -57,12 +57,11 @@ function spawnTile(
     .map((cell, index) => (cell === null ? index : -1))
     .filter((index) => index !== -1);
   if (emptyIndices.length === 0) return { grid, nextId };
+  const value = validRandom(random) < 0.9 ? 2 : 4;
   const picked =
     emptyIndices[
       Math.floor(validRandom(random) * emptyIndices.length) % emptyIndices.length
     ];
-  // Classic 2048 spawn odds: 90% 2-tile, 10% 4-tile.
-  const value = validRandom(random) < 0.9 ? 2 : 4;
   const copy = [...grid];
   copy[picked] = { id: nextId, value, isNew: true };
   return { grid: copy, nextId: nextId + 1 };
@@ -197,9 +196,7 @@ export function moveGroveMerge(
   if (!moved) return { world, moved: false, mergedLevel: 0 };
 
   const spawned = spawnTile(nextGrid, nextId, random);
-  const won =
-    world.won ||
-    spawned.grid.some((tile) => tile !== null && tile.value >= 2048);
+  const won = world.won || mergedLevel === 11;
   const over = !canMergeMove(spawned.grid);
 
   return {
