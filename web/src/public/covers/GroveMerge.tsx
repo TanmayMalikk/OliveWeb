@@ -6,6 +6,8 @@ import {
   ArrowRight,
   ArrowUp,
   RotateCcw,
+  Sprout,
+  Undo2,
 } from "lucide-react";
 import { Button } from "../../components/SharedComponents";
 import { readCover, writeCover } from "../../services/CoverStateStore";
@@ -146,31 +148,29 @@ function GroveTileAsset({ value }: { value: number }) {
   );
 }
 
-const ROUND_KEY = "grove-merge-round";
-let pendingRoundWrite = Promise.resolve();
-
 export default function GroveMerge() {
   const [world, setWorld] = useState<GroveMergeWorld>(() => newGroveMerge());
+  const [previous, setPrevious] = useState<GroveMergeWorld | null>(null);
+  const [started, setStarted] = useState(false);
   const [best, setBest] = useState(0);
   const [previousBest, setPreviousBest] = useState(0);
   const [storageReady, setStorageReady] = useState(false);
-  const pointerStart = useRef<{ x: number; y: number; id: number } | null>(null);
+  const pointerStart = useRef<{ x: number; y: number; fired: boolean } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let live = true;
-    void Promise.all([
-      readCover<number>("grove-merge-best", 0).catch(() => 0),
-      pendingRoundWrite
-        .then(() => readCover<GroveMergeWorld | null>(ROUND_KEY, null))
-        .catch(() => null),
-    ]).then(([value, saved]) => {
-      if (!live) return;
-      setBest(value);
-      setPreviousBest(value);
-      if (saved && !saved.over) setWorld(saved);
-      setStorageReady(true);
-    });
+    void readCover<number>("grove-merge-best", 0)
+      .then((value) => {
+        if (live) {
+          setBest(value);
+          setPreviousBest(value);
+          setStorageReady(true);
+        }
+      })
+      .catch(() => {
+        if (live) setStorageReady(true);
+      });
     return () => {
       live = false;
     };
@@ -182,37 +182,29 @@ export default function GroveMerge() {
     void writeCover("grove-merge-best", world.score).catch(() => {});
   }, [best, storageReady, world.score]);
 
-  useEffect(() => {
-    if (!storageReady) return;
-    const saved = world.over ? null : {
-      ...world,
-      lastGained: 0,
-      grid: world.grid.map((tile) => tile && ({ id: tile.id, value: tile.value })),
-    };
-    pendingRoundWrite = pendingRoundWrite
-      .then(() => writeCover(ROUND_KEY, saved))
-      .catch(() => {});
-  }, [storageReady, world]);
-
   const restart = useCallback(() => {
-    if (!storageReady) return;
     setPreviousBest(best);
+    setPrevious(null);
     setWorld(newGroveMerge());
+    setStarted(true);
     gameSfx.tap();
     requestAnimationFrame(() => boardRef.current?.focus());
-  }, [best, storageReady]);
+  }, [best]);
 
   const step = useCallback(
     (direction: MergeDirection) => {
-      if (!storageReady) return;
-      const result = moveGroveMerge(world, direction);
-      if (!result.moved) return;
-      setWorld(result.world);
-      if (result.world.won && !world.won) gameSfx.win();
-      else if (result.mergedLevel > 0) gameSfx.merge(result.mergedLevel);
-      else gameSfx.tap();
+      if (!started) setStarted(true);
+      setWorld((current) => {
+        const result = moveGroveMerge(current, direction);
+        if (!result.moved) return current;
+        setPrevious(current);
+        if (result.world.won && !current.won) gameSfx.win();
+        else if (result.mergedLevel > 0) gameSfx.merge(result.mergedLevel);
+        else gameSfx.tap();
+        return result.world;
+      });
     },
-    [storageReady, world],
+    [started],
   );
 
   const highestTile = world.grid.reduce(
@@ -223,6 +215,7 @@ export default function GroveMerge() {
   // Build flat positioned tile nodes keyed by persistent tile.id so CSS smoothly slides tiles across cells.
   const tileNodes: Array<{
     key: string;
+    id: number;
     value: number;
     row: number;
     col: number;
@@ -238,7 +231,8 @@ export default function GroveMerge() {
     if (tile.mergedFrom) {
       for (const src of tile.mergedFrom) {
         tileNodes.push({
-          key: `tile-${src.id}`,
+          key: `src-${src.id}`,
+          id: src.id,
           value: src.value,
           row,
           col,
@@ -248,6 +242,7 @@ export default function GroveMerge() {
     }
     tileNodes.push({
       key: `tile-${tile.id}`,
+      id: tile.id,
       value: tile.value,
       row,
       col,
@@ -302,30 +297,38 @@ export default function GroveMerge() {
               A: "left",
               d: "right",
               D: "right",
-              k: "up",
-              j: "down",
-              h: "left",
-              l: "right",
             };
             const dir = map[event.key];
-            if (dir && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+            if (dir) {
               event.preventDefault();
               step(dir);
+            } else if ((event.key === " " || event.key === "Enter") && !started) {
+              event.preventDefault();
+              setStarted(true);
+              boardRef.current?.focus();
             }
           }}
           onPointerDown={(event) => {
-            if (!event.isPrimary || event.button !== 0) return;
-            event.currentTarget.focus();
             event.currentTarget.setPointerCapture(event.pointerId);
-            pointerStart.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+            pointerStart.current = { x: event.clientX, y: event.clientY, fired: false };
+          }}
+          onPointerMove={(event) => {
+            if (!pointerStart.current || pointerStart.current.fired) return;
+            const dx = event.clientX - pointerStart.current.x;
+            const dy = event.clientY - pointerStart.current.y;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < 32) return;
+            pointerStart.current.fired = true;
+            if (Math.abs(dx) > Math.abs(dy)) step(dx > 0 ? "right" : "left");
+            else step(dy > 0 ? "down" : "up");
           }}
           onPointerUp={(event) => {
-            if (pointerStart.current?.id !== event.pointerId) return;
-            const { x, y } = pointerStart.current;
+            if (!pointerStart.current) return;
+            const { x, y, fired } = pointerStart.current;
             pointerStart.current = null;
+            if (fired) return;
             const dx = event.clientX - x;
             const dy = event.clientY - y;
-            if (Math.max(Math.abs(dx), Math.abs(dy)) <= 10) return;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
             if (Math.abs(dx) > Math.abs(dy)) step(dx > 0 ? "right" : "left");
             else step(dy > 0 ? "down" : "up");
           }}
@@ -343,7 +346,6 @@ export default function GroveMerge() {
               {tileNodes.map((node) => (
                 <div
                   key={node.key}
-                  aria-hidden={node.isGhost || undefined}
                   style={
                     {
                       "--row": node.row,
@@ -369,7 +371,24 @@ export default function GroveMerge() {
             </div>
           </div>
 
-          {!world.over && world.won && !world.keepPlaying && (
+          {!started && (
+            <GameOverlay
+              tone="ready"
+              icon={<Sprout size={22} />}
+              title="Grove 2048"
+              subtitle="1:1 classic 2048 gameplay: slide matching Olive Grove stages together until you grow the 2048 Ancient Olive."
+              best={best || null}
+              controlsHint="Swipe directly on the board, tap arrows, or press Arrow keys"
+              actionLabel="Start puzzle"
+              onAction={() => {
+                setStarted(true);
+                gameSfx.tap();
+                requestAnimationFrame(() => boardRef.current?.focus());
+              }}
+            />
+          )}
+
+          {world.won && !world.keepPlaying && (
             <GameOverlay
               tone="won"
               title="Ancient Olive grown!"
@@ -378,10 +397,7 @@ export default function GroveMerge() {
               best={best}
               isNewBest={world.score > previousBest}
               actionLabel="Keep playing"
-              onAction={() => {
-                setWorld((curr) => ({ ...curr, keepPlaying: true }));
-                boardRef.current?.focus();
-              }}
+              onAction={() => setWorld((curr) => ({ ...curr, keepPlaying: true }))}
               secondaryLabel="New grove"
               onSecondary={restart}
             />
@@ -397,6 +413,15 @@ export default function GroveMerge() {
               isNewBest={world.score > 0 && world.score > previousBest}
               actionLabel="Play again"
               onAction={restart}
+              secondaryLabel={previous ? "Undo last" : undefined}
+              onSecondary={
+                previous
+                  ? () => {
+                      setWorld(previous);
+                      setPrevious(null);
+                    }
+                  : undefined
+              }
             />
           )}
         </div>
@@ -424,6 +449,17 @@ export default function GroveMerge() {
             </button>
           </div>
           <div className="crossing-round-actions">
+            <Button
+              variant="quiet"
+              disabled={!previous}
+              onClick={() => {
+                if (!previous) return;
+                setWorld(previous);
+                setPrevious(null);
+              }}
+            >
+              <Undo2 size={16} aria-hidden="true" /> Undo
+            </Button>
             <Button variant="quiet" onClick={restart}>
               <RotateCcw size={16} aria-hidden="true" /> New round
             </Button>
