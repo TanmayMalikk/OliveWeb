@@ -370,27 +370,26 @@ test("PWA manifests use the Little Grove identity and the download page offers t
     page.getByRole("link", { name: /Open the web app/i }),
   ).toHaveAttribute("href", "https://yourolivebranch.ca/account/sign-in");
 });
+const responsivePaths = [
+  "/",
+  "/account",
+  "/account/create",
+  "/admin",
+  "/get",
+  "/cover/daily-digest",
+  "/cover/fitness",
+];
+
 for (const size of [
   { width: 390, height: 844 },
   { width: 768, height: 1024 },
   { width: 1280, height: 800 },
   { width: 1920, height: 1080 },
-])
-  // Inputs: the values in this case. Expected: responsive layouts at ${size.width}×${size.height}.
-  test(`responsive layouts at ${size.width}×${size.height}`, async ({
-    page,
-  }) => {
-    await page.setViewportSize(size);
-    for (const path of [
-      "/",
-      "/account",
-      "/account/create",
-      "/admin",
-      "/get",
-      "/cover/daily-digest",
-      "/cover/fitness",
-    ]) {
-      await page.goto(path);
+]) {
+  for (const path of responsivePaths) {
+    test(`responsive layout for ${path} at ${size.width}×${size.height}`, async ({ page }) => {
+      await page.setViewportSize(size);
+      await page.goto(path, { waitUntil: "domcontentloaded" });
       await expect(page.locator("h1:visible,h2:visible").first()).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
       const overflow = await page.evaluate(
@@ -402,8 +401,9 @@ for (const size of [
           path: `test-results/${size.width}-${path === "/" ? "game" : "account"}.png`,
           fullPage: true,
         });
-    }
-  });
+    });
+  }
+}
 test("Safe Space navigation fits narrow phones through wide desktops", async ({ page }) => {
   const link = await onboard(page);
   await unlock(page, link);
