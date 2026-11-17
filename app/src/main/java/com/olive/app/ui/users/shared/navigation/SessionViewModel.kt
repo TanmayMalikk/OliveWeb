@@ -32,10 +32,14 @@ import com.olive.app.ui.users.user.location.LocationMapController
 
 
 // Android lifecycle adapter. Feature controllers own workflows; screens observe read-only state.
-internal class SessionViewModel(application: Application) : AndroidViewModel(application),
+internal class SessionViewModel @JvmOverloads constructor(
+    application: Application,
+    dataSourcesOverride: com.olive.app.ui.session.SessionDataSources? = null,
+    localMode: Boolean = !com.olive.app.BuildConfig.FIREBASE_CONFIGURED,
+) : AndroidViewModel(application),
     SessionCoverNotesActivityActions,
     SessionAccountManagementActions {
-    override val runtime = SessionRuntime(application, viewModelScope)
+    override val runtime = SessionRuntime(application, viewModelScope, dataSourcesOverride, localMode)
     val emergencyResponses = com.olive.app.ui.session.EmergencyResponseController(application)
     val account = SessionAccountEntry(runtime)
     val messages = SessionMessages(runtime)

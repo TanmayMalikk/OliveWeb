@@ -256,10 +256,11 @@ fun profileChanges(before: UserProfile, after: UserProfile): List<FieldChange> =
 // All account roles: loads and saves Firebase account profiles.
 
 // Real accounts use Firebase Auth, while each user's private profile gets its own Storage file.
-class FirebaseAccountRepository : AccountRepository {
-    private val auth = FirebaseAuth.getInstance()
-    private val storage = FirebaseStorage.getInstance()
-    private val functions = FirebaseFunctions.getInstance("northamerica-northeast1")
+class FirebaseAccountRepository(
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(),
+    private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
+    private val functions: FirebaseFunctions = FirebaseFunctions.getInstance("northamerica-northeast1"),
+) : AccountRepository {
     private val accountSync = AccountSyncRepository()
 
     // Change this path together with firebase/storage.rules and its tests.

@@ -310,6 +310,9 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
             incomingFriendRequests = emptyList(),
             outgoingFriendRequests = emptyList(),
             conversations = emptyList(),
+            privateContactNotes = emptyMap(),
+            archivedConversationIds = emptySet(),
+            restoredClosedConversationIds = emptySet(),
         ) else closed
     }
 }

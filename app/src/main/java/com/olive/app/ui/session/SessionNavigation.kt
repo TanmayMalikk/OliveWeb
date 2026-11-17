@@ -213,8 +213,11 @@ internal class SessionCoverState(private val runtime: SessionRuntime) {
 
 // Users and staff: manages support tickets separately from safety-plan consultations.
 
-internal class StaffSupportController(private val runtime: SessionRuntime) {
-    private val repository by lazy { SupportRepository() }
+internal class StaffSupportController(
+    private val runtime: SessionRuntime,
+    repositoryFactory: () -> SupportRepository = { SupportRepository() },
+) {
+    private val repository by lazy(repositoryFactory)
 
     var requested by mutableStateOf(false)
         private set

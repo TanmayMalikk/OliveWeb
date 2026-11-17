@@ -65,17 +65,29 @@ def watch_results(path):
     return results
 
 
-def device_lines():
+def device_lines(tests):
+    aliases = {}
+    for test in tests:
+        canonical = device_test_key(test)
+        aliases[canonical] = canonical
+        aliases[f'{test.suite}#{test.name}'] = canonical
+        aliases[f'{test.suite.rsplit(".", 1)[-1]}_{test.name}'] = canonical
     rows = defaultdict(dict)
     path = ROOT / 'app/build/reports/coverage/device-test-lines.tsv'
     if path.is_file():
         for row in path.read_text(encoding='utf-8').splitlines():
             test, source, numbers = row.split('\t')
+            canonical = aliases.get(test)
+            if canonical is None:
+                continue
+            results = rows[canonical]
             if source:
-                rows[test][source] = set(map(int, numbers.split(',')))
-            else:
-                rows[test]
+                results.setdefault(source, set()).update(map(int, numbers.split(',')))
     return rows
+
+
+def device_test_key(test):
+    return re.sub(r'[^A-Za-z0-9_.-]', '_', f'{test.suite}#{test.name}')
 
 
 def executable_web_lines():
@@ -196,9 +208,8 @@ def main():
         if args.include_reruns:
             reruns = junit_reports((REPORTS / 'device-regressions').glob('*.xml'))
             results.update({key: row for key, row in reruns.items() if key in results})
-        lines = device_lines()
-        sections.append(render_tests('Phone device tests', results, lambda row: lines.get(
-            re.sub(r'[^A-Za-z0-9_.-]', '_', f'{row.suite}#{row.name}'))))
+        lines = device_lines(results.values())
+        sections.append(render_tests('Phone device tests', results, lambda row: lines.get(device_test_key(row))))
     if args.watch:
         log = REPORTS / ('watch-regression.log' if args.include_reruns else 'device-ui-tests/wear-instrumentation.log')
         results = watch_results(log) or junit_reports([REPORTS / 'device-ui-tests' / f'{WATCH_CLASS}.xml'])

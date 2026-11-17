@@ -60,6 +60,45 @@ class OfflineMediaCacheTest {
     }
 
     @Test
+    fun `replaced device keys and truncated ciphertext invalidate the local copy`() {
+        val root = temporary.newFolder()
+        var deviceId = DEVICE
+        val cache = OfflineMediaCache(FakeJsonVault(), root, currentDeviceId = { deviceId })
+        val document = document("owner-copy", ALICE, ALICE)
+        cache.retainDownloaded(ALICE, document, ciphertext(document))
+        val beforeReplacement = checkNotNull(cache.verifiedCiphertext(ALICE, document))
+        deviceId = "replacement"
+        assertEquals(OfflineMediaAvailability.NOT_CACHED, cache.availability(ALICE, document))
+        assertFalse(beforeReplacement.exists())
+
+        cache.retainDownloaded(ALICE, document, ciphertext(document))
+        val truncated = checkNotNull(cache.verifiedCiphertext(ALICE, document))
+        truncated.writeBytes(byteArrayOf(1, 2))
+        assertEquals(OfflineMediaAvailability.NOT_CACHED, cache.availability(ALICE, document))
+        assertFalse(truncated.exists())
+    }
+
+    @Test
+    fun `expired recent copies need revalidation and changed upload candidates are discarded`() {
+        var clock = 1_000L
+        val cache = cache(clock = { clock })
+        val shared = document("recent-copy", ALICE, BOB)
+        cache.setRecentCachingEnabled(BOB, true)
+        assertTrue(cache.retainRecentDownloaded(BOB, shared, ciphertext(shared)))
+        clock += OfflineMediaCache.SHARED_REVALIDATION_LEASE_MS + 1
+        assertEquals(OfflineMediaAvailability.RECENT_REVALIDATION_REQUIRED, cache.availability(BOB, shared))
+        assertEquals(null, cache.verifiedCiphertext(BOB, shared))
+
+        val uploaded = document("changed-upload", ALICE, ALICE)
+        val upload = ciphertext(uploaded)
+        cache.registerUploadCandidate(ALICE, uploaded.id, upload, uploaded.ciphertextSize, uploaded.ciphertextSha256)
+        upload.writeBytes(ByteArray(uploaded.ciphertextSize.toInt()) { 42 })
+        assertFalse(cache.promoteUploadCandidate(ALICE, uploaded))
+        assertFalse(upload.exists())
+        assertEquals(OfflineMediaAvailability.NOT_CACHED, cache.availability(ALICE, uploaded))
+    }
+
+    @Test
     fun `server reconciliation purges revoked file and refreshes retained lease`() {
         var clock = 1_000L
         val cache = cache(clock = { clock })

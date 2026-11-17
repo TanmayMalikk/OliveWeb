@@ -291,8 +291,9 @@ internal fun FoodSearchPage(
     enabled: Boolean,
     padding: PaddingValues,
     onFoodAdded: (NutritionFood, Float, MealType) -> Unit,
+    foodSource: FoodNutritionDataSource? = null,
 ) {
-    val repository = remember { FoodNutritionRepository() }
+    val repository = remember(foodSource) { foodSource ?: FoodNutritionRepository() }
     val scope = rememberCoroutineScope()
     var query by rememberSaveable { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }

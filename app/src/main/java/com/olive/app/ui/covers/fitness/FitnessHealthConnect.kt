@@ -39,9 +39,17 @@ internal object FitnessHealthConnect {
                 .setInputData(workDataOf("uid" to owner)).build())
     }
 
-    suspend fun read(context: Context, owner: String, background: Boolean = false) = readLock.withLock { withContext(Dispatchers.IO) {
-        if (!FitnessAccountSync.ready.value || fitnessAuthenticatedUid() != owner || !available(context)) return@withContext
-        val client = HealthConnectClient.getOrCreate(context)
+    suspend fun read(
+        context: Context,
+        owner: String,
+        background: Boolean = false,
+        authenticatedUid: () -> String? = ::fitnessAuthenticatedUid,
+        healthProvider: () -> HealthConnectClient? = {
+            if (available(context)) HealthConnectClient.getOrCreate(context) else null
+        },
+    ) = readLock.withLock { withContext(Dispatchers.IO) {
+        if (!FitnessAccountSync.ready.value || authenticatedUid() != owner) return@withContext
+        val client = healthProvider() ?: return@withContext
         val granted = client.permissionController.getGrantedPermissions()
         if (background && HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND !in granted) return@withContext
         if (permissions.none { it in granted }) return@withContext
@@ -80,7 +88,7 @@ internal object FitnessHealthConnect {
             } while (page != null)
         }
         // Reads begun in an old login session cannot be applied to a new session, including A -> B -> A.
-        if (fitnessAuthenticatedUid() != owner || session.getString("sessionId", null) != token) return@withContext
+        if (authenticatedUid() != owner || session.getString("sessionId", null) != token) return@withContext
         FitnessStore(context, owner).recordHealthConnect(steps, samples, today)
         samples.maxOfOrNull { it.recordedAt }?.let { last -> local.edit { putLong("_hc_read_$today", last) } }
     } }
