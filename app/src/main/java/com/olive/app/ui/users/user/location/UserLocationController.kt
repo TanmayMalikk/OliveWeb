@@ -70,6 +70,12 @@ internal class LocationMapController(
     context: Context,
     private val scope: CoroutineScope,
     private val repository: LocationSharingDataSource?,
+    private val requestRoute: (suspend (MapLocationPoint, MapLocationPoint) -> LocationRoute?)? =
+        if (MapboxDirectionsClient.configured) {
+            { origin, target ->
+                MapboxDirectionsClient.drivingRoute(origin.latitude, origin.longitude, target.latitude, target.longitude)
+            }
+        } else null,
 ) {
     private val applicationContext = context.applicationContext
     private var locationJob: Job? = null
@@ -257,7 +263,8 @@ internal class LocationMapController(
         failedMessage: String,
     ) {
         if (state.navigating || state.routeWorking) return
-        if (!MapboxDirectionsClient.configured) {
+        val directions = requestRoute
+        if (directions == null) {
             state = state.copy(routeError = notConfiguredMessage)
             return
         }
@@ -290,12 +297,7 @@ internal class LocationMapController(
                     lastRequestAt = System.currentTimeMillis()
                     state = state.copy(routeWorking = true, routeError = null)
                     runCatching {
-                        MapboxDirectionsClient.drivingRoute(
-                            origin.latitude,
-                            origin.longitude,
-                            target.latitude,
-                            target.longitude,
-                        )
+                        directions(origin, target)
                     }.onSuccess { route ->
                         state = if (route == null) state.copy(
                             routeWorking = false,

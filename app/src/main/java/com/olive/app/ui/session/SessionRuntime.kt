@@ -33,9 +33,9 @@ internal class SessionRuntime(
     val application: Application,
     val scope: CoroutineScope,
     dataSourcesOverride: SessionDataSources? = null,
+    val localMode: Boolean = !BuildConfig.FIREBASE_CONFIGURED,
 ) {
     val state: SessionState = SessionState { canEnterSafe() }
-    val localMode = !BuildConfig.FIREBASE_CONFIGURED
     private val localStorage = SessionLocalStorage(application, localMode)
     val vault get() = localStorage.vault
 

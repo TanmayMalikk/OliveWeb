@@ -41,19 +41,24 @@ internal suspend fun searchSupportRadii(fetch: suspend (Int) -> List<NearbySuppo
 }
 
 internal object NearbySupportServices {
-    suspend fun find(latitude: Double, longitude: Double): NearbySupportResult = withContext(Dispatchers.IO) {
+    suspend fun find(
+        latitude: Double,
+        longitude: Double,
+        accessToken: String = BuildConfig.MAPBOX_ACCESS_TOKEN,
+        openConnection: (URL) -> HttpsURLConnection = { it.openConnection() as HttpsURLConnection },
+    ): NearbySupportResult = withContext(Dispatchers.IO) {
         require(latitude in -90.0..90.0 && longitude in -180.0..180.0)
-        check(BuildConfig.MAPBOX_ACCESS_TOKEN.isNotBlank()) { "Nearby services are not configured." }
+        check(accessToken.isNotBlank()) { "Nearby services are not configured." }
 
         searchSupportRadii { radius ->
-            val parameters = searchParameters(latitude, longitude, radius)
-            val shelters = async { search("category/homeless_shelter", parameters + ("limit" to "25")) }
+            val parameters = searchParameters(latitude, longitude, radius) + ("access_token" to accessToken)
+            val shelters = async { search("category/homeless_shelter", parameters + ("limit" to "25"), openConnection) }
             val support = listOf(
                 "family violence", "domestic violence", "sexual assault centre",
                 "crisis centre", "distress centre", "crisis hotline", "women's shelter",
             ).map { query ->
                 async {
-                    search("forward", parameters + mapOf("q" to query, "limit" to "10", "types" to "poi"))
+                    search("forward", parameters + mapOf("q" to query, "limit" to "10", "types" to "poi"), openConnection)
                         .filter { isNamedSupportService(it.name) }
                 }
             }
@@ -76,20 +81,22 @@ internal object NearbySupportServices {
         val north = latitude + latitudeDelta
         return buildMap {
             put("proximity", "$longitude,$latitude")
-            put("access_token", BuildConfig.MAPBOX_ACCESS_TOKEN)
             if (west >= -180 && east <= 180 && south > -90 && north < 90) {
                 put("bbox", "$west,$south,$east,$north")
             }
         }
     }
 
-    private suspend fun search(endpoint: String, parameters: Map<String, String>): List<NearbySupportService> {
+    private suspend fun search(
+        endpoint: String,
+        parameters: Map<String, String>,
+        openConnection: (URL) -> HttpsURLConnection,
+    ): List<NearbySupportService> {
         currentCoroutineContext().ensureActive()
         val query = parameters.entries.joinToString("&") { (key, value) ->
             "$key=${URLEncoder.encode(value, Charsets.UTF_8.name())}"
         }
-        val connection = URL("https://api.mapbox.com/search/searchbox/v1/$endpoint?$query")
-            .openConnection() as HttpsURLConnection
+        val connection = openConnection(URL("https://api.mapbox.com/search/searchbox/v1/$endpoint?$query"))
         return try {
             connection.connectTimeout = 8_000
             connection.readTimeout = 8_000

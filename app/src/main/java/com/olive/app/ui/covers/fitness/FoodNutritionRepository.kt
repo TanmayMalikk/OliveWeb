@@ -16,6 +16,12 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
+internal interface FoodNutritionDataSource {
+    suspend fun search(query: String, page: Int): FoodSearchResult
+    suspend fun suggestions(query: String): List<String>
+    suspend fun lookupBarcode(barcode: String): FoodSearchResult
+}
+
 internal class FoodNutritionRepository(
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -24,11 +30,15 @@ internal class FoodNutritionRepository(
     functions: () -> FirebaseFunctions = {
         FirebaseFunctions.getInstance("northamerica-northeast1")
     },
-) {
+) : FoodNutritionDataSource {
     // Manual entry and scanning can open before Firebase is available.
     private val remoteFunctions by lazy(functions)
     // Both sources are independent. A failure in one source does not hide results from the other.
-    suspend fun search(query: String, page: Int = 0, foodType: String = ""): FoodSearchResult = coroutineScope {
+    suspend fun search(query: String): FoodSearchResult = search(query, 0)
+
+    override suspend fun search(query: String, page: Int): FoodSearchResult = search(query, page, "")
+
+    suspend fun search(query: String, page: Int = 0, foodType: String): FoodSearchResult = coroutineScope {
         val cleanQuery = query.trim().take(80)
         if (cleanQuery.length < 2) return@coroutineScope FoodSearchResult()
 
@@ -61,14 +71,14 @@ internal class FoodNutritionRepository(
         )
     }
 
-    suspend fun suggestions(query: String): List<String> {
+    override suspend fun suggestions(query: String): List<String> {
         val response = remoteFunctions.getHttpsCallable("nutritionFoodSearch")
             .call(mapOf("query" to query.trim().take(80), "action" to "suggest")).await()
             .data as? Map<*, *> ?: return emptyList()
         return (response["suggestions"] as? List<*>).orEmpty().filterIsInstance<String>().take(4)
     }
 
-    suspend fun lookupBarcode(barcode: String): FoodSearchResult = try {
+    override suspend fun lookupBarcode(barcode: String): FoodSearchResult = try {
         fatSecret(mapOf("barcode" to barcode.trim()))
     } catch (error: kotlinx.coroutines.CancellationException) {
         throw error

@@ -25,6 +25,8 @@ import org.junit.Before
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import org.junit.Rule
 import org.junit.Test
 
@@ -96,5 +98,33 @@ class WatchFitnessAccessibilityTest {
             composeRule.waitForIdle()
             composeRule.onNodeWithText(label).assertIsDisplayed().assertIsSelected()
         }
+    }
+
+    @Test
+    fun foodShowsSyncedCaloriesAndMacrosOnTheWatch() {
+        composeRule.setContent {
+            OliveWatchFitnessApp(WatchFitnessState(calories = 600f, protein = 32f,
+                carbohydrates = 80f, fat = 20f, phoneConnected = true))
+        }
+        composeRule.onNodeWithText("Food").assertIsDisplayed().performClick().assertIsSelected()
+        composeRule.onNodeWithText("600 kcal").assertIsDisplayed()
+        composeRule.onNodeWithText("Goal 2000").assertIsDisplayed()
+        composeRule.onNodeWithText("Protein").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Synced").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun movementWorkoutStartsAndFinishesWithoutLosingItsStepTotal() {
+        val snapshot = mutableStateOf(WatchFitnessState(watchSteps = 100, heartRate = 78))
+        composeRule.setContent { OliveWatchFitnessApp(snapshot.value) }
+        composeRule.onNodeWithText("Move").assertIsDisplayed().performClick().assertIsSelected()
+        val summary = composeRule.onNodeWithContentDescription("Move fitness summary")
+        summary.performTouchInput { swipeUp() }
+        composeRule.onNodeWithText("Start").performScrollTo().performClick()
+        composeRule.runOnIdle { snapshot.value = snapshot.value.copy(watchSteps = 125) }
+        composeRule.onNodeWithText("25").assertExists()
+        composeRule.onNodeWithText("Finish").performScrollTo().performClick()
+        composeRule.onNodeWithText("Start").assertIsDisplayed()
+        composeRule.onNodeWithText("25").assertExists()
     }
 }

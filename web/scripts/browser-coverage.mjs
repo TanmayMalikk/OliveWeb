@@ -18,8 +18,11 @@ if (!process.argv.includes("--merge-only")) {
 const unitReport = path.join(root, "coverage/coverage-final.json");
 if (!fs.existsSync(unitReport)) throw new Error("Run npm run test:coverage before browser coverage");
 const coverage = istanbul.createCoverageMap(JSON.parse(fs.readFileSync(unitReport, "utf8")));
-const browserReports = fs.readdirSync(directory).filter(file => file.endsWith(".json"));
-if (!browserReports.length) throw new Error("Browser tests did not produce coverage");
+const browserReports = fs.readdirSync(directory)
+  .filter(file => file.endsWith(".meta"))
+  .filter(file => JSON.parse(fs.readFileSync(path.join(directory, file), "utf8")).status === "passed")
+  .map(file => file.slice(0, -5) + ".json");
+if (!browserReports.length) throw new Error("Passing browser tests did not produce coverage");
 for (const file of browserReports) {
   const browser = istanbul.createCoverageMap(JSON.parse(fs.readFileSync(path.join(directory, file), "utf8")));
   for (const source of browser.files()) {

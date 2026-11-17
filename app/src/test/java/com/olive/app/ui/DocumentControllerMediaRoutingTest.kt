@@ -232,6 +232,45 @@ class DocumentControllerMediaRoutingTest {
         assertTrue(controller.state.evidenceUpdates.isEmpty())
     }
 
+    @Test
+    fun `pending evidence stays visible through stale snapshots and rolls back after a denied write`() {
+        val original = document(objectKey = "encrypted/document")
+        val response = CompletableDeferred<Unit>()
+        val repository = FakeDocumentRepository(original, File(context.cacheDir, "legacy"), response)
+        val controller = SafetyDocumentsController(context, scope, repository, null)
+        controller.load("owner", "owner_name", false)
+
+        controller.setEvidence(original, "owner", true)
+        assertTrue(controller.state.files.single().evidence)
+        assertEquals(setOf(original.id), controller.state.evidenceUpdates)
+        repository.publish()
+        assertTrue(controller.state.files.single().evidence)
+        response.completeExceptionally(IllegalStateException("Write denied"))
+        assertFalse(controller.state.files.single().evidence)
+        assertTrue(controller.state.evidenceUpdates.isEmpty())
+        assertEquals("Write denied", controller.state.error)
+    }
+
+    @Test
+    fun `late document snapshots and failures cannot replace another account's state`() {
+        val original = document(objectKey = "encrypted/document")
+        val repository = FakeDocumentRepository(original, File(context.cacheDir, "legacy"))
+        val controller = SafetyDocumentsController(context, scope, repository, null)
+        controller.load("owner", "owner_name", false)
+        assertEquals(listOf(original), controller.state.files)
+        val lateSnapshot = repository.snapshotListener
+        val lateError = repository.errorListener
+        controller.prepare("different-account")
+
+        lateSnapshot?.invoke(DocumentListSnapshot(listOf(original), DocumentListSource.SERVER, 2))
+        lateError?.invoke("Old account lacks access")
+
+        assertEquals(1, repository.closedSubscriptions)
+        assertEquals("different-account", controller.state.ownerUid)
+        assertTrue(controller.state.files.isEmpty())
+        assertEquals(null, controller.state.error)
+    }
+
     // Builds a sample document for this test.
     private fun document(objectKey: String) = SafetyDocument(
         id = "document-id",
@@ -246,10 +285,21 @@ class DocumentControllerMediaRoutingTest {
     private class FakeDocumentRepository(
         document: SafetyDocument,
         private val file: File,
+        private val evidenceResponse: CompletableDeferred<Unit>? = null,
     ) : SafetyDocumentDataSource {
         var document = document
             private set
         var downloadCalled = false
+        var closedSubscriptions = 0
+            private set
+        var snapshotListener: ((DocumentListSnapshot) -> Unit)? = null
+            private set
+        var errorListener: ((String) -> Unit)? = null
+            private set
+
+        fun publish() {
+            snapshotListener?.invoke(DocumentListSnapshot(listOf(document), DocumentListSource.SERVER, 1))
+        }
 
         // Checks the list for step with the test's sample data.
         override suspend fun listFor(uid: String) =
@@ -260,8 +310,10 @@ class DocumentControllerMediaRoutingTest {
             onUpdate: (DocumentListSnapshot) -> Unit,
             onError: (String) -> Unit,
         ): ChatSubscription {
-            onUpdate(DocumentListSnapshot(listOf(document), DocumentListSource.SERVER, 1))
-            return ChatSubscription {}
+            snapshotListener = onUpdate
+            errorListener = onError
+            publish()
+            return ChatSubscription { closedSubscriptions++ }
         }
         // Checks the get for step with the test's sample data.
         override suspend fun getFor(uid: String, id: String) = document
@@ -275,6 +327,7 @@ class DocumentControllerMediaRoutingTest {
             ownerUid: String,
             evidence: Boolean,
         ) {
+            evidenceResponse?.await()
             this.document = this.document.copy(evidence = evidence)
         }
         // Checks the download step with the test's sample data.

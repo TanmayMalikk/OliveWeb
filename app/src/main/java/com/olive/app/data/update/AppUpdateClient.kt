@@ -7,10 +7,14 @@ import com.olive.app.BuildConfig
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URL
 import java.security.MessageDigest
 
 // Downloads and verifies signed release updates before Android can install them.
-internal class AppUpdateClient(private val context: Context) {
+internal class AppUpdateClient(
+    private val context: Context,
+    private val openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection },
+) {
     // Reads the current release description without accepting redirects to an unrelated host.
     fun fetchLatest(): AppReleaseManifest {
         val connection = openHttps(BuildConfig.UPDATE_MANIFEST_URL)
@@ -85,7 +89,7 @@ internal class AppUpdateClient(private val context: Context) {
     private fun openHttps(url: String): HttpURLConnection {
         val uri = URI(url)
         check(uri.scheme == "https") { "Only HTTPS update endpoints are permitted" }
-        return (uri.toURL().openConnection() as HttpURLConnection).apply {
+        return openConnection(uri.toURL()).apply {
             connectTimeout = CONNECT_TIMEOUT_MS
             readTimeout = READ_TIMEOUT_MS
             instanceFollowRedirects = false

@@ -54,6 +54,11 @@ internal class SafetyDocumentsController(
     private val failureMessageResolver: (Throwable) -> String = {
         context.getString(mediaFailureResource(it))
     },
+    private val emergencyFunctions: () -> com.google.firebase.functions.FirebaseFunctions = {
+        com.google.firebase.functions.FirebaseFunctions.getInstance("northamerica-northeast1")
+    },
+    private val renderEmergencyReport: (Context, UserProfile, List<PrivateEntry>,
+        EmergencyReportLocation?, Map<String, EmergencyReportMedia>) -> File = EmergencyReportPdf::create,
 ) {
     private val applicationContext = context.applicationContext
     private var generation = 0
@@ -326,8 +331,7 @@ internal class SafetyDocumentsController(
                         applicationContext.getString(R.string.emergency_report_device_verification_failed), error,
                     )
                 }
-                com.google.firebase.functions.FirebaseFunctions.getInstance("northamerica-northeast1")
-                    .getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
+                emergencyFunctions().getHttpsCallable("emergencyStart").call(mapOf("id" to emergencyId)).await()
                 val pressedLocation = location()
                 check(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid == ownerUid && token == generation) {
                     "The account changed. Try again."
@@ -346,7 +350,7 @@ internal class SafetyDocumentsController(
                     files[document.id] = EmergencyReportMedia(document, file)
                 }
                 withContext(Dispatchers.IO) {
-                    EmergencyReportPdf.create(applicationContext, profile, incidents, pressedLocation, files)
+                    renderEmergencyReport(applicationContext, profile, incidents, pressedLocation, files)
                 }
             }
             result.onFailure { error ->

@@ -13,7 +13,6 @@ import kotlin.time.Duration.Companion.seconds
 import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.account.AccountRole
 import com.olive.app.data.messaging.Friend
-import com.olive.app.data.messaging.MessagingRepository
 import com.olive.app.data.network.hasValidatedInternetConnection
 import com.olive.app.data.safety.SAFETY_FIELD_KEYS
 import com.olive.app.data.safety.SafetyAccessIndexStore
@@ -41,11 +40,14 @@ import android.os.SystemClock
 
 
 // Private presentation state is cleared on exit; captured local writes finish without reopening a private screen.
-internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
+internal class SessionSafetyPlans(
+    private val runtime: SessionRuntime,
+    repositoryFactory: () -> SafetyPlanRepository = { SafetyPlanRepository() },
+) {
     private val safetyWriterId = UUID.randomUUID().toString()
     private val store = SafetyPlanStore(runtime.application, runtime.localMode)
     private val accessIndex = SafetyAccessIndexStore(runtime.application)
-    private val repository by lazy { SafetyPlanRepository() }
+    private val repository by lazy(repositoryFactory)
     private val writes = Mutex()
     private val sync = Mutex()
     private var activeOwner: String? = null
@@ -141,6 +143,8 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         if (screenLease == null) {
             loadingAccess = true
             consultations = emptyList()
+            sharedPlans = emptyList()
+            available = true
             accessListener?.remove()
             accessListener = null
             accessActor = null
@@ -347,7 +351,7 @@ internal class SessionSafetyPlans(private val runtime: SessionRuntime) {
         val token = generation
         runtime.scope.launch {
             try {
-                val conversation = MessagingRepository().listConversations(actor).firstOrNull { it.id == conversationId }
+                val conversation = runtime.messagingRepository?.listConversations(actor)?.firstOrNull { it.id == conversationId }
                     ?: return@launch
                 if (!current(actor, actor, token)) return@launch
                 runtime.navigation.navigate(SafePage.Messages)

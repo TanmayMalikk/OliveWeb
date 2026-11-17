@@ -501,8 +501,8 @@ private fun readDocx(file: File): String {
         val text = StringBuilder()
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT && text.length < 500_000) {
-            if (event == XmlPullParser.START_TAG && parser.name.endsWith("t")) text.append(parser.nextText())
-            else if (event == XmlPullParser.END_TAG && parser.name.endsWith("p")) text.append('\n')
+            if (event == XmlPullParser.START_TAG && parser.name.substringAfterLast(':') == "t") text.append(parser.nextText())
+            else if (event == XmlPullParser.END_TAG && parser.name.substringAfterLast(':') == "p") text.append('\n')
             event = parser.next()
         }
         return text.toString().trim()

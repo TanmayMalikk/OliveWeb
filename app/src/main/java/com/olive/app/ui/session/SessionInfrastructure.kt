@@ -14,6 +14,7 @@ import com.olive.app.data.account.LocalAccountRepository
 import com.olive.app.data.account.TriggerEvent
 import com.olive.app.data.cover.CoverStateStore
 import com.olive.app.data.location.AdminLocationRepository
+import com.olive.app.data.location.LocationSharingDataSource
 import com.olive.app.data.location.LocationSharingRepository
 import com.olive.app.data.media.MediaRepository
 import com.olive.app.data.media.MediaTicketDataSource
@@ -72,7 +73,7 @@ internal class SessionDataSources(
     val secureDocument: SecureDocumentRepository?,
     val media: MediaTicketDataSource?,
     val safetyDocuments: SafetyDocumentDataSource?,
-    val locations: LocationSharingRepository?,
+    val locations: LocationSharingDataSource?,
     val adminLocations: AdminLocationRepository?,
 ) {
     companion object {
