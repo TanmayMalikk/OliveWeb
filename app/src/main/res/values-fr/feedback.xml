@@ -49,7 +49,7 @@
     <string name="dob_pick_day">Choisissez un jour</string>
     <string name="dob_clear">Effacer la date de naissance</string>
     <string name="location_background_access">Activer la localisation en arrière-plan</string>
-    <string name="location_background_settings">La localisation en arrière-plan actualise la carte d’administration lorsque l’application est fermée. Dans les paramètres Android, choisissez %1$s, puis revenez ici.</string>
+    <string name="location_background_settings">Sur l’écran d’autorisation Android suivant, choisissez %1$s, puis revenez à Olive. Android exige ce réglage pour actualiser la position en arrière-plan.</string>
     <string name="location_background_dialog">La localisation en arrière-plan actualise la carte d’administration lorsque l’application est fermée. Choisissez Toujours autoriser dans la fenêtre Android.</string>
     <string name="chat_dms_tab">Messages directs</string>
     <string name="chat_tickets_tab">Discussions de tickets</string>

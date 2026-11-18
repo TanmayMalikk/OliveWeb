@@ -21,6 +21,7 @@ import {
 } from "../../../domain/DomainModels";
 import { useSession } from "../../../session/SessionProvider";
 import { accounts, triggerHash } from "../../../services/AccountService";
+import { InviteCodeEntry } from "../safe_app/FriendInviteControls";
 // Shows the sign-in or registration form for the selected account role.
 export function AuthPage({
   organizationOnly = false,
@@ -307,6 +308,7 @@ export function Setup() {
               : "Use your personal link or the olive in Little Grove’s Account tab to reach your browser PIN."}
           </p>
         </div>
+        {step === 1 && ["USER", "SAFE_CONTACT"].includes(identity.role) && <InviteCodeEntry />}
         {step === 1 ? (
           <Form
             className="setup-form"

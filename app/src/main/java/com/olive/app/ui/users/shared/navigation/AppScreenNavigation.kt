@@ -432,6 +432,22 @@ internal fun OliveRoot(
                 )
             }
         }
+        if (isCover && !navigation.privacyBlackout && session.coverEmergencyConfirmation?.first == session.coverAccountId &&
+            session.coverEmergencyConfirmation != null) {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 24.dp)
+                    .widthIn(min = 160.dp, max = 280.dp).testTag("cover_emergency_done"),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shadowElevation = 4.dp,
+            ) {
+                Text(stringResource(R.string.friend_invite_done),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+        }
         if (navigation.privacyBlackout) Box(
             Modifier.fillMaxSize().background(Color.Black)
                 .clickable(

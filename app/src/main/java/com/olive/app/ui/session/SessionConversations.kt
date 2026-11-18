@@ -520,29 +520,35 @@ internal class SessionConversations(private val runtime: SessionRuntime) {
     }
 
     // Keeps the private note on this device for the signed-in session.
-    fun appendPrivateNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) {
+    fun savePrivateNote(target: DirectoryUser, text: String, onSaved: () -> Unit = {}) {
         with(runtime) {
             val uid = enrollment?.uid ?: return
-            if (target.uid == uid || text.isBlank() || text.length > 2_000) return
+            if (target.uid == uid || text.length > 20_000 || state.messagingBusy) return
             val organizationAccount = state.profile?.role in setOf(AccountRole.STAFF, AccountRole.ADMIN)
             if (!organizationAccount && state.friends.none { it.uid == target.uid }) {
                 state.message = runtime.application.getString(R.string.private_note_friends_only)
                 return
             }
+            val noteEpoch = epoch
             state.messagingBusy = true
             scope.launch {
-                // Use the fallback when append private note is unavailable.
+                // Replace only this owner's note for this person.
                 try {
-                    withContext(Dispatchers.IO) {
-                        store.appendPrivateContactNote(uid, target.uid, target.username, text)
+                    val notes = withContext(Dispatchers.IO) {
+                        store.savePrivateContactNote(uid, target.uid, target.username, text)
                         store.privateContactNotes(uid)
-                    }.also { state.privateContactNotes = it }
-                    onSaved()
+                    }
+                    if (enrollment?.uid == uid && epoch == noteEpoch) {
+                        state.privateContactNotes = notes
+                        onSaved()
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (error: Exception) {
-                    state.message = error.localizedMessage
+                    if (enrollment?.uid == uid && epoch == noteEpoch) state.message = error.localizedMessage
                         ?: runtime.application.getString(R.string.unable_to_save_private_contact_note)
                 } finally {
-                    state.messagingBusy = false
+                    if (enrollment?.uid == uid && epoch == noteEpoch) state.messagingBusy = false
                 }
             }
         }

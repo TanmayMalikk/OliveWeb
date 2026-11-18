@@ -9,7 +9,6 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.biometric.BiometricManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,6 +48,7 @@ import com.olive.app.data.update.installUpdatesPermissionIntent
 import com.olive.app.ui.covers.fitness.FitnessHealthConnect
 import com.olive.app.ui.shared.AccessibleMessage
 import com.olive.app.ui.users.user.account.SettingsSection
+import com.olive.app.ui.users.user.location.BackgroundLocationPermissionDialog
 import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -62,7 +62,6 @@ private enum class PermissionFeature(val title: Int, val reason: Int, val runtim
     Notifications(R.string.app_permissions_notifications, R.string.app_permissions_notifications_why,
         if (Build.VERSION.SDK_INT >= 33) listOf(Manifest.permission.POST_NOTIFICATIONS) else emptyList()),
     IncomingCalls(R.string.app_permissions_incoming_calls, R.string.app_permissions_incoming_calls_why),
-    Biometrics(R.string.app_permissions_biometrics, R.string.app_permissions_biometrics_why),
     Activity(R.string.app_permissions_activity, R.string.app_permissions_activity_why, if (Build.VERSION.SDK_INT >= 29) listOf(Manifest.permission.ACTIVITY_RECOGNITION) else emptyList()),
     Health(R.string.app_permissions_health, R.string.app_permissions_health_why),
 }
@@ -106,6 +105,7 @@ internal fun SafePermissionsSettings() {
     val packageUri = "package:${context.packageName}".toUri()
     var resumed by remember { mutableIntStateOf(0) }
     var feedback by remember { mutableStateOf<Int?>(null) }
+    var backgroundPrompt by remember { mutableStateOf(false) }
     LifecycleResumeEffect(context) {
         resumed++
         onPauseOrDispose {}
@@ -141,13 +141,6 @@ internal fun SafePermissionsSettings() {
             else permissionStatus(granted(Manifest.permission.ACTIVITY_RECOGNITION))
         PermissionFeature.IncomingCalls -> if (Build.VERSION.SDK_INT < 34) PermissionStatus.Automatic
             else permissionStatus(context.getSystemService(NotificationManager::class.java).canUseFullScreenIntent())
-        PermissionFeature.Biometrics -> when (BiometricManager.from(context).canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_WEAK,
-        )) {
-            BiometricManager.BIOMETRIC_SUCCESS -> PermissionStatus.Allowed
-            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> PermissionStatus.Denied
-            else -> PermissionStatus.Unavailable
-        }
         PermissionFeature.Health -> health?.status ?: PermissionStatus.Checking
         else -> permissionStatus(feature.runtime.all(::granted))
     }
@@ -170,17 +163,14 @@ internal fun SafePermissionsSettings() {
             }
         }
         return when (feature) {
-            PermissionFeature.BackgroundLocation -> requestBackground?.let { request ->
-                PermissionAction(R.string.app_permissions_allow_short, R.string.app_permissions_request) { scope.launch { request() } }
+            PermissionFeature.BackgroundLocation -> requestBackground?.let {
+                PermissionAction(R.string.app_permissions_allow_short, R.string.app_permissions_request) { backgroundPrompt = true }
             }
             PermissionFeature.IncomingCalls -> if (Build.VERSION.SDK_INT >= 34 && status == PermissionStatus.Denied) {
                 PermissionAction(R.string.app_permissions_manage_short, R.string.app_permissions_manage) {
                     open(Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, packageUri))
                 }
             } else null
-            PermissionFeature.Biometrics -> PermissionAction(R.string.app_permissions_manage_short, R.string.app_permissions_manage) {
-                open(Intent(if (Build.VERSION.SDK_INT >= 30) Settings.ACTION_BIOMETRIC_ENROLL else Settings.ACTION_SECURITY_SETTINGS))
-            }
             PermissionFeature.Health -> health?.missing?.takeIf { it.isNotEmpty() }?.let { missing ->
                 PermissionAction(R.string.app_permissions_manage_short, R.string.app_permissions_manage) {
                     feedback = if (actions.requestHealth(missing)) null else R.string.app_permissions_settings_unavailable
@@ -198,9 +188,20 @@ internal fun SafePermissionsSettings() {
             modifier = Modifier.fillMaxWidth().testTag("settings_install_permission"),
         ) { Text(stringResource(R.string.app_permissions_manage_install)) }
     }
+    if (backgroundPrompt) BackgroundLocationPermissionDialog(
+        onDismiss = { backgroundPrompt = false },
+        onContinue = { backgroundPrompt = false; scope.launch { requestBackground?.invoke() } },
+    )
     feedback?.let { AccessibleMessage(stringResource(it)) }
     SettingsSection(stringResource(R.string.app_permissions_features)) {
-        PermissionFeature.entries.forEachIndexed { index, entry ->
+        PermissionFeature.entries.filter { entry ->
+            when (entry) {
+                PermissionFeature.BackgroundLocation, PermissionFeature.Activity -> Build.VERSION.SDK_INT >= 29
+                PermissionFeature.IncomingCalls -> Build.VERSION.SDK_INT >= 34
+                PermissionFeature.Health -> health?.status != PermissionStatus.Unavailable
+                else -> true
+            }
+        }.forEachIndexed { index, entry ->
             if (index > 0) HorizontalDivider()
             val status = remember(entry, resumed, actions.revision, health) { status(entry) }
             PermissionExplanation(entry.title, entry.reason, status, permissionAction(entry, status), id = entry.name)

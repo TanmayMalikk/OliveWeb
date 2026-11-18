@@ -179,7 +179,7 @@ private fun MessagingSidebar(
     }
     var conversationActions by remember { mutableStateOf<ChatConversation?>(null) }
     var noteTargets by remember { mutableStateOf<List<DirectoryUser>?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
+
     var reconnectPassword by rememberSaveable { mutableStateOf("") }
     var friendsExpanded by rememberSaveable { mutableStateOf(false) }
     var pendingExpanded by rememberSaveable { mutableStateOf(false) }
@@ -308,25 +308,7 @@ private fun MessagingSidebar(
             }
         }
         if (!organizationAccount && !ticketChats && !showingArchived) item {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    query,
-                    { if (it.length <= 24) query = it },
-                    label = { Text(stringResource(R.string.username)) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f).testTag("message_username")
-                        .keepVisibleWhileTyping()
-                )
-                Button(
-                    onClick = { session.messages.searchUsers(query) },
-                    enabled = query.isNotBlank() && !session.messages.busy && !session.localMode && !session.messages.needsReconnect,
-                    modifier = Modifier.testTag("search_users")
-                ) { Text(stringResource(R.string.search)) }
-            }
+            FriendInviteControls(session)
         }
         if (session.messages.loadingIndex) item {
             val layout = if (organizationAccount || ticketChats) SkeletonLayout.TicketList else SkeletonLayout.ChatList
@@ -577,7 +559,8 @@ internal fun PrivateContactNoteDialog(
     onDismiss: () -> Unit,
 ) {
     var selected by remember(targets) { mutableStateOf(targets.singleOrNull()) }
-    var addition by remember(selected?.uid) { mutableStateOf("") }
+    val existingBody = session.messages.privateContactNotes[selected?.uid]?.body.orEmpty()
+    var body by remember(selected?.uid) { mutableStateOf(existingBody) }
     val target = selected
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -598,18 +581,10 @@ internal fun PrivateContactNoteDialog(
                     }
                 } else {
                     Text(target.username, style = MaterialTheme.typography.titleMedium)
-                    session.messages.privateContactNotes[target.uid]?.body?.let { existing ->
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = MaterialTheme.shapes.medium,
-                        ) {
-                            Text(existing, Modifier.fillMaxWidth().padding(12.dp))
-                        }
-                    }
                     OutlinedTextField(
-                        value = addition,
-                        onValueChange = { addition = it.take(2_000) },
-                        label = { Text(stringResource(R.string.add_to_private_note)) },
+                        value = body,
+                        onValueChange = { body = it.take(20_000) },
+                        label = { Text(stringResource(R.string.private_note)) },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth().testTag("private_contact_note_text"),
                     )
@@ -618,10 +593,10 @@ internal fun PrivateContactNoteDialog(
         },
         confirmButton = {
             if (target != null) Button(
-                onClick = { session.messages.appendPrivateContactNote(target, addition, onDismiss) },
-                enabled = addition.isNotBlank() && !session.messages.busy,
+                onClick = { session.messages.savePrivateContactNote(target, body, onDismiss) },
+                enabled = body.trim() != existingBody && !session.messages.busy,
                 modifier = Modifier.testTag("save_private_contact_note"),
-            ) { Text(stringResource(R.string.append_note)) }
+            ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
             TextButton(onClick = if (target != null && targets.size > 1) {

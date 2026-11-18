@@ -68,6 +68,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
     var editing by remember { mutableStateOf<String?>(null) }
     var name by remember { mutableStateOf("") }
     var details by remember { mutableStateOf("") }
+    var relationship by remember { mutableStateOf("") }
     var linkedUid by remember { mutableStateOf("") }
     FormColumn {
         IconButton(onClick = session.navigation::back, modifier = Modifier.testTag("trusted_contacts_back")) {
@@ -104,6 +105,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                         Column(Modifier.weight(1f)) {
                             Text(contact.name, style = MaterialTheme.typography.titleMedium)
                             Text(contact.details)
+                            if (contact.relationship.isNotBlank()) Text(contact.relationship, color = Muted)
                             if (contact.safeToStay) Text(
                                 stringResource(R.string.safe_to_stay), color = OliveGreen,
                                 style = MaterialTheme.typography.labelLarge
@@ -151,6 +153,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                             details =
                                 contact.details
                             linkedUid = contact.linkedUid
+                            relationship = contact.relationship
                         }, enabled = !session.busy) { Text(stringResource(R.string.edit)) }
                         TextButton(onClick = {
                             session.recordSettingsInteraction(
@@ -163,6 +166,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                                 editing = null
                                 name = ""
                                 details = ""
+                                relationship = ""
                                 linkedUid = ""
                             }
                         }, enabled = !session.busy) { Text(stringResource(R.string.remove)) }
@@ -200,6 +204,8 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                     "Focused contact details"
                 )
             }) { details = it.take(200) }
+        Field(uiText(R.string.contact_relationship), relationship, "contact_relationship",
+            enabled = !session.busy) { relationship = it.take(120) }
         TrustedContactLinkPicker(
             session.messages.friends, linkedUid,
             profile.contacts.filterNot { it.id == editing }
@@ -220,12 +226,14 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
                         name.trim(),
                         details.trim(),
                         profile.contacts.firstOrNull { it.id == editing }?.safeToStay ?: false,
-                        linkedUid
+                        linkedUid,
+                        relationship.trim()
                     )
                     session.saveContacts(if (editing == null) profile.contacts + contact else profile.contacts.map { if (it.id == editing) contact else it })
                     editing = null
                     name = ""
                     details = ""
+                    relationship = ""
                     linkedUid = ""
                 }
             },
@@ -236,6 +244,7 @@ internal fun ContactEditor(session: SessionViewModel, profile: UserProfile) {
             editing = null
             name = ""
             details = ""
+            relationship = ""
             linkedUid = ""
         }) { Text(stringResource(R.string.cancel_edit)) }
     }

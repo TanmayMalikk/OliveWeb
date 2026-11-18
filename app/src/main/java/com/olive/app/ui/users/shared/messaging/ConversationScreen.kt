@@ -20,6 +20,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -104,6 +106,7 @@ internal fun ChatPane(
     var showAttachmentPicker by rememberSaveable(active.id) { mutableStateOf(false) }
     var showChatInfo by rememberSaveable(active.id) { mutableStateOf(false) }
     var openedMedia by remember { mutableStateOf<Pair<SafetyDocument, File>?>(null) }
+    val chatHeaderFocus = rememberEntryFocus(active.id, ready = !session.messages.loadingConversation)
     val listState = rememberLazyListState()
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     val keyboardVisible = imeBottom > 0
@@ -217,7 +220,7 @@ internal fun ChatPane(
                     )
                 }
                 Column(
-                    Modifier.weight(1f).clickable { showChatInfo = true }
+                    Modifier.weight(1f).focusProperties { canFocus = true }.focusRequester(chatHeaderFocus).clickable { showChatInfo = true }
                         .testTag("open_chat_info")
                         .semantics { contentDescription = uiText(R.string.chat_open_info) },
                     verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -329,7 +332,7 @@ internal fun ChatPane(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (session.messages.loadingConversation) {
-                        item { LoadingSkeleton(SkeletonLayout.Conversation, rows = 3) }
+                        item { LoadingSkeleton(SkeletonLayout.Conversation, modifier = Modifier.fillMaxWidth().clearAndSetSemantics { }, rows = 3) }
                         return@LazyColumn
                     }
                     if (timeline.isEmpty() && session.message == null) item {

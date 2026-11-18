@@ -73,4 +73,16 @@ class UserProfileEdgeCaseTest {
         assertEquals(CoverType.FITNESS, restored.coverType)
         assertEquals(AccountRole.USER, restored.role)
     }
+    @Test
+    fun relationshipsRoundTripAndOlderContactsDefaultToEmpty() {
+        val oldContact = JSONObject().put("id", "friend").put("name", "Friend")
+            .put("details", "Any contact instructions").put("safeToStay", true).put("linkedUid", "friend-uid")
+        val old = UserProfile.fromJson(JSONObject().put("username", "owner")
+            .put("contacts", org.json.JSONArray().put(oldContact)))
+        assertEquals("", old.contacts.single().relationship)
+        val updated = old.copy(contacts = old.contacts.map { it.copy(relationship = "Sibling") })
+        assertEquals(updated, UserProfile.fromJson(updated.toJson()))
+        assertTrue(updated.contacts.single().safeToStay)
+        assertEquals("friend-uid", updated.contacts.single().linkedUid)
+    }
 }

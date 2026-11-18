@@ -87,15 +87,18 @@ class SessionMessagingActionsTest {
             fixture.await { runtime.store.archivedConversationIds("owner").isEmpty() }
 
             val target = DirectoryUser("trusted", "Trusted fixture")
-            runtime.conversationActions.appendPrivateNote(target, "Denied")
+            runtime.conversationActions.savePrivateNote(target, "Denied")
             assertTrue(runtime.state.privateContactNotes.isEmpty())
             runtime.state.friends = listOf(Friend("pair", "trusted", "Trusted fixture"))
-            runtime.conversationActions.appendPrivateNote(target, "First observation")
+            runtime.conversationActions.savePrivateNote(target, "First observation")
             fixture.await { !runtime.state.messagingBusy }
-            runtime.conversationActions.appendPrivateNote(target, "Second observation")
+            runtime.conversationActions.savePrivateNote(target, "Second observation")
             fixture.await { !runtime.state.messagingBusy }
-            assertTrue(runtime.state.privateContactNotes.getValue("trusted").body.contains("First observation"))
-            assertTrue(runtime.state.privateContactNotes.getValue("trusted").body.contains("Second observation"))
+            assertEquals("Second observation", runtime.state.privateContactNotes.getValue("trusted").body)
+            runtime.conversationActions.savePrivateNote(target, "")
+            fixture.await { !runtime.state.messagingBusy }
+            assertFalse(runtime.state.privateContactNotes.containsKey("trusted"))
+            assertFalse(runtime.store.privateContactNotes("owner").containsKey("trusted"))
             runtime.enrollment = DeviceEnrollment("different-owner", "")
             assertTrue(runtime.state.privateContactNotes.isEmpty())
             assertTrue(runtime.store.privateContactNotes("different-owner").isEmpty())

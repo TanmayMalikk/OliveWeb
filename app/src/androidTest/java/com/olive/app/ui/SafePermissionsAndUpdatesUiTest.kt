@@ -29,6 +29,7 @@ import com.olive.app.data.update.AppUpdateStore
 import com.olive.app.data.update.AppUpdateInstallerActivity
 import com.olive.app.ui.shared.OliveTheme
 import com.olive.app.ui.users.shared.navigation.*
+import com.olive.app.ui.users.user.dashboard.LocalBackgroundLocationPermissionRequest
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -42,6 +43,7 @@ class SafePermissionsAndUpdatesUiTest {
     fun permissionsExplainFeatureAccessAndOpenTheCorrectInstallSettings() {
         var opened: Intent? = null
         var requested = emptyList<String>()
+        var backgroundRequests = 0
         val cameraAllowed = mutableStateOf(false)
         compose.setContent {
             val base = LocalContext.current
@@ -57,6 +59,7 @@ class SafePermissionsAndUpdatesUiTest {
             OliveTheme {
                 CompositionLocalProvider(
                     LocalContext provides fixture,
+                    LocalBackgroundLocationPermissionRequest provides { backgroundRequests++; false },
                     LocalSafeSystemLauncher provides { opened = it; true },
                     LocalSafePermissionActions provides SafePermissionActions(
                         if (cameraAllowed.value) 1 else 0, { requested = it.toList(); true }, { false },
@@ -67,7 +70,16 @@ class SafePermissionsAndUpdatesUiTest {
             }
         }
         compose.onNodeWithText(text(R.string.app_permissions_install_why)).assertExists()
+        compose.onNodeWithText(text(R.string.app_permissions_biometrics)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.app_permissions_why)).assertDoesNotExist()
         compose.onNodeWithText(text(R.string.app_permissions_background_location_why)).assertExists()
+        compose.onNodeWithText(text(R.string.app_permissions_camera_why)).assertExists()
+        compose.onNodeWithText(text(R.string.app_permissions_location_why)).assertExists()
+        compose.onNodeWithTag("settings_permission_BackgroundLocation").performScrollTo().performClick()
+        compose.onNodeWithTag("background_location_continue").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(0, backgroundRequests) }
+        compose.onNodeWithTag("background_location_continue").performClick()
+        compose.runOnIdle { assertEquals(1, backgroundRequests) }
         compose.onNodeWithText(text(R.string.app_permissions_health_why)).assertExists()
         val cameraStatus = compose.onNodeWithTag("settings_permission_status_Camera")
         cameraStatus.assertTextEquals(text(R.string.app_permissions_disallowed))

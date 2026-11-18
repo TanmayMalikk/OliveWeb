@@ -1,0 +1,16 @@
+<resources>
+    <string name="friend_invite">邀请</string>
+    <string name="friend_invite_question">有邀请码吗？（可选）</string>
+    <string name="friend_invite_code">邀请码</string>
+    <string name="friend_invite_connect">添加联系人</string>
+    <string name="friend_invite_connecting">正在连接…</string>
+    <string name="friend_invite_connected">已与 %1$s 建立联系。您可以添加其他邀请码。</string>
+    <string name="friend_invite_unavailable">此邀请已使用或已过期。请刷新以创建新邀请。</string>
+    <string name="friend_invite_expires">到期时间 %1$s</string>
+    <string name="friend_invite_once">仅限使用一次，有效期为48小时。刷新将使之前的邀请码失效。</string>
+    <string name="friend_invite_copy_code">复制邀请码</string>
+    <string name="friend_invite_copy_link">复制链接</string>
+    <string name="friend_invite_share">分享邀请</string>
+    <string name="friend_invite_refresh">刷新邀请码</string>
+    <string name="friend_invite_done">完成</string>
+</resources>

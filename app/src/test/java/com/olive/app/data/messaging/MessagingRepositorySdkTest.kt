@@ -17,7 +17,8 @@ import java.util.Date
 @RunWith(RobolectricTestRunner::class)
 class MessagingRepositorySdkTest {
     private val db = mock(FirebaseFirestore::class.java)
-    private val repository = MessagingRepository(db)
+    private val authorizedPeers = mutableListOf<String>()
+    private val repository = MessagingRepository(db) { authorizedPeers += it }
     private val user = AccountIdentity("owner", "Owner_Name")
     private val peer = DirectoryUser("trusted", "trusted_name", "")
     private val request = FriendRequest("request", peer.uid, peer.username, user.uid, user.username, 1L)
@@ -30,6 +31,7 @@ class MessagingRepositorySdkTest {
         val candidateRow = row("trusted", mapOf("uid" to peer.uid, "username" to peer.username, "publicKey" to "key"))
         `when`(candidate.get()).thenReturn(Tasks.forResult(candidateRow))
         assertEquals(listOf(peer.copy(publicKey = "key")), repository.searchUsers(" Trusted_Name ", user.uid))
+        assertEquals(listOf("trusted_name"), authorizedPeers)
         assertTrue(repository.searchUsers(peer.username, peer.uid).isEmpty())
         assertThrows(IllegalArgumentException::class.java) { runBlocking { repository.searchUsers("invalid!", user.uid) } }
 

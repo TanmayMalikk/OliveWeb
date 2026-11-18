@@ -21,7 +21,8 @@ data class SafeContact(
     val name: String,
     val details: String,
     val safeToStay: Boolean = false,
-    val linkedUid: String = ""
+    val linkedUid: String = "",
+    val relationship: String = ""
 )
 
 // The account role decides which onboarding flow and app shell this person receives.
@@ -83,7 +84,8 @@ data class UserProfile(
                 "name" to it.name,
                 "details" to it.details,
                 "safeToStay" to it.safeToStay,
-                "linkedUid" to it.linkedUid
+                "linkedUid" to it.linkedUid,
+                "relationship" to it.relationship
             )
         },
         "coverType" to coverType.name,
@@ -113,7 +115,7 @@ data class UserProfile(
                     val c = contacts.optJSONObject(it) ?: return@mapNotNull null
                     SafeContact(
                         c.optString("id"), c.optString("name"), c.optString("details"),
-                        c.optBoolean("safeToStay"), c.optString("linkedUid")
+                        c.optBoolean("safeToStay"), c.optString("linkedUid"), c.optString("relationship")
                     )
                 },
                 DeliveryAddress.fromJson(j.optJSONObject("address")),

@@ -41,8 +41,15 @@ import java.util.UUID
 internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean = false) {
     val fraction = if (total > 0) prepared.toFloat() / total else 0f
     val count = stringResource(R.string.safety_prepared_count, prepared, total)
+    val progressLabel = stringResource(R.string.a11y_safety_progress, prepared, total)
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+            .then(if (summary) Modifier.testTag("safety_checklist_progress") else Modifier)
+            .clearAndSetSemantics {
+                contentDescription = progressLabel
+                stateDescription = "${(fraction * 100).toInt()}%"
+                progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+            },
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (summary) {
@@ -64,8 +71,7 @@ internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean
         if (summary || total > 0) LinearProgressIndicator(
             progress = { fraction },
             modifier = Modifier.fillMaxWidth().height(if (summary) 10.dp else 6.dp)
-                .border(1.dp, OliveDivider, CircleShape)
-                .then(if (summary) Modifier.testTag("safety_checklist_progress") else Modifier),
+                .border(1.dp, OliveDivider, CircleShape),
             color = OliveGreen,
             trackColor = SageGreen,
             strokeCap = StrokeCap.Round,

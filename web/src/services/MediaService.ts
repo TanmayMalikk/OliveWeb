@@ -19,6 +19,7 @@ import {
   unwrapRoomKeyBytes,
 } from "./MessagingService";
 import { importKey } from "./EncryptionService";
+import { authorizeMessagingPeer } from "./FriendInviteService";
 import type { Identity } from "../domain/DomainModels";
 
 type StoredMedia = {
@@ -253,6 +254,7 @@ export async function uploadBrowserDocument(
 }
 
 async function wrapForDocumentRecipient(raw: Uint8Array, { uid, username }: { uid: string; username: string }) {
+  await authorizeMessagingPeer(username);
   const { db } = await firebase();
   const directory = doc(db, "messageDirectory", username.toLowerCase());
   const [account, devices] = await Promise.all([getDoc(directory), getDocs(collection(directory, "devices"))]);

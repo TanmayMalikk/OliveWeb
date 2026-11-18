@@ -342,20 +342,15 @@ class DeviceStore(
     }
 
     // Saves the private contact note so app security can load it again.
-    fun appendPrivateContactNote(uid: String, targetUid: String, username: String, text: String) {
-        val addition = text.trim()
+    fun savePrivateContactNote(uid: String, targetUid: String, username: String, text: String) {
+        val body = text.trim()
         require(targetUid.isNotBlank() && targetUid != uid && targetUid.length <= 160)
         require(username.isNotBlank() && username.length <= 60)
-        require(addition.isNotBlank() && addition.length <= 2_000)
+        require(body.length <= 20_000)
         vault.update { root ->
             val notes = root.child("privateContactNotes").child(uid)
-            val previous = notes.optJSONObject(targetUid)?.optString("body").orEmpty()
-            val combined = if (previous.isBlank()) addition else "$previous\n$addition"
-            require(combined.length <= 20_000) { "This private note is full." }
-            notes.put(
-                targetUid,
-                JSONObject().put("username", username).put("body", combined)
-            )
+            if (body.isBlank()) notes.remove(targetUid)
+            else notes.put(targetUid, JSONObject().put("username", username).put("body", body))
         }
     }
 

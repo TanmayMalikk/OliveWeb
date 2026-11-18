@@ -20,7 +20,7 @@ class SafetyDocumentGrantSdkTest {
         val keys=TestAndroidKeyStore.install()
         val db=FirestoreTestDriver()
         val media=mock(MediaTicketDataSource::class.java)
-        val repo=SafetyDocumentRepository(db.db,mock(FirebaseStorage::class.java),media)
+        val repo=SafetyDocumentRepository(db.db,mock(FirebaseStorage::class.java),media) { }
         val key=EncryptionUtils.generateSymmetricKey()
         val public=Base64.getEncoder().encodeToString(KeyManager.getOrCreatePublicKey().encoded)
         val doc:SafetyDocument

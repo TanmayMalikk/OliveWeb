@@ -20,6 +20,9 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material3.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -207,13 +210,15 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
         }
         if (session.accountRole == AccountRole.STAFF) {
             val availabilityLabel = stringResource(R.string.safety_available)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(availabilityLabel, Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().testTag("safety_staff_available")
+                .toggleable(value = controller.available, role = Role.Switch, onValueChange = controller::changeAvailability)
+                .semantics(mergeDescendants = true) { contentDescription = availabilityLabel },
+                horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(availabilityLabel, Modifier.weight(1f).clearAndSetSemantics { })
                 Switch(
                     checked = controller.available,
-                    onCheckedChange = controller::changeAvailability,
-                    modifier = Modifier.testTag("safety_staff_available")
-                        .semantics { contentDescription = availabilityLabel },
+                    onCheckedChange = null,
+                    modifier = Modifier.clearAndSetSemantics { },
                 )
             }
         }

@@ -80,49 +80,6 @@ import com.olive.app.ui.users.user.dashboard.LocalLocationPermissionRequest
 import kotlinx.coroutines.launch
 
 @Composable
-private fun BackgroundLocationButton(requestPermission: suspend () -> Boolean) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var explain by remember { mutableStateOf(false) }
-    var requesting by remember { mutableStateOf(false) }
-    val title = stringResource(R.string.location_background_access)
-    TextButton(onClick = { explain = true }, enabled = !requesting, modifier = Modifier.testTag("background_location")) {
-        Text(title)
-    }
-    if (explain) {
-        val help = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            stringResource(R.string.location_background_settings, context.packageManager.backgroundPermissionOptionLabel)
-        } else {
-            stringResource(R.string.location_background_dialog)
-        }
-        AlertDialog(
-            onDismissRequest = { explain = false },
-            title = { Text(title) },
-            text = { Text(help) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        explain = false
-                        requesting = true
-                        scope.launch {
-                            try {
-                                requestPermission()
-                            } finally {
-                                requesting = false
-                            }
-                        }
-                    },
-                    modifier = Modifier.testTag("background_location_continue"),
-                ) { Text(stringResource(R.string.next)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { explain = false }) { Text(stringResource(R.string.cancel)) }
-            },
-        )
-    }
-}
-
-@Composable
 private fun PrivateRouteControls(controller: LocationMapController, state: LocationMapState) {
     if (state.navigating) {
         OutlinedButton(onClick = controller::stopNavigation, modifier = Modifier.fillMaxWidth()) {
@@ -153,6 +110,21 @@ internal fun LocationMapScreen(session: SessionViewModel) {
     val routeUnavailable = stringResource(R.string.location_route_unavailable)
     val routeFailed = stringResource(R.string.location_route_failed)
     val routeNotConfigured = stringResource(R.string.location_route_not_configured)
+    var permissionResult by remember(uid) { mutableStateOf<Boolean?>(null) }
+    var foregroundDenied by remember(uid) { mutableStateOf(false) }
+    var explainBackground by remember(uid) { mutableStateOf(false) }
+    var offeredBackground by remember(uid) { mutableStateOf(false) }
+    val permissionScope = rememberCoroutineScope()
+    suspend fun requestMapAccess(retry: Boolean = false): Boolean {
+        val granted = if (retry || permissionResult == null) requestPermission() else permissionResult == true
+        permissionResult = granted
+        foregroundDenied = !granted
+        if (granted && profile.role == AccountRole.USER && requestBackgroundPermission != null && !offeredBackground) {
+            offeredBackground = true
+            explainBackground = true
+        }
+        return granted
+    }
     var durationDialog by remember { mutableStateOf(false) }
     var fullScreenMap by rememberSaveable(uid) { mutableStateOf(false) }
     val configuration = LocationMapConfiguration(
@@ -160,7 +132,7 @@ internal fun LocationMapScreen(session: SessionViewModel) {
         session.localMode, youLabel, savedLocationLabel
     )
     LaunchedEffect(uid, profile, session.messages.friends, youLabel, savedLocationLabel, session.localMode) {
-        controller.open(configuration, requestPermission)
+        controller.open(configuration) { requestMapAccess() }
     }
     DisposableEffect(controller) { onDispose(controller::closeMap) }
     val state = controller.state
@@ -276,6 +248,13 @@ internal fun LocationMapScreen(session: SessionViewModel) {
             stringResource(if (profile.role == AccountRole.USER) R.string.location_map_user_help else R.string.location_map_contact_help),
             style = MaterialTheme.typography.bodyMedium, color = Muted
         )
+        if (foregroundDenied) Button(
+            onClick = { permissionScope.launch { if (requestMapAccess(retry = true)) controller.open(configuration) { true } } },
+            modifier = Modifier.fillMaxWidth().testTag("map_allow_location"),
+        ) { Text(stringResource(R.string.app_permissions_request, stringResource(R.string.app_permissions_location))) }
+        if (profile.role == AccountRole.USER && requestBackgroundPermission != null) BackgroundLocationButton(
+            requestBackgroundPermission, explainBackground, { explainBackground = false },
+        )
         Surface(
             Modifier.fillMaxWidth().then(
                 if (profile.role == AccountRole.USER) Modifier.height(300.dp)
@@ -332,7 +311,6 @@ internal fun LocationMapScreen(session: SessionViewModel) {
                 modifier = Modifier.testTag("nearby_support_list"),
             ) { Text(stringResource(R.string.loaded_hotline_locations, supportServices.size)) }
             PrivateRouteControls(controller, state)
-            if (requestBackgroundPermission != null) BackgroundLocationButton(requestBackgroundPermission)
             if (state.navigating) OutlinedButton(onClick = { fullScreenMap = true }) {
                 Text(stringResource(R.string.location_full_screen_navigation))
             }

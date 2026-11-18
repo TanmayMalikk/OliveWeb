@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -276,7 +277,8 @@ class LiveLocationService : Service() {
 
 /** Runs the user location feed even when the cover app is not on screen. */
 class AdminLocationService : Service() {
-    private val fused by lazy { LocationServices.getFusedLocationProviderClient(this) }
+    private val fusedDelegate = lazy { LocationServices.getFusedLocationProviderClient(this) }
+    private val fused by fusedDelegate
     private var ownerUid = ""
     private var displayName = ""
     private var reference: DatabaseReference? = null
@@ -310,6 +312,7 @@ class AdminLocationService : Service() {
             stopTracking()
             return START_NOT_STICKY
         }
+        startForeground(NOTIFICATION_ID, notification())
         preferences.edit {
             putBoolean(KEY_ACTIVE, true)
             putString(KEY_UID, ownerUid)
@@ -319,7 +322,6 @@ class AdminLocationService : Service() {
             LocationDatabase.instance().reference.child(ADMIN_LOCATION_PATH).child(ownerUid)
         }.getOrNull()
         reference?.onDisconnect()?.updateChildren(mapOf("active" to false))
-        startForeground(NOTIFICATION_ID, notification())
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, SAMPLE_MILLIS)
             .setMinUpdateIntervalMillis(MIN_SAMPLE_MILLIS)
             .setMaxUpdateDelayMillis(MAX_DELAY_MILLIS)
@@ -357,7 +359,7 @@ class AdminLocationService : Service() {
 
     // Marks the last point offline, removes GPS callbacks, and clears the saved session.
     private fun stopTracking() {
-        fused.removeLocationUpdates(callback)
+        if (fusedDelegate.isInitialized()) fused.removeLocationUpdates(callback)
         reference?.onDisconnect()?.cancel()
         reference?.updateChildren(mapOf("active" to false, "updatedAt" to System.currentTimeMillis()))
         getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit {
@@ -370,7 +372,7 @@ class AdminLocationService : Service() {
     }
 
     override fun onDestroy() {
-        fused.removeLocationUpdates(callback)
+        if (fusedDelegate.isInitialized()) fused.removeLocationUpdates(callback)
         super.onDestroy()
     }
 
@@ -409,8 +411,10 @@ class AdminLocationService : Service() {
 
         // Starts or refreshes tracking for the currently signed-in user account.
         fun start(context: Context, uid: String, name: String) {
+            // Reject before requesting a foreground service. Stopping an unpromoted request can
+            // cause ForegroundServiceDidNotStartInTimeException on newer Android versions.
+            if (uid.isBlank() || !canStart(context)) return
             context.getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit {
-                putBoolean(KEY_ACTIVE, true)
                 putString(KEY_UID, uid)
                 putString(KEY_NAME, name)
             }
@@ -420,6 +424,15 @@ class AdminLocationService : Service() {
                     .putExtra(EXTRA_UID, uid)
                     .putExtra(EXTRA_NAME, name),
             )
+        }
+
+        internal fun canStart(context: Context): Boolean {
+            val foreground = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                .any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+            val background = Build.VERSION.SDK_INT < 29 || ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_BACKGROUND_LOCATION,
+            ) == PackageManager.PERMISSION_GRANTED
+            return foreground && background
         }
 
         // Stops the admin location feed when the user signs out of this phone.

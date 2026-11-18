@@ -225,6 +225,9 @@ test('credentials and malformed contact data cannot be stored in profiles', asyn
   await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid'}]}));
   await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',safeToStay:true}]}));
   await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',linkedUid:'friend-uid'}]}));
+  await assertSucceeds(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'Call after work',relationship:'Sibling'}]}));
+  await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'Call after work',relationship:5}]}));
+  await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'Call after work',relationship:'x'.repeat(121)}]}));
   await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',linkedUid:5}]}));
   await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',linkedUid:'x'.repeat(129)}]}));
   await assertFails(setDoc(doc(alice,'users/alice-uid'),{...profile,contacts:[{id:'c1',name:'Friend',details:'friend@example.invalid',safeToStay:'yes'}]}));
@@ -335,9 +338,14 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
     {uid:'social-duplicate',username:'social_alice',publicKey:'duplicate-key',updatedAt:serverTimestamp()}));
 
   const safeRequest = doc(bob, 'friendRequests/social-b--social-c');
-  await assertSucceeds(setDoc(safeRequest, {
+  await assertFails(setDoc(safeRequest, {
     senderUid: 'social-b', senderUsername: 'social_bob',
     recipientUid: 'social-c', recipientUsername: 'social_charlie',
+    friendshipId: 'social-b--social-c', createdAt: serverTimestamp(),
+  }));
+  // Existing requests remain actionable after username discovery is retired.
+  await env.withSecurityRulesDisabled(async context => setDoc(doc(context.firestore(), 'friendRequests/social-b--social-c'), {
+    senderUid: 'social-b', senderUsername: 'social_bob', recipientUid: 'social-c', recipientUsername: 'social_charlie',
     friendshipId: 'social-b--social-c', createdAt: serverTimestamp(),
   }));
   const received = await getDocs(query(collection(charlie, 'friendRequests'),
@@ -349,24 +357,25 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   await assertFails(deleteDoc(doc(alice, 'friendRequests/social-b--social-c')));
   await assertSucceeds(deleteDoc(doc(charlie, 'friendRequests/social-b--social-c')));
 
-  await assertSucceeds(getDoc(doc(alice,'messageDirectory/social_bob')));
+  await assertFails(getDoc(doc(alice,'messageDirectory/social_bob')));
   await assertFails(getDocs(query(collection(alice,'messageDirectory'),where('username','>=','social_b'))));
   const aliceDevice={uid:'social-a',deviceId:'alice-web-device-1',publicKey:'alice-web-key',
     platform:'WEB',mgf1Digest:'SHA-256',updatedAt:serverTimestamp()};
   await assertSucceeds(setDoc(doc(alice,'messageDirectory/social_alice/devices/alice-web-device-1'),aliceDevice));
-  await assertSucceeds(getDoc(doc(bob,'messageDirectory/social_alice/devices/alice-web-device-1')));
+  await assertFails(getDoc(doc(bob,'messageDirectory/social_alice/devices/alice-web-device-1')));
   await assertFails(setDoc(doc(bob,'messageDirectory/social_alice/devices/stolen-web-device'),
     {...aliceDevice,deviceId:'stolen-web-device'}));
   const requestId='social-a--social-b';
   const friendshipId='social-a--social-b';
   const request={senderUid:'social-a',senderUsername:'social_alice',recipientUid:'social-b',
     recipientUsername:'social_bob',friendshipId,createdAt:serverTimestamp()};
-  await assertSucceeds(setDoc(doc(alice,'friendRequests/'+requestId),request));
+  await assertFails(setDoc(doc(alice,'friendRequests/'+requestId),request));
+  await env.withSecurityRulesDisabled(async context => setDoc(doc(context.firestore(),'friendRequests/'+requestId),request));
   await assertSucceeds(getDocs(query(collection(bob,'friendRequests'),where('recipientUid','==','social-b'))));
   await assertSucceeds(getDocs(query(collection(alice,'friendRequests'),where('senderUid','==','social-a'))));
   await assertFails(deleteDoc(doc(charlie,'friendRequests/'+requestId)));
   await assertSucceeds(deleteDoc(doc(alice,'friendRequests/'+requestId)));
-  await assertSucceeds(setDoc(doc(alice,'friendRequests/'+requestId),request));
+  await env.withSecurityRulesDisabled(async context => setDoc(doc(context.firestore(),'friendRequests/'+requestId),request));
   await assertFails(setDoc(doc(alice,'friendRequests/'+requestId),request));
 
   await assertFails(setDoc(doc(alice,'friendRequests/social-a--social-a'),{...request,recipientUid:'social-a',
@@ -392,6 +401,8 @@ test('users and safe contacts get encrypted private DMs and only the sender can 
   accept.set(doc(bob,'conversations/'+friendshipId),conversation);
   accept.delete(doc(bob,'friendRequests/'+requestId));
   await assertSucceeds(accept.commit());
+  await assertSucceeds(getDoc(doc(alice,'messageDirectory/social_bob')));
+  await assertSucceeds(getDoc(doc(bob,'messageDirectory/social_alice/devices/alice-web-device-1')));
   await assertSucceeds(getDocs(collection(alice,'friendLists/social-a/friends')));
   await assertSucceeds(getDocs(collection(bob,'friendLists/social-b/friends')));
   await assertFails(getDocs(collection(charlie,'friendLists/social-a/friends')));
@@ -740,4 +751,27 @@ test('fitness records are profile-owned, bounded, and retain deletion tombstones
   await assertSucceeds(setDoc(doc(alice,path),tombstone));
   assert.equal(JSON.parse((await getDoc(doc(alice,path))).data().payload).type,'null');
   await assertSucceeds(setDoc(doc(alice,path),record));
+});
+
+test('invite records are private and group key grants stop working when a member is removed', async () => {
+  const owner = env.authenticatedContext('invite-owner', {email:'invite_owner@users.olive.invalid'}).firestore();
+  const peer = env.authenticatedContext('invite-peer', {email:'invite_peer@safe.olive.invalid'}).firestore();
+  await env.withSecurityRulesDisabled(async context => {
+    const db = context.firestore();
+    await setDoc(doc(db,'friendInviteOwners/invite-owner'), {code:'sampleCode', expiresAt:Date.now()+10000, claimedBy:''});
+    await setDoc(doc(db,'friendInvites/hidden-token-hash'), {ownerUid:'invite-owner'});
+    await setDoc(doc(db,'messageDirectory/invite_peer'), {uid:'invite-peer',username:'invite_peer',publicKey:'peer-key'});
+    await setDoc(doc(db,'conversations/invite-group'), {participantIds:['invite-owner','invite-peer']});
+    await setDoc(doc(db,'messagingPeerAccess/invite-owner/peers/invite-peer'), {conversationId:'invite-group'});
+  });
+  await assertSucceeds(getDoc(doc(owner,'friendInviteOwners/invite-owner')));
+  await assertFails(getDoc(doc(peer,'friendInviteOwners/invite-owner')));
+  await assertFails(getDocs(collection(owner,'friendInviteOwners')));
+  await assertFails(getDoc(doc(owner,'friendInvites/hidden-token-hash')));
+  await assertFails(setDoc(doc(owner,'friendInvites/forged'), {ownerUid:'invite-owner'}));
+  await assertFails(setDoc(doc(owner,'friendInviteOwners/invite-owner'), {code:'forged'}));
+  await assertFails(setDoc(doc(owner,'messagingPeerAccess/invite-owner/peers/stranger'), {conversationId:'invite-group'}));
+  await assertSucceeds(getDoc(doc(owner,'messageDirectory/invite_peer')));
+  await env.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(),'conversations/invite-group'), {participantIds:['invite-peer','third']}));
+  await assertFails(getDoc(doc(owner,'messageDirectory/invite_peer')));
 });

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "pretest": "node -e \"require('node:fs').mkdirSync('../build/reports', {recursive: true})\"",
-    "test": "firebase emulators:exec --only firestore,database,storage --project demo-olive-rules --config emulator.json \"node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/firebase-rules-tests.xml rules.test.mjs storage.rules.test.mjs safety-plans.test.mjs\""
+    "test": "firebase emulators:exec --only firestore,database,storage --project demo-olive-rules --config emulator.json \"node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=../build/reports/firebase-rules-tests.xml rules.test.mjs storage.rules.test.mjs safety-plans.test.mjs friend-invites.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "6.0.0",

@@ -16,7 +16,7 @@ import java.util.Base64
 @RunWith(RobolectricTestRunner::class)
 class SecureChatRepositorySdkTest {
     private val transport = FirestoreTestDriver()
-    private val repository = SecureChatRepository(transport.db)
+    private val repository = SecureChatRepository(transport.db) { }
     private val conversation = ChatConversation("chat", "pair", listOf("owner", "friend"),
         mapOf("owner" to "owner_fixture", "friend" to "friend_fixture"))
 
