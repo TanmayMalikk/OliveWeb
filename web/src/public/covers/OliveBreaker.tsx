@@ -1,4 +1,4 @@
-// Cover users: 1:1 Brick Breaker gameplay with Olive Branch assets (Olive ball sprite, orchard log paddle, leafy bricks & capsules).
+// Canopy Breaker renders the classic paddle game with Olive Branch artwork.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Heart, Pause, Play, RotateCcw, Sparkles } from "lucide-react";
 import { Button } from "../../components/SharedComponents";
@@ -11,6 +11,7 @@ import {
   launchBreakerBall,
   moveBreakerPaddle,
   newBreaker,
+  type BreakerPowerKind,
   type BreakerWorld,
 } from "./olive-breaker";
 
@@ -23,13 +24,19 @@ const BRICK_PALETTE: Record<string, { fill: string; top: string; stroke: string 
   sage: { fill: "#82a066", top: "#a1be83", stroke: "#4c6638" },
   sprout: { fill: "#a4c66e", top: "#c2de8f", stroke: "#618037" },
 };
+const POWER_STYLE: Record<BreakerPowerKind, { label: string; color: string; name: string }> = {
+  wide: { label: "WIDE", color: "#32633f", name: "Wide paddle" },
+  slow: { label: "SLOW", color: "#306175", name: "Slow ball" },
+  multiball: { label: "+1", color: "#884458", name: "Extra olive" },
+};
+
+type BallTrail = Map<boolean, Array<{ x: number; y: number }>>;
 
 function drawBreakerCanvas(
   ctx: CanvasRenderingContext2D,
   world: BreakerWorld,
-  trails: Array<{ x: number; y: number }[]>,
+  trails: BallTrail,
   oliveSprite: HTMLImageElement | null,
-  sproutSprite: HTMLImageElement | null,
 ) {
   const { width, height } = BREAKER;
   const sky = ctx.createLinearGradient(0, 0, 0, height);
@@ -60,7 +67,7 @@ function drawBreakerCanvas(
   ctx.lineTo(width - 3, height);
   ctx.stroke();
 
-  // Leafy timber bricks with beveled highlights & visible damage cracks.
+  // Leafy timber bricks with beveled highlights.
   for (const brick of world.bricks) {
     const pal = BRICK_PALETTE[brick.tone] ?? BRICK_PALETTE.sage;
     ctx.fillStyle = pal.fill;
@@ -77,8 +84,8 @@ function drawBreakerCanvas(
     ctx.roundRect(brick.x + 2.5, brick.y + 2, brick.width - 5, 4.5, 2);
     ctx.fill();
 
-    // Olive leaf emblem stamp on gold/olive armored bricks.
-    if (brick.maxHp > 1 || brick.tone === "gold") {
+    // Olive leaf emblem stamp on high-value bricks.
+    if (brick.points >= 5) {
       ctx.save();
       ctx.translate(brick.x + 11, brick.y + brick.height / 2 + 1);
       ctx.rotate(-0.45);
@@ -89,91 +96,26 @@ function drawBreakerCanvas(
       ctx.restore();
     }
 
-    // Cracks for multi-hit armored bricks.
-    if (brick.hp < brick.maxHp) {
-      ctx.strokeStyle = "rgba(28, 34, 24, 0.65)";
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(brick.x + brick.width * 0.34, brick.y + 3);
-      ctx.lineTo(brick.x + brick.width * 0.46, brick.y + brick.height * 0.55);
-      ctx.lineTo(brick.x + brick.width * 0.39, brick.y + brick.height - 3);
-      if (brick.maxHp - brick.hp >= 2) {
-        ctx.moveTo(brick.x + brick.width * 0.68, brick.y + 4);
-        ctx.lineTo(brick.x + brick.width * 0.58, brick.y + brick.height * 0.62);
-        ctx.lineTo(brick.x + brick.width * 0.72, brick.y + brick.height - 2);
-      }
-      ctx.stroke();
-    }
-
-    if (brick.hp > 1) {
-      ctx.fillStyle = "#fdfdf5";
-      ctx.font = "700 10px system-ui, sans-serif";
-      ctx.textAlign = "right";
-      ctx.textBaseline = "middle";
-      ctx.fillText(
-        `×${brick.hp}`,
-        brick.x + brick.width - 6,
-        brick.y + brick.height / 2 + 1,
-      );
-    }
   }
 
-  // Falling Brick Breaker power-up tokens using our Olive Branch palette & emblems.
-  for (const power of world.powers) {
+  for (const drop of world.drops) {
+    const { label, color } = POWER_STYLE[drop.kind];
     ctx.save();
-    ctx.translate(power.x, power.y);
-    const fill =
-      power.kind === "wide"
-        ? "#356642"
-        : power.kind === "twin"
-          ? "#a9672e"
-          : power.kind === "fire"
-            ? "#c2442e"
-            : power.kind === "life"
-              ? "#8c3549"
-              : "#3d6d7c";
-    ctx.fillStyle = fill;
-    ctx.beginPath();
-    ctx.roundRect(-20, -10, 40, 20, 6);
-    ctx.fill();
-    ctx.strokeStyle = "#ffffff";
+    ctx.translate(drop.x, drop.y);
+    ctx.fillStyle = color;
+    ctx.strokeStyle = "#faf8e8";
     ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(-22, -9, 44, 18, 9);
+    ctx.fill();
     ctx.stroke();
-
-    if (sproutSprite && sproutSprite.complete && sproutSprite.naturalWidth > 0) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(-11, 0, 6.5, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.drawImage(sproutSprite, -17.5, -6.5, 13, 13);
-      ctx.restore();
-    }
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "700 9.5px system-ui, sans-serif";
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 11px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    const label =
-      power.kind === "wide"
-        ? "WIDE"
-        : power.kind === "twin"
-          ? "×3"
-          : power.kind === "fire"
-            ? "FIRE"
-            : power.kind === "life"
-              ? "+1 UP"
-              : "SLOW";
-    ctx.fillText(label, 4, 0.5);
+    ctx.fillText(label, 0, 0);
     ctx.restore();
   }
-
-  // Brick shatter debris.
-  for (const p of world.particles) {
-    ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x - p.size * 0.4, p.y - p.size * 0.4, p.size * 0.8, p.size * 0.8);
-  }
-  ctx.globalAlpha = 1;
 
   // Orchard Log Paddle (matches Olive Crossing log timber asset + leafy tips).
   const px = world.paddleX - world.paddleWidth / 2;
@@ -187,7 +129,7 @@ function drawBreakerCanvas(
   ctx.fill();
 
   // Main wooden log beam
-  ctx.fillStyle = world.wideTimer > 0 ? "#4f723b" : "#7f5431";
+  ctx.fillStyle = "#7f5431";
   ctx.strokeStyle = "#462c17";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -196,7 +138,7 @@ function drawBreakerCanvas(
   ctx.stroke();
 
   // Sunlit bark top highlight
-  ctx.fillStyle = world.wideTimer > 0 ? "#77a15a" : "#a67549";
+  ctx.fillStyle = "#a67549";
   ctx.beginPath();
   ctx.roundRect(px + 10, py + 2, world.paddleWidth - 20, 5, 2.5);
   ctx.fill();
@@ -227,20 +169,18 @@ function drawBreakerCanvas(
     ctx.setLineDash([4, 5]);
     ctx.beginPath();
     ctx.moveTo(b.x, b.y);
-    ctx.lineTo(b.x + 22, b.y - 68);
+    ctx.lineTo(b.x + (b.x < width / 2 ? 22 : -22), b.y - 68);
     ctx.stroke();
     ctx.restore();
   }
 
   // Ball velocity trails.
-  const isFire = world.fireTimer > 0;
-  for (let bIdx = 0; bIdx < trails.length; bIdx++) {
-    const trail = trails[bIdx];
+  for (const [bonus, trail] of trails) {
     for (let t = 0; t < trail.length; t++) {
       const pt = trail[t];
       const frac = (t + 1) / (trail.length + 1);
-      ctx.globalAlpha = frac * (isFire ? 0.42 : 0.28);
-      ctx.fillStyle = isFire ? "#e67b35" : "#6c8c4a";
+      ctx.globalAlpha = frac * 0.28;
+      ctx.fillStyle = bonus ? "#aa8130" : "#6c8c4a";
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, BREAKER.ballRadius * frac * 0.85, 0, Math.PI * 2);
       ctx.fill();
@@ -253,21 +193,14 @@ function drawBreakerCanvas(
     ctx.save();
     ctx.translate(ball.x, ball.y);
 
-    if (isFire) {
-      ctx.fillStyle = "rgba(235, 118, 45, 0.35)";
-      ctx.beginPath();
-      ctx.arc(0, 0, BREAKER.ballRadius + 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
     const grad = ctx.createRadialGradient(-3, -3, 1.5, 0, 0, BREAKER.ballRadius);
-    grad.addColorStop(0, isFire ? "#ffe27a" : "#b8c77f");
-    grad.addColorStop(1, isFire ? "#c74e24" : "#425932");
+    grad.addColorStop(0, ball.bonus ? "#f5d77d" : "#b8c77f");
+    grad.addColorStop(1, ball.bonus ? "#80611f" : "#425932");
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(0, 0, BREAKER.ballRadius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = isFire ? "#7a2611" : "#2b3d20";
+    ctx.strokeStyle = "#2b3d20";
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
@@ -293,10 +226,9 @@ export default function OliveBreaker() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const heldDirection = useRef<-1 | 0 | 1>(0);
-  const trailsRef = useRef<Array<{ x: number; y: number }[]>>([]);
+  const trailsRef = useRef<BallTrail>(new Map());
   const pointerDownPosRef = useRef<{ x: number; moved: boolean } | null>(null);
   const oliveImgRef = useRef<HTMLImageElement | null>(null);
-  const sproutImgRef = useRef<HTMLImageElement | null>(null);
 
   const [phase, setPhase] = useState<BreakerPhase>("ready");
   const phaseRef = useRef<BreakerPhase>("ready");
@@ -305,13 +237,13 @@ export default function OliveBreaker() {
     score: 0,
     wave: 1,
     lives: 3,
-    combo: 0,
     stuck: true,
     bricksLeft: worldRef.current.bricks.length,
   });
   const [best, setBest] = useState(0);
   const [previousBest, setPreviousBest] = useState(0);
   const [storageReady, setStorageReady] = useState(false);
+  const [powerNotice, setPowerNotice] = useState("");
 
   useEffect(() => {
     const oliveImg = new Image();
@@ -319,16 +251,11 @@ export default function OliveBreaker() {
     oliveImg.onload = () => {
       oliveImgRef.current = oliveImg;
     };
-    const sproutImg = new Image();
-    sproutImg.src = "/icons/game.svg";
-    sproutImg.onload = () => {
-      sproutImgRef.current = sproutImg;
-    };
   }, []);
 
   useEffect(() => {
     let live = true;
-    void readCover<number>("olive-breaker-best", 0)
+    void readCover<number>("olive-breaker-arcade-best", 0)
       .then((value) => {
         if (live) {
           setBest(value);
@@ -349,7 +276,6 @@ export default function OliveBreaker() {
       prev.score === w.score &&
       prev.wave === w.wave &&
       prev.lives === w.lives &&
-      prev.combo === w.combo &&
       prev.stuck === w.stuckToPaddle &&
       prev.bricksLeft === w.bricks.length
         ? prev
@@ -357,7 +283,6 @@ export default function OliveBreaker() {
             score: w.score,
             wave: w.wave,
             lives: w.lives,
-            combo: w.combo,
             stuck: w.stuckToPaddle,
             bricksLeft: w.bricks.length,
           },
@@ -388,7 +313,6 @@ export default function OliveBreaker() {
       worldRef.current,
       trailsRef.current,
       oliveImgRef.current,
-      sproutImgRef.current,
     );
   }, []);
 
@@ -413,16 +337,24 @@ export default function OliveBreaker() {
       const { world: next, events } = advanceBreaker(worldRef.current, dt);
       worldRef.current = next;
       if (next.stuckToPaddle) {
-        trailsRef.current = [];
+        trailsRef.current.clear();
       } else {
-        trailsRef.current = next.balls.map((ball, index) => {
-          const prevTrail = trailsRef.current[index] ?? [];
-          return [...prevTrail, { x: ball.x, y: ball.y }].slice(-7);
-        });
+        trailsRef.current = new Map(next.balls.map((ball) => {
+          const bonus = Boolean(ball.bonus);
+          const prevTrail = trailsRef.current.get(bonus) ?? [];
+          return [bonus, [...prevTrail, { x: ball.x, y: ball.y }].slice(-7)];
+        }));
       }
       if (events.bouncedPaddle) gameSfx.bounce();
       if (events.hitBrick) gameSfx.tap();
-      if (events.powerUp) gameSfx.powerup();
+      if (events.caught.length) {
+        gameSfx.powerup();
+        setPowerNotice(events.caught.map((power) =>
+          power === "multiball" ? "Extra olive launched." : `${POWER_STYLE[power].name} caught.`,
+        ).join(" "));
+      } else if (events.lostLife || events.clearedWave) {
+        setPowerNotice("");
+      }
       if (events.clearedWave) gameSfx.win();
       if (events.lostLife) gameSfx.miss();
       paint();
@@ -447,8 +379,9 @@ export default function OliveBreaker() {
   }, []);
 
   const startRound = useCallback(() => {
+    setPowerNotice("");
     setPreviousBest(best);
-    trailsRef.current = [];
+    trailsRef.current.clear();
     const fresh = newBreaker();
     worldRef.current = fresh;
     phaseRef.current = "playing";
@@ -461,8 +394,7 @@ export default function OliveBreaker() {
 
   const serveBall = useCallback(() => {
     if (!worldRef.current.stuckToPaddle || phaseRef.current !== "playing") return;
-    const offset = ((worldRef.current.paddleX / BREAKER.width) - 0.5) * 0.45 + 0.18;
-    const next = launchBreakerBall(worldRef.current, offset);
+    const next = launchBreakerBall(worldRef.current);
     worldRef.current = next;
     syncHud(next);
     paint();
@@ -573,9 +505,9 @@ export default function OliveBreaker() {
               tone="ready"
               icon={<Sparkles size={22} />}
               title="Canopy Breaker"
-              subtitle="1:1 classic brick breaker: bounce the olive off your orchard log paddle, break every row, and catch power capsules."
+              subtitle="Clear both walls. Catch falling capsules with the paddle to activate power-ups."
               best={best || null}
-              controlsHint="Slide paddle to aim, then tap board, press Space, or tap Launch"
+              controlsHint="Move the paddle, then tap the board or press Space to serve"
               actionLabel="Start game"
               actionAriaLabel="Start Canopy Breaker"
               onAction={startRound}
@@ -596,8 +528,8 @@ export default function OliveBreaker() {
           )}
           {phase === "over" && (
             <GameOverlay
-              tone="over"
-              title="All leaves settled"
+              tone={worldRef.current.won ? "won" : "over"}
+              title={worldRef.current.won ? "Both walls cleared!" : "All leaves settled"}
               subtitle={`You reached level ${hud.wave} with ${hud.score} points.`}
               score={hud.score}
               best={best}
@@ -620,9 +552,7 @@ export default function OliveBreaker() {
                 ? `Round over. Final score ${hud.score}.`
                 : hud.stuck
                   ? "Position paddle and tap board, Space, or Launch."
-                  : hud.combo >= 3
-                    ? `Streak ${hud.combo}×! ${hud.bricksLeft} bricks left.`
-                    : `Level ${hud.wave} · ${hud.bricksLeft} bricks left.`}
+                  : `${powerNotice ? powerNotice + " " : ""}Level ${hud.wave} · ${hud.bricksLeft} bricks left.`}
         </p>
         <div className="touch-arcade-controls">
           <div className="touch-steer-pad" role="group" aria-label="Paddle controls">

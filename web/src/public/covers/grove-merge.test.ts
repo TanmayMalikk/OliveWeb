@@ -50,4 +50,25 @@ describe("Grove 2048 puzzle logic", () => {
     unlocked[15] = { id: 99, value: unlocked[14].value };
     expect(canMergeMove(unlocked)).toBe(true);
   });
+
+  it("uses the classic spawn odds and leaves the board untouched on a no-op", () => {
+    const rolls = [0.89, 0, 0.9, 0];
+    const world = newGroveMerge(() => rolls.shift()!);
+    expect(world.grid.filter(Boolean).map((tile) => tile?.value)).toEqual([2, 4]);
+    expect(moveGroveMerge(world, "left", () => {
+      throw new Error("A no-op must not spawn a tile");
+    }).world).toBe(world);
+  });
+
+  it("pauses after creating 2048 and can continue from the same board", () => {
+    const world: GroveMergeWorld = {
+      ...newGroveMerge(),
+      grid: [{ id: 1, value: 1024 }, { id: 2, value: 1024 }, ...Array(14).fill(null)],
+    };
+    const won = moveGroveMerge(world, "left", () => 0).world;
+    expect(won.won).toBe(true);
+    expect(won.score).toBe(2048);
+    expect(moveGroveMerge(won, "right").moved).toBe(false);
+    expect(moveGroveMerge({ ...won, keepPlaying: true }, "right").moved).toBe(true);
+  });
 });
