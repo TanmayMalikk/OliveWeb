@@ -19,10 +19,14 @@ import javax.crypto.spec.SecretKeySpec
 import android.content.Context
 import android.util.AtomicFile
 import java.io.File
+import java.io.FileOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 
 
 // A separate authentication-bound key guards device-lock entry. Cover storage stays usable while locked.
@@ -249,6 +253,7 @@ interface JsonVault {
 // The phone's private stash: one atomic AES-encrypted file backed by Android Keystore.
 class EncryptedVault(context: Context, mode: String) : JsonVault {
     private val file = AtomicFile(File(context.noBackupFilesDir, "olive-$mode.vault"))
+    private val stagingFile = File(file.baseFile.path + ".new")
 
     // Foreground editors and background workers use separate instances of the same file.
     private val fileLock = locks.computeIfAbsent(file.baseFile.absolutePath) { Any() }
@@ -300,15 +305,17 @@ class EncryptedVault(context: Context, mode: String) : JsonVault {
         } finally {
             plain.fill(0)
         }
-        val stream = file.startWrite()
-        // Restore the old file if Android cannot finish the new write.
         try {
-            stream.write(bytes)
-            file.finishWrite(stream)
-        } catch (e: Exception) {
-            file.failWrite(stream)
-            throw e
+            FileOutputStream(stagingFile).use { stream ->
+                stream.write(bytes)
+                stream.fd.sync()
+            }
+            // AtomicFile.finishWrite can silently keep the old file when renameTo cannot replace it.
+            Files.move(stagingFile.toPath(), file.baseFile.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+        } finally {
+            stagingFile.delete()
         }
+        Unit
     }
 
     /** Deletes a disposable encrypted store without removing its Android Keystore key. */
