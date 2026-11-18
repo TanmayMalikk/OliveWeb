@@ -114,7 +114,10 @@ jobs:
           UPDATE_MANIFEST_URL=https://yourolivebranch.ca/api/android/releases/latest
           EOF
 
-      - name: Run release checks and build signed APK
+      - name: Run Android unit tests in local mode
+        run: ./gradlew -PoliveLocalTest=true :app:testDebugUnitTest --stacktrace
+
+      - name: Run release lint and build signed APK
         shell: bash
         run: |
           set -o pipefail
@@ -123,7 +126,7 @@ jobs:
           for attempt in $(seq 1 "$max_attempts"); do
             echo "Gradle release attempt $attempt of $max_attempts"
 
-            if ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease --stacktrace; then
+            if ./gradlew -PoliveLocalTest=false :app:lintRelease :app:assembleRelease --stacktrace; then
               exit 0
             fi
 
