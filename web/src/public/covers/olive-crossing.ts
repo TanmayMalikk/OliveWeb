@@ -1,7 +1,8 @@
 // Cover users: calculates lanes, traffic, obstacles, moving logs, coins, and collisions for Olive Crossing.
 export const CROSSING = {
   columns: 18,
-  rows: 8,
+  rows: 13,
+  rearRows: 4,
   cell: 50,
   playerHalfWidth: 0.3,
   vehicleInset: 0.06,
@@ -244,12 +245,12 @@ export function createCrossingLane(
 export function newCrossing(random: () => number = Math.random): CrossingWorld {
   const lanes = Array.from({ length: CROSSING.rows }, (_, row) => {
     const id = CROSSING.rows - 1 - row;
-    return createCrossingLane(id, random, id < 3);
+    return createCrossingLane(id, random, id <= CROSSING.rearRows);
   });
   return {
     lanes,
     playerColumn: Math.floor(CROSSING.columns / 2),
-    playerRow: CROSSING.rows - 2,
+    playerRow: CROSSING.rows - CROSSING.rearRows,
     position: 0,
     score: 0,
     nextLaneId: CROSSING.rows,
@@ -378,7 +379,7 @@ export function moveCrossing(
 
     playerRow = targetRow;
     position += 1;
-    if (playerRow <= 2) {
+    if (playerRow < CROSSING.rows - CROSSING.rearRows - 1) {
       lanes = [createCrossingLane(nextLaneId, random), ...lanes.slice(0, -1)];
       nextLaneId += 1;
       playerRow += 1;
@@ -386,7 +387,7 @@ export function moveCrossing(
   }
 
   if (direction === "down") {
-    if (playerRow >= CROSSING.rows - 1) return world;
+    if (playerRow >= CROSSING.rows - CROSSING.rearRows) return world;
     const targetRow = playerRow + 1;
     const snappedCol = Math.max(
       0,

@@ -15,8 +15,8 @@ describe("Olive Crossing", () => {
   // Inputs: the values in this case. Expected: starts the olive on a safe lane.
   it("starts the olive on a safe lane", () => {
     const world = newCrossing(() => 0);
-    expect(world.lanes).toHaveLength(CROSSING.rows);
-    expect(world.playerRow).toBe(CROSSING.rows - 2);
+    expect(world.lanes).toHaveLength(13);
+    expect(world.lanes.length - world.playerRow).toBe(4);
     expect(world.lanes[world.playerRow].type).toBe("grass");
     expect(world.score).toBe(0);
   });
@@ -67,15 +67,8 @@ describe("Olive Crossing", () => {
     expect(world.nextLaneId).toBeGreaterThan(CROSSING.rows);
     expect(world.lanes).toHaveLength(CROSSING.rows);
     expect(world.lanes.length - world.playerRow).toBe(5);
-    let back = moveCrossing(world, "down", () => 0);
-    expect(back.playerRow).toBe(world.playerRow + 1);
-    expect(back.score).toBe(world.score);
-    for (let count = 0; count < CROSSING.rows; count++) {
-      back = moveCrossing(back, "down", () => 0);
-    }
-    expect(back.playerRow).toBe(CROSSING.rows - 1);
-    expect(back.position).toBeGreaterThanOrEqual(0);
-    expect(back.score).toBe(world.score);
+    const back = moveCrossing(world, "down", () => 0);
+    expect(back.lanes.length - back.playerRow).toBe(4);
     expect(moveCrossing(back, "down", () => 0)).toBe(back);
   });
 
