@@ -1,6 +1,5 @@
 package com.olive.app.ui
 
-import android.app.Application
 import android.content.Context
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument

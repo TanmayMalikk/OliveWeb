@@ -1,23 +1,25 @@
 // All account roles: defines private account activity records.
 package com.olive.app.data.account
 
-import org.json.JSONArray
-import org.json.JSONObject
-import java.time.Instant
-import java.util.UUID
-import kotlin.time.Duration.Companion.seconds
-import com.google.firebase.auth.FirebaseAuth
+import android.util.Log
 import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import com.google.firebase.storage.StorageMetadata
 import com.google.firebase.storage.StorageReference
-import com.google.firebase.functions.FirebaseFunctions
-import android.util.Log
+import com.olive.app.data.messaging.ChatSubscription
 import com.olive.app.security.*
-import kotlinx.coroutines.tasks.await
+import java.time.Instant
+import java.util.UUID
 import kotlin.collections.get
-
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.tasks.await
+import org.json.JSONArray
+import org.json.JSONObject
 
 data class HistoryRecord(val category: String, val id: String, val json: String)
 
@@ -518,4 +520,26 @@ interface AccountRepository {
     suspend fun authenticatedRole(): AccountRole? = null
     // Signs out the current account and clears its repository session.
     fun signOut()
+}
+
+// Only a revision counter is stored here; profile and history contents stay in their protected Storage files.
+internal class AccountSyncRepository(
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+) {
+    // Watches one account marker and lets the session reload the matching Storage files.
+    fun observe(uid: String, onChange: () -> Unit, onError: (Exception) -> Unit): ChatSubscription {
+        val listener = firestore.collection("accountSync").document(uid)
+            .addSnapshotListener { _, error ->
+                if (error != null) onError(error) else onChange()
+            }
+        return ChatSubscription { listener.remove() }
+    }
+
+    // Raises the marker after a successful profile or history upload.
+    suspend fun notifyChanged(uid: String) {
+        firestore.collection("accountSync").document(uid).set(
+            mapOf("revision" to FieldValue.increment(1), "updatedAt" to FieldValue.serverTimestamp()),
+            com.google.firebase.firestore.SetOptions.merge(),
+        ).await()
+    }
 }

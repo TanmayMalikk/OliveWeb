@@ -14,6 +14,10 @@ exports.nutritionFoodSearch = onCall({
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in before searching foods.");
   const query = cleanQuery(request.data?.query);
   const barcode = request.data?.barcode;
+  const foodId = request.data?.foodId;
+  if (request.data?.action === "detail" && (typeof foodId !== "string" || !/^[0-9]{1,20}$/.test(foodId))) {
+    throw new HttpsError("invalid-argument", "Invalid food ID.");
+  }
   const page = request.data?.page ?? 0;
   if (!Number.isInteger(page) || page < 0 || page > 99) {
     throw new HttpsError("invalid-argument", "Invalid food search page.");
@@ -21,10 +25,15 @@ exports.nutritionFoodSearch = onCall({
   if (barcode !== undefined && !/^(?:[0-9]{8}|[0-9]{12,13})$/.test(String(barcode))) {
     throw new HttpsError("invalid-argument", "Enter an 8, 12 or 13 digit barcode.");
   }
-  if (barcode === undefined && query.length < 2) {
+  if (request.data?.action !== "detail" && barcode === undefined && query.length < 2) {
     throw new HttpsError("invalid-argument", "Enter at least two characters.");
   }
   try {
+    if (request.data?.action === "detail") {
+      const payload = await fatSecretRequest("food/v6", {food_id: foodId, flag_default_serving: "true"});
+      const food = normalizeFatSecretFood(payload.food);
+      return {foods: food ? [food] : []};
+    }
     if (request.data?.action === "suggest") {
       const payload = await fatSecretRequest("food/autocomplete/v2", {expression: query, max_results: "4"});
       return {suggestions: arrayValue(payload.suggestions?.suggestion)

@@ -271,7 +271,7 @@ internal fun CameraScreen(session: SessionViewModel, viewModel: CameraViewModel 
                     Modifier.size(1.dp).align(Alignment.Center).testTag("camera_ready")
                 )
                 else if (cameraError == null) Surface(Modifier.fillMaxSize()) {
-                    com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Image, Modifier.fillMaxWidth().padding(16.dp))
+                    LoadingSkeleton(SkeletonLayout.Image, Modifier.fillMaxWidth().padding(16.dp))
                 }
                 CameraShutter(
                     mode,

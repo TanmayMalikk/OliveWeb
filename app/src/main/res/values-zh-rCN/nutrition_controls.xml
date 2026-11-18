@@ -17,4 +17,12 @@
     <string name="nutrition_water_plus">添加 250 毫升饮水</string>
     <string name="nutrition_edit_food">编辑食物记录</string>
     <string name="nutrition_edit_details">编辑食物详情</string>
+    <string name="nutrition_recent_foods">最近记录</string>
+    <string name="nutrition_saved_foods">已保存的食物</string>
+    <string name="nutrition_recent_searches">最近搜索</string>
+    <string name="nutrition_no_recent_foods">最近没有记录食物。</string>
+    <string name="nutrition_no_saved_foods">你还没有保存任何食物。</string>
+    <string name="nutrition_save_food">保存食物</string>
+    <string name="nutrition_unsave_food">移除已保存的食物</string>
+    <string name="nutrition_saved_unavailable">无法加载这项已保存的食物。</string>
 </resources>

@@ -88,7 +88,8 @@ private fun StaffDashboard(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(end = 56.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(Modifier.padding(end = if (LocalSafeUpdateReminder.current == null) 56.dp else 104.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     stringResource(R.string.olive_tree),
                     fontFamily = FontFamily.Serif,
@@ -102,8 +103,11 @@ private fun StaffDashboard(
                 )
                 Text(uiText(R.string.ui_signed_in_as_value, session.coverUsername), color = Muted)
             }
-            IconButton(onClick = onSettings, modifier = Modifier.align(Alignment.TopEnd)) {
-                Icon(Icons.Outlined.Settings, uiText(R.string.account_settings))
+            Row(Modifier.align(Alignment.TopEnd)) {
+                SafeAppUpdateReminder()
+                IconButton(onClick = onSettings) {
+                    Icon(Icons.Outlined.Settings, uiText(R.string.account_settings))
+                }
             }
         }
         OrganizationDashboardCard(
@@ -198,7 +202,7 @@ internal fun SafetyConsultations(session: SessionViewModel, onBack: () -> Unit) 
             stringResource(R.string.olive_tree),
         )
         if (controller.loadingAccess && !session.localMode) {
-            com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.SharedPlans)
+            LoadingSkeleton(SkeletonLayout.SharedPlans)
             return@FormColumn
         }
         if (session.accountRole == AccountRole.STAFF) {

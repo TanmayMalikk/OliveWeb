@@ -428,7 +428,7 @@ internal fun NewsArticleReader(
                         if (browser === view) browser = null
                     })
             }
-            if (progress < 100 && !failed) com.olive.app.ui.shared.LoadingSkeleton(
+            if (progress < 100 && !failed) LoadingSkeleton(
                 SkeletonLayout.NewsArticle, Modifier.fillMaxWidth().padding(16.dp), rows = 1,
             )
             if (failed) Column(

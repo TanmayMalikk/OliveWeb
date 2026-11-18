@@ -17,4 +17,12 @@
     <string name="nutrition_water_plus">Ajouter 250 ml d’eau</string>
     <string name="nutrition_edit_food">Modifier l’aliment</string>
     <string name="nutrition_edit_details">Modifier les valeurs</string>
+    <string name="nutrition_recent_foods">Ajouts récents</string>
+    <string name="nutrition_saved_foods">Aliments enregistrés</string>
+    <string name="nutrition_recent_searches">Recherches récentes</string>
+    <string name="nutrition_no_recent_foods">Aucun aliment ajouté récemment.</string>
+    <string name="nutrition_no_saved_foods">Vous n’avez encore enregistré aucun aliment.</string>
+    <string name="nutrition_save_food">Enregistrer l’aliment</string>
+    <string name="nutrition_unsave_food">Retirer l’aliment enregistré</string>
+    <string name="nutrition_saved_unavailable">Impossible de charger cet aliment enregistré.</string>
 </resources>

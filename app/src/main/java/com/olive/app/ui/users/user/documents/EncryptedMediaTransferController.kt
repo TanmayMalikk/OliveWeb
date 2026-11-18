@@ -576,7 +576,7 @@ internal class MediaTransferController(
         }
     }
 
-    private suspend fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File {
+    private suspend fun decryptCiphertext(encrypted:File,document:SafetyDocument,viewerUid:String):File = withContext(Dispatchers.IO) {
         val deviceKey="$viewerUid--${KeyManager.deviceId()}"
         val wrapped=listOfNotNull(document.deviceWrappedKeys[deviceKey],document.wrappedKeys[viewerUid])
         val key=runCatching { KeyManager.unwrapFirst(wrapped,document.encryptionVersion) }
@@ -594,7 +594,7 @@ internal class MediaTransferController(
                 MediaCipher.decrypt(input,output,key)
             } }
             check(partial.renameTo(target))
-            return target
+            return@withContext target
         } catch(failure:Exception) {
             partial.delete()
             throw failure

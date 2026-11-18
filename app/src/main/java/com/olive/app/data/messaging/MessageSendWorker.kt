@@ -1,10 +1,6 @@
 // All chat roles: delivers durable ciphertext messages when Firebase becomes reachable.
 package com.olive.app.data.messaging
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Required
-import kotlinx.serialization.json.Json
-
 import android.content.Context
 import android.util.Log
 import androidx.work.BackoffPolicy
@@ -18,25 +14,28 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.functions.FirebaseFunctions
 import com.google.firebase.functions.FirebaseFunctionsException
+import com.olive.app.data.account.AccountIdentity
 import com.olive.app.data.media.MediaAccessError
 import com.olive.app.data.media.MediaAccessException
 import com.olive.app.data.media.MediaRepository
+import com.olive.app.data.safety.SafetyDocument
 import com.olive.app.data.safety.SafetyDocumentRepository
 import com.olive.app.data.work.DurableWorkPolicy
-import java.security.MessageDigest
-import java.security.GeneralSecurityException
-import java.util.concurrent.TimeUnit
 import com.olive.app.security.EncryptionUtils
+import java.security.GeneralSecurityException
+import java.security.MessageDigest
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import javax.crypto.SecretKey
-import org.json.JSONObject
-import org.json.JSONArray
 import kotlinx.coroutines.CancellationException
-import com.google.firebase.functions.FirebaseFunctions
-import com.olive.app.data.account.AccountIdentity
 import kotlinx.coroutines.tasks.await
-
+import kotlinx.serialization.Required
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import org.json.JSONArray
+import org.json.JSONObject
 
 /** WorkManager boundary for idempotent encrypted-message delivery. */
 class MessageSendWorker(context: Context, parameters: WorkerParameters) :
@@ -512,3 +511,56 @@ internal data class StaffSupportTicket(
     val staffUid: String,
     val conversationId: String,
 )
+
+/** References ciphertext already published to the media service. */
+@Serializable
+data class OutgoingAttachment(
+    val mediaId: String,
+) {
+    init {
+        require(validId(mediaId)) { "Attachment media ID is invalid" }
+    }
+
+    companion object {
+        private fun validId(value: String) =
+            value.length <= 160 && value.all { it.isLetterOrDigit() || it == '-' || it == '_' }
+    }
+}
+
+/** Only immutable ciphertext already published to the media service can enter the chat outbox. */
+internal fun isDurableChatAttachment(document: SafetyDocument, ownerUid: String?) =
+    ownerUid != null && document.ownerUid == ownerUid && document.objectKey.isNotBlank()
+
+/** Uses the locally opened conversation key without touching Firebase while the device is offline. */
+internal suspend fun outgoingRoomKey(
+    activeRoomKey: SecretKey?,
+    loadRoomKey: suspend () -> SecretKey,
+): SecretKey = activeRoomKey ?: loadRoomKey()
+
+internal open class MessageDeliveryRejected(
+    val failureCode: String,
+    cause: Throwable? = null,
+) : IllegalStateException(failureCode, cause)
+
+internal class AttachmentDeliveryRejected(
+    failureCode: String,
+    cause: Throwable? = null,
+) : MessageDeliveryRejected(failureCode, cause)
+
+internal fun attachmentKeyUnavailable(cause: GeneralSecurityException) =
+    AttachmentDeliveryRejected("ATTACHMENT_KEY_UNAVAILABLE", cause)
+
+/** Routes one sequenced outbox head without allowing attachments to bypass the text-message queue. */
+internal class OutgoingDeliveryDispatcher(
+    private val deliverText: suspend (OutgoingMessage) -> Unit,
+    private val deliverAttachment: suspend (OutgoingMessage, String) -> Unit,
+) {
+    suspend fun deliver(message: OutgoingMessage) {
+        val attachment = message.attachment
+        if (attachment == null) {
+            deliverText(message)
+            return
+        }
+        deliverAttachment(message, attachment.mediaId)
+    }
+}

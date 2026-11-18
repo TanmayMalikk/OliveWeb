@@ -102,7 +102,7 @@ abstract class OliveUiTestBase {
             }
         } catch (e: Throwable) {
             val session =
-                androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
+                ViewModelProvider(compose.activity)[SessionViewModel::class.java]
             throw AssertionError(
                 "Waiting for $tag; screen=${session.screen}, busy=${session.busy}, message=${session.message}",
                 e
@@ -320,7 +320,7 @@ abstract class OliveUiTestBase {
             }
         } catch (e: Throwable) {
             val session =
-                androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
+                ViewModelProvider(compose.activity)[SessionViewModel::class.java]
             val hierarchy = runCatching { compose.onRoot().printToString() }
                 .getOrElse { "Compose hierarchy unavailable: ${it.message}" }
             throw AssertionError(
@@ -333,7 +333,7 @@ abstract class OliveUiTestBase {
     // Types the private trigger into the active cover app.
     protected fun trigger() {
         val session =
-            androidx.lifecycle.ViewModelProvider(compose.activity)[com.olive.app.ui.users.shared.navigation.SessionViewModel::class.java]
+            ViewModelProvider(compose.activity)[SessionViewModel::class.java]
         compose.runOnIdle { org.junit.Assert.assertTrue(session.account.interceptSearch("moon garden")) }
         waitFor("unlock_pin")
     }

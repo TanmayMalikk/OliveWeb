@@ -67,7 +67,6 @@ internal class SessionViewModel @JvmOverloads constructor(
     // These versions tell Compose to redraw after an entry or cover event.
     val pinChallengeVersion get() = runtime.state.pinChallengeVersion
     val unlockAnimationVersion get() = runtime.state.unlockAnimationVersion
-    val accessibilityExitVersion get() = runtime.state.accessibilityExitVersion
     val page get() = runtime.state.page
     val activityCategory get() = runtime.state.activityCategory
     val busy get() = runtime.state.busy
@@ -95,10 +94,8 @@ internal class SessionViewModel @JvmOverloads constructor(
     val coverUsername get() = runtime.state.coverUsername
     val coverType get() = runtime.state.coverType
     val accountRole get() = runtime.state.accountRole
-    val adminCounts get() = runtime.state.adminCounts
     val adminAccounts get() = runtime.state.adminAccounts
     val savedNews get() = runtime.state.savedNews
-    val idleCountdownSeconds get() = runtime.state.idleCountdownSeconds
     val privacyBlackout get() = runtime.state.privacyBlackout
     val coverReset get() = runtime.state.coverReset
     val localMode get() = runtime.localMode
@@ -116,6 +113,32 @@ internal class SessionViewModel @JvmOverloads constructor(
 
     var callPermissionRequestOpen by mutableStateOf(false)
         private set
+    var safeSystemActivityOpen = false
+        private set
+    private var safeSystemLaunchId = 0
+
+    internal fun beginSafeSystemActivity(): Int? {
+        if (safeSystemActivityOpen) return null
+        safeSystemActivityOpen = true
+        return ++safeSystemLaunchId
+    }
+
+    internal fun finishSafeSystemActivity(launchId: Int = safeSystemLaunchId) {
+        if (launchId == safeSystemLaunchId) safeSystemActivityOpen = false
+    }
+
+    internal fun safeSystemActivityResult(view: android.view.View) {
+        val launchId = safeSystemLaunchId
+        // Some settings activities return a result before their window has even taken focus.
+        // Release the exemption only once Olive has its window back.
+        view.postDelayed(object : Runnable {
+            override fun run() {
+                if (launchId != safeSystemLaunchId || !safeSystemActivityOpen || !view.isAttachedToWindow) return
+                if (view.hasWindowFocus()) finishSafeSystemActivity(launchId)
+                else view.postDelayed(this, 250L)
+            }
+        }, 250L)
+    }
 
     /** Carries checklist-specific tags across navigation into the full-screen camera. */
     internal var pendingCameraUploadTags: Set<String> = emptySet()

@@ -1,5 +1,7 @@
 package com.olive.app.ui.users.shared.messaging
 
+import kotlin.time.Duration.Companion.milliseconds
+
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
@@ -142,7 +144,7 @@ internal fun VoiceMessageComposer(
                 stop()
                 break
             }
-            delay(minOf(100L, remaining))
+            delay(minOf(100L, remaining).milliseconds)
             if (startedAt != recordingStartTime) break
             elapsed = (SystemClock.elapsedRealtime() - recordingStartTime)
                 .coerceIn(0L, VOICE_MESSAGE_LIMIT_MS).toInt()
@@ -441,7 +443,7 @@ private fun VoiceAudioButton(
         val current = player ?: return@LaunchedEffect
         while (playing) {
             position = runCatching { current.currentPosition }.getOrDefault(0)
-            delay(80)
+            delay(80.milliseconds)
         }
     }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {

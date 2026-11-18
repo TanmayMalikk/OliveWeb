@@ -31,7 +31,6 @@ import com.olive.app.data.safety.SafetyPlan
 import com.olive.app.data.safety.readSafetyChecklist
 import com.olive.app.data.safety.readSafetyPlanContact
 import com.olive.app.data.safety.safetyChecklistAttachments
-import com.olive.app.data.safety.safetyChecklistPreview
 import com.olive.app.data.safety.safetyPlanContactItem
 import com.olive.app.data.safety.writeSafetyChecklist
 import com.olive.app.ui.shared.*
@@ -79,7 +78,6 @@ internal fun SafetyChecklistProgress(prepared: Int, total: Int, summary: Boolean
 @Composable
 internal fun SafetyChecklistSection(
     plan: SafetyPlan, fieldKey: String, onEdit: (String, String) -> Unit,
-    onResolve: (String, Boolean) -> Unit,
     onSyncNow: () -> Unit = {},
     contacts: List<SafeContact> = emptyList(),
     contactsEditable: Boolean = false, onContactsChange: ((List<SafeContact>) -> Unit)? = null,

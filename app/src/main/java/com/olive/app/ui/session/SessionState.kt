@@ -136,7 +136,6 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         set(value) = updateNavigation { it.copy(coverReset = value) }
 
     private val accountFlow = MutableStateFlow(SessionAccountState())
-    val accountState = accountFlow.asStateFlow()
     private var accountSnapshot by mutableStateOf(accountFlow.value)
 
     private fun updateAccount(transform: (SessionAccountState) -> SessionAccountState) {
@@ -186,7 +185,6 @@ internal class SessionState(private val canEnterSafe: () -> Boolean) {
         set(value) = updateAccount { it.copy(creatingAccount = value) }
 
     private val activityFlow = MutableStateFlow(SessionActivityState())
-    val activityState = activityFlow.asStateFlow()
     private var activitySnapshot by mutableStateOf(activityFlow.value)
 
     private fun updateActivity(transform: (SessionActivityState) -> SessionActivityState) {

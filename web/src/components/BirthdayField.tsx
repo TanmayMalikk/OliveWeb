@@ -3,12 +3,7 @@ import { Button, Modal } from "./FormElements";
 
 const steps = ["Choose a year range", "Choose a year", "Choose a month", "Choose a day"];
 const firstBirthYear = 1927;
-const lastBirthYear = 2016;
 const yearsPerGroup = 10;
-const rangeEnds = Array.from(
-  { length: Math.floor((lastBirthYear - firstBirthYear) / yearsPerGroup) + 1 },
-  (_, index) => lastBirthYear - index * yearsPerGroup,
-);
 
 function formatDate(year: number, month: number, day: number) {
   return [String(year).padStart(4, "0"), String(month).padStart(2, "0"), String(day).padStart(2, "0")].join("-");
@@ -33,6 +28,14 @@ export function BirthdayField({ defaultValue = "", required = false }: {
   const earliestDay = Math.min(today.getDate(), new Date(earliestYear, currentMonth, 0).getDate());
   const earliest = formatDate(earliestYear, currentMonth, earliestDay);
   const latest = formatDate(currentYear, currentMonth, today.getDate());
+  const firstYear = Math.max(firstBirthYear, earliestYear);
+  const ranges = Array.from(
+    { length: Math.floor((currentYear - firstYear) / yearsPerGroup) + 1 },
+    (_, index) => {
+      const start = firstYear + index * yearsPerGroup;
+      return { start, end: Math.min(start + yearsPerGroup - 1, currentYear) };
+    },
+  ).reverse();
   const [value, setValue] = useState(() => {
     const [y, m, d] = defaultValue.split("-").map(Number);
     const date = new Date(y, m - 1, d);
@@ -41,8 +44,8 @@ export function BirthdayField({ defaultValue = "", required = false }: {
   });
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
-  const [rangeEnd, setRangeEnd] = useState(lastBirthYear);
-  const [year, setYear] = useState(lastBirthYear);
+  const [rangeEnd, setRangeEnd] = useState(currentYear);
+  const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(1);
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -53,15 +56,18 @@ export function BirthdayField({ defaultValue = "", required = false }: {
   const [savedYear, savedMonth, savedDay] = value.split("-").map(Number);
   const displayDate = value && new Date(savedYear, savedMonth - 1, savedDay)
     .toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const range = ranges.find(({ end }) => end === rangeEnd) ?? ranges[0];
   const options = [
-    () => rangeEnds.map((end) => {
-      const start = Math.max(end - yearsPerGroup + 1, firstBirthYear);
-      return [end, `${end}–${start}`] as const;
-    }),
-    () => numbers(Math.max(rangeEnd - yearsPerGroup + 1, firstBirthYear), rangeEnd).reverse()
+    () => ranges.map(({ start, end }) => [end, start === end ? String(end) : `${end}–${start}`] as const),
+    () => numbers(range.start, range.end).reverse()
       .map((number) => [number, String(number)] as const),
-    () => numbers(1, 12).map((number) => [number, monthName(year, number)] as const),
-    () => numbers(1, new Date(year, month, 0).getDate()).map((number) => [number, String(number)] as const),
+    () => numbers(1, 12)
+      .filter((m) => formatDate(year, m, 1) <= latest &&
+        formatDate(year, m, new Date(year, m, 0).getDate()) >= earliest)
+      .map((number) => [number, monthName(year, number)] as const),
+    () => numbers(1, new Date(year, month, 0).getDate())
+      .filter((d) => formatDate(year, month, d) >= earliest && formatDate(year, month, d) <= latest)
+      .map((number) => [number, String(number)] as const),
   ];
 
   function openPicker() {

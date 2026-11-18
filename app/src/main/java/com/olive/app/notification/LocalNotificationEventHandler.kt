@@ -6,8 +6,8 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.SharedPreferences
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -25,6 +25,7 @@ import com.olive.app.OliveActivity
 import com.olive.app.R
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 import kotlinx.coroutines.tasks.await
 
 // Syncs the device's FCM token to Firestore and checks conversation markers when requested.
@@ -396,4 +397,41 @@ object OliveNotificationManager {
         runCatching { NotificationManagerCompat.from(context).notify(tag ?: "safe-app-update", notificationId, notification) }
     }
 
+}
+
+// Coalesces Safe App activity into a notification.
+class SafeUpdateNotificationWorker(context: Context, parameters: WorkerParameters) :
+    Worker(context, parameters) {
+    override fun doWork(): Result {
+        val uid = inputData.getString("uid") ?: return Result.success()
+        if (FirebaseAuth.getInstance().currentUser?.uid != uid) return Result.success()
+        OliveNotificationManager.showSafeUpdate(applicationContext)
+        return Result.success()
+    }
+}
+
+// Schedules Safe App notifications with a random delay to prevent bursts.
+object SafeUpdateNotificationScheduler {
+    private const val WORK_NAME = "olive_pending_safe_update_notification"
+    internal const val MIN_DELAY_SECONDS = 5L
+    internal const val MAX_DELAY_SECONDS = 10L
+
+    // Schedules the background task for safe update notification worker.
+    fun schedule(context: Context) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val request = OneTimeWorkRequestBuilder<SafeUpdateNotificationWorker>()
+            .setInputData(workDataOf("uid" to uid))
+            .setInitialDelay(randomDelaySeconds(), TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request)
+    }
+
+    // Cancels the active background notification timer.
+    fun cancel(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+    }
+
+    // Spreads background checks across a small random delay to avoid bursts.
+    internal fun randomDelaySeconds(random: Random = Random.Default): Long =
+        random.nextLong(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS + 1)
 }

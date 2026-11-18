@@ -316,6 +316,8 @@ class OrganizationAndChatUiTest {
         compose.onNodeWithTag("organization_current_password").assertExists()
         compose.onNodeWithTag("organization_new_password").assertExists()
         compose.onNodeWithTag("organization_confirm_password").assertExists()
+        compose.onNodeWithTag("settings_tab_permissions").performClick()
+        compose.onNodeWithTag("settings_install_permission").assertIsDisplayed()
         compose.onNodeWithText(text(R.string.ui_profile), useUnmergedTree = true).performClick()
         compose.onNodeWithTag("organization_settings_name").assertTextContains("Fixture Name")
         compose.onNodeWithTag("organization_current_password").assertDoesNotExist()

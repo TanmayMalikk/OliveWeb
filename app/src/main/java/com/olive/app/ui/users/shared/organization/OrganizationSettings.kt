@@ -30,6 +30,8 @@ import com.olive.app.ui.users.shared.navigation.*
 import com.olive.app.ui.users.shared.onboarding.*
 import com.olive.app.ui.users.user.location.InteractiveLocationMap
 import com.olive.app.ui.users.user.account.SettingsSection
+import com.olive.app.ui.users.user.account.SettingsCategory
+import com.olive.app.ui.users.user.account.accountSettingsTabs
 
 
 // Shows profile and password settings for staff and admin accounts.
@@ -45,7 +47,7 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
-    var passwordTab by rememberSaveable(session.coverAccountId) { mutableStateOf(false) }
+    var selectedTab by rememberSaveable(session.coverAccountId) { mutableStateOf(SettingsCategory.Profile) }
     OlivePrivateDesign {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -58,77 +60,77 @@ internal fun OrganizationSettings(session: SessionViewModel, onBack: () -> Unit)
                     modifier = Modifier.semantics { heading() },
                 )
             }
-            SecondaryScrollableTabRow(selectedTabIndex = if (passwordTab) 1 else 0, edgePadding = 8.dp) {
-                Tab(
-                    selected = !passwordTab, onClick = { passwordTab = false },
-                    text = { Text(uiText(R.string.ui_profile)) },
-                )
-                Tab(
-                    selected = passwordTab, onClick = { passwordTab = true },
-                    text = { Text(uiText(R.string.password)) },
-                )
+            SecondaryScrollableTabRow(selectedTabIndex = accountSettingsTabs.indexOf(selectedTab), edgePadding = 8.dp) {
+                accountSettingsTabs.forEach { tab ->
+                    Tab(selected = selectedTab == tab, onClick = { selectedTab = tab },
+                        modifier = Modifier.testTag(tab.tag), text = { Text(uiText(tab.label)) })
+                }
             }
-            FormColumn {
-                if (!passwordTab) SettingsSection(uiText(R.string.settings_category_profile)) {
-                    Field(
-                        uiText(R.string.full_name),
-                        fullName,
-                        "organization_settings_name",
-                        enabled = !session.account.busy,
-                    ) { fullName = it.take(120) }
-                    BirthdayPicker(
-                        birthday, "organization_settings_dob", !session.account.busy, showBirthdayErrors,
-                    ) { birthday = it }
-                    Field(
-                        uiText(R.string.ui_email),
-                        email,
-                        "organization_settings_email",
-                        enabled = !session.account.busy,
-                    ) { email = it.take(254) }
-                    Field(
-                        uiText(R.string.ui_phone_optional),
-                        phone,
-                        "organization_settings_phone",
-                        enabled = !session.account.busy,
-                    ) { phone = it.take(40) }
-                    Button(
-                        onClick = {
-                            showBirthdayErrors = !InputPolicy.validDob(birthday)
-                            if (!showBirthdayErrors) session.updateOrganizationProfile(fullName, birthday, email, phone)
-                        },
-                        enabled = !session.account.busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(R.string.save_profile)) }
-                } else SettingsSection(uiText(R.string.change_password)) {
-                    Field(
-                        uiText(R.string.current_password),
-                        currentPassword,
-                        "organization_current_password",
-                        secret = true,
-                        showSecretToggle = true,
-                        enabled = !session.account.busy,
-                    ) { currentPassword = it.take(128) }
-                    Field(
-                        uiText(R.string.new_password),
-                        newPassword,
-                        "organization_new_password",
-                        secret = true,
-                        showSecretToggle = true,
-                        enabled = !session.account.busy,
-                    ) { newPassword = it.take(24) }
-                    Field(
-                        uiText(R.string.confirm_new_password),
-                        confirmation,
-                        "organization_confirm_password",
-                        secret = true,
-                        showSecretToggle = true,
-                        enabled = !session.account.busy,
-                    ) { confirmation = it.take(24) }
-                    Button(
-                        onClick = { session.changePassword(currentPassword, newPassword, confirmation) },
-                        enabled = !session.account.busy,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(stringResource(R.string.change_password)) }
+            FormColumn(scrollResetKey = selectedTab) {
+                when (selectedTab) {
+                    SettingsCategory.Permissions -> SafePermissionsSettings()
+                    SettingsCategory.Profile -> SettingsSection(uiText(R.string.settings_category_profile)) {
+                        Field(
+                            uiText(R.string.full_name),
+                            fullName,
+                            "organization_settings_name",
+                            enabled = !session.account.busy,
+                        ) { fullName = it.take(120) }
+                        BirthdayPicker(
+                            birthday, "organization_settings_dob", !session.account.busy, showBirthdayErrors,
+                        ) { birthday = it }
+                        Field(
+                            uiText(R.string.ui_email),
+                            email,
+                            "organization_settings_email",
+                            enabled = !session.account.busy,
+                        ) { email = it.take(254) }
+                        Field(
+                            uiText(R.string.ui_phone_optional),
+                            phone,
+                            "organization_settings_phone",
+                            enabled = !session.account.busy,
+                        ) { phone = it.take(40) }
+                        Button(
+                            onClick = {
+                                showBirthdayErrors = !InputPolicy.validDob(birthday)
+                                if (!showBirthdayErrors) session.updateOrganizationProfile(fullName, birthday, email, phone)
+                            },
+                            enabled = !session.account.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.save_profile)) }
+                    }
+                    else -> SettingsSection(uiText(R.string.change_password)) {
+                        Field(
+                            uiText(R.string.current_password),
+                            currentPassword,
+                            "organization_current_password",
+                            secret = true,
+                            showSecretToggle = true,
+                            enabled = !session.account.busy,
+                        ) { currentPassword = it.take(128) }
+                        Field(
+                            uiText(R.string.new_password),
+                            newPassword,
+                            "organization_new_password",
+                            secret = true,
+                            showSecretToggle = true,
+                            enabled = !session.account.busy,
+                        ) { newPassword = it.take(24) }
+                        Field(
+                            uiText(R.string.confirm_new_password),
+                            confirmation,
+                            "organization_confirm_password",
+                            secret = true,
+                            showSecretToggle = true,
+                            enabled = !session.account.busy,
+                        ) { confirmation = it.take(24) }
+                        Button(
+                            onClick = { session.changePassword(currentPassword, newPassword, confirmation) },
+                            enabled = !session.account.busy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(stringResource(R.string.change_password)) }
+                    }
                 }
                 Status(session)
             }

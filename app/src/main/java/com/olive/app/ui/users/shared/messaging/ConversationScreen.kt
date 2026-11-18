@@ -329,7 +329,7 @@ internal fun ChatPane(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (session.messages.loadingConversation) {
-                        item { com.olive.app.ui.shared.LoadingSkeleton(SkeletonLayout.Conversation, rows = 3) }
+                        item { LoadingSkeleton(SkeletonLayout.Conversation, rows = 3) }
                         return@LazyColumn
                     }
                     if (timeline.isEmpty() && session.message == null) item {

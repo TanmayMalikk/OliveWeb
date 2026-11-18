@@ -113,7 +113,7 @@ class SafetyPlanAdditionalUiTest {
                 SafetyChecklistSection(
                     plan.value, slot,
                     onEdit = { key, value -> plan.value = plan.value.copy(fields = mapOf(key to SafetyField(value))) },
-                    onResolve = { _, _ -> error("No conflict in fixture") },
+
                     documents = listOf(document),
                     onUploadDocument = { picker = it },
                     onOpenDocument = { opened = it.id },
@@ -145,7 +145,7 @@ class SafetyPlanAdditionalUiTest {
                     SafetyChecklistSection(
                         SafetyPlan("owner", "Synthetic owner", mapOf(slot to updated.value)), slot,
                         onEdit = { _, value -> updated.value = SafetyField(value) },
-                        onResolve = { _, _ -> error("No conflict in fixture") },
+
                         contacts = contacts.value, contactsEditable = true, onContactsChange = { contacts.value = it },
                     )
                 }

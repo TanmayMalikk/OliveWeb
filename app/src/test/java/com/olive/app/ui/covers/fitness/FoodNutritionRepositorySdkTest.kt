@@ -78,6 +78,23 @@ class FoodNutritionRepositorySdkTest {
         assertEquals("123456",requests.last()["barcode"])
     }
     @Test
+    fun savedFatSecretLookupRetainsTheChosenServingAndOffersOtherPortions() = runBlocking<Unit> {
+        result = mapOf("foods" to listOf(mapOf(
+            "id" to "123", "name" to "Rice", "servingDescription" to "100 g", "calories" to 130,
+            "servings" to listOf(
+                mapOf("servingId" to "4", "servingDescription" to "1 cup", "calories" to 205),
+                mapOf("servingId" to "5", "servingDescription" to "100 g", "calories" to 130),
+            ),
+        )))
+        val food = checkNotNull(repo.foodById("fatsecret:123:4"))
+        assertEquals(mapOf("action" to "detail", "foodId" to "123"), requests.single())
+        assertEquals("1 cup", food.servingDescription)
+        assertEquals(205f, food.calories)
+        assertEquals(listOf("fatsecret:123:4", "fatsecret:123:5"), food.servingOptions.map { it.id })
+        assertNull(repo.foodById("fatsecret:123:removed"))
+    }
+
+    @Test
     fun shortQueriesDoNotCallProvidersAndCancellationStopsTheSearch()=runBlocking<Unit> {
         assertTrue(repo.search(" r ").foods.isEmpty())
         assertTrue(requests.isEmpty())

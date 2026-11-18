@@ -99,11 +99,13 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
     val context = LocalContext.current
     val accountId = session.coverAccountId ?: "guest"
     val store = remember(context, accountId) { FitnessStore(context, accountId) }
+    val foodLibrary = remember(store) { FitnessFoodLibrary(store.preferences) }
     var loaded by remember(store) { mutableStateOf<Pair<FitnessSnapshot, List<FitnessHistoryDay>>?>(null) }
     var pendingSnapshot by remember(store) { mutableStateOf<FitnessSnapshot?>(null) }
     val snapshot = pendingSnapshot ?: loaded?.first
     val history = loaded?.second.orEmpty()
     var page by rememberSaveable(accountId) { mutableStateOf(FitnessPage.HOME) }
+    var foodSection by rememberSaveable(accountId) { mutableStateOf(FoodLibrarySection.Search) }
     val pageFocus = remember { FocusRequester() }
     val pageLabel = when (page) {
         FitnessPage.HOME -> stringResource(R.string.home)
@@ -138,7 +140,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
             }
             loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.snapshot() to store.history(days = 14) }
             val nextDay = java.time.LocalDate.now().plusDays(1).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant()
-            delay(java.time.Duration.between(java.time.Instant.now(), nextDay).toMillis().coerceAtLeast(1000L))
+            delay(java.time.Duration.between(java.time.Instant.now(), nextDay).toMillis().coerceAtLeast(1000L).milliseconds)
         }
     }
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -149,7 +151,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                     FitnessHealthConnect.read(context, accountId)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
                   catch (_: Exception) { /* Permission/provider changes are retried on the next foreground read. */ }
-                delay(15_000L)
+                delay(15_000.milliseconds)
             }
         }
     }
@@ -210,7 +212,7 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                     FitnessPage.FOOD_SEARCH -> SkeletonLayout.FoodResults
                     FitnessPage.GOALS, FitnessPage.ACCOUNT -> SkeletonLayout.Form
                 }
-                com.olive.app.ui.shared.LoadingSkeleton(skeleton, Modifier.fillMaxWidth().padding(16.dp))
+                LoadingSkeleton(skeleton, Modifier.fillMaxWidth().padding(16.dp))
             } else when (page) {
                 FitnessPage.HOME -> FitnessHomePage(
                     snapshot = snapshot,
@@ -227,14 +229,19 @@ internal fun FitnessCover(session: SessionViewModel, interactive: Boolean = true
                     snapshot = snapshot,
                     enabled = interactive,
                     padding = PaddingValues(0.dp),
-                    onAddFood = { page = FitnessPage.FOOD_SEARCH },
+                    onAddFood = { foodSection = FoodLibrarySection.Search; page = FitnessPage.FOOD_SEARCH },
                     onRemoveFood = { pendingSnapshot = store.removeFood(it) },
                     onAddWater = { amount, goal -> pendingSnapshot = store.addWater(amount, goal) },
                     onUpdateFood = { pendingSnapshot = store.updateFood(it) },
+                    library = foodLibrary,
+                    onOpenLibrary = { foodSection = it; page = FitnessPage.FOOD_SEARCH },
                 )
                 FitnessPage.FOOD_SEARCH -> FoodSearchPage(
                     enabled = interactive,
                     padding = PaddingValues(0.dp),
+                    library = foodLibrary,
+                    initialSection = foodSection,
+                    recentFoods = store.recentFoods(),
                     onFoodAdded = { food, servings, meal ->
                         pendingSnapshot = store.addFood(food, servings, meal)
                         page = FitnessPage.NUTRITION

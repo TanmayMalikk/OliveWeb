@@ -64,11 +64,8 @@ internal val CameraControlScrim = CallBackground.copy(alpha = .88f)
 
 // Dashboard cards, badges, and private note surfaces.
 internal val CardTintEnabled = Color(0xFFE7EEE0)
-internal val CardTintDisabled = Color(0xFFE9EDE5)
 internal val CardSoftMint = Color(0xFFF0F4EC)
 internal val IconBadgeEnabled = Color(0xFFDDE7D6)
-internal val IconBadgeDisabled = Color(0xFFDDE2D9)
-internal val PinnedStarGold = Color(0xFFFFC107)
 internal val NotePaperCream = Color(0xFFFFFDF4)
 internal val IncidentPaper = Color(0xFFF8E7CE)
 internal val IncidentAccent = Color(0xFF68451F)

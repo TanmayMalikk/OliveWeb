@@ -19,7 +19,6 @@ import androidx.compose.material.icons.outlined.Newspaper
 import androidx.compose.material.icons.outlined.SportsEsports
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -65,6 +64,7 @@ import com.olive.app.ui.shared.OlivePrivateLayout
 import com.olive.app.ui.shared.rememberResourceText
 import com.olive.app.ui.users.shared.navigation.Field
 import com.olive.app.ui.users.shared.navigation.FormColumn
+import com.olive.app.ui.users.shared.navigation.SafePermissionsSettings
 import com.olive.app.ui.users.shared.navigation.SessionViewModel
 import com.olive.app.ui.users.shared.navigation.Status
 import com.olive.app.ui.shared.BirthdayPicker
@@ -74,12 +74,11 @@ import kotlin.math.roundToInt
 
 
 // Saves profile and situation edits from the user settings screen.
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
     val uiText = rememberResourceText()
     val userRole = profile.role == AccountRole.USER
-    val tabs = if (userRole) SettingsCategory.entries else listOf(SettingsCategory.Profile, SettingsCategory.Password)
+    val tabs = if (userRole) SettingsCategory.entries else accountSettingsTabs
     var selectedTab by rememberSaveable(session.coverAccountId) { mutableStateOf(SettingsCategory.Profile) }
     val activeTab = selectedTab.takeIf { it in tabs } ?: SettingsCategory.Profile
     val focus = LocalFocusManager.current
@@ -136,7 +135,22 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
         key(activeTab) {
             FormColumn {
                 when (activeTab) {
-                    SettingsCategory.Profile ->
+                    SettingsCategory.Profile -> {
+                        if (userRole) SettingsSection(uiText(R.string.settings_category_cover_entry)) {
+                            // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
+                            CoverPicker(
+                                profile.coverType,
+                                !session.busy
+                            ) { type ->
+                                session.recordSettingsInteraction(
+                                    "Olive Branch",
+                                    "Selected cover app"
+                                )
+                                session.changeCover(type)
+                            }
+                            HorizontalDivider()
+                            SafeEntryMethodSettings(session)
+                        }
                         SettingsSection(uiText(R.string.settings_category_profile)) {
                             Field(
                                 uiText(R.string.full_name_required),
@@ -213,6 +227,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 )
                             }
                         }
+                    }
                     SettingsCategory.Password -> {
                         SettingsSection(uiText(R.string.change_account_password)) {
                             Text(stringResource(R.string.your_username_cannot_be_changed))
@@ -270,6 +285,49 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 )
                             }
                         }
+                        if (userRole) {
+                            SettingsSection(uiText(R.string.entry_pin_setup)) {
+                                SafeEntryPinSettings(session, entryPinDraft)
+                            }
+                            SettingsSection(uiText(R.string.change_trigger_word)) {
+                                Text(stringResource(if (session.account.usesDeviceLock) R.string.entry_verify_trigger else R.string.enter_your_current_device_pin_to_change_the_trigger_word_incorrect_attempts_count_toward_the_five_attempt_limit))
+                                Field(
+                                    uiText(R.string.new_trigger_word_or_phrase),
+                                    trigger,
+                                    "settings_trigger",
+                                    secret = true,
+                                    onFocus = {
+                                        session.recordSettingsInteraction(
+                                            "Olive Branch",
+                                            "Focused trigger word"
+                                        )
+                                    }) { trigger = it.take(64) }
+                                if (!session.account.usesDeviceLock) Field(
+                                    uiText(R.string.current_pin),
+                                    pin,
+                                    "settings_pin",
+                                    secret = true,
+                                    numeric = true,
+                                    onFocus = {
+                                        session.recordSettingsInteraction(
+                                            "Olive Branch",
+                                            "Focused trigger-change PIN"
+                                        )
+                                    }) { pin = it.filter { c -> c in '0'..'9' }.take(6) }
+                                Button(onClick = {
+                                    if (session.account.usesDeviceLock) session.account.changeDeviceLockTrigger(trigger) else session.changeTrigger(
+                                        trigger,
+                                        pin
+                                    )
+                                    pin = ""
+                                    trigger = ""
+                                }, enabled = !session.busy, modifier = Modifier.testTag("change_trigger")) {
+                                    Text(
+                                        stringResource(R.string.change_trigger_word)
+                                    )
+                                }
+                            }
+                        }
                     }
                     SettingsCategory.Privacy ->
                         SettingsSection(uiText(R.string.settings_category_privacy)) {
@@ -300,63 +358,7 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
                                 )
                             }
                         }
-                    SettingsCategory.Cover ->
-                        SettingsSection(uiText(R.string.settings_category_cover_entry)) {
-                            // Change the visible app and launcher icon here; add new covers to CoverType and CoverLauncher.
-                            CoverPicker(
-                                profile.coverType,
-                                !session.busy
-                            ) { type ->
-                                session.recordSettingsInteraction(
-                                    "Olive Branch",
-                                    "Selected cover app"
-                                )
-                                session.changeCover(type)
-                            }
-                            HorizontalDivider()
-                            SafeEntrySettings(session, entryPinDraft)
-                            HorizontalDivider()
-                            Text(
-                                stringResource(R.string.change_trigger_word),
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.semantics { heading() })
-                            Text(stringResource(if (session.account.usesDeviceLock) R.string.entry_verify_trigger else R.string.enter_your_current_device_pin_to_change_the_trigger_word_incorrect_attempts_count_toward_the_five_attempt_limit))
-                            Field(
-                                uiText(R.string.new_trigger_word_or_phrase),
-                                trigger,
-                                "settings_trigger",
-                                secret = true,
-                                onFocus = {
-                                    session.recordSettingsInteraction(
-                                        "Olive Branch",
-                                        "Focused trigger word"
-                                    )
-                                }) { trigger = it.take(64) }
-                            if (!session.account.usesDeviceLock) Field(
-                                uiText(R.string.current_pin),
-                                pin,
-                                "settings_pin",
-                                secret = true,
-                                numeric = true,
-                                onFocus = {
-                                    session.recordSettingsInteraction(
-                                        "Olive Branch",
-                                        "Focused trigger-change PIN"
-                                    )
-                                }) { pin = it.filter { c -> c in '0'..'9' }.take(6) }
-                            Button(onClick = {
-                                if (session.account.usesDeviceLock) session.account.changeDeviceLockTrigger(trigger) else session.changeTrigger(
-                                    trigger,
-                                    pin
-                                )
-                                pin = ""
-                                trigger = ""
-                            }, enabled = !session.busy, modifier = Modifier.testTag("change_trigger")) {
-                                Text(
-                                    stringResource(R.string.change_trigger_word)
-                                )
-                            }
-                        }
+                    SettingsCategory.Permissions -> SafePermissionsSettings()
                 }
                 Status(session)
             }
@@ -365,12 +367,14 @@ internal fun SettingsEditor(session: SessionViewModel, profile: UserProfile) {
 
 }
 
-private enum class SettingsCategory(val label: Int, val tag: String) {
+internal enum class SettingsCategory(val label: Int, val tag: String) {
     Profile(R.string.ui_profile, "settings_tab_profile"),
     Password(R.string.password, "settings_tab_password"),
     Privacy(R.string.settings_category_privacy, "settings_tab_privacy"),
-    Cover(R.string.settings_cover_tab, "settings_tab_cover")
+    Permissions(R.string.app_permissions_tab, "settings_tab_permissions"),
 }
+
+internal val accountSettingsTabs = listOf(SettingsCategory.Profile, SettingsCategory.Password, SettingsCategory.Permissions)
 
 @Composable
 internal fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) {

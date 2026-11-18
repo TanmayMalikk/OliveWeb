@@ -199,7 +199,7 @@ internal fun PrivateEntryEditLog(
                             Text(
                                 revision.toString(),
                                 Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                                fontWeight = FontWeight.Bold,
                                 color = OliveGreen
                             )
                         }

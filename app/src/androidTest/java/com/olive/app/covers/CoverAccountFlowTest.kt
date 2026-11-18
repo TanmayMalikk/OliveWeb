@@ -35,7 +35,6 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         register(username = "cover_switch_tester")
         unlock()
         click("safe_settings")
-        click("settings_tab_cover")
         listOf("news", "fitness", "game").forEach {
             compose.onNodeWithTag("cover_choice_icon_$it", useUnmergedTree = true).assertExists()
         }
@@ -54,7 +53,6 @@ class CoverAccountFlowTest : OliveUiTestBase() {
         enterPin("123456")
         waitFor("safe_settings")
         click("safe_settings")
-        click("settings_tab_cover")
         // This flow checks switching covers; the sensor permission flow is tested separately.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
